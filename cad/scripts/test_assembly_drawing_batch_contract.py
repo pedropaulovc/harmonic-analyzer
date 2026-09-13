@@ -1,4 +1,4 @@
-"""Cross-drawing contract for the eight simple assembly drawings."""
+"""Cross-drawing contract for the seven remaining simple assembly drawings."""
 
 from __future__ import annotations
 
@@ -42,8 +42,12 @@ ASSEMBLY_DRAWINGS = (
     draw_harmonic_analyzer_assembly,
 )
 
+SIMPLE_ASSEMBLY_DRAWINGS = tuple(
+    drawing for drawing in ASSEMBLY_DRAWINGS if drawing is not draw_frame_assembly
+)
 
-def test_registry_contains_exactly_the_eight_simple_assembly_drawings() -> None:
+
+def test_registry_contains_exactly_the_eight_assembly_drawings() -> None:
     registered = tuple(spec for spec in DRAWINGS if spec.source_kind == "assembly")
     assert {spec.script for spec in registered} == {
         Path(drawing.__file__).resolve() for drawing in ASSEMBLY_DRAWINGS
@@ -62,10 +66,13 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         deps = dodo._drawing_file_deps(spec.name)
         assert str(spec.source) in deps
         assert dodo._assembly_execution_token(spec.part) in deps
-        assert str(Path(_assembly_drawing.__file__).resolve()) in deps
+        if drawing is draw_frame_assembly:
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        else:
+            assert str(Path(_assembly_drawing.__file__).resolve()) in deps
 
 
-def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
+def test_each_simple_recipe_is_only_a_precomputed_shared_builder_call() -> None:
     prohibited = (
         "add_auto_balloons",
         "add_component_bom_balloons",
@@ -77,7 +84,7 @@ def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
         "stamp_drawing_summary",
         "ViewDisplay",
     )
-    for drawing in ASSEMBLY_DRAWINGS:
+    for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
         source = Path(drawing.__file__).read_text(encoding="utf-8")
         assert "return await build_simple_three_view_drawing(" in source
         assert "place_view(" not in source
@@ -87,8 +94,8 @@ def test_each_recipe_is_only_a_precomputed_shared_builder_call() -> None:
         assert not any(token in source for token in prohibited), drawing.ARTIFACT_STEM
 
 
-def test_each_recipe_forwards_its_registered_layout(monkeypatch) -> None:
-    for drawing in ASSEMBLY_DRAWINGS:
+def test_each_simple_recipe_forwards_its_registered_layout(monkeypatch) -> None:
+    for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
         forwarded: list[dict[str, object]] = []
 
         async def build_shared(_adapter, **kwargs):
@@ -104,8 +111,8 @@ def test_each_recipe_forwards_its_registered_layout(monkeypatch) -> None:
         assert forwarded[0]["layout"] is drawing.SPEC.layout
 
 
-def test_each_three_view_layout_has_distinct_left_to_right_centers() -> None:
-    for drawing in ASSEMBLY_DRAWINGS:
+def test_each_simple_three_view_layout_has_distinct_left_to_right_centers() -> None:
+    for drawing in SIMPLE_ASSEMBLY_DRAWINGS:
         front_x, _front_y = drawing.FRONT_CENTER
         right_x, _right_y = drawing.RIGHT_CENTER
         iso_x, _iso_y = drawing.ISO_CENTER
