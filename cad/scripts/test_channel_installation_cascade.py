@@ -68,9 +68,7 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
 
 
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
-    assert _seed_flip(
-        "fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z
-    )
+    assert _seed_flip("fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
 
 
 def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(

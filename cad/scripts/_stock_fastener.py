@@ -215,6 +215,8 @@ def _blank_recipe_references(adapter: Any) -> None:
 
     hide_types = {
         "ProfileFeature": "SKETCH",
+        "3DProfileFeature": "SKETCH",
+        "CompositeCurve": "REFERENCECURVES",
         "Helix": "REFERENCECURVES",
         "RefPlane": "PLANE",
         "RefAxis": "AXIS",
@@ -260,7 +262,7 @@ def _blank_recipe_references(adapter: Any) -> None:
             raise RuntimeError(
                 f"cannot select shown stock reference {name!r} as {select_type}"
             )
-        if kind == "ProfileFeature":
+        if kind in ("ProfileFeature", "3DProfileFeature"):
             model.BlankSketch()
         else:
             model.BlankRefGeom()

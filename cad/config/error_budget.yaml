@@ -166,6 +166,13 @@ critical_features:
     quantity: gain
     class: channel
     holds: "MATCHED, not machined: measure every channel spring and bin the 20 within +/-1.25 % of their common mean; SET QC uses 60/80 mm inside-hook lengths (58/78 mm pin centres with diameter 2 mm pins); catalog rates scatter +/-10 %"
+  spring_initial_tension:
+    tolerance: 0.27
+    unit: N
+    nominal: channel_spring_installed_spec.INITIAL_TENSION_N
+    quantity: gain
+    class: channel
+    holds: "Catalog initial-tension variation is +/-0.06 lbf (0.267 N), bounded here by +/-0.27 N; SET QC records each force-curve intercept. Mean-line zero removes DC, not the small geometric gain contribution."
   cam_phase:
     tolerance: 0.25
     unit: deg

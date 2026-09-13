@@ -147,10 +147,10 @@ LIVE_READS_NEEDED = (
 SW_HELIX_HEIGHT_AND_REVOLUTION = 1
 
 # Vendor helix start angles, in each base plane's own frame (asserted below).
-COIL_START_ANGLE_DEG = 180.0        # -> (coil_start_x, 0, +R)
-LOOP_NEG_START_ANGLE_DEG = 0.0      # -> (coil_start_x, 0, -1.640205) = wire tip
-LOOP_POS_START_ANGLE_DEG = 90.0     # -> (+122.2502, +R, -1.640205)
-HALF_TURN_START_ANGLE_DEG = 0.0     # -> (+116.7003, 0, -R)
+COIL_START_ANGLE_DEG = 180.0  # -> (coil_start_x, 0, +R)
+LOOP_NEG_START_ANGLE_DEG = 0.0  # -> (coil_start_x, 0, -1.640205) = wire tip
+LOOP_POS_START_ANGLE_DEG = 90.0  # -> (+122.2502, +R, -1.640205)
+HALF_TURN_START_ANGLE_DEG = 0.0  # -> (+116.7003, 0, -R)
 HALF_TURN_TURNS = 0.5
 
 # The vendor's two transitions, read natively off their 3D sketches
@@ -196,7 +196,7 @@ _SKETCH_RIGHT = ((0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (-1.0, 0.0, 0.0))
 _SKETCH_FRONT = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
 
 _FRAME_TOL = 1e-6
-_BOX_SLACK_MM = 1.5   # SolidWorks body boxes run up to one wire radius proud
+_BOX_SLACK_MM = 1.5  # SolidWorks body boxes run up to one wire radius proud
 
 # Native per-body mass properties of the vendor part at free length, used to
 # size the stage guards below and for one end-to-end sanity assert (the real
@@ -249,13 +249,13 @@ def _transition_ctrl(
     z_loop = geom.LOOP_HALF_RISE_MM
     if positive_x:
         # A' -> loop4 tangent side, B' -> the reversed half-turn.
-        loop_end = (eye_x, r, -z_loop)              # +122.2502, +5.5499, -1.640205
-        coil_end = (-coil_x, 0.0, -r)               # +116.7003, 0, -5.5499
+        loop_end = (eye_x, r, -z_loop)  # +122.2502, +5.5499, -1.640205
+        coil_end = (-coil_x, 0.0, -r)  # +116.7003, 0, -5.5499
         handle_loop = -TRANSITION_POS_HANDLE_LOOP_MM
         handle_coil = TRANSITION_POS_HANDLE_COIL_MM
     else:
-        loop_end = (eye_x, r, z_loop)               # -122.2502, +5.5499, +1.640205
-        coil_end = (coil_x, 0.0, r)                 # -116.7003, 0, +5.5499
+        loop_end = (eye_x, r, z_loop)  # -122.2502, +5.5499, +1.640205
+        coil_end = (coil_x, 0.0, r)  # -116.7003, 0, +5.5499
         handle_loop = TRANSITION_NEG_HANDLE_LOOP_MM
         handle_coil = TRANSITION_NEG_HANDLE_COIL_MM
     return (
@@ -314,9 +314,7 @@ def _plane_frame(ref_plane) -> tuple[tuple, tuple[float, float, float]]:
     xform = _early_bound(plane.Transform, "IMathTransform")
     arr = [float(v) for v in (xform.ArrayData or ())]
     if len(arr) != 16:
-        raise RuntimeError(
-            f"IRefPlane::Transform gave {len(arr)} doubles, expected 16"
-        )
+        raise RuntimeError(f"IRefPlane::Transform gave {len(arr)} doubles, expected 16")
     if abs(arr[12] - 1.0) > 1e-12:
         raise RuntimeError(f"plane transform is scaled by {arr[12]}, expected 1.0")
     cols = (tuple(arr[0:3]), tuple(arr[3:6]), tuple(arr[6:9]))
@@ -609,26 +607,26 @@ def _boss_sweep(
         raise RuntimeError(f"{feature_name}: cannot select path {path!r} (mark 4)")
     with _telemetry.span("feature.boss_sweep", label=feature_name):
         swept = manager.InsertProtrusionSwept4(
-            False,            # Propagate (vendor TangentPropagation)
+            False,  # Propagate (vendor TangentPropagation)
             align_end_faces,  # Alignment (vendor AlignWithEndFaces)
-            0,                # TwistCtrlOption: swTwistControlFollowPath
-            False,            # KeepTangency (vendor MaintainTangency)
-            False,            # BAdvancedSmoothing
-            0,                # StartMatchingType (vendor StartTangencyType)
-            end_tangency,     # EndMatchingType (vendor EndTangencyType)
-            False,            # IsThinBody
+            0,  # TwistCtrlOption: swTwistControlFollowPath
+            False,  # KeepTangency (vendor MaintainTangency)
+            False,  # BAdvancedSmoothing
+            0,  # StartMatchingType (vendor StartTangencyType)
+            end_tangency,  # EndMatchingType (vendor EndTangencyType)
+            False,  # IsThinBody
             0.0,
             0.0,
-            0,                # thin wall type
-            10,               # PathAlign: swMinimumTwist (vendor PathAlignmentType)
-            False,            # Merge -- every vendor sweep is its own body
-            False,            # UseFeatScope
-            True,             # UseAutoSelect
-            0.0,              # TwistAngle
-            True,             # BMergeSmoothFaces (vendor MergeSmoothFaces)
-            False,            # CircularProfile (vendor: sketched profile)
+            0,  # thin wall type
+            10,  # PathAlign: swMinimumTwist (vendor PathAlignmentType)
+            False,  # Merge -- every vendor sweep is its own body
+            False,  # UseFeatScope
+            True,  # UseAutoSelect
+            0.0,  # TwistAngle
+            True,  # BMergeSmoothFaces (vendor MergeSmoothFaces)
+            False,  # CircularProfile (vendor: sketched profile)
             0.0,
-            -1,               # Direction (vendor read-back)
+            -1,  # Direction (vendor read-back)
         )
     model.ClearSelection2(True)
     if swept is None:
@@ -668,8 +666,7 @@ def _overall_box_mm(adapter) -> list[float]:
     hi = [float("-inf")] * 3
     for body in bodies(adapter):
         box = [
-            float(v) * 1000.0
-            for v in (_early_bound(body, "IBody2").GetBodyBox() or [])
+            float(v) * 1000.0 for v in (_early_bound(body, "IBody2").GetBodyBox() or [])
         ]
         if len(box) != 6:
             raise RuntimeError("GetBodyBox did not return 6 values")
@@ -715,19 +712,19 @@ def _coil_pattern(
         if not _select_named_feature(adapter, seed, 4, True):
             raise RuntimeError(f"{feature_name}: cannot select seed {seed!r} (mark 4)")
         pattern = manager.FeatureLinearPattern5(
-            geom.COIL_SEGMENTS,      # Num1 (includes the seed)
-            spacing_mm / 1000.0,     # Spacing1
+            geom.COIL_SEGMENTS,  # Num1 (includes the seed)
+            spacing_mm / 1000.0,  # Spacing1
             1,
             0.0,
-            flip,                    # FlipDir1
+            flip,  # FlipDir1
             False,
             "",
             "",
-            False,                   # GeometryPattern
+            False,  # GeometryPattern
             False,
             False,
             False,
-            True,                    # CtrlByNum1
+            True,  # CtrlByNum1
             True,
             False,
             False,
@@ -769,8 +766,7 @@ def _combine_coil(adapter, length_mm: float, feature_name: str) -> None:
     combine, separate = [], []
     for body in bodies(adapter):
         box = [
-            float(v) * 1000.0
-            for v in (_early_bound(body, "IBody2").GetBodyBox() or [])
+            float(v) * 1000.0 for v in (_early_bound(body, "IBody2").GetBodyBox() or [])
         ]
         (separate if box[0] > threshold else combine).append(body)
     if len(combine) != 5 or len(separate) != 1:
@@ -811,12 +807,12 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
     length = geom.validate_length_mm(length_mm)
     radius = geom.COIL_MEAN_RADIUS_MM
     wire_r = geom.WIRE_RADIUS_MM
-    coil_x = geom.coil_start_x_mm(length)          # -116.7003 free
-    coil_end_x = geom.coil_end_x_mm(length)        # +115.9002 free
+    coil_x = geom.coil_start_x_mm(length)  # -116.7003 free
+    coil_end_x = geom.coil_end_x_mm(length)  # +115.9002 free
     segment_rise = geom.coil_segment_rise_mm(length)
     eye_neg, eye_pos = geom.end_centers_mm(length)
     loop_z = geom.LOOP_HALF_RISE_MM
-    envelope = radius + wire_r                     # 6.35 -- tube outer radius
+    envelope = radius + wire_r  # 6.35 -- tube outer radius
 
     loop_arc = _helix_arc_mm(radius, geom.LOOP_TURNS, geom.LOOP_RISE_MM)
     coil_arc = _helix_arc_mm(radius, geom.COIL_SEGMENT_TURNS, segment_rise)
@@ -846,16 +842,28 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
     with no_sketch_inference(adapter):
         # --- base planes (vendor Plane5 / Plane1 / Plane3) ----------------
         loop_plane = _parallel_plane(
-            adapter, "LoopBasePlane", "Front Plane", -loop_z,
-            _NORMAL_FRONT, (0.0, 0.0, -loop_z),
+            adapter,
+            "LoopBasePlane",
+            "Front Plane",
+            -loop_z,
+            _NORMAL_FRONT,
+            (0.0, 0.0, -loop_z),
         )
         coil_plane = _parallel_plane(
-            adapter, "CoilStartPlane", "Right Plane", coil_x,
-            _NORMAL_RIGHT, (coil_x, 0.0, 0.0),
+            adapter,
+            "CoilStartPlane",
+            "Right Plane",
+            coil_x,
+            _NORMAL_RIGHT,
+            (coil_x, 0.0, 0.0),
         )
         half_plane = _parallel_plane(
-            adapter, "HalfTurnPlane", "Right Plane", -coil_x,
-            _NORMAL_RIGHT, (-coil_x, 0.0, 0.0),
+            adapter,
+            "HalfTurnPlane",
+            "Right Plane",
+            -coil_x,
+            _NORMAL_RIGHT,
+            (-coil_x, 0.0, 0.0),
         )
 
         # --- coil helix: one patterned segment (vendor Helix/Spiral1) -----
@@ -937,36 +945,56 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         check("exit_sketch -X loop profile", await adapter.exit_sketch())
         name_last_feature(adapter, "ProfileLoopNeg")
         _boss_sweep(
-            adapter, "ProfileLoopNeg", path_neg, "LoopNeg",
-            align_end_faces=False, end_tangency=1,
+            adapter,
+            "ProfileLoopNeg",
+            path_neg,
+            "LoopNeg",
+            align_end_faces=False,
+            end_tangency=1,
         )
         await _check_volume(adapter, "-X loop sweep", loop_arc + neg_arc)
         _check_box(
-            adapter, "-X loop sweep",
-            [eye_neg[0] - envelope, -envelope, -(loop_z + wire_r),
-             coil_x + wire_r, envelope, envelope],
+            adapter,
+            "-X loop sweep",
+            [
+                eye_neg[0] - envelope,
+                -envelope,
+                -(loop_z + wire_r),
+                coil_x + wire_r,
+                envelope,
+                envelope,
+            ],
             1,
         )
 
         # The coil seed shares that same wire section (vendor Sketch32): the
         # two sweeps meet on a coincident disc, which is why the vendor's
         # bodies touch without merging.
-        await _sketch_on(
-            adapter, "Top", "coil profile", _SKETCH_TOP, (0.0, 0.0, 0.0)
-        )
+        await _sketch_on(adapter, "Top", "coil profile", _SKETCH_TOP, (0.0, 0.0, 0.0))
         _circle(adapter, coil_x, -radius, wire_r, "coil profile")
         check("exit_sketch coil profile", await adapter.exit_sketch())
         name_last_feature(adapter, "ProfileCoil")
         _boss_sweep(
-            adapter, "ProfileCoil", coil_helix, "CoilSegment",
-            align_end_faces=False, end_tangency=0,
+            adapter,
+            "ProfileCoil",
+            coil_helix,
+            "CoilSegment",
+            align_end_faces=False,
+            end_tangency=0,
         )
         wire_so_far = loop_arc + neg_arc + coil_arc
         await _check_volume(adapter, "coil seed sweep", wire_so_far)
         _check_box(
-            adapter, "coil seed sweep",
-            [eye_neg[0] - envelope, -envelope, -envelope,
-             coil_x + segment_rise + wire_r, envelope, envelope],
+            adapter,
+            "coil seed sweep",
+            [
+                eye_neg[0] - envelope,
+                -envelope,
+                -envelope,
+                coil_x + segment_rise + wire_r,
+                envelope,
+                envelope,
+            ],
             2,
         )
 
@@ -976,9 +1004,16 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         wire_so_far = loop_arc + neg_arc + geom.COIL_SEGMENTS * coil_arc
         await _check_volume(adapter, "coil pattern", wire_so_far)
         _check_box(
-            adapter, "coil pattern",
-            [eye_neg[0] - envelope, -envelope, -envelope,
-             coil_end_x + wire_r, envelope, envelope],
+            adapter,
+            "coil pattern",
+            [
+                eye_neg[0] - envelope,
+                -envelope,
+                -envelope,
+                coil_end_x + wire_r,
+                envelope,
+                envelope,
+            ],
             1 + geom.COIL_SEGMENTS,
         )
 
@@ -991,15 +1026,26 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         check("exit_sketch +X loop profile", await adapter.exit_sketch())
         name_last_feature(adapter, "ProfileLoopPos")
         _boss_sweep(
-            adapter, "ProfileLoopPos", path_pos, "LoopPos",
-            align_end_faces=True, end_tangency=0,
+            adapter,
+            "ProfileLoopPos",
+            path_pos,
+            "LoopPos",
+            align_end_faces=True,
+            end_tangency=0,
         )
         wire_total = wire_so_far + half_arc + pos_arc + loop_arc
         await _check_volume(adapter, "+X loop sweep", wire_total)
         _check_box(
-            adapter, "+X loop sweep",
-            [eye_neg[0] - envelope, -envelope, -envelope,
-             eye_pos[0] + envelope, envelope, envelope],
+            adapter,
+            "+X loop sweep",
+            [
+                eye_neg[0] - envelope,
+                -envelope,
+                -envelope,
+                eye_pos[0] + envelope,
+                envelope,
+                envelope,
+            ],
             2 + geom.COIL_SEGMENTS,
         )
 
@@ -1007,9 +1053,16 @@ async def build_1330K524(adapter, truth=None, *, length_mm: float | None = None)
         _combine_coil(adapter, length, "Combine1")
         volume = await _check_volume(adapter, "combined spring", wire_total)
         _check_box(
-            adapter, "combined spring",
-            [eye_neg[0] - envelope, -envelope, -envelope,
-             eye_pos[0] + envelope, envelope, envelope],
+            adapter,
+            "combined spring",
+            [
+                eye_neg[0] - envelope,
+                -envelope,
+                -envelope,
+                eye_pos[0] + envelope,
+                envelope,
+                envelope,
+            ],
             2,
         )
         if length_mm is None:

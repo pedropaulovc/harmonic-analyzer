@@ -4,9 +4,9 @@ r"""Gooseneck geometry nominals -- the prose-free import surface for assemblies.
 end-screw shank to prove the counter spring's top eye hangs on the screw, but
 importing ``build_gooseneck`` for them would fold the whole part build --
 including ``gooseneck_spec``'s DRAWING_NOTES prose -- into the summing assembly
-recipe (codex #361, the same closure leak ``boss_hook_geom`` fixes for the
-hook): a text-only note edit would escalate to a full COM re-insert of the
-assembly.  Assemblies import THIS module; ``build_gooseneck`` re-imports the
+recipe (codex #361): a text-only note edit would escalate to a full COM
+re-insert of the assembly. Assemblies import this module; ``build_gooseneck``
+re-imports the
 same constants so the two can never drift.
 
 Part origin is the vertical leg's mid-height. The arm runs toward negative

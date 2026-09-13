@@ -6,6 +6,7 @@ from _fastener_catalog import FASTENERS
 
 _EXPECTED = {
     # Stable production stem: (McMaster SKU(s), MHA number, fleet quantity).
+    "boss-hook": (("9490T1",), "MHA-005", 1),
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
     "cone-lock-knob": (("91882A425",), "MHA-093", 1),
@@ -25,6 +26,7 @@ _EXPECTED = {
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
+    "spring-hook": (("9489T111",), "MHA-090", 20),
 }
 
 
@@ -55,7 +57,7 @@ def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
 
 def test_shared_stop_stock_reduces_inventory_without_changing_fleet_quantity() -> None:
     stock_skus = {sku for spec in FASTENERS.values() for sku in spec.skus}
-    assert len(stock_skus) == 16
+    assert len(stock_skus) == 18
     shared_quantity = sum(
         int(_config.parts(stem)["quantity"])
         for stem, spec in FASTENERS.items()

@@ -16,9 +16,10 @@ def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/channel-spring-installed.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/channel-spring-installed.pdf")
     assert drawing.PNG.as_posix().endswith("/png/channel-spring-installed_drawing.png")
-    assert DRAWINGS_BY_NAME["channel_spring_installed"].script == Path(
-        drawing.__file__
-    ).resolve()
+    assert (
+        DRAWINGS_BY_NAME["channel_spring_installed"].script
+        == Path(drawing.__file__).resolve()
+    )
 
 
 def test_reference_sheet_has_no_fabrication_dimensions() -> None:

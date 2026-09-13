@@ -148,9 +148,7 @@ def transition_bezier_mm(length_mm: float | None = None) -> list[tuple[float, ..
         return [tuple(p) for p in VENDOR_TRANSITION_CP_MM]
     dx = -(length - FREE_LENGTH_MM) / 2.0
     b0, b1, _b2, b3 = ((p[0] + dx, p[1], p[2]) for p in VENDOR_TRANSITION_CP_MM)
-    radial = math.atan2(
-        -COIL_MEAN_RADIUS_MM, helix_pitch_mm(length) / (2.0 * math.pi)
-    )
+    radial = math.atan2(-COIL_MEAN_RADIUS_MM, helix_pitch_mm(length) / (2.0 * math.pi))
     polar = VENDOR_HANDLE_POLAR_RAD
     t3 = (
         math.cos(radial) * math.cos(polar),
@@ -394,7 +392,10 @@ def _verify_helix(adapter, feature_name: str, length_mm: float | None) -> None:
     params = [float(v) for v in (edge.GetCurveParams2() or [])]
     if len(params) < 6:
         raise RuntimeError(f"helix edge returned {len(params)} curve params")
-    got = [tuple(v * 1000.0 for v in params[0:3]), tuple(v * 1000.0 for v in params[3:6])]
+    got = [
+        tuple(v * 1000.0 for v in params[0:3]),
+        tuple(v * 1000.0 for v in params[3:6]),
+    ]
     want = [(x_start, 0.0, a), (x_end, 0.0, -a)]
     worst = min(
         max(
@@ -424,9 +425,15 @@ def _hook_sketch(adapter, length_mm: float | None, feature_name: str) -> None:
     sk = _sketch_manager(adapter)
     # CCW from the +Y transition end to the -Y free tip -> the eye bulges -X.
     arc = sk.CreateArc(
-        x_eye / 1000.0, 0.0, 0.0,
-        x_eye / 1000.0, a / 1000.0, 0.0,
-        x_eye / 1000.0, -a / 1000.0, 0.0,
+        x_eye / 1000.0,
+        0.0,
+        0.0,
+        x_eye / 1000.0,
+        a / 1000.0,
+        0.0,
+        x_eye / 1000.0,
+        -a / 1000.0,
+        0.0,
         1,
     )
     if arc is None:
@@ -436,7 +443,9 @@ def _hook_sketch(adapter, length_mm: float | None, feature_name: str) -> None:
         raise RuntimeError("pattern centreline failed")
 
 
-def _transition_sketch(adapter, bez: list[tuple[float, ...]], feature_name: str) -> None:
+def _transition_sketch(
+    adapter, bez: list[tuple[float, ...]], feature_name: str
+) -> None:
     """Vendor 3DSketch1: the coil->hook transition, as the vendor's own cubic.
 
     The vendor's spline IS a single clamped cubic Bezier -- order 4, four
@@ -511,7 +520,9 @@ def _transition_sketch(adapter, bez: list[tuple[float, ...]], feature_name: str)
     _verify_transition(adapter, feature_name, bez)
 
 
-def _verify_transition(adapter, feature_name: str, bez: list[tuple[float, ...]]) -> None:
+def _verify_transition(
+    adapter, feature_name: str, bez: list[tuple[float, ...]]
+) -> None:
     """Sample the realised curve and measure it against the vendor's cubic."""
     curve = _early_bound(_sketch_segment(adapter, feature_name).GetCurve(), "ICurve")
     ends = curve.GetEndParams()
@@ -762,7 +773,9 @@ async def build_9432K31(adapter, truth=None, *, length_mm: float | None = None):
     # (the hook sweep's single body is the pattern seed; _hook_pattern checks it)
     _hook_pattern(adapter, "HookProfile", "HookMirror")
     if len(bodies(adapter)) != 2:
-        raise RuntimeError(f"hook pattern left {len(bodies(adapter))} bodies, expected 2")
+        raise RuntimeError(
+            f"hook pattern left {len(bodies(adapter))} bodies, expected 2"
+        )
     _sweep_wire(adapter, "CoilHelix", "CoilWire")
 
     # --- shape checks (the vendor gate runs separately, on the free part) --

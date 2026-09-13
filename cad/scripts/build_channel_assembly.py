@@ -296,7 +296,6 @@ from amplitude_bar_spec import (  # noqa: E402
 # (channel_lever_spec is what error_budget.nominal() reads).
 from channel_lever_spec import (  # noqa: E402
     BAR_PIN_X as LEVER_BAR_PIN_X,  # 127.0, fulcrum -> bar-pin c2c, 5"
-    LEVER_SPRING_X,  # 177.8: 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
 )
 
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
@@ -721,18 +720,19 @@ async def build(adapter) -> dict[str, str]:
 
     # Each distinct installed length gets a real supplier-geometry variant.
     # Do not round length keys: that would move a loaded hook off its seat.
-    spring_poses = [spring_mounts.channel_pose(a) for a in amplitudes]
-    spring_parts: list[str] = []
+    # Prepared source rows are the build graph's statically enumerable contract.
+    spring_specs = [{"pose": spring_mounts.channel_pose(a)} for a in amplitudes]
     variant_by_length: dict[float, str] = {}
-    for pose in spring_poses:
+    for spec in spring_specs:
+        pose = spec["pose"]
         if pose.length_mm == spring_mounts.CHANNEL_NOMINAL_POSE.length_mm:
-            spring_parts.append("channel-spring-installed")
+            spec["part"] = "channel-spring-installed"
             continue
         name = variant_by_length.get(pose.length_mm)
         if name is None:
             name = f"channel-spring-installed-stretch{len(variant_by_length):02d}"
             variant_by_length[pose.length_mm] = name
-        spring_parts.append(name)
+        spec["part"] = name
     log(
         f"spring variants: base {spring_mounts.CHANNEL_NOMINAL_POSE.length_mm:.4f} "
         f"+ {len(variant_by_length)} distinct inside-end lengths"
@@ -1517,11 +1517,12 @@ async def build(adapter) -> dict[str, str]:
         z_mid = z_station(j) + ARM_MID_DZ
         # The supplier frame has its origin at mid-length and coil axis +X.
         # These remain grounded display components; they are not a force solver.
-        pose = spring_poses[j]
+        spec = spring_specs[j]
+        pose = spec["pose"]
         _assert_spring_mount(pose, amplitudes[j])
         grounded_specs.append(
             {
-                "part": spring_parts[j],
+                "part": spec["part"],
                 "position": [*pose.centre_xy, z_mid],
                 "rotation": [0.0, 0.0, 0.0],
                 "rows": pose.rotation_rows,

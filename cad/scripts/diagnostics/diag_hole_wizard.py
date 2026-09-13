@@ -40,26 +40,66 @@ BLOCK_T = 10.0
 # CLEARANCE_MM / NUMBER_DRILL_MM -- diag_hole_wizard_tables.py dump). Round-5
 # measurements: taps + number drills exact; clearance "#8" normal = 4.978.
 CASES = [
-    ("tap 8-32 thru x2", HoleSpec("tapped", "#8-32"),
-     [[-20.0, BLOCK_T, -20.0], [-20.0, BLOCK_T, 20.0]], 3.454, BLOCK_T),
-    ("tap 4-40 blind 6mm", HoleSpec("tapped_bottoming", "#4-40", end="blind", depth_mm=6.0),
-     [[-10.0, BLOCK_T, -20.0]], 2.261, 6.0),
-    ("clearance #8 normal x2", HoleSpec("clearance", "#8"),
-     [[0.0, BLOCK_T, -20.0], [0.0, BLOCK_T, 20.0]], 4.978, BLOCK_T),
+    (
+        "tap 8-32 thru x2",
+        HoleSpec("tapped", "#8-32"),
+        [[-20.0, BLOCK_T, -20.0], [-20.0, BLOCK_T, 20.0]],
+        3.454,
+        BLOCK_T,
+    ),
+    (
+        "tap 4-40 blind 6mm",
+        HoleSpec("tapped_bottoming", "#4-40", end="blind", depth_mm=6.0),
+        [[-10.0, BLOCK_T, -20.0]],
+        2.261,
+        6.0,
+    ),
+    (
+        "clearance #8 normal x2",
+        HoleSpec("clearance", "#8"),
+        [[0.0, BLOCK_T, -20.0], [0.0, BLOCK_T, 20.0]],
+        4.978,
+        BLOCK_T,
+    ),
     # A NON-normal fit: HoleFit is a no-op on a plain hole (API: cbore/csink
     # only), so wizard_holes forces the pinned CLOSE dia -- regressed to 7.137
     # (normal) before the 2026-07-11 HoleDiameter fix.
-    ("clearance 1/4 close", HoleSpec("clearance", "1/4", fit="close"),
-     [[-10.0, BLOCK_T, 10.0]], 6.756, BLOCK_T),
-    ("number drill #47 x2", HoleSpec("drilled_number", "#47"),
-     [[10.0, BLOCK_T, -20.0], [10.0, BLOCK_T, 20.0]], 1.994, BLOCK_T),
-    ("cbore fillister #4 + overrides", HoleSpec(
-        "counterbore_fillister", "#4",
-        overrides_mm={"HoleDiameter": 3.0, "CounterBoreDiameter": 6.5,
-                      "CounterBoreDepth": 2.4}),
-     [[20.0, BLOCK_T, -20.0]], 3.0, BLOCK_T),
-    ("tap 9/16-12 thru", HoleSpec("tapped", "9/16-12", thread_class="1B"),
-     [[20.0, BLOCK_T, 15.0]], 12.303, BLOCK_T),
+    (
+        "clearance 1/4 close",
+        HoleSpec("clearance", "1/4", fit="close"),
+        [[-10.0, BLOCK_T, 10.0]],
+        6.756,
+        BLOCK_T,
+    ),
+    (
+        "number drill #47 x2",
+        HoleSpec("drilled_number", "#47"),
+        [[10.0, BLOCK_T, -20.0], [10.0, BLOCK_T, 20.0]],
+        1.994,
+        BLOCK_T,
+    ),
+    (
+        "cbore fillister #4 + overrides",
+        HoleSpec(
+            "counterbore_fillister",
+            "#4",
+            overrides_mm={
+                "HoleDiameter": 3.0,
+                "CounterBoreDiameter": 6.5,
+                "CounterBoreDepth": 2.4,
+            },
+        ),
+        [[20.0, BLOCK_T, -20.0]],
+        3.0,
+        BLOCK_T,
+    ),
+    (
+        "tap 9/16-12 thru",
+        HoleSpec("tapped", "9/16-12", thread_class="1B"),
+        [[20.0, BLOCK_T, 15.0]],
+        12.303,
+        BLOCK_T,
+    ),
 ]
 
 
@@ -75,9 +115,15 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
     check("create_sketch block", await adapter.create_sketch("Top"))
-    check("rect", await adapter.add_rectangle(-BLOCK / 2, -BLOCK / 2, BLOCK / 2, BLOCK / 2))
+    check(
+        "rect",
+        await adapter.add_rectangle(-BLOCK / 2, -BLOCK / 2, BLOCK / 2, BLOCK / 2),
+    )
     check("exit", await adapter.exit_sketch())
-    check("extrude block", await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_T)))
+    check(
+        "extrude block",
+        await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_T)),
+    )
 
     vol = await _volume(adapter)
     _telemetry.info(f"block volume {vol:.1f} mm^3")
@@ -85,20 +131,25 @@ async def build(adapter) -> dict[str, str]:
     failures: list[str] = []
     for label, spec, pts, want_dia, want_depth in CASES:
         try:
-            res = wizard_holes(adapter, spec, pts, (0.0, 1.0, 0.0), label)
+            res = wizard_holes(
+                adapter, spec, pts, (0.0, 1.0, 0.0), label, expect_dia_mm=want_dia
+            )
             after = await _volume(adapter)
             removed = vol - after
-            # Expectation from the PINNED table diameter (want_dia): the cut
-            # dia is not readable off the definition, so the measured volume
-            # IS the proof it cut the pinned diameter.
+            # The native diameter readback and an independent removed-volume
+            # check must both agree with the pinned standard-hole dimensions.
             expect = len(pts) * math.pi * (want_dia / 2.0) ** 2 * want_depth
             ov = spec.overrides_mm
             if "CounterBoreDiameter" in ov:
-                expect += len(pts) * math.pi * (
-                    (ov["CounterBoreDiameter"] / 2.0) ** 2
-                    - (want_dia / 2.0) ** 2) * ov["CounterBoreDepth"]
-            derived = math.sqrt(max(removed, 0.0) / (len(pts) * want_depth)
-                                / math.pi) * 2.0
+                expect += (
+                    len(pts)
+                    * math.pi
+                    * ((ov["CounterBoreDiameter"] / 2.0) ** 2 - (want_dia / 2.0) ** 2)
+                    * ov["CounterBoreDepth"]
+                )
+            derived = (
+                math.sqrt(max(removed, 0.0) / (len(pts) * want_depth) / math.pi) * 2.0
+            )
             _telemetry.info(
                 f"{label}: removed {removed:.1f} (expect {expect:.1f}; "
                 f"derived cyl dia {derived:.3f} vs pinned {want_dia:.3f}) "

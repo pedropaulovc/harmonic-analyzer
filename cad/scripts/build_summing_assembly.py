@@ -90,7 +90,7 @@ ASM_NAME = "summing"
 from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_knife_mount) -----------------------------
-from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+from summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 

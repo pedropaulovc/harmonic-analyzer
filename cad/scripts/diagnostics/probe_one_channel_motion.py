@@ -26,10 +26,16 @@ from __future__ import annotations
 
 import math
 import sys
+import channel_kinematics
 
 from build_channel_assembly import (
-    ARM_MID_DZ, ARM_PIVOT_LOCAL_Y, CAM_DZ, PIVOT,
-    RING_CENTER, SHAFT_R, rot_z_rows, solve_default_state,
+    ARM_MID_DZ,
+    ARM_PIVOT_LOCAL_Y,
+    CAM_DZ,
+    PIVOT,
+    RING_CENTER,
+    SHAFT_R,
+    rot_z_rows,
     z_station,
 )
 from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
@@ -67,14 +73,19 @@ def _comp_xform(adapter, comp):
 def _rot_angle(a0, a1):
     def cols(a):
         return ((a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8]))
+
     c0, c1 = cols(a0), cols(a1)
     tr = sum(c1[k][i] * c0[k][i] for k in range(3) for i in range(3))
     return math.degrees(math.acos(max(-1.0, min(1.0, (tr - 1.0) / 2.0))))
 
 
 def _find(adapter, needle):
-    for c in (adapter._attempt(lambda: adapter.currentModel.GetComponents(False),
-                               default=None) or []):
+    for c in (
+        adapter._attempt(
+            lambda: adapter.currentModel.GetComponents(False), default=None
+        )
+        or []
+    ):
         _flag(c, "IComponent2")
         if needle in str(_read_member(c, "Name2")):
             return c, str(_read_member(c, "Name2"))
@@ -118,25 +129,33 @@ def _cyl_face(adapter, comp, target_r_mm):
 
 async def _concentric_faces(adapter, face_a, face_b, label):
     from solidworks_mcp.adapters.base import AddMateParameters
+
     adapter._attempt(lambda: adapter.currentModel.ClearSelection2(True))
     ok_a = bool(adapter._attempt(lambda: face_a.Select4(True, None), default=False))
     ok_b = bool(adapter._attempt(lambda: face_b.Select4(True, None), default=False))
-    res = await adapter.add_mate(AddMateParameters(
-        mate_type="concentric", entities=[], alignment="closest"))
+    res = await adapter.add_mate(
+        AddMateParameters(mate_type="concentric", entities=[], alignment="closest")
+    )
     adapter._attempt(lambda: adapter.currentModel.ClearSelection2(True))
-    log(f"  {label}: select=({ok_a},{ok_b}) -> {res.is_success} "
-        f"{'' if res.is_success else res.error}")
+    log(
+        f"  {label}: select=({ok_a},{ok_b}) -> {res.is_success} "
+        f"{'' if res.is_success else res.error}"
+    )
     return res
 
 
 async def build(adapter):
     from solidworks_mcp.adapters.base import (
-        MateEntityRef, MotionMotorParameters,
-        MotionStudyParameters, MotionStudyRefParameters, MotionTimeParameters,
+        MateEntityRef,
+        MotionMotorParameters,
+        MotionStudyParameters,
+        MotionStudyRefParameters,
+        MotionTimeParameters,
     )
+
     stage = sys.argv[1] if len(sys.argv) > 1 else "rod"
     log(f"stage={stage}")
-    state = solve_default_state()
+    state = channel_kinematics.solve_state()
     j = 0
     zj = z_station(j)
     z_mid = zj + ARM_MID_DZ
@@ -150,23 +169,41 @@ async def build(adapter):
     # whose bore is pinned by a concentric to an assembly axis so only its spin
     # is free for the motor.
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], 0.0], [0, 0, 0],
-        [[1, 0, 0], [0, 1, 0], [0, 0, 1]], label="pivot-shaft")
+        adapter,
+        "pivot-shaft",
+        [PIVOT[0], PIVOT[1], 0.0],
+        [0, 0, 0],
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        label="pivot-shaft",
+    )
     cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-GEAR_PHASE_DEG))
     cam = await place_component(
-        adapter, "cylinder-gear",
+        adapter,
+        "cylinder-gear",
         [X_DRUM, Y_DRIVE, zj + DRUM_FACE / 2.0],
-        euler_from_rows(cylinder_rows), cylinder_rows,
-        ground=False, label="cam (end-for-end cylinder-gear)")
+        euler_from_rows(cylinder_rows),
+        cylinder_rows,
+        ground=False,
+        label="cam (end-for-end cylinder-gear)",
+    )
     rod = await place_component(
-        adapter, "connecting-rod", [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
-        [0, 0, state["rod_tilt"]], rot_z_rows(state["rod_tilt"]),
-        ground=False, label="connecting-rod")
+        adapter,
+        "connecting-rod",
+        [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
+        [0, 0, state["rod_tilt"]],
+        rot_z_rows(state["rod_tilt"]),
+        ground=False,
+        label="connecting-rod",
+    )
     rocker = await place_component(
-        adapter, "rocker-arm",
+        adapter,
+        "rocker-arm",
         [PIVOT[0] + arm_dx, PIVOT[1] - arm_dy, z_mid],
-        [0, 0, state["arm_tilt"]], rot_z_rows(state["arm_tilt"]),
-        ground=False, label="rocker-arm")
+        [0, 0, state["arm_tilt"]],
+        rot_z_rows(state["arm_tilt"]),
+        ground=False,
+        label="rocker-arm",
+    )
 
     asm = adapter.currentModel
     pivot_w = (-PIVOT[0], PIVOT[1])
@@ -175,60 +212,101 @@ async def build(adapter):
     # cam: pin its bore to an assembly axis at the (mirrored) cam centre +
     # a Z plane, so only its spin is free for the motor.
     from _common import name_bore_axis
+
     cam_world_x = -X_DRUM  # mirrored
     axis_name = await name_bore_axis(
-        adapter, "Right Plane", cam_world_x, "Top Plane", Y_DRIVE, "cam axis")
+        adapter, "Right Plane", cam_world_x, "Top Plane", Y_DRIVE, "cam axis"
+    )
     await coincident_mate(
-        adapter, named_ref(axis_name, "AXIS"), named_ref(f"Axis2@{cam}", "AXIS"),
-        label="cam bore <-> assembly axis")
+        adapter,
+        named_ref(axis_name, "AXIS"),
+        named_ref(f"Axis2@{cam}", "AXIS"),
+        label="cam bore <-> assembly axis",
+    )
     await coincident_mate(
-        adapter, named_ref("Front Plane", "PLANE"),
+        adapter,
+        named_ref("Front Plane", "PLANE"),
         named_ref(f"Front Plane@{cam}", "PLANE"),
-        label="cam Z plane", verify=None)
+        label="cam Z plane",
+        verify=None,
+    )
 
     # rocker revolute: pivot-shaft OD <-> Axis1@rocker; Z via Front planes.
     await concentric_mate(
-        adapter, bore_axis_ref(pivot_od), named_ref(f"Axis1@{rocker}", "AXIS"),
-        label="rocker pivot revolute", verify=(rocker, _org(adapter, rocker)))
+        adapter,
+        bore_axis_ref(pivot_od),
+        named_ref(f"Axis1@{rocker}", "AXIS"),
+        label="rocker pivot revolute",
+        verify=(rocker, _org(adapter, rocker)),
+    )
 
     # cam drives rod: rod ring axis (Axis1) <-> cam lobe axis (Axis3). Two
     # named axes -> coincident (coaxial); fast + mirror-agnostic, no face walk
     # (the geared part has ~thousands of faces and the lobe face will not select
     # through the nested/flexible sub anyway -- see build_cylinder_gear).
     await coincident_mate(
-        adapter, named_ref(f"Axis1@{rod}", "AXIS"),
-        named_ref(f"Axis3@{cam}", "AXIS"), label="cam lobe <-> rod ring")
+        adapter,
+        named_ref(f"Axis1@{rod}", "AXIS"),
+        named_ref(f"Axis3@{cam}", "AXIS"),
+        label="cam lobe <-> rod ring",
+    )
 
     # rod drives rocker: rod pin axis <-> rocker rod-bore axis (two axes ->
     # coincident; AddMate rejects concentric on two axes).
     await coincident_mate(
-        adapter, named_ref(f"Axis2@{rod}", "AXIS"),
-        named_ref(f"Axis2@{rocker}", "AXIS"), label="rod pin <-> rocker bore")
+        adapter,
+        named_ref(f"Axis2@{rod}", "AXIS"),
+        named_ref(f"Axis2@{rocker}", "AXIS"),
+        label="rod pin <-> rocker bore",
+    )
 
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    log(f"  after joints: rocker status "
-        f"{adapter._attempt(lambda: _find(adapter, 'rocker-arm')[0].GetConstrainedStatus(), default=-1)}")
+    log(
+        f"  after joints: rocker status "
+        f"{adapter._attempt(lambda: _find(adapter, 'rocker-arm')[0].GetConstrainedStatus(), default=-1)}"
+    )
 
     # motor on the cam bore; solve; sample the rocker rotation.
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
-    made = check("create_motion_study", await adapter.create_motion_study(
-        MotionStudyParameters(name="", study_type="physical_simulation",
-                              duration=DURATION_S, activate=True)))
+    made = check(
+        "create_motion_study",
+        await adapter.create_motion_study(
+            MotionStudyParameters(
+                name="",
+                study_type="physical_simulation",
+                duration=DURATION_S,
+                activate=True,
+            )
+        ),
+    )
     log(f"  study {made['name']!r}")
     cam_c, cam_n = _find(adapter, "cylinder-gear")
     # Motor on the cam BORE axis by name (Axis2) -- selecting a face on this
     # geared part walks ~thousands of tooth faces (~10 min, live-caught).
-    check("add_motor cam", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary",
-        entity=MateEntityRef(entity_type="AXIS", name=f"Axis2@{cam_n}"),
-        speed=CAM_RPM, study_name="")))
-    check("calculate_motion", await adapter.calculate_motion(
-        MotionStudyRefParameters(name="")))
+    check(
+        "add_motor cam",
+        await adapter.add_motor(
+            MotionMotorParameters(
+                motor_type="rotary",
+                entity=MateEntityRef(entity_type="AXIS", name=f"Axis2@{cam_n}"),
+                speed=CAM_RPM,
+                study_name="",
+            )
+        ),
+    )
+    check(
+        "calculate_motion",
+        await adapter.calculate_motion(MotionStudyRefParameters(name="")),
+    )
 
     base = None
     for time_s in (0.0, 0.5, 1.0, 1.5, 2.0):
-        check(f"set_time {time_s}", await adapter.set_motion_time(
-            MotionTimeParameters(time=time_s, study_name="")))
+        check(
+            f"set_time {time_s}",
+            await adapter.set_motion_time(
+                MotionTimeParameters(time=time_s, study_name="")
+            ),
+        )
         rk, _ = _find(adapter, "rocker-arm")
         a = _comp_xform(adapter, rk)
         base = base or a
@@ -237,7 +315,9 @@ async def build(adapter):
 
 
 def _org(adapter, name):
-    a = __import__("_assembly", fromlist=["component_transform"]).component_transform(adapter, name)
+    a = __import__("_assembly", fromlist=["component_transform"]).component_transform(
+        adapter, name
+    )
     return [a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0]
 
 

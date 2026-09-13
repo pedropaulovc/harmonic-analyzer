@@ -59,6 +59,7 @@ import pen_wire_geom
 import rocker_arm_spec
 import summing_lever_spec
 import spring_mount_geom
+import spring_force_model
 from channel_frame_geom import (
     CAM_SHAFT_XY,
     CYLINDER_LOCK_PHASE_DEG,
@@ -100,8 +101,11 @@ class Nominal:
     contact_dy: float
     spring_rate: float  # channel spring, N/mm
     counter_rate: float  # counter spring, N/mm
-    sum_arm: float  # summing lever: knife -> spring hook row
-    counter_arm: float  # summing lever: knife -> counter-spring anchor
+    spring_initial_tension: float  # channel catalog initial tension, N
+    counter_initial_tension: float  # counter catalog initial tension, N
+    sum_hole_x: float  # manufactured hook-row position relative to the knife, mm
+    sum_arm: float  # loaded channel force's perpendicular arm, mm
+    counter_arm: float  # loaded counter force's perpendicular arm magnitude, mm
     d_max: float  # amplitude-bar full-scale station
     # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
     lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
@@ -140,6 +144,9 @@ def nominal() -> Nominal:
         - float(_config.fit("cam_follower_contact", "contact_gap_mm")),
         spring_rate=channel_spring_installed_spec.SPRING_RATE_N_PER_MM,
         counter_rate=counter_spring_spec.SPRING_RATE_N_PER_MM,
+        spring_initial_tension=channel_spring_installed_spec.INITIAL_TENSION_N,
+        counter_initial_tension=counter_spring_spec.INITIAL_TENSION_N,
+        sum_hole_x=summing_lever_spec.HOLE_X,
         sum_arm=spring_mount_geom.CHANNEL_NOMINAL_POSE.moment_arm_mm,
         counter_arm=-spring_mount_geom.COUNTER_REFERENCE_POSE.moment_arm_mm,
         d_max=float(_config.machine("amplitude", "max_travel_mm")),
@@ -161,22 +168,24 @@ def nominal() -> Nominal:
 
 
 def pen_gain(nom: Nominal, lever_r: float) -> float:
-    """Pen travel (mm) per mm of SUMMED hook displacement at magnifying-lever
-    radius ``lever_r``: the 20 equal-rate springs on one hook row at arm ``a``
-    against the counter spring at ``b`` put the summing lever at
-    theta = k a sum(h) / (N k a^2 + K_c b^2) -- the hook row moves by the mean
-    hook displacement times the spring coupling -- the clamp at radius R rides
-    R theta, wire 1 turns the hub, the rim pays wire 2 out to the pen by the
-    rim/hub ratio (book ch. 20-21). Force balance, so the spring preloads
-    cancel; small angles (the lever rocks ~1.6 deg)."""
-    k, a = nom.spring_rate, nom.sum_arm
-    coupling = (
-        N_ELEMENTS
-        * k
-        * a**2
-        / (N_ELEMENTS * k * a**2 + nom.counter_rate * nom.counter_arm**2)
+    """Pen travel per summed vertical hook lift at the loaded CAD setting.
+
+    Pretension contributes geometric stiffness. Mean-line zero removes its
+    constant torque, not the derivative of torque as the lever rotates.
+    The output wheel then multiplies the clamp's small-angle displacement.
+    """
+    channel = spring_force_model.channel_response(
+        nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
     )
-    return coupling * lever_r * nom.wheel_ratio / (a * N_ELEMENTS)
+    stiffness = (
+        N_ELEMENTS * channel.stiffness_n_mm_per_rad
+        + spring_force_model.counter_stiffness(
+            nom.counter_rate, nom.counter_initial_tension
+        )
+    )
+    if stiffness <= 0:
+        raise ValueError("spring system has no stable rotational equilibrium")
+    return channel.lift_torque_n * lever_r * nom.wheel_ratio / stiffness
 
 
 # --------------------------------------------------------------------------
@@ -787,21 +796,25 @@ def nominal_design_errors(
 
 
 def gain_sensitivities(nom: Nominal) -> dict[str, float]:
-    """% of channel gain per unit of each gain feature (mm, or % for the spring),
-    BEFORE calibration. For the force balance w_i = s_i a_i / (sum_j s_j a_j^2 +
-    S b^2) a channel's own spring or arm also stiffens the common denominator,
-    but that factor is shared by every channel and the calibration-run scale in
-    ``_channel_model`` divides it out -- so only the numerator's sensitivity
-    belongs here (folding the denominator in as well would cancel it twice;
-    codex #742)."""
+    """Calibrated channel-gain sensitivities: % per feature unit.
+
+    Every channel shares the rotational stiffness denominator, which the
+    calibration run removes. Differentiate the loaded lift-torque numerator,
+    including line-angle and initial-tension effects, rather than treating a
+    manufactured hole displacement as a perpendicular moment-arm displacement.
+    """
+    channel = spring_force_model.channel_response(
+        nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
+    )
     r_pin = math.hypot(nom.pin_x, nom.pin_y)
     return {
         "cam_eccentricity": 100.0 / nom.ecc,
         "rocker_rod_pin_radius": -100.0 * nom.pin_x / r_pin**2,
         "lever_bar_pin_arm": -100.0 / nom.bar_pin_arm,
         "lever_spring_hook_arm": 100.0 / nom.hook_arm,
-        "summing_hook_arm": 100.0 / nom.sum_arm,
-        "spring_rate": 1.0,  # % per %
+        "summing_hook_arm": 100.0 * channel.hole_gain_per_mm,
+        "spring_rate": channel.rate_gain_per_fraction,  # % per %
+        "spring_initial_tension": 100.0 * channel.initial_gain_per_n,  # % per N
     }
 
 
@@ -1123,16 +1136,11 @@ def closed_form_terms(
     u_fs = (
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
-    # Knife-edge hysteresis: the lever stalls while the moment error is below
-    # T_f = N * f_r (N = total normal load on the edge, f_r = rolling-resistance
-    # length of the edge). Both spring banks pull UP on opposite sides of
-    # the knife. After zero-setting, 20 * preload * a = F_c * b, and their
-    # combined upward load is reacted by the upper knife seat:
-    # N = 20 * preload * (1 + a / b). With D = sum s a^2 + S b^2 the equivalent
-    # hook-position error is a*T_f/D and ONE channel's full-scale hook motion
-    # s*a^2*u_fs/D, so the ratio T_f/(s*a*u_fs) needs no D. Against the
-    # all-ones full scale (every channel at u_fs) the stall is that ratio / N.
-    preload = channel_spring_installed_spec.INITIAL_TENSION_N + nom.spring_rate * (
+    # Both spring banks pull up. Mean-line zero removes their constant torque;
+    # knife friction still depends on the total preload. Rotational stiffness
+    # cancels between stall displacement and channel signal, leaving the loaded
+    # lift-torque numerator rather than the un-tensioned approximation k*a.
+    preload = nom.spring_initial_tension + nom.spring_rate * (
         channel_spring_installed_spec.INSTALLED_LENGTH_MM
         - channel_spring_installed_spec.FREE_LENGTH_MM
     )
@@ -1140,7 +1148,7 @@ def closed_form_terms(
     counter_max_ext = (
         counter_spring_spec.MAX_LENGTH_MM - counter_spring_spec.FREE_LENGTH_MM
     )
-    counter_minimum = counter_spring_spec.INITIAL_TENSION_N
+    counter_minimum = nom.counter_initial_tension
     counter_available = min(
         counter_spring_spec.MAXIMUM_LOAD_N,
         counter_minimum + nom.counter_rate * counter_max_ext,
@@ -1151,7 +1159,10 @@ def closed_form_terms(
     )
     knife_load = N_ELEMENTS * preload + counter_needed
     f_r = float(res["knife"]["rolling_resistance_mm"])
-    stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
+    channel_response = spring_force_model.channel_response(
+        nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
+    )
+    stall_one = 100.0 * knife_load * f_r / (channel_response.lift_torque_n * u_fs)
     # The stall is a fixed displacement -- one channel's full-scale hook motion
     # times stall_one/100. In a trial's own ordinate units (one unit = scale x
     # the full-scale hook motion) that is stall_one/scale, so against the

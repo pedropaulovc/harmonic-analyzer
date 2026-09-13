@@ -214,7 +214,9 @@ def _thread_sweep_cut(adapter, profile: str, path: str, feature_name: str) -> No
         swept = fm.CreateFeature(data)
     model.ClearSelection2(True)
     if swept is None:
-        raise RuntimeError(f"CreateFeature (sweep cut) returned None for {feature_name}")
+        raise RuntimeError(
+            f"CreateFeature (sweep cut) returned None for {feature_name}"
+        )
     name_last_feature(adapter, feature_name)
 
 
@@ -340,8 +342,7 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
             f"nut ring left {len(bodies(adapter))} bodies, expected 2 (bolt + nut)"
         )
     ring = (
-        1.5 * math.sqrt(3.0) * nut.corner_radius_mm**2
-        - math.pi * nut.bore_radius_mm**2
+        1.5 * math.sqrt(3.0) * nut.corner_radius_mm**2 - math.pi * nut.bore_radius_mm**2
     ) * nut.height_mm
     await volume_check(adapter, "nut ring", bolt_volume + ring, 0.002 * ring)
 
@@ -450,11 +451,17 @@ async def build_9489T111(adapter, truth=None, *, nut: str = "included"):
     name_last_feature(adapter, "TipFillet")
     # Pappus about the wire axis: area R^2 (1 - pi/4) at the corner's centroid.
     r_w, r_f = A.wire_radius_mm, A.tip_fillet_mm
-    fillet_v = 2.0 * math.pi * (
-        r_f * (2.0 * r_w * r_f - r_f * r_f) / 2.0
-        - (math.pi * r_f * r_f / 4.0) * ((r_w - r_f) + 4.0 * r_f / (3.0 * math.pi))
+    fillet_v = (
+        2.0
+        * math.pi
+        * (
+            r_f * (2.0 * r_w * r_f - r_f * r_f) / 2.0
+            - (math.pi * r_f * r_f / 4.0) * ((r_w - r_f) + 4.0 * r_f / (3.0 * math.pi))
+        )
     )
-    volume = await volume_check(adapter, "tip fillet", volume - fillet_v, 0.05 * fillet_v)
+    volume = await volume_check(
+        adapter, "tip fillet", volume - fillet_v, 0.05 * fillet_v
+    )
 
     check(
         "chamfer shank end",

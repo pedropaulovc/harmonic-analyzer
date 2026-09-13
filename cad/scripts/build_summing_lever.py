@@ -244,7 +244,10 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters, LinearPatternParameters
+    from solidworks_mcp.adapters.base import (
+        ExtrusionParameters,
+        LinearPatternParameters,
+    )
 
     plate = SketchDims()
     check("create_sketch plate", await adapter.create_sketch("Top"))
@@ -262,7 +265,11 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     ]
     outline = await add_line_chain(adapter, rect)
     await define_rectilinear_chain(
-        adapter, outline, rect, label="plate", dims=plate,
+        adapter,
+        outline,
+        rect,
+        label="plate",
+        dims=plate,
         names=["PlateWidth", "PlateLength", "PlateAnchorZ"],
         drives=['"PlateW"', '"PlateL"', '"PlateL" / 2'],
     )
@@ -339,7 +346,9 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # D3 == as-built CHANNEL_PITCH, so it stays neutral.
     drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
     await volume_check(
-        adapter, "spring-hole field", v_plate - HOLE_COUNT * v_hole,
+        adapter,
+        "spring-hole field",
+        v_plate - HOLE_COUNT * v_hole,
         0.01 * HOLE_COUNT * v_hole,
     )
 
@@ -354,7 +363,12 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     cyl = SketchDims()
     check("create_sketch cylinder", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, CYL_R, "pivot cylinder", dims=cyl,
+        adapter,
+        0.0,
+        0.0,
+        CYL_R,
+        "pivot cylinder",
+        dims=cyl,
         names=("CylCx", "CylCz", "CylDia"),
         drives=(None, None, '"CylR" * 2'),
     )
@@ -406,19 +420,23 @@ async def _hex_collar(
     _hh2 = '"HexH" / 2'
     _hh4 = '"HexH" / 4'
     await define_polygon_chain(
-        adapter, lines, verts, label=name, dims=hexd,
-        names=[f"{stem}TopY",
-               f"{stem}S0dx", f"{stem}S0dy",
-               f"{stem}S1dy",
-               f"{stem}S2dx", f"{stem}S2dy",
-               f"{stem}S3dx", f"{stem}S3dy",
-               f"{stem}S4dy"],
-        drives=[_hh2,
-                _hw, _hh4,
-                _hh2,
-                _hw, _hh4,
-                _hw, _hh4,
-                _hh2],
+        adapter,
+        lines,
+        verts,
+        label=name,
+        dims=hexd,
+        names=[
+            f"{stem}TopY",
+            f"{stem}S0dx",
+            f"{stem}S0dy",
+            f"{stem}S1dy",
+            f"{stem}S2dx",
+            f"{stem}S2dy",
+            f"{stem}S3dx",
+            f"{stem}S3dy",
+            f"{stem}S4dy",
+        ],
+        drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
@@ -462,7 +480,9 @@ async def _edge_rib(
     rib.record(f"{stem}ArcR", '"ArcR"')
     check(
         f"{name} arc start on y-axis",
-        await adapter.add_sketch_constraint(f"{arc}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{arc}.start", "origin", "vertical_points"
+        ),
     )
     check(
         f"{name} arc end on y-axis",
@@ -495,9 +515,13 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, top_c, _ = await _three_point_arc(adapter, p2, p3, top_int, "summation top")
+    top_arc, top_c, _ = await _three_point_arc(
+        adapter, p2, p3, top_int, "summation top"
+    )
     tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
-    bot_arc, bot_c, _ = await _three_point_arc(adapter, p4, p1, bot_int, "summation bottom")
+    bot_arc, bot_c, _ = await _three_point_arc(
+        adapter, p4, p1, bot_int, "summation bottom"
+    )
     set_sketch_direct_db(adapter, False)
 
     # Record each manual dim in creation order. Unsigned-distance anchors at
@@ -512,7 +536,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
     sd.record("SumBaseStartZ", '"PlateL" / 2')  # vertical_distance = SUM_BASE
     await dimension_between(
-        adapter, f"{base}.start", f"{base}.end", "vertical_distance", PLATE_L, "summation base"
+        adapter,
+        f"{base}.start",
+        f"{base}.end",
+        "vertical_distance",
+        PLATE_L,
+        "summation base",
     )
     sd.record("SumBaseLength", '"PlateL"')
     check(
@@ -523,7 +552,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     sd.record("SumTipX", '"SumH"')  # horizontal_distance = |TIP_X| = SUM_H
     sd.record("SumTipZ", '"AnchorR"')  # vertical_distance = ANCHOR_R
     await dimension_between(
-        adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", 2.0 * ANCHOR_R, "summation tip"
+        adapter,
+        f"{tip}.start",
+        f"{tip}.end",
+        "vertical_distance",
+        2.0 * ANCHOR_R,
+        "summation tip",
     )
     sd.record("SumTipHeight", '2 * "AnchorR"')
     # The base/tip lines pin all four corners; each curved side is then defined
@@ -531,10 +565,14 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     # so the radius is implied and a radial dim would over-define (cf. the
     # magnifying-lever dome caps). Both centres are general points (x, y both
     # nonzero) -> two dims each, no clean global knob, left auto-named.
-    await anchor_point_to_origin(adapter, f"{top_arc}.center", *top_c, "summation top centre")
+    await anchor_point_to_origin(
+        adapter, f"{top_arc}.center", *top_c, "summation top centre"
+    )
     sd.record(None, None)
     sd.record(None, None)
-    await anchor_point_to_origin(adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre")
+    await anchor_point_to_origin(
+        adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
+    )
     sd.record(None, None)
     sd.record(None, None)
     await ensure_fully_defined(adapter, "summation plate sketch")
@@ -563,7 +601,12 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     check("create_sketch summation anchor", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     await define_circle(
-        adapter, TIP_X, 0.0, ANCHOR_R, "anchor outer", dims=sd,
+        adapter,
+        TIP_X,
+        0.0,
+        ANCHOR_R,
+        "anchor outer",
+        dims=sd,
         names=("AnchorOuterX", "AnchorOuterZ", "AnchorOuterDia"),
         drives=('"SumH"', None, '2 * "AnchorR"'),
     )
@@ -602,10 +645,14 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     line1 = check("middle rib line1", await adapter.add_line(*left, *tl_up))
-    arc1, _, _ = await _three_point_arc(adapter, tl_up, tr_up, (0.0, r), "middle rib upper")
+    arc1, _, _ = await _three_point_arc(
+        adapter, tl_up, tr_up, (0.0, r), "middle rib upper"
+    )
     line2 = check("middle rib line2", await adapter.add_line(*tr_up, *right))
     line3 = check("middle rib line3", await adapter.add_line(*right, *tr_dn))
-    arc2, _, _ = await _three_point_arc(adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower")
+    arc2, _, _ = await _three_point_arc(
+        adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower"
+    )
     line4 = check("middle rib line4", await adapter.add_line(*tl_dn, *left))
     set_sketch_direct_db(adapter, False)
 
@@ -640,9 +687,13 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         await adapter.add_sketch_dimension(arc1, None, "radial", r),
     )
     sd.record("MidRibArcR", '"ArcR"')
-    await anchor_point_to_origin(adapter, f"{line1}.start", *left, "middle rib left vertex")
+    await anchor_point_to_origin(
+        adapter, f"{line1}.start", *left, "middle rib left vertex"
+    )
     sd.record("MidRibLeftX", '"MidRibReach"')
-    await anchor_point_to_origin(adapter, f"{line2}.end", *right, "middle rib right vertex")
+    await anchor_point_to_origin(
+        adapter, f"{line2}.end", *right, "middle rib right vertex"
+    )
     sd.record("MidRibRightX", '"SumH"')
     await ensure_fully_defined(adapter, "middle rib sketch")
     check("exit_sketch middle rib", await adapter.exit_sketch())
@@ -740,14 +791,34 @@ async def build(adapter) -> dict[str, str]:
 
     await _coefficients_plate(adapter, drive_jobs)
     await _pivot_cylinder(adapter, drive_jobs)
-    await _hex_collar(adapter, flip=False, name="hex knife edge front",
-                      stem="HexKnifeFront", drive_jobs=drive_jobs)
-    await _hex_collar(adapter, flip=True, name="hex knife edge back",
-                      stem="HexKnifeBack", drive_jobs=drive_jobs)
-    await _edge_rib(adapter, flip=False, name="edge rib front",
-                    stem="EdgeRibFront", drive_jobs=drive_jobs)
-    await _edge_rib(adapter, flip=True, name="edge rib back",
-                    stem="EdgeRibBack", drive_jobs=drive_jobs)
+    await _hex_collar(
+        adapter,
+        flip=False,
+        name="hex knife edge front",
+        stem="HexKnifeFront",
+        drive_jobs=drive_jobs,
+    )
+    await _hex_collar(
+        adapter,
+        flip=True,
+        name="hex knife edge back",
+        stem="HexKnifeBack",
+        drive_jobs=drive_jobs,
+    )
+    await _edge_rib(
+        adapter,
+        flip=False,
+        name="edge rib front",
+        stem="EdgeRibFront",
+        drive_jobs=drive_jobs,
+    )
+    await _edge_rib(
+        adapter,
+        flip=True,
+        name="edge rib back",
+        stem="EdgeRibBack",
+        drive_jobs=drive_jobs,
+    )
     await _summation_plate(adapter, drive_jobs)
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
@@ -780,7 +851,9 @@ async def build(adapter) -> dict[str, str]:
     # once the top-plate bearing supports are modeled.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
-    await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
+    await name_bore_axis(
+        adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
+    )
 
     await apply_material(adapter, MATERIAL)
     # Green-painted casting on the machine (ch17/ch18 macros show the same
@@ -806,8 +879,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     return artefacts

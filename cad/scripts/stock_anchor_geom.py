@@ -51,6 +51,9 @@ Shared by both (the repo's McMaster thread family):
 * ``D1@Sketch4 = Pitch`` and ``D2@Sketch4 = Pitch / 8`` -- the UN cutter's
   sharp-V height and its root flat.  The cutter is capped at ``15P/16`` and
   parked ``7P/16`` past the datum in air (:func:`thread_cutter_profile_mm`).
+  That park is not a fudge: the cutter's axial half width at the thread major
+  radius is ``P/16 + (3 sqrt3 P / 8) tan30 = 7P/16`` exactly, so the first
+  turn is fully formed in the end face and none of it is left uncut.
 
 Length parameters
 -----------------
@@ -60,11 +63,11 @@ becomes straight and the thread starts -- to the cut end:
 
     ``shank_end_y = advertised_shank_start_y - shank_length``   (:data:`SHANK_LENGTH_LAW`)
 
-Trimming moves ONLY that end plane: the helix, the cutter and therefore every
-thread crest stay on the vendor's datum, so a trimmed anchor keeps the factory
-thread phase exactly and no start-angle arithmetic is needed.  :func:`trim`
-reports the removed turns, the equivalent phase shift and the exact finished
-mass properties.
+Trimming physically cuts the complete factory solid at the requested end
+plane, then restores its 45-degree deburr.  The original helix, cutter and
+surviving thread surfaces do not move.  :func:`trim` describes only that
+physical removal; finished mass properties come from the resulting native
+solid, not a re-seeded thread or an exact per-length mass claim.
 
 9489T111's shank is NOT parametric here: its ``Shank Lg.`` drives the bend
 radius through the vendor's own equation, so shortening it is a different
@@ -125,9 +128,7 @@ __all__ = [
     "nut_corner_chamfer_contour_mm",
     "nut_hex_profile_mm",
     "thread_cutter_profile_mm",
-    "thread_groove_area_per_mm_mm2",
     "thread_groove_volume_per_mm_mm3",
-    "threaded_shank_volume_per_mm_mm3",
     "trim",
     "validate_shank_length_mm",
 ]
@@ -143,7 +144,6 @@ HELIX_REVOLUTION_LAW = "revolutions = (thread_length + pitch) / pitch"
 SHANK_LENGTH_LAW = "shank_end_y = advertised_shank_start_y - shank_length"
 
 _TAN30 = math.tan(math.radians(UN_FLANK_HALF_ANGLE_DEG))
-_COS30 = math.cos(math.radians(UN_FLANK_HALF_ANGLE_DEG))
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,15 +230,11 @@ class PathLine:
 
 @dataclass(frozen=True, slots=True)
 class ShankTrim:
-    """What a finished (cut-to-length) shank costs, relative to the vendor."""
+    """Finished length, end plane and material length removed from stock."""
 
     shank_length_mm: float
     shank_end_y_mm: float
     removed_length_mm: float
-    removed_turns: float
-    thread_phase_shift_deg: float
-    volume_mm3: float
-    area_mm2: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,9 +335,7 @@ class StockAnchor:
 
     @property
     def thread_cutter_centre_y_mm(self) -> float:
-        return self.shank_end_y_mm - (
-            CUTTER_CENTRE_OFFSET_TURNS * self.thread_pitch_mm
-        )
+        return self.shank_end_y_mm - (CUTTER_CENTRE_OFFSET_TURNS * self.thread_pitch_mm)
 
     @property
     def thread_helix_revolutions(self) -> float:
@@ -358,8 +352,10 @@ class StockAnchor:
     @property
     def thread_runout_y_mm(self) -> float:
         """Where the groove finally leaves the metal (cutter cap, top end)."""
-        return self.thread_cutter_centre_y_mm + self.thread_helix_height_mm + (
-            self.thread_crest_width_mm / 2.0
+        return (
+            self.thread_cutter_centre_y_mm
+            + self.thread_helix_height_mm
+            + (self.thread_crest_width_mm / 2.0)
         )
 
     @property
@@ -555,13 +551,18 @@ def anchor(sku: str) -> StockAnchor:
 # --------------------------------------------------------------------------
 def thread_cutter_profile_mm(
     a: StockAnchor,
-) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]:
+) -> tuple[
+    tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]
+]:
     """The vendor's UN cutter as ``(radius, y)`` corners, sweep-ready.
 
     A 60 deg V truncated to a ``P/8`` root flat at the root radius and capped
-    at ``15P/16`` in air, centred ``7P/16`` past the thread datum so the
-    helix's first turn opens the end face.  Read back verbatim off 9489T111's
-    Sketch4: (1.795563, -25.375195) (1.237044, -25.697656)
+    at ``15P/16`` in air, centred ``7P/16`` past the thread datum.  That park
+    is exact rather than chosen: the profile's axial half width at the thread
+    major radius is ``P/16 + (3 sqrt3 P / 8) tan30 = 7P/16``, so the cutter's
+    leading edge meets the major radius exactly in the datum plane and the
+    first turn is fully formed in the end face.  Read back verbatim off
+    9489T111's Sketch4: (1.795563, -25.375195) (1.237044, -25.697656)
     (1.237044, -25.796875) (1.795563, -26.119336).
     """
     cy = a.thread_cutter_centre_y_mm
@@ -600,38 +601,8 @@ def thread_groove_volume_per_mm_mm3(
         return 0.0
     lead = a.thread_root_flat_mm / 2.0 - _TAN30 * root_r
     return (4.0 * math.pi / a.thread_pitch_mm) * (
-        lead * (hi * hi - root_r * root_r) / 2.0
-        + _TAN30 * (hi**3 - root_r**3) / 3.0
+        lead * (hi * hi - root_r * root_r) / 2.0 + _TAN30 * (hi**3 - root_r**3) / 3.0
     )
-
-
-def threaded_shank_volume_per_mm_mm3(a: StockAnchor) -> float:
-    """Volume of one mm of finished threaded shank (cylinder less groove)."""
-    major_r = a.thread_major_radius_mm
-    return math.pi * major_r * major_r - thread_groove_volume_per_mm_mm3(a)
-
-
-def thread_groove_area_per_mm_mm2(a: StockAnchor) -> float:
-    """Wetted area of one mm of finished threaded shank -- EXACT.
-
-    Crest land and root band are cylindrical strips of constant axial width
-    (area independent of the helical boundary); each flank is a screw surface
-    whose element is ``sqrt(r^2 + (P cos30 / 2 pi)^2) / cos30``.
-    """
-    major_r = a.thread_major_radius_mm
-    root_r = a.thread_root_radius_mm
-    pitch = a.thread_pitch_mm
-    w_major = a.thread_root_flat_mm / 2.0 + (major_r - root_r) * _TAN30
-    land = 2.0 * math.pi * major_r * (1.0 - 2.0 * w_major / pitch)
-    root = 2.0 * math.pi * root_r * a.thread_root_flat_mm / pitch
-    c = (pitch / (2.0 * math.pi)) * _COS30
-
-    def _int(r: float) -> float:
-        h = math.sqrt(r * r + c * c)
-        return 0.5 * (r * h + c * c * math.log(r + h))
-
-    flanks = (4.0 * math.pi / (pitch * _COS30)) * (_int(major_r) - _int(root_r))
-    return land + root + flanks
 
 
 # --------------------------------------------------------------------------
@@ -690,38 +661,25 @@ def end_chamfer_groove_overlap_mm3(a: StockAnchor) -> float:
             + _TAN30 * (u**4 / 4.0 - root_r**3 * u) / 3.0
         )
 
-    return overlap + total * (major_r - start) - (
-        _int_groove(major_r) - _int_groove(start)
+    return (
+        overlap
+        + total * (major_r - start)
+        - (_int_groove(major_r) - _int_groove(start))
     )
 
 
 def trim(a: StockAnchor, shank_length_mm: float | None = None) -> ShankTrim:
-    """Cost of cutting the shank back to ``shank_length_mm``.
+    """Describe a physical cut of the factory shank, without moving its thread.
 
-    Volume and area are EXACT, not estimates: the removed stretch is uniform
-    thread (the per-mm laws above are phase independent), and the 45 deg
-    deburr chamfer that reappears at the new end is congruent to the one that
-    went away -- both are axisymmetric cuts into identical thread.  The one
-    approximation is the vendor's own end face, where the cutter's cap starts
-    1/32 pitch above the datum and so leaves a sliver of the first crest
-    uncut (~1e-4 mm^3, i.e. 1e-7 of the part) that a trimmed end does not
-    have, because the trimmed end sits in fully swept thread.
-
-    ``thread_phase_shift_deg`` is how much further round the last crest sits
-    at the new end; it is bookkeeping only, because the helix stays seeded on
-    the VENDOR datum, so the replica reproduces the factory phase exactly.
+    The native builder makes the complete stock anchor before cutting at the
+    returned end plane and restoring the deburr.  Its finished volume, area
+    and centre of mass must be measured on that solid.
     """
     length = validate_shank_length_mm(a, shank_length_mm)
-    removed = a.shank_length_mm - length
-    turns = removed / a.thread_pitch_mm
     return ShankTrim(
         shank_length_mm=length,
         shank_end_y_mm=a.advertised_shank_start_y_mm - length,
-        removed_length_mm=removed,
-        removed_turns=turns,
-        thread_phase_shift_deg=(360.0 * turns) % 360.0,
-        volume_mm3=a.truth.volume_mm3 - removed * threaded_shank_volume_per_mm_mm3(a),
-        area_mm2=a.truth.area_mm2 - removed * thread_groove_area_per_mm_mm2(a),
+        removed_length_mm=a.shank_length_mm - length,
     )
 
 

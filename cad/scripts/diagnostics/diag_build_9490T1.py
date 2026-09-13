@@ -50,8 +50,7 @@ the same solid:
    Combine1's own result, so Combine1 has nothing left to do.
 3. Boss-Extrude1 is authored between the vendor's own two stations
    (``swStartOffset`` + blind depth) instead of their layout-driven end
-   condition; that is the fleet's standard route and is what makes
-   ``shank_length_mm`` trimming a one-line change.
+   condition.
 
 Analytic closure of the recipe (pure geometry, no COM): shank 1074.4346 - end
 chamfer 4.3355 - groove (273.3831 - 2.6020 the chamfer already took) + wire
@@ -60,16 +59,14 @@ tube 586.1823 (Weyl, path 32.045586) + dome 29.4260 (hemisphere, r 2.413) =
 closes the same way: the dump's ten faces sum to 1871.2849, which is the
 vendor's own surface area.
 
-``shank_length_mm`` is the production knob.  The stock shank is 58.7375 mm,
-three times what the summing lever needs; the anchor threads straight into the
-lever, so the shank is cut back and the deburr chamfer restored at the new
-end.  19.05 mm is the production length and lands on a whole number of turns
-(37.5 removed, so the last crest keeps the factory phase, half a turn round).
-:func:`stock_anchor_geom.trim` gives the exact finished volume and area, which
-the final rail then gates on.  The helix and the cutter stay seeded on the
-VENDOR datum (-67.53225, 56.5 revs) whatever the length: the first 39.7 mm of
-the sweep then runs through air and cuts nothing, which is what keeps the
-thread phase identical to the stock part instead of merely congruent.
+The production shank is shortened AFTER the complete stock anchor is built.
+An axial trim and a revolved 45-degree deburr reproduce the physical operation
+without changing the factory thread phase. A shortened sweep is not equivalent:
+its end treatment and phase require independent verification. The per-length
+thread-volume estimate is not used as a truth value for the trimmed solid.
+Both trim sketches require ``no_sketch_inference`` (SketchManager.AddToDB):
+inference can snap the deburr profile to nearby thread edges and change the
+solid even when the requested coordinates are correct.
 
 ``truth`` is accepted for :func:`diag_mcmaster_lib.run_replica` (which gates
 the finished part) and is deliberately not read while building.
@@ -89,6 +86,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,
@@ -102,6 +100,7 @@ from _common import (  # noqa: E402
 from stock_anchor_geom import (  # noqa: E402
     ANCHOR_9490T1,
     PathArc,
+    ShankTrim,
     end_chamfer_groove_overlap_mm3,
     eye_path_mm,
     thread_cutter_profile_mm,
@@ -213,7 +212,9 @@ def _thread_sweep_cut(adapter, profile: str, path: str, feature_name: str) -> No
         swept = fm.CreateFeature(data)
     model.ClearSelection2(True)
     if swept is None:
-        raise RuntimeError(f"CreateFeature (sweep cut) returned None for {feature_name}")
+        raise RuntimeError(
+            f"CreateFeature (sweep cut) returned None for {feature_name}"
+        )
     name_last_feature(adapter, feature_name)
 
 
@@ -315,12 +316,10 @@ async def _wire_path(adapter, feature_name: str) -> None:
 
 
 async def _thread(adapter) -> None:
-    """Vendor Sketch3 + Helix/Spiral1 + Sketch4 + Cut-Sweep1.
+    """Build the factory Sketch3 + Helix/Spiral1 + Sketch4 + Cut-Sweep1.
 
-    Seeded on the vendor's datum (the STOCK end face) even when the shank has
-    been trimmed, so the surviving thread keeps the factory phase rather than
-    a congruent copy of it.  On a trimmed shank the first turns of the sweep
-    run below the body and cut nothing.
+    The datum, helix and cutter use only the stock anchor's dimensions.
+    Production shortening happens later as a physical cut of this solid.
     """
     offset_plane(adapter, "ThreadDatum", A.shank_end_y_mm)
     check("create_sketch helix seed", await adapter.create_sketch("ThreadDatum"))
@@ -329,11 +328,10 @@ async def _thread(adapter) -> None:
     )
     if seed is None:
         raise RuntimeError("helix seed circle failed")
-    # InsertHelix consumes the ACTIVE sketch.  The datum plane is a negative
-    # Top offset, so it carries the flipped normal: clockwise=False is the
-    # vendor's right-hand thread in that frame and start angle pi/2 puts the
-    # helix start on +X, the meridian the cutter is drawn on (proven on
-    # 91829A560 / 93075A194, where the other flag left a mirrored thread).
+    # InsertHelix consumes the ACTIVE sketch.  In this Top-offset frame,
+    # clockwise=False and reversed_dir=False match the supplier's helix in
+    # model space; pi/2 starts on +X, the cutter's meridian.  Native helix
+    # samples and cutter corners agree with 9490T1's supplier within 1e-12 mm.
     insert_helix(
         adapter,
         A.thread_pitch_mm,
@@ -359,32 +357,88 @@ def _face_counts(adapter) -> list[int]:
     ]
 
 
+@_telemetry.traced("stock.shank.trim")
+async def _trim_factory_shank(adapter, cut: ShankTrim) -> None:
+    """Physically trim stock; AddToDB prevents snapping to nearby thread edges."""
+    radius, chamfer = A.thread_major_radius_mm, A.end_chamfer_mm
+    y = cut.shank_end_y_mm
+    with no_sketch_inference(adapter):
+        check("create trim sketch", await adapter.create_sketch("Front"))
+        await add_line_chain(
+            adapter,
+            [
+                [-2 * radius, A.shank_end_y_mm - A.thread_major_dia_mm],
+                [2 * radius, A.shank_end_y_mm - A.thread_major_dia_mm],
+                [2 * radius, y],
+                [-2 * radius, y],
+            ],
+        )
+        check("close trim sketch", await adapter.exit_sketch())
+        name_last_feature(adapter, "StockTrimProfile")
+        check(
+            "trim stock shank",
+            await adapter.create_cut_extrude(
+                ExtrusionParameters(
+                    depth=4 * A.thread_major_dia_mm, both_directions=True
+                )
+            ),
+        )
+        name_last_feature(adapter, "StockTrim")
+        check("create deburr sketch", await adapter.create_sketch("Front"))
+        await add_line_chain(
+            adapter,
+            [
+                [radius - chamfer, y],
+                [radius + chamfer, y],
+                [radius + chamfer, y + chamfer],
+                [radius, y + chamfer],
+            ],
+        )
+        axis = _sketch_manager(adapter).CreateCenterLine(
+            0, (y - chamfer) / 1000, 0, 0, (y + 2 * chamfer) / 1000, 0
+        )
+        if axis is None:
+            raise RuntimeError("stock deburr axis failed")
+        check("close deburr sketch", await adapter.exit_sketch())
+        name_last_feature(adapter, "StockDeburrProfile")
+        check(
+            "deburr trimmed stock",
+            await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
+        )
+        name_last_feature(adapter, "StockDeburr")
+    solid_bodies = bodies(adapter)
+    if len(solid_bodies) != 1:
+        raise RuntimeError("stock trim must leave one solid anchor")
+    body = _early_bound(solid_bodies[0], "IBody2")
+    extent = body.GetExtremePoint(0, -1, 0)
+    if not extent[0] or abs(extent[2] * 1000 - y) > 1e-6:
+        raise RuntimeError(f"trimmed shank end {extent} does not match Y={y} mm")
+    _telemetry.event(
+        "stock.trimmed",
+        length_mm=cut.shank_length_mm,
+        removed_mm=cut.removed_length_mm,
+        end_y_mm=y,
+    )
+
+
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
 async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = None):
     """Build 9490T1 into the current (empty) part.  Never opens or saves.
 
-    ``shank_length_mm=None`` reproduces the vendor part exactly (58.7375 mm of
-    thread).  Any shorter length is the installed anchor: the shank is cut
-    back to it and the 45 deg deburr restored at the new end, with the thread
-    still on its factory phase.  Production uses 19.05.
+    ``shank_length_mm=None`` reproduces the vendor part exactly (58.7375 mm).
+    A shorter length physically trims that complete solid and restores its
+    end deburr; it never re-seeds or rotates the factory thread.
     """
-    cut = trim(A, shank_length_mm)
+    requested_cut = trim(A, shank_length_mm)
     _telemetry.info(
-        f"9490T1: {A.thread_size} shank {cut.shank_length_mm} mm "
-        f"(OD {A.thread_major_dia_mm} from y={cut.shank_end_y_mm}), wire "
+        f"9490T1: {A.thread_size} shank {A.shank_length_mm} mm "
+        f"(OD {A.thread_major_dia_mm} from y={A.shank_end_y_mm}), wire "
         f"{A.wire_dia_mm} on eye R{A.eye_mean_radius_mm}, helix "
         f"{A.thread_helix_height_mm:.5f} mm x {A.thread_helix_revolutions:g} "
         f"revs at pitch {A.thread_pitch_mm}, dome {A.dome_height_mm}"
     )
-    if cut.removed_length_mm:
-        _telemetry.info(
-            f"9490T1: trimmed {cut.removed_length_mm} mm off the stock shank "
-            f"({cut.removed_turns:g} turns, last crest {cut.thread_phase_shift_deg:g} "
-            f"deg round), leaving {cut.volume_mm3:.4f} mm^3 / "
-            f"{cut.area_mm2:.4f} mm^2"
-        )
 
     with no_sketch_inference(adapter):
         # --- shank (vendor Sketch2 + Boss-Extrude1) ------------------------
@@ -392,9 +446,9 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
         await define_circle(adapter, 0.0, 0.0, A.thread_major_radius_mm, "shank")
         check("exit_sketch shank", await adapter.exit_sketch())
         name_last_feature(adapter, "ShankProfile")
-        extrude_at_offset(adapter, cut.shank_length_mm, cut.shank_end_y_mm)
+        extrude_at_offset(adapter, A.shank_length_mm, A.shank_end_y_mm)
         name_last_feature(adapter, "Shank")
-        shank_v = math.pi * A.thread_major_radius_mm**2 * cut.shank_length_mm
+        shank_v = math.pi * A.thread_major_radius_mm**2 * A.shank_length_mm
         volume = await volume_check(adapter, "shank", shank_v, 0.002 * shank_v)
 
     # --- deburr (vendor Sketch5 + Cut-Extrude1, brought forward) -----------
@@ -402,7 +456,7 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
         "chamfer shank end",
         await adapter.add_chamfer(
             A.end_chamfer_mm,
-            [[A.thread_major_radius_mm, cut.shank_end_y_mm, 0.0]],
+            [[A.thread_major_radius_mm, A.shank_end_y_mm, 0.0]],
         ),
     )
     name_last_feature(adapter, "EndChamfer")
@@ -418,14 +472,12 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
     # --- thread (vendor Helix/Spiral1 + Sketch4 + Cut-Sweep1) --------------
     with no_sketch_inference(adapter):
         await _thread(adapter)
-    # Full-depth groove over the whole shank -- the helix starts below the end
-    # face and runs out above the shank top -- less the ring the chamfer has
-    # already taken.  Exact to ~1e-4 mm^3 (the vendor's own end face keeps a
-    # sliver of the first crest, see stock_anchor_geom.trim).
-    groove_v = (
-        cut.shank_length_mm * thread_groove_volume_per_mm_mm3(A)
-        - end_chamfer_groove_overlap_mm3(A)
-    )
+    # Analytic check of the factory groove, net of the chamfer overlap.
+    # The final stock gate below uses supplier truth; this estimate does not
+    # supply mass properties for a physically trimmed production anchor.
+    groove_v = A.shank_length_mm * thread_groove_volume_per_mm_mm3(
+        A
+    ) - end_chamfer_groove_overlap_mm3(A)
     volume = await volume_check(
         adapter, "thread groove", volume - groove_v, 0.005 * groove_v
     )
@@ -474,9 +526,9 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
     dome_v = (2.0 / 3.0) * math.pi * A.dome_height_mm**3
     await volume_check(adapter, "dome", volume + dome_v, 0.01 * dome_v)
 
-    # The vendor's own part (or its trim), at the fleet gate's tolerance.
+    # Prove the complete stock solid before applying a production modification.
     await volume_check(
-        adapter, "9490T1 (vendor part)", cut.volume_mm3, 0.0002 * cut.volume_mm3
+        adapter, "9490T1 (vendor part)", A.truth.volume_mm3, 0.0002 * A.truth.volume_mm3
     )
     if _face_counts(adapter) != [PART_FACES]:
         raise RuntimeError(
@@ -484,6 +536,8 @@ async def build_9490T1(adapter, truth=None, *, shank_length_mm: float | None = N
             f"[{PART_FACES}] (thread land, root, 2 flanks, chamfer cone, end "
             "disc, shank-top seam, eye, bend, dome)"
         )
+    if requested_cut.removed_length_mm:
+        await _trim_factory_shank(adapter, requested_cut)
 
     # The replica is authored in the vendor's own frame: no COM remap.
     adapter._mcm_com_map = None

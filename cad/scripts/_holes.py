@@ -610,18 +610,22 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
-    # The post-create definition reads 0.0 for HoleDiameter on EVERY hole Type
-    # on this seat (diag_hole_wizard 2026-07-21: all 7 cases read 0.000 while
-    # the cut geometry was exact), so the ``expect_dia_mm`` tripwire would
-    # always trip on it. The populated knob for a thru hole is
-    # ThruHoleDiameter (the same property the clearance drift check reads) --
-    # fall back to it so the tripwire gates against the real table value.
+    # Tap holes expose their drill diameter through the tap-specific members,
+    # not HoleDiameter/ThruHoleDiameter. Native #6-32 and #10-24 controls prove
+    # ThruTapDrillDiameter for through taps and TapDrillDiameter for blind taps.
+    if spec.kind in ("tapped", "tapped_bottoming"):
+        diameter_member = (
+            "TapDrillDiameter" if spec.end == "blind" else "ThruTapDrillDiameter"
+        )
+        hole_dia_mm = _dim(diameter_member)
+    else:
+        hole_dia_mm = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
     # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
     # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
     # independently by volume. ThreadDepth is populated and is gated below.
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=_dim("HoleDiameter") or _dim("ThruHoleDiameter"),
+        hole_dia_mm=hole_dia_mm,
         depth_mm=_dim("HoleDepth"),
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),

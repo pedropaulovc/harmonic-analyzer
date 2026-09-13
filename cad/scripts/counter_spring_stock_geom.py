@@ -81,34 +81,34 @@ __all__ = [
 ]
 
 # --- catalogue figures, all confirmed against the native tree -------------
-FREE_LENGTH_MM = 254.0        # inside loop to inside loop (vendor Length@Sketch1)
-MAX_LENGTH_MM = 421.6146      # catalogue maximum extended length
-COIL_OD_MM = 12.7             # vendor OD@Sketch1 (= eye OD; the eye is a coil)
-WIRE_DIA_MM = 1.6002          # vendor Wire Diameter@Sketch1
-COIL_TURNS = 128.0            # 4 patterned segments x 32 revolutions (CAD model)
+FREE_LENGTH_MM = 254.0  # inside loop to inside loop (vendor Length@Sketch1)
+MAX_LENGTH_MM = 421.6146  # catalogue maximum extended length
+COIL_OD_MM = 12.7  # vendor OD@Sketch1 (= eye OD; the eye is a coil)
+WIRE_DIA_MM = 1.6002  # vendor Wire Diameter@Sketch1
+COIL_TURNS = 128.0  # 4 patterned segments x 32 revolutions (CAD model)
 
 # --- decoded wire / coil geometry ----------------------------------------
-WIRE_RADIUS_MM = 0.8001              # WIRE_DIA_MM / 2 (vendor sweep profile radius)
-COIL_MEAN_RADIUS_MM = 5.5499         # (COIL_OD_MM - WIRE_DIA_MM) / 2
+WIRE_RADIUS_MM = 0.8001  # WIRE_DIA_MM / 2 (vendor sweep profile radius)
+COIL_MEAN_RADIUS_MM = 5.5499  # (COIL_OD_MM - WIRE_DIA_MM) / 2
 COIL_AXIS = (1.0, 0.0, 0.0)
-COIL_SEGMENTS = 4                    # vendor LPattern1 instance count
-COIL_SEGMENT_TURNS = 32.0            # vendor Helix/Spiral1 revolutions
+COIL_SEGMENTS = 4  # vendor LPattern1 instance count
+COIL_SEGMENT_TURNS = 32.0  # vendor Helix/Spiral1 revolutions
 
 # --- decoded end-loop geometry (rigid: never scales with length) ---------
-LOOP_TURNS = 1.75                    # vendor Helix/Spiral3 & 4 revolutions
-LOOP_RISE_MM = 3.28041               # their axial (Z) rise
-LOOP_PITCH_MM = 1.87452              # LOOP_RISE_MM / LOOP_TURNS
-LOOP_HALF_RISE_MM = 1.640205         # LOOP_RISE_MM / 2 -- the loop is Z-centred
-END_OCCUPIED_WIDTH_MM = 4.88061      # LOOP_RISE_MM + WIRE_DIA_MM (Z envelope)
+LOOP_TURNS = 1.75  # vendor Helix/Spiral3 & 4 revolutions
+LOOP_RISE_MM = 3.28041  # their axial (Z) rise
+LOOP_PITCH_MM = 1.87452  # LOOP_RISE_MM / LOOP_TURNS
+LOOP_HALF_RISE_MM = 1.640205  # LOOP_RISE_MM / 2 -- the loop is Z-centred
+END_OCCUPIED_WIDTH_MM = 4.88061  # LOOP_RISE_MM + WIRE_DIA_MM (Z envelope)
 EYE_AXIS = (0.0, 0.0, 1.0)
-EYE_ID_MM = 9.4996                   # = the coil bore: 2 * R_mean - wire
-EYE_OD_MM = 12.7                     # 2 * COIL_MEAN_RADIUS_MM + WIRE_DIA_MM
+EYE_ID_MM = 9.4996  # = the coil bore: 2 * R_mean - wire
+EYE_OD_MM = 12.7  # 2 * COIL_MEAN_RADIUS_MM + WIRE_DIA_MM
 
 # Inside-length bookkeeping: the eye centre is inset from the catalogue end
 # face by (mean radius - wire radius); the first full coil turn starts one mean
 # radius further in, which is also where the loop's wire tip sits.
-_EYE_INSET_MM = 4.7498               # COIL_MEAN_RADIUS_MM - WIRE_RADIUS_MM
-_COIL_END_INSET_MM = 10.2997         # _EYE_INSET_MM + COIL_MEAN_RADIUS_MM
+_EYE_INSET_MM = 4.7498  # COIL_MEAN_RADIUS_MM - WIRE_RADIUS_MM
+_COIL_END_INSET_MM = 10.2997  # _EYE_INSET_MM + COIL_MEAN_RADIUS_MM
 
 
 def validate_length_mm(length_mm: float | None = None) -> float:
