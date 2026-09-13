@@ -486,11 +486,14 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     notch_dims.record("NotchMeanRadius", None)
+    # Text point INSIDE the 1.5 deg sector (SolidWorks picks which of the four
+    # angles the text sits in; 0.4 deg off the lobe axis, well clear of the
+    # radial at 1.5 deg) -- a point outside it reads the 178.5 supplement.
     await add_angular_reference_dimension(
         adapter,
         lobe_axis,
         notch_radial,
-        (-6.0, NOTCH_MEAN_RADIUS + 4.0),
+        (-0.3, RA_MM + 12.0),
         "notch phase",
         expected_degrees=NOTCH_PHASE_DEG,
     )

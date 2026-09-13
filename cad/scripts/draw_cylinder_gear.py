@@ -88,7 +88,7 @@ FRONT_KEEP = {
     "BoreDia": (0.065, 0.360),
     "CamDia": (0.175, 0.325),
     "CamCy": (0.175, 0.279),
-    "NotchPhase": (0.075, 0.322),
+    "NotchPhase": (0.140, 0.338),
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
