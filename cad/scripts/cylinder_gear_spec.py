@@ -42,6 +42,9 @@ OVERALL_THICKNESS = FACE_WIDTH + CAM_THICKNESS
 ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
+# Cam-lobe direction vs the alignment-notch centreline (the channel's phase
+# datum); error_budget.yaml cam_phase -- index lobe and notch in one setup.
+CAM_PHASE_TOLERANCE_DEG = 0.25
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
 NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
 NOTCH_DEPTH = 3.0

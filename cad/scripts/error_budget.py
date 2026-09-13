@@ -50,6 +50,7 @@ import channel_spring_installed_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
+import measuring_stick_spec
 import paper_drive_geom
 import rocker_arm_spec
 import summing_lever_spec
@@ -324,6 +325,31 @@ def second_harmonic(u: np.ndarray, grid: np.ndarray) -> float:
     return 2.0 * float(np.mean(u * np.cos(2.0 * grid)))
 
 
+_READ_GRID = np.arange(1440) * 2.0 * math.pi / 1440
+
+
+def read_ordinate(d: float, nom: Nominal, f_full: float | None = None) -> float:
+    """The ordinate a bar at station ``d`` (mm) actually contributes: its
+    fundamental as a fraction of a full-scale bar's -- the station table's
+    ``read ordinate`` column, what the operator records after setting the bar
+    to the modelled station x*d_max."""
+    if f_full is None:
+        f_full = 2.0 * float(
+            np.mean(hook_displacement(_READ_GRID, nom.d_max, nom) * np.cos(_READ_GRID))
+        )
+    return (
+        2.0
+        * float(np.mean(hook_displacement(_READ_GRID, d, nom) * np.cos(_READ_GRID)))
+        / f_full
+    )
+
+
+def read_ordinates(x: np.ndarray, nom: Nominal) -> np.ndarray:
+    """``read_ordinate`` for every channel of ordinate vector ``x``."""
+    f_full = read_ordinate(nom.d_max, nom, f_full=1.0)
+    return np.array([read_ordinate(float(xi) * nom.d_max, nom, f_full) for xi in x])
+
+
 def nominal_design_errors(
     nom: Nominal,
     null_lift: float = 0.0,
@@ -495,19 +521,25 @@ def _channel_model(
         elif key in ("cam_phase", "mesh_lag_spread"):
             phi += np.radians(v)
         elif key == "station_setting":
-            # A bar cannot be set below the pivot (build_channel_assembly rejects
-            # amplitude_mm < 0): the setting error at a zero ordinate is one-sided,
-            # [0, +tol]. Its MEAN is a coherent lift identical in kind to the
-            # null lift the procedure measures on the assembled machine (one bar
-            # at the stick zero), so it is subtracted the same way; only the
-            # scatter about that mean survives. The measured mean is applied as
-            # the same known lift vector on every channel.
-            # Draws come in uniform on [-tol, +tol]; fold the unreachable half
-            # onto the reachable one so an idle bar's error is uniform on
-            # [0, +tol] (mean tol/2), not a point mass at the pivot (mean tol/4).
-            v = np.where((x == 0.0)[None, :], np.abs(v), v)
-            d = np.maximum(d + v, 0.0)
-            lift = np.where(x == 0.0, setting_tol / 2.0, 0.0) / nom.d_max
+            # A bar can be set neither below the pivot (build_channel_assembly
+            # rejects amplitude_mm < 0) nor past amplitude.max_travel_mm (the
+            # config gate): the setting error at a zero ordinate is one-sided
+            # [0, +tol] and at a full-scale ordinate one-sided [-tol, 0]. Draws
+            # come in uniform on [-tol, +tol]; fold the unreachable half onto the
+            # reachable one at each bound (uniform on the reachable band, mean
+            # +/-tol/2 -- not a clipped point mass with mean tol/4). Each bound's
+            # MEAN is a coherent lift identical in kind to the null lift the
+            # procedure measures on the assembled machine (one bar at the stick
+            # zero / at the stop), so it is subtracted the same way; only the
+            # scatter about it survives.
+            at_zero = (x == 0.0)[None, :]
+            at_full = (x == 1.0)[None, :]
+            v = np.where(at_zero, np.abs(v), np.where(at_full, -np.abs(v), v))
+            d = np.clip(d + v, 0.0, nom.d_max)
+            lift = (
+                np.where(x == 0.0, setting_tol / 2.0, 0.0)
+                - np.where(x == 1.0, setting_tol / 2.0, 0.0)
+            ) / nom.d_max
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
@@ -623,6 +655,13 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     knife_load = N_ELEMENTS * preload + counter_needed
     f_r = float(res["knife"]["rolling_resistance_mm"])
     stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
+    # The stall is a fixed displacement -- one channel's full-scale hook motion
+    # times stall_one/100 -- so against each trial's greatest term (sum of the
+    # ordinates the machine actually sums, x_read >= x) it is stall_one/sum(x_read).
+    scored = list(budget["reference_inputs"])
+    broad = [n for n in scored if n != "pair_1_20"]
+    x_read = {n: read_ordinates(reference_inputs()[n], nom) for n in scored}
+    knife_per_input = {n: stall_one / float(np.sum(x_read[n])) for n in scored}
     knife = {
         "assumed_preload_N_per_spring": preload,
         "counter_spring_needed_N": counter_needed,
@@ -632,7 +671,8 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "assumed_knife_load_N": knife_load,
         "assumed_rolling_resistance_mm": f_r,
         "stall_pct_of_one_channel_fs": stall_one,
-        "pct_fs": stall_one / N_ELEMENTS,
+        "pct_fs_per_input": knife_per_input,
+        "pct_fs": max(knife_per_input[n] for n in broad),
         "note": "spring rate/preload are DERIVED from wire geometry (low confidence); measure trace width on a slow reversal",
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
@@ -645,30 +685,33 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     }
     # Ordinate readout. The CAD maps the trace PEAK onto output.yaml
     # pen_trace_half_mm (pen_driver: scale = stroke_half / peak|pen_y|), and the
-    # greatest term of a non-negative input is its k=0 reading, so the reading
-    # uncertainty is the same fraction of the greatest term for every trial --
-    # PROVIDED the magnifier can be set so each trial's k=0 spans the stroke.
-    # The magnification each reference input needs relative to the all-ones
-    # setting (N / sum x_i) is reported; it is the open magnifier-range item.
+    # greatest term of a non-negative input is its k=0 reading. With the
+    # magnifier set per trial so k=0 spans the stroke, a reading error of
+    # ``reading`` mm is reading/pen_half of the k=0 reading = of sum(x_read);
+    # against the trial's IDEAL greatest term (sum x, what the error is scored
+    # on) it is that times sum(x_read)/sum(x) -- idle bars read ~0.029 each,
+    # so a sparse trial pays for them. At a fixed magnifier (all-ones setting)
+    # multiply by N/sum(x_read) as well.
     pen_half = float(_config.machine("output", "pen_trace_half_mm"))
     reading = float(res["readout"]["reading_uncertainty_mm"])
     spans = bool(res["readout"]["greatest_term_spans_stroke"])
-    scored = [n for n in budget["reference_inputs"]]
-    broad = [n for n in scored if n != "pair_1_20"]
-    magnification = {
-        n: float(N_ELEMENTS / np.sum(reference_inputs()[n])) for n in scored
+    magnification = {n: float(N_ELEMENTS / np.sum(x_read[n])) for n in scored}
+    per_mm = 100.0 * reading / pen_half
+    spanning = {
+        n: per_mm * float(np.sum(x_read[n]) / np.sum(reference_inputs()[n]))
+        for n in scored
     }
-    per_trial = 100.0 * reading / pen_half
-    fixed = {n: per_trial * magnification[n] for n in scored}
+    fixed = {n: spanning[n] * magnification[n] for n in scored}
+    chosen = spanning if spans else fixed
     readout = {
         "pen_half_stroke_mm": pen_half,
         "assumed_reading_uncertainty_mm": reading,
         "assumed_greatest_term_spans_stroke": spans,
         "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
-        "pct_fs_greatest_term_spans_stroke": per_trial,
+        "pct_fs_greatest_term_spans_stroke": spanning,
         "magnification_vs_all_ones": magnification,
         "pct_fs_fixed_magnifier": fixed,
-        "pct_fs": per_trial if spans else max(fixed[n] for n in broad),
+        "pct_fs": max(chosen[n] for n in broad),
         "note": "reading uncertainty = half the line width + interpolation; scales as 1/(pen full scale)",
     }
     # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
@@ -892,9 +935,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
-STICK_DIVISION_MM = (
-    14.20  # measuring_stick_spec note 2: TICK N AT 14.20 x N from the 0 tick
-)
+STICK_DIVISION_MM = measuring_stick_spec.DIVISION_SPACING  # the engraved scale
 
 
 def calibration_table(
@@ -931,7 +972,7 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
     table = "\n".join(
-        f"| {x:+.4f} | {d:6.1f} | {d / STICK_DIVISION_MM:6.3f} | {k * 100:6.2f} % |"
+        f"| {d:6.1f} | {d / STICK_DIVISION_MM:6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
         for d, x, k in rows
     )
     return f"""# Reading the analyzer -- operating and readout procedure
@@ -943,20 +984,22 @@ only by following every step below. Coefficient $k$ is read at crank position
 $\\theta_k = k\\pi/20$, i.e. with the crank stopped on its index after $2k$
 turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
 
-## 1. Set the bars by table lookup
+## 1. Set the bars linearly; record what each one reads
 
 The stick's 0 tick sits at the rocker pivot axis (stick drawing note 5); every
-station is on the lifting side. The stick is engraved **linear in station**
-(one numbered division = {STICK_DIVISION_MM:.2f} mm, tenths between), but the
-ordinate a bar contributes is NOT linear in station: the null lies at
-{r["null_station_mm"]:+.2f} mm, unreachable, and the slope of ordinate per mm
-changes by {100.0 * ((rows[-1][1] - rows[-2][1]) / (rows[1][1] - rows[0][1]) - 1.0):+.1f} %
-from the pivot to full scale. So for each wanted ordinate $x_i$ look up the
-**stick reading** in the table (interpolate between rows), set the bar to it
-reading to 1/5 minor division (setting error +/-0.25 mm max per bar), and
-record the read ordinate actually set.
+station is on the lifting side. Set bar $i$ to the **linear station**
+$d_i = x_i \\cdot {nom.d_max:.0f}$ mm ($= x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
+divisions on the engraved {STICK_DIVISION_MM:.2f} mm/division scale), reading
+to 1/5 minor division (setting error +/-0.25 mm max per bar). Then look up, in
+the table, the **read ordinate** $x^{{read}}_i$ that station actually
+contributes (interpolate between rows) and record it: the ordinate is NOT
+linear in station (the null lies at {r["null_station_mm"]:+.2f} mm, unreachable,
+and the slope of ordinate per mm changes by
+{100.0 * ((rows[-1][1] - rows[-2][1]) / (rows[1][1] - rows[0][1]) - 1.0):+.1f} %
+from the pivot to full scale), so $x^{{read}}_i \\ne x_i$; the difference is
+what step 4 subtracts.
 
-| read ordinate $x$ | station (mm) | stick reading (div) | $\\kappa$ = c2/c1 |
+| station (mm) | stick reading (div) | read ordinate $x^{{read}}$ | $\\kappa$ = c2/c1 |
 |---:|---:|---:|---:|
 {table}
 

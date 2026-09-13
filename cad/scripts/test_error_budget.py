@@ -167,10 +167,11 @@ def test_fixed_magnifier_readout_is_scored_on_the_worst_broad_input(budget):
     }
     r = eb.build_report(fixed)
     ro = r["closed_form"]["readout"]
-    assert ro["pct_fs"] == pytest.approx(
-        ro["pct_fs_greatest_term_spans_stroke"]
-        * ro["magnification_vs_all_ones"]["gaussian_a0p1"]
-    )
+    spanning = ro["pct_fs_greatest_term_spans_stroke"]
+    mag = ro["magnification_vs_all_ones"]
+    for name, fixed_pct in ro["pct_fs_fixed_magnifier"].items():
+        assert fixed_pct == pytest.approx(spanning[name] * mag[name])
+    assert ro["pct_fs"] == pytest.approx(ro["pct_fs_fixed_magnifier"]["gaussian_a0p1"])
     assert any(b.startswith("readout") for b in eb.budget_closes(r))
 
 
@@ -188,20 +189,29 @@ def test_lift_vector_is_what_the_procedure_subtracts():
 def test_station_setting_scatter_never_goes_below_the_pivot(nom):
     """Setting error at a zero ordinate is one-sided (a bar cannot be set below
     the pivot): the symmetric draw is folded onto [0, +tol], so a draw at -tol
-    reads exactly like one at +tol, and the band's mean (+tol/2) is the known
+    reads exactly like one at +tol; at full scale it folds the other way onto
+    [-tol, 0]. Each band's mean (+tol/2 at zero, -tol/2 at full) is the known
     lift the operator subtracts, so THAT draw reads as error-free."""
     x = eb.reference_inputs()["pair_1_20"]
     sens = eb.gain_sensitivities(nom)
     tol = 0.25
     idle = (x == 0.0)[None, :]
+    full = (x == 1.0)[None, :]
 
-    def read(offset: float) -> np.ndarray:
-        dev = {"station_setting": np.where(idle, offset, 0.0)}
+    def read(offset: np.ndarray) -> np.ndarray:
+        dev = {"station_setting": np.broadcast_to(offset, (1, eb.N_ELEMENTS))}
         return eb._channel_model(x, nom, dev, sens, tol)[0]
 
-    assert np.allclose(read(-tol), read(tol), atol=1e-12)  # folded, not clipped
-    assert np.max(np.abs(read(tol / 2.0))) < 1e-9  # the band's mean is the known lift
-    assert np.max(np.abs(read(0.0))) > 0.5  # the residual scatter is real, at odd k
+    zero = np.zeros((1, eb.N_ELEMENTS))
+    assert np.allclose(
+        read(np.where(idle, -tol, 0.0)), read(np.where(idle, tol, 0.0)), atol=1e-12
+    )
+    assert np.allclose(
+        read(np.where(full, tol, 0.0)), read(np.where(full, -tol, 0.0)), atol=1e-12
+    )
+    mean = np.where(idle, tol / 2.0, 0.0) - np.where(full, tol / 2.0, 0.0)
+    assert np.max(np.abs(read(mean))) < 1e-9  # each band's mean is the known lift
+    assert np.max(np.abs(read(zero))) > 0.5  # the residual scatter is real, at odd k
 
 
 def test_unbalanced_counter_spring_fails_unless_waived(budget, report):
@@ -239,9 +249,12 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     doc = eb.readout_procedure(report, nom)
     rows = eb.calibration_table(nom)
     assert rows[0][0] == 0.0 and rows[-1][0] == nom.d_max
-    assert f"| {rows[0][1]:+.4f} | {rows[0][0]:6.1f} |" in doc  # idle-bar read ordinate
-    assert f"one numbered division = {eb.STICK_DIVISION_MM:.2f} mm" in doc
-    assert "look up the\n**stick reading**" in doc
+    assert (
+        f"| {rows[0][0]:6.1f} | {rows[0][0] / eb.STICK_DIVISION_MM:6.3f} | {rows[0][1]:+.4f} |"
+        in doc
+    )
+    assert f"{eb.STICK_DIVISION_MM:.2f} mm/division scale" in doc
+    assert "Set bar $i$ to the **linear station**" in doc
     assert f"\\ell = {report['null_lift_ordinate']:.4f}" in doc
     assert "-c$ at every odd $k$" in doc
     assert "\\kappa_i \\cos(2 i \\theta_k)" in doc
@@ -249,20 +262,55 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert "ONE direction" in doc
 
 
-def test_stick_division_matches_the_engraved_scale():
-    """The procedure converts stations to stick readings with the same division
-    the stick drawing engraves (note 2: TICK N AT 14.20 x N), and the drawing
-    says the scale is linear in station -- the ordinate is a table lookup."""
+def test_stick_division_is_the_spec_constant_the_builder_engraves():
+    """The procedure's station -> stick-reading conversion, the drawing notes
+    and the builder's engraved ticks all read measuring_stick_spec
+    .DIVISION_SPACING; the builder must import it, not copy it."""
     import measuring_stick_spec
 
+    assert eb.STICK_DIVISION_MM == measuring_stick_spec.DIVISION_SPACING
     assert (
-        f"TICK N AT {eb.STICK_DIVISION_MM:.2f} X N"
+        f"TICK N AT {measuring_stick_spec.DIVISION_SPACING:.2f} X N"
         in measuring_stick_spec.DRAWING_NOTES
     )
     assert (
-        f"SCALE IS LINEAR IN STATION (1 DIVISION = {eb.STICK_DIVISION_MM:.2f})"
+        f"SCALE IS LINEAR IN STATION (1 DIVISION = {measuring_stick_spec.DIVISION_SPACING:.2f})"
         in measuring_stick_spec.DRAWING_NOTES
     )
+    src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"^\s*DIVISION_SPACING,\s*$", src, re.M)
+    for name in (
+        "DIVISION_SPACING",
+        "DIVISION_COUNT",
+        "MINOR_PER_DIVISION",
+        "MINOR_SPACING",
+    ):
+        assert not re.search(rf"^{name}\s*=", src, re.M), (
+            f"{name} is copied, not imported"
+        )
+
+
+def test_reserved_terms_are_scored_on_the_worst_broad_input(report):
+    """Knife stall is a fixed displacement and readout error a fixed fraction
+    of the k=0 reading, so both are larger against a trial whose greatest term
+    is smaller than the all-ones 20; the gated value must be the worst broad
+    input, not the all-ones one."""
+    cf = report["closed_form"]
+    knife, ro = cf["knife"], cf["readout"]
+    assert knife["pct_fs"] == pytest.approx(
+        max(v for n, v in knife["pct_fs_per_input"].items() if n != "pair_1_20")
+    )
+    assert knife["pct_fs"] > 2.0 * knife["pct_fs_per_input"]["all_ones"]
+    assert ro["pct_fs"] == pytest.approx(
+        max(
+            v
+            for n, v in ro["pct_fs_greatest_term_spans_stroke"].items()
+            if n != "pair_1_20"
+        )
+    )
+    assert ro["pct_fs"] > ro["pct_fs_greatest_term_spans_stroke"]["all_ones"]
 
 
 def test_reference_inputs_stay_on_the_lifting_side():
@@ -276,20 +324,22 @@ def test_drawing_limits_agree_with_the_budget(budget):
     """Every budgeted limit that reaches a manufacturing output (drawing note,
     GD&T zone, fit band) carries the SAME number as error_budget.yaml."""
     import channel_spring_installed_notes
+    import cylinder_gear_notes
     import cylinder_gear_spec
     import measuring_stick_spec
     import summing_lever_spec
 
     feats = budget["critical_features"]
-    ecc_tol = feats["cam_eccentricity"]["tolerance"]
+    assert cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM == pytest.approx(
+        feats["cam_eccentricity"]["tolerance"]
+    ), "cylinder-gear drawing carries a different eccentricity tolerance"
+    assert cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
+        feats["cam_phase"]["tolerance"]
+    ), "cylinder-gear drawing carries a different cam-phase tolerance"
     assert (
-        f"AXIS OFFSET {cylinder_gear_spec.ECCENTRICITY:.3f} +/-{ecc_tol:.3f}"
-        in cylinder_gear_spec.DRAWING_NOTES
-    ), "cylinder-gear drawing note carries a different eccentricity tolerance"
-    assert (
-        f"NOTCH CENTERLINE\n  WITHIN +/-{feats['cam_phase']['tolerance']:.2f} DEG"
-        in cylinder_gear_spec.DRAWING_NOTES
-    ), "cylinder-gear drawing note carries a different cam-phase tolerance"
+        f"WITHIN +/-{cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG:.2f} DEG"
+        in cylinder_gear_notes.DRAWING_NOTES
+    ), "cam-phase tolerance does not reach the cylinder-gear drawing notes"
     assert (
         f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.2f}% OF THE SET MEAN"
         in channel_spring_installed_notes.DRAWING_NOTES

@@ -59,14 +59,20 @@ reserved:
                                    # magnification each input needs vs the all-ones setting
                                    # (2.0-2.4x for the broad inputs -- the open magnifier-range
                                    # item). `false` scores a fixed magnifier at the all-ones setting.
-    allowance_pct: 0.50            # = the 0.5-unit quantisation of Michelson's own tables
+    allowance_pct: 0.55            # 0.5 (the 0.5-unit quantisation of Michelson's own tables)
+                                   # scaled by sum(x_read)/sum(x) on the worst broad input --
+                                   # idle bars read ~0.029 each and inflate the k=0 term the
+                                   # reading error is a fraction of (Gaussian: 1.033x)
   timebase:                        # reading coefficient k with the crank stopped on its index,
                                    # scored on the worst reference input
     crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
     allowance_pct: 0.30
-  knife:                           # summing-lever knife-edge hysteresis (stall)
+  knife:                           # summing-lever knife-edge hysteresis (stall), scored on the
+                                   # worst broad input: the stall is a fixed displacement, so
+                                   # against the Gaussian's greatest term (sum x_read ~8.9) it is
+                                   # 2.4x the all-ones value
     rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
-    allowance_pct: 0.10
+    allowance_pct: 0.25
     # The knife load is the 20 channel preloads PLUS the counter spring's
     # balancing reaction (20*preload*a/b). The CAD's counter spring
     # (counter_spring_spec: 0.51 N/mm, at most ~28 mm of extension in its

@@ -9,6 +9,16 @@ exactly ``DRAWING_DIMENSIONS``.
 from __future__ import annotations
 
 
+# --- Scale geometry (shared with build_measuring_stick and error_budget). ---
+DIVISION_SPACING = 14.2  # ch16 page001_img02 (200 mm bar at 5.65 px/mm): the
+# 0 and 10 numerals sit 805 px = 142 mm apart -- one half of the rocker arm's
+# 292 mm working arc, as the text says (2026-09 re-derive; the old 80 mm was a
+# misread of the 8 mm width callout).
+DIVISION_COUNT = 11  # full ticks 0..10 (stated 0-10 scale)
+MINOR_PER_DIVISION = 10  # tenths: 9 short ticks between full ticks (page001_img03)
+MINOR_SPACING = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42
+
+
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Only the bar's overall envelope (BodyProfile length + width) is
 # marked; the 0-10 graduation swarm (11 ticks, 90 tenths + the longer 0.5 tick) is carried
@@ -26,10 +36,10 @@ DRAWING_NOTES = "\n".join(
         "   SHOWN. SCALE SPAN 142.00; THE 10 TICK 0.50 +/-0.25 FROM",
         "   THE FAR END.",
         "2. ENGRAVE 11 FULL TICKS (VALUES 0 THRU 10). THE 0 TICK",
-        "   IS THE DATUM: TICK N AT 14.20 X N FROM THE 0 TICK,",
+        f"   IS THE DATUM: TICK N AT {DIVISION_SPACING:.2f} X N FROM THE 0 TICK,",
         "   EACH WITHIN +/-0.05 OF ITS OWN POSITION",
-        "   (NONCUMULATIVE; 0-TO-10 SPAN 142.00 REF). NINE MINOR",
-        "   TICKS PER DIVISION AT 1.42 PITCH, 1.80 +/-0.10 UP FROM",
+        f"   (NONCUMULATIVE; 0-TO-10 SPAN {10 * DIVISION_SPACING:.2f} REF). NINE MINOR",
+        f"   TICKS PER DIVISION AT {MINOR_SPACING:.2f} PITCH, 1.80 +/-0.10 UP FROM",
         "   THE BOTTOM EDGE SHOWN, SAME SLOT SECTION.",
         "   SLOTS: SQUARE BOTTOM, 0.40 +/-0.05 WIDE, 0.50 +/-0.05",
         "   DEEP NORMAL TO THE RULED FACE; EACH FULL TICK RUNS",
@@ -49,11 +59,11 @@ DRAWING_NOTES = "\n".join(
         "4. TICK VALUES ARE ALSO SHOWN OFFSET BELOW THE BAR FOR",
         "   LEGIBILITY; THE ENGRAVED NUMERALS ARE PER NOTE 3.",
         "5. SETTING: THE 0 TICK SITS AT THE ROCKER PIVOT AXIS. THE",
-        "   SCALE IS LINEAR IN STATION (1 DIVISION = 14.20); THE",
-        "   ORDINATE IS NOT: LOOK UP EACH WANTED ORDINATE'S STICK",
-        "   READING IN THE TABLE IN READOUT.MD (RELEASE BUNDLE),",
-        "   WHICH ALSO GIVES THE CORRECTIONS. SET EACH BAR BY",
-        "   INTERPOLATING TO 1/5 MINOR DIVISION (0.28);",
+        f"   SCALE IS LINEAR IN STATION (1 DIVISION = {DIVISION_SPACING:.2f}); THE",
+        "   ORDINATE IS NOT: SET EACH BAR TO ITS LINEAR STATION, THEN",
+        "   RECORD THE ORDINATE IT READS FROM THE TABLE IN READOUT.MD",
+        "   (RELEASE BUNDLE), WHICH ALSO GIVES THE CORRECTIONS. SET",
+        "   BY INTERPOLATING TO 1/5 MINOR DIVISION (0.28);",
         "   SETTING ERROR +/-0.25 MAX PER BAR.",
     )
 )
