@@ -218,10 +218,13 @@ Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, e
 uniform within ± tolerance per channel — `class: channel` drawn once per draw and shared by
 every trial, `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
 station — so a gain error scales the channel's second harmonic, a phase error rotates it, and a
-kinematic deviation (eccentricity, pin radius, the lever arms: `WAVEFORM_FIELDS`) **reshapes** it
+kinematic deviation (eccentricity, the rod pin, the lever's bar pin and spring eye: `feature_axes`) **reshapes** it
 through a linearised deviated cycle (central differences of the exact kinematics, exact to 1e-6 of
 the stroke), so the operator's fixed κ row is wrong for that channel by the amount the tolerance
-moves c2/c1 — second order, but scored, not assumed — then through the shipped readout;
+moves c2/c1 — second order, but scored, not assumed. A hole held by a diametral **position zone** draws
+**both axes** (the zone's bounding square): the rod pin's tangential offset and, on the lever, the hook-line
+skew a tangential hole offset amounts to — 10–30× weaker than the radial arm, but sampled, not assumed —
+then through the shipped readout;
 every bar at the physical amplitude its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
 deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
@@ -231,15 +234,15 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
 |---|---:|---:|---:|---:|---:|---|
 | cam eccentricity | 0.025 mm | 0.026 | 0.14 | 0.26 | 0.048 | offset-turn in a 4-jaw, indicate the throw |
-| rocker rod-pin radius | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.73 | DRO/CNC hole position |
-| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.73 | DRO/CNC hole position |
-| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.97 | DRO/CNC hole position |
+| rocker rod-pin radius | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.73 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
+| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
+| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.96 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
 | summing hook arm | 0.15 mm | 0.034 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
 | **spring rate** | **1.25 %** | **0.113** | **0.60** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.039 | 0.21 | 0.23 | 0.32 | on the cylinder-gear drawing's native `NotchPhase` angular dimension (lobe axis to notch radial, 1.50° ± 0.25°) |
 | mesh lag spread | 0.14° | 0.022 | 0.12 | 0.13 | 0.32 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.081 | 0.47 | 0.54 | 0.15 | `READOUT.md` step 1 (an operating allowance, not a part limit — the stick drawing carries only the pointer, per drawing-simplicity rule 6): interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
-| **all combined** | | **0.154** | **0.82** | **1.50** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.081 | 0.47 | 0.52 | 0.15 | `READOUT.md` step 1 (an operating allowance, not a part limit — the stick drawing carries only the pointer, per drawing-simplicity rule 6): interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
+| **all combined** | | **0.154** | **0.81** | **1.48** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
@@ -282,7 +285,7 @@ two-channel consistency target. Read it as follows.
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform). Scored on the **physical trace through the procedure**: the pen read at $\theta_k + \delta$ while the second-harmonic and read-vs-set corrections stay at $\theta_k$ (`NominalTrial.readout(theta_error=…)`, so live idle bars, calibrated ordinates and the CAD's own harmonics all enter the slope), RMS over k and the uniform band, worst reference input (the lifted square), each input at the ordinate scale the pen forces. The ideal-vector slope $-\sum i x_i \sin(i\theta_k)$ gives 0.254 there against the physical 0.261 (the hook motion's harmonics are a larger share at small stations; on the two-channel case 0.059 vs 0.035) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.26 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm). The stall is a fixed displacement, so against a trial's greatest term it is 1.7 % / (scale × Σx) — and the pen caps every broad input at the same 4.7-bar capacity, so **all four read 0.40 %** (0.09 % if all-ones could run at full scale), 0.86 % on the two-channel case. **The capacity, not the edge, is what this term buys**: a clamp band reaching nearer the knife or a longer pen stroke halves it; *measure* as trace width on a slow reversal | 0.40 % FS | 0.45 |
 | **total** | residual + RSS(scatter 0.154, readout, timebase, knife) | **0.59 % MAE** | **0.7 benchmark** |
-| **two-channel worst coefficient** | the pair's own residual max 0.09 + RSS(its scatter p99 1.50, readout worst-coefficient bound 0.80, timebase 0.06, knife 0.86) — every reserved term evaluated on the sparse input, since its criterion is a worst coefficient, not an MAE | **2.00 %** | **2.0 benchmark** — no headroom; the spring-rate scatter (1.16 of the 1.50) and the knife stall at the capacity the pen forces are what the open items above would buy back |
+| **two-channel worst coefficient** | the pair's own residual max 0.09 + RSS(its scatter p99 1.48, readout worst-coefficient bound 0.80, timebase 0.06, knife 0.86) — every reserved term evaluated on the sparse input, since its criterion is a worst coefficient, not an MAE | **1.99 %** | **2.0 benchmark** — no headroom; the spring-rate scatter (1.15 of the 1.48) and the knife stall at the capacity the pen forces are what the open items above would buy back |
 
 `check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
 coarser reading or a duller knife cannot be hidden behind a green scatter result. **The knife

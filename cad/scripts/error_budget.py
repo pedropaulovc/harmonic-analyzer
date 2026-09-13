@@ -96,6 +96,10 @@ class Nominal:
     lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
     wheel_ratio: float  # rim wire radius / hub wire radius
     pen_half: float  # the pen's physical half-stroke
+    # -- deviation-only axes (0 as designed) --
+    hook_skew: float = 0.0  # rad: hook direction vs fulcrum->bar-pin direction on the
+    # lever part -- what a TANGENTIAL offset of either hole (the drawing's position
+    # zone) amounts to; the radial offsets are bar_pin_arm / hook_arm themselves
 
 
 def nominal() -> Nominal:
@@ -257,7 +261,7 @@ def hook_displacement(theta: np.ndarray, d: float, nom: Nominal) -> np.ndarray:
     tx = kx - (nom.contact_dx * c - nom.contact_dy * s) + nom.bar_len * s
     ty = ky - (nom.contact_dx * s + nom.contact_dy * c) + nom.bar_len * c
     phi = np.arctan2(ty - nom.fulcrum_dy, nom.fulcrum_dx - tx)  # lever tilt
-    return nom.hook_arm * np.sin(phi)
+    return nom.hook_arm * np.sin(phi + nom.hook_skew)
 
 
 def linear_gain(nom: Nominal) -> float:
@@ -402,17 +406,43 @@ _CYCLE_TABLES: dict[tuple, "CycleTable"] = {}
 _CYCLE_DERIVATIVES: dict[tuple, dict[str, "CycleTable"]] = {}
 
 # Budget features that perturb the channel's KINEMATICS (the Nominal field each
-# one moves): their deviation changes the hook waveform's shape -- eccentricity
-# sets c2/c1 ~ e/L, the pin radius the rocker swing's nonlinearity -- not only
-# its fundamental, so the Monte Carlo samples a linearised deviated cycle for
-# them (``cycle_derivatives``). summing_hook_arm and spring_rate are pure force-
-# balance scalars (they never enter ``hook_displacement``) and stay a gain.
+# one moves, radially): their deviation changes the hook waveform's shape --
+# eccentricity sets c2/c1 ~ e/L, the pin radius the rocker swing's
+# nonlinearity -- not only its fundamental, so the Monte Carlo samples a
+# linearised deviated cycle for them (``cycle_derivatives``). summing_hook_arm
+# and spring_rate are pure force-balance scalars (they never enter
+# ``hook_displacement``) and stay a gain.
 WAVEFORM_FIELDS = {
     "cam_eccentricity": "ecc",
     "rocker_rod_pin_radius": "pin_x",
     "lever_bar_pin_arm": "bar_pin_arm",
     "lever_spring_hook_arm": "hook_arm",
 }
+
+
+def feature_axes(nom: Nominal) -> dict[str, tuple[tuple[str, float], ...]]:
+    """Per kinematic feature, the Nominal fields its +/-tolerance moves and the
+    field units per mm of deviation. A hole held by a diametral POSITION zone
+    (the rocker rod pin, the lever's bar pin and spring eye: zone = 2 x the
+    budget's +/-tol) may sit off both radially AND tangentially, so those draw
+    two axes -- the Monte Carlo samples the zone's bounding square, a superset
+    of the disc. Tangential: the rod pin's ``pin_y``; on the lever, a hole
+    offset of delta skews the hook direction from the bar-pin direction by
+    delta/arm (``hook_skew``). The summing-lever spring hole's tangential
+    (vertical) offset leaves its horizontal moment arm unchanged to first
+    order, so ``summing_hook_arm`` stays one gain axis."""
+    return {
+        "cam_eccentricity": (("ecc", 1.0),),
+        "rocker_rod_pin_radius": (("pin_x", 1.0), ("pin_y", 1.0)),
+        "lever_bar_pin_arm": (
+            ("bar_pin_arm", 1.0),
+            ("hook_skew", -1.0 / nom.bar_pin_arm),
+        ),
+        "lever_spring_hook_arm": (("hook_arm", 1.0), ("hook_skew", 1.0 / nom.hook_arm)),
+    }
+
+
+DERIVATIVE_FIELDS = ("ecc", "pin_x", "pin_y", "bar_pin_arm", "hook_arm", "hook_skew")
 
 
 @dataclass(frozen=True)
@@ -454,9 +484,13 @@ class CycleTable:
 
 
 def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
-    stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
+    """The regular grid through the last multiple of ``step_mm`` NOT past the
+    stop, then the stop itself (a short last interval when it is off-grid) --
+    never a row beyond the configured travel."""
+    n = math.floor(nom.d_max / step_mm + 1e-9)
+    stations = np.arange(n + 1) * step_mm
     if not math.isclose(stations[-1], nom.d_max):
-        stations = np.append(stations, nom.d_max)  # the stop, always a row
+        stations = np.append(stations, nom.d_max)
     return stations
 
 
@@ -480,21 +514,22 @@ def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
 
 
 def cycle_derivatives(nom: Nominal, step_mm: float = 0.25) -> dict[str, CycleTable]:
-    """d(cycle)/d(field) per ``WAVEFORM_FIELDS`` feature, on ``cycle_table``'s
-    grid, by central differences of the exact kinematics (h = 0.05 mm; the
-    tolerances are 0.025-0.15 mm, so first order is exact to ~1e-6 of the
-    cycle). ``read``/``kappa`` of a derivative table are unused (zeros)."""
+    """d(cycle)/d(field) per ``DERIVATIVE_FIELDS`` Nominal field, on
+    ``cycle_table``'s grid, by central differences of the exact kinematics
+    (h = 0.05 mm, or 0.05/arm rad for the skew; the tolerances are 0.025-0.15
+    mm, so first order is exact to ~1e-6 of the cycle). ``read``/``kappa`` of
+    a derivative table are unused (zeros)."""
     key = astuple(nom)
     if key not in _CYCLE_DERIVATIVES:
         stations = _station_grid(nom, step_mm)
-        h = 0.05
         out = {}
-        for feature, field in WAVEFORM_FIELDS.items():
+        for field in DERIVATIVE_FIELDS:
+            h = 0.05 / nom.hook_arm if field == "hook_skew" else 0.05
             hi = _cycles_at(stations, replace(nom, **{field: getattr(nom, field) + h}))
             lo = _cycles_at(stations, replace(nom, **{field: getattr(nom, field) - h}))
             dc = (hi - lo) / (2.0 * h)
             zeros = np.zeros(len(stations))
-            out[feature] = CycleTable(stations, dc, dc.mean(axis=1), zeros, zeros)
+            out[field] = CycleTable(stations, dc, dc.mean(axis=1), zeros, zeros)
         _CYCLE_DERIVATIVES[key] = out
     return _CYCLE_DERIVATIVES[key]
 
@@ -804,13 +839,17 @@ def _channel_model(
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
-    shape: dict[str, tuple[CycleTable, np.ndarray]] = {}
+    shape: dict[str, np.ndarray] = {}  # Nominal field -> draws x 20 deviation
+    axes = feature_axes(nom)
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
     for key, v in dev.items():
-        if key in WAVEFORM_FIELDS:
-            # the linearised deviated cycle: its gain AND its shape
-            shape[key] = (cycle_derivatives(nom)[key], v)
+        if key in axes:
+            # the linearised deviated cycle: its gain AND its shape, per axis
+            # (a one-axis feature may arrive as draws x 20)
+            comps = v[..., None] if v.ndim == 2 else v
+            for (field, per_mm), comp in zip(axes[key], np.moveaxis(comps, -1, 0)):
+                shape[field] = shape.get(field, 0.0) + per_mm * comp
         elif key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
         elif key in ("cam_phase", "mesh_lag_spread"):
@@ -843,7 +882,10 @@ def _channel_model(
     recorded = set_stations + bias
     x_read = np.interp(recorded, t.stations, t.read) / scale
     kappa = np.interp(recorded, t.stations, t.kappa)
-    measured = _read_draws(x, t, g, phi, d, x_read, kappa, shape)
+    tables = cycle_derivatives(nom)
+    measured = _read_draws(
+        x, t, g, phi, d, x_read, kappa, {f: (tables[f], v) for f, v in shape.items()}
+    )
     # the NOMINAL machine through the same sampler (g = 1, phi = 0, bars at
     # their set stations, the set-station row): its residual is the closure's
     # separate nominal_residual_mae term, so the scatter scores deviations only
@@ -927,11 +969,19 @@ def monte_carlo(
                 f"{key}: class must be channel or setup, got {f['class']!r}"
             )
 
-    def draw(f: dict[str, Any]) -> np.ndarray:
-        return rng.uniform(-f["tolerance"], f["tolerance"], size=(draws, N_ELEMENTS))
+    axes = feature_axes(nom)
+
+    def draw(key: str, f: dict[str, Any]) -> np.ndarray:
+        # one column per axis the feature moves: a position zone's radial AND
+        # tangential offsets, each uniform within +/-tol (feature_axes)
+        n_axes = len(axes.get(key, ((key, 1.0),)))
+        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
+        return rng.uniform(-f["tolerance"], f["tolerance"], size=size)
 
     all_dev = {
-        key: draw(f) if f["class"] == "channel" else {n: draw(f) for n in names}
+        key: draw(key, f)
+        if f["class"] == "channel"
+        else {n: draw(key, f) for n in names}
         for key, f in feats.items()
     }
 

@@ -600,7 +600,7 @@ def test_kinematic_deviations_reshape_the_waveform_not_just_its_gain(nom):
     exact = eb.hook_displacement(
         grid, 44.0, dataclasses.replace(nom, ecc=nom.ecc + tol)
     )
-    linear = t.sample(44.0, grid) + tol * dv["cam_eccentricity"].sample(44.0, grid)
+    linear = t.sample(44.0, grid) + tol * dv["ecc"].sample(44.0, grid)
     assert np.max(np.abs(exact - linear)) < 1e-6 * np.max(np.abs(exact))
 
     def kappa(u):
@@ -608,6 +608,7 @@ def test_kinematic_deviations_reshape_the_waveform_not_just_its_gain(nom):
 
     assert kappa(exact) != pytest.approx(kappa(t.sample(44.0, grid)), rel=1e-4)
     assert "summing_hook_arm" not in eb.WAVEFORM_FIELDS
+    assert "summing_hook_arm" not in eb.feature_axes(nom)
     # through the model: an eccentricity draw on channel 1 must leave a
     # second-harmonic residual the fixed kappa correction cannot remove
     x = eb.reference_inputs()["all_ones"]
@@ -631,6 +632,61 @@ def test_kinematic_deviations_reshape_the_waveform_not_just_its_gain(nom):
     assert np.max(np.abs(e - e_gain)) < 0.1 * np.max(np.abs(e))  # and second order
 
 
+def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
+    """A hole held by a diametral position zone may sit off tangentially as
+    well as radially, so the rod pin, bar pin and spring eye draw TWO axes
+    (the zone's bounding square), each through the exact kinematics: the
+    linearised tangential tables match the exact deviated cycle, the tangential
+    response is real but far below the radial one (a skew of the hook line
+    changes the hook height's AC part only by cos(skew) - 1 and the rest
+    tilt), and the Monte Carlo actually samples the second column."""
+    grid = eb._READ_GRID
+    t = eb.cycle_table(nom)
+    dv = eb.cycle_derivatives(nom)
+    axes = eb.feature_axes(nom)
+    assert [f for f, _ in axes["rocker_rod_pin_radius"]] == ["pin_x", "pin_y"]
+    assert [f for f, _ in axes["lever_bar_pin_arm"]] == ["bar_pin_arm", "hook_skew"]
+    assert [f for f, _ in axes["lever_spring_hook_arm"]] == ["hook_arm", "hook_skew"]
+    assert axes["lever_bar_pin_arm"][1][1] == pytest.approx(-1.0 / nom.bar_pin_arm)
+    for field, h in (("pin_y", 0.1), ("hook_skew", 0.1 / nom.hook_arm)):
+        exact = eb.hook_displacement(
+            grid, 44.0, dataclasses.replace(nom, **{field: getattr(nom, field) + h})
+        )
+        linear = t.sample(44.0, grid) + h * dv[field].sample(44.0, grid)
+        assert np.max(np.abs(exact - linear)) < 1e-6 * np.max(np.abs(exact))
+    nominal_ac = t.sample(44.0, grid)
+    nominal_ac = np.max(np.abs(nominal_ac - nominal_ac.mean()))
+
+    def ac_gain(field, h):
+        u = eb.hook_displacement(
+            grid, 44.0, dataclasses.replace(nom, **{field: getattr(nom, field) + h})
+        )
+        return np.max(np.abs(u - u.mean())) / nominal_ac - 1.0
+
+    radial = abs(ac_gain("pin_x", 0.1))
+    tangential = abs(ac_gain("pin_y", 0.1))
+    assert 0.0 < tangential < 0.1 * radial
+    # the sampler: a tangential-only draw moves the reading, by less than the radial one
+    x = eb.reference_inputs()["all_ones"]
+    f = eb.NominalTrial(nom).magnifier_setup(x).ordinate_scale
+    sens = eb.gain_sensitivities(nom)
+    both = np.zeros((2, eb.N_ELEMENTS, 2))
+    both[0, 0, 0] = 0.1  # radial on channel 1, draw 0
+    both[1, 0, 1] = 0.1  # tangential on channel 1, draw 1
+    e = eb._channel_model(x, nom, {"rocker_rod_pin_radius": both}, sens, 0.25, f)
+    assert np.max(np.abs(e[1])) > 1e-5
+    assert np.max(np.abs(e[1])) < 0.25 * np.max(np.abs(e[0]))  # ~0.11 at the trial scale
+    mc = eb.monte_carlo(
+        {**budget, "monte_carlo": {**budget["monte_carlo"], "draws": 20}},
+        nom,
+        {
+            n: eb.NominalTrial(nom).magnifier_setup(eb.reference_inputs()[n])
+            for n in budget["reference_inputs"]
+        },
+    )
+    assert mc["per_feature"]["rocker_rod_pin_radius"]["mae"] > 0
+
+
 def test_cycle_table_always_ends_at_the_travel_stop(nom):
     """A full scale off the 0.25 mm grid gets the stop APPENDED (a short last
     interval), never overwritten onto the last grid row, and the lookup
@@ -639,6 +695,13 @@ def test_cycle_table_always_ends_at_the_travel_stop(nom):
     odd = dataclasses.replace(nom, d_max=88.1)
     t = eb.cycle_table(odd)
     assert t.stations[-3:] == pytest.approx([87.75, 88.0, 88.1])
+    # and a stop just short of the next grid line never gets that line
+    # (88.25) generated past it: the grid stops at 88.0, then 88.2
+    over = eb.cycle_table(dataclasses.replace(nom, d_max=88.2))
+    assert over.stations[-3:] == pytest.approx([87.75, 88.0, 88.2])
+    assert np.all(np.diff(over.stations) > 0)
+    assert eb.cycle_table(nom).stations[-1] == nom.d_max  # on-grid: no duplicate row
+    assert np.all(np.diff(eb.cycle_table(nom).stations) > 0)
     grid = eb._READ_GRID
     assert np.allclose(
         t.sample(88.1, grid), eb.hook_displacement(grid, 88.1, odd), atol=1e-12
