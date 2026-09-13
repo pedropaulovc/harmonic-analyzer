@@ -257,7 +257,10 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert "Set bar $i$ to the **linear station**" in doc
     assert f"\\ell = {report['null_lift_ordinate']:.4f}" in doc
     assert "-c$ at every odd $k$" in doc
-    assert "\\kappa_i \\cos(2 i \\theta_k)" in doc
+    # the c2 correction is scaled by the READ ordinate: an idle bar still moves
+    assert "\\sum_i x^{read}_i\\,\\kappa_i \\cos(2 i \\theta_k)" in doc
+    assert "\\sum_i x_i\\,\\kappa_i" not in doc
+    assert f"\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}" in doc
     assert "crank stopped on its index" in doc
     assert "ONE direction" in doc
 

@@ -253,8 +253,9 @@ the specification.
    measured lift, so only the scatter about it survives; a full-scale bar is one-sided the other
    way, [−0.25, 0] against the travel stop (the Monte Carlo samples both one-sided bands and
    subtracts their known means).
-2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x_i$ (the operator
-   set the bars) — Michelson's normalisation to the greatest term. This removes all common-mode
+2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x^\text{read}_i$
+   (the read ordinates of the stations the operator set) — Michelson's normalisation to the
+   greatest term. This removes all common-mode
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
    k = 0 term to the full stroke (the CAD's `pen_driver` maps the trace peak onto the stroke).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
@@ -264,10 +265,13 @@ the specification.
 4. **Mean-line zero**: for each trial, take the zero as the mean of the trace over one full
    period, not the pen's neutral position. This removes the one-sided-swing DC, spring-preload
    scatter, strap-clearance offsets and tare drift in one step.
-5. **Second-harmonic correction**: subtract $\sum_i x_i\,\kappa_i \cos(2 i\theta_k)$ from
-   reading $k$, with $\kappa_i$ the per-station ratio from the report (or measured: run channel
-   20 alone; $\kappa = (r_\text{even}-|r_\text{odd}|)/(r_\text{even}+|r_\text{odd}|)$ over its
-   alternating readings). The ordinates $x_i$ are known — the operator set them.
+5. **Second-harmonic correction**: subtract $\sum_i x^\text{read}_i\,\kappa_i \cos(2 i\theta_k)$
+   from reading $k$, with $\kappa_i = c_2/c_1$ the per-station ratio from the report (or
+   measured: run channel 20 alone;
+   $\kappa = (r_\text{even}-|r_\text{odd}|)/(r_\text{even}+|r_\text{odd}|)$ over its
+   alternating readings). Use the **read** ordinate, not the set one: an idle bar still moves
+   (its $c_1$ is the null lift), so its second harmonic is $\kappa\,x^\text{read} \neq 0$ — on
+   `pair_1_20` the 18 idle channels' $c_2$ is what the correction removes.
 6. **Crank in one direction**, and read coefficient $k$ with the crank stopped on its index at
    $2k$ turns (the 80-turn period makes $\theta_k = k\pi/20$ exactly two turns apart) rather
    than at a ruled abscissa on a moving paper.

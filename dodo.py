@@ -2537,17 +2537,19 @@ def task_check():
             # toleranced nominal still resolves to the spec constant the CAD
             # builds from, the drawing limits equal the budget's, and the Monte
             # Carlo of error_budget.yaml lands inside its targets. Pure python.
-            # Deps: the model, its config, and every spec module it imports (a
-            # geometry re-anchor must re-run the budget, not reuse the stamp).
+            # Deps: the model, its config, every spec module the model OR the
+            # test imports (the test lazily imports the notes/spec modules whose
+            # drawing lines it pins to the budget -- a note edit must re-run
+            # the gate, not reuse the stamp; Codex #742), and the two builders
+            # the test reads as TEXT (the assembly imports SolidWorks so it
+            # cannot be imported offline, and the stick builder is scanned for
+            # its spec import): module_deps_of cannot see either.
             "file_dep": sorted(
                 {
                     str((SCRIPTS_DIR / "error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
-                    # read as TEXT by the gate (the assembly imports SolidWorks so
-                    # it cannot be imported offline): module_deps_of cannot see it.
                     str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
-                    str((SCRIPTS_DIR / "channel_spring_installed_notes.py").resolve()),
-                    str((SCRIPTS_DIR / "measuring_stick_spec.py").resolve()),
+                    str((SCRIPTS_DIR / "build_measuring_stick.py").resolve()),
                     str((CONFIG_DIR / "error_budget.yaml").resolve()),
                     str((CONFIG_DIR / "tolerances.yaml").resolve()),
                     str((CONFIG_DIR / "machine" / "amplitude.yaml").resolve()),
@@ -2558,6 +2560,7 @@ def task_check():
                         ).resolve()
                     ),
                     *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
+                    *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
                 }
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],

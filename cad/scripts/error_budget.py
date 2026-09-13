@@ -367,8 +367,10 @@ def nominal_design_errors(
     every odd k; pass ``null_lift`` to subtract that known vector after the
     k=0 normalisation (the buildable form of "zero the stick at the null
     station"). ``correct_second_harmonic`` applies the readout correction of
-    tolerance-policy.md: the operator subtracts sum_i x_i kappa_i cos(2 i theta_k)
-    using the per-station kappa table. ``calibrated_stick`` graduates the stick
+    tolerance-policy.md: the operator subtracts sum_i x_i^read kappa_i cos(2 i
+    theta_k) using the per-station kappa (= c2/c1) table -- the READ ordinate,
+    since an idle bar's c2 is not zero (its c1 is the null lift, not 0).
+    ``calibrated_stick`` graduates the stick
     from single-channel runs instead of a ruler (Michelson's "hand stamped,
     unevenly spaced" stick): each channel's fundamental is read as the
     ordinate the calibration table assigns its station, so the machine-hand
@@ -1025,15 +1027,18 @@ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
 Divide every reading by the $k=0$ reading and multiply by the sum of the read
 ordinates from step 1 (Michelson's normalisation to the greatest term). Before
 dividing, subtract from the $k=0$ reading the second-harmonic total
-$\\sum_i x_i \\kappa_i$ in the same units (step 4's correction at $k=0$).
+$\\sum_i x^{{read}}_i \\kappa_i$ in the same units (step 4's correction at $k=0$).
 
 ## 4. Correct
 
 Subtract, at each $k$:
 
-- the second-harmonic term $\\sum_i x_i\\,\\kappa_i \\cos(2 i \\theta_k)$ with
-  $\\kappa_i$ from the table above at each bar's station (the connecting-rod
-  distortion, 1.4-5 % of each channel's amplitude);
+- the second-harmonic term $\\sum_i x^{{read}}_i\\,\\kappa_i \\cos(2 i \\theta_k)$ with
+  $\\kappa_i = c_2/c_1$ from the table above at each bar's station (the
+  connecting-rod distortion, 1.4-5 % of each channel's amplitude). Use the
+  READ ordinate, not the set one: an idle bar ($x^{{set}} = 0$) still moves, so
+  its second harmonic is $\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}$,
+  not zero;
 - the read-vs-set deviation vector $\\sum_i (x^{{read}}_i - x^{{set}}_i)\\cos(i\\theta_k)$
   -- for an idle bar $x^{{read}} = {rows[0][1]:+.4f}$ against $x^{{set}} = 0$, so this
   is the null lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$)
