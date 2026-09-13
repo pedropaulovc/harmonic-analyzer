@@ -264,7 +264,7 @@ def _select_view_entity(
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(f"failed to select {label} {entity_type.lower()} {where}")
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
-    if count != 1:
+    if entity is not None and count != 1:
         raise RuntimeError(
             f"selecting {label} {entity_type.lower()} produced {count} entities"
         )
@@ -299,18 +299,9 @@ def _select_annotation_entity(
             raise ValueError(f"{label} requires edge_xy, edge_entity, or entity")
         return _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
 
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = view
-    selectable = _early_bound(edge_entity, "IEntity")
-    selected = adapter._attempt(lambda: selectable.Select4(False, selection_data))
-    if not selected:
-        raise RuntimeError(f"failed to select {label} entity in drawing view")
-    count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
-    if count != 1:
-        raise RuntimeError(f"selecting {label} entity produced {count} entities")
+    _select_view_entity(
+        adapter, view, entity_type, None, label=label, entity=edge_entity
+    )
     return edge_entity
 
 
