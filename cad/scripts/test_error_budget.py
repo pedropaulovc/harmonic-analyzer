@@ -255,7 +255,7 @@ def test_shipped_scale_rule_is_the_table_solve_not_proportion(report, nom):
     naive = cap / trial.peak_bars(ones * nom.d_max)
     assert naive > trial.ordinate_scale_for(ones, cap) * 1.05
     assert trial.peak_bars(naive * ones * nom.d_max) > 1.08 * cap
-    doc = eb.readout_procedure(report, nom)
+    doc = eb.readout_procedure(report)
     assert "largest $f$ for which $P(f)" in doc
     assert "NOT by proportion" in doc
 
@@ -407,10 +407,20 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("cam home phase") for b in bad), bad
     # the shipped procedure says so, with the as-built numbers
-    doc = eb.readout_procedure(report, nom)
+    doc = eb.readout_procedure(report)
     assert "**As built, this CAD does not reach that residual.**" in doc
     assert f"{cl['total_mae_as_built']:.2f} % against" in doc
     assert "#749" in doc
+    assert "note 5" not in doc  # the stick drawing has four notes
+    # and it is rendered from the report's OWN machine (the credited one),
+    # never a separately constructed Nominal: a report on a different machine
+    # renders a different document (the tables are phase-invariant to 1e-5,
+    # so the check is on the model identity the header prints)
+    assert report["nominal"]["cam_home_deg"] == 0.0
+    assert "cam home phase 0 deg" not in doc  # the header names the as-built 1.5
+    shifted = {**report, "nominal": {**report["nominal"], "d_max": 79.3}}
+    assert "|   79.3 |" in eb.readout_procedure(shifted)
+    assert "|   79.3 |" not in doc
 
 
 def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
@@ -470,7 +480,7 @@ def test_shipped_procedure_caps_the_clamp_radius_at_the_built_pose(report, nom):
     """The R = 66 x 4.72 / P rule would ask for R > 165 mm on a small input;
     READOUT.md must cap it at the as-built radius and tell the operator the
     short-stroke cost (scale the input up) rather than promise a full stroke."""
-    doc = eb.readout_procedure(report, nom)
+    doc = eb.readout_procedure(report)
     mag = report["closed_form"]["magnifier"]
     p_min = (
         mag["ordinate_capacity_full_scale_bars"]
@@ -497,7 +507,7 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     """The release bundle's READOUT.md must let a builder reproduce the credited
     residual: the station/ordinate/kappa table, the null lift vector, the
     second-harmonic formula and the crank-index readout."""
-    doc = eb.readout_procedure(report, nom)
+    doc = eb.readout_procedure(report)
     rows = eb.calibration_table(nom)
     assert rows[0][0] == 0.0 and rows[-1][0] == nom.d_max
     # and when full scale is not a multiple of the row step, the travel stop
@@ -933,7 +943,7 @@ def test_drawing_limits_agree_with_the_budget(budget, report, nom):
     # the shipped READOUT.md, and the stick drawing carries no note about it
     # at all (drawing-simplicity rule 6: at most four lines of part facts,
     # never a method or a tolerance; READOUT.md ships beside the drawings)
-    doc = eb.readout_procedure(report, nom)
+    doc = eb.readout_procedure(report)
     assert (
         f"(setting error +/-{feats['station_setting']['tolerance']:.2f} mm max per bar)"
         in doc

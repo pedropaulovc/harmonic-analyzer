@@ -926,9 +926,7 @@ def stage_readout_procedure(stage: Path) -> list[str]:
 
     dst = stage / "READOUT.md"
     dst.write_text(
-        error_budget.readout_procedure(
-            error_budget.build_report(), error_budget.nominal()
-        ),
+        error_budget.readout_procedure(error_budget.build_report()),
         encoding="utf-8",
     )
     staged = [dst.name]

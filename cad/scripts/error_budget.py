@@ -1667,10 +1667,12 @@ def calibration_table(
     return rows
 
 
-def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
+def readout_procedure(r: dict[str, Any]) -> str:
     """The operating/readout procedure the budget's residual assumes, as a
     self-contained Markdown document for the release bundle -- generated from
-    the model's own numbers so it cannot drift from what check:budget proved."""
+    the report's own numbers AND its own machine (``r["nominal"]``, the
+    credited one) so neither can drift from what check:budget proved."""
+    nom = Nominal(**r["nominal"])
     cf = r["closed_form"]
     mag = cf["magnifier"]
     rows = calibration_table(nom)
@@ -1754,7 +1756,8 @@ flowchart LR
 
 ## 1. Set the bars linearly; record what each one reads
 
-The stick's 0 tick sits at the rocker pivot axis (stick drawing note 5); every
+The stick's 0 tick sits at the rocker pivot axis (`channels.rocker_pivot_xy_mm`,
+the datum the stick's scale span is ruled from); every
 station is on the lifting side. Set bar $i$ to the **linear station**
 $d_i = f\\,x_i \\cdot {nom.d_max:.0f}$ mm ($= f\\,x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
 divisions on the engraved {STICK_DIVISION_MM:.2f} mm/division scale), reading
@@ -1915,7 +1918,7 @@ def _main() -> int:
     r = build_report(budget)
     if args.procedure:
         args.procedure.parent.mkdir(parents=True, exist_ok=True)
-        args.procedure.write_text(readout_procedure(r, nominal()), encoding="utf-8")
+        args.procedure.write_text(readout_procedure(r), encoding="utf-8")
         print(f"wrote {args.procedure}")
         return 0 if not budget_closes(r) else 1
     if args.json:
