@@ -173,10 +173,13 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
     )
+    # The side rim is only 1.5 mm from the rod silhouette; SelectByID2 can
+    # choose that line instead of the Hole Wizard circle. The bottom rim is
+    # clear of both side silhouettes and the rod end.
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=hole_side,
+        edge_xy=hole_bottom,
         callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.017),
         label="pen-rod wire hole",
     )
