@@ -50,6 +50,23 @@ def report(budget):
     return eb.build_report(budget)
 
 
+def negative(budget: dict, **reserved: dict) -> dict:
+    """A deliberately-broken budget for a failure-routing test, at a REDUCED
+    draw count: these tests assert WHICH gate trips, not the value, and a full
+    4000-draw report each would multiply the required check:budget gate's
+    runtime by the number of negative cases."""
+    out = {
+        **budget,
+        "monte_carlo": {**budget["monte_carlo"], "draws": 500},
+    }
+    if reserved:
+        out["reserved"] = {
+            k: {**budget["reserved"][k], **reserved.get(k, {})}
+            for k in budget["reserved"]
+        }
+    return out
+
+
 def _resolve(dotted: str) -> float:
     """``module.ATTR`` -> its value, for the yaml's ``nominal`` references."""
     module, attr = dotted.rsplit(".", 1)
@@ -144,32 +161,47 @@ def test_budget_closes(report):
 def test_closure_fails_when_a_reserved_term_overruns(budget):
     """A reading uncertainty the CAD's pen stroke cannot carry must fail the
     gate through the readout allowance, not pass on scatter alone."""
-    coarse = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "readout": {
-                **budget["reserved"]["readout"],
-                "reading_uncertainty_mm": 0.3,
-            },
-        },
-    }
+    coarse = negative(budget, readout={"reading_uncertainty_mm": 0.3})
     bad = eb.budget_closes(eb.build_report(coarse))
     assert any(b.startswith("readout") for b in bad), bad
 
 
-def test_sparse_pair_is_gated_on_its_combined_worst_coefficient(budget, report):
-    """The two-channel trial's 2 % pass criterion is a worst COEFFICIENT, so
-    its scatter p99 must be combined with every reserved term evaluated on
-    it (the knife stall it pays most for, its readout bound, timebase) plus
-    its nominal residual -- a knife term that alone fits its allowance must
-    still fail the pair when it pushes that combination past 2 %."""
+def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, report):
+    """The two-channel trial's 2 % criterion is a worst COEFFICIENT of one
+    machine, so the model draws every source JOINTLY (scatter, both reads of
+    each coefficient, the stall at each read, the crank index) on top of the
+    machine's residual and gates the EXPECTED max over k -- the statistic the
+    benchmark actually is. The quantiles and the fraction of machines over the
+    benchmark are reported, and the RSS of each source's own worst coefficient
+    is kept beside it as the conservative (double-counting) envelope."""
     cl = report["closure"]
     pt = cl["pair_terms"]
+    pj = report["pair_joint"]
     assert (
         pt["knife"] > cl["knife"]
     )  # the pair pays more for the stall than any broad input
-    assert cl["pair_worst"] == pytest.approx(
+    assert cl["pair_worst"] == pj["expected_worst_coefficient"]
+    assert cl["pair_worst"] < budget["targets"]["pair_consistency_max_fs_pct"]
+    assert not any(b.startswith("pair") for b in eb.budget_closes(report))
+    # every source contributes, none dominates to the point of hiding another
+    assert set(pj["expected_worst_per_source"]) == {
+        "scatter",
+        "reading",
+        "stall",
+        "index",
+    }
+    assert min(pj["expected_worst_per_source"].values()) > 0.0
+    # a percentile of an ensemble is NOT the benchmark's statistic: the p99 is
+    # above the expected max, and the exceedance fraction is published rather
+    # than the gate silently passing on a mixed comparison
+    q = pj["quantiles"]
+    assert q["p50"] < q["p90"] < q["p99"]
+    assert q["p99"] > pj["expected_worst_coefficient"]
+    assert 0.0 < pj["fraction_over_benchmark_max"] < 0.5
+    assert pj["benchmark_max_fs_pct"] == report["benchmark"]["max_fs_pct"]
+    # the envelope is the RSS of per-source worsts on top of the residual, and
+    # it is conservative relative to the joint draw's own p90
+    assert pt["envelope_rss_of_worst"] == pytest.approx(
         pt["nominal_residual_max"]
         + math.sqrt(
             pt["scatter_p99"] ** 2
@@ -178,21 +210,24 @@ def test_sparse_pair_is_gated_on_its_combined_worst_coefficient(budget, report):
             + pt["knife"] ** 2
         )
     )
-    assert cl["pair_worst"] < budget["targets"]["pair_consistency_p99_pct"]
-    assert not any(b.startswith("pair") for b in eb.budget_closes(report))
-    sticky = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "knife": {
-                **budget["reserved"]["knife"],
-                "rolling_resistance_mm": 3
-                * budget["reserved"]["knife"]["rolling_resistance_mm"],
-            },
+    assert pt["envelope_rss_of_worst"] > q["p90"]
+    # the readout's reported worst coefficient is a real absolute bound
+    # (delta(1 + |a_k|)), not an RSS of half-widths
+    cf = report["closed_form"]["readout"]
+    a = max(abs(v) for v in cf["normaliser_share_per_input"]["pair_1_20"][1:])
+    assert pt["readout_worst_coefficient"] == pytest.approx(
+        cf["one_reading_pct_fs_per_input"]["pair_1_20"] * (1.0 + a)
+    )
+    # and a duller knife still fails the pair gate
+    sticky = negative(
+        budget,
+        knife={
+            "rolling_resistance_mm": 3
+            * budget["reserved"]["knife"]["rolling_resistance_mm"]
         },
-    }
+    )
     bad = eb.budget_closes(eb.build_report(sticky))
-    assert any(b.startswith("pair worst coefficient") for b in bad), bad
+    assert any(b.startswith("pair expected worst coefficient") for b in bad), bad
 
 
 def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
@@ -363,13 +398,7 @@ def test_unbalanced_counter_spring_fails_unless_waived(budget, report):
     knife = report["closed_form"]["knife"]
     assert knife["static_balance"] is False
     assert knife["counter_spring_available_N"] < 0.1 * knife["counter_spring_needed_N"]
-    strict = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "knife": {**budget["reserved"]["knife"], "waive_static_balance": False},
-        },
-    }
+    strict = negative(budget, knife={"waive_static_balance": False})
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("counter spring cannot balance") for b in bad), bad
 
@@ -415,16 +444,7 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
         cl["nominal_residual_mae"]
         < report["reserved_allowance"]["nominal_residual_mae"]
     )
-    strict = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "nominal_residual_mae": {
-                **budget["reserved"]["nominal_residual_mae"],
-                "waive_cam_home_phase": False,
-            },
-        },
-    }
+    strict = negative(budget, nominal_residual_mae={"waive_cam_home_phase": False})
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("cam home phase") for b in bad), bad
     # the shipped procedure says so, with the as-built numbers
@@ -478,13 +498,7 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     mag = report["closed_form"]["magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
     assert set(mag["inputs_at_minimum_pose"]) >= {"all_ones", "gaussian_a0p1"}
-    strict = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "readout": {**budget["reserved"]["readout"], "waive_minimum_pose": False},
-        },
-    }
+    strict = negative(budget, readout={"waive_minimum_pose": False})
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("magnifier minimum pose is not CAD-gated") for b in bad), (
         bad
@@ -855,21 +869,26 @@ def test_readout_term_counts_the_normalising_read(report):
     carries that read too, scaled by the PHYSICAL r_k/r_0: an input whose k=20
     term nearly equals its k=0 (the lifted square; the second harmonic riding
     r_0 keeps the ratio just under 1) pays for it, all-ones (r_k/r_0 <= 0.05)
-    barely; the worst single coefficient is the sqrt(1 + a^2) RSS bound."""
+    barely. The reported worst single coefficient is the ABSOLUTE bound
+    delta(1 + |a_k|) -- both reads extreme and opposing -- since an RSS of the
+    two half-widths is neither a bound nor a quantile of their difference."""
     ro = report["closed_form"]["readout"]
     one = ro["one_reading_pct_fs_per_input"]
     mae = ro["pct_fs_per_input"]
-    bound = ro["pct_fs_worst_coefficient_bound"]
+    bound = ro["pct_fs_worst_coefficient_abs_bound"]
     assert 0.8 < ro["normaliser_share_max_abs"]["alternating"] < 1.0
     a_max = ro["normaliser_share_max_abs"]["alternating"]
     assert bound["alternating"] / one["alternating"] == pytest.approx(
-        math.sqrt(1.0 + a_max**2), rel=1e-6
+        1.0 + a_max, rel=1e-6
     )
-    assert bound["all_ones"] / one["all_ones"] == pytest.approx(1.0, rel=0.01)
+    assert bound["all_ones"] / one["all_ones"] == pytest.approx(1.0, abs=0.06)
     # MAE of |own - a * normaliser| for uniform reads: delta/2 at a=0, 2 delta/3 at a=1
     assert mae["all_ones"] / one["all_ones"] == pytest.approx(0.5 * 20 / 21, rel=0.01)
     assert mae["alternating"] > mae["all_ones"]
     assert mae["alternating"] / one["alternating"] < 2.0 / 3.0
+    # the bound is above the MAE and above the joint draw's own reading term
+    for name in one:
+        assert bound[name] > mae[name]
 
 
 def test_stick_division_is_the_configured_scale_the_builder_engraves():

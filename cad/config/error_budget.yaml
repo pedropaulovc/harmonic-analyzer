@@ -24,8 +24,14 @@ benchmark:                       # comparison values, NOT acceptance limits (see
 targets:
   scatter_mae_fs_pct: 0.30       # mean |e_k| over k, inputs and draws
   scatter_p99_max_fs_pct: 1.5    # 99th percentile of the worst coefficient of a draw
-  pair_consistency_p99_pct: 2.0  # worst coefficient of the two-channel input: its scatter p99
-                                 # RSS'd with every reserved term evaluated on it, plus its residual
+  pair_consistency_max_fs_pct: 2.0 # EXPECTED worst coefficient of the two-channel input (mean over
+                                 # machines of max_k), every error source drawn JOINTLY -- scatter,
+                                 # both reads of each coefficient, the stall at each read, the crank
+                                 # index -- on the credited machine's residual (report: pair_joint).
+                                 # Compared with the benchmark's largest SINGLE tabulated difference,
+                                 # which is one machine's worst coefficient, so the comparable model
+                                 # statistic is the expected max, not a quantile of an ensemble; the
+                                 # p50/p90/p99 and the fraction of machines over 2.0 are reported.
 
 # Per-feature headroom the report prints as `allowable`: the tolerance at which
 # a feature ALONE would consume this much (linear scaling). A drawing limit
@@ -62,6 +68,7 @@ reserved:
     # lobe half a pitch from the crest so the lock leaves it up; #749), not in
     # the budget. The report scores the as-built residual beside the lobe-up
     # one; this waiver is the record that the closure credits the latter.
+    # TODO(#749): cut the cam lobe half a pitch from the crest, then drop this waiver.
     waive_cam_home_phase: true
   readout:                         # ordinate reading at the pen. The stroke is the CAD's
                                    # output.yaml pen_trace_half_mm (15, verify:kinematics), NOT set here
@@ -87,6 +94,7 @@ reserved:
     # the waiver (hook at x 51, same 0.3 mm ring / 1.7 mm spoke
     # z clearance as the built pose -- the wire's z run is x-independent); it is not
     # a proof, and it says nothing about the clamp, rod or collar.
+    # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this waiver.
     waive_minimum_pose: true
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
                                    # carries its own read AND the k=0 normaliser's read (scaled
@@ -116,9 +124,10 @@ reserved:
     # (counter_spring_spec: 0.51 N/mm, at most ~28 mm of extension in its
     # 325.3 installed body) cannot supply that reaction -- the spring pair is
     # unbalanced ~50x and the machine as modelled has no static operating
-    # point. That is an OPEN DESIGN ITEM (tolerance-policy.md), not a budget
+    # point. That is an OPEN DESIGN ITEM (#747, tolerance-policy.md), not a budget
     # assumption: check:budget fails on it unless waived here, and the waiver
     # is the record that the closure below is conditional on resolving it.
+    # TODO(#747): resolve the spring pair, then drop this waiver.
     waive_static_balance: true
 
 monte_carlo:

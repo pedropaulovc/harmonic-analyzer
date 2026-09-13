@@ -2376,12 +2376,15 @@ def task_check():
             # Guards the GENERATED numerals DXF the measuring-stick build imports:
             # byte-identical regeneration from gen_stick_numerals_dxf, closed-loop
             # census, clearance from every tick, and the area/bbox the build pins.
-            # Deps: the test, the asset, and the generator/build/font-render
-            # modules it imports (module_deps_of), so a layout-constant edit that
-            # forgot to regenerate the DXF fails this gate.
+            # Deps: the test, the asset, the generator/build/font-render modules it
+            # imports (module_deps_of) AND the cad/config files those modules read
+            # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
+            # scale) -- so a layout-constant OR scale-config edit that forgot to
+            # regenerate the DXF fails this gate instead of reusing its stamp.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
                 *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
+                *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
                 str(
                     (
                         REPO_ROOT

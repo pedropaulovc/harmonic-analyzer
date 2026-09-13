@@ -208,6 +208,6 @@ CMM against the basic-dimension grid / nominal curve, since a hand gauge can't h
 
 **Go/no-go — gear cutters: RESOLVED (they don't exist).** Off-the-shelf involute cutters for the
 cone/cylinder train's **DP 49.82** at these tooth counts do not exist (searched exhaustively). **Plan:
-generate self-made form cutters via the Eureka method** ([`references/gears-and-gear-cutting/`](../references/gears-and-gear-cutting/gears-and-gear-cutting.pdf)
+generate self-made form cutters via the Eureka method** ([`references/gears-and-gear-cutting.pdf`](../../references/gears-and-gear-cutting.pdf)
 ch. 12), then cut the teeth indexed on a dividing head — the in-house gear path referenced in the
 routing tables above; wire-EDM / hobbing stay outsource alternates.

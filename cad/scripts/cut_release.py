@@ -917,11 +917,63 @@ def operating_docs() -> list[str]:
     return seen
 
 
-def stage_readout_procedure(stage: Path) -> list[str]:
+_LINK_RE = re.compile(r"(!?)\[([^\]]*)\]\((?!https?:|mailto:|#)([^)\s]+)([^)]*)\)")
+
+
+def portable_links(text: str, name: str, tag: str, staged: set[str]) -> str:
+    """Make every RELATIVE link in a staged doc resolve outside the repository.
+
+    A ``./`` link to another staged page stays as-is. Anything else points at a
+    file the bundle does not carry (``../config/*.yaml``, ``../scripts/*.py``)
+    or cannot carry (the ``references`` submodule's third-party scans -- the
+    2014 book is non-commercial, so the release must not redistribute them):
+
+    - a path inside THIS repository becomes a blob URL at the release tag, so
+      the reader gets the exact revision the bundle was cut from;
+    - a path inside the ``references`` submodule becomes plain text naming the
+      source, since a blob URL of a submodule path does not resolve (and an
+      image embed would render broken).
+
+    Raises on a ``./`` link with no staged target -- a broken in-bundle link
+    must fail the release, not ship."""
+    repo_url = f"https://github.com/{_repo_slug()}/blob/{tag}"
+
+    def fix(m: re.Match[str]) -> str:
+        bang, label, target, rest = m.groups()
+        if target.startswith("./"):
+            page = target[2:].split("#", 1)[0]
+            if page not in staged:
+                raise RuntimeError(
+                    f"{name}: ./{page} is linked but not staged in the bundle"
+                )
+            return m.group(0)
+        path, _, frag = target.partition("#")
+        rel = os.path.relpath((CAD_ROOT / "docs" / path).resolve(), REPO_ROOT)
+        rel = rel.replace(os.sep, "/")
+        if rel.startswith(".."):
+            raise RuntimeError(f"{name}: link escapes the repository: {target}")
+        if rel.startswith("references/"):
+            bare = label.strip("`").split("/")[-1]
+            if rel.endswith(bare):
+                return f"`{rel}` (pinned references submodule)"
+            return f"{label} (`{rel}`, pinned references submodule)"
+        if not _git("ls-files", "--", rel, check_rc=False).strip():
+            raise RuntimeError(
+                f"{name}: link target is not tracked at the tag: {target} -> {rel}"
+            )
+        anchor = f"#{frag}" if frag else ""
+        return f"{bang}[{label}]({repo_url}/{rel}{anchor}{rest})"
+
+    return _LINK_RE.sub(fix, text)
+
+
+def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
     into the bundle root as ``READOUT.md``, plus ``operating_docs()`` under
-    ``docs/`` so every ``./`` cross-link resolves inside the bundle. Not COM:
-    the model is offline. Returns the staged relative paths."""
+    ``docs/`` so every ``./`` cross-link resolves inside the bundle and every
+    other relative link is rewritten to the repository at ``tag``
+    (``portable_links``). Not COM: the model is offline. Returns the staged
+    relative paths."""
     import error_budget
 
     dst = stage / "READOUT.md"
@@ -932,8 +984,12 @@ def stage_readout_procedure(stage: Path) -> list[str]:
     staged = [dst.name]
     docs = stage / "docs"
     docs.mkdir(exist_ok=True)
-    for name in operating_docs():
-        shutil.copyfile(CAD_ROOT / "docs" / name, docs / name)
+    names = operating_docs()
+    for name in names:
+        text = (CAD_ROOT / "docs" / name).read_text(encoding="utf-8")
+        (docs / name).write_text(
+            portable_links(text, name, tag, set(names)), encoding="utf-8"
+        )
         staged.append(f"docs/{name}")
     return staged
 
@@ -994,7 +1050,7 @@ def bundle(
     #     accuracy those drawings' limits are derived from (check:budget) is
     #     reached only by the calibration + correction procedure the budget
     #     assumes -- generated from the same model so it cannot drift.
-    facts["readout_procedure"] = stage_readout_procedure(stage)
+    facts["readout_procedure"] = stage_readout_procedure(stage, version)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs

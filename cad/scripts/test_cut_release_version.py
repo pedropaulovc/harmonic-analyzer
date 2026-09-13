@@ -111,11 +111,15 @@ def test_release_image_tools_do_not_use_deprecated_getdata() -> None:
 def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path):
     """READOUT.md sends the reader to the operating explanation; a release
     consumer has only the bundle, so that page -- and the pages IT cross-links
-    with ./ -- must be staged beside it, and every ./ link among them must
-    resolve within the stage (no dangling reference in the shipped zip)."""
+    with ./ -- must be staged beside it, every ./ link among them must resolve
+    within the stage, and every link that points OUT of the bundle must be
+    rewritten to something the reader can follow: a blob URL at the release
+    tag for a tracked repo file, plain text naming the path for the
+    non-redistributable references submodule. A relative link surviving into
+    the zip would be dead on arrival."""
     import re
 
-    staged = cut_release.stage_readout_procedure(tmp_path)
+    staged = cut_release.stage_readout_procedure(tmp_path, "v42")
     assert staged[0] == "READOUT.md"
     for rel in staged:
         assert (tmp_path / rel).is_file(), rel
@@ -124,7 +128,31 @@ def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path)
     assert "`cad/docs/device-operation.md`" not in readout.split("beside this file")[0]
     docs = cut_release.operating_docs()
     assert docs[0] == cut_release.OPERATING_DOC and "tolerance-policy.md" in docs
+    relative = re.compile(r"\]\(((?!https?:|mailto:|#)[^)]+)\)")
+    tagged = 0
     for name in docs:
         page = (tmp_path / "docs" / name).read_text(encoding="utf-8")
-        for target in re.findall(r"\]\(\./([^)#]+)", page):
-            assert (tmp_path / "docs" / target).is_file(), f"{name} -> ./{target}"
+        for target in relative.findall(page):
+            assert target.startswith("./"), f"{name} -> {target} escapes the bundle"
+            assert (tmp_path / "docs" / target.split("#")[0]).is_file(), (
+                f"{name} -> {target}"
+            )
+        tagged += page.count("/blob/v42/cad/")
+    assert tagged >= 5  # the policy's config/script citations
+    # the submodule scans are cited by repo path, never embedded or linked
+    paper = (tmp_path / "docs" / "michelson-1898-trial-accuracy.md").read_text(
+        encoding="utf-8"
+    )
+    assert "28_Michelsons_1898_Paper.pdf` (pinned references submodule)" in paper
+    assert "/blob/v42/references/" not in paper
+
+
+def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
+    """The rewrite is a GATE, not a best effort: a ./ link to an unstaged page,
+    or a repo path that is not tracked at the tag, must fail the release."""
+    with pytest.raises(RuntimeError, match="not staged"):
+        cut_release.portable_links("[x](./gone.md)", "d.md", "v42", {"d.md"})
+    with pytest.raises(RuntimeError, match="not tracked"):
+        cut_release.portable_links(
+            "[x](../config/no-such.yaml)", "d.md", "v42", {"d.md"}
+        )
