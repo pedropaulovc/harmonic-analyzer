@@ -93,6 +93,7 @@ TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
 @_telemetry.traced("drawing.verify_dimension_value", label_param="label")
 def _require_dimension_value(display: Any, expected_mm: float, *, label: str) -> None:
     """Fail if SolidWorks dimensioned a different projected edge."""
+    display = _early_bound(display, "IDisplayDimension")
     raw_dimension = display.GetDimension2(0)
     if raw_dimension is None:
         raise RuntimeError(f"{label}: display has no dimension")
