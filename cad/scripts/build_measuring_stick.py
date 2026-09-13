@@ -243,7 +243,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(
         adapter,
         "ScaleStartX",
-        '"BodyLength" - 10 * "DivisionSpacing" - "ScaleEndMargin"',
+        f'"BodyLength" - {DIVISION_COUNT - 1} * "DivisionSpacing" - "ScaleEndMargin"',
     )
 
     drive_jobs: list[tuple[str, str]] = []

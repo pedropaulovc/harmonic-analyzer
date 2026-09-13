@@ -932,11 +932,25 @@ def test_stick_division_is_the_configured_scale_the_builder_engraves():
     assert stick.SCALE_START_X == (
         stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
     )
-    assert f"TICK N AT {configured:.2f} X N" in measuring_stick_spec.DRAWING_NOTES
-    assert f"SPAN {10 * configured:.2f} REF" in measuring_stick_spec.DRAWING_NOTES
+    # the NATIVE equation and the drawing NOTES carry the same counts, so a
+    # config edit cannot leave the driven sketch or the sheet describing a
+    # scale the part does not engrave
     src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
         encoding="utf-8"
     )
+    assert '{DIVISION_COUNT - 1} * "DivisionSpacing"' in src
+    notes = measuring_stick_spec.DRAWING_NOTES
+    top = measuring_stick_geom.DIVISION_COUNT - 1
+    assert (
+        f"{measuring_stick_geom.DIVISION_COUNT} FULL TICKS (VALUES 0 THRU {top})"
+        in notes
+    )
+    assert (
+        f"{measuring_stick_geom.MINOR_PER_DIVISION - 1} MINOR" in notes
+    )  # tenths between two full ticks
+    assert f"NUMERALS 0 THRU {top}" in notes
+    assert f"TICK N AT {configured:.2f} X N" in notes
+    assert f"SPAN {top * configured:.2f} REF" in notes
     assert re.search(r"^from measuring_stick_geom import \($", src, re.M)
     for module in ("measuring_stick_geom.py", "measuring_stick_spec.py"):
         text = (pathlib.Path(eb.__file__).with_name(module)).read_text(encoding="utf-8")
