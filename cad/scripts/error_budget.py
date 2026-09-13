@@ -1331,16 +1331,25 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     t = r["targets"]
     p(
         f"targets: scatter MAE <= {t['scatter_mae_fs_pct']}  p99 max <= {t['scatter_p99_max_fs_pct']}  "
-        f"pair p99 <= {t['pair_consistency_p99_pct']}   (benchmark MAE {r['benchmark']['mae_fs_pct']}, max {r['benchmark']['max_fs_pct']})"
+        f"pair worst <= {t['pair_consistency_p99_pct']}   (benchmark MAE {r['benchmark']['mae_fs_pct']}, max {r['benchmark']['max_fs_pct']})"
     )
     p("\n## 4. Terms that are not part tolerances")
     p(json.dumps(r["closed_form"], indent=2))
     p("\n## 5. Closure -- every term against the benchmark MAE")
     for k, v in r["closure"].items():
+        if k == "pair_terms":
+            continue
         p(f"  {k:<28} {v:.3f}")
+    pt = r["closure"]["pair_terms"]
+    p(
+        f"  pair_1_20 worst coefficient = residual {pt['nominal_residual_max']:.3f}"
+        f" + RSS(scatter p99 {pt['scatter_p99']:.3f}, readout "
+        f"{pt['readout_worst_coefficient']:.3f}, timebase {pt['timebase']:.3f}, "
+        f"knife {pt['knife']:.3f}) vs {t['pair_consistency_p99_pct']}"
+    )
 
 
-def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, float]:
+def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
     """Every reserved term (% FS) beside the scatter, and their total: the
     corrected nominal residual is systematic and adds; scatter, readout,
     timebase and knife are independent and combine root-sum-square."""
@@ -1358,6 +1367,31 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, float]:
         sum(terms[k] ** 2 for k in ("scatter_mae", "readout", "timebase", "knife"))
     )
     terms["total_mae"] = terms["nominal_residual_mae"] + rss
+    # The sparse two-channel trial is gated on its WORST coefficient (the
+    # benchmark's 2 % largest tabulated difference), not the MAE: its own
+    # scatter p99 plus every reserved term evaluated on it, combined the same
+    # way -- the residual's max adds, the rest RSS. Excluding the pair from the
+    # reserved terms (as the MAE closure does, because it is not a broad
+    # input) would let the knife stall it pays most for hide behind a green
+    # scatter number.
+    pair = "pair_1_20"
+    pair_terms = {
+        "nominal_residual_max": nde[pair]["max"],
+        "scatter_p99": r["monte_carlo"]["combined"]["per_input"][pair]["p99_max"],
+        "readout_worst_coefficient": cf["readout"]["pct_fs_worst_coefficient_bound"][
+            pair
+        ],
+        "timebase": cf["timebase"]["pct_fs_physical_per_input"][pair],
+        "knife": cf["knife"]["pct_fs_per_input"][pair],
+    }
+    pair_rss = math.sqrt(
+        sum(
+            pair_terms[k] ** 2
+            for k in ("scatter_p99", "readout_worst_coefficient", "timebase", "knife")
+        )
+    )
+    terms["pair_worst"] = pair_terms["nominal_residual_max"] + pair_rss
+    terms["pair_terms"] = pair_terms
     return terms
 
 
@@ -1373,10 +1407,15 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
         bad.append(
             f"scatter p99 max {c['p99_max']:.3f} > {t['scatter_p99_max_fs_pct']}"
         )
-    pair = c["per_input"]["pair_1_20"]["p99_max"]
-    if pair > t["pair_consistency_p99_pct"]:
-        bad.append(f"pair p99 max {pair:.3f} > {t['pair_consistency_p99_pct']}")
     cl, allow = r["closure"], r["reserved_allowance"]
+    if cl["pair_worst"] > t["pair_consistency_p99_pct"]:
+        pt = cl["pair_terms"]
+        bad.append(
+            f"pair worst coefficient {cl['pair_worst']:.3f} > {t['pair_consistency_p99_pct']} "
+            f"(residual {pt['nominal_residual_max']:.3f} + RSS of scatter p99 "
+            f"{pt['scatter_p99']:.3f}, readout {pt['readout_worst_coefficient']:.3f}, "
+            f"timebase {pt['timebase']:.3f}, knife {pt['knife']:.3f})"
+        )
     for k in ("nominal_residual_mae", "readout", "timebase", "knife"):
         if cl[k] > allow[k]:
             bad.append(f"{k} {cl[k]:.3f} > allowance {allow[k]}")

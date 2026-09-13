@@ -123,7 +123,8 @@ def test_null_station_is_unreachable_and_handled_as_a_lift(report, nom):
 
 def test_budget_closes(report):
     """The Monte Carlo lands inside its targets, every reserved term inside its
-    allowance, and the total inside the benchmark MAE."""
+    allowance, the total inside the benchmark MAE, and the two-channel worst
+    coefficient inside its own benchmark."""
     assert eb.budget_closes(report) == []
     assert set(report["closure"]) == {
         "nominal_residual_mae",
@@ -132,6 +133,8 @@ def test_budget_closes(report):
         "timebase",
         "knife",
         "total_mae",
+        "pair_worst",
+        "pair_terms",
     }
 
 
@@ -150,6 +153,43 @@ def test_closure_fails_when_a_reserved_term_overruns(budget):
     }
     bad = eb.budget_closes(eb.build_report(coarse))
     assert any(b.startswith("readout") for b in bad), bad
+
+
+def test_sparse_pair_is_gated_on_its_combined_worst_coefficient(budget, report):
+    """The two-channel trial's 2 % pass criterion is a worst COEFFICIENT, so
+    its scatter p99 must be combined with every reserved term evaluated on
+    it (the knife stall it pays most for, its readout bound, timebase) plus
+    its nominal residual -- a knife term that alone fits its allowance must
+    still fail the pair when it pushes that combination past 2 %."""
+    cl = report["closure"]
+    pt = cl["pair_terms"]
+    assert (
+        pt["knife"] > cl["knife"]
+    )  # the pair pays more for the stall than any broad input
+    assert cl["pair_worst"] == pytest.approx(
+        pt["nominal_residual_max"]
+        + math.sqrt(
+            pt["scatter_p99"] ** 2
+            + pt["readout_worst_coefficient"] ** 2
+            + pt["timebase"] ** 2
+            + pt["knife"] ** 2
+        )
+    )
+    assert cl["pair_worst"] < budget["targets"]["pair_consistency_p99_pct"]
+    assert not any(b.startswith("pair") for b in eb.budget_closes(report))
+    sticky = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "knife": {
+                **budget["reserved"]["knife"],
+                "rolling_resistance_mm": 3
+                * budget["reserved"]["knife"]["rolling_resistance_mm"],
+            },
+        },
+    }
+    bad = eb.budget_closes(eb.build_report(sticky))
+    assert any(b.startswith("pair worst coefficient") for b in bad), bad
 
 
 def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
@@ -601,7 +641,7 @@ def test_stick_division_is_the_spec_constant_the_builder_engraves():
         in measuring_stick_spec.DRAWING_NOTES
     )
     assert (
-        f"SCALE IS LINEAR IN STATION (1 DIVISION = {measuring_stick_spec.DIVISION_SPACING:.2f})"
+        f"SCALE IS LINEAR IN STATION ({measuring_stick_spec.DIVISION_SPACING:.2f} PER DIVISION)"
         in measuring_stick_spec.DRAWING_NOTES
     )
     src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
@@ -644,7 +684,7 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_drawing_limits_agree_with_the_budget(budget):
+def test_drawing_limits_agree_with_the_budget(budget, report, nom):
     """Every budgeted limit that reaches a manufacturing output (native
     dimension tolerance, drawing note, GD&T zone, fit band) carries the SAME
     number as error_budget.yaml."""
@@ -681,10 +721,19 @@ def test_drawing_limits_agree_with_the_budget(budget):
         f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.2f}% OF THE SET MEAN"
         in channel_spring_installed_notes.DRAWING_NOTES
     ), "spring spec sheet carries a different matching requirement"
+    # station setting is an OPERATING allowance, not a part limit: it reaches
+    # the shipped READOUT.md (drawing-simplicity rule 6 keeps methods and
+    # tolerances off the stick's notes; the stick carries the pointer only)
+    doc = eb.readout_procedure(report, nom)
     assert (
-        f"SETTING ERROR +/-{feats['station_setting']['tolerance']:.2f} MAX PER BAR"
-        in measuring_stick_spec.DRAWING_NOTES
-    ), "measuring-stick drawing carries a different setting allowance"
+        f"(setting error +/-{feats['station_setting']['tolerance']:.2f} mm max per bar)"
+        in doc
+    ), "READOUT.md carries a different setting allowance"
+    assert "ORDINATE TABLE: READOUT.MD" in measuring_stick_spec.DRAWING_NOTES
+    assert not any(
+        "SETTING ERROR" in line or "INTERPOLAT" in line
+        for line in measuring_stick_spec.DRAWING_NOTES
+    ), "the stick drawing carries the operating method (rule 6)"
     # every +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
         ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),

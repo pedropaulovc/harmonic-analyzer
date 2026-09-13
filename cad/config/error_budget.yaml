@@ -24,7 +24,8 @@ benchmark:                       # comparison values, NOT acceptance limits (see
 targets:
   scatter_mae_fs_pct: 0.30       # mean |e_k| over k, inputs and draws
   scatter_p99_max_fs_pct: 1.5    # 99th percentile of the worst coefficient of a draw
-  pair_consistency_p99_pct: 2.0  # 99th percentile worst coefficient for the two-channel input
+  pair_consistency_p99_pct: 2.0  # worst coefficient of the two-channel input: its scatter p99
+                                 # RSS'd with every reserved term evaluated on it, plus its residual
 
 # Per-feature headroom the report prints as `allowable`: the tolerance at which
 # a feature ALONE would consume this much (linear scaling). A drawing limit

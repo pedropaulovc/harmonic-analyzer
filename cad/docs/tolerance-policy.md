@@ -235,7 +235,7 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | **spring rate** | **1.25 %** | **0.113** | **0.60** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.039 | 0.21 | 0.23 | 0.32 | on the cylinder-gear drawing's native `NotchPhase` angular dimension (lobe axis to notch radial, 1.50° ± 0.25°) |
 | mesh lag spread | 0.14° | 0.022 | 0.12 | 0.13 | 0.32 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.081 | 0.47 | 0.54 | 0.15 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
+| station setting (setup) | 0.25 mm | 0.081 | 0.47 | 0.54 | 0.15 | `READOUT.md` step 1 (an operating allowance, not a part limit — the stick drawing carries only the pointer, per drawing-simplicity rule 6): interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
 | **all combined** | | **0.154** | **0.82** | **1.50** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
@@ -279,6 +279,7 @@ two-channel consistency target. Read it as follows.
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform). Scored on the **physical trace through the procedure**: the pen read at $\theta_k + \delta$ while the second-harmonic and read-vs-set corrections stay at $\theta_k$ (`NominalTrial.readout(theta_error=…)`, so live idle bars, calibrated ordinates and the CAD's own harmonics all enter the slope), RMS over k and the uniform band, worst reference input (the lifted square), each input at the ordinate scale the pen forces. The ideal-vector slope $-\sum i x_i \sin(i\theta_k)$ gives 0.254 there against the physical 0.261 (the hook motion's harmonics are a larger share at small stations; on the two-channel case 0.059 vs 0.035) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.26 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm). The stall is a fixed displacement, so against a trial's greatest term it is 1.7 % / (scale × Σx) — and the pen caps every broad input at the same 4.7-bar capacity, so **all four read 0.40 %** (0.09 % if all-ones could run at full scale), 0.86 % on the two-channel case. **The capacity, not the edge, is what this term buys**: a clamp band reaching nearer the knife or a longer pen stroke halves it; *measure* as trace width on a slow reversal | 0.40 % FS | 0.45 |
 | **total** | residual + RSS(scatter 0.154, readout, timebase, knife) | **0.59 % MAE** | **0.7 benchmark** |
+| **two-channel worst coefficient** | the pair's own residual max 0.09 + RSS(its scatter p99 1.50, readout worst-coefficient bound 0.80, timebase 0.06, knife 0.86) — every reserved term evaluated on the sparse input, since its criterion is a worst coefficient, not an MAE | **2.00 %** | **2.0 benchmark** — no headroom; the spring-rate scatter (1.16 of the 1.50) and the knife stall at the capacity the pen forces are what the open items above would buy back |
 
 `check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
 coarser reading or a duller knife cannot be hidden behind a green scatter result. **The knife
@@ -352,7 +353,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    calibrate the stick from single-channel runs, not from a ruler — the gain deviates from
    linear by 0.9–1.1 % across the range (table above), and Michelson's own stick was "hand
    stamped, unevenly spaced" for the same reason. Set each bar by interpolating to 1/5 of the
-   stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm step gives ±0.14 mm
+   stick's 1.42 mm minor division (`READOUT.md` step 1): a 0.28 mm step gives ±0.14 mm
    rounding, ±0.25 mm with eye and parallax — the budget's setting term. A bar at a zero
    ordinate cannot be set below the pivot, so its setting error is one-sided [0, +0.25]: on
    average it stands at +0.125 mm, so **record its read ordinate at that station** (0.0294,
