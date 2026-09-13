@@ -102,6 +102,7 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 
 | step | what | why | provenance |
 |---|---|---|---|
+| 0 | **choose the ordinate scale**: with the clamp against the bracket collar (66 mm from the knife) one full-scale bar moves the pen 3.2 mm, so the bars' read ordinates may sum to at most **4.7** before the $k = 0$ peak overruns the 15 mm half-stroke; scale a broader function down first, then set the clamp so the peak just fills the stroke | the magnifier's range is finite (collar face to rod tip); step 3 removes the scale, but every fixed error — the stick's 0.25 mm, the knife stall, the idle lift — is a larger share of a scaled-down trial | book p. 99 ("scaled by adjusting the magnifying lever"); the capacity is this CAD's, see [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
 | 1 | set bar $i$ to the linear station $x_i \cdot 88$ mm; **record the ordinate it reads** from the station table | a bar at the stick zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the gain is 1–2.5 % non-linear across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
 | 2 | crank in one direction; read the pen height $r_k$ (mm) off the trace's own mean line at $\theta_k$, i.e. with the crank on its index after $2k$ turns | the coefficients are the ordinates at those divisions | 1898 p. 10; book p. 8 |
 | 3 | **normalise**: $s = r_0 / (S + C_2)$ with $S = \sum x^{read}_i$, $C_2 = \sum x^{read}_i \kappa_i$; then $O'_k = r_k / s$ | the pen scale is unknown; the $k = 0$ reading is the greatest term and fixes it | 1898 pp. 10–11 (`obs.` $n = 0$ ≡ 100); book p. 99 |
@@ -145,7 +146,12 @@ rejected for the same reason:
   which is why note 5 on the stick drawing points the builder at the table instead.
 
 The normalisation (step 3) can never be removed: it is the price of an adjustable
-magnifier, and the reason the trace can span the paper for any input.
+magnifier, and the reason the trace can span the paper for any input. What *can*
+change is how much the operator has to give up to fit the pen: on this CAD the
+clamp cannot get nearer the knife than the bracket collar, so a broad function is
+set at a fifth to a half of full scale and every fixed error grows by the same
+factor — the budget's largest single term after that is the knife stall, and it is
+the magnifier's range, not the edge, that sets it (#748).
 
 ## For the impatient builder
 

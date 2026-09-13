@@ -28,3 +28,32 @@ ROD_DIA = 6.0  # round brass rod (low)
 # build_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
 KNIFE_LOCAL_X = 215.0
 KNIFE_LOCAL_Y = 5.134
+
+# --- clamp travel along the rod = the magnification range ---------------------
+# The sliding clamp (magnifying_clamp_geom.BLOCK_DEPTH along the rod) rides the
+# rod between its free west tip (local 0) and the bracket collar that carries
+# the rod at its east end. Its radius from the knife axis, over the summing
+# lever's spring-hook arm, is the magnification the operator sets (book p. 46:
+# "up to 4x"); the reachable band is what cad/scripts/error_budget.py derives
+# the pen scale and the ordinate-capacity rule from. Lever-local x (rod along
+# +X, knife at KNIFE_LOCAL_X); build_magnifier_assembly asserts its bracket and
+# clamp placements against these, so a layout move fails loud there.
+COLLAR_LOCAL_X = 160.0  # bracket collar centre on the rod (machine x +40)
+COLLAR_HALF_LEN = 5.0  # == build_magnifying_bracket.COLLAR_HALF_LEN (asserted)
+CLAMP_LOCAL_X = 50.0  # as-built clamp centre (machine x +150, p.46/48 insets)
+
+
+def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:
+    """(min, as-built, max) knife -> clamp-centre radius, mm, for a clamp of
+    ``block_depth`` along the rod: the block face against the collar face
+    (minimum magnification), the as-built pose, the block flush with the rod
+    tip (maximum -- a mechanical bound; the wire route past the as-built pose
+    is not gated)."""
+    half = block_depth / 2.0
+    nearest = COLLAR_LOCAL_X - COLLAR_HALF_LEN - half
+    farthest = half
+    return (
+        KNIFE_LOCAL_X - nearest,
+        KNIFE_LOCAL_X - CLAMP_LOCAL_X,
+        KNIFE_LOCAL_X - farthest,
+    )

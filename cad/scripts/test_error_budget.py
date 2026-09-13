@@ -151,28 +151,72 @@ def test_closure_fails_when_a_reserved_term_overruns(budget):
     assert any(b.startswith("readout") for b in bad), bad
 
 
-def test_fixed_magnifier_readout_is_scored_on_the_worst_broad_input(budget):
-    """With the magnifier left at the all-ones setting, a trial whose greatest
-    term is half the stroke reads twice as coarsely; the switch must score that
-    and fail the gate."""
-    fixed = {
-        **budget,
-        "reserved": {
-            **budget["reserved"],
-            "readout": {
-                **budget["reserved"]["readout"],
-                "greatest_term_spans_stroke": False,
-            },
-        },
-    }
-    r = eb.build_report(fixed)
-    ro = r["closed_form"]["readout"]
-    spanning = ro["pct_fs_greatest_term_spans_stroke"]
-    mag = ro["magnification_vs_all_ones"]
-    for name, fixed_pct in ro["pct_fs_fixed_magnifier"].items():
-        assert fixed_pct == pytest.approx(spanning[name] * mag[name])
-    assert ro["pct_fs"] == pytest.approx(ro["pct_fs_fixed_magnifier"]["gaussian_a0p1"])
-    assert any(b.startswith("readout") for b in eb.budget_closes(r))
+def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
+    """The pen scale is not an assumption: the clamp's reachable radius band
+    (collar face to rod tip) and the wheel ratio come from the geom modules the
+    magnifier assembly builds from, and every reference input is fitted to the
+    15 mm half-stroke by them. A broad input needs less magnification than the
+    clamp can give, so it runs at a reduced ordinate scale with the clamp at
+    the collar; the sparse pair fits at full scale inside the band."""
+    import magnifying_clamp_geom
+    import magnifying_lever_geom
+
+    band = magnifying_lever_geom.clamp_radius_band(magnifying_clamp_geom.BLOCK_DEPTH)
+    assert (nom.lever_r_min, nom.lever_r_built, nom.lever_r_max) == band
+    assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
+    mag = report["closed_form"]["magnifier"]
+    assert 4.0 < mag["ordinate_capacity_full_scale_bars"] < 6.0
+    for name, s in mag["per_input"].items():
+        assert s["k0_reading_mm"] == pytest.approx(
+            nom.pen_half * s["stroke_fill"], rel=1e-6
+        )
+        assert nom.lever_r_min <= s["lever_r"] <= nom.lever_r_built
+        if name == "pair_1_20":
+            assert s["ordinate_scale"] == 1.0 and s["lever_r"] > nom.lever_r_min
+        else:
+            assert s["ordinate_scale"] < 0.6 and s["lever_r"] == nom.lever_r_min
+    # the scale is the capacity shared over the input's read ordinates
+    trial = eb.NominalTrial(nom)
+    for name, s in mag["per_input"].items():
+        x = eb.reference_inputs()[name]
+        r0 = eb.pen_gain(nom, s["lever_r"]) * trial.k0_hook_mm(
+            s["ordinate_scale"] * x * nom.d_max
+        )
+        assert r0 == pytest.approx(s["k0_reading_mm"], rel=1e-6)
+
+
+def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, nom):
+    """A fixed 0.25 mm setting error and a fixed knife stall are a larger share
+    of a trial the pen forced to a smaller scale: every capped broad input's
+    scaled bars sum (read ordinates, which exceed the set ones by the idle
+    lift) to the same capacity, the knife term is stall/(scale * sum x), and
+    the station-setting Monte Carlo on all-ones at its 0.21 scale reads
+    1/scale times the full-scale value."""
+    cf = report["closed_form"]
+    mag, knife = cf["magnifier"], cf["knife"]
+    cap = mag["ordinate_capacity_full_scale_bars"]
+    trial = eb.NominalTrial(nom)
+    for name, s in mag["per_input"].items():
+        if s["ordinate_scale"] < 1.0:
+            x = eb.reference_inputs()[name]
+            read_sum = float(np.sum(trial.x_read(s["ordinate_scale"] * x * nom.d_max)))
+            assert s["ordinate_scale"] * float(np.sum(x)) < read_sum
+            assert read_sum == pytest.approx(cap, rel=0.03)  # C_2 rides the k=0 peak
+            assert knife["pct_fs_per_input"][name] == pytest.approx(
+                knife["stall_pct_of_one_channel_fs"]
+                / (s["ordinate_scale"] * float(np.sum(x)))
+            )
+    # bars at 0.5 (interior: no one-sided fold at either end of the scale)
+    x = np.full(eb.N_ELEMENTS, 0.5)
+    sens = eb.gain_sensitivities(nom)
+    rng = np.random.default_rng(1)
+    dev = {"station_setting": rng.uniform(-0.25, 0.25, size=(400, eb.N_ELEMENTS))}
+    full = eb._channel_model(x, nom, dev, sens, 0.25, 1.0)
+    f = mag["per_input"]["all_ones"]["ordinate_scale"]
+    capped = eb._channel_model(x, nom, dev, sens, 0.25, f)
+    assert np.mean(np.abs(capped)) / np.mean(np.abs(full)) == pytest.approx(
+        1.0 / f, rel=0.1
+    )
 
 
 def test_lift_vector_is_what_the_procedure_subtracts():
@@ -297,16 +341,17 @@ def test_normalisation_uses_only_observable_units():
 def test_timebase_is_scored_on_the_physical_trace(report, nom):
     """Reading off the crank index samples the REAL trace (calibrated
     ordinates, live idle bars, the CAD's 2nd/3rd harmonics) while the
-    corrections stay at theta_k. On broad inputs the ideal-vector slope is a
-    good proxy; on the sparse pair it is not -- the 18 idle bars' harmonics
-    make the physical term larger -- so the gate must score the physical one."""
+    corrections stay at theta_k. On the broad inputs -- now run at the reduced
+    ordinate scale the pen forces, where the hook motion's 2nd/3rd harmonics
+    are a larger share of the fundamental -- the physical term sits a little
+    ABOVE the ideal-vector proxy; on the sparse pair the proxy fails outright
+    (the 18 idle bars' harmonics), so the gate must score the physical one."""
     tb = report["closed_form"]["timebase"]
     phys, ideal = tb["pct_fs_physical_per_input"], tb["pct_fs_per_rad_rms_ideal_vector"]
     rad_index = math.radians(tb["assumed_crank_index_deg"]) / eb.CRANK_TURNS_PER_PERIOD
     for name in ("all_ones", "alternating"):
-        assert phys[name] == pytest.approx(
-            ideal[name] * rad_index / math.sqrt(3.0), rel=0.03
-        )
+        proxy = ideal[name] * rad_index / math.sqrt(3.0)
+        assert proxy <= phys[name] < 1.15 * proxy, name
     assert phys["pair_1_20"] > 1.3 * ideal["pair_1_20"] * rad_index / math.sqrt(3.0)
     assert tb["pct_fs"] == phys[tb["worst_input"]]
     # and the mechanism: an off-index read of the nominal trial moves every
@@ -343,17 +388,18 @@ def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
 
 def test_readout_term_counts_the_normalising_read(report):
     """Every coefficient is divided by the pen-read k=0 value, so its error
-    carries that read too, scaled by A_k/A_0: an input whose k=20 term equals
-    its k=0 (the lifted square) pays for it, all-ones (A_k/A_0 <= 0.05) barely;
-    the worst single coefficient is the sqrt(1 + a^2) RSS bound."""
+    carries that read too, scaled by the PHYSICAL r_k/r_0: an input whose k=20
+    term nearly equals its k=0 (the lifted square; the second harmonic riding
+    r_0 keeps the ratio just under 1) pays for it, all-ones (r_k/r_0 <= 0.05)
+    barely; the worst single coefficient is the sqrt(1 + a^2) RSS bound."""
     ro = report["closed_form"]["readout"]
     one = ro["one_reading_pct_fs_per_input"]
-    mae = ro["pct_fs_greatest_term_spans_stroke"]
+    mae = ro["pct_fs_per_input"]
     bound = ro["pct_fs_worst_coefficient_bound"]
-    assert ro["normaliser_share_max_abs"]["alternating"] > 0.9
-    assert ro["normaliser_share_max_abs"]["all_ones"] < 0.06
+    assert 0.8 < ro["normaliser_share_max_abs"]["alternating"] < 1.0
+    a_max = ro["normaliser_share_max_abs"]["alternating"]
     assert bound["alternating"] / one["alternating"] == pytest.approx(
-        math.sqrt(2.0), rel=0.03
+        math.sqrt(1.0 + a_max**2), rel=1e-6
     )
     assert bound["all_ones"] / one["all_ones"] == pytest.approx(1.0, rel=0.01)
     # MAE of |own - a * normaliser| for uniform reads: delta/2 at a=0, 2 delta/3 at a=1
@@ -393,24 +439,21 @@ def test_stick_division_is_the_spec_constant_the_builder_engraves():
 
 
 def test_reserved_terms_are_scored_on_the_worst_broad_input(report):
-    """Knife stall is a fixed displacement and readout error a fixed fraction
-    of the k=0 reading, so both are larger against a trial whose greatest term
-    is smaller than the all-ones 20; the gated value must be the worst broad
-    input, not the all-ones one."""
+    """The gated readout and knife values must be the worst BROAD input, not
+    the all-ones one nor the sparse pair (reported, not gated). The readout
+    term converts one reading through s = r_0/(S + C_2): its per-input value
+    is proportional to (S + C_2)/sum x, so the pair -- whose 18 idle bars lift
+    S well above sum x -- reads highest and is excluded."""
     cf = report["closed_form"]
     knife, ro = cf["knife"], cf["readout"]
     assert knife["pct_fs"] == pytest.approx(
         max(v for n, v in knife["pct_fs_per_input"].items() if n != "pair_1_20")
     )
-    assert knife["pct_fs"] > 2.0 * knife["pct_fs_per_input"]["all_ones"]
+    assert knife["pct_fs_per_input"]["pair_1_20"] > knife["pct_fs"]
     assert ro["pct_fs"] == pytest.approx(
-        max(
-            v
-            for n, v in ro["pct_fs_greatest_term_spans_stroke"].items()
-            if n != "pair_1_20"
-        )
+        max(v for n, v in ro["pct_fs_per_input"].items() if n != "pair_1_20")
     )
-    assert ro["pct_fs"] > ro["pct_fs_greatest_term_spans_stroke"]["all_ones"]
+    assert ro["pct_fs_per_input"]["pair_1_20"] > ro["pct_fs"]
 
 
 def test_reference_inputs_stay_on_the_lifting_side():
@@ -513,5 +556,10 @@ def test_assembly_imports_the_shared_stations_instead_of_copying():
 def test_unsupported_distribution_fails_loud(budget, nom):
     """A distribution the model does not implement raises instead of sampling uniform."""
     bad = {**budget, "monte_carlo": {**budget["monte_carlo"], "distribution": "normal"}}
+    trial = eb.NominalTrial(nom)
+    setups = {
+        n: trial.magnifier_setup(eb.reference_inputs()[n])
+        for n in budget["reference_inputs"]
+    }
     with pytest.raises(ValueError, match="distribution"):
-        eb.monte_carlo(bad, nom)
+        eb.monte_carlo(bad, nom, setups)

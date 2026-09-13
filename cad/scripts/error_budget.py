@@ -36,7 +36,7 @@ import argparse
 import json
 import math
 import sys
-from dataclasses import astuple, dataclass, replace
+from dataclasses import asdict, astuple, dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -50,8 +50,12 @@ import channel_spring_installed_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
+import lever_wire_geom
+import magnifying_clamp_geom
+import magnifying_lever_geom
 import measuring_stick_spec
 import paper_drive_geom
+import pen_wire_geom
 import rocker_arm_spec
 import summing_lever_spec
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
@@ -86,10 +90,19 @@ class Nominal:
     sum_arm: float  # summing lever: knife -> spring hook row
     counter_arm: float  # summing lever: knife -> counter-spring anchor
     d_max: float  # amplitude-bar full-scale station
+    # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
+    lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
+    lever_r_built: float  # the as-built (CLAMP_LOCAL_X) radius
+    lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
+    wheel_ratio: float  # rim wire radius / hub wire radius
+    pen_half: float  # the pen's physical half-stroke
 
 
 def nominal() -> Nominal:
     """The as-designed inputs, read from the spec modules the CAD builds from."""
+    lever_band = magnifying_lever_geom.clamp_radius_band(
+        magnifying_clamp_geom.BLOCK_DEPTH
+    )
     return Nominal(
         ecc=cylinder_gear_spec.ECCENTRICITY,
         rod=connecting_rod_spec.CENTER_DISTANCE,
@@ -110,7 +123,40 @@ def nominal() -> Nominal:
         sum_arm=summing_lever_spec.HOLE_X,
         counter_arm=summing_lever_spec.SUM_H,
         d_max=float(_config.machine("amplitude", "max_travel_mm")),
+        lever_r_min=lever_band[0],
+        lever_r_built=lever_band[1],
+        lever_r_max=lever_band[2],
+        wheel_ratio=(
+            pen_wire_geom.RIM_DIA / 2.0
+            + pen_wire_geom.WIRE_DIA / 2.0
+            + pen_wire_geom.CLEARANCE
+        )
+        / (
+            lever_wire_geom.HUB_DIA / 2.0
+            + lever_wire_geom.WIRE_DIA / 2.0
+            + lever_wire_geom.CLEARANCE
+        ),
+        pen_half=float(_config.machine("output", "pen_trace_half_mm")),
     )
+
+
+def pen_gain(nom: Nominal, lever_r: float) -> float:
+    """Pen travel (mm) per mm of SUMMED hook displacement at magnifying-lever
+    radius ``lever_r``: the 20 equal-rate springs on one hook row at arm ``a``
+    against the counter spring at ``b`` put the summing lever at
+    theta = k a sum(h) / (N k a^2 + K_c b^2) -- the hook row moves by the mean
+    hook displacement times the spring coupling -- the clamp at radius R rides
+    R theta, wire 1 turns the hub, the rim pays wire 2 out to the pen by the
+    rim/hub ratio (book ch. 20-21). Force balance, so the spring preloads
+    cancel; small angles (the lever rocks ~1.6 deg)."""
+    k, a = nom.spring_rate, nom.sum_arm
+    coupling = (
+        N_ELEMENTS
+        * k
+        * a**2
+        / (N_ELEMENTS * k * a**2 + nom.counter_rate * nom.counter_arm**2)
+    )
+    return coupling * lever_r * nom.wheel_ratio / (a * N_ELEMENTS)
 
 
 # --------------------------------------------------------------------------
@@ -371,19 +417,38 @@ def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndar
     return _READ_TABLES[key]
 
 
-def setting_bias_lift(x: np.ndarray, nom: Nominal, setting_tol: float) -> np.ndarray:
+def setting_bias_lift(
+    x: np.ndarray, nom: Nominal, setting_tol: float, scale: float = 1.0
+) -> np.ndarray:
     """The coherent read-ordinate shift a one-sided setting band leaves on each
     bar: a bar set at the stick zero cannot go below the pivot, so its setting
     error is uniform on [0, +tol] with mean +tol/2 -- it stands at station
     tol/2, not 0 -- and a bar at the stop is uniform on [-tol, 0], mean -tol/2.
     Bars in between are two-sided (mean 0). This is what the procedure tells the
-    operator to take the station as, and what the Monte Carlo subtracts."""
+    operator to take the station as, and what the Monte Carlo subtracts. In the
+    trial's ordinate units (``scale`` full-scale travel per unit, see
+    ``NominalTrial.magnifier_setup``)."""
     grid, table = read_table(nom)
-    d = x * nom.d_max
+    d = scale * x * nom.d_max
+    at_stop = (x == 1.0) & (scale == 1.0)
     mean = np.where(x == 0.0, setting_tol / 2.0, 0.0) - np.where(
-        x == 1.0, setting_tol / 2.0, 0.0
+        at_stop, setting_tol / 2.0, 0.0
     )
-    return np.interp(d + mean, grid, table) - np.interp(d, grid, table)
+    return (np.interp(d + mean, grid, table) - np.interp(d, grid, table)) / scale
+
+
+@dataclass(frozen=True)
+class MagnifierSetup:
+    """How one trial is fitted to the pen stroke: the ordinate scale the bars
+    are set at (1 = the ordinate 1 is full-scale travel; < 1 = the operator
+    scaled every ordinate down so the k=0 peak fits the stroke at the minimum
+    magnification), the magnifying-lever radius, and how much of the stroke the
+    k=0 reading spans (< 1 only when the maximum magnification is not enough)."""
+
+    ordinate_scale: float
+    lever_r: float
+    stroke_fill: float
+    k0_reading_mm: float
 
 
 class NominalTrial:
@@ -443,17 +508,18 @@ class NominalTrial:
         null_lift: float | None = None,
         correct_second_harmonic: bool = True,
         calibrated_stick: bool = True,
+        scale: float = 1.0,
     ) -> np.ndarray:
         """O_k in ordinate units through the procedure. ``theta_error`` (rad of
         fundamental angle) reads the pen at theta_k + error while every
         correction is still evaluated at theta_k -- the crank stopped off its
         index. ``null_lift`` (no calibrated stick: x_read = x + lift) and the
         two switches reproduce the report's correction cascade."""
-        stations = x * self.nom.d_max
+        stations = scale * x * self.nom.d_max
         if calibrated_stick:
-            x_read = self.x_read(stations)
+            x_read = self.x_read(stations) / scale
         else:
-            x_read = x + (null_lift or 0.0)
+            x_read = x + (null_lift or 0.0) / scale
         kappa = self.kappa(stations) if correct_second_harmonic else np.zeros_like(x)
         zero = float(np.mean(self.trace(stations, PERIOD)))
         readings = self.trace(stations, THETA_K + theta_error) - zero
@@ -463,6 +529,47 @@ class NominalTrial:
         # at k=0, -lift at odd k) or, with a calibrated stick, the table's
         # full per-channel deviation vector.
         return measured - ideal_coefficients(x_read - x)
+
+    def k0_hook_mm(self, stations: np.ndarray) -> float:
+        """The k=0 (theta = 0) reading off the mean line, in summed hook
+        displacement (mm) -- what ``pen_gain`` turns into pen travel. A
+        magnitude: the CAD's hand reads a +X bar negative at the top of stroke
+        (the sign convention the procedure absorbs)."""
+        zero = float(np.mean(self.trace(stations, PERIOD)))
+        return abs(float(self.trace(stations, THETA_K[:1])[0]) - zero)
+
+    def magnifier_setup(self, x: np.ndarray) -> MagnifierSetup:
+        """Fit the trial to the pen: the k=0 reading must span the half-stroke
+        (Michelson's normalisation to the greatest term, book p. 99: "scaled by
+        adjusting the magnifying lever"). Solve the lever radius that does it;
+        below the reachable minimum the operator instead scales every ordinate
+        down (the bars sum to the same hook travel whatever the input -- the
+        machine's ordinate CAPACITY) with the clamp at the collar; above the
+        maximum the reading falls short of the stroke by ``stroke_fill``."""
+        nom = self.nom
+        pen_per_r = pen_gain(nom, 1.0)
+        r0 = self.k0_hook_mm(x * nom.d_max)
+        if r0 <= 0.0:
+            raise ValueError("k=0 reading is not positive; the input is not lifted")
+        r_req = nom.pen_half / (pen_per_r * r0)
+        if r_req >= nom.lever_r_min:
+            lever_r = min(r_req, nom.lever_r_built)
+            fill = min(1.0, nom.lever_r_built / r_req)
+            return MagnifierSetup(1.0, lever_r, fill, pen_per_r * lever_r * r0)
+        # bisect the ordinate scale at the minimum magnification (the idle
+        # bars' lift is a fixed offset, so the reading is not quite linear in it)
+        gain = pen_per_r * nom.lever_r_min
+        lo, hi = 0.0, 1.0
+        for _ in range(50):
+            mid = 0.5 * (lo + hi)
+            if gain * self.k0_hook_mm(mid * x * nom.d_max) > nom.pen_half:
+                hi = mid
+            else:
+                lo = mid
+        f = 0.5 * (lo + hi)
+        return MagnifierSetup(
+            f, nom.lever_r_min, 1.0, gain * self.k0_hook_mm(f * x * nom.d_max)
+        )
 
 
 def nominal_design_errors(
@@ -571,6 +678,7 @@ def _channel_model(
     dev: dict[str, np.ndarray],
     sens: dict[str, float],
     setting_tol: float = 0.0,
+    scale: float = 1.0,
 ) -> np.ndarray:
     """A_k read from a machine whose channel i has gain g_i and phase phi_i
     built from the drawn deviations ``dev[feature]`` (draws x 20), on the
@@ -582,11 +690,14 @@ def _channel_model(
     Pure cosines have a zero mean line, so only the scale step of the readout is
     modelled here. ``setting_tol`` is the station-setting half-width the
     ``station_setting`` draws were taken from (needed for the one-sided mean,
-    below). Returns e_k in % FS, shape (draws, K_MAX+1)."""
+    below); ``scale`` is the trial's ordinate scale (``MagnifierSetup``): the
+    bars stand at scale * x * d_max, so a fixed setting error and a fixed idle
+    lift are 1/scale larger in the trial's own units. Returns e_k in % FS,
+    shape (draws, K_MAX+1)."""
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
-    d = np.broadcast_to(x * nom.d_max, (draws, N_ELEMENTS)).copy()
+    d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     lift = np.zeros(N_ELEMENTS)
     for key, v in dev.items():
         if key in sens:
@@ -607,10 +718,10 @@ def _channel_model(
             # (setting_bias_lift, published in READOUT.md); only the scatter
             # about it survives.
             at_zero = (x == 0.0)[None, :]
-            at_full = (x == 1.0)[None, :]
+            at_full = ((x == 1.0) & (scale == 1.0))[None, :]
             v = np.where(at_zero, np.abs(v), np.where(at_full, -np.abs(v), v))
             d = np.clip(d + v, 0.0, nom.d_max)
-            lift = setting_bias_lift(x, nom, setting_tol)
+            lift = setting_bias_lift(x, nom, setting_tol, scale)
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
@@ -620,16 +731,21 @@ def _channel_model(
         THETA_K[None, :, None] * HARMONICS[None, None, :] + phi[:, None, :]
     )  # draws,k,i
     r = np.einsum("di,dki->dk", g * amplitude, cos_k)
-    x_read = np.interp(x * nom.d_max, grid, table) + lift  # what the operator records
+    x_read = (
+        np.interp(scale * x * nom.d_max, grid, table) / scale + lift
+    )  # what the operator records, in the trial's units
     measured = r * (float(np.sum(x_read)) / r[:, :1]) - ideal_coefficients(x_read - x)
     ideal = ideal_coefficients(x)
     return 100.0 * (measured - ideal[None, :]) / np.max(np.abs(ideal))
 
 
-def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
+def monte_carlo(
+    budget: dict[str, Any], nom: Nominal, setups: dict[str, MagnifierSetup]
+) -> dict[str, Any]:
     """Per-feature and combined coefficient-error statistics (% FS) with every
     critical feature drawn uniformly within its tolerance, per channel, on the
-    budget's reference inputs through the calibrated readout."""
+    budget's reference inputs through the calibrated readout, each input at the
+    ordinate scale its ``MagnifierSetup`` fits to the pen."""
     mc = budget["monte_carlo"]
     rng = np.random.default_rng(int(mc["seed"]))
     draws = int(mc["draws"])
@@ -657,7 +773,12 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
         pooled = []
         for name in names:
             e = _channel_model(
-                inputs[name], nom, dev, sens, feats["station_setting"]["tolerance"]
+                inputs[name],
+                nom,
+                dev,
+                sens,
+                feats["station_setting"]["tolerance"],
+                setups[name].ordinate_scale,
             )
             per_input[name] = {
                 "mae": float(np.mean(np.abs(e))),
@@ -692,12 +813,14 @@ def monte_carlo(budget: dict[str, Any], nom: Nominal) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
+def closed_form_terms(
+    nom: Nominal, budget: dict[str, Any], setups: dict[str, MagnifierSetup]
+) -> dict[str, Any]:
     """Error terms that are procedure or design-adjustment items, not part
     tolerances: knife hysteresis, strap lost motion, ordinate readout, timebase.
     Each is evaluated at the ``reserved`` assumptions of error_budget.yaml as a
-    ``pct_fs`` (% of the greatest term on the all-ones input, whose k=0 reading is
-    the machine's full-scale output) so ``budget_closes`` can bound it."""
+    ``pct_fs`` (% of the greatest term, each reference input fitted to the pen
+    by its ``MagnifierSetup``) so ``budget_closes`` can bound it."""
     res = budget["reserved"]
     u_fs = (
         linear_gain(nom) * nom.d_max
@@ -729,12 +852,17 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     f_r = float(res["knife"]["rolling_resistance_mm"])
     stall_one = 100.0 * knife_load * f_r / (nom.spring_rate * nom.sum_arm * u_fs)
     # The stall is a fixed displacement -- one channel's full-scale hook motion
-    # times stall_one/100 -- so against each trial's greatest term (sum of the
-    # ordinates the machine actually sums, x_read >= x) it is stall_one/sum(x_read).
+    # times stall_one/100. In a trial's own ordinate units (one unit = scale x
+    # the full-scale hook motion) that is stall_one/scale, so against the
+    # trial's ideal greatest term sum(x) it is stall_one / (scale * sum x): a
+    # trial the operator had to scale down to fit the pen pays 1/scale.
     scored = list(budget["reference_inputs"])
     broad = [n for n in scored if n != "pair_1_20"]
-    x_read = {n: read_ordinates(reference_inputs()[n], nom) for n in scored}
-    knife_per_input = {n: stall_one / float(np.sum(x_read[n])) for n in scored}
+    inputs = reference_inputs()
+    knife_per_input = {
+        n: stall_one / (setups[n].ordinate_scale * float(np.sum(inputs[n])))
+        for n in scored
+    }
     knife = {
         "assumed_preload_N_per_spring": preload,
         "counter_spring_needed_N": counter_needed,
@@ -756,62 +884,64 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
         "note": "constant within a run (mean-line zero removes it) as long as a station keeps its sign",
     }
-    # Ordinate readout. The CAD maps the trace PEAK onto output.yaml
-    # pen_trace_half_mm (pen_driver: scale = stroke_half / peak|pen_y|), and the
-    # greatest term of a non-negative input is its k=0 reading. The procedure
-    # normalises every reading by that k=0 reading, so coefficient k carries
-    # TWO independent reading errors: its own, and the normaliser's scaled by
-    # a_k = A_k/A_0 (the coefficient's share of the greatest term). With the
-    # magnifier set per trial so k=0 spans the stroke, a reading error of
-    # ``reading`` mm is reading/pen_half of sum(x_read); against the trial's
-    # IDEAL greatest term (sum x, what the error is scored on) it is that
-    # times sum(x_read)/sum(x) -- idle bars read ~0.028 each, so a sparse
-    # trial pays for them. Scored as the MAE the benchmark and the other
-    # closure terms use: for independent uniform +/-delta reads,
-    # E|delta_k - a_k delta_0| = delta (1/2 + a_k^2/6) (|a_k| <= 1), averaged
-    # over k (k=0 reads as itself: zero error). The worst single coefficient
-    # (RSS bound delta sqrt(1 + a_k^2), sqrt 2 on an input whose k=20 term
-    # equals its k=0) is reported beside it, not gated. At a fixed magnifier
-    # (all-ones setting) multiply by N/sum(x_read) as well.
-    pen_half = float(_config.machine("output", "pen_trace_half_mm"))
+    # Ordinate readout. The procedure divides every reading by the k=0 reading
+    # through s = r_0 / (S + C_2) (S = sum x_read, C_2 = sum x_read kappa, both
+    # in the trial's ordinate units), so coefficient k carries TWO independent
+    # reading errors: its own, delta/s = delta (S + C_2)/r_0, and the
+    # normaliser's scaled by the PHYSICAL pre-correction reading ratio
+    # a_k = r_k/r_0. r_0 is the k=0 reading the MagnifierSetup fits to the pen:
+    # stroke_fill x pen_half (the full half-stroke unless even the maximum
+    # magnification cannot fill it). Against the trial's IDEAL greatest term
+    # sum x (what the error is scored on) one reading is therefore
+    # reading/(fill pen_half) x (S + C_2)/sum x -- idle bars read ~0.028/scale
+    # each and the second harmonic rides the k=0 peak, so both inflate it.
+    # Scored as the MAE the benchmark and the other closure terms use: for
+    # independent uniform +/-delta reads, E|delta_k - a_k delta_0| =
+    # delta (1/2 + a_k^2/6) (|a_k| <= 1), averaged over k (k=0 reads as itself:
+    # zero error). The worst single coefficient (RSS bound delta sqrt(1 +
+    # a_k^2), sqrt 2 on an input whose k=20 term equals its k=0) is reported
+    # beside it, not gated.
     reading = float(res["readout"]["reading_uncertainty_mm"])
-    spans = bool(res["readout"]["greatest_term_spans_stroke"])
-    magnification = {n: float(N_ELEMENTS / np.sum(x_read[n])) for n in scored}
-    per_mm = 100.0 * reading / pen_half
+    trial = NominalTrial(nom)
     share = {}
+    scale = {}
     for n in scored:
-        coeff = ideal_coefficients(x_read[n])
-        share[n] = coeff / coeff[0]
-    scale = {
-        n: per_mm * float(np.sum(x_read[n]) / np.sum(reference_inputs()[n]))
-        for n in scored
-    }
+        x = inputs[n]
+        f = setups[n].ordinate_scale
+        stations = f * x * nom.d_max
+        x_read_n = trial.x_read(stations) / f
+        s_plus_c2 = float(np.sum(x_read_n) + np.sum(x_read_n * trial.kappa(stations)))
+        zero = float(np.mean(trial.trace(stations, PERIOD)))
+        raw = trial.trace(stations, THETA_K) - zero
+        share[n] = raw / raw[0]
+        scale[n] = (
+            100.0
+            * reading
+            / (setups[n].stroke_fill * nom.pen_half)
+            * s_plus_c2
+            / float(np.sum(x))
+        )
     mae_factor = {}
     for n in scored:
         f = 0.5 + share[n] ** 2 / 6.0
         f[0] = 0.0  # k=0 is normalised by itself
         mae_factor[n] = float(np.mean(f))
-    spanning = {n: scale[n] * mae_factor[n] for n in scored}
+    mae = {n: scale[n] * mae_factor[n] for n in scored}
     worst_bound = {
         n: scale[n] * float(np.max(np.sqrt(1.0 + share[n][1:] ** 2))) for n in scored
     }
-    fixed = {n: spanning[n] * magnification[n] for n in scored}
-    chosen = spanning if spans else fixed
     readout = {
-        "pen_half_stroke_mm": pen_half,
+        "pen_half_stroke_mm": nom.pen_half,
         "assumed_reading_uncertainty_mm": reading,
-        "assumed_greatest_term_spans_stroke": spans,
-        "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
+        "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / nom.pen_half,
         "one_reading_pct_fs_per_input": scale,
         "normaliser_share_max_abs": {
             n: float(np.max(np.abs(share[n][1:]))) for n in scored
         },
-        "pct_fs_greatest_term_spans_stroke": spanning,
+        "pct_fs_per_input": mae,
         "pct_fs_worst_coefficient_bound": worst_bound,
-        "magnification_vs_all_ones": magnification,
-        "pct_fs_fixed_magnifier": fixed,
-        "pct_fs": max(chosen[n] for n in broad),
-        "note": "MAE over k of |own read - a_k * k=0 read|, uniform +/-reading each; worst-coefficient RSS bound reported, not gated; scales as 1/(pen full scale)",
+        "pct_fs": max(mae[n] for n in broad),
+        "note": "MAE over k of |own read - a_k * k=0 read|, uniform +/-reading each, a_k the physical r_k/r_0, one reading = reading/(fill x pen_half) x (S + C_2)/sum x; worst-coefficient RSS bound reported, not gated",
     }
     # Timebase: reading at the wrong theta. The budgeted procedure stops the
     # crank on its index within +/-index_deg (uniform); one fundamental period
@@ -832,18 +962,18 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         0.1 / paper_drive_geom.NET_RACK_TRAVEL_PER_CRANK_REV * rad_per_crank_turn
     )
     rad_index = index_deg / 360.0 * rad_per_crank_turn
-    trial = NominalTrial(nom)
     nodes, weights = np.polynomial.legendre.leggauss(8)
     slope = {}
     physical = {}
-    for name, x in reference_inputs().items():
+    for name, x in inputs.items():
         fs = np.max(np.abs(ideal_coefficients(x)))
         s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
         slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
-        on_index = trial.readout(x)
+        f = setups[name].ordinate_scale
+        on_index = trial.readout(x, scale=f)
         sq = 0.0
         for node, w in zip(nodes, weights):
-            off = trial.readout(x, theta_error=float(node) * rad_index)
+            off = trial.readout(x, theta_error=float(node) * rad_index, scale=f)
             sq += float(w) / 2.0 * float(np.mean((off - on_index) ** 2))
         physical[name] = 100.0 * math.sqrt(sq) / fs
     worst = max(scored, key=lambda n: physical[n])
@@ -861,11 +991,35 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "pct_fs": physical[worst],
         "note": "RMS over k and a uniform +/-index band of the physical trace read off-index through the procedure, worst broad input; ideal-vector slope reported for comparison",
     }
+    # The magnifier: what the CAD's output chain lets the operator do. The
+    # ordinate capacity is the summed full-scale-bar-equivalents whose k=0 peak
+    # just fills the half-stroke at the minimum magnification -- every broad
+    # input whose read ordinates sum to more than this is scaled down by the
+    # operator (MagnifierSetup.ordinate_scale < 1), so setting and knife
+    # errors grow by that factor. A design lever, not a part tolerance.
+    gain_min = pen_gain(nom, nom.lever_r_min)
+    magnifier = {
+        "lever_radius_min_mm": nom.lever_r_min,
+        "lever_radius_built_mm": nom.lever_r_built,
+        "lever_radius_max_mm": nom.lever_r_max,
+        "wheel_ratio": nom.wheel_ratio,
+        "pen_mm_per_full_scale_bar_at_min": gain_min * abs(trial.f_full),
+        "pen_mm_per_full_scale_bar_at_built": pen_gain(nom, nom.lever_r_built)
+        * abs(trial.f_full),
+        "ordinate_capacity_full_scale_bars": nom.pen_half
+        / (gain_min * abs(trial.f_full)),
+        "station_sum_capacity_mm": nom.pen_half
+        / (gain_min * abs(trial.f_full))
+        * nom.d_max,
+        "per_input": {n: asdict(setups[n]) for n in scored},
+        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1",
+    }
     return {
         "knife": knife,
         "lost_motion": lost_motion,
         "readout": readout,
         "timebase": timebase,
+        "magnifier": magnifier,
     }
 
 
@@ -881,6 +1035,11 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     nom = nominal()
     d0 = null_station(nom)
     stations = [nom.d_max, nom.d_max / 2, nom.d_max / 4, 10.0]  # lifting side only
+    trial = NominalTrial(nom)
+    setups = {
+        name: trial.magnifier_setup(reference_inputs()[name])
+        for name in budget["reference_inputs"]
+    }
     r = {
         "nominal": nom.__dict__,
         "linear_gain_mm_per_mm": linear_gain(nom),
@@ -904,8 +1063,8 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         },
         "gain_sensitivities": gain_sensitivities(nom),
         "finite_difference_check": finite_difference_check(nom),
-        "monte_carlo": monte_carlo(budget, nom),
-        "closed_form": closed_form_terms(nom, budget),
+        "monte_carlo": monte_carlo(budget, nom, setups),
+        "closed_form": closed_form_terms(nom, budget, setups),
         "targets": budget["targets"],
         "benchmark": budget["benchmark"],
         "reserved_allowance": {
@@ -1089,6 +1248,7 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
     self-contained Markdown document for the release bundle -- generated from
     the model's own numbers so it cannot drift from what check:budget proved."""
     cf = r["closed_form"]
+    mag = cf["magnifier"]
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
     tol = r["station_setting_tolerance_mm"]
@@ -1170,13 +1330,30 @@ Signed functions: every bar stays on the lifting side, so add a constant $c$
 to a signed input before setting the bars; its lift vector ($20c$ at $k=0$,
 $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 
+**Choose the ordinate scale for the pen first.** The pen's half-stroke is
+{cf["readout"]["pen_half_stroke_mm"]:.0f} mm and the $k=0$ reading must span it
+(step 3 divides everything by it). At the magnifier's MINIMUM setting -- the
+clamp against the bracket collar, {mag["lever_radius_min_mm"]:.0f} mm from the
+knife axis -- one full-scale bar moves the pen
+{mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the bars' read ordinates
+may sum to at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}** (stations
+summing to {mag["station_sum_capacity_mm"]:.0f} mm): a function whose samples
+sum to more than that is set at a proportionally smaller scale (every ordinate
+times the same factor; step 3 removes it). Broad inputs run at 0.2-0.5 of full
+scale on this machine; the stick's +/-{tol:.2f} mm then costs that much more of
+each ordinate, which is what the budget's `station_setting` and `knife` terms
+carry. Then set the clamp radius so the $k=0$ peak just fills the stroke:
+$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ S$
+(as built {mag["lever_radius_built_mm"]:.0f} mm; the wheel's rim/hub wire ratio
+is {mag["wheel_ratio"]:.2f}).
+
 ## 2. Run and read
 
 Crank in ONE direction only (a reversal re-seats every mesh on the other flank).
 Take the zero of each trial as the mean line of the trace over one full period.
 Read the pen at each $\\theta_k$ to +/-{cf["readout"]["assumed_reading_uncertainty_mm"]:.3f} mm
-(half the line width against the grid) with the magnifier set so the $k=0$
-reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
+(half the line width against the grid), the magnifier set as in step 1 so the
+$k=0$ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
 
 ## 3. Normalise
 

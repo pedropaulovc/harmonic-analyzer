@@ -156,10 +156,14 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
 from magnifying_lever_geom import (  # noqa: E402
+    CLAMP_LOCAL_X,
+    COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN,
+    COLLAR_LOCAL_X,
     KNIFE_LOCAL_X,
     KNIFE_LOCAL_Y,
     ROD_DIA as LEVER_ROD_DIA,
 )
+from build_magnifying_bracket import COLLAR_HALF_LEN as BRACKET_COLLAR_HALF_LEN  # noqa: E402
 from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
@@ -184,7 +188,14 @@ assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
     f"thumb-screw head clears the top-frame rail by only "
     f"{THUMB_SCREW_RAIL_CLEARANCE:.4f} mm"
 )
-CLAMP_X = 150.0  # sliding clamp default position (p.46/48 insets)
+# Sliding clamp default position (p.46/48 insets) and the bracket collar, both
+# derived from the lever-local stations error_budget.py reads for the
+# magnification range (Ry(180): machine x = LEVER_X0 - local x).
+CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
+BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X  # 40
+assert math.isclose(BRACKET_COLLAR_HALF_LEN, LEVER_COLLAR_HALF_LEN), (
+    "magnifying_lever_geom.COLLAR_HALF_LEN drifted from the bracket part"
+)
 from magnifying_clamp_geom import (  # noqa: E402
     BLOCK_DEPTH as CLAMP_DEPTH,
     LEVER_BORE_Y as CLAMP_BORE_Y,
@@ -441,7 +452,7 @@ async def build(adapter) -> dict[str, str]:
     bracket = await place_component(
         adapter,
         "magnifying-bracket",
-        [40.0, LEVER_ROD_Y, LEVER_ROD_Z],
+        [BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,

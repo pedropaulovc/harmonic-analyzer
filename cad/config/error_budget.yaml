@@ -53,30 +53,39 @@ reserved:
   readout:                         # ordinate reading at the pen. The stroke is the CAD's
                                    # output.yaml pen_trace_half_mm (15, verify:kinematics), NOT set here
     reading_uncertainty_mm: 0.075  # half a 0.15 mm technical-pen line, read against the grid
-    greatest_term_spans_stroke: true  # the magnifier is set per trial so the k=0 (greatest) term
-                                   # spans the stroke -- the CAD's pen_driver mapping (trace peak
-                                   # -> stroke) and Michelson's normalisation; the report lists the
-                                   # magnification each input needs vs the all-ones setting
-                                   # (2.0-2.4x for the broad inputs -- the open magnifier-range
-                                   # item). `false` scores a fixed magnifier at the all-ones setting.
+    # The magnifier is NOT an assumption: error_budget.py fits every reference
+    # input to the pen from the CAD's own output chain (spring coupling, the
+    # clamp's reachable radius band on the magnifying lever -- collar face to
+    # rod tip, magnifying_lever_geom -- and the wheel's rim/hub wire ratio).
+    # The k=0 (greatest) term is made to span the stroke, Michelson's
+    # normalisation, book p. 99: where the lever radius that does it is below
+    # the clamp's minimum the operator scales the ordinates down instead (the
+    # machine's ORDINATE CAPACITY, ~4.7 full-scale bars -- every broad input
+    # runs at 0.2-0.5 of full scale), and where it is above the as-built
+    # radius the reading falls short and the term grows by the shortfall.
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
                                    # carries its own read AND the k=0 normaliser's read (scaled
-                                   # by A_k/A_0), uniform +/-reading each, averaged over k, on
-                                   # the worst broad input, scaled by sum(x_read)/sum(x) (idle
-                                   # bars read ~0.028 each and inflate the k=0 term). Lands at
-                                   # 0.25 on every broad input; the worst SINGLE coefficient
-                                   # (0.5-0.7, Michelson's 0.5-unit table quantisation) is
-                                   # reported beside it, not gated.
+                                   # by the physical r_k/r_0), uniform +/-reading each, averaged
+                                   # over k, on the worst broad input; one reading converts
+                                   # through s = r_0/(S + C_2), so the idle bars' lift and the
+                                   # second harmonic riding the k=0 peak both inflate it. Lands
+                                   # at 0.27 on every broad input; the worst SINGLE coefficient
+                                   # (Michelson's 0.5-unit table quantisation) is reported
+                                   # beside it, not gated.
   timebase:                        # reading coefficient k with the crank stopped on its index,
                                    # scored on the worst reference input
     crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
     allowance_pct: 0.30
   knife:                           # summing-lever knife-edge hysteresis (stall), scored on the
-                                   # worst broad input: the stall is a fixed displacement, so
-                                   # against the Gaussian's greatest term (sum x_read ~8.9) it is
-                                   # 2.4x the all-ones value
+                                   # worst broad input: the stall is a fixed displacement, so it
+                                   # is paid against the trial's greatest term at the ordinate
+                                   # scale the pen forces -- every broad input is capped at the
+                                   # ~4.7-bar capacity, so all read 0.40 (0.09 if the broad
+                                   # inputs could run at full scale). The capacity, not the
+                                   # edge, is what this allowance buys: a clamp band reaching
+                                   # nearer the knife, or a longer pen stroke, halves it.
     rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
-    allowance_pct: 0.25
+    allowance_pct: 0.45
     # The knife load is the 20 channel preloads PLUS the counter spring's
     # balancing reaction (20*preload*a/b). The CAD's counter spring
     # (counter_spring_spec: 0.51 N/mm, at most ~28 mm of extension in its
