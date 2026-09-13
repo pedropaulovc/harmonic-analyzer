@@ -1318,7 +1318,7 @@ readings):
 ```mermaid
 flowchart LR
     t[("station table:<br/>d -> x_read, kappa")]
-    s1["1. set bar i to the linear<br/>station x_i * {nom.d_max:.0f} mm"] --> s1b["record x_read,i<br/>from the table"]
+    s0["0. scale f: largest with<br/>P(f) = sum table(f x_i)(1+kappa) <= {mag["ordinate_capacity_full_scale_bars"]:.2f}"] --> s1["1. set bar i to the linear<br/>station f x_i * {nom.d_max:.0f} mm"] --> s1b["record x_read,i =<br/>table ordinate / f"]
     t -.-> s1b
     s1b --> s2["2. crank one way; read r_k (mm)<br/>off the mean line at 2k turns"]
     s2 --> s3["3. s = r_0 / (S + C_2)<br/>O'_k = r_k / s"]
@@ -1332,26 +1332,34 @@ flowchart LR
 
 The stick's 0 tick sits at the rocker pivot axis (stick drawing note 5); every
 station is on the lifting side. Set bar $i$ to the **linear station**
-$d_i = x_i \\cdot {nom.d_max:.0f}$ mm ($= x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
+$d_i = f\\,x_i \\cdot {nom.d_max:.0f}$ mm ($= f\\,x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
 divisions on the engraved {STICK_DIVISION_MM:.2f} mm/division scale), reading
 to 1/5 minor division (setting error +/-{tol:.2f} mm max per bar). Then look up,
-in the table, the **read ordinate** $x^{{read}}_i$ that station actually
-contributes (interpolate between rows) and record it: the ordinate is NOT
-linear in station (the null lies at {r["null_station_mm"]:+.2f} mm, unreachable,
-and the slope of ordinate per mm changes by
+in the table, the ordinate that station actually contributes (interpolate
+between rows), **divide it by the trial's scale $f$** (below; $f = 1$ unless
+the function had to be scaled down to fit the pen) and record the quotient as
+the **read ordinate** $x^{{read}}_i$. Everything downstream -- $S$, $C_2$, the
+corrections of step 4 -- uses $x^{{read}}_i$ in the function's OWN units, so
+$f$ never appears again. The ordinate is NOT linear in station (the null lies
+at {r["null_station_mm"]:+.2f} mm, unreachable, and the slope of ordinate per
+mm changes by
 {100.0 * ((rows[-1][1] - rows[-2][1]) / (rows[1][1] - rows[0][1]) - 1.0):+.1f} %
 from the pivot to full scale), so $x^{{read}}_i \\ne x_i$; the difference is
-what step 4 subtracts.
+what step 4 subtracts. An idle bar's {rows[0][1]:+.4f} table ordinate becomes
+${rows[0][1]:.4f}/f$ of the function's unit -- at $f = {scale_all:.3f}$ that is
+{rows[0][1] / scale_all:+.4f}, which is why a scaled-down trial pays more for
+its idle bars.
 
 **Bars at the ends of the scale are biased, not centred.** A bar set at the
 stick zero cannot sit below the pivot, so its setting error is one-sided,
 $[0, +{tol:.2f}]$ mm, and on average it stands at $+{tol / 2:.3f}$ mm, not 0;
 a bar at the travel stop is the mirror, $[-{tol:.2f}, 0]$, on average at
-${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' read ordinates --
-**{at_zero:+.4f} for a bar at zero** (not {rows[0][1]:+.4f}) and
-**{at_stop:+.4f} for a bar at the stop** (not {rows[-1][1]:+.4f}) -- so the
-read-vs-set vector of step 4 removes the bias; only the scatter about it is
-left, which is what the budget's `station_setting` term scores.
+${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' table ordinates
+(divided by $f$ like every other) -- **{at_zero:+.4f}$/f$ for a bar at zero**
+(not {rows[0][1]:+.4f}) and, at $f = 1$ only (a scaled trial never reaches the
+stop), **{at_stop:+.4f} for a bar at the stop** (not {rows[-1][1]:+.4f}) -- so
+the read-vs-set vector of step 4 removes the bias; only the scatter about it
+is left, which is what the budget's `station_setting` term scores.
 
 | station (mm) | stick reading (div) | read ordinate $x^{{read}}$ | $\\kappa$ = c2/c1 |
 |---:|---:|---:|---:|
@@ -1373,8 +1381,10 @@ $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 clamp against the bracket collar, {mag["lever_radius_min_mm"]:.0f} mm from the
 knife axis -- one full-scale bar moves the pen
 {mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the trial's $k=0$ peak,
-$P = \\sum_i x^{{read}}_i\\,(1 + \\kappa_i)$ ($= S + C_2$ of step 3, both from
-the station table), may be at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}**
+$P = \\sum_i t_i\\,(1 + \\kappa_i)$ with $t_i$ the TABLE ordinate at bar $i$'s
+set station, undivided ($= f\\,(S + C_2)$ of step 3, in full-scale-bar units;
+the pen sees table ordinates, the arithmetic sees them divided by $f$), may be
+at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}**
 full-scale bars. If the function's samples give $P > {mag["ordinate_capacity_full_scale_bars"]:.2f}$
 at full scale, set every bar at $f\\,x_i \\cdot {nom.d_max:.0f}$ mm with the
 **largest $f$ for which $P(f) \\le {mag["ordinate_capacity_full_scale_bars"]:.2f}$** --
@@ -1384,9 +1394,11 @@ affine in $f$ (for 20 bars at 1, $P = {p_all[0]:.2f}$ at $f = 1$ and the solve
 gives $f = {scale_all:.3f}$, where proportion would say
 {mag["ordinate_capacity_full_scale_bars"] / p_all[0]:.3f} and overdrive the
 stroke by {100.0 * (p_all[1] / mag["ordinate_capacity_full_scale_bars"] - 1.0):.0f} %).
-Step 3 removes $f$. Broad inputs run at 0.2-0.5 of full scale on this machine;
-the stick's +/-{tol:.2f} mm then costs that much more of each ordinate, which
-is what the budget's `station_setting` and `knife` terms carry. Then set the
+$f$ is removed by the division in the read ordinates above, so step 3 sees
+the function's own units. Broad inputs run at 0.2-0.5 of full scale on this
+machine; the stick's +/-{tol:.2f} mm then costs that much more of each
+ordinate, which is what the budget's `station_setting` and `knife` terms
+carry. Then set the
 clamp radius so the peak just fills the stroke:
 $R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$
 (as built {mag["lever_radius_built_mm"]:.0f} mm; the wheel's rim/hub wire ratio
@@ -1409,8 +1421,8 @@ $k=0$ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke
 ## 3. Normalise
 
 Everything the operator has is in two units: pen readings $r_k$ in mm (off the
-mean line, step 2) and ordinates (step 1). From step 1 form two sums, both in
-ordinate units:
+mean line, step 2) and read ordinates (step 1, already divided by $f$). From
+step 1 form two sums, both in ordinate units:
 
 - $S = \\sum_i x^{{read}}_i$ (what the machine sums at $k=0$),
 - $C_2 = \\sum_i x^{{read}}_i\\,\\kappa_i$ (the second-harmonic total riding the
@@ -1434,10 +1446,13 @@ Subtract from every $O'_k$, in ordinate units:
   (the connecting-rod distortion, 1.4-5 % of each channel's amplitude; at
   $k=0$ it equals $C_2$, so $O'_0 - C_2 = S$ exactly);
 - the read-vs-set deviation vector $\\sum_i (x^{{read}}_i - x^{{set}}_i)\\cos(i\\theta_k)$
-  with the recorded (bias-corrected) read ordinates of step 1 -- for an idle
-  bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$, so this is the null
-  lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$) plus the
-  one-sided setting bias, plus the same for any lift constant $c$ from step 1.
+  with the recorded (bias-corrected, $f$-divided) read ordinates of step 1 --
+  for an idle bar $x^{{read}} = {at_zero:+.4f}/f$ against $x^{{set}} = 0$
+  ({at_zero:+.4f} at $f = 1$, {at_zero / scale_all:+.4f} at the all-ones
+  $f = {scale_all:.3f}$), so this is the null lift ($20\\ell$ at $k=0$,
+  $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$ at $f = 1$) plus the one-sided
+  setting bias, all over $f$, plus the same for any lift constant $c$ from
+  step 1.
 
 The result is $O_k$. This is the arithmetic `check:budget` credits: the model's
 `read_coefficients` computes exactly $r_k/s$ minus the second-harmonic term.

@@ -285,11 +285,15 @@ RING_CENTER = (
 # rest tilt -7.8158 deg, and the oblique 163.18/180.83 era before it.
 
 # --- amplitude bars ---------------------------------------------------------
-BAR_WIDTH = 6.35
-BAR_LENGTH = 808.3  # legacy 812.8 trimmed 4.5 at the TOP (top-frame rederive
-# 2026-08-02: fulcrum chain -4.5; foot end untouched) = amplitude_bar_spec
-BAR_FOOT_NOTCH = 2.381
-BAR_TOP_PIN_DROP = 6.35
+# Imported, NOT copied (same rule as CAM_ECC): the offline error budget reads
+# amplitude_bar_spec for the bar's rigid-link length and notch-roof contact,
+# so a copy here could drift from what check:budget certifies.
+from amplitude_bar_spec import (  # noqa: E402
+    BAR_WIDTH,  # 6.35 square section
+    BOTTOM_NOTCH_HEIGHT as BAR_FOOT_NOTCH,  # 2.381
+    TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.95
+)
+
 # The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
 # fix-all build the bar sat at the exact tangent (0-volume line contact,
 # filtered as coincidence). Mated, the solver lands a sub-0.005 mm^3
@@ -305,8 +309,13 @@ BAR_CONTACT_GAP = _config.fit(
 
 # --- lever bank -------------------------------------------------------------
 # FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
-LEVER_BAR_PIN_X = 127.0
-LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
+# The lever's two transfer arms -- imported, NOT copied, for the budget's sake
+# (channel_lever_spec is what error_budget.nominal() reads).
+from channel_lever_spec import (  # noqa: E402
+    BAR_PIN_X as LEVER_BAR_PIN_X,  # 127.0, fulcrum -> bar-pin c2c, 5"
+    LEVER_SPRING_X,  # 177.8: 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
+)
+
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
 # springs must reach the summing plate at x ~ -22..-27)
 LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
@@ -418,9 +427,17 @@ ROCKER_ROD_BORE_LOCAL = [
 ]  # rocker Axis2 (rod pin)
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
-LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
-BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # bar Axis1 (swing pivot; 808.3 - 6.35)
-BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~802 mm arm)
+LEVER_BAR_PIN_BORE_LOCAL = [LEVER_BAR_PIN_X, 0.0, 0.0]  # lever Axis2 (bar pin)
+BAR_TOP_PIN_LOCAL = [
+    BAR_WIDTH / 2.0,
+    BAR_TOP_PIN_Y,
+    BAR_WIDTH / 2.0,
+]  # bar Axis1 (swing pivot; 808.3 - 6.35)
+BAR_FOOT_LOCAL = [
+    BAR_WIDTH / 2.0,
+    0.0,
+    BAR_WIDTH / 2.0,
+]  # bar Axis2 (foot, ~802 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
 # A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author

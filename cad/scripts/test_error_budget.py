@@ -344,9 +344,9 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     at_zero = eb.read_ordinate(tol / 2.0, nom)
     at_stop = eb.read_ordinate(nom.d_max - tol / 2.0, nom)
     assert at_zero != pytest.approx(rows[0][1], abs=1e-4)
-    assert f"**{at_zero:+.4f} for a bar at zero**" in doc
+    assert f"**{at_zero:+.4f}$/f$ for a bar at zero**" in doc
     assert f"**{at_stop:+.4f} for a bar at the stop**" in doc
-    assert f"bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$" in doc
+    assert f"bar $x^{{read}} = {at_zero:+.4f}/f$ against $x^{{set}} = 0$" in doc
     assert "s = \\frac{r_0}{S + C_2}" in doc
     assert "O'_k = \\frac{r_k}{s}" in doc
 
@@ -367,6 +367,63 @@ def test_normalisation_uses_only_observable_units():
     measured = eb.read_coefficients(readings_mm, x_read, kappa)
     measured -= eb.ideal_coefficients(x_read - x)
     assert np.allclose(measured, eb.ideal_coefficients(x), atol=1e-12)
+
+
+def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
+    report, nom
+):
+    """On a trial the pen forced to scale f < 1, the operator sets bars at
+    f x_i d_max, reads the pen, and looks up TABLE ordinates at those stations.
+    READOUT.md says: divide each by f and use the quotient everywhere. Executed
+    literally on the nominal Gaussian trial that matches the model and recovers
+    the unscaled coefficients. The raw table ordinates ALSO recover them on a
+    perfect machine -- the read-vs-set vector absorbs (f - 1) x -- but that
+    vector is then (1 - f) of the answer, computed from the answer (circular),
+    and a real channel-gain error comes out understated by f. With the
+    division the vector is the lift-sized known deviation the budget scores."""
+    x = eb.reference_inputs()["gaussian_a0p1"]
+    f = report["closed_form"]["magnifier"]["per_input"]["gaussian_a0p1"][
+        "ordinate_scale"
+    ]
+    assert f < 0.6
+    trial = eb.NominalTrial(nom)
+    stations = f * x * nom.d_max
+    table = trial.x_read(stations)  # what the operator looks up
+    kappa = trial.kappa(stations)
+    zero = float(np.mean(trial.trace(stations, eb.PERIOD)))
+    readings = trial.trace(stations, eb.THETA_K) - zero  # the pen, any scale
+    ideal = eb.ideal_coefficients(x)
+    fs = np.max(np.abs(ideal))
+
+    def procedure(r, x_read):
+        return eb.read_coefficients(r, x_read, kappa) - eb.ideal_coefficients(
+            x_read - x
+        )
+
+    divided = procedure(readings, table / f)
+    assert np.allclose(divided, trial.readout(x, scale=f), atol=1e-12)
+    assert np.max(np.abs(divided - ideal)) / fs < 1e-3
+    raw = procedure(readings, table)
+    assert np.max(np.abs(raw - ideal)) / fs < 1e-3  # perfect machine: no tell
+    # the correction vector step 4 subtracts, as a share of the answer
+    small = np.max(np.abs(eb.ideal_coefficients(table / f - x))) / fs
+    big = np.max(np.abs(eb.ideal_coefficients(table - x))) / fs
+    assert small < 0.1 and big > 0.4
+    # a +1 % gain error on channel 1: the divided procedure reports it in
+    # full, the raw one at f of it
+    err = np.zeros(eb.N_ELEMENTS)
+    err[0] = 0.01
+    perturbed = np.zeros_like(readings)
+    for j, d, g in zip(eb.HARMONICS, stations, 1.0 + err):
+        cyc = trial.one_cycle(float(d))
+        perturbed += g * np.interp(
+            (j * eb.THETA_K) % (2 * math.pi), trial.grid, cyc, period=2 * math.pi
+        )
+    perturbed -= float(np.mean(trial.trace(stations, eb.PERIOD)))
+    e_div = procedure(perturbed, table / f) - divided
+    e_raw = procedure(perturbed, table) - raw
+    assert np.max(np.abs(e_div)) > 0.5 * 0.01 * x[0]
+    assert np.max(np.abs(e_raw)) / np.max(np.abs(e_div)) == pytest.approx(f, rel=0.05)
 
 
 def test_timebase_is_scored_on_the_physical_trace(report, nom):
@@ -559,29 +616,77 @@ def test_drawing_limits_agree_with_the_budget(budget):
     )
 
 
-def test_assembly_imports_the_shared_stations_instead_of_copying():
+def test_assembly_imports_every_transfer_dimension_the_budget_reads():
     """build_channel_assembly imports SolidWorks, so it cannot be imported in
-    this gate; pin at the SOURCE level that its PIVOT / FULCRUM / arc centre /
-    slide radius come from the shared modules error_budget reads, never from a
-    literal."""
+    this gate; pin at the SOURCE level that every transfer dimension
+    error_budget.nominal() reads from a spec module -- pivot/fulcrum stations,
+    arc centre and radius, cam throw, rod length, rod-pin hole, bar width /
+    notch / top-pin station, the lever's two arms -- reaches the assembly by
+    IMPORT from that same module, never as a literal. The builder is a
+    check:budget dependency; a copied literal drifting would re-run the gate
+    and certify stale sensitivities."""
     src = (pathlib.Path(eb.__file__).with_name("build_channel_assembly.py")).read_text(
         encoding="utf-8"
     )
-    assert re.search(r"^\s*LEVER_FULCRUM_XY as FULCRUM,\s*$", src, re.M)
-    assert re.search(r"^\s*ROCKER_PIVOT_XY as PIVOT,\s*$", src, re.M)
-    assert re.search(
-        r"^from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y", src, re.M
-    )
-    assert re.search(
-        r"^from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS", src, re.M
-    )
+    imports = {
+        "channel_frame_geom": (
+            "LEVER_FULCRUM_XY as FULCRUM",
+            "ROCKER_PIVOT_XY as PIVOT",
+        ),
+        "rocker_arm_spec": (
+            "CENTER_Y as ARM_ARC_CENTER_LOCAL_Y",
+            "CURVE_RADIUS as ARM_TOP_RADIUS",
+            "ROD_HOLE_X as ARM_ROD_HOLE_X",
+            "ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y",
+            "PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y",
+        ),
+        "cylinder_gear_spec": ("ECCENTRICITY as CAM_ECC",),
+        "connecting_rod_spec": ("CENTER_DISTANCE as ROD_C2C",),
+        "amplitude_bar_spec": (
+            "BAR_WIDTH",
+            "BOTTOM_NOTCH_HEIGHT as BAR_FOOT_NOTCH",
+            "TOP_PIN_Y as BAR_TOP_PIN_Y",
+        ),
+        "channel_lever_spec": ("BAR_PIN_X as LEVER_BAR_PIN_X", "LEVER_SPRING_X"),
+    }
+    for module, names in imports.items():
+        block = re.findall(
+            rf"^from {module} import (?:\((?:[^)]*)\)|[^\n]*)", src, re.M | re.S
+        )
+        joined = "\n".join(block)
+        for name in names:
+            assert re.search(rf"\b{re.escape(name)}\b", joined), (
+                f"{name} is not imported from {module}"
+            )
     assert "disc = ARM_TOP_RADIUS**2" in src, (
         "solve_state no longer rides the imported radius"
     )
-    for name in ("PIVOT", "FULCRUM", "ARM_ARC_CENTER_LOCAL_Y", "ARM_TOP_RADIUS"):
+    for name in (
+        "PIVOT",
+        "FULCRUM",
+        "ARM_ARC_CENTER_LOCAL_Y",
+        "ARM_TOP_RADIUS",
+        "ARM_ROD_HOLE_X",
+        "ARM_ROD_PIN_LOCAL_Y",
+        "CAM_ECC",
+        "ROD_C2C",
+        "BAR_WIDTH",
+        "BAR_FOOT_NOTCH",
+        "BAR_TOP_PIN_Y",
+        "LEVER_BAR_PIN_X",
+        "LEVER_SPRING_X",
+    ):
         assert not re.search(rf"^{name}\s*=", src, re.M), (
             f"{name} is copied, not imported"
         )
+    # and the bar's local axes are built from those imports, not typed in
+    assert re.search(
+        r"BAR_TOP_PIN_LOCAL = \[\s*BAR_WIDTH / 2\.0,\s*BAR_TOP_PIN_Y,", src
+    )
+    assert re.search(
+        r"BAR_FOOT_LOCAL = \[\s*BAR_WIDTH / 2\.0,\s*0\.0,\s*BAR_WIDTH / 2\.0,", src
+    )
+    assert "LEVER_BAR_PIN_BORE_LOCAL = [LEVER_BAR_PIN_X, 0.0, 0.0]" in src
 
 
 def test_unsupported_distribution_fails_loud(budget, nom):
