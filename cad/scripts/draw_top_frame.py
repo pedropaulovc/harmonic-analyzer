@@ -136,7 +136,6 @@ TOP_KEEP = {
     "HubDia": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] + 0.026),
     "RibWidth": (0.100, TOP_CENTER[1] + 0.020),
     "PocketRun": (0.100, TOP_CENTER[1] + 0.004),
-    "PocketRise": (0.100, TOP_CENTER[1] - 0.012),
     "SetTapZ": (0.100, TOP_CENTER[1] - 0.028),
     "GnX": (0.100, TOP_CENTER[1] + 0.052),
     "GnZ": (0.100, TOP_CENTER[1] + 0.036),
@@ -153,6 +152,9 @@ TOP_KEEP = {
     "KeeperFrontZ": (0.260, TOP_CENTER[1] + 0.004),
     "KeeperRearX": (0.260, TOP_CENTER[1] - 0.012),
     "KeeperRearZ": (0.260, TOP_CENTER[1] - 0.028),
+}
+FRONT_KEEP = {
+    "PocketRise": (FRONT_CENTER[0] + PLAN_HALF_W + 0.010, FRONT_CENTER[1]),
 }
 SECTION_KEEP = {
     "BossTopExtent": (SECTION_CENTER[0] + 0.060, SECTION_CENTER[1] + 0.032),
@@ -280,11 +282,16 @@ async def build(adapter: Any) -> dict[str, str]:
     top_dimensions = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
+    front_dimensions = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
     section_dimensions = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
     set_dimension_callouts(
-        adapter, [*top_dimensions, *section_dimensions], DIMENSION_CALLOUTS
+        adapter,
+        [*top_dimensions, *front_dimensions, *section_dimensions],
+        DIMENSION_CALLOUTS,
     )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError(
