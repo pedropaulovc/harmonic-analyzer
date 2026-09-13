@@ -285,7 +285,9 @@ def test_station_setting_scatter_never_goes_below_the_pivot(nom):
         read(np.where(full, tol, 0.0)), read(np.where(full, -tol, 0.0)), atol=1e-12
     )
     mean = np.where(idle, tol / 2.0, 0.0) - np.where(full, tol / 2.0, 0.0)
-    assert np.max(np.abs(read(mean))) < 1e-9  # each band's mean is the known lift
+    # each band's mean is the known lift: ordinate AND kappa from that row, so
+    # only the 3rd harmonic and the table interpolation are left (< 0.005 % FS)
+    assert np.max(np.abs(read(mean))) < 5e-3
     assert np.max(np.abs(read(zero))) > 0.5  # the residual scatter is real, at odd k
 
 
@@ -324,6 +326,11 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     doc = eb.readout_procedure(report, nom)
     rows = eb.calibration_table(nom)
     assert rows[0][0] == 0.0 and rows[-1][0] == nom.d_max
+    # and when full scale is not a multiple of the row step, the travel stop
+    # is still the last row (the bias paragraph quotes rows[-1] as full scale)
+    odd = eb.calibration_table(nom, step_mm=5.0)
+    assert odd[-1][0] == nom.d_max and odd[-2][0] == 85.0
+    assert odd[-1][1:] == pytest.approx(rows[-1][1:])
     assert (
         f"| {rows[0][0]:6.1f} | {rows[0][0] / eb.STICK_DIVISION_MM:6.3f} | {rows[0][1]:+.4f} |"
         in doc
@@ -451,6 +458,44 @@ def test_timebase_is_scored_on_the_physical_trace(report, nom):
         np.max(np.abs(trial.readout(x, theta_error=rad_index) - trial.readout(x)))
         > 0.01
     )
+
+
+def test_monte_carlo_perturbs_the_physical_waveform_not_a_cosine(nom):
+    """A gain error delta on channel i scales its second harmonic with its
+    fundamental, and the operator's FIXED nominal kappa correction cannot
+    remove that: delta * kappa_i * x_i * cos(2 i theta_k) must survive in the
+    scatter (Codex round 21). Decompose the model's response to +1.25 % on
+    channel 1 into the fundamental term, the normaliser share and that
+    residual -- the three reproduce it to 1e-4 % FS, and without the residual
+    the fit is 10x worse. A zero deviation scores exactly zero (the nominal
+    residual is the closure's own term, not scatter)."""
+    x = eb.reference_inputs()["all_ones"]
+    trial = eb.NominalTrial(nom)
+    f = trial.magnifier_setup(x).ordinate_scale
+    t = eb.cycle_table(nom)
+    st = f * x * nom.d_max
+    kappa = np.interp(st, t.stations, t.kappa)
+    xr = np.interp(st, t.stations, t.read) / f
+    fs = np.max(np.abs(eb.ideal_coefficients(x)))
+    sens = eb.gain_sensitivities(nom)
+    delta = 0.0125
+    dev = {"spring_rate": np.zeros((2, eb.N_ELEMENTS))}
+    dev["spring_rate"][0, 0] = 100.0 * delta
+    e = eb._channel_model(x, nom, dev, sens, 0.25, f)
+    assert np.max(np.abs(e[1])) < 1e-9  # the zero-deviation row
+    e = e[0]
+    th = eb.THETA_K
+    cos_2 = np.cos(2.0 * np.outer(th, eb.HARMONICS))
+    fund = 100.0 * delta * xr[0] * np.cos(th) / fs
+    share = (eb.ideal_coefficients(xr) + cos_2 @ (xr * kappa)) / fs
+    norm = delta * xr[0] * (1.0 + kappa[0]) / (np.sum(xr) + np.sum(xr * kappa))
+    second = 100.0 * delta * xr[0] * kappa[0] * np.cos(2.0 * th) / fs
+    fit = fund - 100.0 * norm * share + second
+    assert np.max(np.abs(e - fit)) < 2e-4
+    assert np.max(np.abs(e - (fund - 100.0 * norm * share))) > 5 * np.max(
+        np.abs(e - fit)
+    )
+    assert np.max(np.abs(second)) > 1e-3
 
 
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):

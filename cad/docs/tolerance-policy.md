@@ -215,8 +215,10 @@ flowchart LR
 ## Result: the budget for the critical features
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, every feature
-uniform within ± tolerance per channel, calibrated readout, every bar at the physical amplitude
-its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
+uniform within ± tolerance per channel, applied to each bar's **physical hook waveform** at its
+station — so a gain error scales the channel's second harmonic and a phase error rotates it, and
+the operator's fixed κ correction leaves δ·κ in the scatter — then through the shipped readout;
+every bar at the physical amplitude its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
 deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
 20 alone, the consistency stress case. `allowable` is the tolerance at which the feature

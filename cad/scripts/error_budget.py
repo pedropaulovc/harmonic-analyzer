@@ -398,6 +398,60 @@ def read_ordinates(x: np.ndarray, nom: Nominal) -> np.ndarray:
 
 
 _READ_TABLES: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+_CYCLE_TABLES: dict[tuple, "CycleTable"] = {}
+
+
+@dataclass(frozen=True)
+class CycleTable:
+    """One channel's PHYSICAL hook cycle at every reachable station (0.25 mm
+    grid), for vectorised lookup: ``cycles[s, a]`` is the hook displacement
+    (mm) at station ``stations[s]`` and crank angle ``_READ_GRID[a]``;
+    ``mean`` its per-period mean line; ``read`` the read ordinate (fundamental
+    / full-scale fundamental); ``kappa`` c2/c1. The Monte Carlo perturbs THIS
+    waveform -- so a gain error scales the second harmonic and a phase error
+    rotates it at twice the phase -- then runs the shipped correction."""
+
+    stations: np.ndarray
+    cycles: np.ndarray
+    mean: np.ndarray
+    read: np.ndarray
+    kappa: np.ndarray
+
+    def sample(self, d: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+        """Bilinear lookup of the cycle at stations ``d`` and angles ``alpha``
+        (rad, any real; periodic), broadcast together."""
+        d, alpha = np.broadcast_arrays(d, alpha)
+        step = self.stations[1] - self.stations[0]
+        si = np.clip(d / step, 0.0, len(self.stations) - 1.0)
+        s0 = np.minimum(si.astype(int), len(self.stations) - 2)
+        sf = si - s0
+        n = self.cycles.shape[1]
+        ai = (alpha % (2.0 * math.pi)) / (2.0 * math.pi) * n
+        a0 = ai.astype(int) % n
+        af = ai - ai.astype(int)
+        a1 = (a0 + 1) % n
+        c = self.cycles
+        top = c[s0, a0] * (1.0 - af) + c[s0, a1] * af
+        bot = c[s0 + 1, a0] * (1.0 - af) + c[s0 + 1, a1] * af
+        return top * (1.0 - sf) + bot * sf
+
+
+def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
+    """``CycleTable`` for ``nom``, cached (the same ~350 exact-kinematics
+    solves ``read_table`` makes, kept whole instead of reduced to c1)."""
+    key = astuple(nom)
+    if key not in _CYCLE_TABLES:
+        stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
+        stations[-1] = nom.d_max
+        cycles = np.array(
+            [hook_displacement(_READ_GRID, float(d), nom) for d in stations]
+        )
+        c1 = 2.0 * (cycles * np.cos(_READ_GRID)).mean(axis=1)
+        c2 = 2.0 * (cycles * np.cos(2.0 * _READ_GRID)).mean(axis=1)
+        _CYCLE_TABLES[key] = CycleTable(
+            stations, cycles, cycles.mean(axis=1), c1 / c1[-1], c2 / c1
+        )
+    return _CYCLE_TABLES[key]
 
 
 def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndarray]:
@@ -407,34 +461,24 @@ def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndar
     nominal: ~350 exact-kinematics solves once, not per draw."""
     key = astuple(nom)
     if key not in _READ_TABLES:
-        stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
-        stations[-1] = nom.d_max
-        f_full = read_ordinate(nom.d_max, nom, f_full=1.0)
-        _READ_TABLES[key] = (
-            stations,
-            np.array([read_ordinate(float(d), nom, f_full) for d in stations]),
-        )
+        t = cycle_table(nom, step_mm)
+        _READ_TABLES[key] = (t.stations, t.read)
     return _READ_TABLES[key]
 
 
-def setting_bias_lift(
-    x: np.ndarray, nom: Nominal, setting_tol: float, scale: float = 1.0
+def setting_bias_station(
+    x: np.ndarray, setting_tol: float, scale: float = 1.0
 ) -> np.ndarray:
-    """The coherent read-ordinate shift a one-sided setting band leaves on each
+    """The mean station offset (mm) a one-sided setting band leaves on each
     bar: a bar set at the stick zero cannot go below the pivot, so its setting
     error is uniform on [0, +tol] with mean +tol/2 -- it stands at station
     tol/2, not 0 -- and a bar at the stop is uniform on [-tol, 0], mean -tol/2.
-    Bars in between are two-sided (mean 0). This is what the procedure tells the
-    operator to take the station as, and what the Monte Carlo subtracts. In the
-    trial's ordinate units (``scale`` full-scale travel per unit, see
-    ``NominalTrial.magnifier_setup``)."""
-    grid, table = read_table(nom)
-    d = scale * x * nom.d_max
+    Bars in between are two-sided (mean 0). The procedure tells the operator
+    to read the station table at THIS station (ordinate and kappa alike)."""
     at_stop = (x == 1.0) & (scale == 1.0)
-    mean = np.where(x == 0.0, setting_tol / 2.0, 0.0) - np.where(
+    return np.where(x == 0.0, setting_tol / 2.0, 0.0) - np.where(
         at_stop, setting_tol / 2.0, 0.0
     )
-    return (np.interp(d + mean, grid, table) - np.interp(d, grid, table)) / scale
 
 
 @dataclass(frozen=True)
@@ -702,24 +746,27 @@ def _channel_model(
     scale: float = 1.0,
 ) -> np.ndarray:
     """A_k read from a machine whose channel i has gain g_i and phase phi_i
-    built from the drawn deviations ``dev[feature]`` (draws x 20), on the
-    PHYSICAL amplitude of each bar -- ``read_table``'s ordinate at its station,
-    so an idle bar's ~0.028 of motion is perturbed by that channel's own spring,
-    arm, cam and phase deviations too, not only by the nominal lift -- then
-    normalised by the trial's own k=0 reading (= sum x_read, known to the
-    operator) with the read-vs-set vector subtracted, as the procedure says.
-    Pure cosines have a zero mean line, so only the scale step of the readout is
-    modelled here. ``setting_tol`` is the station-setting half-width the
-    ``station_setting`` draws were taken from (needed for the one-sided mean,
-    below); ``scale`` is the trial's ordinate scale (``MagnifierSetup``): the
-    bars stand at scale * x * d_max, so a fixed setting error and a fixed idle
-    lift are 1/scale larger in the trial's own units. Returns e_k in % FS,
-    shape (draws, K_MAX+1)."""
+    built from the drawn deviations ``dev[feature]`` (draws x 20), applied to
+    the PHYSICAL hook cycle of each bar at its station (``cycle_table``): the
+    pen trace is sum_i g_i u_i(j_i theta + phi_i), so a gain error scales the
+    channel's second harmonic with its fundamental and a phase error rotates
+    it at twice the phase, and an idle bar's ~0.028 of motion is perturbed by
+    that channel's own deviations too, not only by the nominal lift. The
+    readings (off each draw's own mean line) then go through the SHIPPED
+    correction -- s = r0/(S + C2), the nominal kappa table at the set
+    stations, the read-vs-set vector -- exactly as ``NominalTrial.readout``,
+    so whatever the fixed nominal correction cannot remove (delta * kappa,
+    the rotated second harmonic) lands in the scatter. ``setting_tol`` is the
+    station-setting half-width the ``station_setting`` draws were taken from
+    (needed for the one-sided mean, below); ``scale`` is the trial's ordinate
+    scale (``MagnifierSetup``): the bars stand at scale * x * d_max, so a fixed
+    setting error and a fixed idle lift are 1/scale larger in the trial's own
+    units. Returns e_k in % FS, shape (draws, K_MAX+1)."""
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
-    lift = np.zeros(N_ELEMENTS)
+    bias = np.zeros(N_ELEMENTS)
     for key, v in dev.items():
         if key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
@@ -736,28 +783,63 @@ def _channel_model(
             # MEAN is a coherent lift identical in kind to the null lift the
             # procedure measures on the assembled machine (one bar at the stick
             # zero / at the stop), so it is subtracted the same way
-            # (setting_bias_lift, published in READOUT.md); only the scatter
+            # (setting_bias_station, published in READOUT.md); only the scatter
             # about it survives.
             at_zero = (x == 0.0)[None, :]
             at_full = ((x == 1.0) & (scale == 1.0))[None, :]
             v = np.where(at_zero, np.abs(v), np.where(at_full, -np.abs(v), v))
             d = np.clip(d + v, 0.0, nom.d_max)
-            lift = setting_bias_lift(x, nom, setting_tol, scale)
+            bias = setting_bias_station(x, setting_tol, scale)
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
-    grid, table = read_table(nom)
-    amplitude = np.interp(d, grid, table)  # what each bar physically contributes
-    cos_k = np.cos(
-        THETA_K[None, :, None] * HARMONICS[None, None, :] + phi[:, None, :]
-    )  # draws,k,i
-    r = np.einsum("di,dki->dk", g * amplitude, cos_k)
-    x_read = (
-        np.interp(scale * x * nom.d_max, grid, table) / scale + lift
-    )  # what the operator records, in the trial's units
-    measured = r * (float(np.sum(x_read)) / r[:, :1]) - ideal_coefficients(x_read - x)
-    ideal = ideal_coefficients(x)
-    return 100.0 * (measured - ideal[None, :]) / np.max(np.abs(ideal))
+    t = cycle_table(nom)
+    set_stations = scale * x * nom.d_max
+    # the operator's table row: at the mean biased station when a bar sits at
+    # an end of the scale (READOUT.md step 1), else the set station
+    recorded = set_stations + bias
+    x_read = np.interp(recorded, t.stations, t.read) / scale
+    kappa = np.interp(recorded, t.stations, t.kappa)
+    measured = _read_draws(x, t, g, phi, d, x_read, kappa)
+    # the NOMINAL machine through the same sampler (g = 1, phi = 0, bars at
+    # their set stations, the set-station row): its residual is the closure's
+    # separate nominal_residual_mae term, so the scatter scores deviations only
+    base = _read_draws(
+        x,
+        t,
+        np.ones((1, N_ELEMENTS)),
+        np.zeros((1, N_ELEMENTS)),
+        set_stations[None, :],
+        np.interp(set_stations, t.stations, t.read) / scale,
+        np.interp(set_stations, t.stations, t.kappa),
+    )
+    fs = np.max(np.abs(ideal_coefficients(x)))
+    return 100.0 * (measured - base) / fs
+
+
+def _read_draws(
+    x: np.ndarray,
+    t: CycleTable,
+    g: np.ndarray,
+    phi: np.ndarray,
+    d: np.ndarray,
+    x_read: np.ndarray,
+    kappa: np.ndarray,
+) -> np.ndarray:
+    """The shipped procedure on a batch of machines: pen readings from each
+    channel's physical cycle at its drawn station ``d`` (draws x 20), read at
+    j_i theta_k + phi_i with gain g_i, off each draw's own mean line; then
+    s = r0/(S + C2), the kappa correction and the read-vs-set vector with the
+    operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
+    alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi[:, None, :]
+    u = t.sample(d[:, None, :], alpha)  # draws,k,i
+    r = np.einsum("di,dki->dk", g, u)
+    zero = np.einsum("di,di->d", g, np.interp(d, t.stations, t.mean))
+    readings = r - zero[:, None]
+    s = readings[:, :1] / (np.sum(x_read) + np.sum(x_read * kappa))
+    cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
+    measured = readings / s - (cos_2k @ (x_read * kappa))[None, :]
+    return measured - ideal_coefficients(x_read - x)[None, :]
 
 
 def monte_carlo(
@@ -1252,9 +1334,9 @@ def calibration_table(
     rows = []
     f_full = None
     stations = np.arange(0.0, nom.d_max + 1e-9, step_mm)
+    if not math.isclose(stations[-1], nom.d_max):
+        stations = np.append(stations, nom.d_max)  # the travel stop, always a row
     cycles = {float(d): hook_displacement(grid, float(d), nom) for d in stations}
-    if nom.d_max not in cycles:
-        cycles[nom.d_max] = hook_displacement(grid, nom.d_max, nom)
     f_full = 2.0 * float(np.mean(cycles[nom.d_max] * np.cos(grid)))
     for d in stations:
         u = cycles[float(d)]
@@ -1354,8 +1436,8 @@ its idle bars.
 stick zero cannot sit below the pivot, so its setting error is one-sided,
 $[0, +{tol:.2f}]$ mm, and on average it stands at $+{tol / 2:.3f}$ mm, not 0;
 a bar at the travel stop is the mirror, $[-{tol:.2f}, 0]$, on average at
-${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' table ordinates
-(divided by $f$ like every other) -- **{at_zero:+.4f}$/f$ for a bar at zero**
+${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' table rows -- ordinate (divided by $f$ like
+every other) AND $\\kappa$, both from the row at the mean station -- **{at_zero:+.4f}$/f$ for a bar at zero**
 (not {rows[0][1]:+.4f}) and, at $f = 1$ only (a scaled trial never reaches the
 stop), **{at_stop:+.4f} for a bar at the stop** (not {rows[-1][1]:+.4f}) -- so
 the read-vs-set vector of step 4 removes the bias; only the scatter about it
