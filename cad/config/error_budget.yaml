@@ -69,7 +69,7 @@ reserved:
     # The magnifier is NOT an assumption: error_budget.py fits every reference
     # input to the pen from the CAD's own output chain (spring coupling, the
     # clamp's reachable radius band on the magnifying lever -- collar face to
-    # rod tip, magnifying_lever_geom -- and the wheel's rim/hub wire ratio).
+    # rod tip, output.yaml magnifier_* -- and the wheel's rim/hub wire ratio).
     # The k=0 (greatest) term is made to span the stroke, Michelson's
     # normalisation, book p. 99: where the lever radius that does it is below
     # the clamp's minimum the operator scales the ordinates down instead (the

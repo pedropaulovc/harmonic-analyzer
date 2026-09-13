@@ -53,7 +53,7 @@ import cylinder_gear_spec
 import lever_wire_geom
 import magnifying_clamp_geom
 import magnifying_lever_geom
-import measuring_stick_spec
+import measuring_stick_geom
 import paper_drive_geom
 import pen_wire_geom
 import rocker_arm_spec
@@ -1638,7 +1638,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
-STICK_DIVISION_MM = measuring_stick_spec.DIVISION_SPACING  # the engraved scale
+STICK_DIVISION_MM = measuring_stick_geom.DIVISION_SPACING  # the engraved scale
 
 
 def calibration_table(

@@ -70,15 +70,17 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from measuring_stick_spec import (
+from measuring_stick_geom import (
     DIVISION_COUNT,
     DIVISION_SPACING,
+    MINOR_PER_DIVISION,
+    MINOR_SPACING,
+)
+from measuring_stick_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FRONT_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
-    MINOR_PER_DIVISION,
-    MINOR_SPACING,
 )
 
 PART_NAME = "measuring-stick"
@@ -90,8 +92,9 @@ BODY_WIDTH = 8.0  # DIMENSIONS.md ch16: stick width, annotated (high) — the 8 
 # superseded ~15 mm scaled body-width is retired.
 BODY_THICKNESS = 3.0  # DIMENSIONS.md ch16: scaled (low)
 # DIVISION_SPACING / DIVISION_COUNT / MINOR_PER_DIVISION / MINOR_SPACING: the
-# engraved scale, imported from measuring_stick_spec (shared with the offline
-# error budget's station -> stick-reading conversion) -- never copied.
+# engraved scale, owned by config (amplitude.stick_*) and read through
+# measuring_stick_geom -- the offline error budget's station -> stick-reading
+# conversion reads the same source, so neither copies a literal.
 SCALE_END_MARGIN = 0.5  # the 10 tick lands just short of the far end (img02)
 SCALE_START_X = BODY_LENGTH - 10 * DIVISION_SPACING - SCALE_END_MARGIN  # 57.5
 

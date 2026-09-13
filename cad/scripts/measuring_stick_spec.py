@@ -1,22 +1,20 @@
 r"""Pure-data dimensional contract shared by the measuring stick and drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_measuring_stick`` imports the
-marked-dimension NAME map + notes from here; ``draw_measuring_stick`` imports the
+PURE DATA, no SolidWorks/COM imports.  The engraved scale itself is NOT owned
+here: it lives in ``cad/config/machine/amplitude.yaml`` and is read through
+``measuring_stick_geom`` (re-exported below for the notes and the builder).
+``build_measuring_stick`` imports the marked-dimension NAME map + notes from here; ``draw_measuring_stick`` imports the
 bar's plan geometry from ``build_measuring_stick`` for its view math and keeps
 exactly ``DRAWING_DIMENSIONS``.
 """
 
 from __future__ import annotations
 
-
-# --- Scale geometry (shared with build_measuring_stick and error_budget). ---
-DIVISION_SPACING = 14.2  # ch16 page001_img02 (200 mm bar at 5.65 px/mm): the
-# 0 and 10 numerals sit 805 px = 142 mm apart -- one half of the rocker arm's
-# 292 mm working arc, as the text says (2026-09 re-derive; the old 80 mm was a
-# misread of the 8 mm width callout).
-DIVISION_COUNT = 11  # full ticks 0..10 (stated 0-10 scale)
-MINOR_PER_DIVISION = 10  # tenths: 9 short ticks between full ticks (page001_img03)
-MINOR_SPACING = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42
+from measuring_stick_geom import (
+    DIVISION_SPACING,
+    MINOR_SPACING,
+    SCALE_SPAN,
+)
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -33,12 +31,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. FINISHED BAR 200.00 X 8.00 X 3.00; RULE THE BROAD FACE",
-        "   SHOWN. SCALE SPAN 142.00; THE 10 TICK 0.50 +/-0.25 FROM",
+        f"   SHOWN. SCALE SPAN {SCALE_SPAN:.2f}; THE 10 TICK 0.50 +/-0.25 FROM",
         "   THE FAR END.",
         "2. ENGRAVE 11 FULL TICKS (VALUES 0 THRU 10). THE 0 TICK",
         f"   IS THE DATUM: TICK N AT {DIVISION_SPACING:.2f} X N FROM THE 0 TICK,",
         "   EACH WITHIN +/-0.05 OF ITS OWN POSITION",
-        f"   (NONCUMULATIVE; 0-TO-10 SPAN {10 * DIVISION_SPACING:.2f} REF). NINE MINOR",
+        f"   (NONCUMULATIVE; 0-TO-10 SPAN {SCALE_SPAN:.2f} REF). NINE MINOR",
         f"   TICKS PER DIVISION AT {MINOR_SPACING:.2f} PITCH, 1.80 +/-0.10 UP FROM",
         "   THE BOTTOM EDGE SHOWN, SAME SLOT SECTION.",
         "   SLOTS: SQUARE BOTTOM, 0.40 +/-0.05 WIDE, 0.50 +/-0.05",

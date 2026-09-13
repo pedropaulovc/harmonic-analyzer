@@ -13,6 +13,8 @@ drawing-side consumers and adds only the drawing data.
 
 from __future__ import annotations
 
+import _config
+
 # --- rod nominals (DIMENSIONS.md ch20; Ø6 photo-scaled, low) ------------------
 ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess)
 ROD_DIA = 6.0  # round brass rod (low)
@@ -35,12 +37,23 @@ KNIFE_LOCAL_Y = 5.134
 # the rod at its east end. Its radius from the knife axis, over the summing
 # lever's spring-hook arm, is the magnification the operator sets (book p. 46:
 # "up to 4x"); the reachable band is what cad/scripts/error_budget.py derives
-# the pen scale and the ordinate-capacity rule from. Lever-local x (rod along
-# +X, knife at KNIFE_LOCAL_X); build_magnifier_assembly asserts its bracket and
-# clamp placements against these, so a layout move fails loud there.
-COLLAR_LOCAL_X = 160.0  # bracket collar centre on the rod (machine x +40)
-COLLAR_HALF_LEN = 5.0  # == build_magnifying_bracket.COLLAR_HALF_LEN (asserted)
-CLAMP_LOCAL_X = 50.0  # as-built clamp centre (machine x +150, p.46/48 insets)
+# the pen scale and the ordinate-capacity rule from.
+#
+# The stations are OWNED by cad/config/machine/output.yaml (output.magnifier_*)
+# -- the output chain's subsystem file, beside magnify_factor -- and this module
+# is only the read point the part build, build_magnifier_assembly (which
+# derives its bracket/clamp placements from them, so a layout move fails loud
+# there) and the offline error budget share, so none copies a literal.
+# Lever-local x (rod along +X, knife at KNIFE_LOCAL_X).
+COLLAR_LOCAL_X: float = float(
+    _config.machine("output", "magnifier_collar_station_mm")
+)  # bracket collar centre on the rod (machine x +40)
+COLLAR_HALF_LEN: float = float(
+    _config.machine("output", "magnifier_collar_half_len_mm")
+)  # == build_magnifying_bracket.COLLAR_HALF_LEN (asserted)
+CLAMP_LOCAL_X: float = float(
+    _config.machine("output", "magnifier_clamp_station_mm")
+)  # as-built clamp centre (machine x +150, p.46/48 insets)
 
 
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:

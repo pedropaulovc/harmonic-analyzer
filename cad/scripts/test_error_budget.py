@@ -207,6 +207,27 @@ def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
 
     band = magnifying_lever_geom.clamp_radius_band(magnifying_clamp_geom.BLOCK_DEPTH)
     assert (nom.lever_r_min, nom.lever_r_built, nom.lever_r_max) == band
+    # ... and those stations are CONFIG (output.magnifier_*), not helper
+    # literals: the geom module only reads them, so the assembly's placements
+    # and this model cannot drift apart silently
+    assert magnifying_lever_geom.COLLAR_LOCAL_X == float(
+        eb._config.machine("output", "magnifier_collar_station_mm")
+    )
+    assert magnifying_lever_geom.COLLAR_HALF_LEN == float(
+        eb._config.machine("output", "magnifier_collar_half_len_mm")
+    )
+    assert magnifying_lever_geom.CLAMP_LOCAL_X == float(
+        eb._config.machine("output", "magnifier_clamp_station_mm")
+    )
+    asm = (
+        pathlib.Path(eb.__file__).with_name("build_magnifier_assembly.py")
+    ).read_text(encoding="utf-8")
+    for name in ("CLAMP_LOCAL_X", "COLLAR_LOCAL_X"):
+        assert re.search(rf"^\s*{name},\s*$", asm, re.M), (
+            f"build_magnifier_assembly no longer imports {name}"
+        )
+    assert re.search(r"^CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X", asm, re.M)
+    assert re.search(r"^BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X", asm, re.M)
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
     mag = report["closed_form"]["magnifier"]
     assert 4.0 < mag["ordinate_capacity_full_scale_bars"] < 6.0
@@ -851,21 +872,35 @@ def test_readout_term_counts_the_normalising_read(report):
     assert mae["alternating"] / one["alternating"] < 2.0 / 3.0
 
 
-def test_stick_division_is_the_spec_constant_the_builder_engraves():
-    """The procedure's station -> stick-reading conversion, the drawing notes
-    and the builder's engraved ticks all read measuring_stick_spec
-    .DIVISION_SPACING; the builder must import it, not copy it."""
+def test_stick_division_is_the_configured_scale_the_builder_engraves():
+    """The engraved scale is CONFIG (amplitude.stick_*), and the procedure's
+    station -> stick-reading conversion, the drawing notes and the builder's
+    ticks all reach it through the one read point (measuring_stick_geom); none
+    may copy it."""
+    import measuring_stick_geom
     import measuring_stick_spec
 
-    assert eb.STICK_DIVISION_MM == measuring_stick_spec.DIVISION_SPACING
-    assert (
-        f"TICK N AT {measuring_stick_spec.DIVISION_SPACING:.2f} X N"
-        in measuring_stick_spec.DRAWING_NOTES
+    configured = float(eb._config.machine("amplitude", "stick_division_spacing_mm"))
+    assert measuring_stick_geom.DIVISION_SPACING == configured
+    assert measuring_stick_geom.DIVISION_COUNT == int(
+        eb._config.machine("amplitude", "stick_division_count")
     )
+    assert measuring_stick_geom.MINOR_SPACING == configured / int(
+        eb._config.machine("amplitude", "stick_minor_per_division")
+    )
+    assert eb.STICK_DIVISION_MM == configured
+    assert f"TICK N AT {configured:.2f} X N" in measuring_stick_spec.DRAWING_NOTES
+    assert f"SPAN {10 * configured:.2f} REF" in measuring_stick_spec.DRAWING_NOTES
     src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
         encoding="utf-8"
     )
-    assert re.search(r"^\s*DIVISION_SPACING,\s*$", src, re.M)
+    assert re.search(r"^from measuring_stick_geom import \($", src, re.M)
+    for module in ("measuring_stick_geom.py", "measuring_stick_spec.py"):
+        text = (pathlib.Path(eb.__file__).with_name(module)).read_text(encoding="utf-8")
+        assert not re.search(r"^\s*\w*DIVISION\w*\s*[:=].*\d", text, re.M) or (
+            "_config.machine" in text
+        ), f"{module} assigns the scale instead of reading config"
+        assert f"= {configured}" not in text, f"{module} hardcodes the division spacing"
     for name in (
         "DIVISION_SPACING",
         "DIVISION_COUNT",
