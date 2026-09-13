@@ -21,6 +21,7 @@ from _drawing_common import (
     project_part_pmi,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -89,10 +90,13 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
 
 
+@_telemetry.traced("drawing.verify_dimension_value", label_param="label")
 def _require_dimension_value(display: Any, expected_mm: float, *, label: str) -> None:
     """Fail if SolidWorks dimensioned a different projected edge."""
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    raw_dimension = display.GetDimension2(0)
+    if raw_dimension is None:
+        raise RuntimeError(f"{label}: display has no dimension")
+    dimension = _early_bound(raw_dimension, "IDimension")
     measured_mm = abs(float(dimension.SystemValue) * 1000.0)
     if not math.isclose(measured_mm, expected_mm, rel_tol=0.0, abs_tol=1e-5):
         raise RuntimeError(
@@ -175,15 +179,19 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=hole_bottom,
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
+        orientation="vertical",
         entities=(None, wire_hole_edge),
+    )
+    set_arc_endpoints_to_center(
+        adapter, wire_hole_y, label="wire-hole length location"
     )
     _require_dimension_value(
         wire_hole_y, WIRE_HOLE_Y, label="wire-hole length location"
     )
     # Locate the wire hole ACROSS the square section too: the native callout gives
     # only the drill size, so without this the cross-hole could sit off-centre and
-    # still satisfy every shown dimension. Left slide face -> hole (line-to-circle,
-    # so the value is to the hole centre) reads 2.50 of the 5.00 section = centred.
+    # still satisfy every shown dimension. The left-face coordinate is unambiguous
+    # at this scale; the circle is entity-selected and the 2.50 mm value is verified.
     wire_hole_x = add_edge_dimension(
         adapter,
         front,
@@ -191,7 +199,11 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=hole_side,
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
+        orientation="horizontal",
         entities=(None, wire_hole_edge),
+    )
+    set_arc_endpoints_to_center(
+        adapter, wire_hole_x, label="wire-hole centerline location"
     )
     _require_dimension_value(
         wire_hole_x, ROD_SECTION / 2.0, label="wire-hole centerline location"
