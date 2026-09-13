@@ -1,8 +1,16 @@
 boss-hook:
+  title: Counter-Spring Lower Anchor
   number: MHA-005
-  material: ASTM A108 Grade 1018 steel
-  material_specification: "ASTM A108 Grade 1018 steel"
-  finish: "black oxide per MIL-DTL-13924 Class 1, oil sealed"
+  stock_name: 'Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)'
+  supplier: McMaster-Carr
+  supplier_skus: [9490T1]
+  material: Plain Carbon Steel
+  material_specification: Zinc-plated steel, McMaster-Carr 9490T1
+  finish: >-
+    zinc plating as supplied; cut the shank to 19.05 and restore the 45 deg end
+    deburr, then thread the anchor directly into the summing lever's tapped
+    boss, eye clocked to the pull plane, with removable medium-strength
+    threadlocker
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel)"
+  process: purchased

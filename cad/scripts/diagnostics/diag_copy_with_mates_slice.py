@@ -64,6 +64,7 @@ from _assembly import (  # noqa: E402
 )
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
 import _telemetry  # noqa: E402
+import channel_kinematics  # noqa: E402
 from solidworks_mcp.adapters.base import (  # noqa: E402
     ComponentRefParameters,
     MateRefParameters,
@@ -96,7 +97,6 @@ from build_channel_assembly import (  # noqa: E402
     _seat_bushing_on_shaft,
     bore_axis_ref,
     rot_z_rows,
-    solve_state,
     z_station,
 )
 
@@ -196,7 +196,7 @@ async def _seed_chain(adapter, j: int, bushing: str) -> tuple[dict[str, str], li
     the ``Values`` array (C2): dimension-less mates carry 0.0 (dead entries).
     """
     t0 = time.perf_counter()
-    st = solve_state(0.0)  # neutral amplitude for every station
+    st = channel_kinematics.solve_state(0.0)  # neutral amplitude for every station
     zj = z_station(j)
     z_mid = zj + ARM_MID_DZ
     arm_rows = compose_rows(rot_z_rows(st["arm_tilt"]), ROT_Y_180)

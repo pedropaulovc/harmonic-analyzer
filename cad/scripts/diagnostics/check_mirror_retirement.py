@@ -222,6 +222,7 @@ expect(DT, "crank-handle-1", [d.X_CRANK, d.Y_CRANK - d.ARM_C2C, d.CRANK_ARM_Z0],
 # ---- channel ---------------------------------------------------------------
 import math
 import build_channel_assembly as c
+import channel_kinematics
 
 _rz = getattr(c, "rot_z_rows", None) or (lambda deg: [
     [math.cos(math.radians(deg)), math.sin(math.radians(deg)), 0.0],
@@ -229,7 +230,7 @@ _rz = getattr(c, "rot_z_rows", None) or (lambda deg: [
     [0.0, 0.0, 1.0]])
 CH = "channel"
 amplitudes = __import__("_config").amplitudes()
-st0 = c.solve_state(0.0)
+st0 = channel_kinematics.solve_state(0.0)
 arm_rows = compose_rows(_rz(st0["arm_tilt"]), ROT_Y_180)
 rod_rows = compose_rows(_rz(st0["rod_tilt"]), ROT_Y_180)
 _t = math.radians(st0["arm_tilt"])
@@ -255,7 +256,7 @@ hole_x_0 = c.FULCRUM[0] - c.LEVER_SPRING_X * math.cos(phi0)
 for j in range(20):
     zj = c.z_station(j)
     z_mid = zj + c.ARM_MID_DZ
-    st = c.solve_state(amplitudes[j])
+    st = channel_kinematics.solve_state(amplitudes[j])
     expect(CH, f"rocker-arm-{j + 1}",
            [c.PIVOT[0] - arm_dx, c.PIVOT[1] - arm_dy, z_mid], arm_rows,
            f"rocker-arm ch{j:02d}", **_SOLV)

@@ -23,9 +23,12 @@ equation::
 
 so only the *coil* stretches: the helix height is ``L - 2*ID`` and the pitch is
 that height over a fixed 55.5 revolutions.  Wire diameter, coil diameter, hook
-radius, hook arc angle and the coil<->hook transition are rigid; the whole
-hook assembly translates by +-(L - free)/2 as the spring extends.  That is why
-``end_centers_mm`` is exact for any catalog length and not an approximation.
+radius and hook arc angle are rigid, and the whole hook assembly translates by
++-(L - free)/2 as the spring extends -- which is why ``end_centers_mm`` is
+exact for any catalog length and not an approximation.  Only the short
+coil<->hook transition spline is elastic, and only at its coil end: its
+tangent there follows the stretched pitch so the swept wire stays tangent
+continuous (see :mod:`diagnostics.diag_build_9432K31`).
 
 Catalog lengths are measured **inside hook to inside hook**; the eye centres
 sit one inside-radius (ID/2) in from each tip, which is what

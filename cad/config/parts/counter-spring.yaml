@@ -1,9 +1,17 @@
 counter-spring:
   number: MHA-019
+  stock_name: Music-Wire Steel Extension Spring with Double Loop Ends
+  supplier: McMaster-Carr
+  supplier_skus: [1330K524]
   material: Alloy Steel
-  material_specification: ASTM A228 music-wire spring steel
-  finish: black japanned
+  material_specification: Music-wire steel, McMaster-Carr 1330K524
+  finish: as supplied; no additional coating
   quantity: 1
   tolerance_class: machined_block
   fit_class: spring_eye_threading
-  process: "coiled wire"
+  process: purchased
+  # Catalog force law: 1.78 lbf/in, 3.84 lbf initial, 15.58 lbf maximum.
+  # The supplier does not state rate/initial-tension tolerances; measure at setup.
+  spring_rate_n_per_mm: 0.311725766738728
+  initial_tension_n: 17.081171002600318
+  maximum_load_n: 69.30329276575858

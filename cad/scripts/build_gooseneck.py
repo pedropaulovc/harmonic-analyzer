@@ -13,28 +13,13 @@ ch30 plates crop below the bend.) Tension is set by sliding the tube
 through the top-frame casting's rail-hub bore, gripped by its 1/4-20
 square-head set screw (build_top_frame).
 
-Geometry: vertical leg at machine x 197 (east column line), y 880 -- the
-post passes through a clearance bore in the east rail (build_top_frame
-gooseneck bore) and drops ~120 below the rail underside (999.7), so the
-support extends well below the top plate. The free lower tip is visible,
-clear of the columns, in the ch. 7 back-left three-quarter view
-(page001_img17): tip at machine 880 by the frame-height vertical scale,
-cross-checked by the post's Ø16 silhouette. Up to the bend start 1322.3;
-quarter bend to the horizontal arm at centreline y 1373.3, running west
-to its end face at machine x 101.75. The end screw runs ON the tube axis,
-so the arm height IS the spring hang: the eye centre stays at machine
-(95, 1370.7) -- plumb above the summing-lever boss hook -- and the
-O3.6 shank (radius 1.8) hangs the eye's inner top (radius 4.45) with a
-0.05 air gap, which puts the axis at 1373.3 (the 2026-09-02 photo
-re-derive: the old 1386 only ever cleared a lug under the arm). Along the
-arm the eye sits 6.75 in from the end face on the 8.0 exposed shank --
-1.25 from the head shoulder, the wire band (0.9 half-width) 0.35 clear of
-the head and 5.85 clear of the end face -- because the coil's O12.5 body
-hangs under the eye and its top (1367.1) rises above the tube underside
-(1365.3): the coil clears the end face by 0.5 in x instead (the photo
-shows exactly this: the eye pressed up against the head, the coil
-partly under the tube end). ``build_summing_assembly`` proves both
-hangs analytically.
+The post passes through the east rail's clearance bore and is clamped at
+the height needed to balance the channel springs. The historical reference
+position put its lower tip near machine Y880; the stock counter spring's
+installed geometry now owns that adjustment in ``build_summing_assembly``.
+The horizontal arm retains the photographed 90-degree bend and axial screw.
+The 1330K524 double-loop eye needs its full axial wire band on the exposed
+shank; the assembly checks both end-face/head clearance and coil clearance.
 
 The screw is modelled INTEGRAL to the post: this repo models small
 captive fasteners as part of their carrier when they never come apart in
@@ -46,14 +31,12 @@ for the shank to merge into), so plug + shank + head are ONE stepped
 revolve about the tube axis. The head slot is omitted (a 0.8 x 0.8 slot
 across the head face adds nothing the notes don't carry).
 
-Layout: part origin at the vertical leg's MID-height of the OLD 180 lay
-(machine (197, 1210, 0), placement preserved): leg y -330..+112.3, bend
-arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -95.25,
-end plug x -95.25..-89.25 (mid-wall O14, so it overlaps the wall rather
-than sharing the bore face), shank x -95.25..-103.25 (O3.6), head
-x -103.25..-105.25 (O10 -- wider than the eye's 8.9 inner diameter, so it
-retains a slack eye; its underside at y 158.3 clears the coil's top wire
-at 158.0). The tube is HOLLOW -- O16 x 2.0 wall, matching
+Layout: part origin at the vertical leg's mid-height; leg y -330..+112.3,
+bend arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -95.25,
+end plug x -95.25..-89.25 (mid-wall O14, overlapping the tube wall), shank
+x -95.25..-103.25 (O3.6), and head x -103.25..-105.25 (O12). The enlarged
+head retains the stock double-loop eye without a separate washer.
+The tube is HOLLOW -- O16 x 2.0 wall, matching
 the drawing's tube stock -- so every tube profile is an annulus.
 Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
@@ -200,12 +183,22 @@ async def build(adapter) -> dict[str, str]:
     leg = SketchDims()
     check("create_sketch leg", await adapter.create_sketch("Top"))
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_R, "leg", dims=leg,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_R,
+        "leg",
+        dims=leg,
         names=("LegCx", "LegCz", "TubeDia"),
         drives=(None, None, '"TubeDia"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_IR, "leg bore", dims=leg,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_IR,
+        "leg bore",
+        dims=leg,
         names=("LegBoreCx", "LegBoreCz", "TubeBoreDia"),
         drives=(None, None, '"TubeDia" - 2 * "WallT"'),
     )
@@ -232,9 +225,12 @@ async def build(adapter) -> dict[str, str]:
     arc = check(
         "bend arc",
         await adapter.add_arc(
-            -BEND_R, LEG_TOP,  # centre
-            0.0, LEG_TOP,  # start (bend entry, top of the leg)
-            -BEND_R, ARM_Y,  # end (bend exit into the arm)
+            -BEND_R,
+            LEG_TOP,  # centre
+            0.0,
+            LEG_TOP,  # start (bend entry, top of the leg)
+            -BEND_R,
+            ARM_Y,  # end (bend exit into the arm)
         ),
     )
     arm = check(
@@ -248,7 +244,9 @@ async def build(adapter) -> dict[str, str]:
     # distance dims (horizontal then vertical), driven by the magnitudes: the
     # centre X is BEND_R east of the origin, the centre Y is LEG_TOP up. THEN the
     # arc radius, THEN the arm run -- four dims total.
-    await anchor_point_to_origin(adapter, f"{arc}.center", -BEND_R, LEG_TOP, "bend centre")
+    await anchor_point_to_origin(
+        adapter, f"{arc}.center", -BEND_R, LEG_TOP, "bend centre"
+    )
     bend_path.record("BendCentreX", '"BendR"')
     bend_path.record("BendCentreY", '"LegTop"')
     check(
@@ -258,13 +256,19 @@ async def build(adapter) -> dict[str, str]:
     bend_path.record("BendRadius", '"BendR"')
     check(
         "bend entry level with centre",
-        await adapter.add_sketch_constraint(f"{arc}.start", f"{arc}.center", "horizontal_points"),
+        await adapter.add_sketch_constraint(
+            f"{arc}.start", f"{arc}.center", "horizontal_points"
+        ),
     )
     check(
         "bend exit above centre",
-        await adapter.add_sketch_constraint(f"{arc}.end", f"{arc}.center", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{arc}.end", f"{arc}.center", "vertical_points"
+        ),
     )
-    check("arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal"))
+    check(
+        "arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal")
+    )
     await dimension_between(
         adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
     )
@@ -296,12 +300,22 @@ async def build(adapter) -> dict[str, str]:
     # actually consumed.
     bend_prof = SketchDims()
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_R, "bend profile", dims=bend_prof,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_R,
+        "bend profile",
+        dims=bend_prof,
         names=("BendCx", "BendCz", "BendOD"),
         drives=(None, None, '"TubeDia"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, TUBE_IR, "bend profile bore", dims=bend_prof,
+        adapter,
+        0.0,
+        0.0,
+        TUBE_IR,
+        "bend profile bore",
+        dims=bend_prof,
         names=("BendBoreCx", "BendBoreCz", "BendBoreDia"),
         drives=(None, None, '"TubeDia" - 2 * "WallT"'),
     )
@@ -327,13 +341,21 @@ async def build(adapter) -> dict[str, str]:
         )
         bend_prof_flipped = SketchDims()
         await define_circle(
-            adapter, 0.0, 0.0, TUBE_R, "bend profile (flipped)",
+            adapter,
+            0.0,
+            0.0,
+            TUBE_R,
+            "bend profile (flipped)",
             dims=bend_prof_flipped,
             names=("BendCx", "BendCz", "BendOD"),
             drives=(None, None, '"TubeDia"'),
         )
         await define_circle(
-            adapter, 0.0, 0.0, TUBE_IR, "bend profile bore (flipped)",
+            adapter,
+            0.0,
+            0.0,
+            TUBE_IR,
+            "bend profile bore (flipped)",
             dims=bend_prof_flipped,
             names=("BendBoreCx", "BendBoreCz", "BendBoreDia"),
             drives=(None, None, '"TubeDia" - 2 * "WallT"'),
@@ -356,7 +378,9 @@ async def build(adapter) -> dict[str, str]:
     v_arm = _RING_AREA * ARM_RUN
     expected = expected + v_bend + v_arm
     vol = await _volume(adapter)
-    _telemetry.info(f"volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(
+        f"volume after bend + arm: {vol:.1f} mm^3 (analytic {expected:.1f})"
+    )
     # 0.02 (was 0.01 solid): the annular wall is ~44% of the solid section, so
     # the same absolute B-rep slack is ~2.3x larger relative to the expectation.
     if abs(vol - expected) > 0.02 * expected:
@@ -403,10 +427,20 @@ async def build(adapter) -> dict[str, str]:
     profile = await add_line_chain(adapter, screw_profile)
     set_sketch_direct_db(adapter, False)
     await define_rectilinear_chain(
-        adapter, profile, screw_profile, label="end screw", dims=screw_dims,
+        adapter,
+        profile,
+        screw_profile,
+        label="end screw",
+        dims=screw_dims,
         names=[
-            "PlugRadius", "PlugDepth", "PlugShankStep", "ShankLen",
-            "ShankHeadStep", "HeadThick", "ScrewAnchorX", "ScrewAnchorY",
+            "PlugRadius",
+            "PlugDepth",
+            "PlugShankStep",
+            "ShankLen",
+            "ShankHeadStep",
+            "HeadThick",
+            "ScrewAnchorX",
+            "ScrewAnchorY",
         ],
         drives=[
             '"PlugDia" / 2',
@@ -423,7 +457,10 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch end screw", await adapter.exit_sketch())
     name_last_feature(adapter, "EndScrewProfile")
     drive_jobs += screw_dims.apply(adapter, "EndScrewProfile")
-    check("revolve end screw", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    check(
+        "revolve end screw",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    )
     name_last_feature(adapter, "EndScrew")
     # Added material: the plug fills only the BORE (its mid-wall overlap band
     # r 6..7 is already tube wall), then the solid shank and head outside the

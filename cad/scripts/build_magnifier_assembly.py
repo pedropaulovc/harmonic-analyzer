@@ -162,7 +162,7 @@ from magnifying_lever_geom import (  # noqa: E402
     KNIFE_LOCAL_Y,
     ROD_DIA as LEVER_ROD_DIA,
 )
-from build_summing_assembly import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
+from spring_mount_geom import KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # The lever is placed Ry(180) (local +x -> machine -x), so the knife lands at
 # LEVER_X0 - KNIFE_LOCAL_X.

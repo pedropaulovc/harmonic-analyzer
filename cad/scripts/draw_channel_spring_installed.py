@@ -1,14 +1,13 @@
-r"""Create the curated machinist SPEC SHEET for the channel spring (installed).
+"""Create the purchased-reference sheet for the installed 9432K31 spring.
 
-A coil spring is documented by a data table, not by graphical dimensions on the
-helix, so this print is a single 1:1 side view (drawn at the INSTALLED length),
-a 1:1 isometric, and the spring data table (a property-linked note stating BOTH
-the free and installed body lengths).  Shared behavior lives in
-``_drawing_common``.
+The supplier-native part stays in its vendor frame.  Its +X spring axis is
+shown horizontally in the Front view, with the +Z hook-eye axes normal to the
+sheet.  The part is ordered by SKU; the view is reference geometry and carries
+no fabrication dimensions.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_channel_spring_installed.py channel-spring-installed
+    uv run python cad\\scripts\\draw_channel_spring_installed.py channel-spring-installed
 """
 
 from __future__ import annotations
@@ -27,12 +26,11 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.solidworks.drawing import (
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["channel_spring_installed"]
@@ -47,10 +45,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)  # 1:1
-
-FRONT_CENTER = (0.100, 0.150)
-ISO_CENTER = (0.210, 0.150)
+SHEET_SCALE = (1.0, 1.0)
+FRONT_CENTER = (0.105, 0.165)
+ISO_CENTER = (0.120, 0.095)
 
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -71,6 +68,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Stock Name",
+            "Supplier",
+            "Supplier SKUs",
             "Manufacturing Notes",
             "Isometric View Note",
         ),
@@ -79,6 +79,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Stock Name",
+            "Supplier",
+            "Supplier SKUs",
             "Manufacturing Notes",
             "Isometric View Note",
         ),
@@ -90,27 +93,27 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Channel Spring (Installed) Spec Sheet",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
+            0: "Purchased Channel Spring Reference Sheet",
+            1: "McMaster-Carr 9432K31; order by supplier SKU",
             2: "Harmonic Analyzer Project",
-            3: "channel spring; extension spring; coiled wire",
-            4: "Generated from the project-owned ASME B drawing standard",
+            3: "channel spring; 9432K31; purchased reference part",
+            4: "Vendor-frame Front and Isometric views; no fabrication dimensions",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    set_hidden_lines_visible(adapter, front)
     set_hidden_lines_removed(adapter, iso)
-
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.300, 0.235)
-    add_property_linked_note(adapter, "Isometric View Note", 0.190, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.275, 0.245)
+    add_property_linked_note(adapter, "Isometric View Note", 0.075, 0.055)
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Channel Spring (Installed) Spec Sheet",
+        pdf_title="Purchased Channel Spring Reference Sheet",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )

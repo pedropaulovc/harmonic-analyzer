@@ -109,26 +109,14 @@ reserved:
                                    # scored on the worst reference input
     crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
     allowance_pct: 0.30
-  knife:                           # summing-lever knife-edge hysteresis (stall), scored on the
-                                   # worst broad input: the stall is a fixed displacement, so it
-                                   # is paid against the trial's greatest term at the ordinate
-                                   # scale the pen forces -- every broad input is capped at the
-                                   # ~4.7-bar capacity, so all read 0.40 (0.09 if the broad
-                                   # inputs could run at full scale). The capacity, not the
-                                   # edge, is what this allowance buys: a clamp band reaching
-                                   # nearer the knife, or a longer pen stroke, halves it.
+  knife:                           # fixed reversal displacement, evaluated at each input's
+                                   # actual ordinate scale and available magnifier range
     rolling_resistance_mm: 0.005   # hardened edge on a hardened seat; MEASURE as trace width on reversal
     allowance_pct: 0.45
-    # The knife load is the 20 channel preloads PLUS the counter spring's
-    # balancing reaction (20*preload*a/b). The CAD's counter spring
-    # (counter_spring_spec: 0.51 N/mm, at most ~28 mm of extension in its
-    # 325.3 installed body) cannot supply that reaction -- the spring pair is
-    # unbalanced ~50x and the machine as modelled has no static operating
-    # point. That is an OPEN DESIGN ITEM (#747, tolerance-policy.md), not a budget
-    # assumption: check:budget fails on it unless waived here, and the waiver
-    # is the record that the closure below is conditional on resolving it.
-    # TODO(#747): resolve the spring pair, then drop this waiver.
-    waive_static_balance: true
+    # Both spring banks pull upward on opposite sides of the knife.
+    # Stock rates/initial tensions and loaded perpendicular arms govern the
+    # balancing load. Catalog force AND length limits are hard gates; no waiver.
+    # Zero-setting slides the gooseneck to include measured preloads and weight.
 
 monte_carlo:
   draws: 4000
@@ -174,10 +162,10 @@ critical_features:
   spring_rate:
     tolerance: 1.25
     unit: pct
-    nominal: channel_spring_installed_spec.SPRING_RATE_REF
+    nominal: channel_spring_installed_spec.SPRING_RATE_N_PER_MM
     quantity: gain
     class: channel
-    holds: "MATCHED, not machined: measure every channel spring (weights + calipers, two loads) and bin the 20 within +/-1.25 % of their mean (spec-sheet SET QC: two hanging loads at eye c-c 60/70); stock springs scatter +/-10 %"
+    holds: "MATCHED, not machined: measure every channel spring and bin the 20 within +/-1.25 % of their common mean; SET QC uses 60/80 mm inside-hook lengths (58/78 mm pin centres with diameter 2 mm pins); catalog rates scatter +/-10 %"
   cam_phase:
     tolerance: 0.25
     unit: deg

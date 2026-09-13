@@ -75,9 +75,18 @@ DIM_ANGULAR = 1
 SELECT_TYPES = {1: "edge", 2: "face", 3: "vertex", 4: "datum-plane", 5: "datum-axis"}
 # folder/administrative features that carry no recipe
 SKIP_TYPES = {
-    "CommentsFolder", "FavoriteFolder", "HistoryFolder", "SelectionSetFolder",
-    "SensorFolder", "DocsFolder", "DetailCabinet", "SurfaceBodyFolder",
-    "SolidBodyFolder", "EnvFolder", "InkMarkupFolder", "EqnFolder",
+    "CommentsFolder",
+    "FavoriteFolder",
+    "HistoryFolder",
+    "SelectionSetFolder",
+    "SensorFolder",
+    "DocsFolder",
+    "DetailCabinet",
+    "SurfaceBodyFolder",
+    "SolidBodyFolder",
+    "EnvFolder",
+    "InkMarkupFolder",
+    "EqnFolder",
 }
 
 
@@ -139,9 +148,7 @@ def _dimensions(feat):
     owning feature is reported per row rather than assumed.
     """
     rows = []
-    feat = _early_bound(
-        feat, "IFeature"
-    )
+    feat = _early_bound(feat, "IFeature")
     disp = _read_member(feat, "GetFirstDisplayDimension")
     for _ in range(1000):
         if not disp:
@@ -216,9 +223,13 @@ def _sketch(feat):
             row["is_circle"] = bool(_g(ar, "IsCircle"))
         elif row["kind"] == "ellipse":
             el = _early_bound(s, "ISketchEllipse")
-            for key, meth in (("center", "GetCenterPoint2"), ("start", "GetStartPoint2"),
-                              ("end", "GetEndPoint2"), ("major", "GetMajorPoint2"),
-                              ("minor", "GetMinorPoint2")):
+            for key, meth in (
+                ("center", "GetCenterPoint2"),
+                ("start", "GetStartPoint2"),
+                ("end", "GetEndPoint2"),
+                ("major", "GetMajorPoint2"),
+                ("minor", "GetMinorPoint2"),
+            ):
                 row[key] = _pt(_g(el, meth))
         info["segments"].append(row)
 
@@ -236,12 +247,17 @@ def _feature_data(feat, type_name):
     if raw is None:
         return None
     out: dict = {}
-    if type_name in ("Extrusion", "ICE", "BossThin", "CutThin"):  # boss AND cut extrudes
+    if type_name in (
+        "Extrusion",
+        "ICE",
+        "BossThin",
+        "CutThin",
+    ):  # boss AND cut extrudes
         d = _early_bound(raw, "IExtrudeFeatureData2")
         for key, meth, args in (
             ("depth1_mm", "GetDepth", (True,)),
             ("depth2_mm", "GetDepth", (False,)),
-            ("end_cond1", "GetEndCondition", (True,)),   # swEndConditions_e
+            ("end_cond1", "GetEndCondition", (True,)),  # swEndConditions_e
             ("end_cond2", "GetEndCondition", (False,)),
             ("draft1_deg", "GetDraftAngle", (True,)),
             ("draft2_deg", "GetDraftAngle", (False,)),
@@ -250,48 +266,72 @@ def _feature_data(feat, type_name):
                 v = getattr(d, meth)(*args)
             except Exception:  # noqa: BLE001
                 continue
-            out[key] = _mm(v) if key.endswith("_mm") else (
-                _deg(v) if key.endswith("_deg") else v)
-        for prop in ("ReverseDirection", "BothDirections", "Merge", "FlipSideToCut",
-                     "NormalCut", "IsBaseExtrude", "IsBossFeature", "IsThinFeature",
-                     "ThinWallType", "CapEnds", "FromType", "FromOffsetDistance"):
+            out[key] = (
+                _mm(v)
+                if key.endswith("_mm")
+                else (_deg(v) if key.endswith("_deg") else v)
+            )
+        for prop in (
+            "ReverseDirection",
+            "BothDirections",
+            "Merge",
+            "FlipSideToCut",
+            "NormalCut",
+            "IsBaseExtrude",
+            "IsBossFeature",
+            "IsThinFeature",
+            "ThinWallType",
+            "CapEnds",
+            "FromType",
+            "FromOffsetDistance",
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
             out[prop] = _mm(v) if prop == "FromOffsetDistance" else v
         for key, meth, args in (
-                ("wall_forward_mm", "GetWallThickness", (True,)),
-                ("wall_reverse_mm", "GetWallThickness", (False,)),
-                ("cap_mm", "CapThickness", ())):
+            ("wall_forward_mm", "GetWallThickness", (True,)),
+            ("wall_reverse_mm", "GetWallThickness", (False,)),
+            ("cap_mm", "CapThickness", ()),
+        ):
             try:
                 v = getattr(d, meth)(*args) if args else _g(d, meth)
             except Exception as exc:  # noqa: BLE001
-                _telemetry.debug(
-                    f"feature dump: {type_name}.{meth} unavailable: {exc}")
+                _telemetry.debug(f"feature dump: {type_name}.{meth} unavailable: {exc}")
                 continue
             if v is not None:
                 out[key] = _mm(v)
-    elif type_name in ("RevolveBoss", "RevolveCut", "Revolve", "Revolution",
-                       "RevCut"):
+    elif type_name in ("RevolveBoss", "RevolveCut", "Revolve", "Revolution", "RevCut"):
         d = _early_bound(raw, "IRevolveFeatureData2")
-        for key, prop in (("angle_deg", "GetRevolutionAngle"),
-                          ("reverse", "ReverseDirection"), ("type", "Type"),
-                          ("is_boss", "IsBossFeature"), ("is_thin", "IsThinFeature"),
-                          ("axis_type", "GetAxisType")):
+        for key, prop in (
+            ("angle_deg", "GetRevolutionAngle"),
+            ("reverse", "ReverseDirection"),
+            ("type", "Type"),
+            ("is_boss", "IsBossFeature"),
+            ("is_thin", "IsThinFeature"),
+            ("axis_type", "GetAxisType"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
             out[key] = _deg(v) if key == "angle_deg" else v
     elif type_name == "RefPlane":
         d = _early_bound(raw, "IRefPlaneFeatureData")
-        for key, prop in (("distance_mm", "Distance"), ("angle_deg", "Angle"),
-                          ("reverse", "ReverseDirection"), ("type", "Type"),
-                          ("type2", "Type2")):
+        for key, prop in (
+            ("distance_mm", "Distance"),
+            ("angle_deg", "Angle"),
+            ("reverse", "ReverseDirection"),
+            ("type", "Type"),
+            ("type2", "Type2"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
-            out[key] = _mm(v) if key.endswith("_mm") else (
-                _deg(v) if key.endswith("_deg") else v)
+            out[key] = (
+                _mm(v)
+                if key.endswith("_mm")
+                else (_deg(v) if key.endswith("_deg") else v)
+            )
         # The constraint data says HOW the plane is defined; the resolved
         # transform says WHERE it landed -- the number a replica script needs
         # (this is how the vendor Split plane was located at the undercut
@@ -303,91 +343,124 @@ def _feature_data(feat, type_name):
                 arr = _g(_early_bound(xf, "IMathTransform"), "ArrayData")
                 if arr is not None:
                     out["origin_mm"] = [_mm(v) for v in list(arr)[9:12]]
-                    out["rotation"] = [round(float(v), 9)
-                                       for v in list(arr)[0:9]]
+                    out["rotation"] = [round(float(v), 9) for v in list(arr)[0:9]]
     elif type_name == "Helix":
         d = _early_bound(raw, "IHelixFeatureData")
-        for key, prop in (("pitch_mm", "Pitch"), ("height_mm", "Height"),
-                          ("revolutions", "Revolution"),
-                          ("clockwise", "Clockwise"),
-                          ("reverse", "ReverseDirection"),
-                          ("start_angle_deg", "StartingAngle"),
-                          ("defined_by", "DefinedBy"),
-                          ("variable_pitch", "VariablePitch")):
+        for key, prop in (
+            ("pitch_mm", "Pitch"),
+            ("height_mm", "Height"),
+            ("revolutions", "Revolution"),
+            ("clockwise", "Clockwise"),
+            ("reverse", "ReverseDirection"),
+            ("start_angle_deg", "StartingAngle"),
+            ("defined_by", "DefinedBy"),
+            ("variable_pitch", "VariablePitch"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
-            out[key] = _mm(v) if key.endswith("_mm") else (
-                _deg(v) if key.endswith("_deg") else v)
+            out[key] = (
+                _mm(v)
+                if key.endswith("_mm")
+                else (_deg(v) if key.endswith("_deg") else v)
+            )
     elif type_name in ("SweepCut", "Sweep", "SweepSurface"):
         d = _early_bound(raw, "ISweepFeatureData")
         # The options a re-authored InsertCutSwept5/CreateFeature call must
         # pass -- reading these live off the vendor's Cut-Sweep1 is what
         # cracked the 91829A560 thread (AlignWithEndFaces + swMinimumTwist).
-        for prop in ("AlignWithEndFaces", "TwistControlType",
-                     "PathAlignmentType", "Direction", "MergeSmoothFaces",
-                     "MaintainTangency", "AdvancedSmoothing",
-                     "StartTangencyType", "EndTangencyType", "FeatureScope",
-                     "AutoSelect", "ThinFeature", "CircularProfile",
-                     "TangentPropagation"):
+        for prop in (
+            "AlignWithEndFaces",
+            "TwistControlType",
+            "PathAlignmentType",
+            "Direction",
+            "MergeSmoothFaces",
+            "MaintainTangency",
+            "AdvancedSmoothing",
+            "StartTangencyType",
+            "EndTangencyType",
+            "FeatureScope",
+            "AutoSelect",
+            "ThinFeature",
+            "CircularProfile",
+            "TangentPropagation",
+        ):
             v = _g(d, prop)
             if v is not None:
                 out[prop] = v
     elif type_name == "Fillet":
         d = _early_bound(raw, "ISimpleFilletFeatureData2")
-        for key, prop in (("type", "Type"), ("radius_mm", "DefaultRadius"),
-                          ("propagate", "PropagateToTangentFaces"),
-                          ("asymmetric", "AsymmetricFillet"),
-                          ("distance_mm", "DefaultDistance"),
-                          ("multi_radius", "IsMultipleRadius"),
-                          ("conic_type", "ConicTypeForCrossSectionProfile"),
-                          ("conic_rho_or_radius", "DefaultConicRhoOrRadius")):
+        for key, prop in (
+            ("type", "Type"),
+            ("radius_mm", "DefaultRadius"),
+            ("propagate", "PropagateToTangentFaces"),
+            ("asymmetric", "AsymmetricFillet"),
+            ("distance_mm", "DefaultDistance"),
+            ("multi_radius", "IsMultipleRadius"),
+            ("conic_type", "ConicTypeForCrossSectionProfile"),
+            ("conic_rho_or_radius", "DefaultConicRhoOrRadius"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
             out[key] = _mm(v) if key.endswith("_mm") else v
     elif type_name == "Chamfer":
         d = _early_bound(raw, "IChamferFeatureData2")
-        for key, prop in (("type", "Type"), ("distance_mm", "Distance"),
-                          ("angle_deg", "Angle")):
+        for key, prop in (
+            ("type", "Type"),
+            ("distance_mm", "Distance"),
+            ("angle_deg", "Angle"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
-            out[key] = _mm(v) if key.endswith("_mm") else (
-                _deg(v) if key.endswith("_deg") else v)
+            out[key] = (
+                _mm(v)
+                if key.endswith("_mm")
+                else (_deg(v) if key.endswith("_deg") else v)
+            )
     elif type_name == "CirPattern":
         d = _early_bound(raw, "ICircularPatternFeatureData")
-        for key, prop in (("spacing_deg", "Spacing"),
-                          ("instances", "TotalInstances"),
-                          ("equal_spacing", "EqualSpacing"),
-                          ("reverse", "ReverseDirection"),
-                          ("symmetric", "Symmetric"),
-                          ("geometry_pattern", "GeometryPattern"),
-                          ("axis_type", "GetAxisType")):
+        for key, prop in (
+            ("spacing_deg", "Spacing"),
+            ("instances", "TotalInstances"),
+            ("equal_spacing", "EqualSpacing"),
+            ("reverse", "ReverseDirection"),
+            ("symmetric", "Symmetric"),
+            ("body_pattern", "BodyPattern"),
+            ("geometry_pattern", "GeometryPattern"),
+            ("axis_type", "GetAxisType"),
+        ):
             v = _g(d, prop)
             if v is None:
                 continue
             out[key] = _deg(v) if key.endswith("_deg") else v
     elif type_name == "MirrorPattern":
         d = _early_bound(raw, "IMirrorPatternFeatureData")
-        for key, prop in (("plane_type", "GetMirrorPlaneType"),
-                          ("geometry_pattern", "GeometryPattern"),
-                          ("feature_count", "GetPatternFeatureCount")):
+        for key, prop in (
+            ("plane_type", "GetMirrorPlaneType"),
+            ("geometry_pattern", "GeometryPattern"),
+            ("feature_count", "GetPatternFeatureCount"),
+        ):
             v = _g(d, prop)
             if v is not None:
                 out[key] = v
     elif type_name == "CombineBodies":
         d = _early_bound(raw, "ICombineBodiesFeatureData")
-        for key, prop in (("operation", "OperationType"),  # swBodyOperationType_e
-                          ("body_count", "GetBodiesToCombineCount")):
+        for key, prop in (
+            ("operation", "OperationType"),  # swBodyOperationType_e
+            ("body_count", "GetBodiesToCombineCount"),
+        ):
             v = _g(d, prop)
             if v is not None:
                 out[key] = v
     elif type_name == "Split":
         d = _early_bound(raw, "ISplitBodyFeatureData")
-        for key, prop in (("consume", "Consume"),
-                          ("split_body_count", "GetSplitBodiesCount"),
-                          ("trim_tool_count", "GetTrimToolsCount")):
+        for key, prop in (
+            ("consume", "Consume"),
+            ("split_body_count", "GetSplitBodiesCount"),
+            ("trim_tool_count", "GetTrimToolsCount"),
+        ):
             v = _g(d, prop)
             if v is not None:
                 out[key] = v
@@ -403,14 +476,31 @@ def _feature_data(feat, type_name):
     elif type_name == "HoleWzd":
         d = _early_bound(raw, "IWizardHoleFeatureData2")
         # Readable WITHOUT AccessSelections (the _holes.py read-back path).
-        for prop in ("Type", "Standard", "FastenerType", "FastenerSize", "HoleFit",
-                     "ThreadClass", "EndCondition", "ReverseDirection"):
+        for prop in (
+            "Type",
+            "Standard",
+            "FastenerType",
+            "FastenerSize",
+            "HoleFit",
+            "ThreadClass",
+            "EndCondition",
+            "ReverseDirection",
+        ):
             v = _g(d, prop)
             if v is not None:
                 out[prop] = v
-        for prop in ("ThruHoleDiameter", "ThruHoleDepth", "HoleDiameter", "HoleDepth",
-                     "CounterBoreDiameter", "CounterBoreDepth", "CounterSinkDiameter",
-                     "ThreadDiameter", "ThreadDepth", "BlindHoleDepth"):
+        for prop in (
+            "ThruHoleDiameter",
+            "ThruHoleDepth",
+            "HoleDiameter",
+            "HoleDepth",
+            "CounterBoreDiameter",
+            "CounterBoreDepth",
+            "CounterSinkDiameter",
+            "ThreadDiameter",
+            "ThreadDepth",
+            "BlindHoleDepth",
+        ):
             v = _g(d, prop)
             if v:
                 out[f"{prop}_mm"] = _mm(v)
@@ -451,8 +541,11 @@ def _tree(model):
                 break
             sub = _early_bound(sub, "IFeature")
             stn = str(_g(sub, "GetTypeName2"))
-            srow = {"name": str(_g(sub, "Name")), "type": stn,
-                    "dimensions": _dimensions(sub)}
+            srow = {
+                "name": str(_g(sub, "Name")),
+                "type": stn,
+                "dimensions": _dimensions(sub),
+            }
             if stn in ("ProfileFeature", "3DProfileFeature"):
                 srow["sketch"] = _sketch(sub)
             subs.append(srow)
@@ -519,11 +612,13 @@ def _surface(surf):
     if surf is None:
         return None
     s = _early_bound(surf, "ISurface")
-    for flag, kind, params in (("IsPlane", "plane", "PlaneParams"),
-                               ("IsCylinder", "cylinder", "CylinderParams"),
-                               ("IsCone", "cone", "ConeParams2"),
-                               ("IsSphere", "sphere", "SphereParams"),
-                               ("IsTorus", "torus", "TorusParams")):
+    for flag, kind, params in (
+        ("IsPlane", "plane", "PlaneParams"),
+        ("IsCylinder", "cylinder", "CylinderParams"),
+        ("IsCone", "cone", "ConeParams2"),
+        ("IsSphere", "sphere", "SphereParams"),
+        ("IsTorus", "torus", "TorusParams"),
+    ):
         if not _g(s, flag):
             continue
         out = {"surface": kind, "identity": int(_g(s, "Identity"))}
@@ -559,15 +654,17 @@ def _refs(model):
         row = {"name": name, "type": tn}
         parents = _g(feat, "GetParents")
         if parents:
-            row["parents"] = [str(_g(_early_bound(p, "IFeature"), "Name"))
-                              for p in parents]
+            row["parents"] = [
+                str(_g(_early_bound(p, "IFeature"), "Name")) for p in parents
+            ]
 
         if tn in ("ProfileFeature", "3DProfileFeature"):
             sk = _g(feat, "GetSpecificFeature2")
             if sk is not None:
                 try:
                     row["sketch_plane"] = _entity(
-                        _early_bound(sk, "ISketch").GetReferenceEntity(0))
+                        _early_bound(sk, "ISketch").GetReferenceEntity(0)
+                    )
                 except Exception as exc:  # noqa: BLE001
                     row["sketch_plane_error"] = repr(exc)
 
@@ -597,9 +694,11 @@ def _extrude_refs(feat, model, name):
         out["access_error"] = repr(exc)
         return out
     try:
-        for key, meth, args in (("end_ref1", "GetEndConditionReference", (True,)),
-                                ("end_ref2", "GetEndConditionReference", (False,)),
-                                ("from_entity", "GetFromEntity", ())):
+        for key, meth, args in (
+            ("end_ref1", "GetEndConditionReference", (True,)),
+            ("end_ref2", "GetEndConditionReference", (False,)),
+            ("from_entity", "GetFromEntity", ()),
+        ):
             try:
                 desc = _entity(getattr(d, meth)(*args))
             except Exception:  # noqa: BLE001
@@ -673,8 +772,10 @@ def _faces(adapter):
 def _doc_level(adapter, model):
     out: dict = {}
     part = _early_bound(adapter.currentModel, "IPartDoc")
-    for meth, args in (("GetMaterialPropertyName2", ("Default", "")),
-                       ("GetMaterialPropertyName2", ("", ""))):
+    for meth, args in (
+        ("GetMaterialPropertyName2", ("Default", "")),
+        ("GetMaterialPropertyName2", ("", "")),
+    ):
         try:
             v = getattr(part, meth)(*args)
         except Exception:  # noqa: BLE001
@@ -683,8 +784,9 @@ def _doc_level(adapter, model):
             out["material"] = str(v)
             break
     try:
-        out["appearance_rgb"] = [round(float(v), 6)
-                                 for v in (model.MaterialPropertyValues or [])[:3]]
+        out["appearance_rgb"] = [
+            round(float(v), 6) for v in (model.MaterialPropertyValues or [])[:3]
+        ]
     except Exception:  # noqa: BLE001
         pass
     try:
@@ -704,9 +806,14 @@ def _doc_level(adapter, model):
                 # not another indexed property.  Calling it as Status(i)
                 # turns the returned int into a callable and loses the entire
                 # otherwise-successful equation row.
-                eqns.append({"index": i, "equation": equation,
-                             "global": is_global,
-                             "status": _g(mgr, "Status")})
+                eqns.append(
+                    {
+                        "index": i,
+                        "equation": equation,
+                        "global": is_global,
+                        "status": _g(mgr, "Status"),
+                    }
+                )
             except Exception as exc:  # noqa: BLE001
                 eqns.append({"index": i, "error": repr(exc)})
     out["equations"] = eqns
@@ -715,8 +822,7 @@ def _doc_level(adapter, model):
     ext = _g(model, "Extension")
     try:
         cpm = ext.CustomPropertyManager("")
-        for nm in (_g(_early_bound(cpm, "ICustomPropertyManager"),
-                      "GetNames") or []):
+        for nm in _g(_early_bound(cpm, "ICustomPropertyManager"), "GetNames") or []:
             try:
                 res = cpm.Get5(str(nm), False)
                 props[str(nm)] = {"value": str(res[0]), "resolved": str(res[1])}
@@ -745,8 +851,8 @@ def _doc_level(adapter, model):
 async def build(adapter) -> dict[str, str]:
     if PART is None:
         raise SystemExit(
-            "usage: diag_dump_part.py <part.SLDPRT> [out.json] [--no-refs] "
-            "[--no-faces]")
+            "usage: diag_dump_part.py <part.SLDPRT> [out.json] [--no-refs] [--no-faces]"
+        )
     check("open", await adapter.open_model(str(PART)))
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     doc: dict = {"path": str(PART), "title": str(_g(model, "GetTitle"))}

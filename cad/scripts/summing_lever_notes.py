@@ -11,7 +11,14 @@ mount.  Imported ONLY by ``build_summing_lever`` and the offline drawing test.
 
 from __future__ import annotations
 
-from summing_lever_spec import HEX_DEPTH, HEX_H, HEX_W, PLATE_L, PLATE_T
+from summing_lever_spec import (
+    ANCHOR_H,
+    HEX_DEPTH,
+    HEX_H,
+    HEX_W,
+    PLATE_L,
+    PLATE_T,
+)
 
 # --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -20,12 +27,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationAnchorProfile": {"AnchorOuterDia"},
 }
 
-# The spring-hole pattern (count, size, row X, start offset, pitch) and the
-# anchor-eye size/location are dimensioned NATIVELY on the sheet (basic
-# coordinates + position frames); the notes must not repeat those numbers.
-# Note 4 lists the machined features explicitly -- the sheet also carries the
-# 20X controlled spring-hole pattern, so "only knife edges and anchor bore"
-# would contradict it (codex #354).
+# The anchor-tap pattern (count, size, row X, start offset, spacing) and the
+# counter-anchor tap size/location are dimensioned NATIVELY on the sheet (basic
+# coordinates + position frames + Hole Wizard callouts); the notes must not
+# repeat those numbers.  The boss HEIGHT is not a sketch dimension, so it is
+# stated here -- it is the engagement the purchased counter anchor's shank is
+# cut to.  Note 5 lists the machined features explicitly -- the sheet also
+# carries the 20X controlled anchor-tap pattern, so "only knife edges and
+# anchor bore" would contradict it (codex #354).  Notes 6-7 carry the no-nut
+# rule: both lower spring anchors are purchased eyebolts that thread straight
+# into this casting, so the casting is their nut and the eye clocking and
+# threadlocker are the print's business, not an assembly aside.
 DRAWING_NOTES = "\n".join(
     (
         f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
@@ -33,10 +45,19 @@ DRAWING_NOTES = "\n".join(
         "   THE KNIFE EDGE.",
         f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
         f"3. PIVOT CYLINDER {PLATE_L:.2f} LONG; NO BORE.",
-        "4. CAST PART: UNDIMENSIONED CONTOURS",
+        f"4. SUMMATION ANCHOR BOSS {ANCHOR_H:.2f} HIGH.",
+        "5. CAST PART: UNDIMENSIONED CONTOURS",
         "   PER SUPPLIED MODEL/PATTERN. MACHINE",
-        "   THE KNIFE EDGES, SPRING HOLES,",
-        "   AND ANCHOR BORE ONLY.",
+        "   THE KNIFE EDGES AND TAP THE SPRING",
+        "   ANCHOR SEATS ONLY.",
+        "6. BOTH SPRING ANCHORS ARE PURCHASED",
+        "   EYEBOLTS THREADED DIRECTLY INTO THIS",
+        "   PART; NO NUTS. TAP FULL DEPTH",
+        "   THROUGH THE PLATE AND THE BOSS.",
+        "7. ON ASSEMBLY CLOCK EACH EYE INTO THE",
+        "   SPRING PULL PLANE AND SET WITH",
+        "   REMOVABLE MEDIUM-STRENGTH",
+        "   THREADLOCKER.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"

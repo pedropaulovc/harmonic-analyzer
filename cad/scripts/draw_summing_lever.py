@@ -6,11 +6,13 @@ sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
-bore): a coefficients plate on the +X arm carrying the 20 channel-spring holes,
-a solid pivot cylinder (152.4 long, along Z), and a summation arm reaching to
-the counter-spring anchor eye on the -X arm.  The print shows a 1:2 front
-profile (pivot Ø), a 1:2 top plan (plate width/length + anchor eye), and a 1:4
-isometric.  The sheet runs at 1:2.
+bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
+taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
+reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
+anchors are purchased eyebolts that thread straight into those taps, so the
+print controls thread identity and position, never a seat bore.  The print
+shows a 1:2 front profile (pivot Ø), a 1:2 top plan (plate width/length +
+anchor boss), and a 1:4 isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -47,9 +49,9 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
-    ANCHOR_BORE_R,
     ANCHOR_R,
     CHANNEL_PITCH,
+    COUNTER_HOLE_SPEC,
     HEX_DEPTH,
     HOLE_SPEC,
     HOLE_X,
@@ -73,6 +75,9 @@ OUTPUTS = DrawingOutputs(
     png=SPEC.outputs["png"],
 )
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
+# Tap-drill diameter of the boss's counter-anchor tap; the rim points below
+# pick its circular edge, and the native callout prints the thread itself.
+COUNTER_R = blind_cut_dia_mm(COUNTER_HOLE_SPEC) / 2.0
 
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
@@ -169,15 +174,16 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Anchor bore (Ø3.0) native callout in the top plan.  Pick a point on the
-    # bore rim (not its centre) so SolidWorks catches the circular edge.
-    anchor_bore_edge = _top_xy(TIP_X, ANCHOR_BORE_R)
+    # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
+    # a point on the hole rim (not its centre) so SolidWorks catches the
+    # circular edge.
+    anchor_tap_edge = _top_xy(TIP_X, COUNTER_R)
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=anchor_bore_edge,
+        edge_xy=anchor_tap_edge,
         callout_xy=(0.060, 0.125),
-        label="anchor bore",
+        label="anchor tap",
     )
 
     # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
@@ -203,16 +209,16 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
-    # Use a separate point on the bore rim so the position-frame leader does
-    # not stack on the hole-callout leader at the bore's 12-o'clock point.
-    anchor_bore_fcf_edge = _top_xy(TIP_X - ANCHOR_BORE_R, 0.0)
+    # Use a separate point on the tap rim so the position-frame leader does
+    # not stack on the hole-callout leader at the hole's 12-o'clock point.
+    anchor_tap_fcf_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=anchor_bore_fcf_edge,
+        edge_xy=anchor_tap_fcf_edge,
         frame_xy=(
-            anchor_bore_fcf_edge[0] - 0.010,
-            anchor_bore_fcf_edge[1] + 0.026,
+            anchor_tap_fcf_edge[0] - 0.010,
+            anchor_tap_fcf_edge[1] + 0.026,
         ),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
@@ -221,22 +227,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="summation anchor position",
     )
     # BASIC X coordinate backing the anchor position frame: knife-edge pivot
-    # axis (datum A, the -Z trunnion ridge line) to the anchor bore centre.
+    # axis (datum A, the -Z trunnion ridge line) to the anchor tap centre.
     ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
-    anchor_bore_bottom = _top_xy(TIP_X, -ANCHOR_BORE_R)
+    anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     anchor_location = add_edge_dimension(
         adapter,
         top,
         p0=ridge_dim_edge,
-        p1=anchor_bore_bottom,
+        p1=anchor_tap_bottom,
         text_xy=(0.146, 0.050),
-        label="anchor bore X location",
+        label="anchor tap X location",
         orientation="horizontal",
     )
-    set_basic_dimension(adapter, anchor_location, label="anchor bore X location")
+    set_basic_dimension(adapter, anchor_location, label="anchor tap X location")
 
-    # Spring-hole pattern control: datum B on the -Z plate end, BASIC row-X /
-    # start-Z / pitch coordinates off A|B, a native #47 callout, and a 20X
+    # Anchor-tap pattern control: datum B on the -Z plate end, BASIC row-X /
+    # start-Z / pitch coordinates off A|B, a native thread callout, and a 20X
     # position frame -- the inspectable pattern definition (the notes no longer
     # carry these numbers as prose).
     # Pick B toward the plate's -X side and hang its tag down-LEFT: the seed
