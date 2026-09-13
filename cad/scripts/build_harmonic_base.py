@@ -78,6 +78,7 @@ from harmonic_base_spec import (
     LIP_H,
     LIP_W,
     DRAWING_NOTES,
+    DRAWING_NOTES_B,
     SIDE_VIEW_NOTE,
     STACK_HEIGHT,
     TOP_LENGTH,
@@ -125,6 +126,7 @@ import _telemetry
 
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 # Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
 # COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
@@ -1083,7 +1085,9 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
+            "Manufacturing Notes B": DRAWING_NOTES_B,
             "Side View Note": SIDE_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

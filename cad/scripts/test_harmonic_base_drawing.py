@@ -54,6 +54,7 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
 
 
+
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     expected_holes = {
         *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),
@@ -68,11 +69,6 @@ def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
     assert len(drawing.ALL_HOLES) == len(expected_holes) == 18
     assert set(drawing.ALL_HOLES) == expected_holes
     assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
-    assert drawing.HOLE_TABLE_ANCHOR[0] >= 0.274
-
-
-def test_plan_view_clears_top_border_and_lower_notes() -> None:
-    assert drawing.TOP_CENTER == (0.130, 0.163)
 
 
 @pytest.mark.parametrize(

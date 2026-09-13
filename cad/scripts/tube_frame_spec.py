@@ -64,6 +64,7 @@ DRAWING_NOTES = "\n".join(
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
 LENGTH_VIEW_NOTE = "LENGTH VIEW SCALE 1:5"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.

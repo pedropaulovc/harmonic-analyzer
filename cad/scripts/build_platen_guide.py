@@ -110,10 +110,18 @@ if _MIN_OPPOSED_RECEIVER_C2C < _TAP_DRILL_DIA + 0.2:
     raise AssertionError("front and rear #4-40 guide receivers intersect")
 
 DRAWING_NOTES = "HOLE POSITION PER FCF."
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
 
 
 def _apply_drawing_properties(adapter) -> None:
-    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
 
 
 async def build(adapter) -> dict[str, str]:

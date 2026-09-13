@@ -92,6 +92,7 @@ from tube_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
     INNER_DIA,
     LENGTH_VIEW_NOTE,
     OUTER_DIA,
@@ -269,6 +270,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Length View Note": LENGTH_VIEW_NOTE,
         },
     )

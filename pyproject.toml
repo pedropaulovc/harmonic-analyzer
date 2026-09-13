@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Parametric CAD model + build pipeline for a Michelson-style harmonic analyzer (SolidWorks-driven, doit-orchestrated)."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.12"
+# grpcio has no CPython 3.15 wheel; avoid an implicit native build until it does.
+requires-python = ">=3.12,<3.15"
 
 # Core: everything the doit pipeline and the SolidWorks-free gates / comparison
 # diff tooling import directly.
@@ -41,10 +42,10 @@ dependencies = [
     "azure-identity>=1.16",
     "opentelemetry-api>=1.20",
     "opentelemetry-sdk>=1.20",
-    # OTLP/HTTP exporter so spans+logs ship to a collector / the .NET Aspire
-    # dashboard out of the box (see _telemetry._DEFAULT_OTLP_ENDPOINT). HTTP, not
-    # gRPC, to avoid a grpcio build on newer Pythons.
+    # OTLP exporters so spans+logs ship either to the local Aspire dashboard over
+    # HTTP or to Azure Monitor Agent's local gRPC endpoint.
     "opentelemetry-exporter-otlp-proto-http>=1.20",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
     # The SolidWorks COM adapter + gate logic (verify.py, _common.py, _assembly.py
     # all `from solidworks_mcp...`) lives in the sibling repo. Pulled in editable so
     # the whole pipeline runs from this one uv venv.

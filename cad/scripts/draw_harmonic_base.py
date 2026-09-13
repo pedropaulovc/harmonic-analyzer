@@ -5,10 +5,11 @@ overall footprint dimensions, the mounting-hole table, and manufacturing notes; 
 shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The base is machined from one-piece gray-iron stock: the legacy lower flange
-and upper pad retain their front edges and extend 35.415 mm rearward, with four
-blind rocker-support taps and nine other assembly-drilled hardware seats. The
-plate is 457 mm long, so the whole sheet runs 1:2; the front elevation is 1:4.
+The base is machined from one-piece gray-iron stock: the legacy lower flange and
+upper pad retain their front edges and extend 35.415 mm rearward, with four
+counterbored lag-screw mounting holes and nine assembly-drilled hardware seats.
+The plate is 457 mm long, so the whole sheet runs 1:4; the front elevation is
+also 1:4 and the pictorial isometric is 1:10.
 
 Run with SolidWorks open::
 
@@ -81,18 +82,22 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (457 mm plate)
-VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5 plan/front sheet-metres-per-mm
+SHEET_SCALE = (1.0, 4.0)  # 1:4 whole sheet keeps this data-dense print legible
+PLAN_SCALE = SHEET_SCALE
+VIEW_SCALE = PLAN_SCALE[0] / PLAN_SCALE[1]
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
-# Sheet layout (meters).  The plan (top) carries the footprint + the hole
-# pattern; the front elevation (1:4) shows the stepped stack; the hole
-# table sits upper-right and the notes fill the lower-left.  The plan runs at the
-# sheet's 1:2; only the 1:4 isometric carries a scale note.
-TOP_CENTER = (0.130, 0.163)
-SIDE_CENTER = (0.345, 0.075)
+# Sheet layout (meters). The full-height native hole table owns the left
+# column, where it may extend below the title-block top without entering that
+# right-side keep-out. Views, controls, and notes occupy the remaining field.
+TOP_CENTER = (0.230, 0.205)
+SIDE_CENTER = (0.230, 0.145)
+ISO_SCALE = (1, 10)
+ISO_CENTER = (0.350, 0.240)
+SIDE_NOTE_XY = (0.170, 0.128)
+ISO_NOTE_XY = (0.305, 0.212)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position (meters).  Only the bottom plate's overall footprint is marked.
@@ -116,7 +121,7 @@ _DATUM_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
-HOLE_TABLE_ANCHOR = (0.274, 0.256)
+HOLE_TABLE_ANCHOR = (0.015, 0.265)
 
 
 def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -281,17 +286,21 @@ async def build(adapter: Any) -> dict[str, str]:
             "Title",
             "Material Specification",
             "Finish",
+            "Manufacturing Notes B",
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes B",
             "Manufacturing Notes",
             "Side View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -310,9 +319,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Explicit per-view scale: a view placed without one can silently auto-scale,
     # which shifts every coordinate-based pick on it.
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=PLAN_SCALE)
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
-    for view in (top, side):
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
@@ -350,7 +360,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Keep the native datum triangle directly on the visible underside
         # edge.  The former far-left position produced a long leader that read
         # like an unattached free-standing tag at print scale.
-        symbol_xy=(0.310, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
+        symbol_xy=(0.205, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
         datum="A",
         label="machined underside datum",
         entity=datum_a_edge,
@@ -359,7 +369,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(0.060, _DATUM_XY[1] - 0.010),
+        symbol_xy=(0.210, _DATUM_XY[1] - 0.010),
         datum="B",
         label="machined long-side datum",
         entity=datum_b_edge,
@@ -368,7 +378,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         top,
-        symbol_xy=(_DATUM_XY[0] + 0.013, 0.190),
+        symbol_xy=(_DATUM_XY[0] + 0.013, 0.205),
         datum="C",
         label="machined left-end datum",
         entity=datum_c_edge,
@@ -377,7 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.165, 0.125),
+        frame_xy=(0.310, 0.205),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
         datums=("A", "B", "C"),
@@ -389,7 +399,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.085, 0.147),
+        frame_xy=(0.300, 0.175),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
         datums=("A", "B", "C"),
@@ -402,7 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.075, 0.105),
+        frame_xy=(0.300, 0.160),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
         datums=("A",),
@@ -413,7 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        frame_xy=(0.022, 0.135),
+        frame_xy=(0.170, 0.185),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["datum C perpendicularity to A and B"],
         datums=("A", "B"),
@@ -424,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         side,
-        frame_xy=(0.365, 0.093),
+        frame_xy=(0.300, 0.145),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["top-pad parallelism to A"],
         datums=("A",),
@@ -433,9 +443,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.0825, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.170, 0.115, char_height=0.002
     )
-    add_property_linked_note(adapter, "Side View Note", 0.260, 0.095)
+    add_property_linked_note(
+        adapter, "Manufacturing Notes B", 0.305, 0.115, char_height=0.002
+    )
+    add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

@@ -47,8 +47,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
 }
 
-# Lines kept short (<~68 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
+# Lines stay short so two lower-field note columns remain clear of the side
+# elevation and title block.
 DRAWING_NOTES = "\n".join(
     (
         "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
@@ -63,6 +63,10 @@ DRAWING_NOTES = "\n".join(
         "   9.52 +/-0.10 DEEP. PLAN RIMS ARE THE DIA 13.00 THRU FEATURES.",
         "   C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER",
         "   FULL SURFACES; SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX.",
+    )
+)
+DRAWING_NOTES_B = "\n".join(
+    (
         "5. BLIND UNC-2B TAPS: FULL THREAD / CYLINDRICAL DRILL DEPTH.",
         "   BOTTOMING: PIVOT #10-24 9.775/12; BLOCK #8-32 6.90/10;",
         "   FOOT #4-40 8.975/11; NAMEPLATE #4-40 6/9. LEAD >=2P.",
