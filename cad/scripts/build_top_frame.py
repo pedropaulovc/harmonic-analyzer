@@ -14,10 +14,9 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   outer faces z -/+131, window z -/+93.
 * Corner bosses O52.2 spanning y 993.4..1040.7 (proud 4.5 above the rail
   top, hanging 6.3 below the underside -- ch19 img04 / p002+p006 corner
-  crops), bored O25.5 around the O25.4 columns, each with a #8-32 side
-  screw tapped into its z face (front pair from the front, rear pair from
-  the rear; O9 x 0.9 spot-face on the boss cylinder) pressing the column:
-  the screws that hold the frame to the tube-frame.
+  crops), bored O25.5 around the O25.4 columns. Four stock cross screws
+  enter from the front/rear spot seats, clear both tube walls, and continue
+  into the far casting wall through one #10-32 UNF-2B interrupted tap path.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces (its underside 999.7 is the knife-mount seat
   plane), with 18 x 18 plan gussets at all four rail junctions and two
@@ -84,6 +83,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_last_feature,
+    name_dimensions,
     report_mass_properties,
     run_build,
     save_part_and_images,
@@ -94,10 +94,12 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _visibility import blank_reference_geometry
 from _holes import (
+    DRILL_POINT_H,
     CLEARANCE_MM,
     HoleSpec,
     TAP_DRILL_MM,
@@ -109,8 +111,8 @@ from top_frame_spec import (
     DRAWING_NOTES,
     DRAWING_NOTES_B,
     FRONT_VIEW_NOTE,
-    INSPECTION_NOTES,
     OUTER_PROFILE_TOLERANCE_MM,
+    SECTION_VIEW_NOTE,
     TOP_VIEW_NOTE,
 )
 from cone_pivot_post_installation import (
@@ -119,6 +121,17 @@ from cone_pivot_post_installation import (
     FRAME_REAR_COLUMN_Z,
     SUMMING_Z,
 )
+from frame_attachment_spec import (
+    CAP_RECESS_DEPTH,
+    CAP_RECESS_DIAMETER,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    COLUMN_SOCKET_DIAMETER,
+    SCREW_SPOTFACE_DIAMETER,
+    TOP_SCREW_SEAT_Z,
+)
+from _fit_limits import deviations
+from tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 
 PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
@@ -138,7 +151,13 @@ HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
 BOSS_DIA = 52.2  # silhouette extremes +/-223.1 in p002/p006
 BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
 BOSS_BELOW = 6.3  # boss hang below the underside (p006 read 5.7-7)
-BORE_DIA = 25.5  # clamps the O25.4 column (0.1 slip)
+BORE_DIA = COLUMN_SOCKET_DIAMETER
+CAP_RECESS_DIAMETER_BAND = (0.20, 0.0)
+CAP_RECESS_DEPTH_BAND = (0.30, 0.0)
+CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH
+CAP_RECESS_DIAMETRAL_CLEARANCE = CAP_RECESS_DIAMETER - CAP_MAX_OUTER_DIAMETER
+if CAP_RECESS_DIAMETRAL_CLEARANCE <= 0.0:
+    raise AssertionError("purchased cap does not clear the top-frame recess")
 
 OUTER_X = COLUMN_X + RAIL_W_SIDE / 2.0  # 214.1
 INNER_X = COLUMN_X - RAIL_W_SIDE / 2.0  # 179.9
@@ -168,16 +187,26 @@ SET_POCKET = 16.0  # cast pocket (square) around the set-screw tap
 SET_POCKET_DEPTH = 2.0
 SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="blind", depth_mm=8.0)
 
-# --- Side screws (frame -> tube-frame columns) ------------------------------
-SPOTFACE_DIA = 9.0
-SPOTFACE_PLANE = abs(FRAME_FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4  # z -/+138.5
-SPOTFACE_FLOOR = SPOTFACE_PLANE - 0.9  # planar seat z -/+137.6
-SIDE_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=14.0)
+# --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
+SPOTFACE_DIA = SCREW_SPOTFACE_DIAMETER
+SPOTFACE_PLANE = abs(FRAME_FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
+SPOTFACE_FLOOR = TOP_SCREW_SEAT_Z
+SIDE_TAP_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "#10-32",
+    end="blind",
+    depth_mm=CASTING_TAP_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
+)
+SIDE_TAP_DRILL_DIA = TAP_DRILL_MM[SIDE_TAP_SPEC.size]
 SIDE_SCREW_XS = (-COLUMN_X, COLUMN_X)
 SIDE_SCREW_FACES = (
     ("front", -1.0, True),
     ("rear", 1.0, False),
 )
+if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
+    raise AssertionError("cap recess breaks into the cross-screw drill")
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
 KEEPER_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=10.0)
@@ -222,8 +251,28 @@ if STUD_Z_REAR + STUD_HOLE_DIA / 2.0 >= INNER_Z + GUSSET:
     raise AssertionError("rear hanger-stud hole escapes the junction material")
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
-if abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0 > WEB_T / 2.0:
+if (
+    abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
+    > WEB_T / 2.0
+):
     raise AssertionError("keeper taps break out of the west-rail web")
+if not math.isclose(SPOTFACE_PLANE - SPOTFACE_FLOOR, 0.9, abs_tol=1e-9):
+    raise AssertionError("top cross-screw spotface depth drifted")
+if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
+    raise AssertionError("top cross tap lacks two-pitch bottoming-tap lead")
+SIDE_TAP_FAR_WALL = (
+    abs(FRONT_COLUMN_Z)
+    - BORE_DIA / 2.0
+    - (
+        SPOTFACE_FLOOR
+        - CASTING_TAP_DRILL_DEPTH
+        - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
+    )
+)
+if SIDE_TAP_FAR_WALL <= SIDE_TAP_DRILL_DIA:
+    raise AssertionError(
+        "top cross-tap drill point leaves insufficient far casting wall"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -372,19 +421,20 @@ def _spotface_removal() -> float:
 
 
 def _side_tap_removal() -> float:
-    """Material one #8-32 x 14 tap removes (break-in to the curved bore)."""
-    r_h = TAP_DRILL_MM[SIDE_TAP_SPEC.size] / 2.0
+    """Casting removed by one blind tap continued across the column bore."""
+    r_h = SIDE_TAP_DRILL_DIA / 2.0
     r_v = BORE_DIA / 2.0
-    step = 0.005
+    step = 0.001
     vol = 0.0
     d = -r_h
     while d < r_h:
         dd = d + 0.5 * step
         chord = 2.0 * math.sqrt(max(0.0, r_h * r_h - dd * dd))
-        void = abs(FRONT_COLUMN_Z) + math.sqrt(max(0.0, r_v * r_v - dd * dd))
-        length = max(0.0, SPOTFACE_FLOOR - void)
-        vol += chord * length * step
+        bore_span = 2.0 * math.sqrt(max(0.0, r_v * r_v - dd * dd))
+        vol += chord * (CASTING_TAP_DRILL_DEPTH - bore_span) * step
         d += step
+    # The 118-degree point is wholly beyond the bore in the far wall.
+    vol += math.pi / 3.0 * r_h**3 * DRILL_POINT_H
     return vol
 
 
@@ -464,12 +514,12 @@ def _t_root_add() -> float:
 
 
 def _bore_chamfer_removal() -> float:
-    """Volume the C1 45-degree breaks remove from the five TOP bore rims."""
+    """Volume the C1 x 45 breaks remove from the five top bore rims."""
 
     def ring(bore_dia: float) -> float:
         return math.pi * BORE_CHAMFER**2 * (bore_dia / 2.0 + BORE_CHAMFER / 3.0)
 
-    return 4.0 * ring(BORE_DIA) + ring(GOOSENECK_BORE_DIA)
+    return 4.0 * ring(CAP_RECESS_DIAMETER) + ring(GOOSENECK_BORE_DIA)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -487,6 +537,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RailWFR", f"{RAIL_W_FR}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    await set_global(adapter, "CapRecessDia", f"{CAP_RECESS_DIAMETER}mm")
+    await set_global(adapter, "CapRecessDepth", f"{CAP_RECESS_DEPTH}mm")
     await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
     await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
     await set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
@@ -970,6 +1022,67 @@ async def build(adapter) -> dict[str, str]:
     v_bores = 4.0 * math.pi * (BORE_DIA / 2.0) ** 2 * boss_h
     volume = await volume_check(adapter, "column bores", volume - v_bores, 100.0)
 
+    # Four recessed seats hide the purchased cap skirts while leaving the
+    # cross-screw station intact below. The positive-offset Top plane's default
+    # cut direction is toward the casting, opposite its +Y sketch normal.
+    recess_plane = check(
+        "create_plane cap recess mouths",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=HALF_H + BOSS_ABOVE,
+            )
+        ),
+    )
+    recess_plane_name = str(getattr(recess_plane, "name", recess_plane))
+    ref_planes.append(recess_plane_name)
+    recesses = SketchDims()
+    check("create_sketch cap recesses", await adapter.create_sketch(recess_plane_name))
+    n = 0
+    for sx in (-1.0, 1.0):
+        for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z):
+            await define_circle(
+                adapter,
+                sx * COLUMN_X,
+                -z_world,
+                CAP_RECESS_DIAMETER / 2.0,
+                f"cap recess ({sx:+.0f}, z={z_world:+.0f})",
+                dims=recesses,
+                names=(
+                    f"CR{n}X",
+                    f"CR{n}Z",
+                    "CapRecessDia" if n == 0 else f"CapRecess{n}Dia",
+                ),
+                drives=('"ColumnX"', '"ColumnZ"', '"CapRecessDia"'),
+            )
+            n += 1
+    await ensure_fully_defined(adapter, "cap recess sketch")
+    check("exit_sketch cap recesses", await adapter.exit_sketch())
+    name_last_feature(adapter, "CapRecessProfile")
+    drive_jobs += recesses.apply(adapter, "CapRecessProfile")
+    check(
+        "cut cap recesses",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(
+                depth=CAP_RECESS_DEPTH,
+                reverse_direction=False,
+            )
+        ),
+    )
+    name_last_feature(adapter, "CapRecesses")
+    recess_depth_dim = name_dimensions(adapter, "CapRecesses", ["CapRecessDepth"])
+    drive_jobs.append((recess_depth_dim[0], '"CapRecessDepth"'))
+    v_recess = (
+        4.0
+        * math.pi
+        * ((CAP_RECESS_DIAMETER / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2)
+        * CAP_RECESS_DEPTH
+    )
+    volume = await volume_check(
+        adapter, "cap recesses", volume - v_recess, 0.005 * v_recess + 5.0
+    )
+
     # 11. Gooseneck clearance bore (through the rib + hub boss).
     gneck = SketchDims()
     check("create_sketch gooseneck bore", await adapter.create_sketch("Top"))
@@ -1013,12 +1126,11 @@ async def build(adapter) -> dict[str, str]:
     v_studs = 2.0 * math.pi * (STUD_HOLE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(adapter, "hanger stud holes", volume - v_studs, 60.0)
 
-    # 13. Side-screw taps (#8-32 x 14 blind): one per boss, on the
-    #     spot-face seats, breaking into the column bores. ONE feature per
-    #     side with BOTH positions (the two spot floors are co-planar
-    #     disjoint faces sharing one placement sketch -- the StudHoles
-    #     idiom); opposed blind holes cannot share a feature across sides,
-    #     the drill direction is per-feature.
+    # 13. Cross-screw taps (#10-32 UNF-2B bottoming): one per boss,
+    #     46 mm full thread in a 48 mm cylindrical drill. Each path starts on
+    #     its spot seat, crosses the near casting wall and column bore, then
+    #     continues through the far casting wall. Opposed holes remain one
+    #     two-position Hole Wizard feature per entry side.
     v_side_tap = _side_tap_removal()
     for side, sign, _reverse in SIDE_SCREW_FACES:
         feat = f"SideTaps{side.capitalize()}"
@@ -1030,9 +1142,9 @@ async def build(adapter) -> dict[str, str]:
             SIDE_TAP_SPEC,
             tap_points,
             normal,
-            f"side screw taps {feat}",
+            f"frame cross-screw taps {feat}",
             name=feat,
-            # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
+            expect_dia_mm=SIDE_TAP_DRILL_DIA,
         )
         volume = await volume_check(
             adapter,
@@ -1163,18 +1275,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "top rim breaks", volume - v_rims, 0.03 * v_rims + 100.0
     )
 
-    # 18. Bore lead-in chamfers: C1 x 45 on the TOP ends of the four column
-    #     bores and the gooseneck bore only -- the boss undersides keep
-    #     sharp rims (no low-side breaks).
+    # 18. C1 x 45 lead-ins on the four cap-recess mouths and gooseneck bore
+    # top. Boss undersides remain sharp.
     boss_top_y = HALF_H + BOSS_ABOVE
-    r_bore = BORE_DIA / 2.0
     r_gn = GOOSENECK_BORE_DIA / 2.0
     check(
         "chamfer bore tops",
         await adapter.add_chamfer(
             BORE_CHAMFER,
             [
-                [sx * COLUMN_X, boss_top_y, z_world + r_bore]
+                [sx * COLUMN_X, boss_top_y, z_world + CAP_RECESS_DIAMETER / 2.0]
                 for sx in (-1.0, 1.0)
                 for z_world in (FRONT_COLUMN_Z, REAR_COLUMN_Z)
             ]
@@ -1199,6 +1309,24 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "OuterProfile", "Depth", OUTER_PROFILE_TOLERANCE_MM
     )
+    for recess_dia_name in (
+        "CapRecessDia",
+        "CapRecess1Dia",
+        "CapRecess2Dia",
+        "CapRecess3Dia",
+    ):
+        set_dimension_bilateral_tolerance(
+            adapter,
+            "CapRecessProfile",
+            recess_dia_name,
+            *deviations(CAP_RECESS_DIAMETER_BAND),
+        )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "CapRecesses",
+        "CapRecessDepth",
+        *deviations(CAP_RECESS_DEPTH_BAND),
+    )
     await volume_check(adapter, "driven casting (equations neutral)", volume, 200.0)
 
     # Hide the construction offset planes -- shown reference geometry renders
@@ -1217,9 +1345,9 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Manufacturing Notes B": DRAWING_NOTES_B,
-            "Inspection Notes": INSPECTION_NOTES,
             "Top View Note": TOP_VIEW_NOTE,
             "Front View Note": FRONT_VIEW_NOTE,
+            "Section View Note": SECTION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

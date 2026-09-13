@@ -1,15 +1,14 @@
 r"""Create the curated machinist drawing for the tube-frame column.
 
-The SLDPRT remains authoritative.  This recipe supplies only the column's views,
-diameter/length dimensions, and manufacturing notes; every shared sheet/template,
-import, curation, and export behavior lives in ``_drawing_common``.
+The SLDPRT remains authoritative. This recipe supplies the regular open tube's
+orthographic views, diameter/cut-length/cross-hole dimensions, and manufacturing
+notes; shared sheet/template, import, curation, and export behavior lives in
+``_drawing_common``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
-(tube vertical) and the annulus end view is ``*Top``.  The portrait sheet uses
-the long axis for the ~994 mm overall column at 1:5; the end view carries an
-explicit 2:1 override so the 25.4/19.3 mm annulus is legible. The standard
-1:10 isometric is pictorial only; the length and annulus views still define
-the part.
+and the annulus end view is ``*Top``. The portrait sheet uses the long axis for
+the 1018.765 mm cut length at 1:5; the end view carries an explicit 2:1 override
+so the 25.4/19.3 mm annulus remains legible. The isometric is pictorial only.
 
 Run with SolidWorks open::
 
@@ -22,19 +21,17 @@ import argparse
 import sys
 from typing import Any
 
-from tube_frame_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -45,7 +42,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA
+from tube_frame_spec import OUTER_DIA
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -60,7 +57,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (~990 mm column)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (1018.765 mm cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
 
@@ -71,8 +68,7 @@ LENGTH_CENTER = (0.055, 0.220)
 END_CENTER = (0.190, 0.360)
 ISO_CENTER = (0.205, 0.140)
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Diameters live on the end view, the length on the tube view.
+# Per-view survivors of the marked-dimension import.
 END_KEEP = {
     "OuterDia": (
         END_CENTER[0] - OUTER_DIA * END_VIEW_SCALE / 1000.0 - 0.024,
@@ -80,7 +76,15 @@ END_KEEP = {
     ),
 }
 LENGTH_KEEP = {
-    "CapApexY": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
+    "Length": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
+    "LowerHoleY": (LENGTH_CENTER[0] - 0.032, LENGTH_CENTER[1] - 0.088),
+    "UpperHoleY": (LENGTH_CENTER[0] - 0.032, LENGTH_CENTER[1] + 0.088),
+    "CrossHoleDia": (LENGTH_CENTER[0] + 0.034, LENGTH_CENTER[1] - 0.090),
+    "TopChamfer": (LENGTH_CENTER[0] + 0.034, LENGTH_CENTER[1] + 0.097),
+}
+DIMENSION_CALLOUTS = {
+    "CrossHoleDia": "2 STATIONS; DRILL THRU BOTH WALLS",
+    "TopChamfer": "TOP END ONLY; FIT MHA-133 CAP",
 }
 
 
@@ -133,58 +137,35 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (end, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The length view carries the bore as greyed hidden lines, so the wall shows.
-    set_hidden_lines_visible(adapter, length)
+    for view in (length, end):
+        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
 
     end_annotations = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="end"
     )
-    curate_view_dimensions(adapter, length, keep=LENGTH_KEEP, view_label="length")
-    set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
+    length_annotations = curate_view_dimensions(
+        adapter, length, keep=LENGTH_KEEP, view_label="length"
+    )
+    dimensions = [*end_annotations, *length_annotations]
+    set_dimension_callouts(adapter, dimensions, DIMENSION_CALLOUTS)
+    set_dimension_precision(
+        adapter,
+        dimensions,
+        {
+            "OuterDia": 2,
+            "Length": 3,
+            "LowerHoleY": 2,
+            "UpperHoleY": 2,
+            "CrossHoleDia": 2,
+            "TopChamfer": 2,
+        },
+    )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    end_top = (
-        END_CENTER[0],
-        END_CENTER[1] + OUTER_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=end_top,
-        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.038),
-        datum="A",
-        label="finished OD derived axis",
-    )
-    flank_x = LENGTH_CENTER[0] + OUTER_DIA / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(flank_x, LENGTH_CENTER[1]),
-        frame_xy=(0.120, 0.270),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"],
-        quantity="FULL OD LENGTH",
-        label="full-length OD cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    # Only the BOTTOM end face survives as a perpendicularity target: the top
-    # end is the integral dome cap (no planar top face; the notes own the
-    # cap's finish/blend requirement).
-    half_length_on_sheet = COLUMN_LENGTH / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(LENGTH_CENTER[0], LENGTH_CENTER[1] - half_length_on_sheet),
-        frame_xy=(0.100, 0.100),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bottom end perpendicularity"],
-        datums=("A",),
-        quantity="BOTTOM END FACE",
-        label="bottom end perpendicularity",
-    )
+    # Both end rims receive native centre marks; the length view exposes both
+    # cross-drilled stations through visible hidden geometry.
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.115, 0.225, char_height=0.0025

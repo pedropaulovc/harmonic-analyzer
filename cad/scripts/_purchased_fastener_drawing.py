@@ -18,7 +18,7 @@ from _drawing_common import (
     new_project_drawing,
     property_link,
     read_required_properties,
-    set_hidden_lines_removed,
+    set_hidden_lines_visible,
     sheet_drawable_region,
     stamp_drawing_summary,
 )
@@ -291,7 +291,7 @@ async def build_purchased_fastener_drawing(
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
-            set_hidden_lines_removed(adapter, view)
+            set_hidden_lines_visible(adapter, view)
             views.append(view)
         # Later insertions may auto-adjust the sheet scale. Pin all views only
         # after insertion so the measurement pass is genuinely at native 1:1.

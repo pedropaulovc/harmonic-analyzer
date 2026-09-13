@@ -1,13 +1,13 @@
-frame-side-screw:
-  title: Steel Narrow Fillister Head Slotted Screw
-  number: MHA-117
+frame-cross-screw:
+  title: Frame Cross Screw
+  number: MHA-132
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A194]
+  supplier_skus: [90280A837]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A194
+  material_specification: Steel, McMaster-Carr 90280A837, ASME B18.6.3
   finish: zinc plated
-  quantity: 2
+  quantity: 8
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

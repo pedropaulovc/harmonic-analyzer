@@ -736,7 +736,8 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
         "gooseneck": {"summing"},
         "harmonic_base": {"frame"},
         "cylinder_gear": {"drive_train"},
-        "frame_side_screw": {"frame", "channel"},
+        "frame_side_screw": {"channel"},
+        "frame_cross_screw": {"frame"},
     }
     for source, expected in cases.items():
         part_tokens[source].write_text("b" * 64 + "\n")

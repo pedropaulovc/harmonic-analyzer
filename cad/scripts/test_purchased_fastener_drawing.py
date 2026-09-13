@@ -49,7 +49,9 @@ class _Sheet:
 
 
 class _View:
-    def __init__(self, orientation: str, source: Path, center: tuple[float, float]) -> None:
+    def __init__(
+        self, orientation: str, source: Path, center: tuple[float, float]
+    ) -> None:
         self._orientation = orientation
         self._source = source
         self._center = center
@@ -153,8 +155,12 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         return draw, sheet
 
     monkeypatch.setattr(purchased, "new_project_drawing", new_project_drawing)
-    monkeypatch.setattr(purchased, "_purchased_title_block", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(purchased, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        purchased, "_purchased_title_block", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        purchased, "stamp_drawing_summary", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(purchased, "double_array", tuple)
 
     centers = {name: center for name, center, _cell in purchased._VIEW_CELLS}
@@ -167,7 +173,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         return view
 
     monkeypatch.setattr(purchased, "place_view", place_view)
-    monkeypatch.setattr(purchased, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(purchased, "set_hidden_lines_visible", lambda *_args: None)
     monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views: (1, 1))
     monkeypatch.setattr(
         purchased,
@@ -206,7 +212,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
 
-    result = asyncio.run(purchased.build_purchased_fastener_drawing(_Adapter(source), spec))
+    result = asyncio.run(
+        purchased.build_purchased_fastener_drawing(_Adapter(source), spec)
+    )
 
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
