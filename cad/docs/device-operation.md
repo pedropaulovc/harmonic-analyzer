@@ -115,10 +115,14 @@ greatest term, mean absolute error; Gaussian input | two-channel input):
 
 | after | Gaussian | two-channel |
 |---|---:|---:|
-| reading and normalising only (Michelson's procedure) | 0.49 | 10.6 |
-| + the read-vs-set lift vector (4b, common lift only) | 0.14 | 1.32 |
+| reading and normalising only (Michelson's procedure) | 0.48 | 10.6 |
+| + the read-vs-set lift vector (4b, common lift only) | 0.14 | 1.30 |
 | + the second-harmonic correction (4a) | 0.06 | 0.14 |
-| + the full station table (1 and 4b) | **0.016** | **0.037** |
+| + the full station table (1 and 4b) | **0.006** | **0.018** |
+
+(on a machine whose cam lobes stand vertical at crank home; the as-built CAD's sit 1.5° off —
+the tooth-in-gap lock, [#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749) —
+and that common phase adds 0.30 | 0.80 that no step here can remove: it is the sine transform)
 
 against 0.13 from *all nine* part tolerances combined. The corrections are where the
 accuracy lives; the drawings are where the last 0.13 lives. That is the whole point of
@@ -143,7 +147,7 @@ rejected for the same reason:
   photographed rod is 163 mm and the reconstruction is photo-faithful;
 - a **non-linearly engraved stick** (Michelson's actual solution) absorbs the
   read-vs-set vector — but a non-linear scale cannot be inspected against a rule,
-  which is why note 5 on the stick drawing points the builder at the table instead.
+  which is why the table ships in `READOUT.md` beside the stick drawing instead.
 
 The normalisation (step 3) can never be removed: it is the price of an adjustable
 magnifier, and the reason the trace can span the paper for any input. What *can*

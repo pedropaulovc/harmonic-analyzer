@@ -38,9 +38,10 @@ def budget():
 
 
 @pytest.fixture(scope="module")
-def nom():
-    """The as-designed inputs from the spec modules."""
-    return eb.nominal()
+def nom(budget):
+    """The machine the report credits: the spec modules' inputs with the cam
+    lobe vertical at crank home (the as-built 1.5 deg is waived, #749)."""
+    return eb.credited_nominal(budget)
 
 
 @pytest.fixture(scope="module")
@@ -133,6 +134,8 @@ def test_budget_closes(report):
         "timebase",
         "knife",
         "total_mae",
+        "nominal_residual_mae_as_built",
+        "total_mae_as_built",
         "pair_worst",
         "pair_terms",
     }
@@ -348,6 +351,89 @@ def test_unbalanced_counter_spring_fails_unless_waived(budget, report):
     }
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("counter spring cannot balance") for b in bad), bad
+
+
+def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, report, nom):
+    """The CAD locks every cylinder gear half a tooth pitch off vertical
+    (tooth-in-gap), so at crank home every cam lobe -- a tooth crest -- sits
+    1.5 deg off: a COMMON cam phase (channel i turns i x faster, so no crank
+    index zeroes all 20) whose error h * sum x_i sin(i theta_k) no procedure
+    step removes. The model reads it from the CAD (cam_home_deg), the as-built
+    fundamental carries that phase while the lobe-up machine's does not, the
+    residual it leaves is ~6x the allowance and the as-built total misses the
+    benchmark, and the gate fails on it unless the yaml records the waiver
+    (#749)."""
+    import channel_frame_geom
+
+    as_built = eb.nominal()
+    assert as_built.cam_home_deg == channel_frame_geom.CYLINDER_LOCK_PHASE_DEG == 1.5
+    assert nom == dataclasses.replace(as_built, cam_home_deg=0.0)
+    th = np.arange(360) * 2.0 * math.pi / 360
+
+    def phase_deg(n):
+        u = eb.hook_displacement(th, n.d_max, n)
+        c1, s1 = 2 * np.mean(u * np.cos(th)), 2 * np.mean(u * np.sin(th))
+        return math.degrees(math.atan2(-s1, -c1))  # the hook reads -cos (crank side)
+
+    assert phase_deg(as_built) == pytest.approx(1.5, abs=0.02)
+    assert abs(phase_deg(nom)) < 0.02
+    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones
+    x = eb.reference_inputs()["all_ones"]
+    leak = math.radians(1.5) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
+    home = report["cam_home_phase"]
+    assert home["residual_as_built"]["all_ones"]["max"] == pytest.approx(
+        100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
+    )
+    cl = report["closure"]
+    assert (
+        cl["nominal_residual_mae_as_built"]
+        > 5 * report["reserved_allowance"]["nominal_residual_mae"]
+    )
+    assert cl["total_mae_as_built"] > report["benchmark"]["mae_fs_pct"]
+    assert (
+        cl["nominal_residual_mae"]
+        < report["reserved_allowance"]["nominal_residual_mae"]
+    )
+    strict = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "nominal_residual_mae": {
+                **budget["reserved"]["nominal_residual_mae"],
+                "waive_cam_home_phase": False,
+            },
+        },
+    }
+    bad = eb.budget_closes(eb.build_report(strict))
+    assert any(b.startswith("cam home phase") for b in bad), bad
+    # the shipped procedure says so, with the as-built numbers
+    doc = eb.readout_procedure(report, nom)
+    assert "**As built, this CAD does not reach that residual.**" in doc
+    assert f"{cl['total_mae_as_built']:.2f} % against" in doc
+    assert "#749" in doc
+
+
+def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
+    """A cam or rod-pin deviation moves the part; the shaft axis stays where
+    the frame holds it (CAD: X_DRUM / Y_DRIVE), so the rocker settles at a
+    different rest angle instead of the axis following the part (Codex round
+    28). As designed the rod hangs plumb onto the phased home centre, so the
+    nominal rocker is level at home."""
+    import channel_frame_geom
+
+    assert (nom.axis_dx, nom.axis_dy) == pytest.approx(
+        tuple(
+            c - p
+            for c, p in zip(
+                channel_frame_geom.CAM_SHAFT_XY, channel_frame_geom.ROCKER_PIVOT_XY
+            )
+        )
+    )
+    zero = np.array([0.0])
+    assert abs(eb.rocker_angle(zero, nom)[0]) < 1e-4
+    longer = dataclasses.replace(nom, rod=nom.rod + 0.5)
+    assert eb.rocker_angle(zero, longer)[0] == pytest.approx(-0.5 / nom.pin_x, rel=0.05)
+    assert (longer.axis_dx, longer.axis_dy) == (nom.axis_dx, nom.axis_dy)
 
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
@@ -637,9 +723,10 @@ def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
     well as radially, so the rod pin, bar pin and spring eye draw TWO axes
     (the zone's bounding square), each through the exact kinematics: the
     linearised tangential tables match the exact deviated cycle, the tangential
-    response is real but far below the radial one (a skew of the hook line
-    changes the hook height's AC part only by cos(skew) - 1 and the rest
-    tilt), and the Monte Carlo actually samples the second column."""
+    response is real and below the radial one (with the shaft axis fixed by
+    the frame a radial pin offset also re-leans the rod, so the two are within
+    a factor of ~4, not 30), and the Monte Carlo actually samples the second
+    column."""
     grid = eb._READ_GRID
     t = eb.cycle_table(nom)
     dv = eb.cycle_derivatives(nom)
@@ -665,7 +752,7 @@ def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
 
     radial = abs(ac_gain("pin_x", 0.1))
     tangential = abs(ac_gain("pin_y", 0.1))
-    assert 0.0 < tangential < 0.1 * radial
+    assert 0.0 < tangential < radial  # ~0.25x with the shaft axis fixed by the frame
     # the sampler: a tangential-only draw moves the reading, by less than the radial one
     x = eb.reference_inputs()["all_ones"]
     f = eb.NominalTrial(nom).magnifier_setup(x).ordinate_scale
@@ -675,7 +762,7 @@ def test_position_zones_draw_both_axes_through_the_kinematics(budget, nom):
     both[1, 0, 1] = 0.1  # tangential on channel 1, draw 1
     e = eb._channel_model(x, nom, {"rocker_rod_pin_radius": both}, sens, 0.25, f)
     assert np.max(np.abs(e[1])) > 1e-5
-    assert np.max(np.abs(e[1])) < 0.25 * np.max(np.abs(e[0]))  # ~0.11 at the trial scale
+    assert np.max(np.abs(e[1])) < np.max(np.abs(e[0]))
     mc = eb.monte_carlo(
         {**budget, "monte_carlo": {**budget["monte_carlo"], "draws": 20}},
         nom,
@@ -765,10 +852,6 @@ def test_stick_division_is_the_spec_constant_the_builder_engraves():
         f"TICK N AT {measuring_stick_spec.DIVISION_SPACING:.2f} X N"
         in measuring_stick_spec.DRAWING_NOTES
     )
-    assert (
-        f"SCALE IS LINEAR IN STATION ({measuring_stick_spec.DIVISION_SPACING:.2f} PER DIVISION)"
-        in measuring_stick_spec.DRAWING_NOTES
-    )
     src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
         encoding="utf-8"
     )
@@ -847,18 +930,21 @@ def test_drawing_limits_agree_with_the_budget(budget, report, nom):
         in channel_spring_installed_notes.DRAWING_NOTES
     ), "spring spec sheet carries a different matching requirement"
     # station setting is an OPERATING allowance, not a part limit: it reaches
-    # the shipped READOUT.md (drawing-simplicity rule 6 keeps methods and
-    # tolerances off the stick's notes; the stick carries the pointer only)
+    # the shipped READOUT.md, and the stick drawing carries no note about it
+    # at all (drawing-simplicity rule 6: at most four lines of part facts,
+    # never a method or a tolerance; READOUT.md ships beside the drawings)
     doc = eb.readout_procedure(report, nom)
     assert (
         f"(setting error +/-{feats['station_setting']['tolerance']:.2f} mm max per bar)"
         in doc
     ), "READOUT.md carries a different setting allowance"
-    assert "ORDINATE TABLE: READOUT.MD" in measuring_stick_spec.DRAWING_NOTES
+    notes = measuring_stick_spec.DRAWING_NOTES
+    numbered = [line for line in notes.splitlines() if line[:1].isdigit()]
+    assert len(numbered) == 4, numbered
     assert not any(
-        "SETTING ERROR" in line or "INTERPOLAT" in line
-        for line in measuring_stick_spec.DRAWING_NOTES
-    ), "the stick drawing carries the operating method (rule 6)"
+        key in notes
+        for key in ("SETTING", "INTERPOLAT", "READOUT", "ORDINATE", "PIVOT")
+    ), "the stick drawing carries operating-package information (rule 6)"
     # every +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
         ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),

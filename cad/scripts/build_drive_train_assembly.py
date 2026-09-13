@@ -162,6 +162,10 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
+from channel_frame_geom import (
+    CAM_SHAFT_XY,
+    CYLINDER_LOCK_PHASE_DEG,
+)
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
     DRUM_X,
@@ -219,6 +223,12 @@ ASM_NAME = "drive-train"
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
+if abs(Y_DRIVE - CAM_SHAFT_XY[1]) > 1e-9 or abs(DRUM_X - CAM_SHAFT_XY[0]) > 1e-9:
+    raise AssertionError(
+        f"drum shaft axis ({DRUM_X}, {Y_DRIVE}) drifted from channel_frame_geom"
+        f".CAM_SHAFT_XY {CAM_SHAFT_XY} (gear_train.drive_axis_y_mm) -- the channel"
+        " assembly and the error budget read that one"
+    )
 # The manually rederived cone-pivot-post-v2 is the harder source than the old
 # GT centreline fit: its foot sits on the 1/4-in platform and its cast-in
 # journal is 33.368 above that seat. The resulting drive line cascades into
@@ -2460,8 +2470,9 @@ async def build(adapter) -> dict[str, str]:
     # Flip the asymmetric gear/cam sandwich about its already-phased local Y
     # diameter.  Local +Z becomes machine -Z while local +Y (the cam-lobe
     # phase) is unchanged.  Translating the origin from face centre -1.5 to
-    # face centre +1.5 keeps the 3-mm toothed slab centred on station z_j.
-    cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-1.5))
+    # face centre +1.5 keeps the 3-mm toothed slab centred on station z_j. The
+    # lock phase is gear_train.cylinder_lock_phase_deg via channel_frame_geom.
+    cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-CYLINDER_LOCK_PHASE_DEG))
     cyl_gears: list[str] = [
         await place_component(
             adapter,

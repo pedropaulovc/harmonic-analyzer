@@ -51,6 +51,18 @@ reference_inputs: [all_ones, rect_half, gaussian_a0p1, alternating, pair_1_20]
 reserved:
   nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
     allowance_pct: 0.05
+    # The as-built CAD locks every cylinder gear at Rz(+1.5) -- half its tooth
+    # pitch, tooth-in-gap against the phase-0 cones (gear_train.cylinder_lock_
+    # phase_deg) -- and the cam lobe is a tooth crest, so at crank home every
+    # lobe sits 1.5 deg off vertical. That is a COMMON cam phase: channel i turns
+    # i x faster than the crank, so no crank index zeroes all 20, and the error
+    # it leaves (h * sum x_i sin(i theta_k), the sine transform the machine does
+    # not read) is beyond every procedure step -- ~0.3 % MAE / 1.7 % max on the
+    # broad inputs, 6x this allowance. The fix is in the cylinder gear (cut the
+    # lobe half a pitch from the crest so the lock leaves it up; #749), not in
+    # the budget. The report scores the as-built residual beside the lobe-up
+    # one; this waiver is the record that the closure credits the latter.
+    waive_cam_home_phase: true
   readout:                         # ordinate reading at the pen. The stroke is the CAD's
                                    # output.yaml pen_trace_half_mm (15, verify:kinematics), NOT set here
     reading_uncertainty_mm: 0.075  # half a 0.15 mm technical-pen line, read against the grid

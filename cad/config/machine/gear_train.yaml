@@ -3,6 +3,11 @@ gear_train:
   diametral_pitch: 49.82           # DP_TRAIN — cone/cylinder train (= 122*25.4/62.2)
   fundamental_cone_teeth: 120      # largest cone gear; per-channel = 120 - 6*index
   cylinder_teeth: 120              # equal-size cylinder gears
+  cylinder_lock_phase_deg: 1.5     # drive-train locks every cylinder gear at Rz(+1.5), half its 3-deg pitch, to mesh
+                                   # tooth-in-gap with the phase-0 cones -- so at crank home every cam LOBE (a tooth
+                                   # crest) sits 1.5 deg off vertical: a common cam phase the error budget scores as-built
+  drive_axis_y_mm: 90.518          # cylinder-gear shaft (drum) axis height: base top 50.8 + swing plate 6.35 + v2 journal
+                                   # 33.368 (build_drive_train_assembly derives it and asserts against this; channels read it)
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
   crank_drive_diametral_pitch: 25.73110354953376 # Fixed-post recenter: the 64T moves toward the post along its unchanged bore; c2c 39.735 with 0.25 slack.
   crank_drive_helix_deg: 12.0        # Exact-solid rederive at the recentered 64T station; replaces the intermediate 12.5182-degree helix.

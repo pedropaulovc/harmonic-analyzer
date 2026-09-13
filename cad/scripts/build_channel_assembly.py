@@ -182,7 +182,6 @@ from _transforms import (
 )
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
-    DRUM_X,
     MECHANISM_Z_SHIFT,
 )
 from build_fulcrum_keeper import (
@@ -220,7 +219,9 @@ from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS  # 800: the R800 slid
 
 # centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
-from channel_frame_geom import (  # machine-frame shaft axes, shared with error_budget
+from channel_frame_geom import (  # machine-frame shaft axes + cam lock, shared with error_budget
+    CAM_SHAFT_XY,
+    CYLINDER_LOCK_PHASE_DEG,
     LEVER_FULCRUM_XY as FULCRUM,
     ROCKER_PIVOT_XY as PIVOT,
 )
@@ -259,22 +260,23 @@ ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
 # ARM_TOP_RADIUS (800): the R800 slide -- imported from rocker_arm_spec.CURVE_RADIUS.
 
 # --- drive interface (default state) ----------------------------------------
-GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
-# half the T120 tooth pitch, so a TOOTH faces the cone mesh (see
-# build_drive_train_assembly.py). The integral cam (local (0, +CAM_ECC) -- lobe
-# UP at notch-up, the cos-mode top of stroke per the ch14 end views) swings
-# with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
-# centre, not a point straight north of the arbor. The end-for-end gear flip
-# reverses local Z only; local +Y and therefore this phased XY centre stay put.
-# CAM_ECC is imported above.
-X_DRUM = DRUM_X
-Y_DRIVE = 90.518
+# GEAR_PHASE_DEG, X_DRUM, Y_DRIVE: imported from channel_frame_geom (the
+# drive-train's tooth-in-gap lock of every cylinder gear at Rz(+1.5), half the
+# T120 pitch, and the drum shaft axis) -- NOT copied, so the offline error
+# budget and both assemblies read one source. The integral cam (local (0,
+# +CAM_ECC) -- lobe UP at notch-up, the cos-mode top of stroke per the ch14 end
+# views) swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the
+# PHASED cam centre, not a point straight north of the arbor. The end-for-end
+# gear flip reverses local Z only; local +Y and therefore this phased XY centre
+# stay put. CAM_ECC is imported above.
+X_DRUM, Y_DRIVE = CAM_SHAFT_XY
+GEAR_PHASE_DEG = CYLINDER_LOCK_PHASE_DEG
 RING_CENTER = (
     X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # The drum sits at machine X_DRUM (crank side -X); y is the ch30 GT drive
-# height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
-# build_drive_train_assembly.Y_DRIVE.
+)  # The drum sits at machine X_DRUM (crank side -X); y is the v2 casting's
+# drive height 90.518 (gear_train.drive_axis_y_mm; build_drive_train_assembly
+# derives and asserts it).
 # ROD_C2C (imported from connecting_rod_spec.CENTER_DISTANCE, 163.1010):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits

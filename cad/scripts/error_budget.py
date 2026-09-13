@@ -58,7 +58,12 @@ import paper_drive_geom
 import pen_wire_geom
 import rocker_arm_spec
 import summing_lever_spec
-from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
+from channel_frame_geom import (
+    CAM_SHAFT_XY,
+    CYLINDER_LOCK_PHASE_DEG,
+    LEVER_FULCRUM_XY,
+    ROCKER_PIVOT_XY,
+)
 
 BUDGET_YAML = _config.CONFIG_DIR / "error_budget.yaml"
 
@@ -76,6 +81,13 @@ class Nominal:
     rod: float  # connecting-rod centre distance
     pin_x: float  # rod-pin hole along the arm from the pivot bore
     pin_y: float  # rod-pin hole above the pivot-bore centreline
+    axis_dx: (
+        float  # cam (drum) shaft axis from the rocker pivot, x -- FIXED by the frame
+    )
+    axis_dy: float  # ... y: a part tolerance moves the part, never this axis
+    cam_home_deg: (
+        float  # cam lobe direction off vertical at crank home (the lock phase)
+    )
     arc_r: float  # rocker slide radius
     arc_cy: float  # slide-arc centre above the pivot-bore centreline
     fulcrum_dx: float  # lever fulcrum, rocker frame
@@ -112,6 +124,9 @@ def nominal() -> Nominal:
         rod=connecting_rod_spec.CENTER_DISTANCE,
         pin_x=rocker_arm_spec.ROD_HOLE_X,
         pin_y=rocker_arm_spec.ROD_HOLE_Y - rocker_arm_spec.PIVOT_MID_Y,
+        axis_dx=CAM_SHAFT_XY[0] - ROCKER_PIVOT_XY[0],
+        axis_dy=CAM_SHAFT_XY[1] - ROCKER_PIVOT_XY[1],
+        cam_home_deg=CYLINDER_LOCK_PHASE_DEG,
         arc_r=rocker_arm_spec.CURVE_RADIUS,
         arc_cy=rocker_arm_spec.CENTER_Y - rocker_arm_spec.PIVOT_MID_Y,
         fulcrum_dx=LEVER_FULCRUM_XY[0] - ROCKER_PIVOT_XY[0],
@@ -190,16 +205,21 @@ def rocker_angle(theta: np.ndarray, nom: Nominal) -> np.ndarray:
 
     Machine hand, as build_channel_assembly._arc_geometry: the rod pin sits on
     the rocker's -X (crank) side at (-pin_x, +pin_y) from the pivot, the
-    amplitude bars ride the +X side. The rod hangs plumb below the pin at rest
-    with the lobe up, so the gear axis sits ``rod + ecc`` below the pin; the
-    lobe's horizontal excursion is the cam's own (x = -ecc sin theta about its
-    axis, as build_cylinder_gear's +Y-lobe cosine home), and the pin rides its
-    arc about the pivot.
+    amplitude bars ride the +X side. The cam shaft axis is FIXED by the frame
+    at (axis_dx, axis_dy) from the pivot (channel_frame_geom.CAM_SHAFT_XY --
+    the drum x and the v2 drive height): a cam or rod-pin deviation moves the
+    part and the rocker settles where the rod lets it, never the axis. The
+    lobe's excursion is the cam's own about that axis (x = -ecc sin about the
+    lobe angle, build_cylinder_gear's +Y-lobe cosine home), starting
+    ``cam_home_deg`` off vertical at crank home -- the drive-train's
+    tooth-in-gap lock (build_channel_assembly.RING_CENTER) -- and the pin
+    rides its arc about the pivot. As designed the rod hangs plumb from the
+    pin onto the phased home centre, so the nominal rocker is level at home.
     """
     p0 = np.array([-nom.pin_x, nom.pin_y])
-    axis = p0 - np.array([0.0, nom.rod + nom.ecc])
-    cx = axis[0] - nom.ecc * np.sin(theta)
-    cy = axis[1] + nom.ecc * np.cos(theta)
+    lobe = theta - math.radians(nom.cam_home_deg)
+    cx = nom.axis_dx - nom.ecc * np.sin(lobe)
+    cy = nom.axis_dy + nom.ecc * np.cos(lobe)
 
     def gap(tr: np.ndarray) -> np.ndarray:
         px = p0[0] * np.cos(tr) - p0[1] * np.sin(tr)
@@ -1306,11 +1326,32 @@ def closed_form_terms(
 # --------------------------------------------------------------------------
 
 
+def credited_nominal(budget: dict[str, Any] | None = None) -> Nominal:
+    """The machine the report models: the as-built CAD (``nominal``), or --
+    under ``reserved.nominal_residual_mae.waive_cam_home_phase`` -- the same
+    with the cam lobe cut half a tooth pitch from the crest so the drive
+    train's tooth-in-gap lock leaves it vertical at crank home (#749). The
+    as-built cam phase is then scored separately (``cam_home_phase`` in the
+    report) and printed as a waiver; every other layer -- correction cascade,
+    tables, scatter, closed-form terms, READOUT.md -- is the credited
+    machine's, since the fix changes nothing else about it (the station table
+    moves by cos 1.5 deg, 0.03 %)."""
+    budget = load_budget() if budget is None else budget
+    nom = nominal()
+    if budget["reserved"]["nominal_residual_mae"].get("waive_cam_home_phase", False):
+        return replace(nom, cam_home_deg=0.0)
+    return nom
+
+
 def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
     """Every layer of the budget as one JSON-able dict (what the CLI prints and
     test_error_budget.py asserts on)."""
     budget = load_budget() if budget is None else budget
-    nom = nominal()
+    as_built = nominal()
+    home_waived = bool(
+        budget["reserved"]["nominal_residual_mae"].get("waive_cam_home_phase", False)
+    )
+    nom = credited_nominal(budget)
     d0 = null_station(nom)
     stations = [nom.d_max, nom.d_max / 2, nom.d_max / 4, 10.0]  # lifting side only
     trial = NominalTrial(nom)
@@ -1327,7 +1368,8 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "station_setting_tolerance_mm": float(
             budget["critical_features"]["station_setting"]["tolerance"]
         ),
-        "nominal_design_errors": {
+        "nominal_design_errors": {  # the correction cascade on the credited machine
+            "cam_home_deg": nom.cam_home_deg,
             "uncorrected": nominal_design_errors(nom),
             "null_lift_corrected": nominal_design_errors(
                 nom, null_lift=-d0 / nom.d_max
@@ -1337,6 +1379,27 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
             ),
             "calibrated_stick_and_c2_corrected": nominal_design_errors(
                 nom, correct_second_harmonic=True, calibrated_stick=True
+            ),
+        },
+        # The as-built CAD locks every cylinder gear half a tooth pitch off
+        # vertical (tooth-in-gap against the phase-0 cones), so at crank home
+        # every cam lobe -- a tooth crest -- sits cam_home_deg off: a COMMON
+        # cam phase the crank index cannot absorb (channel i turns i x faster,
+        # so no single crank offset zeroes all 20) and the procedure cannot
+        # remove (its error is h * sum x_i sin(i theta_k), the sine transform
+        # the machine does not read). The residual that survives every
+        # shipped correction is scored as-built here and, beside it, with the
+        # lobe cut half a pitch from the crest so the lock leaves it up -- the
+        # CAD fix (#749) the waiver below makes the closure conditional on.
+        "cam_home_phase": {
+            "deg": as_built.cam_home_deg,
+            "residual_as_built": nominal_design_errors(
+                as_built, correct_second_harmonic=True, calibrated_stick=True
+            ),
+            "residual_lobe_up": nominal_design_errors(
+                replace(as_built, cam_home_deg=0.0),
+                correct_second_harmonic=True,
+                calibrated_stick=True,
             ),
         },
         "gain_sensitivities": gain_sensitivities(nom),
@@ -1354,6 +1417,7 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "minimum_pose_waived": bool(
             budget["reserved"]["readout"].get("waive_minimum_pose", False)
         ),
+        "cam_home_phase_waived": home_waived,
     }
     r["closure"] = closure(r, budget)
     return r
@@ -1379,13 +1443,20 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
         p(
             f"{d:>8} {h['gain_vs_linear']:>12.4f} {h['dc'] / h['c1'] * 100:>+7.2f}% {h['c2'] / h['c1'] * 100:>7.3f}% {h['c3'] / h['c1'] * 100:>7.3f}%"
         )
+    nde = r["nominal_design_errors"]
     p(
-        "\ncoefficient error of the NOMINAL machine through the calibrated readout, % of greatest term:"
+        "\ncoefficient error of the NOMINAL machine through the calibrated readout, % of greatest term"
+        f" (cam home phase {nde['cam_home_deg']:g} deg"
+        + (
+            "; as-built 1.5 deg residual under section 5"
+            if r["cam_home_phase_waived"]
+            else ""
+        )
+        + "):"
     )
     p(
         f"{'input':>16} {'uncorrected':>12} {'max':>6} {'+null lift':>11} {'max':>6} {'+c2':>8} {'max':>6} {'+cal stick':>11} {'max':>6}"
     )
-    nde = r["nominal_design_errors"]
     a, b, c3, c4 = (
         nde["uncorrected"],
         nde["null_lift_corrected"],
@@ -1455,10 +1526,20 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
     corrected nominal residual is systematic and adds; scatter, readout,
     timebase and knife are independent and combine root-sum-square."""
     cf = r["closed_form"]
-    nde = r["nominal_design_errors"]["calibrated_stick_and_c2_corrected"]
+    # the residual the closure credits: as-built, or -- under the waiver -- the
+    # lobe-up machine's (the CAD fix); the as-built number is always reported
+    home = r["cam_home_phase"]
+    nde = (
+        home["residual_lobe_up"]
+        if r["cam_home_phase_waived"]
+        else home["residual_as_built"]
+    )
     broad = [n for n in budget["reference_inputs"] if n != "pair_1_20"]
     terms = {
         "nominal_residual_mae": max(nde[n]["mae"] for n in broad),
+        "nominal_residual_mae_as_built": max(
+            home["residual_as_built"][n]["mae"] for n in broad
+        ),
         "scatter_mae": r["monte_carlo"]["combined"]["mae"],
         "readout": cf["readout"]["pct_fs"],
         "timebase": cf["timebase"]["pct_fs"],
@@ -1467,6 +1548,7 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
     rss = math.sqrt(
         sum(terms[k] ** 2 for k in ("scatter_mae", "readout", "timebase", "knife"))
     )
+    terms["total_mae_as_built"] = terms["nominal_residual_mae_as_built"] + rss
     terms["total_mae"] = terms["nominal_residual_mae"] + rss
     # The sparse two-channel trial is gated on its WORST coefficient (the
     # benchmark's 2 % largest tabulated difference), not the MAE: its own
@@ -1520,6 +1602,17 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     for k in ("nominal_residual_mae", "readout", "timebase", "knife"):
         if cl[k] > allow[k]:
             bad.append(f"{k} {cl[k]:.3f} > allowance {allow[k]}")
+    home = r["cam_home_phase"]
+    if (
+        not r["cam_home_phase_waived"]
+        and cl["nominal_residual_mae_as_built"] > allow["nominal_residual_mae"]
+    ):
+        bad.append(
+            f"cam home phase {home['deg']:g} deg (tooth-in-gap lock) leaves a "
+            f"{cl['nominal_residual_mae_as_built']:.3f} % MAE residual no "
+            "procedure step removes (lobe-up machine: "
+            f"{max(home['residual_lobe_up'][n]['mae'] for n in home['residual_lobe_up'] if n != 'pair_1_20'):.3f})"
+        )
     knife = r["closed_form"]["knife"]
     if not knife["static_balance"] and not r["counter_spring_balance_waived"]:
         bad.append(
@@ -1610,6 +1703,22 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
         f"| {d:6.1f} | {d / STICK_DIVISION_MM:6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
         for d, x, k in rows
     )
+    home = r["cam_home_phase"]
+    as_built = ""
+    if r["cam_home_phase_waived"]:
+        as_built = f"""
+**As built, this CAD does not reach that residual.** Its drive train locks
+every cylinder gear half a tooth pitch ({home["deg"]:g} deg) off vertical so it
+meshes tooth-in-gap, and the cam lobe is a tooth crest: at crank home every
+lobe sits {home["deg"]:g} deg off. Channel $i$ turns $i\\times$ faster than the
+crank, so no crank index zeroes all 20 -- it is a common cam phase, and the
+error it leaves, $h \\sum_i x_i \\sin(i\\theta_k)$, is the sine transform this
+machine does not read: no step below removes it. On the reference inputs it
+is {r["closure"]["nominal_residual_mae_as_built"]:.2f} % MAE / {max(v["max"] for n, v in home["residual_as_built"].items() if n != "pair_1_20"):.1f} % max of the
+greatest term, and the total error budget {r["closure"]["total_mae_as_built"]:.2f} % against
+Michelson's 0.7. The fix is in the cylinder gear -- the lobe cut half a pitch
+from the crest (#749); the numbers below assume it.
+"""
     return f"""# Reading the analyzer -- operating and readout procedure
 
 Generated by `cad/scripts/error_budget.py --procedure` from the model that
@@ -1618,7 +1727,7 @@ Generated by `cad/scripts/error_budget.py --procedure` from the model that
 only by following every step below. Coefficient $k$ is read at crank position
 $\\theta_k = k\\pi/20$, i.e. with the crank stopped on its index after $2k$
 turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
-
+{as_built}
 **Why there is arithmetic after the pen stops** -- and why every step of it is
 Michelson's own procedure (1898, pp. 10-11: "the required coefficients are
 then proportional to the ordinates erected at these divisions"; every
@@ -1821,6 +1930,17 @@ def _main() -> int:
                 f"({knife['counter_spring_available_N']:.0f} N available vs "
                 f"{knife['counter_spring_needed_N']:.0f} N needed) -- closure is "
                 "conditional on resolving the spring pair (tolerance-policy.md)"
+            )
+        home = r["cam_home_phase"]
+        if r["cam_home_phase_waived"]:
+            print(
+                f"WAIVED: cam home phase {home['deg']:g} deg -- every cam lobe sits "
+                "half a tooth pitch off vertical at crank home (the drive-train's "
+                "tooth-in-gap lock), a common phase no crank index or procedure "
+                f"step removes: as-built residual {r['closure']['nominal_residual_mae_as_built']:.3f} % MAE "
+                f"(total {r['closure']['total_mae_as_built']:.3f}) vs "
+                f"{r['closure']['nominal_residual_mae']:.3f} with the lobe cut "
+                "half a pitch from the crest -- closure is conditional on #749"
             )
         mag = r["closed_form"]["magnifier"]
         if mag["inputs_at_minimum_pose"] and r["minimum_pose_waived"]:
