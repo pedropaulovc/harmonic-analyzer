@@ -71,7 +71,7 @@ from _assembly import (
     write_dof_manifest,
 )
 from _interference_contracts import allowed_interference_pairs
-from _transforms import IDENTITY, ROT_Y_180
+from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
 from build_knife_hanger_stud import (
     SHANK_DIA as BOLT_MAJOR_DIA,
@@ -445,7 +445,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "counter-spring",
         list(SPRING_POS),
-        [0.0, 0.0, 0.0],
+        euler_from_rows(spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows),
         spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows,
     )
     # Ry(180): the gooseneck's overhang arm reaches from

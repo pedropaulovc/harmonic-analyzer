@@ -103,12 +103,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    set_hidden_lines_visible(adapter, front)
     set_hidden_lines_removed(adapter, iso)
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.275, 0.245)
     add_property_linked_note(adapter, "Isometric View Note", 0.065, 0.050)
+    set_hidden_lines_visible(adapter, front)
 
     return await finalize_drawing(
         adapter,
