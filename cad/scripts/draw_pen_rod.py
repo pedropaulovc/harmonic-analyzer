@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -145,6 +146,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, top_annotations, TOP_DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the wire hole")
+    wire_hole_edge = visible_circle_edge(adapter, front, _WIRE_HOLE_DIA)
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
@@ -172,14 +174,12 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=hole_side,
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
+        entities=(None, wire_hole_edge),
     )
-    # The side rim is only 1.5 mm from the rod silhouette; SelectByID2 can
-    # choose that line instead of the Hole Wizard circle. The bottom rim is
-    # clear of both side silhouettes and the rod end.
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=hole_bottom,
+        edge=wire_hole_edge,
         callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.017),
         label="pen-rod wire hole",
     )

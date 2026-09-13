@@ -7,6 +7,7 @@ from pathlib import Path
 import pinion_lever_spec
 import draw_pinion_lever as drawing
 import build_pinion_lever as lever
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -75,7 +76,19 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "GRIP-TO-HUB JUNCTION R0.25 MAX" in normalized
     assert "EXEMPT FROM THE TITLE-BLOCK EDGE-BREAK" in normalized
 
-
+def test_model_tolerances_and_process_callouts_define_machining_contract() -> None:
+    assert model_toleranced_dimensions(lever) == {
+        ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
+        ("Barrel", "BoreDepth"): "*deviations(BORE_DEPTH_BAND)",
+        ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
+        ("RodProfile", "RodTipY"): "ROD_TIP_Y_TOLERANCE_MM",
+        ("RodProfile", "RodTipDia"): "ROD_TIP_DIAMETER_TOLERANCE_MM",
+        ("RodProfile", "GripHalfAngle"): "GRIP_HALF_ANGLE_TOLERANCE_DEG",
+        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
+    }
+    assert drawing.DIMENSION_CALLOUTS["HubBore"] == "FINAL REAM"
+    assert "+0.10/-0.00" not in drawing.DIMENSION_CALLOUTS["BoreDepth"]
+    assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

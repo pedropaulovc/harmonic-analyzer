@@ -40,6 +40,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
+from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from pinion_lever_spec import (
     BORE,
@@ -91,7 +93,6 @@ def _front_y(model_y_mm: float) -> float:
 
 
 HUB_R_SHEET = HUB_OD * SHEET_SCALE[0] / 2000.0
-BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 FRONT_KEEP = {
     "HubOd": (0.025, 0.102),
     "HubBore": (0.115, 0.085),
@@ -180,8 +181,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
+    bore_edge = visible_circle_edge(adapter, front, BORE)
 
-    bore_left = (hub_center[0] - BORE_R_SHEET, hub_center[1])
     hub_right = (hub_center[0] + HUB_R_SHEET, hub_center[1])
     flat_face = model_point_in_view(
         adapter,
@@ -190,22 +191,20 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever flat end face",
     )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
-    # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by up to 5.2 mm. Bound only annotation placement;
-    # part dimensions and GD&T remain unchanged.
-    add_datum_feature(
+    add_native_axis_datum(
         adapter,
         front,
-        edge_xy=bore_left,
-        symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),
+        entity=bore_edge,
+        source_path=SOURCE,
+        radius_m=BORE / 2000.0,
         datum="A",
         label="lever final bore axis",
-        position_tolerance_m=0.006,
+        stability_tolerance_m=2e-5,
     )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_left,
+        edge_entity=bore_edge,
         symbol_xy=(0.155, 0.115),
         control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
         label="lever hub bore finish",

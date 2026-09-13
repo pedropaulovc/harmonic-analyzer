@@ -2333,6 +2333,7 @@ def add_edge_dimension(
     orientation: str = "smart",
     entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
     entity_types: tuple[str, str] | None = None,
+    entities: tuple[Any | None, Any | None] | None = None,
 ) -> Any:
     """Dimension across two view entities picked at explicit sheet points.
 
@@ -2349,6 +2350,10 @@ def add_edge_dimension(
     ``"vertical"`` force the X/Y component — required when a hole is located by
     coordinate components off a datum rather than a slant centre distance (a
     slant reads ambiguous for holes not collinear with their datum).
+
+    ``entities`` may identify either pick exactly; a ``None`` entry retains the
+    corresponding coordinate pick. Explicit entities avoid ambiguous hit-test
+    results when projected edges are close together.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2360,14 +2365,28 @@ def add_edge_dimension(
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
         selected_type = entity_types[index] if entity_types else entity_type
-        selected = draw.Extension.SelectByID2(
-            "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
+        requested_entity = entities[index] if entities else None
+        if requested_entity is None:
+            selected = draw.Extension.SelectByID2(
+                "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
+            )
+            location = f"at sheet ({x:g}, {y:g})"
+        else:
+            selected = view.SelectEntity(requested_entity, index > 0)
+            location = "by entity"
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} {selected_type.lower()} {index} "
-                f"at sheet ({x:g}, {y:g})"
+                f"failed to select {label} {selected_type.lower()} {index} {location}"
             )
+        if requested_entity is not None:
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selected_entity = manager.GetSelectedObject6(index + 1, -1)
+            if selected_entity is None or int(
+                adapter.swApp.IsSame(selected_entity, requested_entity)
+            ) != 1:
+                raise RuntimeError(
+                    f"{label} {selected_type.lower()} {index} selected a different entity"
+                )
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
     elif orientation == "vertical":
