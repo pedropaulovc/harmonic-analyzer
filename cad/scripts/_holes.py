@@ -111,14 +111,17 @@ class WizardHoleResult:
 
 
 def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
-    """Return the planar face with outward normal ``normal`` (a principal
-    +/-X/Y/Z unit tuple) whose plane contains and bounding box spans every
-    point of ``points_mm`` -- the face the holes are drilled from.
+    """Return the closest eligible planar face with the requested outward normal.
+
+    Eligibility still permits ``tol_mm`` plane/bounds drift, but proximity to
+    the requested point's plane outranks face area. This matters after a shallow
+    spotface: its small exact floor and the much larger original face can both
+    fall inside the tolerance, yet Hole Wizard depth must start at the floor.
+    Equal-plane ambiguity falls back to the largest spanning face.
 
     Coordinate ``SelectByID2`` is unreliable for this (a point on the target
-    plane can resolve to a side face that merely touches the plane, sending
-    the drill axis sideways -- the rocker-arm-support live failure), so the
-    face OBJECT found by enumeration is the reliable path.
+    plane can resolve to a side face that merely touches the plane), so the
+    enumerated face object remains the selection anchor.
     """
     axis = max(range(3), key=lambda k: abs(normal[k]))
     sign = 1.0 if normal[axis] > 0 else -1.0
@@ -139,7 +142,9 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
             "face-exploding features"
         )
     best = None
+    best_key = None
     seed = None  # spans at least the FIRST point (co-planar-disjoint fallback)
+    seed_key = None
     for f in faces:
         f = _early_bound(f, "IFace2")
         try:
@@ -149,32 +154,44 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
         if n[axis] * sign < 0.99 or any(abs(n[k]) > 0.01 for k in others):
             continue
         box = [v * 1000.0 for v in f.GetBox()]
-        if abs(box[axis] - plane_mm) > tol_mm:
+        plane_error = abs(box[axis] - plane_mm)
+        if plane_error > tol_mm:
             continue
+        area = float(f.GetArea())
+        rank = (plane_error, -area)
         spans = all(
             box[k] - tol_mm <= p[k] <= box[k + 3] + tol_mm
             for p in points_mm
             for k in others
         )
-        if spans and (best is None or f.GetArea() > best.GetArea()):
+        if spans and (best_key is None or rank < best_key):
             best = f
+            best_key = rank
         first = all(
             box[k] - tol_mm <= points_mm[0][k] <= box[k + 3] + tol_mm for k in others
         )
-        if first and (seed is None or f.GetArea() > seed.GetArea()):
+        if first and (seed_key is None or rank < seed_key):
             seed = f
-    if best is None and seed is not None and len(points_mm) > 1:
-        # No single face spans every point: the stations sit on CO-PLANAR
-        # DISJOINT faces (e.g. the top-frame side-screw spot floors, one per
-        # boss). The seed face only supplies the placement-sketch PLANE --
-        # each instance lands at its absolute sketch point regardless of
-        # which co-planar face seeded it -- so the first-point face is a
-        # valid anchor (top-frame SideTaps* live case, 2026-08-03).
-        _telemetry.debug(
-            "find_planar_face: no single face spans all points; seeding from "
-            "the first point's co-planar face"
-        )
+            seed_key = rank
+    selection_mode = "spanning"
+    if (
+        seed is not None
+        and len(points_mm) > 1
+        and (best is None or seed_key[0] < best_key[0])
+    ):
+        # The stations occupy disjoint, co-planar faces (one spotface floor per
+        # boss). A larger offset face may span every station, but plane
+        # proximity is the primary contract. The first-point face supplies the
+        # placement-sketch plane; all instances still land at absolute points.
         best = seed
+        best_key = seed_key
+        selection_mode = "first-point"
+    if best is not None:
+        _telemetry.event(
+            "hole_wizard.placement_face_selected",
+            plane_error_mm=round(best_key[0], 6),
+            selection_mode=selection_mode,
+        )
     return best
 
 
@@ -590,9 +607,7 @@ def wizard_holes(
                             f"hole wizard {label}: selection cleanup after "
                             f"{prop} rejection failed: {cleanup_exc}"
                         )
-                    raise RuntimeError(
-                        f"hole wizard {label}: {prop} rejected"
-                    ) from exc
+                    raise RuntimeError(f"hole wizard {label}: {prop} rejected") from exc
                 # Properties alias per hole Type; the inapplicable ones reject
                 # or no-op. The caller's analytic volume check is the hard
                 # gate that the surviving writes produced the right geometry.
@@ -629,23 +644,22 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
-    # Tap holes expose their drill diameter through the tap-specific members,
-    # not HoleDiameter/ThruHoleDiameter. Native #6-32 and #10-24 controls prove
-    # ThruTapDrillDiameter for through taps and TapDrillDiameter for blind taps.
-    if spec.kind in ("tapped", "tapped_bottoming"):
+    # Use the tap-specific drill members selected by the actual termination.
+    # Generic HoleDiameter/HoleDepth can read zero for native tapped features.
+    if hole_type == 4:
         diameter_member = (
             "TapDrillDiameter" if spec.end == "blind" else "ThruTapDrillDiameter"
         )
-        hole_dia_mm = _dim(diameter_member)
+        depth_member = "TapDrillDepth" if spec.end == "blind" else "ThruTapDrillDepth"
+        cut_diameter = _dim(diameter_member)
+        cut_depth = _dim(depth_member)
     else:
-        hole_dia_mm = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
-    # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
-    # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
-    # independently by volume. ThreadDepth is populated and is gated below.
+        cut_diameter = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
+        cut_depth = _dim("HoleDepth")
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=hole_dia_mm,
-        depth_mm=_dim("HoleDepth"),
+        hole_dia_mm=cut_diameter,
+        depth_mm=cut_depth,
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),
         placement_drive_jobs=placement_drive_jobs,

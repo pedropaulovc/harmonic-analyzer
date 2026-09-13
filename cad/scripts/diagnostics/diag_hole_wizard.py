@@ -55,6 +55,19 @@ CASES = [
         6.0,
     ),
     (
+        "tap 10-32 blind readback",
+        HoleSpec(
+            "tapped_bottoming",
+            "#10-32",
+            end="blind",
+            depth_mm=6.0,
+            overrides_mm={"ThreadDepth": 4.0},
+        ),
+        [[-10.0, BLOCK_T, 0.0]],
+        4.0386,
+        6.0,
+    ),
+    (
         "clearance #8 normal x2",
         HoleSpec("clearance", "#8"),
         [[0.0, BLOCK_T, -20.0], [0.0, BLOCK_T, 20.0]],

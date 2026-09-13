@@ -35,59 +35,39 @@ RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
 
-# --- Marked-dimension contract. The plan carries the overall footprint and
-# one representative socket's centre coordinates/4X diameter. Section A-A
-# carries the socket and spotface depths; the cross tap is a native Hole Wizard
-# callout from the same section. ---
+# --- Marked-dimension contract. The plan carries both plate envelopes, the
+# finished corner radii/edge break, and one representative socket's centre
+# coordinates/4X diameter. Front elevation carries plate thicknesses; section
+# A-A carries socket/spotface depths and the pad-root fillet. The cross tap is a
+# native Hole Wizard callout from that same section. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
+    "TopProfile": {"TopLen", "TopWid"},
+    "BottomPlate": {"BottomThickness"},
+    "TopPlate": {"TopThickness"},
+    "PadCorners": {"PadCornerRadius"},
+    "FlangeCorners": {"FlangeCornerRadius"},
+    "RimInnerCorners": {"RimInnerCornerRadius"},
+    "TopRimBreaks": {"TopRimChamfer"},
+    "BottomEdgeBreak": {"BottomEdgeChamfer"},
+    "PadRootFillet": {"PadRootRadius"},
     "ColumnSocketProfile": {"Socket0X", "Socket0Z", "SocketDia"},
     "ColumnSockets": {"SocketDepth"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia"},
     "BaseSpotFaceRear": {"SpotFaceDepth"},
 }
 
-# Lines stay short so two lower-field note columns remain clear of the side
-# elevation and title block.
+# Keep this block to short, part-specific facts that are not already legible
+# in a native dimension, hole table, or feature callout.  Finish and masking
+# live in the registry's Finish field.
 DRAWING_NOTES = "\n".join(
     (
-        "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
-        "   PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;",
-        "   DECK 50.80, TOTAL HEIGHT 53.30 OVER THE RIM.",
-        "2. UPPER PAD 444.50 X 266.70;",
-        "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
-        "   NEAR LEFT END 6.35 +/-0.10 FROM C.",
-        "3. TOP-VIEW HOLE-TABLE LOCATIONS ORIGINATE AT THE FINISHED",
-        "   REAR LONG-SIDE / LEFT-END THEORETICAL SHARP CORNER.",
-        "4. FOUR DIA 13.00 THRU / DIA 23.00 C'BORES FROM UNDERSIDE,",
-        "   9.52 +/-0.10 DEEP. PLAN RIMS ARE THE DIA 13.00 THRU FEATURES.",
-        "   C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER",
-        "   FULL SURFACES; SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX.",
+        "TOP-DECK BLIND TAPPED SEATS: USE THE ASSOCIATIVE HOLE TABLE.",
+        "CROSS TAPS: BOTTOMING-TAPPED SIDE WALLS; SEE SECTION A-A.",
+        "STAMPED SERIAL IDENTIFIER: LEAVE BRIGHT BESIDE THE NAMEPLATE.",
     )
 )
-DRAWING_NOTES_B = "\n".join(
-    (
-        "5. BLIND UNC-2B TAPS: FULL THREAD / CYLINDRICAL DRILL DEPTH.",
-        "   BOTTOMING: PIVOT #10-24 9.775/12; BLOCK #8-32 6.90/10;",
-        "   FOOT #4-40 8.975/11; NAMEPLATE #4-40 6/9. LEAD >=2P.",
-        "   PLUG: LOCK 1/4-20 19.30/25.65; STOP #8-32 16/20.",
-        "   PLUG LEAD >=5P; P = THREAD PITCH; DRILL POINT EXTRA.",
-        '5A. STAMP SERIAL "2" 3.50 HIGH X 0.30 DEEP ON THE RIM TOP',
-        "   BESIDE THE NAMEPLATE (SEE MODEL); BRIGHT, UNPAINTED.",
-        "6. DURING COATING, MASK FINISHED FACES AND ALL BORES/THREADS;",
-        "   COAT PAD SIDES, ROOTS AND RIM. DECK INSIDE THE RIM: BLACK",
-        "   ENAMEL, SAME SYSTEM AND DFT AS THE FINISH CALLOUT.",
-        "7. VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88",
-        "   (CONCENTRIC), RIM INNER CORNERS R8.88, ALL FULL HEIGHT.",
-        "   FLANGE TOP RIM, RIM TOP AND UNDERSIDE RIM C1.59 X 45 DEG.",
-        "8. RAISED RIM 7.00 WIDE X 2.50 HIGH, OUTER FACES FLUSH WITH THE",
-        "   PAD SIDES; DECK STAYS AT 50.80.",
-        "9. SECTION A-A: FOUR DIA25.50 +0.05/0 SOCKETS, 25.40 DEEP;",
-        "   MATCH FIT MHA-083 TUBE COLUMN, 0.10 TO 0.20 DIAMETRAL CLEARANCE.",
-        "   FOUR #10-32 UNF-2B BOTTOMING TAPS: 46.00 FULL THREAD / 48.00",
-        "   CYLINDRICAL TAP-DRILL DEPTH FROM DIA9.00 SPOT-FACED SEATS.",
-    )
-)
+
 SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"
 SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
 

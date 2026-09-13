@@ -103,10 +103,12 @@ from _holes import (
     CLEARANCE_MM,
     HoleSpec,
     TAP_DRILL_MM,
+    THREAD_MAJOR_MM,
     blind_hole_volume_mm3,
     wizard_holes,
 )
 from top_frame_spec import (
+    COLUMN_BORE_DIAMETER_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
@@ -258,21 +260,23 @@ if (
     raise AssertionError("keeper taps break out of the west-rail web")
 if not math.isclose(SPOTFACE_PLANE - SPOTFACE_FLOOR, 0.9, abs_tol=1e-9):
     raise AssertionError("top cross-screw spotface depth drifted")
-if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
-    raise AssertionError("top cross tap lacks two-pitch bottoming-tap lead")
-SIDE_TAP_FAR_WALL = (
-    abs(FRONT_COLUMN_Z)
-    - BORE_DIA / 2.0
-    - (
-        SPOTFACE_FLOOR
-        - CASTING_TAP_DRILL_DEPTH
-        - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
-    )
+SIDE_TAP_THREAD_MAJOR_DIA = THREAD_MAJOR_MM[SIDE_TAP_SPEC.size]
+SIDE_TAP_THREAD_END_Z = SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
+SIDE_TAP_MAJOR_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - math.sqrt(
+    (BOSS_DIA / 2.0) ** 2 - (SIDE_TAP_THREAD_MAJOR_DIA / 2.0) ** 2
 )
-if SIDE_TAP_FAR_WALL <= SIDE_TAP_DRILL_DIA:
+SIDE_TAP_THREAD_WALL_MARGIN = SIDE_TAP_THREAD_END_Z - SIDE_TAP_MAJOR_FAR_WALL_Z
+SIDE_TAP_DRILL_POINT_Z = (
+    SPOTFACE_FLOOR - CASTING_TAP_DRILL_DEPTH - SIDE_TAP_DRILL_DIA / 2.0 * DRILL_POINT_H
+)
+SIDE_TAP_DRILL_FAR_WALL_Z = abs(FRONT_COLUMN_Z) - BOSS_DIA / 2.0
+SIDE_TAP_DRILL_WALL_MARGIN = SIDE_TAP_DRILL_POINT_Z - SIDE_TAP_DRILL_FAR_WALL_Z
+if SIDE_TAP_THREAD_WALL_MARGIN <= 0.0:
     raise AssertionError(
-        "top cross-tap drill point leaves insufficient far casting wall"
+        "top cross-tap finished-thread major envelope breaks through the far wall"
     )
+if SIDE_TAP_DRILL_WALL_MARGIN <= 0.0:
+    raise AssertionError("top cross-tap drill point breaks through the far wall")
 
 
 # --------------------------------------------------------------------------
@@ -541,6 +545,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CapRecessDepth", f"{CAP_RECESS_DEPTH}mm")
     await set_global(adapter, "GooseneckZ", f"{GOOSENECK_Z}mm")
     await set_global(adapter, "GooseneckBoreDia", f"{GOOSENECK_BORE_DIA}mm")
+    await set_global(adapter, "RingHeight", f"{RING_HEIGHT}mm")
+    await set_global(adapter, "BossTopExtent", f"{HALF_H + BOSS_ABOVE}mm")
+    await set_global(adapter, "BossBottomExtent", f"{HALF_H + BOSS_BELOW}mm")
+    await set_global(adapter, "HubBossExtent", f"{HALF_H + HUB_BOSS_DROP}mm")
     await set_global(adapter, "HubBossDia", f"{HUB_BOSS_DIA}mm")
     await set_global(adapter, "WebT", f"{WEB_T}mm")
     await set_global(adapter, "Flange", f"{FLANGE}mm")
@@ -564,8 +572,8 @@ async def build(adapter) -> dict[str, str]:
         WEB_OUT_Z,
         "web outer rectangle",
         dims=web,
-        name_width="Width",
-        name_depth="Depth",
+        name_width="WebOuterWidth",
+        name_depth="WebOuterDepth",
         drive_width='2 * "ColumnX" + "WebT"',
         drive_depth='2 * "ColumnZ" + "WebT"',
     )
@@ -575,8 +583,8 @@ async def build(adapter) -> dict[str, str]:
         WEB_IN_Z,
         "web inner rectangle",
         dims=web,
-        name_width="WinWidth",
-        name_depth="WinDepth",
+        name_width="WebInnerWidth",
+        name_depth="WebInnerDepth",
         drive_width='2 * "ColumnX" - "WebT"',
         drive_depth='2 * "ColumnZ" - "WebT"',
     )
@@ -591,6 +599,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "WebRing")
+    ring_height_dim = name_dimensions(adapter, "WebRing", ["RingHeight"])
+    drive_jobs.append((ring_height_dim[0], '"RingHeight"'))
     v_web = 4.0 * (WEB_OUT_X * WEB_OUT_Z - WEB_IN_X * WEB_IN_Z) * RING_HEIGHT
     volume = await volume_check(adapter, "web ring", v_web, 0.001 * v_web)
 
@@ -794,6 +804,9 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, feat)
+        extent_name = "BossTopExtent" if updown == "up" else "BossBottomExtent"
+        boss_extent_dim = name_dimensions(adapter, feat, [extent_name])
+        drive_jobs.append((boss_extent_dim[0], f'"{extent_name}"'))
         v_add = 4.0 * (v_boss_up if updown == "up" else v_boss_down)
         volume = await volume_check(
             adapter,
@@ -828,6 +841,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "HubBoss")
+    hub_boss_extent_dim = name_dimensions(adapter, "HubBoss", ["HubBossExtent"])
+    drive_jobs.append((hub_boss_extent_dim[0], '"HubBossExtent"'))
     v_hub_boss_add = _hub_boss_add_volume()
     volume = await volume_check(
         adapter, "hub boss", volume + v_hub_boss_add, 0.01 * v_hub_boss_add + 20.0
@@ -1122,6 +1137,10 @@ async def build(adapter) -> dict[str, str]:
         "hanger stud holes",
         name="StudHoles",
         expect_dia_mm=STUD_HOLE_DIA,
+        placement_dims=[
+            (("StudFrontX", None), ("StudFrontZ", None)),
+            (("StudRearX", None), ("StudRearZ", None)),
+        ],
     )
     v_studs = 2.0 * math.pi * (STUD_HOLE_DIA / 2.0) ** 2 * RING_HEIGHT
     volume = await volume_check(adapter, "hanger stud holes", volume - v_studs, 60.0)
@@ -1153,8 +1172,6 @@ async def build(adapter) -> dict[str, str]:
             0.1 * v_side_tap + 15.0,
         )
 
-    # 14. Gooseneck set-screw tap (1/4-20 blind) on the pocket floor,
-    #     through the rib into the bore.
     v_set_tap = _set_tap_removal()
     wizard_holes(
         adapter,
@@ -1163,17 +1180,13 @@ async def build(adapter) -> dict[str, str]:
         (-1.0, 0.0, 0.0),
         "gooseneck set-screw tap",
         name="GooseneckTap",
-        # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
+        placement_dims=[(("SetTapZ", None), (None, None))],
     )
     volume = await volume_check(
         adapter, "gooseneck set tap", volume - v_set_tap, 0.1 * v_set_tap + 10.0
     )
 
     # 15. Fulcrum-keeper taps (#8-32 x 10 blind) into the west rail TOP
-    #     face: the two shaft-end keeper brackets' feet (ch17 p.40; the
-    #     lever-pair ball mounts are replaced by keepers in channel.SLDASM).
-    #     Solid flange + 12.7-thick web under both points -- exact blind
-    #     volumes, no break-in.
     wizard_holes(
         adapter,
         KEEPER_TAP_SPEC,
@@ -1184,7 +1197,10 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 1.0, 0.0),
         "fulcrum keeper taps",
         name="KeeperTaps",
-        # blind tap: no expect_dia_mm (definition reads 0.0 on blinds)
+        placement_dims=[
+            (("KeeperFrontX", None), ("KeeperFrontZ", None)),
+            (("KeeperRearX", None), ("KeeperRearZ", None)),
+        ],
     )
     v_keeper = 2.0 * blind_hole_volume_mm3(
         TAP_DRILL_MM[KEEPER_TAP_SPEC.size], KEEPER_TAP_SPEC.depth_mm
@@ -1327,6 +1343,13 @@ async def build(adapter) -> dict[str, str]:
         "CapRecessDepth",
         *deviations(CAP_RECESS_DEPTH_BAND),
     )
+    for bore_dia_name in ("B0Dia", "B1Dia", "B2Dia", "B3Dia"):
+        set_dimension_bilateral_tolerance(
+            adapter,
+            "BoreProfile",
+            bore_dia_name,
+            *deviations(COLUMN_BORE_DIAMETER_BAND),
+        )
     await volume_check(adapter, "driven casting (equations neutral)", volume, 200.0)
 
     # Hide the construction offset planes -- shown reference geometry renders

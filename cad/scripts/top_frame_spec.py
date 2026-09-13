@@ -18,65 +18,60 @@ from __future__ import annotations
 
 OUTER_PROFILE_TOLERANCE_MM = 0.25
 
+# The column socket is the running fit around the 25.4 mm tube.  The band is
+# written upper/lower (the shared fit-limit convention); the builder converts
+# it to the model setter's lower/upper ordering.
+COLUMN_BORE_DIAMETER_BAND = (0.05, 0.0)
 
-# --- Marked-dimension contract. The plan keeps the outside profile; the
-# section keeps the purchased-cap recess diameter/depth. ---
+
+# --- Marked-dimension contract -------------------------------------------------
+#
+# The hole sizes remain associative callouts; named Hole Wizard placement
+# dimensions expose the stations without duplicating those sizes.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OuterProfile": {"Width", "Depth"},
+    "OuterProfile": {"Width", "Depth", "WinWidth", "WinDepth"},
+    "WebProfile": {
+        "WebOuterWidth",
+        "WebOuterDepth",
+        "WebInnerWidth",
+        "WebInnerDepth",
+    },
+    "WebRing": {"RingHeight"},
+    "BossUpProfile": {"C0Dia"},
+    "BossesUpper": {"BossTopExtent"},
+    "BossesLower": {"BossBottomExtent"},
+    "BoreProfile": {"B0X", "B0Z", "B0Dia"},
+    "BarProfile": {
+        "BarAnchorX",
+        "BarAnchorZ",
+        "BarFootSpan",
+        "GussetRunE",
+        "BarSideE",
+    },
+    "HubBossProfile": {"HubDia"},
+    "HubBoss": {"HubBossExtent"},
+    "RibProfile": {"RibWidth"},
+    "SetPocketProfile": {"PocketRun", "PocketRise"},
+    "GooseneckTap": {"SetTapZ"},
+    "GooseneckProfile": {"GnX", "GnZ"},
+    "StudHoles": {"StudFrontX", "StudFrontZ", "StudRearX", "StudRearZ"},
+    "KeeperTaps": {
+        "KeeperFrontX",
+        "KeeperFrontZ",
+        "KeeperRearX",
+        "KeeperRearZ",
+    },
     "CapRecessProfile": {"CapRecessDia"},
     "CapRecesses": {"CapRecessDepth"},
 }
 
-# Two linked note blocks keep the existing geometry legible while the section
-# view exposes the interrupted cross-thread path.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. GREEN-PAINTED GRAY IRON CASTING; MACHINE FINISHED FACES, BORES, SEATS;",
-        "   CAST ELSEWHERE, 1.5 MAX DRAFT. T-ROOT FILLETS R3; TOP-FACE RIM EDGES",
-        "   C2.00 X 45 DEG; ALL OTHER CAST EDGES (BAND BOTTOM, BOSSES) SHARP.",
-        "2. PLAN PROFILE: 428.20 X 262.00 OUTER RAIL RING; SIDE RAILS 34.20 WIDE,",
-        "   FRONT/REAR RAILS 38.00 WIDE; CLEAR WINDOW 359.80 X 186.00 BETWEEN",
-        "   STRAIGHT INNER FACES. INTEGRAL CROSSBAR 22.00 WIDE AT X -26.00..-4.00",
-        "   SPANNING THE WINDOW, FLUSH BOTH FACES, 18X18 GUSSETS AT ALL FOUR",
-        "   JUNCTIONS. RING BAND 36.50 TALL; ENVELOPE 446.20 +/-0.25 X 276.20",
-        "   +/-0.25 X 47.30.",
-        "3. 4X CORNER BOSSES DIA52.20, 47.30 TALL (PROUD 4.50 ABOVE / 6.30 BELOW",
-        "   THE RAIL BAND), BORED DIA25.50 +0.05/0 THRU; MATCH FIT MHA-083",
-        "   TUBE-FRAME COLUMN FOR 0.10 TO 0.20 DIAMETRAL CLEARANCE, WITHOUT BINDING;",
-        "   BORES ON 394.00 X 224.00 RECTANGULAR PITCH CENTRED ON THE RAIL RING.",
-        "   4X CAP-SKIRT RECESSES DIA27.50 +0.20/0 X 16.30 +0.30/0 DEEP FROM",
-        "   BOSS TOP; FIT INTACT MHA-133 CAP. CAP SEATS ON TUBE END, NOT RECESS FLOOR.",
-        "4. WEBBED FACES: 12.70 WEB CENTRED ON EACH RAIL -- PANELS RECESSED",
-        "   10.75 INTO THE SIDE-RAIL FACES / 12.65 INTO THE FRONT/REAR-RAIL",
-        "   FACES FROM 8.00 BELOW THE TOP FACE THROUGH THE BOTTOM EDGE (TOP",
-        "   FLANGE ONLY -- THE WEB THINS AND STAYS THIN TO THE BOTTOM);",
-        "   FULL-THICKNESS LANDS AT BOSSES, HUB RIB AND CROSSBAR JUNCTIONS.",
-        "   CAST FINISH INSIDE PANELS.",
-    )
-)
-DRAWING_NOTES_B = "\n".join(
-    (
-        "5. GOOSENECK HUB, EAST RAIL AT Z +3.09: RIB 27.00 WIDE FULL HEIGHT,",
-        "   BORE <MOD-DIAM>17.00 +0.20/0 THRU; UNDERSIDE BOSS DIA30 X 8.00 WITH",
-        "   TWIN GUSSETS; DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE ON THE BAND",
-        "   MID-PLANE, 16X16X2 SPOT POCKET.",
-        "6. 4X #10-32 UNF-2B BOTTOMING TAP: 46.00 FULL THREAD / 48.00",
-        "   CYLINDRICAL TAP-DRILL DEPTH FROM THE BOSS Z-FACE SPOT SEAT;",
-        "   DIA9.00 X 0.90 SPOT-FACE EACH. SEE SECTION A-A.",
-        "7. 2X <MOD-DIAM>13.49 (1/2 CLOSE) HANGER-STUD HOLES THRU THE CROSSBAR AT",
-        "   Z -83.97 / +90.15.",
-        "8. ALL BORES Ra 1.6, TOP ENDS BROKEN C1.00 X 45 DEG. MASK BORES,",
-        "   BOSS END LANDS AND TAPPED HOLES BEFORE COATING;",
-        "   DIMENSIONS APPLY BEFORE COATING.",
-        "9. 2X DRILL + TAP #8-32 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP",
-        "   FACE AT (X +199.90, Z +77.09 / -70.91): FULCRUM-KEEPER FEET.",
-    )
-)
-INSPECTION_NOTES = ""
-SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"
-TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:4"
 
-# Frame parts carry no datums or feature-control frames under the drawing
-# simplicity policy.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}
+# Only facts that cannot be read from the native views/callouts belong here.
+# Keep this block deliberately short: dimensions, fit limits, coating and
+# machining method live on the model/title block or on the attached callouts.
+DRAWING_NOTES = "CAPS ARE SEPARATE PURCHASED PARTS."
+DRAWING_NOTES_B = ""
+
+TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
+FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:2"
+SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"

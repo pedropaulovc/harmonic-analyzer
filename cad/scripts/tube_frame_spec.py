@@ -49,11 +49,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Part-specific facts that cannot be inferred from the native views/dimensions.
 DRAWING_NOTES = "\n".join(
     (
-        "1. ID IS THE AS-PROCURED STOCK RESULT; DO NOT MACHINE.",
-        "2. LOWER END IS SOCKETED; TOP END C0.50 +0.15/-0.10 X 45 DEG;",
-        "   FIT INTACT MHA-133 CAP AT TOP.",
-        "3. MATCH-DRILL WITH MHA-035 BASE AND MHA-077 TOP FRAME.",
-        "4. MATCH-MARK EACH COLUMN/CORNER AND FRONT/REAR ORIENTATION.",
+        "ID AS SUPPLIED.",
+        "MATCH-DRILL WITH BASE MHA-035 AND TOP FRAME MHA-077.",
+        "MATCH-MARK COLUMN, CORNER AND ORIENTATION.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
