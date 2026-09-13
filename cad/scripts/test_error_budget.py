@@ -294,6 +294,32 @@ def test_normalisation_uses_only_observable_units():
     assert np.allclose(measured, eb.ideal_coefficients(x), atol=1e-12)
 
 
+def test_timebase_is_scored_on_the_physical_trace(report, nom):
+    """Reading off the crank index samples the REAL trace (calibrated
+    ordinates, live idle bars, the CAD's 2nd/3rd harmonics) while the
+    corrections stay at theta_k. On broad inputs the ideal-vector slope is a
+    good proxy; on the sparse pair it is not -- the 18 idle bars' harmonics
+    make the physical term larger -- so the gate must score the physical one."""
+    tb = report["closed_form"]["timebase"]
+    phys, ideal = tb["pct_fs_physical_per_input"], tb["pct_fs_per_rad_rms_ideal_vector"]
+    rad_index = math.radians(tb["assumed_crank_index_deg"]) / eb.CRANK_TURNS_PER_PERIOD
+    for name in ("all_ones", "alternating"):
+        assert phys[name] == pytest.approx(
+            ideal[name] * rad_index / math.sqrt(3.0), rel=0.03
+        )
+    assert phys["pair_1_20"] > 1.3 * ideal["pair_1_20"] * rad_index / math.sqrt(3.0)
+    assert tb["pct_fs"] == phys[tb["worst_input"]]
+    # and the mechanism: an off-index read of the nominal trial moves every
+    # coefficient by the trace's slope there, an on-index read by nothing
+    trial = eb.NominalTrial(nom)
+    x = eb.reference_inputs()["all_ones"]
+    assert np.allclose(trial.readout(x, theta_error=0.0), trial.readout(x))
+    assert (
+        np.max(np.abs(trial.readout(x, theta_error=rad_index) - trial.readout(x)))
+        > 0.01
+    )
+
+
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
     """A bar at the stick zero still moves (~0.028 of a full-scale bar), so a
     gain deviation on an IDLE channel must move the reading -- the nominal lift

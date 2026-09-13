@@ -2552,15 +2552,14 @@ def task_check():
                     str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
                     str((SCRIPTS_DIR / "build_cylinder_gear.py").resolve()),
                     str((SCRIPTS_DIR / "build_measuring_stick.py").resolve()),
+                    # config: derived from the accessor scan of the model's and
+                    # the test's import closures (the same _config_deps every
+                    # part uses), never hand-listed -- a hand list missed
+                    # machine/gear_train.yaml, which cylinder_gear_spec reads
+                    # for the pitch the mesh-lag check converts at (Codex).
+                    *_config_deps(SCRIPTS_DIR / "error_budget.py"),
+                    *_config_deps(SCRIPTS_DIR / "test_error_budget.py"),
                     str((CONFIG_DIR / "error_budget.yaml").resolve()),
-                    str((CONFIG_DIR / "tolerances.yaml").resolve()),
-                    str((CONFIG_DIR / "machine" / "amplitude.yaml").resolve()),
-                    str((CONFIG_DIR / "machine" / "output.yaml").resolve()),
-                    str(
-                        (
-                            CONFIG_DIR / "parts" / "channel-spring-installed.yaml"
-                        ).resolve()
-                    ),
                     *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
                     *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
                 }

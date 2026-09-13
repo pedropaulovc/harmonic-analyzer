@@ -386,15 +386,93 @@ def setting_bias_lift(x: np.ndarray, nom: Nominal, setting_tol: float) -> np.nda
     return np.interp(d + mean, grid, table) - np.interp(d, grid, table)
 
 
+class NominalTrial:
+    """The NOMINAL machine (no tolerances) run through the shipped procedure
+    on one ordinate vector, from the exact kinematics: every bar on the lifting
+    side (station = x_i * d_max >= 0, the only poses the CAD builds), the pen
+    trace summed from each channel's one-cycle hook motion, the readings taken
+    off the trial's own mean line, then ``read_coefficients`` and the
+    read-vs-set vector. One instance caches the per-station cycles."""
+
+    def __init__(self, nom: Nominal) -> None:
+        self.nom = nom
+        self.grid = np.arange(1440) * 2.0 * math.pi / 1440
+        self._cycle: dict[float, np.ndarray] = {}
+        self.f_full = self.fundamental(nom.d_max)
+
+    def one_cycle(self, d: float) -> np.ndarray:
+        if d not in self._cycle:
+            self._cycle[d] = hook_displacement(self.grid, d, self.nom)
+        return self._cycle[d]
+
+    def fundamental(self, d: float) -> float:
+        return 2.0 * float(np.mean(self.one_cycle(d) * np.cos(self.grid)))
+
+    def kappa(self, stations: np.ndarray) -> np.ndarray:
+        """The table's c2/c1 at each bar's station."""
+        return np.array(
+            [
+                second_harmonic(self.one_cycle(float(d)), self.grid)
+                / self.fundamental(float(d))
+                for d in stations
+            ]
+        )
+
+    def x_read(self, stations: np.ndarray) -> np.ndarray:
+        """The table's read ordinate at each bar's station (signed)."""
+        return np.array([self.fundamental(float(d)) / self.f_full for d in stations])
+
+    def trace(self, stations: np.ndarray, th: np.ndarray) -> np.ndarray:
+        """The pen trace y(theta) (hook-displacement units) -- channel j runs
+        j cycles per fundamental period."""
+        y = np.zeros_like(th)
+        for j, d in zip(HARMONICS, stations):
+            y += np.interp(
+                (j * th) % (2 * math.pi),
+                self.grid,
+                self.one_cycle(float(d)),
+                period=2 * math.pi,
+            )
+        return y
+
+    def readout(
+        self,
+        x: np.ndarray,
+        *,
+        theta_error: float = 0.0,
+        null_lift: float | None = None,
+        correct_second_harmonic: bool = True,
+        calibrated_stick: bool = True,
+    ) -> np.ndarray:
+        """O_k in ordinate units through the procedure. ``theta_error`` (rad of
+        fundamental angle) reads the pen at theta_k + error while every
+        correction is still evaluated at theta_k -- the crank stopped off its
+        index. ``null_lift`` (no calibrated stick: x_read = x + lift) and the
+        two switches reproduce the report's correction cascade."""
+        stations = x * self.nom.d_max
+        if calibrated_stick:
+            x_read = self.x_read(stations)
+        else:
+            x_read = x + (null_lift or 0.0)
+        kappa = self.kappa(stations) if correct_second_harmonic else np.zeros_like(x)
+        zero = float(np.mean(self.trace(stations, PERIOD)))
+        readings = self.trace(stations, THETA_K + theta_error) - zero
+        measured = read_coefficients(readings, x_read, kappa)
+        # what the operator subtracts: the known deviation of every channel's
+        # read ordinate from its set ordinate -- the null-lift vector (20*lift
+        # at k=0, -lift at odd k) or, with a calibrated stick, the table's
+        # full per-channel deviation vector.
+        return measured - ideal_coefficients(x_read - x)
+
+
 def nominal_design_errors(
     nom: Nominal,
     null_lift: float = 0.0,
     correct_second_harmonic: bool = False,
     calibrated_stick: bool = False,
 ) -> dict[str, dict[str, float]]:
-    """Coefficient errors of the NOMINAL machine (no tolerances) through the
-    exact kinematics, per reference input, every bar on the lifting side
-    (station = x_i * d_max >= 0, the only poses the CAD builds).
+    """Coefficient errors of the NOMINAL machine per reference input
+    (``NominalTrial.readout``), at each stage of the correction cascade.
 
     A bar parked at the pivot zero still moves -- the null station lies at
     ``null_station()`` < 0, unreachable -- so every channel reads as ordinate
@@ -406,68 +484,20 @@ def nominal_design_errors(
     tolerance-policy.md: the operator subtracts sum_i x_i^read kappa_i cos(2 i
     theta_k) using the per-station kappa (= c2/c1) table -- the READ ordinate,
     since an idle bar's c2 is not zero (its c1 is the null lift, not 0).
-    ``calibrated_stick`` graduates the stick
-    from single-channel runs instead of a ruler (Michelson's "hand stamped,
-    unevenly spaced" stick): each channel's fundamental is read as the
-    ordinate the calibration table assigns its station, so the machine-hand
-    gain curvature (-1.010 at the null to -1.025 at full scale) is removed."""
-    grid = np.arange(1440) * 2.0 * math.pi / 1440
-    cycle: dict[float, np.ndarray] = {}
-
-    def one_cycle(d: float) -> np.ndarray:
-        if d not in cycle:
-            cycle[d] = hook_displacement(grid, d, nom)
-        return cycle[d]
-
-    def trace_for(stations: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
-        def trace(th: np.ndarray) -> np.ndarray:
-            y = np.zeros_like(th)
-            for j, d in zip(HARMONICS, stations):
-                # channel j runs j cycles per fundamental period
-                y += np.interp(
-                    (j * th) % (2 * math.pi),
-                    grid,
-                    one_cycle(float(d)),
-                    period=2 * math.pi,
-                )
-            return y
-
-        return trace
-
-    def kappa(stations: np.ndarray) -> np.ndarray:
-        """The table's c2/c1 per channel (0 when the correction is off)."""
-        if not correct_second_harmonic:
-            return np.zeros_like(stations)
-        return np.array(
-            [
-                second_harmonic(one_cycle(float(d)), grid) / fundamental(float(d))
-                for d in stations
-            ]
-        )
-
-    def fundamental(d: float) -> float:
-        return 2.0 * float(np.mean(one_cycle(d) * np.cos(grid)))
-
-    # the calibration table: a full-scale bar's fundamental defines "1 ordinate";
-    # a bar at station d is read as fundamental(d)/fundamental(d_max) (signed).
-    f_full = fundamental(nom.d_max)
+    ``calibrated_stick`` graduates the stick from single-channel runs instead
+    of a ruler (Michelson's "hand stamped, unevenly spaced" stick): each
+    channel's fundamental is read as the ordinate the calibration table
+    assigns its station, so the machine-hand gain curvature (-1.010 at the
+    null to -1.025 at full scale) is removed."""
+    trial = NominalTrial(nom)
     out: dict[str, dict[str, float]] = {}
     for name, x in reference_inputs().items():
-        stations = x * nom.d_max
-        if calibrated_stick:
-            x_read = np.array([fundamental(float(d)) / f_full for d in stations])
-        else:
-            x_read = x + null_lift  # what the machine actually sums, per channel
-        # steps 2-4 of the shipped procedure, in the operator's units: pen
-        # readings off the trial's own mean line, then read_coefficients
-        trace = trace_for(stations)
-        readings = trace(THETA_K) - float(np.mean(trace(PERIOD)))
-        measured = read_coefficients(readings, x_read, kappa(stations))
-        # what the operator subtracts: the known deviation of every channel's
-        # read ordinate from its set ordinate -- the null-lift vector (20*lift
-        # at k=0, -lift at odd k) or, with a calibrated stick, the table's
-        # full per-channel deviation vector.
-        measured -= ideal_coefficients(x_read - x)
+        measured = trial.readout(
+            x,
+            null_lift=null_lift,
+            correct_second_harmonic=correct_second_harmonic,
+            calibrated_stick=calibrated_stick,
+        )
         e = coefficient_errors_pct(measured, x)
         out[name] = {"mae": float(np.mean(np.abs(e))), "max": float(np.max(np.abs(e)))}
     return out
@@ -783,27 +813,43 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "pct_fs": max(chosen[n] for n in broad),
         "note": "MAE over k of |own read - a_k * k=0 read|, uniform +/-reading each; worst-coefficient RSS bound reported, not gated; scales as 1/(pen full scale)",
     }
-    # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
-    # RMS over k, in % FS per rad of FUNDAMENTAL angle. One fundamental period is
-    # CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn); the
-    # budgeted procedure stops the crank on its index within +/-index_deg
-    # (uniform, so RMS = slope * half-width / sqrt 3), scored on the WORST
-    # reference input; the abscissa-reading alternative at the CAD's platen feed
-    # is reported for comparison.
-    slope = {}
-    for name, x in reference_inputs().items():
-        s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
-        fs = np.max(np.abs(ideal_coefficients(x)))
-        slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
-    worst = max(scored, key=lambda n: slope[n])
+    # Timebase: reading at the wrong theta. The budgeted procedure stops the
+    # crank on its index within +/-index_deg (uniform); one fundamental period
+    # is CRANK_TURNS_PER_PERIOD crank turns (gear k turns k/80 per crank turn).
+    # Scored on the PHYSICAL trace through the shipped procedure
+    # (NominalTrial.readout with theta_error): the pen is read at theta_k +
+    # delta while the operator's corrections -- second harmonic, read-vs-set
+    # -- are still evaluated at theta_k, so the live idle bars, the calibrated
+    # ordinates and the CAD's own 2nd/3rd harmonics all contribute to the
+    # slope, not just the ideal set vector. delta is integrated over the
+    # uniform band by Gauss-Legendre quadrature (RMS over k and delta, % FS),
+    # worst reference input. The analytic ideal-vector slope
+    # -sum i x_i sin(i theta_k) is reported beside it for comparison, as is the
+    # abscissa-reading alternative at the CAD's platen feed.
     index_deg = float(res["timebase"]["crank_index_deg"])
     rad_per_crank_turn = 2.0 * math.pi / CRANK_TURNS_PER_PERIOD
     rad_per_0p1mm = (
         0.1 / paper_drive_geom.NET_RACK_TRAVEL_PER_CRANK_REV * rad_per_crank_turn
     )
     rad_index = index_deg / 360.0 * rad_per_crank_turn
+    trial = NominalTrial(nom)
+    nodes, weights = np.polynomial.legendre.leggauss(8)
+    slope = {}
+    physical = {}
+    for name, x in reference_inputs().items():
+        fs = np.max(np.abs(ideal_coefficients(x)))
+        s = -np.sin(np.outer(THETA_K, HARMONICS)) @ (x * HARMONICS)
+        slope[name] = float(np.sqrt(np.mean(s * s)) / fs * 100.0)
+        on_index = trial.readout(x)
+        sq = 0.0
+        for node, w in zip(nodes, weights):
+            off = trial.readout(x, theta_error=float(node) * rad_index)
+            sq += float(w) / 2.0 * float(np.mean((off - on_index) ** 2))
+        physical[name] = 100.0 * math.sqrt(sq) / fs
+    worst = max(scored, key=lambda n: physical[n])
     timebase = {
-        "pct_fs_per_rad_rms": slope,
+        "pct_fs_per_rad_rms_ideal_vector": slope,
+        "pct_fs_physical_per_input": physical,
         "platen_feed_mm_per_crank_turn": paper_drive_geom.NET_RACK_TRAVEL_PER_CRANK_REV,
         "pct_fs_worst_per_0p1mm_abscissa": slope[worst] * rad_per_0p1mm,
         "pct_fs_worst_per_0p1mm_abscissa_coarse_gears": slope[worst]
@@ -811,7 +857,9 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         / paper_drive_geom.COARSE_FEED_RATIO,
         "assumed_crank_index_deg": index_deg,
         "worst_input": worst,
-        "pct_fs": slope[worst] * rad_index / math.sqrt(3.0),
+        "pct_fs_ideal_vector": slope[worst] * rad_index / math.sqrt(3.0),
+        "pct_fs": physical[worst],
+        "note": "RMS over k and a uniform +/-index band of the physical trace read off-index through the procedure, worst broad input; ideal-vector slope reported for comparison",
     }
     return {
         "knife": knife,
@@ -1058,6 +1106,22 @@ Generated by `cad/scripts/error_budget.py --procedure` from the model that
 only by following every step below. Coefficient $k$ is read at crank position
 $\\theta_k = k\\pi/20$, i.e. with the crank stopped on its index after $2k$
 turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
+
+At a glance (the station table below is the only data needed beyond the
+readings):
+
+```mermaid
+flowchart LR
+    t[("station table:<br/>d -> x_read, kappa")]
+    s1["1. set bar i to the linear<br/>station x_i * {nom.d_max:.0f} mm"] --> s1b["record x_read,i<br/>from the table"]
+    t -.-> s1b
+    s1b --> s2["2. crank one way; read r_k (mm)<br/>off the mean line at 2k turns"]
+    s2 --> s3["3. s = r_0 / (S + C_2)<br/>O'_k = r_k / s"]
+    s3 --> s4a["4a. subtract<br/>sum x_read kappa cos(2 i theta_k)"]
+    t -.-> s4a
+    s4a --> s4b["4b. subtract<br/>sum (x_read - x_set) cos(i theta_k)"]
+    s4b --> s5["5. e_k = (O_k - C_k) / max|C|"]
+```
 
 ## 1. Set the bars linearly; record what each one reads
 
