@@ -66,6 +66,40 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### The chain, and where each error enters
+
+```mermaid
+flowchart LR
+    crank([crank, 80 turns / period]) --> cam
+    cam["cylinder gear<br/>eccentric cam"] --> rod["connecting rod<br/>+ strap"]
+    rod --> rocker["rocker arm<br/>(pin on arc)"]
+    rocker --> bar["amplitude bar<br/>at station d_i"]
+    bar --> lever["channel lever"]
+    lever --> spring["channel spring<br/>s_i"]
+    spring --> summing["summing lever<br/>on knife edge"]
+    summing --> mag["magnifier"] --> pen(["pen trace y(θ)"])
+    pen --> op["operator reads r_k<br/>at θ_k = kπ/20"]
+
+    e1["eccentricity ±0.025 mm<br/>cam phase ±0.25°<br/><b>gain 11.6 %/mm, phase</b>"]:::part -.-> cam
+    e2["2nd harmonic e/4L = 1.3 %<br/><b>design, corrected by table</b>"]:::design -.-> rod
+    e3["rod-pin radius ±0.10<br/>0.75 %/mm"]:::part -.-> rocker
+    e4["station setting ±0.25 mm<br/><b>setup</b>; null lift 0.029"]:::setup -.-> bar
+    e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
+    e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
+    e7["hook arm ±0.15 (2.5 %/mm)<br/>knife stall 0.20 % FS"]:::part -.-> summing
+    e8["common-mode gain:<br/>calibrated out"]:::free -.-> mag
+    e9["reading ±0.075 mm → 0.25 % FS<br/>crank index ±8° → 0.25 % FS"]:::setup -.-> op
+
+    classDef part fill:#fde2e2,stroke:#c0392b
+    classDef setup fill:#fff3cd,stroke:#b7791f
+    classDef design fill:#e2ecfd,stroke:#2b6cb0
+    classDef free fill:#e6f4ea,stroke:#2f855a
+```
+
+Red = channel-specific part tolerances (the Monte Carlo); yellow = setup/readout terms the
+procedure bounds; blue = the nominal design's own distortion, removed by the correction table;
+green = common-mode, removed by normalisation. Sensitivities and sizes are the report's.
+
 ## Transfer function and error model
 
 The machine draws, with magnifier gain $G$,
@@ -157,6 +191,18 @@ max on every reference input — the "+cal stick" column of the report.
 Lengthening the rod would remove it by design but is not photo-faithful; the correction is the
 period-appropriate answer (the machine computes, the operator corrects a known table).
 
+What each correction in `READOUT.md` removes, on the nominal (perfect-parts) machine, % MAE of
+the greatest term (Gaussian input | two-channel input):
+
+```mermaid
+flowchart LR
+    raw["raw readings<br/><b>0.49 | 10.6</b>"] -->|"subtract the null-lift vector<br/>20ℓ at k=0, −ℓ at odd k"| a["<b>0.14 | 1.32</b>"]
+    a -->|"subtract Σ x_read κ cos(2iθ_k)<br/>(the κ column of the table)"| b["<b>0.06 | 0.14</b>"]
+    b -->|"record x_read from the table<br/>instead of x_set (full read-vs-set vector)"| c["<b>0.016 | 0.037</b><br/>residual credited"]
+    style raw fill:#fde2e2,stroke:#c0392b
+    style c fill:#e6f4ea,stroke:#2f855a
+```
+
 ## Result: the budget for the critical features
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, every feature
@@ -218,7 +264,7 @@ two-channel consistency target. Read it as follows.
 |---|---|---:|---:|
 | nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`) | 0.016 % MAE | 0.05 |
 | ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. Every coefficient carries **two** independent reads: its own and the k = 0 normaliser's, the latter scaled by $a_k = A_k/A_0$. Scored as the **MAE** the benchmark and the other terms use — for uniform ±δ reads $E\lvert\delta_k - a_k\delta_0\rvert = \delta(1/2 + a_k^2/6)$, averaged over k — on the worst broad input, against the ideal greatest term (the k = 0 reading sums the *read* ordinates, idle bars ≈ 0.028 each, so × Σx_read/Σx): 0.24–0.25 % on every broad input, 0.32 % two-channel. The **worst single coefficient** is a √(1 + a_k²) bound — 0.71 % on the lifted square, whose k = 20 term equals its k = 0 — reported (`pct_fs_worst_coefficient_bound`), not gated. Needs 2.0–2.3× the all-ones magnification for the broad inputs (8× two-channel): the open magnifier-range item; at a fixed all-ones setting the broad worst case is 0.57 % (`greatest_term_spans_stroke: false` scores it and fails the gate) | 0.25 % MAE | 0.30 |
-| timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
+| timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform). Scored on the **physical trace through the procedure**: the pen read at $\theta_k + \delta$ while the second-harmonic and read-vs-set corrections stay at $\theta_k$ (`NominalTrial.readout(theta_error=…)`, so live idle bars, calibrated ordinates and the CAD's own harmonics all enter the slope), RMS over k and the uniform band, worst reference input (the lifted square). The ideal-vector slope $-\sum i x_i \sin(i\theta_k)$ gives the same 0.254 there (it differs only on the two-channel case, 0.059 vs 0.035) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm). The stall is a fixed displacement, so against a trial's greatest term it is 1.7 %/Σx_read: 0.09 % on all-ones, **0.20 % on the Gaussian** (scored), 0.68 % on the two-channel case; *measure* as trace width on a slow reversal | 0.20 % FS | 0.25 |
 | **total** | residual + RSS(scatter 0.127, readout, timebase, knife) | **0.44 % MAE** | **0.7 benchmark** |
 
@@ -231,10 +277,51 @@ stroke (a CAD/`verify:kinematics` change to `pen_trace_half_mm`, once the magnif
 reconciled) would reduce it proportionally; that is the one design lever left, and it is not
 machining.
 
+How the 0.7 % benchmark is spent (all % of the greatest term, MAE; independent terms combine
+root-sum-square, the systematic residual adds):
+
+```mermaid
+flowchart TB
+    subgraph rss["independent terms, RSS = 0.43"]
+        direction LR
+        s["part scatter<br/>(Monte Carlo)<br/><b>0.13</b> / 0.30"]
+        r["ordinate readout<br/><b>0.25</b> / 0.30"]
+        t["timebase<br/>(crank index)<br/><b>0.25</b> / 0.30"]
+        k["knife hysteresis<br/><b>0.20</b> / 0.25"]
+    end
+    n["nominal residual<br/>after corrections<br/><b>0.016</b> / 0.05"]
+    rss --> total["<b>total 0.44</b>"]
+    n --> total
+    total --> bench["benchmark 0.7<br/>Michelson & Stratton 1898"]
+    style total fill:#e6f4ea,stroke:#2f855a
+    style bench fill:#e2ecfd,stroke:#2b6cb0
+```
+
+Each node shows **value** / allowance (`error_budget.yaml reserved:` and `targets:`). The part
+scatter box is the only one machining controls; within it the spring rate is 40 % and the
+eccentricity and summing-hole position most of the rest (table above).
+
 ## Readout and calibration procedure (what the model assumes)
 
 The Monte Carlo and the residual numbers above hold only under this procedure; it is part of
 the specification.
+
+```mermaid
+flowchart LR
+    t[("station table<br/>READOUT.md:<br/>d → x_read, κ")]:::table
+    s1["1. set bar i to the<br/>linear station x_i·88 mm"] --> s1b["record x_read,i<br/>from the table"]
+    t -.-> s1b
+    s1b --> s2["2. crank one way;<br/>read r_k (mm) off the<br/>mean line at 2k turns"]
+    s2 --> s3["3. s = r₀ / (S + C₂)<br/>O'_k = r_k / s"]
+    s3 --> s4a["4a. − Σ x_read κ cos(2iθ_k)"]
+    t -.-> s4a
+    s4a --> s4b["4b. − Σ (x_read − x_set) cos(iθ_k)<br/>(null lift, setting bias, lift c)"]
+    s4b --> s5["5. e_k = (O_k − C_k) / max|C|"]
+    classDef table fill:#e2ecfd,stroke:#2b6cb0
+```
+
+$S = \sum_i x^\text{read}_i$ and $C_2 = \sum_i x^\text{read}_i\kappa_i$ are the two sums the
+operator forms from step 1; the table is the only data the procedure needs beyond the readings.
 
 1. **Zero the measuring stick at the pivot** (every station ≥ 0, the only side the CAD builds)
    and **set each bar to its linear station** $x_i \cdot 88$ mm on the engraved 14.20 mm/division
