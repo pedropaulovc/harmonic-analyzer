@@ -964,8 +964,8 @@ async def build(adapter) -> dict[str, str]:
                 "SocketDia" if i == 0 else f"Socket{i}Dia",
             ),
             drives=(
-                _pos_drive("ColumnX", x),
-                _pos_drive("ColumnZ", -z),
+                '"ColumnX"',
+                '"ColumnZ"',
                 '"SocketDia"',
             ),
         )
@@ -1027,7 +1027,7 @@ async def build(adapter) -> dict[str, str]:
                     "SpotFaceDia" if i == 0 else f"Spot{i}Dia",
                 ),
                 drives=(
-                    _pos_drive("ColumnX", x),
+                    '"ColumnX"',
                     '"BaseScrewY"',
                     '"SpotFaceDia"',
                 ),
