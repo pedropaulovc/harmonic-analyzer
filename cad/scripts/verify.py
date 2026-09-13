@@ -1778,6 +1778,7 @@ def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
     """
     declared = _declared_part_names()
     registry = _config.parts()
+    defaults = _config._doc("parts").get("defaults", {})
     tol = _config._doc("tolerances")
     tol_classes = set(tol.get("general", {}))
     fit_classes = set(tol.get("fits", {}))
@@ -1799,8 +1800,8 @@ def _audit_rows() -> tuple[list[dict[str, str]], dict[str, list[str]]]:
         if part not in declared:
             issues.append("registry entry has no build_*.py PART_NAME")
             problems["orphan_registry"].append(part)
-        merged = {**_config.parts().get(part, {}), **{k: rec[k] for k in rec}}
-        confidence = merged.get("confidence", _config._doc("parts").get("defaults", {}).get("confidence", ""))
+        merged = dict(rec)
+        confidence = merged.get("confidence", defaults.get("confidence", ""))
         for fieldname in _REQUIRED_PART_FIELDS:
             value = merged.get(fieldname)
             if value in (None, "", "None"):

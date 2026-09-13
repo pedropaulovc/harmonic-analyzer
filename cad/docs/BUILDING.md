@@ -44,8 +44,9 @@ glance:
 # The one fully-safe build: every part + assembly + every gate (= default task)
 uv run python -m doit
 
-# Same, but fan the SolidWorks-free check:* gates out across 4 workers while the
-# COM build/verify stream stays serial (safe — see "Parallelism" below)
+# Direct invocations use the host-aware worker pool (up to 8 on the development
+# seat); pass `-n N` to override it explicitly. Four is still a conservative
+# explicit choice for a smaller seat.
 uv run python -m doit -n 4
 
 # Quick rebuild — parts + assemblies only, no gates or export

@@ -54,10 +54,12 @@ def negative(budget: dict, **reserved: dict) -> dict:
     """A deliberately-broken budget for a failure-routing test, at a REDUCED
     draw count: these tests assert WHICH gate trips, not the value, and a full
     4000-draw report each would multiply the required check:budget gate's
-    runtime by the number of negative cases."""
+    runtime by the number of negative cases. One hundred draws is enough to
+    exercise the deterministic seeded routing while keeping these negative
+    cases from re-running the full statistical sample."""
     out = {
         **budget,
-        "monte_carlo": {**budget["monte_carlo"], "draws": 500},
+        "monte_carlo": {**budget["monte_carlo"], "draws": 100},
     }
     if reserved:
         out["reserved"] = {
