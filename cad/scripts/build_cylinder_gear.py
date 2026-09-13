@@ -98,10 +98,12 @@ from _common import (
     set_sketch_direct_db,
 )
 from _drawing_marks import (
+    add_angular_reference_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
@@ -113,6 +115,7 @@ from cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
+    CAM_PHASE_TOLERANCE_DEG,
     CAM_THICKNESS,
     DRAWING_DIMENSIONS,
     ECCENTRICITY,
@@ -123,6 +126,8 @@ from cylinder_gear_spec import (
     NOTCH_DEPTH,
     NOTCH_FLOOR_RADIUS,
     NOTCH_DEPTH_TOLERANCE_MM,
+    NOTCH_MEAN_RADIUS,
+    NOTCH_PHASE_DEG,
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
     OUTSIDE_DIA,
@@ -435,6 +440,61 @@ async def build(adapter) -> dict[str, str]:
         "notch depth",
     )
     notch_dims.record("NotchDepth", '"NotchDepth"')
+    # The cam-phase datum, natively: the lobe axis (origin -> the +Y crest, the
+    # direction CamCy offsets the cam) and the notch radial (origin -> the kerf
+    # centreline x = NOTCH_X at the mean notch radius) meet at NOTCH_PHASE_DEG,
+    # half a circular pitch. A DRIVEN angular dimension between them carries
+    # the error budget's cam_phase tolerance (drawing-simplicity rule 2: the
+    # band goes on the dimension, not in a note); the kerf stays located by
+    # NotchCenterX, so its geometry is unchanged and the sketch fully defined.
+    set_sketch_direct_db(adapter, True)
+    lobe_axis = check(
+        "notch lobe-axis construction line",
+        await adapter.add_centerline(0.0, 0.0, 0.0, RA_MM),
+    )
+    notch_radial = check(
+        "notch radial construction line",
+        await adapter.add_centerline(
+            0.0,
+            0.0,
+            NOTCH_X,
+            NOTCH_MEAN_RADIUS * math.cos(math.radians(NOTCH_PHASE_DEG)),
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
+    check(
+        "lobe axis ends on the +Y crest",
+        await adapter.add_sketch_constraint(
+            f"{lobe_axis}.end", f"{depth_witness}.end", "coincident"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{notch_radial}.start", 0.0, 0.0, "notch radial"
+    )
+    # the radial's tip rides the kerf centreline: same x as the floor midpoint
+    check(
+        "notch radial ends on the kerf centreline",
+        await adapter.add_sketch_constraint(
+            f"{notch_radial}.end", f"{depth_witness}.start", "vertical_points"
+        ),
+    )
+    check(
+        "dimension notch mean radius",
+        await adapter.add_sketch_dimension(
+            notch_radial, None, "linear", NOTCH_MEAN_RADIUS
+        ),
+    )
+    notch_dims.record("NotchMeanRadius", None)
+    await add_angular_reference_dimension(
+        adapter,
+        lobe_axis,
+        notch_radial,
+        (-6.0, NOTCH_MEAN_RADIUS + 4.0),
+        "notch phase",
+        expected_degrees=NOTCH_PHASE_DEG,
+    )
+    notch_dims.record("NotchPhase")
     await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
     name_last_feature(adapter, "NotchProfile")
@@ -534,6 +594,13 @@ async def build(adapter) -> dict[str, str]:
         "NotchProfile",
         "NotchDepth",
         NOTCH_DEPTH_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "NotchProfile",
+        "NotchPhase",
+        CAM_PHASE_TOLERANCE_DEG,
+        require_driven=True,
     )
     volume = await volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore

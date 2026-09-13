@@ -2540,15 +2540,17 @@ def task_check():
             # Deps: the model, its config, every spec module the model OR the
             # test imports (the test lazily imports the notes/spec modules whose
             # drawing lines it pins to the budget -- a note edit must re-run
-            # the gate, not reuse the stamp; Codex #742), and the two builders
-            # the test reads as TEXT (the assembly imports SolidWorks so it
-            # cannot be imported offline, and the stick builder is scanned for
-            # its spec import): module_deps_of cannot see either.
+            # the gate, not reuse the stamp; Codex #742), and the three builders
+            # the test reads as TEXT (they import SolidWorks so cannot be
+            # imported offline: the assembly for its shared stations, the stick
+            # for its spec import, the cylinder gear for its NotchPhase
+            # tolerance call): module_deps_of cannot see them.
             "file_dep": sorted(
                 {
                     str((SCRIPTS_DIR / "error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
+                    str((SCRIPTS_DIR / "build_cylinder_gear.py").resolve()),
                     str((SCRIPTS_DIR / "build_measuring_stick.py").resolve()),
                     str((CONFIG_DIR / "error_budget.yaml").resolve()),
                     str((CONFIG_DIR / "tolerances.yaml").resolve()),

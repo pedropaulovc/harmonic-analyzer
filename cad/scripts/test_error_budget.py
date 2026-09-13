@@ -375,12 +375,15 @@ def test_reference_inputs_stay_on_the_lifting_side():
 
 
 def test_drawing_limits_agree_with_the_budget(budget):
-    """Every budgeted limit that reaches a manufacturing output (drawing note,
-    GD&T zone, fit band) carries the SAME number as error_budget.yaml."""
+    """Every budgeted limit that reaches a manufacturing output (native
+    dimension tolerance, drawing note, GD&T zone, fit band) carries the SAME
+    number as error_budget.yaml."""
+    import channel_lever_spec
     import channel_spring_installed_notes
-    import cylinder_gear_notes
     import cylinder_gear_spec
+    import draw_cylinder_gear
     import measuring_stick_spec
+    import rocker_arm_spec
     import summing_lever_spec
 
     feats = budget["critical_features"]
@@ -390,10 +393,20 @@ def test_drawing_limits_agree_with_the_budget(budget):
     assert cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
         feats["cam_phase"]["tolerance"]
     ), "cylinder-gear drawing carries a different cam-phase tolerance"
-    assert (
-        f"WITHIN +/-{cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG:.2f} DEG"
-        in cylinder_gear_notes.DRAWING_NOTES
-    ), "cam-phase tolerance does not reach the cylinder-gear drawing notes"
+    # the cam phase rides a NATIVE angular dimension (drawing-simplicity rule
+    # 2), not a note: the part build tolerances NotchPhase with the spec
+    # constant and the front view shows it. build_cylinder_gear imports
+    # SolidWorks, so its tolerance call is pinned at the source level.
+    assert "NotchPhase" in cylinder_gear_spec.DRAWING_DIMENSIONS["NotchProfile"]
+    assert "NotchPhase" in draw_cylinder_gear.FRONT_KEEP
+    part_src = (
+        pathlib.Path(eb.__file__).with_name("build_cylinder_gear.py")
+    ).read_text(encoding="utf-8")
+    assert re.search(
+        r'set_dimension_symmetric_angular_tolerance\(\s*adapter,\s*"NotchProfile",'
+        r'\s*"NotchPhase",\s*CAM_PHASE_TOLERANCE_DEG,',
+        part_src,
+    ), "cam-phase tolerance does not reach the NotchPhase model dimension"
     assert (
         f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.2f}% OF THE SET MEAN"
         in channel_spring_installed_notes.DRAWING_NOTES
@@ -402,12 +415,18 @@ def test_drawing_limits_agree_with_the_budget(budget):
         f"SETTING ERROR +/-{feats['station_setting']['tolerance']:.2f} MAX PER BAR"
         in measuring_stick_spec.DRAWING_NOTES
     ), "measuring-stick drawing carries a different setting allowance"
-    zone = float(
-        summing_lever_spec.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]
-    )
-    assert zone == pytest.approx(
-        2.0 * budget["critical_features"]["summing_hook_arm"]["tolerance"]
-    )
+    # every +/- arm tolerance is held by a diametral position zone of twice it
+    for feature, spec_module, key in (
+        ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),
+        ("rocker_rod_pin_radius", rocker_arm_spec, "rod-pin hole position"),
+        ("lever_bar_pin_arm", channel_lever_spec, "bar-pin hole position"),
+        ("lever_spring_hook_arm", channel_lever_spec, "spring-eye hole position"),
+    ):
+        zone = float(spec_module.GEOMETRIC_TOLERANCES_MM[key])
+        assert zone == pytest.approx(2.0 * feats[feature]["tolerance"]), (
+            f"{spec_module.__name__} {key!r} zone {zone} is not twice the budget's "
+            f"+/-{feats[feature]['tolerance']} on {feature}"
+        )
     backlash_lo, backlash_hi = eb._config.fit("gear_mesh", "backlash_mm")
     pitch_r = (
         eb.cylinder_gear_spec.TEETH

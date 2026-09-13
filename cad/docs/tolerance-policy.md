@@ -175,7 +175,7 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.97 | DRO/CNC hole position |
 | summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
 | **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
-| cam phase | 0.25° | 0.038 | 0.20 | 0.23 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
+| cam phase | 0.25° | 0.038 | 0.20 | 0.23 | 0.33 | on the cylinder-gear drawing's native `NotchPhase` angular dimension (lobe axis to notch radial, 1.50° ± 0.25°) |
 | mesh lag spread | 0.14° | 0.021 | 0.11 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
 | station setting (setup) | 0.25 mm | 0.024 | 0.23 | 0.53 | 0.24 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored |
 | **all combined** | | **0.127** | **0.67** | **1.50** | | targets 0.30 / 1.5 / 2.0 |

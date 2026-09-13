@@ -43,7 +43,8 @@ ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase
-# datum); error_budget.yaml cam_phase -- index lobe and notch in one setup.
+# datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
+# angular dimension (build_cylinder_gear), lobe axis to notch radial.
 CAM_PHASE_TOLERANCE_DEG = 0.25
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
 NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
@@ -51,11 +52,13 @@ NOTCH_DEPTH = 3.0
 NOTCH_DEPTH_TOLERANCE_MM = 0.2
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH
-# +Y is a tooth crest.  The phase kerf is the first root counter-clockwise
-# from the cam lobe, half a circular pitch away, and is cut as a vertical slot.
-NOTCH_CENTER_X = (
-    (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0 * math.cos(math.pi / 2.0 + math.pi / TEETH)
-)
+NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
+# +Y is a tooth crest (the cam lobe direction).  The phase kerf is the first
+# root counter-clockwise from the cam lobe, half a circular pitch away, and is
+# cut as a vertical slot whose centreline crosses the mean notch radius at
+# NOTCH_PHASE_DEG from the lobe axis.
+NOTCH_PHASE_DEG = 180.0 / TEETH
+NOTCH_CENTER_X = -NOTCH_MEAN_RADIUS * math.sin(math.radians(NOTCH_PHASE_DEG))
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -74,7 +77,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
     "CamBoss": {"CamThickness"},
-    "NotchProfile": {"NotchDepth", "NotchWidth"},
+    "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase"},
 }
 
 
