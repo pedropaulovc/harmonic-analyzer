@@ -24,7 +24,7 @@ from _common import (
 )
 
 
-type RecipeAuthor = Callable[[Any, Any | None], Awaitable[None]]
+type RecipeAuthor = Callable[..., Awaitable[None]]
 type Vector3 = tuple[float, float, float]
 
 
@@ -89,6 +89,8 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91882A221": RecipeMetadata(
             "diagnostics.diag_build_91882A221", "build_91882A221"
         ),
+        "9489T111": RecipeMetadata("diagnostics.diag_build_9489T111", "build_9489T111"),
+        "9490T1": RecipeMetadata("diagnostics.diag_build_9490T1", "build_9490T1"),
     }
 )
 
@@ -109,6 +111,7 @@ class StockComponent:
     sku: str
     author: RecipeAuthor
     transform: RigidTransform = RigidTransform()
+    parameters: Mapping[str, str | float] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -461,7 +464,10 @@ async def build_stock_fastener(
                 component=component_count,
             ):
                 try:
-                    await component.author(adapter, None)
+                    if component.parameters is None:
+                        await component.author(adapter, None)
+                    else:
+                        await component.author(adapter, None, **component.parameters)
                 finally:
                     model.ClearSelection2(True)
             after = _solid_bodies(model)
