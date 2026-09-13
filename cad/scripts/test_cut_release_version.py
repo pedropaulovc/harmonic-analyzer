@@ -106,3 +106,25 @@ def test_release_image_tools_do_not_use_deprecated_getdata() -> None:
 
     for source in sources:
         assert ".getdata(" not in source.read_text(encoding="utf-8"), source
+
+
+def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path):
+    """READOUT.md sends the reader to the operating explanation; a release
+    consumer has only the bundle, so that page -- and the pages IT cross-links
+    with ./ -- must be staged beside it, and every ./ link among them must
+    resolve within the stage (no dangling reference in the shipped zip)."""
+    import re
+
+    staged = cut_release.stage_readout_procedure(tmp_path)
+    assert staged[0] == "READOUT.md"
+    for rel in staged:
+        assert (tmp_path / rel).is_file(), rel
+    readout = (tmp_path / "READOUT.md").read_text(encoding="utf-8")
+    assert "`docs/device-operation.md`" in readout
+    assert "`cad/docs/device-operation.md`" not in readout.split("beside this file")[0]
+    docs = cut_release.operating_docs()
+    assert docs[0] == cut_release.OPERATING_DOC and "tolerance-policy.md" in docs
+    for name in docs:
+        page = (tmp_path / "docs" / name).read_text(encoding="utf-8")
+        for target in re.findall(r"\]\(\./([^)#]+)", page):
+            assert (tmp_path / "docs" / target).is_file(), f"{name} -> ./{target}"

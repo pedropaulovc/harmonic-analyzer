@@ -1623,8 +1623,8 @@ turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
 Michelson's own procedure (1898, pp. 10-11: "the required coefficients are
 then proportional to the ordinates erected at these divisions"; every
 published table normalised to the greatest term) -- is explained in
-`cad/docs/device-operation.md`. Read that first if the steps below are a
-surprise: the machine draws a *curve of coefficients* whose scale is set by
+`docs/device-operation.md` beside this file (`cad/docs/device-operation.md`
+in the repository). Read that first if the steps below are a surprise: the machine draws a *curve of coefficients* whose scale is set by
 the magnifier, so reading and normalising were always part of analysis.
 
 At a glance (the station table below is the only data needed beyond the

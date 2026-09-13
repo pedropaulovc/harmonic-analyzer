@@ -6,8 +6,8 @@ read straight off the pen. It exists because that arithmetic is easy to miss —
 2014 book and the video series present the traces, and the 1898 paper states the
 procedure in one sentence — yet it is the step that most of the machine's accuracy
 lives in. The release ships the step-by-step form of it as `READOUT.md` (generated
-by `error_budget.py --procedure`); this document is the *why* behind that file, and
-`READOUT.md` points back here.
+by `error_budget.py --procedure`) with this page beside it under `docs/`; this document
+is the *why* behind that file, and `READOUT.md` points back here.
 
 **None of this is new.** Every step below is Michelson's own practice, cited to the
 1898 paper or the 2014 book where it appears. What the error budget adds is the

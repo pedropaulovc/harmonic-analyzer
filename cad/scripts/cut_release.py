@@ -897,9 +897,31 @@ def package_drawings(
     return staged
 
 
-def stage_readout_procedure(stage: Path) -> str:
+OPERATING_DOC = "device-operation.md"  # what READOUT.md's arithmetic is and why
+
+
+def operating_docs() -> list[str]:
+    """``OPERATING_DOC`` plus the ``cad/docs`` pages reachable from it through
+    ``./`` markdown links (the tolerance policy, the GD&T assessment, the DFM
+    notes, the 1898 benchmark): the closure a bundle reader can follow without
+    the repository. Links out to config/scripts name repo paths at the tag."""
+    seen: list[str] = []
+    todo = [OPERATING_DOC]
+    while todo:
+        name = todo.pop()
+        if name in seen:
+            continue
+        seen.append(name)
+        text = (CAD_ROOT / "docs" / name).read_text(encoding="utf-8")
+        todo.extend(re.findall(r"\]\(\./([^)#]+)", text))
+    return seen
+
+
+def stage_readout_procedure(stage: Path) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
-    into the bundle root as ``READOUT.md``. Not COM: the model is offline."""
+    into the bundle root as ``READOUT.md``, plus ``operating_docs()`` under
+    ``docs/`` so every ``./`` cross-link resolves inside the bundle. Not COM:
+    the model is offline. Returns the staged relative paths."""
     import error_budget
 
     dst = stage / "READOUT.md"
@@ -909,7 +931,13 @@ def stage_readout_procedure(stage: Path) -> str:
         ),
         encoding="utf-8",
     )
-    return dst.name
+    staged = [dst.name]
+    docs = stage / "docs"
+    docs.mkdir(exist_ok=True)
+    for name in operating_docs():
+        shutil.copyfile(CAD_ROOT / "docs" / name, docs / name)
+        staged.append(f"docs/{name}")
+    return staged
 
 
 def bundle(

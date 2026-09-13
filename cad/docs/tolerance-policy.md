@@ -28,8 +28,9 @@ machine can reach, and most of that accuracy lives in how the trace is read); it
 explained for the operator in [`device-operation.md`](./device-operation.md), with the
 1898 provenance for each step, and shipped as a **manufacturing output**: `error_budget.py
 --procedure` renders it from the same model and `cut_release` ships it as `READOUT.md` in the
-bundle root (the stick drawing's note 5 points at it), so a builder working from the release
-has the station table and every correction, not just the drawings.
+bundle root (the stick drawing's note 5 points at it) with this page, `device-operation.md`
+and the pages they `./`-link under `docs/` (`cut_release.operating_docs`), so a builder working
+from the release has the station table, every correction and the why, not just the drawings.
 
 The whole-device performance benchmark that constrains this allocation is
 [`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md):
