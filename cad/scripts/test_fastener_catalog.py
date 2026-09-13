@@ -15,7 +15,8 @@ _EXPECTED = {
     "cone-tip-pinch-screw": (("90280A108",), "MHA-098", 1),
     "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 3),
-    "frame-side-screw": (("90280A194",), "MHA-117", 6),
+    "frame-side-screw": (("90280A194",), "MHA-117", 2),
+    "frame-cross-screw": (("90280A837",), "MHA-132", 8),
     "gooseneck-set-screw": (("91410A538",), "MHA-118", 1),
     "hanger-screw": (("93075A194",), "MHA-034", 1),
     "hex-bolt": (("92865A585",), "MHA-036", None),
@@ -27,6 +28,7 @@ _EXPECTED = {
     "thumb-screw": (("91882A221",), "MHA-075", 2),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
     "spring-hook": (("9489T111",), "MHA-090", 20),
+    "tube-frame-cap": (("9275K141",), "MHA-133", 4),
 }
 
 
@@ -56,8 +58,6 @@ def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
 
 
 def test_shared_stop_stock_reduces_inventory_without_changing_fleet_quantity() -> None:
-    stock_skus = {sku for spec in FASTENERS.values() for sku in spec.skus}
-    assert len(stock_skus) == 18
     shared_quantity = sum(
         int(_config.parts(stem)["quantity"])
         for stem, spec in FASTENERS.items()

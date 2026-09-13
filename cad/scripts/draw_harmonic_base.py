@@ -22,27 +22,31 @@ import argparse
 import sys
 from typing import Any
 
-from harmonic_base_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_harmonic_base import (
+    BASE_CROSS_TAP_DRILL_DIA,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
+    COLUMN_X,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
     HOLD_DOWN_TAP_DRILL_DIA,
@@ -61,8 +65,11 @@ from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
-    RIM_TOP,
-    STACK_HEIGHT,
+)
+from frame_attachment_spec import (
+    BASE_SCREW_SEAT_Z,
+    BASE_SCREW_Y,
+    COLUMN_SOCKET_DIAMETER,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -94,13 +101,16 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
 # right-side keep-out. Views, controls, and notes occupy the remaining field.
 TOP_CENTER = (0.230, 0.205)
 SIDE_CENTER = (0.230, 0.145)
+SECTION_CENTER = (0.360, 0.150)
 ISO_SCALE = (1, 10)
 ISO_CENTER = (0.350, 0.240)
 SIDE_NOTE_XY = (0.170, 0.128)
+SECTION_NOTE_XY = (0.326, 0.126)
 ISO_NOTE_XY = (0.305, 0.212)
 
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Only the bottom plate's overall footprint is marked.
+# Per-view survivors of the native marked-dimension import. Socket locations
+# and diameter live in the plan; hidden socket/tap depth geometry lives only
+# in section A-A.
 TOP_KEEP = {
     "BottomLen": (
         TOP_CENTER[0],
@@ -112,6 +122,18 @@ TOP_KEEP = {
         TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017,
         TOP_CENTER[1],
     ),
+    "Socket0X": (TOP_CENTER[0] - 0.050, TOP_CENTER[1] - 0.050),
+    "Socket0Z": (TOP_CENTER[0] - 0.085, TOP_CENTER[1]),
+    "SocketDia": (TOP_CENTER[0] - 0.058, TOP_CENTER[1] + 0.043),
+}
+SECTION_KEEP = {
+    "SocketDepth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1]),
+    "SpotFaceDia": (SECTION_CENTER[0] + 0.040, SECTION_CENTER[1] + 0.010),
+    "SpotFaceDepth": (SECTION_CENTER[0] + 0.038, SECTION_CENTER[1] - 0.010),
+}
+DIMENSION_CALLOUTS = {
+    "SocketDia": "4X COLUMN SOCKET; MATCH FIT MHA-083",
+    "SpotFaceDia": "4X SPOTFACE",
 }
 
 # Hole-table origin corner (the plate's lower-left plan corner) plus every
@@ -237,42 +259,6 @@ def _visible_hole_table_entities(
     )
 
 
-def _visible_side_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return the finished underside A and top-pad face edges in the side view."""
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    candidates: list[tuple[float, Any]] = []
-    for component in components:
-        edges = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1),
-                default=(),
-            )
-            or ()
-        )
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsLine():
-                continue
-            parameters = tuple(float(value) for value in curve.LineParams)
-            if abs(parameters[3]) < 0.99:
-                continue
-            candidates.append((parameters[1], edge))
-
-    def _at_height(height_m: float, label: str) -> Any:
-        matching = [edge for y, edge in candidates if abs(y - height_m) <= 2e-6]
-        if not matching:
-            raise RuntimeError(
-                f"harmonic-base side view has no visible {label} edge at "
-                f"model Y={height_m:g} m"
-            )
-        return matching[0]
-
-    # The side silhouette's top edge is the raised rim's top (RIM_TOP), not the
-    # deck: the deck sits LIP_H below it inside the rim.
-    return _at_height(0.0, "underside datum A"), _at_height(RIM_TOP / 1000.0, "rim top")
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -290,6 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
+            "Section View Note",
             "Isometric View Note",
         ),
         required=(
@@ -300,6 +287,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes B",
             "Manufacturing Notes",
             "Side View Note",
+            "Section View Note",
             "Isometric View Note",
         ),
     )
@@ -317,26 +305,50 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # Explicit per-view scale: a view placed without one can silently auto-scale,
-    # which shifts every coordinate-based pick on it.
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(542, 0, 1):
+        raise RuntimeError("failed to set end-only section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 1:
+        raise RuntimeError("section cutting-line style did not persist")
+
+    # Explicit per-view scale prevents coordinate-based picks drifting.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=PLAN_SCALE)
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
+    section_line_x = _plan_xy(COLUMN_X, 0.0)[0]
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=(section_line_x, TOP_CENTER[1] - 0.040),
+        line_end=(section_line_x, TOP_CENTER[1] + 0.040),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(1, 4),
+        label="base column-socket section",
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (top, side, iso):
+    for view in (top, side):
+        set_hidden_lines_visible(adapter, view)
+    for view in (section, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    top_dimensions = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="top"
+    )
+    section_dimensions = curate_view_dimensions(
+        adapter, section, keep=SECTION_KEEP, view_label="section A-A"
+    )
+    set_dimension_callouts(
+        adapter, [*top_dimensions, *section_dimensions], DIMENSION_CALLOUTS
+    )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
     hole_entities, datum_b_edge, datum_c_edge = _visible_hole_table_entities(
         adapter, top
     )
-    datum_a_edge, top_pad_edge = _visible_side_datum_edges(adapter, side)
 
-    # One complete hole table: the four blind support seats plus every other
-    # top-side blind tapped seat. Basic locations use the family-specific
-    # position tolerances below.
+    # One complete hole table for the top-side mounting seats. Section A-A
+    # separately defines the horizontal column-retention taps.
     insert_hole_table(
         adapter,
         top,
@@ -351,95 +363,25 @@ async def build(adapter: Any) -> dict[str, str]:
             for x, z, _diameter in ALL_HOLES
         ),
         anchor_xy=HOLE_TABLE_ANCHOR,
-        basic_locations=True,
+        basic_locations=False,
         label="harmonic-base mounting",
     )
-    add_datum_feature(
+    tap_edge = model_point_in_view(
         adapter,
-        side,
-        # Keep the native datum triangle directly on the visible underside
-        # edge.  The former far-left position produced a long leader that read
-        # like an unattached free-standing tag at print scale.
-        symbol_xy=(0.205, SIDE_CENTER[1] - STACK_HEIGHT / 8000.0),
-        datum="A",
-        label="machined underside datum",
-        entity=datum_a_edge,
-        shoulder=True,
+        section,
+        (
+            COLUMN_X / 1000.0,
+            (BASE_SCREW_Y + BASE_CROSS_TAP_DRILL_DIA / 2.0) / 1000.0,
+            (BASE_SCREW_SEAT_Z - COLUMN_SOCKET_DIAMETER) / 1000.0,
+        ),
+        label="base cross-tap longitudinal edge",
     )
-    add_datum_feature(
+    add_native_hole_callout(
         adapter,
-        top,
-        symbol_xy=(0.210, _DATUM_XY[1] - 0.010),
-        datum="B",
-        label="machined long-side datum",
-        entity=datum_b_edge,
-        shoulder=True,
-    )
-    add_datum_feature(
-        adapter,
-        top,
-        symbol_xy=(_DATUM_XY[0] + 0.013, 0.205),
-        datum="C",
-        label="machined left-end datum",
-        entity=datum_c_edge,
-        shoulder=True,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.310, 0.205),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["through-hole true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="4X DIA 13 THRU",
-        label="through-hole true position",
-        entity=hole_entities[2],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.300, 0.175),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["tapped-hole true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        # Native tag letters may change when a seat group is added.
-        quantity="ALL BLIND TAPPED HOLES",
-        label="tapped-hole true position",
-        entity=hole_entities[8],
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.300, 0.160),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum B perpendicularity to A"],
-        datums=("A",),
-        quantity="DATUM B LONG SIDE",
-        label="datum B perpendicularity to A",
-        entity=datum_b_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        top,
-        frame_xy=(0.170, 0.185),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum C perpendicularity to A and B"],
-        datums=("A", "B"),
-        quantity="DATUM C LEFT END",
-        label="datum C perpendicularity to A and B",
-        entity=datum_c_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        frame_xy=(0.300, 0.145),
-        characteristic="parallelism",
-        tolerance=GEOMETRIC_TOLERANCES_MM["top-pad parallelism to A"],
-        datums=("A",),
-        label="top-pad parallelism to A",
-        entity=top_pad_edge,
+        section,
+        edge_xy=tap_edge,
+        callout_xy=(SECTION_CENTER[0] + 0.050, SECTION_CENTER[1] - 0.025),
+        label="4X base column-retention bottoming taps",
     )
 
     add_property_linked_note(
@@ -450,6 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    add_property_linked_note(adapter, "Section View Note", *SECTION_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
@@ -457,9 +400,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # Pivot, lock, stop, block, foot, nameplate, and rocker-support seats
-        # are seven Hole Wizard tapped groups; the table replaces generic notes.
-        expected_redundant_notes=7,
+        # Seven top-side tapped groups plus the sectioned cross-tap group.
+        expected_redundant_notes=8,
         layout=SPEC.layout,
     )
 

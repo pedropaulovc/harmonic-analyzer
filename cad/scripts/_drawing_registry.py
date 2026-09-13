@@ -642,6 +642,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="frame_cross_screw",
+        part="frame_cross_screw",
+        artifact_stem="frame-cross-screw",
+        script_name="draw_frame_cross_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="tube_frame_cap",
+        part="tube_frame_cap",
+        artifact_stem="tube-frame-cap",
+        script_name="draw_tube_frame_cap.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="gooseneck_set_screw",
         part="gooseneck_set_screw",
         artifact_stem="gooseneck-set-screw",

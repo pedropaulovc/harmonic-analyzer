@@ -67,6 +67,12 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         assert str(spec.source) in deps
         assert dodo._assembly_execution_token(spec.part) in deps
         if drawing is draw_frame_assembly:
+            frame_dir = Path(draw_frame_assembly.__file__).resolve().parent
+            assert {
+                str(frame_dir / "frame_attachment_spec.py"),
+                str(frame_dir / "frame_cross_screw_spec.py"),
+                str(frame_dir / "tube_frame_cap_spec.py"),
+            } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps

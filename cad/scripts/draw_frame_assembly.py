@@ -19,15 +19,36 @@ from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
+    add_edge_dimension,
     create_blank_drawing_sheets,
+    create_section_view,
     finalize_drawing,
     insert_bom_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
+    set_reference_dimension,
     set_hidden_lines_visible,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from frame_attachment_spec import (
+    BASE_SCREW_Y,
+    CAP_TOP_Y,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    SCREW_SPOTFACE_DIAMETER,
+    TOP_SCREW_SEAT_Z,
+    TOP_SCREW_Y,
+    TUBE_CROSS_HOLE_DIAMETER,
+)
+from frame_cross_screw_spec import (
+    HEAD_DIA as CROSS_SCREW_HEAD_DIA,
+    SHANK_DIA as CROSS_SCREW_SHANK_DIA,
+    SHANK_LEN as CROSS_SCREW_SHANK_LEN,
+    THREAD as CROSS_SCREW_THREAD,
+)
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 
@@ -46,57 +67,78 @@ PNG = OUTPUTS.png
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the frame package requires the landscape ASME B template")
 
-SHEET_NAMES = ("WORKING VIEWS", "EXPLODED VIEW + BOM", "ASSEMBLY")
+SHEET_NAMES = (
+    "ASSEMBLED + JOINT SECTIONS",
+    "EXPLODED VIEW + BOM",
+    "FITTING + ASSEMBLY",
+)
 SHEET_SCALE = (1.0, 6.0)
-WORKING_FRONT_CENTER = (0.065, 0.155)
-WORKING_RIGHT_CENTER = (0.150, 0.155)
-WORKING_ISO_CENTER = (0.305, 0.160)
+WORKING_FRONT_CENTER = (0.080, 0.155)
+BASE_SECTION_CENTER = (0.190, 0.165)
+TOP_SECTION_CENTER = (0.325, 0.165)
+JOINT_SECTION_SCALE = (1.0, 4.0)
 EXPLODED_ISO_CENTER = (0.305, 0.170)
 EXPLODED_ISO_SCALE = (1.0, 8.0)
-ASSEMBLY_ISO_CENTER = (0.335, 0.185)
+ASSEMBLY_ISO_CENTER = (0.345, 0.145)
 ASSEMBLY_ISO_SCALE = (1.0, 10.0)
 BOM_ANCHOR = (0.018, 0.263)
+
+# Drawing-selection coordinate only. The manufacturing column pitch remains
+# defined by the released source assembly and the part drawings.
+_LEFT_COLUMN_X_M = -0.197
 
 BOM_QUANTITIES = {
     "harmonic-base": 1,
     "tube-frame": 4,
+    "tube-frame-cap": 4,
     "rocker-arm-support": 1,
     "lag-screw": 4,
     "top-frame": 1,
     "nameplate": 1,
     "fillister-screw": 4,
-    "frame-side-screw": 4,
+    "frame-cross-screw": 8,
     "gooseneck-set-screw": 1,
 }
+if sum(BOM_QUANTITIES.values()) != 29:
+    raise AssertionError("the released frame assembly must contain 29 components")
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 BOM_DESCRIPTIONS = {
     "harmonic-base": "TWO-PLATE FRAME BASE",
-    "tube-frame": "CAPPED HOLLOW FRAME COLUMN",
+    "tube-frame": "OPEN-END TUBULAR FRAME COLUMN",
+    "tube-frame-cap": "STEEL PUSH-ON CAP FOR 1 IN OD TUBE",
     "rocker-arm-support": "ROCKER-ARM SUPPORT CASTING",
     "lag-screw": "1/4-20 X 5/8 HEX-HEAD SCREW, 18-8 SS",
     "top-frame": "TOP-FRAME CASTING",
     "nameplate": "ENGRAVED BRASS MAKER'S NAMEPLATE",
     "fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
-    "frame-side-screw": "STEEL #8-32 X 1/2 NARROW FILLISTER-HEAD SLOTTED SCREW",
+    "frame-cross-screw": (
+        "ZINC-PLATED STEEL #10-32 X 1-3/4 NARROW FILLISTER-HEAD SLOTTED SCREW"
+    ),
     "gooseneck-set-screw": "STEEL 1/4-20 X 5/8 SQUARE-HEAD CUP-POINT SET SCREW",
 }
 BOM_PART_NUMBERS = {
     "harmonic-base": "MHA-035",
     "tube-frame": "MHA-083",
+    "tube-frame-cap": "MHA-133",
     "rocker-arm-support": "MHA-089",
     "lag-screw": "MHA-039",
     "top-frame": "MHA-077",
     "nameplate": "MHA-086",
     "fillister-screw": "MHA-030",
-    "frame-side-screw": "MHA-117",
+    "frame-cross-screw": "MHA-132",
     "gooseneck-set-screw": "MHA-118",
 }
-BOM_IDENTITY_ALIASES = {
-    number: stem for stem, number in BOM_PART_NUMBERS.items()
-}
+BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
+
+if CROSS_SCREW_THREAD != "#10-32":
+    raise AssertionError("MHA-132 must remain the approved #10-32 stock screw")
+if TUBE_CROSS_HOLE_DIAMETER <= CROSS_SCREW_SHANK_DIA:
+    raise AssertionError("tube match holes must clear the stock screw shank")
+if CROSS_SCREW_SHANK_LEN >= CASTING_FULL_THREAD_DEPTH:
+    raise AssertionError("stock cross screw must seat before reaching the tap bottom")
 
 # Distances are drawing-only displacements, not assembly requirements. The
 # sequence first moves a part and its fasteners together, then pulls each
@@ -104,36 +146,56 @@ BOM_NORMALIZED_ALIASES = {
 _EXPLODE_Y = 1
 _EXPLODE_X = 0
 _EXPLODE_Z = 2
-EXPLODE_STEP_COUNT = 11
+EXPLODE_STEP_COUNT = 12
 
-# Source-grounded instructions only. The frame's concealed column/base and
-# top-frame/column retention design is being resolved before this block is
-# released; the complete list is filled from that approved design.
+# These instructions carry only requirements that exist at assembly: matched
+# fits, the one-setup coaxial casting threads, transfer-drilled tube holes,
+# fitted stock caps, and checks against the actual purchased components. Part
+# drawings still define the other manufacturing features.
 ASSEMBLY_STEPS = "\n".join(
     (
-        "ASSEMBLY SEQUENCE",
-        "1. SET THE HARMONIC BASE WITH ITS DECK FACE UP.",
-        "2. PLACE THE FOUR CAPPED COLUMNS IN THE BASE SEATS, DOMED ENDS UP.",
-        "3. SEAT THE ROCKER-ARM SUPPORT FOOT ON THE DECK; TURN ITS WINDOWED",
-        "   FACES TOWARD THE LONG SIDES OF THE BASE.",
-        "4. INSTALL FOUR MHA-039 HOLD-DOWN SCREWS TOP-DOWN THROUGH THE SUPPORT",
-        "   FOOT INTO THE BASE TAPS. DRAW THE HEADS DOWN EVENLY.",
-        "5. LAY THE NAMEPLATE FLAT ON THE EAST DECK, DECORATED FACE UP AND",
-        "   READABLE FROM THE EAST SIDE.",
-        "6. INSTALL FOUR MHA-030 BRASS SCREWS THROUGH THE PLATE INTO THE BASE.",
-        "7. LOWER THE TOP FRAME OVER ALL FOUR COLUMNS WITH ITS GOOSENECK HUB",
-        "   ON THE EAST SIDE.",
-        "8. START MHA-118 IN THE HUB TAP; LEAVE ITS CUP POINT CLEAR OF THE",
-        "   GOOSENECK BORE FOR THE LATER GOOSENECK INSTALLATION.",
+        "MATCH-FIT AND ASSEMBLY SEQUENCE",
+        "PARTS ARRIVE COMPLETE TO THEIR CONTROLLED PART DRAWINGS.",
+        "1. COLUMNS OUT: RUN AN ACTUAL MHA-132 THROUGH BOTH CASTING THREAD",
+        "   SEGMENTS AT EVERY BASE/TOP SOCKET. EACH HEAD MUST SEAT BEFORE ITS",
+        "   TIP BOTTOMS; REMOVE THE SCREWS.",
+        "2. DECK UP. ASSIGN EACH MHA-083 TO ONE MHA-035 SOCKET; HAND-FIT TO",
+        "   FULL SHOULDER SEATING WITHOUT BIND OR ROCK; MATCH-MARK CORNER/ORIENTATION.",
+        "3. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
+        "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
+        "   SMALLER THAN THE 4.0386 TAP MINOR; PROTECT BOTH THREAD SEGMENTS.",
+        f"   REMOVE COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
+        "AND DEBURR.",
+        "   THE ACTUAL MHA-132 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
+        "4. FIT MHA-077 OVER ALL COLUMNS, HUB EAST. SET BOTH FRONT AND REAR",
+        "   CROSS-BORE AXES TO THE SHEET-1 HEIGHT DIMENSION; CLAMP LEVEL/SQUARE.",
+        "   MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
+        "5. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
+        "   AXIS THROUGH BOTH TUBE WALLS AS STEP 3; PROTECT BOTH THREAD SEGMENTS.",
+        f"   REMOVE MHA-077/COLUMNS; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f},",
+        "   DEBURR, AND VERIFY FREE PASSAGE OF THE ACTUAL MHA-132 SHANK.",
+        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THEIR MARKED",
+        "   ENTRY SIDES; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
+        "7. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
+        "   AFTER MATCH MARKS ALIGN AND MHA-132 HEADS SEAT, PUSH EACH CAP OVER",
+        "   THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S INSIDE SEAT.",
+        "8. SEAT MHA-089 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
+        "   MHA-039 TOP-DOWN AND DRAW DOWN EVENLY.",
+        "9. INSTALL MHA-086 DECORATED FACE UP WITH FOUR MHA-030 SCREWS.",
+        "10. START MHA-118 IN EAST HUB; LEAVE CUP POINT CLEAR OF GOOSENECK BORE.",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
     (
         "ASSEMBLY-ONLY CHECKS",
-        "1. SUPPORT FOOT IS FULLY SEATED ON THE DECK AND DOES NOT ROCK.",
-        "2. ALL FOUR SUPPORT HOLD-DOWN HEADS BEAR ON THE FOOT.",
-        "3. NAMEPLATE LIES FLAT, DECORATED FACE UP; ALL FOUR HEADS ARE SEATED.",
-        "4. TOP FRAME PASSES OVER ALL FOUR COLUMNS WITHOUT BINDING.",
+        "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED AND THE",
+        "   TOP FRAME IS LEVEL/SQUARE WITH FRONT/REAR AXES AT THE SHEET-1 HEIGHT.",
+        "2. ALL EIGHT MHA-132 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
+        "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
+        "   NEAR AND FAR CASTING THREAD SEGMENTS.",
+        "3. ALL FOUR MHA-133 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
+        "   MHA-077 RECESSES, TOPS ARE EVEN, AND TUBE ENDS ARE NOT DISTORTED.",
+        "4. MHA-089 AND MHA-086 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS BEAR.",
         "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-118 BACKED CLEAR.",
     )
 )
@@ -169,7 +231,9 @@ def _activate_sheet(adapter: Any, name: str) -> None:
         raise RuntimeError(f"active drawing sheet is {actual!r}, expected {name!r}")
 
 
-def _add_note_block(adapter: Any, text: str, xy: tuple[float, float], *, label: str) -> Any:
+def _add_note_block(
+    adapter: Any, text: str, xy: tuple[float, float], *, label: str
+) -> Any:
     note = add_note(adapter, text, *xy)
     if note is None:
         raise RuntimeError(f"failed to add {label}")
@@ -192,16 +256,126 @@ def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> N
     adapter.currentModel.EditRebuild3()
 
 
-def _align_working_views(front: Any, right: Any) -> None:
-    front = _early_bound(front, "IView")
-    right = _early_bound(right, "IView")
-    # swAlignViewHorizontalCenter = 2: preserve the ASME side-view row.
-    if not right.AlignWithView(2, front):
-        raise RuntimeError("failed to align the working right view to the front view")
-    if int(right.GetAlignment()) not in {2, 3}:  # aligned / aligned + children
-        raise RuntimeError("working right view alignment did not persist")
-    if int(front.GetAlignment()) not in {1, 3}:  # has aligned child / both
-        raise RuntimeError("working front view does not retain its aligned child")
+def _checked_height_dimension(
+    adapter: Any, display: Any, *, expected_mm: float, label: str
+) -> Any:
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - expected_mm) > 1e-5:
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {expected_mm:g} mm"
+        )
+    if int(display.SetPrecision3(2, -1, -1, -1)) < 0:
+        raise RuntimeError(f"failed to set {label} precision")
+    if int(display.GetPrimaryPrecision2()) != 2:
+        raise RuntimeError(f"{label} did not retain two-place precision")
+    adapter.currentModel.EditRebuild3()
+    return display
+
+
+def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
+    """Add native overall and top-cross-screw setup heights."""
+    bottom_pick = model_point_in_view(
+        adapter,
+        front,
+        (_LEFT_COLUMN_X_M, 0.0, -TOP_SCREW_SEAT_Z / 1000.0),
+        label="frame base underside dimension pick",
+    )
+    cap_top_pick = model_point_in_view(
+        adapter,
+        front,
+        (_LEFT_COLUMN_X_M, CAP_TOP_Y / 1000.0, -TOP_SCREW_SEAT_Z / 1000.0),
+        label="finished cap top dimension pick",
+    )
+    overall = add_edge_dimension(
+        adapter,
+        front,
+        p0=bottom_pick,
+        p1=cap_top_pick,
+        text_xy=(0.017, WORKING_FRONT_CENTER[1]),
+        label="finished frame overall height",
+        orientation="vertical",
+    )
+    overall = _checked_height_dimension(
+        adapter,
+        overall,
+        expected_mm=CAP_TOP_Y,
+        label="finished frame overall height",
+    )
+    overall = set_reference_dimension(
+        adapter,
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="finished frame overall height reference",
+    )
+
+    screw_center = (
+        _LEFT_COLUMN_X_M,
+        TOP_SCREW_Y / 1000.0,
+        -TOP_SCREW_SEAT_Z / 1000.0,
+    )
+    screw_edge_pick = model_point_in_view(
+        adapter,
+        front,
+        (
+            screw_center[0] + CROSS_SCREW_HEAD_DIA / 2000.0,
+            screw_center[1],
+            screw_center[2],
+        ),
+        label="top cross-screw head dimension pick",
+    )
+    screw_axis = add_edge_dimension(
+        adapter,
+        front,
+        p0=bottom_pick,
+        p1=screw_edge_pick,
+        text_xy=(0.027, WORKING_FRONT_CENTER[1]),
+        label="installed top cross-screw axis height",
+        orientation="vertical",
+    )
+    screw_axis = set_arc_endpoints_to_center(
+        adapter, screw_axis, label="installed top cross-screw axis height"
+    )
+    screw_axis = _checked_height_dimension(
+        adapter,
+        screw_axis,
+        expected_mm=TOP_SCREW_Y,
+        label="installed top cross-screw axis height",
+    )
+    return overall, screw_axis
+
+
+def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
+    """Cut plan sections through the lower and upper cross-screw axes."""
+    bound_front = _early_bound(front, "IView")
+    outline = tuple(float(value) for value in bound_front.GetOutline())
+    if len(outline) != 4 or outline[0] >= outline[2]:
+        raise RuntimeError(f"working front view has invalid outline {outline!r}")
+    line_x = (outline[0] - 0.002, outline[2] + 0.002)
+    sections = []
+    for axis_y_mm, center, section_label, label in (
+        (BASE_SCREW_Y, BASE_SECTION_CENTER, "A", "base socket joint"),
+        (TOP_SCREW_Y, TOP_SECTION_CENTER, "B", "top socket joint"),
+    ):
+        cut_y = model_point_in_view(
+            adapter,
+            front,
+            (0.0, axis_y_mm / 1000.0, 0.0),
+            label=f"{label} cutting-plane station",
+        )[1]
+        section = create_section_view(
+            adapter,
+            front,
+            line_start=(line_x[0], cut_y),
+            line_end=(line_x[1], cut_y),
+            view_xy=center,
+            section_label=section_label,
+            scale=JOINT_SECTION_SCALE,
+            label=label,
+        )
+        set_hidden_lines_visible(adapter, section)
+        sections.append(section)
+    return sections[0], sections[1]
 
 
 def _component_stem(component: Any) -> str:
@@ -294,9 +468,7 @@ def _add_native_explode_step(
 ) -> Any:
     if axis not in {_EXPLODE_X, _EXPLODE_Y, _EXPLODE_Z} or distance_m <= 0.0:
         raise ValueError(f"{label}: invalid explode direction or distance")
-    expected_names = _select_explode_components(
-        source_model, components, label=label
-    )
+    expected_names = _select_explode_components(source_model, components, label=label)
     before = int(configuration.GetNumberOfExplodeSteps())
     # AddExplodeStep2's generated early-bound wrapper returns
     # (IExplodeStep, swCreateExplodeStepError_e). The final [out] argument is
@@ -386,25 +558,39 @@ def _create_temporary_native_explode(
         raise RuntimeError("auto explode steps remain before authored sequence")
 
     groups = _top_level_component_groups(assembly)
-    front_side_screws = tuple(
-        component
-        for component in groups["frame-side-screw"]
-        if _component_origin(component)[2] < 0.0
-    )
-    rear_side_screws = tuple(
-        component
-        for component in groups["frame-side-screw"]
-        if _component_origin(component)[2] > 0.0
-    )
-    if len(front_side_screws) != 2 or len(rear_side_screws) != 2:
-        raise RuntimeError("frame side screws do not split into two front/two rear")
+    lower_cross_screws: list[Any] = []
+    top_cross_screws: list[Any] = []
+    front_cross_screws: list[Any] = []
+    rear_cross_screws: list[Any] = []
+    for component in groups["frame-cross-screw"]:
+        _x, y_m, z_m = _component_origin(component)
+        y_mm = y_m * 1000.0
+        if abs(y_mm - BASE_SCREW_Y) <= 1e-3:
+            lower_cross_screws.append(component)
+        elif abs(y_mm - TOP_SCREW_Y) <= 1e-3:
+            top_cross_screws.append(component)
+        else:
+            raise RuntimeError(
+                f"frame cross screw has unexpected axis height {y_mm:g} mm"
+            )
+        if z_m < 0.0:
+            front_cross_screws.append(component)
+        elif z_m > 0.0:
+            rear_cross_screws.append(component)
+        else:
+            raise RuntimeError("frame cross screw lies on the assembly mid-plane")
+    if (len(lower_cross_screws), len(top_cross_screws)) != (4, 4):
+        raise RuntimeError("frame cross screws do not split into four lower/four top")
+    if (len(front_cross_screws), len(rear_cross_screws)) != (4, 4):
+        raise RuntimeError("frame cross screws do not split into four front/four rear")
 
     plans = (
+        ("tube caps lift", groups["tube-frame-cap"], _EXPLODE_Y, False, 0.050),
         (
             "top frame clears columns",
             (
                 *groups["top-frame"],
-                *groups["frame-side-screw"],
+                *top_cross_screws,
                 *groups["gooseneck-set-screw"],
             ),
             _EXPLODE_Y,
@@ -412,15 +598,15 @@ def _create_temporary_native_explode(
             0.150,
         ),
         (
-            "front side screws withdraw",
-            front_side_screws,
+            "front cross screws withdraw",
+            front_cross_screws,
             _EXPLODE_Z,
             True,
             0.050,
         ),
         (
-            "rear side screws withdraw",
-            rear_side_screws,
+            "rear cross screws withdraw",
+            rear_cross_screws,
             _EXPLODE_Z,
             False,
             0.050,
@@ -518,9 +704,7 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
 
     item_column = column_named(lambda cell: cell.startswith("ITEM NO"), "ITEM NO.")
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
-    description_column = column_named(
-        lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
-    )
+    description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
 
     actual: dict[str, tuple[int, str, str, str]] = {}
@@ -536,8 +720,7 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
         )
     if set(actual) != set(BOM_COMPONENTS):
         raise RuntimeError(
-            f"frame BOM identities {sorted(actual)!r} != "
-            f"{sorted(BOM_COMPONENTS)!r}"
+            f"frame BOM identities {sorted(actual)!r} != {sorted(BOM_COMPONENTS)!r}"
         )
     expected_items = {str(item) for item in range(1, len(BOM_COMPONENTS) + 1)}
     actual_items = {values[1] for values in actual.values()}
@@ -581,9 +764,7 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
 
 def _place_package(adapter: Any) -> None:
     new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
-    create_blank_drawing_sheets(
-        adapter, SHEET_NAMES, label="frame assembly package"
-    )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="frame assembly package")
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
@@ -593,31 +774,14 @@ def _place_package(adapter: Any) -> None:
         *WORKING_FRONT_CENTER,
         scale=SHEET_SCALE,
     )
-    right = place_view(
-        adapter,
-        str(SOURCE),
-        "*Right",
-        *WORKING_RIGHT_CENTER,
-        scale=SHEET_SCALE,
-    )
-    iso = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *WORKING_ISO_CENTER,
-        scale=SHEET_SCALE,
-    )
-    for label, view in (("working front", front), ("working right", right)):
-        _set_exploded_state(adapter, view, False, label=label)
-        set_hidden_lines_visible(adapter, view)
-    _align_working_views(front, right)
-    _set_exploded_state(adapter, iso, False, label="working isometric")
-    set_high_quality_shaded_with_edges(
-        adapter, iso, label="working isometric"
-    )
+    _set_exploded_state(adapter, front, False, label="working front")
+    set_hidden_lines_visible(adapter, front)
+    _add_frame_height_dimensions(adapter, front)
+    _create_joint_sections(adapter, front)
+
     _add_note_block(
         adapter,
-        "FINISHED ASSEMBLY - WORKING POSITION",
+        "WORKING POSITION - A-A BASE JOINT / B-B TOP JOINT",
         (0.018, 0.263),
         label="working-view heading",
     )
@@ -631,9 +795,7 @@ def _place_package(adapter: Any) -> None:
         scale=EXPLODED_ISO_SCALE,
     )
     _set_exploded_state(adapter, exploded, True, label="exploded isometric")
-    set_high_quality_shaded_with_edges(
-        adapter, exploded, label="exploded isometric"
-    )
+    set_high_quality_shaded_with_edges(adapter, exploded, label="exploded isometric")
     table = insert_bom_table(
         adapter,
         exploded,
@@ -673,16 +835,12 @@ def _place_package(adapter: Any) -> None:
     set_high_quality_shaded_with_edges(
         adapter, instruction_iso, label="assembly instruction isometric"
     )
-    _add_note_block(
-        adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence"
-    )
-    _add_note_block(
-        adapter, ASSEMBLY_CHECKS, (0.018, 0.105), label="assembly checks"
-    )
+    _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
+    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.115), label="assembly checks")
     _add_note_block(
         adapter,
         "FINISHED ASSEMBLY 1:10",
-        (0.300, 0.118),
+        (0.300, 0.078),
         label="assembly isometric caption",
     )
 
@@ -723,9 +881,7 @@ async def build(adapter: Any) -> dict[str, str]:
     explode_name = ""
     artifacts: dict[str, str] | None = None
     try:
-        assembly, explode_name = _create_temporary_native_explode(
-            adapter, source_model
-        )
+        assembly, explode_name = _create_temporary_native_explode(adapter, source_model)
         _place_package(adapter)
         artifacts = await finalize_drawing(
             adapter,

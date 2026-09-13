@@ -1,0 +1,13 @@
+tube-frame-cap:
+  title: Metal Round Cap
+  number: MHA-133
+  stock_name: Metal Round Cap
+  supplier: McMaster-Carr
+  supplier_skus: [9275K141]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 9275K141
+  finish: as supplied
+  quantity: 4
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

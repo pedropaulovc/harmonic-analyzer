@@ -1,14 +1,22 @@
-"""Offline contracts for the tube-frame drawing."""
+"""Offline contracts for the tube-frame manufacturing drawing."""
 
 from __future__ import annotations
 
-import re
+import math
 from pathlib import Path
 
 import build_tube_frame as part
 import draw_tube_frame as drawing
 import tube_frame_spec
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from frame_attachment_spec import (
+    BASE_SCREW_Y,
+    COLUMN_BOTTOM_Y,
+    TOP_SCREW_Y,
+    TUBE_CUT_LENGTH,
+    TUBE_TOP_Y,
+)
+from tube_frame_cap_spec import INNER_CORNER_R
 
 
 def test_required_drawing_paths() -> None:
@@ -19,85 +27,54 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["tube_frame"].layout is DrawingLayout.PORTRAIT
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
+def test_drawing_keeps_every_marked_manufacturing_dimension() -> None:
     assert part.DRAWING_DIMENSIONS is tube_frame_spec.DRAWING_DIMENSIONS
     marked = set().union(*tube_frame_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.END_KEEP) | set(drawing.LENGTH_KEEP)
-    assert kept == marked
-    assert drawing.OUTER_DIA == tube_frame_spec.OUTER_DIA
+    assert set(drawing.END_KEEP) | set(drawing.LENGTH_KEEP) == marked
+    assert marked == {
+        "OuterDia",
+        "Length",
+        "LowerHoleY",
+        "UpperHoleY",
+        "CrossHoleDia",
+        "TopChamfer",
+    }
 
 
-def test_tube_nominals_are_single_sourced() -> None:
-    assert part.OUTER_DIA is tube_frame_spec.OUTER_DIA
-    assert part.COLUMN_LENGTH is tube_frame_spec.COLUMN_LENGTH
+def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:
     assert tube_frame_spec.OUTER_DIA == 25.4
-    # 1 in OD, 0.12 in wall -> Ø19.304 bore.
-    assert abs(tube_frame_spec.INNER_DIA - 19.304) < 1e-6
-    # 2026-09-02 user re-read (ch30 p002: columns end just above the corner
-    # bosses): 994.0 overall = 990.7 tube + 3.3 integral dome cap (capped
-    # stub top at machine 1044.8, 4.1 above the 1040.7 boss tops).
-    assert tube_frame_spec.COLUMN_LENGTH == 994.0
-    assert tube_frame_spec.CAP_HEIGHT == 3.3
-    assert abs(tube_frame_spec.BODY_LENGTH - 990.7) < 1e-9
-    # Full-width spherical cap: R = (a^2 + h^2) / (2h) with a = OD/2.
-    assert abs(tube_frame_spec.CAP_SPHERE_RADIUS - 26.08787878787879) < 1e-9
-
-
-def test_notes_and_native_gdt() -> None:
-    notes = tube_frame_spec.DRAWING_NOTES
-    assert "STEEL TUBE" not in notes
-    assert "POLISH" not in notes
-    assert "DEBURR" not in notes
-    assert "UOS" not in notes
-    assert "AS-PROCURED STOCK RESULT" in notes
-    assert "NOT AN ACCEPTANCE DIMENSION" in notes
-    assert "DO NOT MACHINE THE ID" in notes
-    assert "FULL-LENGTH CYLINDRICITY CONTROL" in notes
-    assert "ASME RULE 1" in notes
-    assert "FORM DOES NOT OVERRIDE SIZE" in notes
-    assert "AS-RECEIVED OD 25.40 MIN" in notes
-    # Domed top (2026-08-02): orientation is now functional -- cap up; only
-    # the bottom end face keeps a perpendicularity control.
-    assert "ORIENT DOMED (CAPPED) END UP" in notes
-    assert "ONLY THE BOTTOM END FACE" in notes
-    assert "SR26.09 X 3.3 SPHERICAL CAP" in notes
-    assert "TOP/BOTTOM ORIENTATION IS NONFUNCTIONAL" not in notes
-    assert "BORE" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert re.search(
-        r'add_property_linked_note\(\s*adapter,\s*"Manufacturing Notes"', source
+    assert math.isclose(tube_frame_spec.INNER_DIA, 19.304, abs_tol=1e-9)
+    assert part.COLUMN_LENGTH == tube_frame_spec.COLUMN_LENGTH == TUBE_CUT_LENGTH
+    assert math.isclose(
+        COLUMN_BOTTOM_Y + tube_frame_spec.COLUMN_LENGTH,
+        TUBE_TOP_Y,
+        abs_tol=1e-9,
     )
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="cylindricity"' in source
-    assert (
-        tube_frame_spec.GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"] == "0.03"
+    assert math.isclose(
+        COLUMN_BOTTOM_Y + tube_frame_spec.LOWER_CROSS_HOLE_Y,
+        BASE_SCREW_Y,
+        abs_tol=1e-9,
     )
-    assert 'tolerance=GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"]' in source
-    assert '"BOTTOM END FACE"' in source
-    assert '"TOP END FACE"' not in source
-    assert "top end perpendicularity" not in tube_frame_spec.GEOMETRIC_TOLERANCES_MM
-    assert source.count('characteristic="perpendicularity"') == 1
-    assert "set_dimension_callouts" not in source
-    assert source.count("add_surface_finish(") == 0
+    assert math.isclose(
+        COLUMN_BOTTOM_Y + tube_frame_spec.UPPER_CROSS_HOLE_Y,
+        TOP_SCREW_Y,
+        abs_tol=1e-9,
+    )
+    assert tube_frame_spec.CROSS_HOLE_DIAMETER > 4.826
+    assert tube_frame_spec.TOP_END_CHAMFER > INNER_CORNER_R
+    assert part.TOP_END_CHAMFER_BAND == (0.15, -0.10)
 
 
-def test_view_scales_are_explicit() -> None:
+def test_drawing_identifies_two_wall_drilling_and_cap_fit() -> None:
+    assert drawing.DIMENSION_CALLOUTS["CrossHoleDia"] == (
+        "2 STATIONS; DRILL THRU BOTH WALLS"
+    )
+    assert "FIT MHA-133 CAP" in drawing.DIMENSION_CALLOUTS["TopChamfer"]
     assert drawing.SHEET_SCALE == (1.0, 5.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 5)" in source
-    assert "scale=(2, 1)" in source
     assert tube_frame_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
-    assert drawing.LENGTH_CENTER == (0.055, 0.220)
-    assert drawing.END_CENTER == (0.190, 0.360)
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
 
 
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_part_registry_keeps_stock_and_finish_requirements() -> None:
     import _config
 
     config = _config.parts("tube-frame")

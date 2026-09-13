@@ -21,6 +21,14 @@ from cone_pivot_post_installation import (
 from build_cone_lock_knob import COLLAR_DIA as KNOB_COLLAR_DIA
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
+from frame_attachment_spec import (
+    BASE_SCREW_SEAT_Z,
+    BASE_SCREW_Y,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    COLUMN_SOCKET_DEPTH,
+    COLUMN_SOCKET_DIAMETER,
+)
 
 
 def test_required_drawing_paths() -> None:
@@ -33,7 +41,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is harmonic_base_spec.DRAWING_DIMENSIONS
     marked = set().union(*harmonic_base_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP)
+    kept = set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked
     assert (drawing.BOTTOM_LENGTH, drawing.BOTTOM_WIDTH) == (
         harmonic_base_spec.BOTTOM_LENGTH,
@@ -53,6 +61,27 @@ def test_plate_geometry_is_single_sourced() -> None:
     assert math.isclose(harmonic_base_spec.BOTTOM_WIDTH, 11.0 * 25.4)
     assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
 
+
+def test_column_sockets_and_cross_taps_share_the_frame_contract() -> None:
+    assert part.COLUMN_SOCKET_DIAMETER == COLUMN_SOCKET_DIAMETER == 25.5
+    assert part.COLUMN_SOCKET_DEPTH == COLUMN_SOCKET_DEPTH == 25.4
+    assert set(part.COLUMN_SOCKET_XZ) == {
+        (-197.0, -112.0),
+        (-197.0, 112.0),
+        (197.0, -112.0),
+        (197.0, 112.0),
+    }
+    assert part.BASE_CROSS_TAP_SPEC.kind == "tapped_bottoming"
+    assert part.BASE_CROSS_TAP_SPEC.size == "#10-32"
+    assert part.BASE_CROSS_TAP_SPEC.thread_class == "2B"
+    assert part.BASE_CROSS_TAP_SPEC.depth_mm == CASTING_TAP_DRILL_DEPTH
+    assert (
+        part.BASE_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]
+        == CASTING_FULL_THREAD_DEPTH
+    )
+    assert part.BASE_SCREW_Y == BASE_SCREW_Y
+    assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == BASE_SCREW_SEAT_Z
+    assert harmonic_base_spec.SECTION_VIEW_NOTE == "SECTION A-A SCALE 1:4"
 
 
 def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:

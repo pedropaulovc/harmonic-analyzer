@@ -33,6 +33,11 @@ from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
 from pinion_cam_pin_geometry import PIN_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
+from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
+from frame_cross_screw_spec import SHANK_DIA as _FRAME_CROSS_DIA
+from frame_cross_screw_spec import SHANK_LEN as _FRAME_CROSS_LENGTH
+from frame_cross_screw_spec import THREAD as _FRAME_CROSS_THREAD
+from _hole_spec import TAP_DRILL_MM
 
 
 def _smooth_annulus_limit_mm3(
@@ -130,6 +135,18 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
 }
 
+# Minimum socket chord across the screw's complete major-diameter envelope.
+# Only the two tapped casting lands may overlap the stock helical thread.
+# Neither the clearance-drilled tubes nor the cap skirts receive an exemption.
+_FRAME_CROSS_CASTING_LENGTH = _FRAME_CROSS_LENGTH - math.sqrt(
+    COLUMN_SOCKET_DIAMETER**2 - _FRAME_CROSS_DIA**2
+)
+_FRAME_CROSS_GATE_LIMIT_MM3 = _smooth_annulus_limit_mm3(
+    _FRAME_CROSS_DIA,
+    TAP_DRILL_MM[_FRAME_CROSS_THREAD],
+    _FRAME_CROSS_CASTING_LENGTH,
+)
+
 _FRAME_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "lag-screw",
@@ -142,10 +159,16 @@ _FRAME_ALLOWED_PAIRS = {
         ),
     ),
     **_numbered_pairs(
-        "frame-side-screw",
+        "frame-cross-screw",
         range(1, 5),
+        "harmonic-base",
+        _FRAME_CROSS_GATE_LIMIT_MM3,
+    ),
+    **_numbered_pairs(
+        "frame-cross-screw",
+        range(5, 9),
         "top-frame",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.7),
+        _FRAME_CROSS_GATE_LIMIT_MM3,
     ),
     frozenset(("gooseneck-set-screw-1", "top-frame-1")): _smooth_annulus_limit_mm3(
         6.35, 5.105, 6.95

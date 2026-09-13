@@ -35,16 +35,16 @@ RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows. ``build_harmonic_base`` marks exactly these; ``draw_harmonic_base``
-# keeps exactly their union. Only the BOTTOM plate's plan footprint is a marked
-# sketch dimension -- it is the overall envelope; the top plate is fixed by the
-# side reveal note (note 2), and the plate THICKNESSES are
-# parameters (not sketch dims) carried in note 2 as well. Keeping the marked set
-# to the two overalls avoids stacking four dimensions on a 457 mm plan that
-# barely fits the sheet. ---
+# --- Marked-dimension contract. The plan carries the overall footprint and
+# one representative socket's centre coordinates/4X diameter. Section A-A
+# carries the socket and spotface depths; the cross tap is a native Hole Wizard
+# callout from the same section. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
+    "ColumnSocketProfile": {"Socket0X", "Socket0Z", "SocketDia"},
+    "ColumnSockets": {"SocketDepth"},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia"},
+    "BaseSpotFaceRear": {"SpotFaceDepth"},
 }
 
 # Lines stay short so two lower-field note columns remain clear of the side
@@ -57,8 +57,8 @@ DRAWING_NOTES = "\n".join(
         "2. UPPER PAD 444.50 X 266.70;",
         "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
         "   NEAR LEFT END 6.35 +/-0.10 FROM C.",
-        "3. DATUM A = UNDERSIDE FACE; B = LONG-SIDE FACE; C = LEFT-END FACE;",
-        "   HOLE-TABLE ORIGIN = B-C. LOCATIONS ARE BASIC.",
+        "3. TOP-VIEW HOLE-TABLE LOCATIONS ORIGINATE AT THE FINISHED",
+        "   REAR LONG-SIDE / LEFT-END THEORETICAL SHARP CORNER.",
         "4. FOUR DIA 13.00 THRU / DIA 23.00 C'BORES FROM UNDERSIDE,",
         "   9.52 +/-0.10 DEEP. PLAN RIMS ARE THE DIA 13.00 THRU FEATURES.",
         "   C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER",
@@ -74,7 +74,7 @@ DRAWING_NOTES_B = "\n".join(
         "   PLUG LEAD >=5P; P = THREAD PITCH; DRILL POINT EXTRA.",
         '5A. STAMP SERIAL "2" 3.50 HIGH X 0.30 DEEP ON THE RIM TOP',
         "   BESIDE THE NAMEPLATE (SEE MODEL); BRIGHT, UNPAINTED.",
-        "6. DURING COATING, MASK DATUM A/B/C FACES AND ALL BORES/THREADS;",
+        "6. DURING COATING, MASK FINISHED FACES AND ALL BORES/THREADS;",
         "   COAT PAD SIDES, ROOTS AND RIM. DECK INSIDE THE RIM: BLACK",
         "   ENAMEL, SAME SYSTEM AND DFT AS THE FINISH CALLOUT.",
         "7. VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88",
@@ -82,16 +82,15 @@ DRAWING_NOTES_B = "\n".join(
         "   FLANGE TOP RIM, RIM TOP AND UNDERSIDE RIM C1.59 X 45 DEG.",
         "8. RAISED RIM 7.00 WIDE X 2.50 HIGH, OUTER FACES FLUSH WITH THE",
         "   PAD SIDES; DECK STAYS AT 50.80.",
+        "9. SECTION A-A: FOUR DIA25.50 +0.05/0 SOCKETS, 25.40 DEEP;",
+        "   MATCH FIT MHA-083 TUBE COLUMN, 0.10 TO 0.20 DIAMETRAL CLEARANCE.",
+        "   FOUR #10-32 UNF-2B BOTTOMING TAPS: 46.00 FULL THREAD / 48.00",
+        "   CYLINDRICAL TAP-DRILL DEPTH FROM DIA9.00 SPOT-FACED SEATS.",
     )
 )
+SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"
 SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "through-hole true position": "0.20",
-    "tapped-hole true position": "0.50",
-    "datum B perpendicularity to A": "0.10",
-    "datum C perpendicularity to A and B": "0.10",
-    "top-pad parallelism to A": "0.10",
-}
+# Base/frame parts carry no datums or feature-control frames under the drawing
+# simplicity policy.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}
