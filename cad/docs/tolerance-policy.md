@@ -16,8 +16,17 @@ Accuracy-driven limits on the **critical features** live in
 by the sensitivity model [`cad/scripts/error_budget.py`](../scripts/error_budget.py)
 (`uv run python cad/scripts/error_budget.py`; gate `check:budget`,
 [`test_error_budget.py`](../scripts/test_error_budget.py)). Every number quoted below comes
-from that report; regenerate it rather than trusting the prose. The operating and readout
-procedure the residual assumes is itself a **manufacturing output**: `error_budget.py
+from that report; regenerate it rather than trusting the prose.
+
+**What this buys, concretely:** every individual part tolerance on a critical feature can be
+traced to a number. Ask "why ±0.025 on the cam eccentricity, why ±1.25 % on the springs,
+why ±0.10 on a lever arm and not ±0.05?" and the answer is the sensitivity table, the Monte
+Carlo row and the allowance — not a habit. That was the goal of the exercise, and the
+per-feature answer is the "Result" section below. The readout procedure turned out to be a
+necessary part of the same answer (a tolerance is only meaningful against the accuracy the
+machine can reach, and most of that accuracy lives in how the trace is read); it is
+explained for the operator in [`device-operation.md`](./device-operation.md), with the
+1898 provenance for each step, and shipped as a **manufacturing output**: `error_budget.py
 --procedure` renders it from the same model and `cut_release` ships it as `READOUT.md` in the
 bundle root (the stick drawing's note 5 points at it), so a builder working from the release
 has the station table and every correction, not just the drawings.

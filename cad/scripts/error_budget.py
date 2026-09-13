@@ -1107,6 +1107,14 @@ only by following every step below. Coefficient $k$ is read at crank position
 $\\theta_k = k\\pi/20$, i.e. with the crank stopped on its index after $2k$
 turns of the {CRANK_TURNS_PER_PERIOD}-turn period.
 
+**Why there is arithmetic after the pen stops** -- and why every step of it is
+Michelson's own procedure (1898, pp. 10-11: "the required coefficients are
+then proportional to the ordinates erected at these divisions"; every
+published table normalised to the greatest term) -- is explained in
+`cad/docs/device-operation.md`. Read that first if the steps below are a
+surprise: the machine draws a *curve of coefficients* whose scale is set by
+the magnifier, so reading and normalising were always part of analysis.
+
 At a glance (the station table below is the only data needed beyond the
 readings):
 
