@@ -215,7 +215,8 @@ flowchart LR
 ## Result: the budget for the critical features
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, every feature
-uniform within ± tolerance per channel, applied to each bar's **physical hook waveform** at its
+uniform within ± tolerance per channel — `class: channel` drawn once per draw and shared by
+every trial, `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
 station — so a gain error scales the channel's second harmonic and a phase error rotates it, and
 the operator's fixed κ correction leaves δ·κ in the scatter — then through the shipped readout;
 every bar at the physical amplitude its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
@@ -234,8 +235,8 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 | **spring rate** | **1.25 %** | **0.113** | **0.60** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
 | cam phase | 0.25° | 0.039 | 0.21 | 0.23 | 0.32 | on the cylinder-gear drawing's native `NotchPhase` angular dimension (lobe axis to notch radial, 1.50° ± 0.25°) |
 | mesh lag spread | 0.14° | 0.022 | 0.12 | 0.13 | 0.32 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.082 | 0.46 | 0.53 | 0.15 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
-| **all combined** | | **0.154** | **0.81** | **1.50** | | targets 0.30 / 1.5 / 2.0 |
+| station setting (setup) | 0.25 mm | 0.081 | 0.47 | 0.54 | 0.15 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored. **Scored at the ordinate scale the pen forces** (broad inputs at 0.2–0.5 of full scale, see the magnifier below), where a fixed 0.25 mm is 2–5× the share it is at full scale |
+| **all combined** | | **0.154** | **0.82** | **1.50** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.

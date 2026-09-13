@@ -792,3 +792,57 @@ def test_unsupported_distribution_fails_loud(budget, nom):
     }
     with pytest.raises(ValueError, match="distribution"):
         eb.monte_carlo(bad, nom, setups)
+
+
+def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
+    """`class: channel` is the machine's deviation -- one draw shared by every
+    trial; `class: setup` (station setting) is re-introduced each time the
+    operator resets the bars. Two trials of the SAME input must therefore see
+    identical channel-class errors draw for draw, and different setup-class
+    ones -- otherwise the pooled worst coefficient models one setting pattern
+    reused across trials."""
+    base = eb.reference_inputs()
+    monkeypatch.setattr(
+        eb, "reference_inputs", lambda: {**base, "twin": base["all_ones"]}
+    )
+    small = {
+        **budget,
+        "monte_carlo": {**budget["monte_carlo"], "draws": 50},
+        "reference_inputs": ["all_ones", "twin", "pair_1_20"],
+    }
+    trial = eb.NominalTrial(nom)
+    setups = {
+        n: trial.magnifier_setup(eb.reference_inputs()[n])
+        for n in small["reference_inputs"]
+    }
+    seen = {}
+
+    real = eb._channel_model
+
+    def spy(x, nom_, dev, sens, tol, scale):
+        seen.setdefault(len(seen), {k: v.copy() for k, v in dev.items()})
+        return real(x, nom_, dev, sens, tol, scale)
+
+    monkeypatch.setattr(eb, "_channel_model", spy)
+    eb.monte_carlo(small, nom, setups)
+    channel = [
+        k for k, f in small["critical_features"].items() if f["class"] == "channel"
+    ][0]
+    per_feature = [v for v in seen.values() if set(v) == {channel}]
+    assert np.array_equal(
+        per_feature[0][channel], per_feature[1][channel]
+    )  # all_ones, twin
+    setup = [v for v in seen.values() if set(v) == {"station_setting"}]
+    assert not np.array_equal(setup[0]["station_setting"], setup[1]["station_setting"])
+    bad = {
+        **small,
+        "critical_features": {
+            **small["critical_features"],
+            "station_setting": {
+                **small["critical_features"]["station_setting"],
+                "class": "operator",
+            },
+        },
+    }
+    with pytest.raises(ValueError, match="class"):
+        eb.monte_carlo(bad, nom, setups)

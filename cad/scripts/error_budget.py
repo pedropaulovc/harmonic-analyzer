@@ -866,19 +866,32 @@ def monte_carlo(
             f"reference_inputs not defined in error_budget.py: {sorted(unknown)}"
         )
 
+    # ``class: channel`` -- a part's deviation is the machine's: ONE draw per
+    # draw, shared by every trial. ``class: setup`` -- re-introduced every
+    # trial (the operator resets the bars), so each reference input gets its
+    # own draw and the pooled worst coefficient sees independent settings.
+    for key, f in feats.items():
+        if f["class"] not in ("channel", "setup"):
+            raise ValueError(
+                f"{key}: class must be channel or setup, got {f['class']!r}"
+            )
+
+    def draw(f: dict[str, Any]) -> np.ndarray:
+        return rng.uniform(-f["tolerance"], f["tolerance"], size=(draws, N_ELEMENTS))
+
     all_dev = {
-        key: rng.uniform(-f["tolerance"], f["tolerance"], size=(draws, N_ELEMENTS))
+        key: draw(f) if f["class"] == "channel" else {n: draw(f) for n in names}
         for key, f in feats.items()
     }
 
-    def stats(dev: dict[str, np.ndarray]) -> dict[str, Any]:
+    def stats(dev: dict[str, Any]) -> dict[str, Any]:
         per_input = {}
         pooled = []
         for name in names:
             e = _channel_model(
                 inputs[name],
                 nom,
-                dev,
+                {k: v[name] if isinstance(v, dict) else v for k, v in dev.items()},
                 sens,
                 feats["station_setting"]["tolerance"],
                 setups[name].ordinate_scale,
