@@ -76,6 +76,7 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "GRIP-TO-HUB JUNCTION R0.25 MAX" in normalized
     assert "EXEMPT FROM THE TITLE-BLOCK EDGE-BREAK" in normalized
 
+
 def test_model_tolerances_and_process_callouts_define_machining_contract() -> None:
     assert model_toleranced_dimensions(lever) == {
         ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",

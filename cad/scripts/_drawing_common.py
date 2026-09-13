@@ -2371,6 +2371,15 @@ def add_edge_dimension(
                 "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
             )
             location = f"at sheet ({x:g}, {y:g})"
+        elif selected_type == "SILHOUETTE":
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _sw_type_info.early_bound_or_flag(
+                requested_entity, "ISilhouetteEdge", "Select2"
+            )
+            selected = selectable.Select2(index > 0, selection_data)
+            location = "by entity"
         else:
             selected = view.SelectEntity(requested_entity, index > 0)
             location = "by entity"
@@ -2380,12 +2389,11 @@ def add_edge_dimension(
             )
         if requested_entity is not None:
             manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-            selected_entity = manager.GetSelectedObject6(index + 1, -1)
-            if selected_entity is None or int(
-                adapter.swApp.IsSame(selected_entity, requested_entity)
-            ) != 1:
+            count = int(manager.GetSelectedObjectCount2(-1))
+            if count != index + 1:
                 raise RuntimeError(
-                    f"{label} {selected_type.lower()} {index} selected a different entity"
+                    f"{label} {selected_type.lower()} {index} changed the "
+                    f"selection count to {count}"
                 )
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)

@@ -3,11 +3,12 @@ r"""Create the curated machinist drawing for the pen square rod."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     PmiDrawingPlacement,
@@ -33,6 +34,7 @@ from pen_rod_spec import (
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     ROD_LENGTH,
+    ROD_SECTION,
     SURFACE_FINISHES,
     WIRE_HOLE_SPEC,
     WIRE_HOLE_Y,
@@ -85,6 +87,17 @@ TOP_KEEP = {
 # No-oversize bands on both functional slide dimensions live on the source model.
 DIMENSION_CALLOUTS: dict[str, str] = {}
 TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
+
+
+def _require_dimension_value(display: Any, expected_mm: float, *, label: str) -> None:
+    """Fail if SolidWorks dimensioned a different projected edge."""
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if not math.isclose(measured_mm, expected_mm, rel_tol=0.0, abs_tol=1e-5):
+        raise RuntimeError(
+            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -155,19 +168,23 @@ async def build(adapter: Any) -> dict[str, str]:
     hole_bottom = (FRONT_CENTER[0], hole_center_y - _WIRE_HOLE_DIA / 2000.0)
     hole_side = (FRONT_CENTER[0] + _WIRE_HOLE_DIA / 2000.0, hole_center_y)
 
-    add_edge_dimension(
+    wire_hole_y = add_edge_dimension(
         adapter,
         front,
         p0=front_bottom,
         p1=hole_bottom,
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
+        entities=(None, wire_hole_edge),
+    )
+    _require_dimension_value(
+        wire_hole_y, WIRE_HOLE_Y, label="wire-hole length location"
     )
     # Locate the wire hole ACROSS the square section too: the native callout gives
     # only the drill size, so without this the cross-hole could sit off-centre and
     # still satisfy every shown dimension. Left slide face -> hole (line-to-circle,
     # so the value is to the hole centre) reads 2.50 of the 5.00 section = centred.
-    add_edge_dimension(
+    wire_hole_x = add_edge_dimension(
         adapter,
         front,
         p0=front_side,
@@ -175,6 +192,9 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
         entities=(None, wire_hole_edge),
+    )
+    _require_dimension_value(
+        wire_hole_x, ROD_SECTION / 2.0, label="wire-hole centerline location"
     )
     add_native_hole_callout(
         adapter,
