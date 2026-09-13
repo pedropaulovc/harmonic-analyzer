@@ -366,8 +366,11 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    `read_coefficients` is the same arithmetic). This removes all common-mode
    gain, including the magnifier setting, so the magnifier is reset per trial to bring the
    k = 0 term to the full stroke. Its range is finite: with the clamp against the bracket collar
-   (66 mm from the knife) the bars' read ordinates may sum to at most 4.72 — a function whose
-   samples sum to more is set at a proportionally smaller scale first (`READOUT.md` step 1).
+   (66 mm from the knife) the trial's k = 0 peak $P = \sum x^{read}_i(1 + \kappa_i)$ may be at
+   most 4.72 full-scale bars — a broader function is set at the largest scale $f$ with
+   $P(f) \le 4.72$, solved from the station table, *not* by proportion: the idle bars' read
+   ordinate is fixed, so $P$ is affine in $f$ and proportion overdrives the stroke ~9 %
+   (`READOUT.md` step 1 ships the rule and a $P(f)$ check table).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
    no negative station), so add a constant $c$ to a signed function before setting the bars and
    subtract its lift vector ($20c$ at k = 0, $-c$ at odd k) from the readings, exactly as for

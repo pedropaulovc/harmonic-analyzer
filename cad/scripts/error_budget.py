@@ -538,37 +538,58 @@ class NominalTrial:
         zero = float(np.mean(self.trace(stations, PERIOD)))
         return abs(float(self.trace(stations, THETA_K[:1])[0]) - zero)
 
+    def peak_bars(self, stations: np.ndarray) -> float:
+        """The k=0 (theta = 0) peak in full-scale-bar units, from the station
+        table alone: sum_i x_read,i (1 + kappa_i) -- each bar's fundamental
+        plus the second harmonic riding its crest. This is S + C_2 of the
+        procedure's step 3, and what the operator can compute before cranking;
+        ``k0_hook_mm`` is the same number from the trace (asserted equal in
+        test_error_budget)."""
+        x_read = self.x_read(stations)
+        return float(np.sum(x_read * (1.0 + self.kappa(stations))))
+
+    def ordinate_scale_for(self, x: np.ndarray, capacity: float) -> float:
+        """The largest scale f in (0, 1] at which the bars set at f * x * d_max
+        have peak_bars <= capacity -- the executable rule of READOUT.md step 1.
+        Not proportional: the idle bars' read ordinate is a fixed lift, so
+        S(f) + C_2(f) is affine in f, not linear."""
+        if self.peak_bars(x * self.nom.d_max) <= capacity:
+            return 1.0
+        lo, hi = 0.0, 1.0
+        for _ in range(50):
+            mid = 0.5 * (lo + hi)
+            if self.peak_bars(mid * x * self.nom.d_max) > capacity:
+                hi = mid
+            else:
+                lo = mid
+        return 0.5 * (lo + hi)
+
     def magnifier_setup(self, x: np.ndarray) -> MagnifierSetup:
         """Fit the trial to the pen: the k=0 reading must span the half-stroke
         (Michelson's normalisation to the greatest term, book p. 99: "scaled by
         adjusting the magnifying lever"). Solve the lever radius that does it;
         below the reachable minimum the operator instead scales every ordinate
-        down (the bars sum to the same hook travel whatever the input -- the
-        machine's ordinate CAPACITY) with the clamp at the collar; above the
-        maximum the reading falls short of the stroke by ``stroke_fill``."""
+        down (``ordinate_scale_for`` against the machine's ordinate CAPACITY,
+        the peak the pen holds at minimum magnification) with the clamp at the
+        collar; above the maximum the reading falls short of the stroke by
+        ``stroke_fill``."""
         nom = self.nom
-        pen_per_r = pen_gain(nom, 1.0)
-        r0 = self.k0_hook_mm(x * nom.d_max)
-        if r0 <= 0.0:
+        pen_per_bar = pen_gain(nom, 1.0) * abs(self.f_full)  # per lever mm
+        peak = self.peak_bars(x * nom.d_max)
+        if peak <= 0.0:
             raise ValueError("k=0 reading is not positive; the input is not lifted")
-        r_req = nom.pen_half / (pen_per_r * r0)
+        r_req = nom.pen_half / (pen_per_bar * peak)
         if r_req >= nom.lever_r_min:
             lever_r = min(r_req, nom.lever_r_built)
             fill = min(1.0, nom.lever_r_built / r_req)
-            return MagnifierSetup(1.0, lever_r, fill, pen_per_r * lever_r * r0)
-        # bisect the ordinate scale at the minimum magnification (the idle
-        # bars' lift is a fixed offset, so the reading is not quite linear in it)
-        gain = pen_per_r * nom.lever_r_min
-        lo, hi = 0.0, 1.0
-        for _ in range(50):
-            mid = 0.5 * (lo + hi)
-            if gain * self.k0_hook_mm(mid * x * nom.d_max) > nom.pen_half:
-                hi = mid
-            else:
-                lo = mid
-        f = 0.5 * (lo + hi)
+            return MagnifierSetup(1.0, lever_r, fill, pen_per_bar * lever_r * peak)
+        capacity = nom.pen_half / (pen_per_bar * nom.lever_r_min)
+        f = self.ordinate_scale_for(x, capacity)
         return MagnifierSetup(
-            f, nom.lever_r_min, 1.0, gain * self.k0_hook_mm(f * x * nom.d_max)
+            f,
+            nom.lever_r_min,
+            1.0,
+            pen_per_bar * nom.lever_r_min * self.peak_bars(f * x * nom.d_max),
         )
 
 
@@ -1251,6 +1272,22 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
     mag = cf["magnifier"]
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
+    trial = NominalTrial(nom)
+    ones = np.ones(N_ELEMENTS)
+    scale_all = trial.ordinate_scale_for(ones, mag["ordinate_capacity_full_scale_bars"])
+    naive_all = mag["ordinate_capacity_full_scale_bars"] / trial.peak_bars(
+        ones * nom.d_max
+    )
+    p_all = (
+        trial.peak_bars(ones * nom.d_max),
+        trial.peak_bars(naive_all * ones * nom.d_max),
+    )
+    scale_table = "\n".join(
+        f"| {f:.3f} | {f * nom.d_max:6.2f} | {trial.peak_bars(f * ones * nom.d_max):6.2f} |"
+        for f in sorted(
+            {1.0, 0.75, 0.5, 0.4, 0.3, 0.25, scale_all, 0.2, 0.1, 0.0}, reverse=True
+        )
+    )
     tol = r["station_setting_tolerance_mm"]
     at_zero = read_ordinate(tol / 2.0, nom)
     at_stop = read_ordinate(nom.d_max - tol / 2.0, nom)
@@ -1335,17 +1372,31 @@ $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 (step 3 divides everything by it). At the magnifier's MINIMUM setting -- the
 clamp against the bracket collar, {mag["lever_radius_min_mm"]:.0f} mm from the
 knife axis -- one full-scale bar moves the pen
-{mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the bars' read ordinates
-may sum to at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}** (stations
-summing to {mag["station_sum_capacity_mm"]:.0f} mm): a function whose samples
-sum to more than that is set at a proportionally smaller scale (every ordinate
-times the same factor; step 3 removes it). Broad inputs run at 0.2-0.5 of full
-scale on this machine; the stick's +/-{tol:.2f} mm then costs that much more of
-each ordinate, which is what the budget's `station_setting` and `knife` terms
-carry. Then set the clamp radius so the $k=0$ peak just fills the stroke:
-$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ S$
+{mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the trial's $k=0$ peak,
+$P = \\sum_i x^{{read}}_i\\,(1 + \\kappa_i)$ ($= S + C_2$ of step 3, both from
+the station table), may be at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}**
+full-scale bars. If the function's samples give $P > {mag["ordinate_capacity_full_scale_bars"]:.2f}$
+at full scale, set every bar at $f\\,x_i \\cdot {nom.d_max:.0f}$ mm with the
+**largest $f$ for which $P(f) \\le {mag["ordinate_capacity_full_scale_bars"]:.2f}$** --
+evaluate $P(f)$ from the table at the scaled stations, NOT by proportion: an
+idle bar keeps its {rows[0][1]:+.4f} read ordinate at any $f$, so $P(f)$ is
+affine in $f$ (for 20 bars at 1, $P = {p_all[0]:.2f}$ at $f = 1$ and the solve
+gives $f = {scale_all:.3f}$, where proportion would say
+{mag["ordinate_capacity_full_scale_bars"] / p_all[0]:.3f} and overdrive the
+stroke by {100.0 * (p_all[1] / mag["ordinate_capacity_full_scale_bars"] - 1.0):.0f} %).
+Step 3 removes $f$. Broad inputs run at 0.2-0.5 of full scale on this machine;
+the stick's +/-{tol:.2f} mm then costs that much more of each ordinate, which
+is what the budget's `station_setting` and `knife` terms carry. Then set the
+clamp radius so the peak just fills the stroke:
+$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$
 (as built {mag["lever_radius_built_mm"]:.0f} mm; the wheel's rim/hub wire ratio
 is {mag["wheel_ratio"]:.2f}).
+
+$P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it):
+
+| $f$ | station (mm) | $P(f)$ |
+|---:|---:|---:|
+{scale_table}
 
 ## 2. Run and read
 

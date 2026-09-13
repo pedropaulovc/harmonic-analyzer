@@ -175,14 +175,45 @@ def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
             assert s["ordinate_scale"] == 1.0 and s["lever_r"] > nom.lever_r_min
         else:
             assert s["ordinate_scale"] < 0.6 and s["lever_r"] == nom.lever_r_min
-    # the scale is the capacity shared over the input's read ordinates
+    # the k0 reading the setup credits is the PHYSICAL trace peak at the set
+    # scale, and the table rule the procedure ships (P = sum x_read (1 + kappa))
+    # reproduces it to 1e-3 (the 3rd harmonic is all that is left out)
     trial = eb.NominalTrial(nom)
     for name, s in mag["per_input"].items():
         x = eb.reference_inputs()[name]
-        r0 = eb.pen_gain(nom, s["lever_r"]) * trial.k0_hook_mm(
-            s["ordinate_scale"] * x * nom.d_max
+        st = s["ordinate_scale"] * x * nom.d_max
+        r0 = eb.pen_gain(nom, s["lever_r"]) * trial.k0_hook_mm(st)
+        assert r0 == pytest.approx(s["k0_reading_mm"], rel=1e-3)
+        assert trial.peak_bars(st) == pytest.approx(
+            trial.k0_hook_mm(st) / abs(trial.f_full), rel=1e-3
         )
-        assert r0 == pytest.approx(s["k0_reading_mm"], rel=1e-6)
+
+
+def test_shipped_scale_rule_is_the_table_solve_not_proportion(report, nom):
+    """READOUT.md tells the operator to take the largest f with P(f) <= capacity
+    from the station table. That must be exactly the scale the budget scores
+    (ordinate_scale_for), and scaling by proportion P(1)/capacity must NOT be
+    it: the idle bars keep a fixed read ordinate, so P is affine in f and the
+    proportional scale overdrives the stroke (~12 % on all-ones)."""
+    mag = report["closed_form"]["magnifier"]
+    cap = mag["ordinate_capacity_full_scale_bars"]
+    trial = eb.NominalTrial(nom)
+    for name, s in mag["per_input"].items():
+        x = eb.reference_inputs()[name]
+        assert trial.ordinate_scale_for(x, cap) == pytest.approx(
+            s["ordinate_scale"], abs=1e-9
+        )
+        f = s["ordinate_scale"]
+        if f < 1.0:
+            assert trial.peak_bars(f * x * nom.d_max) == pytest.approx(cap, rel=1e-6)
+            assert trial.peak_bars(min(1.0, 1.001 * f) * x * nom.d_max) > cap
+    ones = np.ones(eb.N_ELEMENTS)
+    naive = cap / trial.peak_bars(ones * nom.d_max)
+    assert naive > trial.ordinate_scale_for(ones, cap) * 1.05
+    assert trial.peak_bars(naive * ones * nom.d_max) > 1.08 * cap
+    doc = eb.readout_procedure(report, nom)
+    assert "largest $f$ for which $P(f)" in doc
+    assert "NOT by proportion" in doc
 
 
 def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, nom):
