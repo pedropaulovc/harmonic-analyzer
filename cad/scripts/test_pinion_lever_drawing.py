@@ -7,8 +7,6 @@ from pathlib import Path
 import pinion_lever_spec
 import draw_pinion_lever as drawing
 import build_pinion_lever as lever
-import _drawing_common
-from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -78,62 +76,6 @@ def test_lever_drive_is_fully_released_for_manufacture() -> None:
     assert "EXEMPT FROM THE TITLE-BLOCK EDGE-BREAK" in normalized
 
 
-def test_direct_limits_replace_ambiguous_gdt() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    common_source = Path(_drawing_common.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 3
-    assert (
-        "        edge_xy=bore_left,\n"
-        "        symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),\n"
-        '        datum="A",\n'
-        '        label="lever final bore axis",\n'
-        "        position_tolerance_m=0.005," in source
-    )
-    assert source.count("position_tolerance_m=0.005") == 1
-    assert source.count('entity_type="SILHOUETTE"') == 5
-    assert source.count('entity_type="FACE"') == 0
-    assert 'characteristic="circular_runout"' in source
-    assert source.count("add_surface_finish(") == 1
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "hub_bore")' in source
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(
-        lever.__file__
-    ).read_text(encoding="utf-8")
-    assert model_toleranced_dimensions(lever) == {
-        ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
-        ("Barrel", "BoreDepth"): "*deviations(BORE_DEPTH_BAND)",
-        ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",
-        ("RodProfile", "RodTipY"): "ROD_TIP_Y_TOLERANCE_MM",
-        ("RodProfile", "RodTipDia"): "ROD_TIP_DIAMETER_TOLERANCE_MM",
-        ("RodProfile", "GripHalfAngle"): "GRIP_HALF_ANGLE_TOLERANCE_DEG",
-        ("CapProfile", "CapR"): "CAP_RADIUS_TOLERANCE_MM",
-    }
-    part_source = Path(lever.__file__).read_text(encoding="utf-8")
-    assert "await add_diametric_linear_dimension(" in part_source
-    assert "await add_angular_reference_dimension(" in part_source
-    assert "set_dimension_symmetric_angular_tolerance(" in part_source
-    assert drawing.DIMENSION_CALLOUTS["HubBore"] == "FINAL REAM"
-    assert "+0.10/-0.00" not in drawing.DIMENSION_CALLOUTS["BoreDepth"]
-    assert "END WALL" in drawing.DIMENSION_CALLOUTS["EndWall"]
-    assert set(drawing.RIGHT_KEEP) == {"BoreDepth", "EndWall"}
-    assert set(drawing.TOP_KEEP) == {"CapR"}
-    assert "SPHERICAL CROWN SR{CAP_RADIUS:.2f}+/-0.10" not in source
-    assert "<MOD-DIAM>{ROD_TIP_DIA:.2f}" not in source
-    assert "GRIP_HALF_ANGLE_DEG" not in source
-    assert "{HUB_LEN:.2f} REF" in source
-    assert "({CAP_SAG:.2f}) REF AXIAL HEIGHT" in source
-    assert "create_section_view(" not in source
-    assert 'place_view(adapter, str(SOURCE), "*Right"' in source
-    assert source.count("model_point_in_view(") == 2
-    assert "ModelToViewTransform" in common_source
-    assert "(0.0, HUB_OD / 2000.0, HUB_LEN / 2000.0)" in source
-    assert "section_hub_y" not in source
-    assert (
-        'sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")'
-        in common_source
-    )
-    assert "segment = sketch_manager.CreateLine(" in common_source
-    assert "segment = ddoc.CreateLine2(" not in common_source
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:

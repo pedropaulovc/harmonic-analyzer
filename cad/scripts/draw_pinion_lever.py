@@ -191,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     grip_edge = (_front_x(ROD_ROOT_DIA / 2.0), _front_y(12.0))
     # SolidWorks restricts this axis-attached tag and live readback normalizes
-    # the intended sheet point by 4.664 mm.  Bound only annotation placement;
+    # the intended sheet point by up to 5.2 mm. Bound only annotation placement;
     # part dimensions and GD&T remain unchanged.
     add_datum_feature(
         adapter,
@@ -200,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(bore_left[0] - 0.022, bore_left[1] + 0.018),
         datum="A",
         label="lever final bore axis",
-        position_tolerance_m=0.005,
+        position_tolerance_m=0.006,
     )
     add_surface_finish(
         adapter,
