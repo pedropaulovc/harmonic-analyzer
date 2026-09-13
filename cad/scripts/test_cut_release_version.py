@@ -147,6 +147,22 @@ def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path)
     assert "/blob/v42/references/" not in paper
 
 
+def test_staged_bundle_declares_its_sources_and_permitted_use(tmp_path):
+    """The staged pages quote the 2014 book (short attributed excerpts) and
+    cite the reference scans, so the bundle must carry that boundary itself:
+    a downloader who never sees kickstarter/campaign/risks.md must still be
+    told the 2014 book is non-commercial-use only, that no photograph or
+    drawing from it is reproduced, and where the CC BY credits are."""
+    staged = cut_release.stage_readout_procedure(tmp_path, "v42")
+    assert "NOTICE.md" in staged
+    notice = (tmp_path / "NOTICE.md").read_text(encoding="utf-8")
+    assert "non-commercial purposes" in notice
+    assert "Hammack" in notice and "2014" in notice
+    assert "public domain" in notice  # the 1898 machine and paper
+    assert "ATTRIBUTION.md" in notice  # the CC BY gallery imagery
+    assert "NOT included in this bundle" in notice  # the reference scans
+
+
 def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
     """The rewrite is a GATE, not a best effort: a ./ link to an unstaged page,
     or a repo path that is not tracked at the tag, must fail the release."""

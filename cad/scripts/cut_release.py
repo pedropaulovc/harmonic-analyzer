@@ -967,9 +967,42 @@ def portable_links(text: str, name: str, tag: str, staged: set[str]) -> str:
     return _LINK_RE.sub(fix, text)
 
 
+# The bundle's docs quote the 2014 Hammack/Kranz/Carpenter book (short,
+# attributed excerpts) and cite the pinned reference scans. The repository and
+# this release are the project's OPEN, non-commercial artefacts -- the boundary
+# kickstarter/campaign/risks.md draws is against the commercial book/campaign,
+# which reproduce no book text or photograph. Ship that boundary WITH the zip so
+# a downloader cannot mistake the bundle for a commercially reusable set.
+NOTICE = """# Notice -- sources and permitted use
+
+**The machine is public domain.** Michelson and Stratton published in 1898;
+Wm. Gaertner & Co. built the instruments between 1896 and 1923.
+
+**This bundle is an open, non-commercial research artefact.** The CAD, the
+drawings, the neutral geometry and the derived numbers in `READOUT.md` and
+`docs/` are this project's own work, built from `cad/config` + `cad/scripts`.
+
+**Third-party sources are cited, not redistributed:**
+
+- A. A. Michelson and S. W. Stratton, *A New Harmonic Analyzer*,
+  *Am. J. Sci.* 4th ser. vol. V (1898) pp. 1-13 -- public domain; the
+  benchmark tables in `docs/michelson-1898-trial-accuracy.md` are read from it.
+- B. Hammack, S. Kranz and B. Carpenter, *Albert Michelson's Harmonic
+  Analyzer* (2014) -- (c) 2014, distributed free **for non-commercial purposes
+  only**. `docs/` quotes short attributed excerpts and cites it generously; no
+  photograph or drawing from it is reproduced here, and nothing from it may be
+  used commercially.
+- Reference scans and photographs live in the pinned `references` submodule and
+  are NOT included in this bundle; `docs/` cites them by repository path.
+- Comparison-gallery imagery is CC BY -- credits in
+  `cad/comparisons/ATTRIBUTION.md`.
+"""
+
+
 def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
-    into the bundle root as ``READOUT.md``, plus ``operating_docs()`` under
+    into the bundle root as ``READOUT.md``, plus ``NOTICE`` (the sources the
+    staged pages quote and the permitted use of each) and ``operating_docs()`` under
     ``docs/`` so every ``./`` cross-link resolves inside the bundle and every
     other relative link is rewritten to the repository at ``tag``
     (``portable_links``). Not COM: the model is offline. Returns the staged
@@ -991,6 +1024,8 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
             portable_links(text, name, tag, set(names)), encoding="utf-8"
         )
         staged.append(f"docs/{name}")
+    (stage / "NOTICE.md").write_text(NOTICE, encoding="utf-8")
+    staged.append("NOTICE.md")
     return staged
 
 
