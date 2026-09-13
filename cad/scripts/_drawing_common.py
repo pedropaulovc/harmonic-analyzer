@@ -2381,7 +2381,11 @@ def add_edge_dimension(
             selected = selectable.Select2(index > 0, selection_data)
             location = "by entity"
         else:
-            selected = view.SelectEntity(requested_entity, index > 0)
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _early_bound(requested_entity, "IEntity")
+            selected = selectable.Select4(index > 0, selection_data)
             location = "by entity"
         if not selected:
             raise RuntimeError(
