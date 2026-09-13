@@ -70,6 +70,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
+from measuring_stick_geom import (
+    DIVISION_COUNT,
+    DIVISION_SPACING,
+    MINOR_PER_DIVISION,
+    MINOR_SPACING,
+)
 from measuring_stick_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -85,15 +91,13 @@ BODY_WIDTH = 8.0  # DIMENSIONS.md ch16: stick width, annotated (high) — the 8 
 # callout is the stick WIDTH (bd992c6 re-read), not the division spacing; the
 # superseded ~15 mm scaled body-width is retired.
 BODY_THICKNESS = 3.0  # DIMENSIONS.md ch16: scaled (low)
-DIVISION_SPACING = 14.2  # ch16 page001_img02 (200 mm bar at 5.65 px/mm): the
-# 0 and 10 numerals sit 805 px = 142 mm apart -- one half of the rocker arm's
-# 292 mm working arc, as the text says (2026-09 re-derive; the old 80 mm was a
-# misread of the 8 mm width callout).
-DIVISION_COUNT = 11  # full ticks 0..10 (stated 0-10 scale)
-MINOR_PER_DIVISION = 10  # tenths: 9 short ticks between full ticks (page001_img03)
-MINOR_SPACING = DIVISION_SPACING / MINOR_PER_DIVISION  # 1.42
+# DIVISION_SPACING / DIVISION_COUNT / MINOR_PER_DIVISION / MINOR_SPACING: the
+# engraved scale, owned by config (amplitude.stick_*) and read through
+# measuring_stick_geom -- the offline error budget's station -> stick-reading
+# conversion reads the same source, so neither copies a literal.
 SCALE_END_MARGIN = 0.5  # the 10 tick lands just short of the far end (img02)
-SCALE_START_X = BODY_LENGTH - 10 * DIVISION_SPACING - SCALE_END_MARGIN  # 57.5
+SCALE_SPAN = (DIVISION_COUNT - 1) * DIVISION_SPACING  # 0..10 -> 10 pitches
+SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN  # 57.5
 
 TICK_WIDTH = 0.4
 # Graduation-mark lengths are modelling choices: ch16 pins only the 200×8 body and
@@ -117,7 +121,9 @@ TICK_OVERHANG = 1.0  # sketch reaches past the top edge: a line drawn exactly
 NUMERALS_DXF = REFERENCES_DIR / "measuring-stick-numerals.dxf"
 NUMERAL_HEIGHT_MM = 2.0  # digit height (page001_img01 at 5.65 px/mm: ~11 px)
 NUMERAL_GAP_MM = 0.6  # clear gap tick-edge -> numeral ink, and tick-end -> numeral
-NUMERAL_ROTATION_DEG = 90  # 90 = photo (read with the 10 end up); 0 = upright along the bar
+NUMERAL_ROTATION_DEG = (
+    90  # 90 = photo (read with the 10 end up); 0 = upright along the bar
+)
 # Pinned from `uv run python cad/scripts/gen_stick_numerals_dxf.py` output. The
 # build bound-checks the engraving's removed volume against AREA x TICK_DEPTH on
 # the live seat (the DXF loops have no closed-form area; this script cannot read
@@ -171,7 +177,10 @@ async def _cut_tick(
         (right, "vertical"),
         (left, "vertical"),
     ):
-        check(f"{label} constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
+        check(
+            f"{label} constraint {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
     check(
         f"{label} width dim",
         await adapter.add_sketch_dimension(bottom, None, "linear", TICK_WIDTH),
@@ -234,7 +243,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(
         adapter,
         "ScaleStartX",
-        '"BodyLength" - 10 * "DivisionSpacing" - "ScaleEndMargin"',
+        f'"BodyLength" - {DIVISION_COUNT - 1} * "DivisionSpacing" - "ScaleEndMargin"',
     )
 
     drive_jobs: list[tuple[str, str]] = []
@@ -255,10 +264,19 @@ async def build(adapter) -> dict[str, str]:
         (right, "vertical"),
         (left, "vertical"),
     ):
-        check(f"body constraint {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check("body length dim", await adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH))
+        check(
+            f"body constraint {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
+    check(
+        "body length dim",
+        await adapter.add_sketch_dimension(bottom, None, "linear", BODY_LENGTH),
+    )
     body_dims.record("BodyLength", '"BodyLength"')
-    check("body width dim", await adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH))
+    check(
+        "body width dim",
+        await adapter.add_sketch_dimension(right, None, "linear", BODY_WIDTH),
+    )
     body_dims.record("BodyWidth", '"BodyWidth"')
     # Pin the (0, 0) corner to the origin. The h/v relations + the two dims fix
     # the bar's shape but not its position; that corner was previously located
@@ -287,7 +305,11 @@ async def build(adapter) -> dict[str, str]:
     # auto-name would go stale the moment name_last_feature ran (M: renamed-feature
     # references). _cut_tick returns the assigned name for exactly this reason.
     seed_name = await _cut_tick(
-        adapter, "tick 0", "Tick0", SCALE_START_X, TICK_LENGTH,
+        adapter,
+        "tick 0",
+        "Tick0",
+        SCALE_START_X,
+        TICK_LENGTH,
         drive_jobs=drive_jobs,
         drive_xcenter='"ScaleStartX"',
         drive_length='"TickLength"',
@@ -325,8 +347,11 @@ async def build(adapter) -> dict[str, str]:
     for k in range(1, MINOR_PER_DIVISION):
         minor_names.append(
             await _cut_tick(
-                adapter, f"minor tick 0.{k}", f"Minor{k}",
-                SCALE_START_X + k * MINOR_SPACING, MINOR_TICK_LENGTH,
+                adapter,
+                f"minor tick 0.{k}",
+                f"Minor{k}",
+                SCALE_START_X + k * MINOR_SPACING,
+                MINOR_TICK_LENGTH,
                 drive_jobs=drive_jobs,
                 drive_xcenter=f'"ScaleStartX" + {k} * "DivisionSpacing" / {MINOR_PER_DIVISION}',
                 drive_length='"MinorTickLength"',
@@ -361,8 +386,11 @@ async def build(adapter) -> dict[str, str]:
     # The hand-stamped artefact the book calls out: a longer 0.5 tick (it
     # overcuts the 0.5 tenth above).
     await _cut_tick(
-        adapter, "tick 0.5", "TickHalf",
-        SCALE_START_X + DIVISION_SPACING / 2.0, HALF_TICK_LENGTH,
+        adapter,
+        "tick 0.5",
+        "TickHalf",
+        SCALE_START_X + DIVISION_SPACING / 2.0,
+        HALF_TICK_LENGTH,
         drive_jobs=drive_jobs,
         drive_xcenter='"ScaleStartX" + "DivisionSpacing" / 2',
         drive_length='"HalfTickLength"',
@@ -398,7 +426,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "NumeralsSketch")
-    check("cut numerals", await adapter.create_cut_extrude(ExtrusionParameters(depth=TICK_DEPTH)))
+    check(
+        "cut numerals",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=TICK_DEPTH)),
+    )
     name_last_feature(adapter, "Numerals")
     post = await adapter.get_mass_properties()
     if not post.is_success:

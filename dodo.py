@@ -1059,6 +1059,7 @@ _CHECK_NAMES = (
     "freshness",
     "flagonly",
     "partiso",
+    "budget",
 )
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
@@ -2375,12 +2376,15 @@ def task_check():
             # Guards the GENERATED numerals DXF the measuring-stick build imports:
             # byte-identical regeneration from gen_stick_numerals_dxf, closed-loop
             # census, clearance from every tick, and the area/bbox the build pins.
-            # Deps: the test, the asset, and the generator/build/font-render
-            # modules it imports (module_deps_of), so a layout-constant edit that
-            # forgot to regenerate the DXF fails this gate.
+            # Deps: the test, the asset, the generator/build/font-render modules it
+            # imports (module_deps_of) AND the cad/config files those modules read
+            # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
+            # scale) -- so a layout-constant OR scale-config edit that forgot to
+            # regenerate the DXF fails this gate instead of reusing its stamp.
             "file_dep": [
                 str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
                 *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
+                *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
                 str(
                     (
                         REPO_ROOT
@@ -2527,6 +2531,43 @@ def task_check():
                 }
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+        },
+        "budget": {
+            # The coefficient-error budget (cad/docs/tolerance-policy.md): the
+            # sensitivity model's linear gains agree with the exact channel
+            # kinematics, the calibrated readout cancels common-mode error, the
+            # nominal-design residual is corrected below 0.05 % MAE, every
+            # toleranced nominal still resolves to the spec constant the CAD
+            # builds from, the drawing limits equal the budget's, and the Monte
+            # Carlo of error_budget.yaml lands inside its targets. Pure python.
+            # Deps: the model, its config, every spec module the model OR the
+            # test imports (the test lazily imports the notes/spec modules whose
+            # drawing lines it pins to the budget -- a note edit must re-run
+            # the gate, not reuse the stamp; Codex #742), and the three builders
+            # the test reads as TEXT (they import SolidWorks so cannot be
+            # imported offline: the assembly for its shared stations, the stick
+            # for its spec import, the cylinder gear for its NotchPhase
+            # tolerance call): module_deps_of cannot see them.
+            "file_dep": sorted(
+                {
+                    str((SCRIPTS_DIR / "error_budget.py").resolve()),
+                    str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
+                    str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
+                    str((SCRIPTS_DIR / "build_cylinder_gear.py").resolve()),
+                    str((SCRIPTS_DIR / "build_measuring_stick.py").resolve()),
+                    # config: derived from the accessor scan of the model's and
+                    # the test's import closures (the same _config_deps every
+                    # part uses), never hand-listed -- a hand list missed
+                    # machine/gear_train.yaml, which cylinder_gear_spec reads
+                    # for the pitch the mesh-lag check converts at (Codex).
+                    *_config_deps(SCRIPTS_DIR / "error_budget.py"),
+                    *_config_deps(SCRIPTS_DIR / "test_error_budget.py"),
+                    str((CONFIG_DIR / "error_budget.yaml").resolve()),
+                    *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
+                    *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
+                }
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a

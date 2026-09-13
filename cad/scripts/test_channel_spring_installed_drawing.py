@@ -46,6 +46,11 @@ def test_data_table_distinguishes_free_and_installed_length() -> None:
     assert "FREE BODY LENGTH" in notes
     assert "INSTALLED BODY" in notes
     assert f"{spec.FREE_BODY_LENGTH:.2f}" in notes
+    # The rate is matched, not machined: the sheet defines the two test points
+    # (the budget's +/- value is pinned by test_error_budget).
+    assert "RATE = (F2-F1)/(X2-X1)" in notes
+    assert "EYE C-C X1 = 60.00 AND X2 = 70.00" in notes
+    assert "READ 30 S AFTER LOADING" in notes
     assert f"{spec.INSTALLED_BODY_LENGTH:.2f}" in notes
     assert "RELAXED" in notes
     assert "STRETCHED" in notes

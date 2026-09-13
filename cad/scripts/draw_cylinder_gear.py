@@ -88,6 +88,7 @@ FRONT_KEEP = {
     "BoreDia": (0.065, 0.360),
     "CamDia": (0.175, 0.325),
     "CamCy": (0.175, 0.279),
+    "NotchPhase": (0.140, 0.338),
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
@@ -97,6 +98,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_FIT_CALLOUT,
     "NotchWidth": "ALIGNMENT NOTCH",
     "NotchDepth": "FROM OD",
+    "NotchPhase": "NOTCH CCW FROM CAM LOBE",
 }
 DIMENSION_PRECISION = {
     "BoreDia": 3,

@@ -182,7 +182,6 @@ from _transforms import (
 )
 from cone_pivot_post_installation import (
     CHANNEL_Z0,
-    DRUM_X,
     MECHANISM_Z_SHIFT,
 )
 from build_fulcrum_keeper import (
@@ -208,12 +207,24 @@ from rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
 from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
+
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
 # reason: the rocker's rod-pin bore is NOT level with the pivot bore
 # (ROD_HOLE_Y = 15.30 vs 8.0). _arc_geometry must model that intrinsic 3.28 deg
 # lever angle or the placed pin lands 7 mm off the solved point and the J2
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
+from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
+from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS  # 800: the R800 slide
+
+# centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
+# offline error budget so the slide-arc height is never copied.
+from channel_frame_geom import (  # machine-frame shaft axes + cam lock, shared with error_budget
+    CAM_SHAFT_XY,
+    CYLINDER_LOCK_PHASE_DEG,
+    LEVER_FULCRUM_XY as FULCRUM,
+    ROCKER_PIVOT_XY as PIVOT,
+)
 
 ASM_NAME = "channel"
 
@@ -235,7 +246,7 @@ ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes at z_j + 0.8
 CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
 
 # --- rocker bank ------------------------------------------------------------
-PIVOT = (72.9, 253.8)  # rocker pivot shaft axis (x, y); machine frame (crank at -X)
+# PIVOT (72.9, 253.8): the rocker pivot shaft axis -- imported from channel_frame_geom.
 # True pivot->rod-pin lever: 127.37 along the arm (near the rod-side tip) PLUS
 # the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
 # Length 127.583; the intrinsic lever angle beta (3.2813 deg above the arm's
@@ -246,26 +257,26 @@ _LEVER_DX = ARM_ROD_HOLE_X
 _LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
 ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
 ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
-ARM_ARC_CENTER_LOCAL_Y = 816.0  # arm local arc centre above the bottom edge
-ARM_TOP_RADIUS = 800.0
+# ARM_TOP_RADIUS (800): the R800 slide -- imported from rocker_arm_spec.CURVE_RADIUS.
 
 # --- drive interface (default state) ----------------------------------------
-GEAR_PHASE_DEG = 1.5  # drive-train locks each cylinder gear at Rz(+1.5):
-# half the T120 tooth pitch, so a TOOTH faces the cone mesh (see
-# build_drive_train_assembly.py). The integral cam (local (0, +CAM_ECC) -- lobe
-# UP at notch-up, the cos-mode top of stroke per the ch14 end views) swings
-# with the gear by GEAR_PHASE_DEG, so the rod ring rides the PHASED cam
-# centre, not a point straight north of the arbor. The end-for-end gear flip
-# reverses local Z only; local +Y and therefore this phased XY centre stay put.
-# CAM_ECC is imported above.
-X_DRUM = DRUM_X
-Y_DRIVE = 90.518
+# GEAR_PHASE_DEG, X_DRUM, Y_DRIVE: imported from channel_frame_geom (the
+# drive-train's tooth-in-gap lock of every cylinder gear at Rz(+1.5), half the
+# T120 pitch, and the drum shaft axis) -- NOT copied, so the offline error
+# budget and both assemblies read one source. The integral cam (local (0,
+# +CAM_ECC) -- lobe UP at notch-up, the cos-mode top of stroke per the ch14 end
+# views) swings with the gear by GEAR_PHASE_DEG, so the rod ring rides the
+# PHASED cam centre, not a point straight north of the arbor. The end-for-end
+# gear flip reverses local Z only; local +Y and therefore this phased XY centre
+# stay put. CAM_ECC is imported above.
+X_DRUM, Y_DRIVE = CAM_SHAFT_XY
+GEAR_PHASE_DEG = CYLINDER_LOCK_PHASE_DEG
 RING_CENTER = (
     X_DRUM + CAM_ECC * math.sin(math.radians(GEAR_PHASE_DEG)),
     Y_DRIVE + CAM_ECC * math.cos(math.radians(GEAR_PHASE_DEG)),
-)  # The drum sits at machine X_DRUM (crank side -X); y is the ch30 GT drive
-# height 90.518, fixed by cone-pivot-post-v2. MUST stay in sync with
-# build_drive_train_assembly.Y_DRIVE.
+)  # The drum sits at machine X_DRUM (crank side -X); y is the v2 casting's
+# drive height 90.518 (gear_train.drive_axis_y_mm; build_drive_train_assembly
+# derives and asserts it).
 # ROD_C2C (imported from connecting_rod_spec.CENTER_DISTANCE, 163.1010):
 # VERTICAL rod (ch30): every rod hangs PLUMB from the arm's rod-side tip onto
 # its cam -- the pin (ROD_HOLE_X out from the mid-seesaw pivot) sits
@@ -276,11 +287,15 @@ RING_CENTER = (
 # rest tilt -7.8158 deg, and the oblique 163.18/180.83 era before it.
 
 # --- amplitude bars ---------------------------------------------------------
-BAR_WIDTH = 6.35
-BAR_LENGTH = 808.3  # legacy 812.8 trimmed 4.5 at the TOP (top-frame rederive
-# 2026-08-02: fulcrum chain -4.5; foot end untouched) = amplitude_bar_spec
-BAR_FOOT_NOTCH = 2.381
-BAR_TOP_PIN_DROP = 6.35
+# Imported, NOT copied (same rule as CAM_ECC): the offline error budget reads
+# amplitude_bar_spec for the bar's rigid-link length and notch-roof contact,
+# so a copy here could drift from what check:budget certifies.
+from amplitude_bar_spec import (  # noqa: E402
+    BAR_WIDTH,  # 6.35 square section
+    BOTTOM_NOTCH_HEIGHT as BAR_FOOT_NOTCH,  # 2.381
+    TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.95
+)
+
 # The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
 # fix-all build the bar sat at the exact tangent (0-volume line contact,
 # filtered as coincidence). Mated, the solver lands a sub-0.005 mm^3
@@ -295,11 +310,14 @@ BAR_CONTACT_GAP = _config.fit(
 )  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
-FULCRUM = (199.9, 1061.4)  # lever fulcrum shaft axis (x, y); machine frame
-# (2026-08-02 top-frame rederive: casting top face 1036.2 + ball rise 25.2;
-# was 1065.9 off the old 1040.7 rail top)
-LEVER_BAR_PIN_X = 127.0
-LEVER_SPRING_X = 177.8  # 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
+# FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
+# The lever's two transfer arms -- imported, NOT copied, for the budget's sake
+# (channel_lever_spec is what error_budget.nominal() reads).
+from channel_lever_spec import (  # noqa: E402
+    BAR_PIN_X as LEVER_BAR_PIN_X,  # 127.0, fulcrum -> bar-pin c2c, 5"
+    LEVER_SPRING_X,  # 177.8: 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
+)
+
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
 # springs must reach the summing plate at x ~ -22..-27)
 LEVER_TAB_HALF = 3.0  # spring hole sits in the lever's 6.0-tall end tab
@@ -411,9 +429,17 @@ ROCKER_ROD_BORE_LOCAL = [
 ]  # rocker Axis2 (rod pin)
 ROD_STRAP_BORE_LOCAL = [0.0, 0.0, 0.0]  # rod Axis1 (cam ring centre = origin)
 ROD_PIN_BORE_LOCAL = [0.0, ROD_C2C, 0.0]  # rod Axis2 (rocker pin = swing pivot)
-LEVER_BAR_PIN_BORE_LOCAL = [127.0, 0.0, 0.0]  # lever Axis2 (bar pin)
-BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # bar Axis1 (swing pivot; 808.3 - 6.35)
-BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]  # bar Axis2 (foot, ~802 mm arm)
+LEVER_BAR_PIN_BORE_LOCAL = [LEVER_BAR_PIN_X, 0.0, 0.0]  # lever Axis2 (bar pin)
+BAR_TOP_PIN_LOCAL = [
+    BAR_WIDTH / 2.0,
+    BAR_TOP_PIN_Y,
+    BAR_WIDTH / 2.0,
+]  # bar Axis1 (swing pivot; 808.3 - 6.35)
+BAR_FOOT_LOCAL = [
+    BAR_WIDTH / 2.0,
+    0.0,
+    BAR_WIDTH / 2.0,
+]  # bar Axis2 (foot, ~802 mm arm)
 
 # --- CopyWithMates2 slice replication (PR #220 probes -> production) ---------
 # A channel's 4 moving parts + their 9 mates are one repeatable SLICE: author

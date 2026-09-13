@@ -1,6 +1,13 @@
 
 output:
   magnify_factor: 4.0              # magnifying lever / wheel amplification to the pen
+  magnifier_collar_station_mm: 160.0 # magnifying-bracket collar centre on the lever rod, lever-local x
+                                   # (rod along +x from its free west tip; machine x +40 after the Ry(180)
+                                   # placement) -- the east end of the sliding clamp's travel
+  magnifier_collar_half_len_mm: 5.0 # half the collar length; the clamp block stops against its face
+  magnifier_clamp_station_mm: 50.0 # as-built sliding-clamp centre, lever-local x (machine x +150, p.46/48
+                                   # insets). Clamp radius from the knife axis IS the magnification the
+                                   # operator sets, so this band is what error_budget.py reads
   spring_count_channel: 20         # one return spring per channel
   spring_count_counter: 1          # single counter spring (force-balance datum)
   pen_trace_half_mm: 15.0          # physical pen half-stroke the computed curve maps onto

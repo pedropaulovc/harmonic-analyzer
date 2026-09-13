@@ -897,6 +897,153 @@ def package_drawings(
     return staged
 
 
+OPERATING_DOC = "device-operation.md"  # what READOUT.md's arithmetic is and why
+
+
+def operating_docs() -> list[str]:
+    """``OPERATING_DOC`` plus the ``cad/docs`` pages reachable from it through
+    ``./`` markdown links (the tolerance policy, the GD&T assessment, the DFM
+    notes, the 1898 benchmark): the closure a bundle reader can follow without
+    the repository. Links out to config/scripts name repo paths at the tag.
+
+    Every page must be TRACKED: preflight and provenance read the tree with
+    ``--untracked-files=no``, so an untracked page would ship inside a bundle
+    the manifest calls a clean, tag-pinned tree."""
+    seen: list[str] = []
+    todo = [OPERATING_DOC]
+    while todo:
+        name = todo.pop()
+        if name in seen:
+            continue
+        require_tracked(f"cad/docs/{name}", name)
+        seen.append(name)
+        text = (CAD_ROOT / "docs" / name).read_text(encoding="utf-8")
+        todo.extend(re.findall(r"\]\(\./([^)#]+)", text))
+    return seen
+
+
+def require_tracked(rel: str, who: str) -> None:
+    """Raise unless repo-relative ``rel`` is tracked (i.e. present at the tag)."""
+    if not _git("ls-files", "--", rel, check_rc=False).strip():
+        raise RuntimeError(f"{who}: not tracked at the tag: {rel}")
+
+
+_LINK_RE = re.compile(r"(!?)\[([^\]]*)\]\((?!https?:|mailto:|#)([^)\s]+)([^)]*)\)")
+
+
+def portable_links(text: str, name: str, tag: str, staged: set[str]) -> str:
+    """Make every RELATIVE link in a staged doc resolve outside the repository.
+
+    A ``./`` link to another staged page stays as-is. Anything else points at a
+    file the bundle does not carry (``../config/*.yaml``, ``../scripts/*.py``)
+    or cannot carry (the ``references`` submodule's third-party scans -- the
+    2014 book is non-commercial, so the release must not redistribute them):
+
+    - a path inside THIS repository becomes a blob URL at the release tag, so
+      the reader gets the exact revision the bundle was cut from;
+    - a path inside the ``references`` submodule becomes plain text naming the
+      source, since a blob URL of a submodule path does not resolve (and an
+      image embed would render broken).
+
+    Raises on a ``./`` link with no staged target -- a broken in-bundle link
+    must fail the release, not ship."""
+    repo_url = f"https://github.com/{_repo_slug()}/blob/{tag}"
+
+    def fix(m: re.Match[str]) -> str:
+        bang, label, target, rest = m.groups()
+        if target.startswith("./"):
+            page = target[2:].split("#", 1)[0]
+            if page not in staged:
+                raise RuntimeError(
+                    f"{name}: ./{page} is linked but not staged in the bundle"
+                )
+            return m.group(0)
+        path, _, frag = target.partition("#")
+        rel = os.path.relpath((CAD_ROOT / "docs" / path).resolve(), REPO_ROOT)
+        rel = rel.replace(os.sep, "/")
+        if rel.startswith(".."):
+            raise RuntimeError(f"{name}: link escapes the repository: {target}")
+        if rel.startswith("references/"):
+            bare = label.strip("`").split("/")[-1]
+            if rel.endswith(bare):
+                return f"`{rel}` (pinned references submodule)"
+            return f"{label} (`{rel}`, pinned references submodule)"
+        require_tracked(rel, f"{name}: link target {target}")
+        anchor = f"#{frag}" if frag else ""
+        return f"{bang}[{label}]({repo_url}/{rel}{anchor}{rest})"
+
+    return _LINK_RE.sub(fix, text)
+
+
+# The bundle's docs quote the 2014 Hammack/Kranz/Carpenter book (short,
+# attributed excerpts) and cite the pinned reference scans. The repository and
+# this release are the project's OPEN, non-commercial artefacts -- the boundary
+# kickstarter/campaign/risks.md draws is against the commercial book/campaign,
+# which reproduce no book text or photograph. Ship that boundary WITH the zip so
+# a downloader cannot mistake the bundle for a commercially reusable set.
+NOTICE = """# Notice -- sources and permitted use
+
+**Everything this project made is MIT-licensed** -- see `LICENSE` beside this
+file. The CAD, the drawings, the neutral geometry and the derived numbers in
+`READOUT.md` and `docs/` are this project's own work, built from `cad/config` +
+`cad/scripts`, and you may use them commercially under the MIT terms.
+
+**The machine is public domain.** Michelson and Stratton published in 1898;
+Wm. Gaertner & Co. built the instruments between 1896 and 1923.
+
+**The restrictions below apply ONLY to the third-party sources those pages
+cite** -- never to the project's own artefacts:
+
+- A. A. Michelson and S. W. Stratton, *A New Harmonic Analyzer*,
+  *Am. J. Sci.* 4th ser. vol. V (1898) pp. 1-13 -- public domain; the
+  benchmark tables in `docs/michelson-1898-trial-accuracy.md` are read from it.
+- B. Hammack, S. Kranz and B. Carpenter, *Albert Michelson's Harmonic
+  Analyzer* (2014) -- (c) 2014, distributed free **for non-commercial purposes
+  only**. `docs/` quotes short attributed excerpts and cites it generously; no
+  photograph or drawing from it is reproduced here, and nothing from it may be
+  used commercially.
+- Reference scans and photographs live in the pinned `references` submodule and
+  are NOT included in this bundle; `docs/` cites them by repository path.
+- Comparison-gallery imagery is CC BY -- credits in
+  `comparisons/ATTRIBUTION.md` (present when the gallery shipped).
+"""
+
+
+def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
+    """Write the operating/readout procedure (error_budget.readout_procedure)
+    into the bundle root as ``READOUT.md``, plus the repository ``LICENSE``,
+    ``NOTICE`` (what is MIT, and the permitted use of each third-party source the
+    staged pages quote) and ``operating_docs()`` under
+    ``docs/`` so every ``./`` cross-link resolves inside the bundle and every
+    other relative link is rewritten to the repository at ``tag``
+    (``portable_links``). Not COM: the model is offline. Returns the staged
+    relative paths."""
+    import error_budget
+
+    dst = stage / "READOUT.md"
+    dst.write_text(
+        error_budget.readout_procedure(error_budget.build_report()),
+        encoding="utf-8",
+    )
+    staged = [dst.name]
+    docs = stage / "docs"
+    docs.mkdir(exist_ok=True)
+    names = operating_docs()
+    for name in names:
+        text = (CAD_ROOT / "docs" / name).read_text(encoding="utf-8")
+        (docs / name).write_text(
+            portable_links(text, name, tag, set(names)), encoding="utf-8"
+        )
+        staged.append(f"docs/{name}")
+    (stage / "NOTICE.md").write_text(NOTICE, encoding="utf-8")
+    staged.append("NOTICE.md")
+    # NOTICE points at it, and a zip-only consumer has no repository to look in
+    require_tracked("LICENSE", "release LICENSE")
+    shutil.copyfile(REPO_ROOT / "LICENSE", stage / "LICENSE")
+    staged.append("LICENSE")
+    return staged
+
+
 def bundle(
     sw: Any, revision: str, version: str, prev_tag: str | None = None
 ) -> tuple[Path, dict[str, Any]]:
@@ -948,6 +1095,12 @@ def bundle(
     #     Blender render off the stable STLs) under stage/comparisons. Export fails
     #     loudly when Blender is unavailable, so a release cannot silently omit it.
     facts["comparisons"] = stage_comparisons(stage)
+
+    # 4c. Operating/readout procedure: the release ships the drawings, and the
+    #     accuracy those drawings' limits are derived from (check:budget) is
+    #     reached only by the calibration + correction procedure the budget
+    #     assumes -- generated from the same model so it cannot drift.
+    facts["readout_procedure"] = stage_readout_procedure(stage, version)
 
     # 5. Provenance manifest LAST -- it hashes everything staged above, so it must
     #    run after the diff is written and before the zip is sealed. (Build logs

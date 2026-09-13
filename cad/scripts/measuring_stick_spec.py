@@ -1,17 +1,37 @@
 r"""Pure-data dimensional contract shared by the measuring stick and drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_measuring_stick`` imports the
-marked-dimension NAME map + notes from here; ``draw_measuring_stick`` imports the
+PURE DATA, no SolidWorks/COM imports.  The engraved scale itself is NOT owned
+here: it lives in ``cad/config/machine/amplitude.yaml`` and is read through
+``measuring_stick_geom`` (re-exported below for the notes and the builder).
+``build_measuring_stick`` imports the marked-dimension NAME map + notes from here; ``draw_measuring_stick`` imports the
 bar's plan geometry from ``build_measuring_stick`` for its view math and keeps
 exactly ``DRAWING_DIMENSIONS``.
 """
 
 from __future__ import annotations
 
+from measuring_stick_geom import (
+    DIVISION_COUNT,
+    DIVISION_SPACING,
+    MINOR_PER_DIVISION,
+    MINOR_SPACING,
+    SCALE_SPAN,
+)
+
+# The engraved scale is CONFIG (amplitude.stick_*, read through
+# measuring_stick_geom), so the note TEXT is derived from the same counts the
+# build patterns: TOP is the highest engraved value, MINORS the tick count
+# between two full ticks. A count edit rewrites these notes and fails
+# check:numerals until the numerals DXF is regenerated -- it never leaves the
+# sheet describing a scale the part does not carry.
+TOP = DIVISION_COUNT - 1
+MINORS = MINOR_PER_DIVISION - 1
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Only the bar's overall envelope (BodyProfile length + width) is
-# marked; the 0-10 graduation swarm (11 ticks, 90 tenths + the longer 0.5 tick) is carried
+# marked; the graduation swarm (DIVISION_COUNT ticks, MINORS per division + the
+# longer 0.5 tick) is carried
 # in the notes -- a ruled scale dimensioned tick-by-tick would swamp an 8 mm-tall
 # bar, and the scale span / pitch fully define it. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -23,13 +43,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "1. FINISHED BAR 200.00 X 8.00 X 3.00; RULE THE BROAD FACE",
-        "   SHOWN. SCALE SPAN 142.00; THE 10 TICK 0.50 +/-0.25 FROM",
+        f"   SHOWN. SCALE SPAN {SCALE_SPAN:.2f}; THE {TOP} TICK 0.50 +/-0.25 FROM",
         "   THE FAR END.",
-        "2. ENGRAVE 11 FULL TICKS (VALUES 0 THRU 10). THE 0 TICK",
-        "   IS THE DATUM: TICK N AT 14.20 X N FROM THE 0 TICK,",
+        f"2. ENGRAVE {DIVISION_COUNT} FULL TICKS (VALUES 0 THRU {TOP}). THE 0 TICK",
+        f"   IS THE DATUM: TICK N AT {DIVISION_SPACING:.2f} X N FROM THE 0 TICK,",
         "   EACH WITHIN +/-0.05 OF ITS OWN POSITION",
-        "   (NONCUMULATIVE; 0-TO-10 SPAN 142.00 REF). NINE MINOR",
-        "   TICKS PER DIVISION AT 1.42 PITCH, 1.80 +/-0.10 UP FROM",
+        f"   (NONCUMULATIVE; 0-TO-{TOP} SPAN {SCALE_SPAN:.2f} REF). {MINORS} MINOR",
+        f"   TICKS PER DIVISION AT {MINOR_SPACING:.2f} PITCH, 1.80 +/-0.10 UP FROM",
         "   THE BOTTOM EDGE SHOWN, SAME SLOT SECTION.",
         "   SLOTS: SQUARE BOTTOM, 0.40 +/-0.05 WIDE, 0.50 +/-0.05",
         "   DEEP NORMAL TO THE RULED FACE; EACH FULL TICK RUNS",
@@ -37,10 +57,10 @@ DRAWING_NOTES = "\n".join(
         "   HALF-DIVISION TICK BETWEEN 0 + 1: SAME SLOT SECTION,",
         "   4.00 +/-0.10 UP FROM THE BOTTOM EDGE.",
         "3. ENGRAVE 2.00 +/-0.10 HIGH ASME Y14.2 VERTICAL GOTHIC",
-        "   NUMERALS 0 THRU 10, STROKE WIDTH 0.30 +/-0.10, TURNED",
-        "   90 DEG: DIGIT TOPS TOWARD THE 10 END (READ WITH THE",
-        "   10 END UP). NUMERALS 0-9 START 0.60 +/-0.10 PAST THEIR",
-        "   FULL TICK TOWARD 10; THE 10 NUMERAL ENDS 0.60 +/-0.10",
+        f"   NUMERALS 0 THRU {TOP}, STROKE WIDTH 0.30 +/-0.10, TURNED",
+        f"   90 DEG: DIGIT TOPS TOWARD THE {TOP} END (READ WITH THE",
+        f"   {TOP} END UP). NUMERALS 0-{TOP - 1} START 0.60 +/-0.10 PAST THEIR",
+        f"   FULL TICK TOWARD {TOP}; THE {TOP} NUMERAL ENDS 0.60 +/-0.10",
         "   SHORT OF ITS TICK. TICK-SIDE END OF EACH NUMERAL",
         "   3.60 +/-0.10 ABOVE THE BOTTOM EDGE SHOWN (0.60 BEYOND",
         "   THE FULL-TICK ENDS). DEPTH 0.50 +/-0.05, SAME SLOT",

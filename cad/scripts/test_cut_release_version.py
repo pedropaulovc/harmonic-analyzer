@@ -106,3 +106,82 @@ def test_release_image_tools_do_not_use_deprecated_getdata() -> None:
 
     for source in sources:
         assert ".getdata(" not in source.read_text(encoding="utf-8"), source
+
+
+def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path):
+    """READOUT.md sends the reader to the operating explanation; a release
+    consumer has only the bundle, so that page -- and the pages IT cross-links
+    with ./ -- must be staged beside it, every ./ link among them must resolve
+    within the stage, and every link that points OUT of the bundle must be
+    rewritten to something the reader can follow: a blob URL at the release
+    tag for a tracked repo file, plain text naming the path for the
+    non-redistributable references submodule. A relative link surviving into
+    the zip would be dead on arrival."""
+    import re
+
+    staged = cut_release.stage_readout_procedure(tmp_path, "v42")
+    assert staged[0] == "READOUT.md"
+    for rel in staged:
+        assert (tmp_path / rel).is_file(), rel
+    readout = (tmp_path / "READOUT.md").read_text(encoding="utf-8")
+    assert "`docs/device-operation.md`" in readout
+    assert "`cad/docs/device-operation.md`" not in readout.split("beside this file")[0]
+    docs = cut_release.operating_docs()
+    assert docs[0] == cut_release.OPERATING_DOC and "tolerance-policy.md" in docs
+    relative = re.compile(r"\]\(((?!https?:|mailto:|#)[^)]+)\)")
+    tagged = 0
+    for name in docs:
+        page = (tmp_path / "docs" / name).read_text(encoding="utf-8")
+        for target in relative.findall(page):
+            assert target.startswith("./"), f"{name} -> {target} escapes the bundle"
+            assert (tmp_path / "docs" / target.split("#")[0]).is_file(), (
+                f"{name} -> {target}"
+            )
+        tagged += page.count("/blob/v42/cad/")
+    assert tagged >= 5  # the policy's config/script citations
+    # the submodule scans are cited by repo path, never embedded or linked
+    paper = (tmp_path / "docs" / "michelson-1898-trial-accuracy.md").read_text(
+        encoding="utf-8"
+    )
+    assert "28_Michelsons_1898_Paper.pdf` (pinned references submodule)" in paper
+    assert "/blob/v42/references/" not in paper
+
+
+def test_staged_bundle_declares_its_sources_and_permitted_use(tmp_path):
+    """The staged pages quote the 2014 book (short attributed excerpts) and
+    cite the reference scans, so the bundle must carry that boundary itself:
+    a downloader who never sees kickstarter/campaign/risks.md must still be
+    told the 2014 book is non-commercial-use only, that no photograph or
+    drawing from it is reproduced, and where the CC BY credits are."""
+    staged = cut_release.stage_readout_procedure(tmp_path, "v42")
+    assert "NOTICE.md" in staged
+    notice = (tmp_path / "NOTICE.md").read_text(encoding="utf-8")
+    assert "non-commercial purposes" in notice
+    assert "Hammack" in notice and "2014" in notice
+    assert "public domain" in notice  # the 1898 machine and paper
+    assert "comparisons/ATTRIBUTION.md" in notice  # where the gallery lands
+    assert "cad/comparisons/ATTRIBUTION.md" not in notice  # not the repo path
+    assert "NOT included in this bundle" in notice  # the reference scans
+    # the project's OWN artefacts stay MIT -- a zip-only reader must not read
+    # the third-party restriction as covering the CAD, and the licence it is
+    # told about has to be in the zip
+    assert "MIT" in notice.split("public domain")[0]
+    assert "LICENSE" in staged
+    assert "MIT License" in (tmp_path / "LICENSE").read_text(encoding="utf-8")
+
+
+def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
+    """The rewrite is a GATE, not a best effort: a ./ link to an unstaged page,
+    or a repo path that is not tracked at the tag, must fail the release."""
+    with pytest.raises(RuntimeError, match="not staged"):
+        cut_release.portable_links("[x](./gone.md)", "d.md", "v42", {"d.md"})
+    with pytest.raises(RuntimeError, match="not tracked"):
+        cut_release.portable_links(
+            "[x](../config/no-such.yaml)", "d.md", "v42", {"d.md"}
+        )
+    # an UNTRACKED page is absent from the tag the provenance manifest pins
+    # (preflight reads the tree with --untracked-files=no), so staging it would
+    # publish documentation the release claims is not there
+    with pytest.raises(RuntimeError, match="not tracked"):
+        cut_release.require_tracked("cad/docs/not-a-page.md", "closure")
+    cut_release.require_tracked("cad/docs/device-operation.md", "closure")
