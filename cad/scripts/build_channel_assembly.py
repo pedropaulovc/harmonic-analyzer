@@ -189,7 +189,7 @@ from build_fulcrum_keeper import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
 )
-from build_cylinder_gear import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
+from cylinder_gear_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the
@@ -400,9 +400,6 @@ def z_station(j: int) -> float:
     return Z0 + PITCH * j
 
 
-
-
-
 # --- mate scheme (validated single-channel probe) ---------------------------
 # Both rocker-pivot and lever-fulcrum shafts ride O6.35 bores.
 SHAFT_R = 6.35 / 2.0
@@ -565,7 +562,6 @@ async def _locate_to_datum(adapter, name: str) -> None:
             label=f"{name} datum {axis} d={abs(coord):.2f}",
             verify=(name, o),
         )
-
 
 
 BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 801.95

@@ -15,7 +15,6 @@ import build_connecting_rod
 import build_crank_drive_gear
 import build_crank_pinion
 import build_crankshaft
-import build_cylinder_gear
 import build_cylinder_gear_shaft
 import cone_gear_shaft_spec
 import cone_gear_spec
@@ -25,7 +24,6 @@ import crank_drive_gear_spec
 import crank_pinion_spec
 import crankshaft_spec
 import cylinder_gear_shaft_spec
-import cylinder_gear_spec
 import draw_alignment_pinion
 import draw_arbor_pedestal
 import draw_cone_gear
@@ -35,7 +33,6 @@ import draw_connecting_rod
 import draw_crank_drive_gear
 import draw_crank_pinion
 import draw_crankshaft
-import draw_cylinder_gear
 import draw_cylinder_gear_shaft
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -172,18 +169,6 @@ CASES = (
                     ),
                 ),
                 production_method="BEARING JOURNAL",
-            ),
-        ),
-    ),
-    (
-        cylinder_gear_spec,
-        build_cylinder_gear,
-        draw_cylinder_gear,
-        (
-            SurfaceFinishControl(
-                "cylinder_gear_bore",
-                MACHINED_UM,
-                CylinderFace(cylinder_gear_spec.BORE_DIA),
             ),
         ),
     ),

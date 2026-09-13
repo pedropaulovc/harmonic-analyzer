@@ -513,7 +513,7 @@ from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 # the south side (z_j - DRUM_FACE/2 - cam), so the south disc clears gear 0's
 # cam and rod ring, the north disc gear 19's face. Beside the north pedestal
 # instead, the O60 disc fouled the cone-tip block (interference gate).
-from build_cylinder_gear import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
+from cylinder_gear_spec import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
 
 END_DISC_AIR = 0.5
 # Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
@@ -1809,7 +1809,10 @@ if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
 _require_tapped_thread(
-    "pinion block base seat", BSCREW_THREAD, BASE_BLOCK_SEAT_SPEC, kind="tapped_bottoming"
+    "pinion block base seat",
+    BSCREW_THREAD,
+    BASE_BLOCK_SEAT_SPEC,
+    kind="tapped_bottoming",
 )
 _BLOCK_SCREW_ENGAGEMENT = BSCREW_SHANK_LEN - BLOCK_HEIGHT
 if _BLOCK_SCREW_ENGAGEMENT < 1.0:
