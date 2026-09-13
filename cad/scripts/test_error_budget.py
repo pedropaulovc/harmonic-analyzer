@@ -254,6 +254,15 @@ def test_magnifier_setup_is_derived_from_the_cad_output_chain(report, nom):
     assert magnifying_lever_geom.CLAMP_LOCAL_X == float(
         eb._config.machine("output", "magnifier_clamp_station_mm")
     )
+    # and the collar length DRIVES the CAD: the bracket part builds its collar
+    # from the same read point, so a config edit moves the metal (an assembly
+    # assert that the two merely agree would leave the config decorative)
+    import build_magnifying_bracket
+
+    assert (
+        build_magnifying_bracket.COLLAR_HALF_LEN
+        is magnifying_lever_geom.COLLAR_HALF_LEN
+    )
     asm = (
         pathlib.Path(eb.__file__).with_name("build_magnifier_assembly.py")
     ).read_text(encoding="utf-8")
@@ -841,6 +850,13 @@ def test_cycle_table_always_ends_at_the_travel_stop(nom):
     mid = t.sample(88.05, grid)
     assert np.allclose(mid, 0.5 * (t.cycles[-2] + t.cycles[-1]), atol=1e-12)
     assert t.read[-1] == pytest.approx(1.0)
+    # the cache is keyed on the STEP too: a coarse diagnostic grid must not be
+    # handed back to a caller that asked for the budget's resolution
+    coarse = eb.cycle_table(odd, 1.0)
+    assert coarse is not eb.cycle_table(odd)
+    assert len(coarse.stations) < len(t.stations)
+    assert eb.read_table(odd, 1.0)[0].shape == coarse.stations.shape
+    assert eb.read_table(odd)[0].shape == t.stations.shape
 
 
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
@@ -908,6 +924,14 @@ def test_stick_division_is_the_configured_scale_the_builder_engraves():
         eb._config.machine("amplitude", "stick_minor_per_division")
     )
     assert eb.STICK_DIVISION_MM == configured
+    # the engraved span follows the configured COUNT, so the last tick keeps
+    # its end margin instead of running off a longer/shorter scale
+    import build_measuring_stick as stick
+
+    assert stick.SCALE_SPAN == (measuring_stick_geom.DIVISION_COUNT - 1) * configured
+    assert stick.SCALE_START_X == (
+        stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
+    )
     assert f"TICK N AT {configured:.2f} X N" in measuring_stick_spec.DRAWING_NOTES
     assert f"SPAN {10 * configured:.2f} REF" in measuring_stick_spec.DRAWING_NOTES
     src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(

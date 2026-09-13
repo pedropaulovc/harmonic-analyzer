@@ -904,17 +904,28 @@ def operating_docs() -> list[str]:
     """``OPERATING_DOC`` plus the ``cad/docs`` pages reachable from it through
     ``./`` markdown links (the tolerance policy, the GD&T assessment, the DFM
     notes, the 1898 benchmark): the closure a bundle reader can follow without
-    the repository. Links out to config/scripts name repo paths at the tag."""
+    the repository. Links out to config/scripts name repo paths at the tag.
+
+    Every page must be TRACKED: preflight and provenance read the tree with
+    ``--untracked-files=no``, so an untracked page would ship inside a bundle
+    the manifest calls a clean, tag-pinned tree."""
     seen: list[str] = []
     todo = [OPERATING_DOC]
     while todo:
         name = todo.pop()
         if name in seen:
             continue
+        require_tracked(f"cad/docs/{name}", name)
         seen.append(name)
         text = (CAD_ROOT / "docs" / name).read_text(encoding="utf-8")
         todo.extend(re.findall(r"\]\(\./([^)#]+)", text))
     return seen
+
+
+def require_tracked(rel: str, who: str) -> None:
+    """Raise unless repo-relative ``rel`` is tracked (i.e. present at the tag)."""
+    if not _git("ls-files", "--", rel, check_rc=False).strip():
+        raise RuntimeError(f"{who}: not tracked at the tag: {rel}")
 
 
 _LINK_RE = re.compile(r"(!?)\[([^\]]*)\]\((?!https?:|mailto:|#)([^)\s]+)([^)]*)\)")
@@ -957,10 +968,7 @@ def portable_links(text: str, name: str, tag: str, staged: set[str]) -> str:
             if rel.endswith(bare):
                 return f"`{rel}` (pinned references submodule)"
             return f"{label} (`{rel}`, pinned references submodule)"
-        if not _git("ls-files", "--", rel, check_rc=False).strip():
-            raise RuntimeError(
-                f"{name}: link target is not tracked at the tag: {target} -> {rel}"
-            )
+        require_tracked(rel, f"{name}: link target {target}")
         anchor = f"#{frag}" if frag else ""
         return f"{bang}[{label}]({repo_url}/{rel}{anchor}{rest})"
 
@@ -975,14 +983,16 @@ def portable_links(text: str, name: str, tag: str, staged: set[str]) -> str:
 # a downloader cannot mistake the bundle for a commercially reusable set.
 NOTICE = """# Notice -- sources and permitted use
 
+**Everything this project made is MIT-licensed** -- see `LICENSE` beside this
+file. The CAD, the drawings, the neutral geometry and the derived numbers in
+`READOUT.md` and `docs/` are this project's own work, built from `cad/config` +
+`cad/scripts`, and you may use them commercially under the MIT terms.
+
 **The machine is public domain.** Michelson and Stratton published in 1898;
 Wm. Gaertner & Co. built the instruments between 1896 and 1923.
 
-**This bundle is an open, non-commercial research artefact.** The CAD, the
-drawings, the neutral geometry and the derived numbers in `READOUT.md` and
-`docs/` are this project's own work, built from `cad/config` + `cad/scripts`.
-
-**Third-party sources are cited, not redistributed:**
+**The restrictions below apply ONLY to the third-party sources those pages
+cite** -- never to the project's own artefacts:
 
 - A. A. Michelson and S. W. Stratton, *A New Harmonic Analyzer*,
   *Am. J. Sci.* 4th ser. vol. V (1898) pp. 1-13 -- public domain; the
@@ -995,14 +1005,15 @@ drawings, the neutral geometry and the derived numbers in `READOUT.md` and
 - Reference scans and photographs live in the pinned `references` submodule and
   are NOT included in this bundle; `docs/` cites them by repository path.
 - Comparison-gallery imagery is CC BY -- credits in
-  `cad/comparisons/ATTRIBUTION.md`.
+  `comparisons/ATTRIBUTION.md` (present when the gallery shipped).
 """
 
 
 def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
     """Write the operating/readout procedure (error_budget.readout_procedure)
-    into the bundle root as ``READOUT.md``, plus ``NOTICE`` (the sources the
-    staged pages quote and the permitted use of each) and ``operating_docs()`` under
+    into the bundle root as ``READOUT.md``, plus the repository ``LICENSE``,
+    ``NOTICE`` (what is MIT, and the permitted use of each third-party source the
+    staged pages quote) and ``operating_docs()`` under
     ``docs/`` so every ``./`` cross-link resolves inside the bundle and every
     other relative link is rewritten to the repository at ``tag``
     (``portable_links``). Not COM: the model is offline. Returns the staged
@@ -1026,6 +1037,10 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
         staged.append(f"docs/{name}")
     (stage / "NOTICE.md").write_text(NOTICE, encoding="utf-8")
     staged.append("NOTICE.md")
+    # NOTICE points at it, and a zip-only consumer has no repository to look in
+    require_tracked("LICENSE", "release LICENSE")
+    shutil.copyfile(REPO_ROOT / "LICENSE", stage / "LICENSE")
+    staged.append("LICENSE")
     return staged
 
 

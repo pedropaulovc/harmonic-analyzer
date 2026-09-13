@@ -159,8 +159,15 @@ def test_staged_bundle_declares_its_sources_and_permitted_use(tmp_path):
     assert "non-commercial purposes" in notice
     assert "Hammack" in notice and "2014" in notice
     assert "public domain" in notice  # the 1898 machine and paper
-    assert "ATTRIBUTION.md" in notice  # the CC BY gallery imagery
+    assert "comparisons/ATTRIBUTION.md" in notice  # where the gallery lands
+    assert "cad/comparisons/ATTRIBUTION.md" not in notice  # not the repo path
     assert "NOT included in this bundle" in notice  # the reference scans
+    # the project's OWN artefacts stay MIT -- a zip-only reader must not read
+    # the third-party restriction as covering the CAD, and the licence it is
+    # told about has to be in the zip
+    assert "MIT" in notice.split("public domain")[0]
+    assert "LICENSE" in staged
+    assert "MIT License" in (tmp_path / "LICENSE").read_text(encoding="utf-8")
 
 
 def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
@@ -172,3 +179,9 @@ def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
         cut_release.portable_links(
             "[x](../config/no-such.yaml)", "d.md", "v42", {"d.md"}
         )
+    # an UNTRACKED page is absent from the tag the provenance manifest pins
+    # (preflight reads the tree with --untracked-files=no), so staging it would
+    # publish documentation the release claims is not there
+    with pytest.raises(RuntimeError, match="not tracked"):
+        cut_release.require_tracked("cad/docs/not-a-page.md", "closure")
+    cut_release.require_tracked("cad/docs/device-operation.md", "closure")

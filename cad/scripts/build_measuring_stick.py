@@ -96,7 +96,8 @@ BODY_THICKNESS = 3.0  # DIMENSIONS.md ch16: scaled (low)
 # measuring_stick_geom -- the offline error budget's station -> stick-reading
 # conversion reads the same source, so neither copies a literal.
 SCALE_END_MARGIN = 0.5  # the 10 tick lands just short of the far end (img02)
-SCALE_START_X = BODY_LENGTH - 10 * DIVISION_SPACING - SCALE_END_MARGIN  # 57.5
+SCALE_SPAN = (DIVISION_COUNT - 1) * DIVISION_SPACING  # 0..10 -> 10 pitches
+SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN  # 57.5
 
 TICK_WIDTH = 0.4
 # Graduation-mark lengths are modelling choices: ch16 pins only the 200×8 body and

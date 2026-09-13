@@ -520,8 +520,11 @@ def _cycles_at(stations: np.ndarray, nom: Nominal) -> np.ndarray:
 
 def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
     """``CycleTable`` for ``nom``, cached (the same ~350 exact-kinematics
-    solves ``read_table`` makes, kept whole instead of reduced to c1)."""
-    key = astuple(nom)
+    solves ``read_table`` makes, kept whole instead of reduced to c1).
+
+    Keyed on (nominal, step): a coarser grid is a DIFFERENT table, so a
+    diagnostic asking for step 1.0 must not prime the budget's 0.25 grid."""
+    key = (astuple(nom), step_mm)
     if key not in _CYCLE_TABLES:
         stations = _station_grid(nom, step_mm)
         cycles = _cycles_at(stations, nom)
@@ -538,8 +541,9 @@ def cycle_derivatives(nom: Nominal, step_mm: float = 0.25) -> dict[str, CycleTab
     ``cycle_table``'s grid, by central differences of the exact kinematics
     (h = 0.05 mm, or 0.05/arm rad for the skew; the tolerances are 0.025-0.15
     mm, so first order is exact to ~1e-6 of the cycle). ``read``/``kappa`` of
-    a derivative table are unused (zeros)."""
-    key = astuple(nom)
+    a derivative table are unused (zeros). Keyed on (nominal, step), like
+    ``cycle_table``."""
+    key = (astuple(nom), step_mm)
     if key not in _CYCLE_DERIVATIVES:
         stations = _station_grid(nom, step_mm)
         out = {}
@@ -558,8 +562,9 @@ def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndar
     """(station, read ordinate) samples from the pivot zero to full scale, for
     vectorised lookup (``np.interp``) of the ordinate a bar at ANY reachable
     station contributes -- the Monte Carlo's physical baseline. Cached per
-    nominal: ~350 exact-kinematics solves once, not per draw."""
-    key = astuple(nom)
+    nominal AND step, like ``cycle_table``: ~350 exact-kinematics solves once,
+    not per draw."""
+    key = (astuple(nom), step_mm)
     if key not in _READ_TABLES:
         t = cycle_table(nom, step_mm)
         _READ_TABLES[key] = (t.stations, t.read)

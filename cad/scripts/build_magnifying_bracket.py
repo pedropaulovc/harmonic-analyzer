@@ -61,13 +61,17 @@ from magnifying_bracket_spec import (
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
+from magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
 
 PART_NAME = "magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
 
 COLLAR_OD = 12.0  # rod collar (low)
 COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
-COLLAR_HALF_LEN = 5.0  # along X
+# along X. CONFIG owns it (output.magnifier_collar_half_len_mm): the error
+# budget derives the magnifier's minimum pose from the collar face, so the
+# config value must drive the CAD, not merely be asserted equal to it.
+COLLAR_HALF_LEN = LEVER_COLLAR_HALF_LEN
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
 ARM_Y = (-3.0, 4.5)
 # DEPTH RE-ANCHOR (2026-07-04): the collar (part origin) moved forward with
