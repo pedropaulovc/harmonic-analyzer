@@ -474,6 +474,11 @@ DOIT_CONFIG = {
     # a shared config no longer invalidate every dependent part (see ContentChecker
     # above). Non-YAML deps keep stock md5 behaviour.
     "check_file_uptodate": "content",
+    # Direct ``doit`` invocations use up to eight workers on this host; smaller
+    # machines use fewer. An explicit ``-n`` still overrides this default. The
+    # runtime COM seat lock keeps SolidWorks work serialized while check:* tasks
+    # fan out.
+    "num_process": min(8, os.cpu_count() or 1),
     # `build` is the one fully-safe entry point (parts + assemblies + every
     # gate). `build_bare` is the quick parts+assemblies rebuild; export/release
     # are opt-in.
@@ -2185,12 +2190,14 @@ def task_verify():
 
 
 def task_check():
-    """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
+    """SolidWorks-FREE checks -- no COM, so they run in the configured worker
+    pool (up to eight on this host, or an explicit ``-n N`` override).
 
     ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
     runs those two without connecting to SolidWorks); ``check:graph`` /
     ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
-    pytest. None takes the COM seat lock, so they fan out under ``-n``.
+    pytest. None takes the COM seat lock, so they fan out under the configured
+    pool.
     """
     config_py = str((SCRIPTS_DIR / "_config.py").resolve())
     # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a

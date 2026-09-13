@@ -41,6 +41,7 @@ which IS checkable here.
 from __future__ import annotations
 
 import ast
+import functools
 import sys
 from pathlib import Path
 
@@ -80,6 +81,7 @@ def _assembly_scripts() -> list[Path]:
     return [SCRIPTS_DIR / f"build_{s}_assembly.py" for s in ASSEMBLY_ORDER]
 
 
+@functools.lru_cache(maxsize=None)
 def _imported_modules(path: Path) -> set[str]:
     """Every fully-qualified module name imported ANYWHERE in ``path`` (top-level or
     lazily inside a function): ``import a.b.c`` and ``from a.b import c`` (absolute

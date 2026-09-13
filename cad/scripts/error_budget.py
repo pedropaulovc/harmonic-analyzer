@@ -184,9 +184,13 @@ def pen_gain(nom: Nominal, lever_r: float) -> float:
 
 
 def _bisect(
-    f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 50
+    f: Callable[[np.ndarray], np.ndarray], lo: float, hi: float, n: int, iters: int = 40
 ) -> np.ndarray:
-    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots."""
+    """Vectorised bisection of ``f`` on [lo, hi] for ``n`` independent roots.
+
+    The current +/-0.4 rad call sites reach a sub-picoradian bracket in the
+    default forty iterations, well below the budget model's tolerances.
+    """
     lo_a = np.full(n, lo)
     hi_a = np.full(n, hi)
     f_lo = f(lo_a)
