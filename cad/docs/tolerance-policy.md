@@ -453,11 +453,20 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   CAD — spring coupling 0.958, lever radius 66–165 mm (collar face to as-built), wheel ratio
   4.76 — and finds one full-scale bar moves the pen 3.2 mm at the *minimum* setting, so the
   15 mm half-stroke holds 4.7 bars of read ordinate. The book's "up to 4×" is the as-built
-  165/39.85; `output.magnify_factor` 4.0 stays the kinematic-probe convention. The wire route
-  at the minimum radius is not gated (the clamp face touches the collar face; the vertical rod
-  hangs 6 mm forward of the collar). Raising the capacity — a clamp band reaching ~15 mm from
-  the knife, or a longer stroke — is the cheapest remaining accuracy gain: it halves the knife
-  term and the setting share together.
+  165/39.85; `output.magnify_factor` 4.0 stays the kinematic-probe convention. **The minimum
+  pose is not CAD-gated**: `build_magnifier_assembly` builds and `verify:soundness` exercises
+  only the as-built 165 mm placement; no clearance or articulation proof exists with the clamp
+  face against the collar face (the vertical rod hangs 6 mm forward of the collar), yet every
+  broad input is scored there. `check:budget` names the inputs that rely on it and fails
+  unless `reserved.readout.waive_minimum_pose` is set; the waiver is set, and **the closure
+  above is conditional on that pose being buildable** (#748). The report prints an offline
+  straight-wire estimate beside the waiver (hook at x 51; the same 0.3 mm ring / 1.7 mm spoke
+  z clearance as the built pose, since the wire's z run does not depend on x) — it is not a
+  proof and says nothing about the clamp, rod or collar. `READOUT.md` caps the clamp-radius
+  instruction at the as-built 165 mm and tells the operator the short-stroke cost (scale a
+  small input up) rather than promising a full stroke. Raising the capacity — a clamp band
+  reaching ~15 mm from the knife, or a longer stroke — is the cheapest remaining accuracy
+  gain: it halves the knife term and the setting share together.
 - `amplitude.max_travel_mm` 88 vs. the ledger's ±146 mm foot travel: the budget uses 88; a
   larger full scale improves every readout term proportionally.
 - The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.048): keep or relax

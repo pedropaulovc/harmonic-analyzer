@@ -916,6 +916,61 @@ def monte_carlo(
 # --------------------------------------------------------------------------
 
 
+def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
+    """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
+    with the clamp against the bracket collar: the hook (which rides the clamp
+    at machine x = LEVER_X0 - clamp local x, the same y/z as built) to the hub
+    tangent, versus the magnifying wheel's rim. Reported so the waiver in
+    error_budget.yaml is an informed one; the proof is a seat build of the
+    magnifier at that pose (#748)."""
+    import magnifying_wheel_geom
+
+    lever_x0 = lever_wire_geom.CLAMP_X + magnifying_lever_geom.CLAMP_LOCAL_X  # 200
+    hook_x = lever_x0 - (magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
+    hook = np.array([hook_x, lever_wire_geom.HOOK_Y, lever_wire_geom.HOOK_Z])
+    cx, cy = lever_wire_geom.WHEEL_X, lever_wire_geom.WHEEL_BAR_Y
+    vx, vy = hook[0] - cx, hook[1] - cy
+    r_eff = lever_wire_geom._R_EFF
+    theta = math.atan2(vy, vx) - math.acos(r_eff / math.hypot(vx, vy))
+    end = np.array(
+        [
+            cx + r_eff * math.cos(theta),
+            cy + r_eff * math.sin(theta),
+            lever_wire_geom.HUB_END_Z,
+        ]
+    )
+    # closest approach of the run to the wheel: the wire runs in FRONT of the
+    # wheel (less negative z), so the clearance is wire z minus the face z of
+    # whatever it passes over -- the rim ring (radial 44..50) or the spokes
+    ts = np.linspace(0.0, 1.0, 2001)
+    pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
+    radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
+    rim_r = magnifying_wheel_geom.RIM_OUTER_DIA / 2.0
+    rim_in = magnifying_wheel_geom.RIM_INNER_DIA / 2.0
+    margin = lever_wire_geom.WIRE_DIA / 2.0 + lever_wire_geom.CLEARANCE
+    over_ring = (radial >= rim_in - margin) & (radial <= rim_r + margin)
+    over_spokes = (radial > lever_wire_geom.HUB_DIA / 2.0 + margin) & (
+        radial < rim_in - margin
+    )
+    ring_face = lever_wire_geom.WHEEL_MID_Z + magnifying_wheel_geom.RIM_AXIAL / 2.0
+    spoke_face = lever_wire_geom.WHEEL_MID_Z + magnifying_wheel_geom.SPOKE_AXIAL / 2.0
+
+    def gap(mask: np.ndarray, face: float) -> float:
+        if not np.any(mask):
+            return float("inf")
+        return float(np.min(pts[mask, 2] - face)) - lever_wire_geom.WIRE_DIA / 2.0
+
+    return {
+        "hook_x_mm": float(hook[0]),
+        "wire_length_mm": float(np.linalg.norm(end - hook)),
+        "min_radial_to_wheel_axis_mm": float(np.min(radial)),
+        "rim_outer_radius_mm": rim_r,
+        "z_clearance_to_rim_face_where_over_ring_mm": gap(over_ring, ring_face),
+        "z_clearance_to_spoke_face_where_over_spokes_mm": gap(over_spokes, spoke_face),
+        "note": "straight rest run only; no clamp/rod/collar/frame check, no articulation -- NOT a CAD gate",
+    }
+
+
 def closed_form_terms(
     nom: Nominal, budget: dict[str, Any], setups: dict[str, MagnifierSetup]
 ) -> dict[str, Any]:
@@ -1115,7 +1170,13 @@ def closed_form_terms(
         / (gain_min * abs(trial.f_full))
         * nom.d_max,
         "per_input": {n: asdict(setups[n]) for n in scored},
-        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1",
+        "inputs_at_minimum_pose": [
+            n for n in scored if setups[n].lever_r == nom.lever_r_min
+        ],
+        "minimum_pose_cad_gated": False,  # build_magnifier_assembly builds the
+        # as-built pose only; the clamp/rod/wire at the collar is #748's proof
+        "minimum_pose_wire_estimate": _minimum_pose_wire_estimate(nom),
+        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; the minimum pose is NOT CAD-gated (reserved.readout.waive_minimum_pose)",
     }
     return {
         "knife": knife,
@@ -1175,6 +1236,9 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         },
         "counter_spring_balance_waived": bool(
             budget["reserved"]["knife"].get("waive_static_balance", False)
+        ),
+        "minimum_pose_waived": bool(
+            budget["reserved"]["readout"].get("waive_minimum_pose", False)
         ),
     }
     r["closure"] = closure(r, budget)
@@ -1310,6 +1374,17 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
             f"{knife['counter_spring_available_N']:.0f} N available vs "
             f"{knife['counter_spring_needed_N']:.0f} N needed"
         )
+    mag = r["closed_form"]["magnifier"]
+    if (
+        mag["inputs_at_minimum_pose"]
+        and not mag["minimum_pose_cad_gated"]
+        and not r["minimum_pose_waived"]
+    ):
+        bad.append(
+            "magnifier minimum pose is not CAD-gated but scores "
+            f"{', '.join(mag['inputs_at_minimum_pose'])} "
+            f"(clamp at {mag['lever_radius_min_mm']:.0f} mm from the knife)"
+        )
     if cl["total_mae"] > r["benchmark"]["mae_fs_pct"]:
         bad.append(
             f"total MAE {cl['total_mae']:.3f} > benchmark {r['benchmark']['mae_fs_pct']}"
@@ -1364,6 +1439,11 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
         trial.peak_bars(ones * nom.d_max),
         trial.peak_bars(naive_all * ones * nom.d_max),
     )
+    p_min_full = (
+        mag["ordinate_capacity_full_scale_bars"]
+        * mag["lever_radius_min_mm"]
+        / mag["lever_radius_built_mm"]
+    )  # the smallest peak the as-built cap can still bring to full stroke
     scale_table = "\n".join(
         f"| {f:.3f} | {f * nom.d_max:6.2f} | {trial.peak_bars(f * ones * nom.d_max):6.2f} |"
         for f in sorted(
@@ -1482,9 +1562,18 @@ machine; the stick's +/-{tol:.2f} mm then costs that much more of each
 ordinate, which is what the budget's `station_setting` and `knife` terms
 carry. Then set the
 clamp radius so the peak just fills the stroke:
-$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$
-(as built {mag["lever_radius_built_mm"]:.0f} mm; the wheel's rim/hub wire ratio
-is {mag["wheel_ratio"]:.2f}).
+$R = {mag["lever_radius_min_mm"]:.0f}$ mm $\\times$ {mag["ordinate_capacity_full_scale_bars"]:.2f} $/ P$,
+**capped at the as-built {mag["lever_radius_built_mm"]:.0f} mm** (the clamp's
+far end; the wheel's rim/hub wire ratio is {mag["wheel_ratio"]:.2f}). A sparse
+or small input with $P < {p_min_full:.2f}$ therefore cannot fill the stroke:
+its $k=0$ reading is $r_0 = {mag["pen_mm_per_full_scale_bar_at_built"]:.2f}\\,P$ mm
+and every reading error in step 3 is $15/r_0$ times larger; scale such an
+input UP (multiply every ordinate by a constant, up to the capacity) before
+setting the bars -- step 3 removes it like any $f$.
+
+The minimum pose (clamp against the collar) is what every broad input uses
+and it is not CAD-gated (error_budget.yaml `waive_minimum_pose`, #748); the
+as-built pose is.
 
 $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it):
 
@@ -1498,7 +1587,8 @@ Crank in ONE direction only (a reversal re-seats every mesh on the other flank).
 Take the zero of each trial as the mean line of the trace over one full period.
 Read the pen at each $\\theta_k$ to +/-{cf["readout"]["assumed_reading_uncertainty_mm"]:.3f} mm
 (half the line width against the grid), the magnifier set as in step 1 so the
-$k=0$ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
+$k=0$ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke
+(or the $r_0$ it reaches at the {mag["lever_radius_built_mm"]:.0f} mm cap).
 
 ## 3. Normalise
 
@@ -1578,6 +1668,19 @@ def _main() -> int:
                 f"({knife['counter_spring_available_N']:.0f} N available vs "
                 f"{knife['counter_spring_needed_N']:.0f} N needed) -- closure is "
                 "conditional on resolving the spring pair (tolerance-policy.md)"
+            )
+        mag = r["closed_form"]["magnifier"]
+        if mag["inputs_at_minimum_pose"] and r["minimum_pose_waived"]:
+            est = mag["minimum_pose_wire_estimate"]
+            print(
+                "WAIVED: the magnifier's minimum pose (clamp at "
+                f"{mag['lever_radius_min_mm']:.0f} mm from the knife) is not "
+                f"CAD-gated; it scores {', '.join(mag['inputs_at_minimum_pose'])} "
+                f"(offline straight-wire estimate: hook x {est['hook_x_mm']:.0f}, "
+                f"{est['z_clearance_to_rim_face_where_over_ring_mm']:.1f} mm in "
+                f"front of the rim ring, "
+                f"{est['z_clearance_to_spoke_face_where_over_spokes_mm']:.1f} mm in "
+                "front of the spokes) -- closure is conditional on #748"
             )
         print("\nBUDGET:", "closes" if not bad else "; ".join(bad))
     return 0 if not budget_closes(r) else 1

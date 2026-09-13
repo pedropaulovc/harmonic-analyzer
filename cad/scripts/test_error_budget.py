@@ -10,6 +10,7 @@ match the budget, and the Monte Carlo lands inside the targets. SolidWorks-free.
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import pathlib
 import re
@@ -307,6 +308,53 @@ def test_unbalanced_counter_spring_fails_unless_waived(budget, report):
     }
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("counter spring cannot balance") for b in bad), bad
+
+
+def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
+    """Every broad input is scored at the magnifier's minimum pose (clamp
+    against the collar), which build_magnifier_assembly never builds: the
+    report names those inputs, the gate fails on it unless the yaml records
+    the waiver (#748), and the offline wire estimate that rides the waiver
+    reproduces lever_wire_geom's own numbers at the as-built pose."""
+    import lever_wire_geom
+
+    mag = report["closed_form"]["magnifier"]
+    assert mag["minimum_pose_cad_gated"] is False
+    assert set(mag["inputs_at_minimum_pose"]) >= {"all_ones", "gaussian_a0p1"}
+    strict = {
+        **budget,
+        "reserved": {
+            **budget["reserved"],
+            "readout": {**budget["reserved"]["readout"], "waive_minimum_pose": False},
+        },
+    }
+    bad = eb.budget_closes(eb.build_report(strict))
+    assert any(b.startswith("magnifier minimum pose is not CAD-gated") for b in bad), (
+        bad
+    )
+    built = eb._minimum_pose_wire_estimate(
+        dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
+    )
+    assert built["hook_x_mm"] == pytest.approx(lever_wire_geom.CLAMP_X)
+    assert built["wire_length_mm"] == pytest.approx(lever_wire_geom.WIRE_LEN, abs=1e-3)
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < lever_wire_geom.CLAMP_X
+
+
+def test_shipped_procedure_caps_the_clamp_radius_at_the_built_pose(report, nom):
+    """The R = 66 x 4.72 / P rule would ask for R > 165 mm on a small input;
+    READOUT.md must cap it at the as-built radius and tell the operator the
+    short-stroke cost (scale the input up) rather than promise a full stroke."""
+    doc = eb.readout_procedure(report, nom)
+    mag = report["closed_form"]["magnifier"]
+    p_min = (
+        mag["ordinate_capacity_full_scale_bars"]
+        * mag["lever_radius_min_mm"]
+        / mag["lever_radius_built_mm"]
+    )
+    assert f"capped at the as-built {mag['lever_radius_built_mm']:.0f} mm" in doc
+    assert f"$P < {p_min:.2f}$" in doc
+    assert "scale such an\ninput UP" in doc
+    assert "not CAD-gated" in doc
 
 
 def test_rod_drive_is_on_the_crank_side(nom):

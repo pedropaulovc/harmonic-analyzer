@@ -63,6 +63,18 @@ reserved:
     # machine's ORDINATE CAPACITY, ~4.7 full-scale bars -- every broad input
     # runs at 0.2-0.5 of full scale), and where it is above the as-built
     # radius the reading falls short and the term grows by the shortfall.
+    # The MINIMUM pose -- clamp face against the bracket collar face, 66 mm
+    # from the knife -- is what every broad input is scored at, and the CAD
+    # builds only the as-built 165 mm pose (build_magnifier_assembly): no
+    # clearance or articulation gate exercises the clamp, vertical rod and
+    # wire there. That is an OPEN DESIGN ITEM (#748), not a budget
+    # assumption: check:budget fails on it unless waived here, and the waiver
+    # is the record that the closure is conditional on that pose being
+    # buildable. The report prints an offline straight-wire estimate beside
+    # the waiver (hook at x 51, same 0.3 mm ring / 1.7 mm spoke
+    # z clearance as the built pose -- the wire's z run is x-independent); it is not
+    # a proof, and it says nothing about the clamp, rod or collar.
+    waive_minimum_pose: true
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
                                    # carries its own read AND the k=0 normaliser's read (scaled
                                    # by the physical r_k/r_0), uniform +/-reading each, averaged
