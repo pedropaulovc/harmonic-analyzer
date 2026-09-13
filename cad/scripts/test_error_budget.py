@@ -272,6 +272,26 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert f"**{at_zero:+.4f} for a bar at zero**" in doc
     assert f"**{at_stop:+.4f} for a bar at the stop**" in doc
     assert f"bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$" in doc
+    assert "s = \\frac{r_0}{S + C_2}" in doc
+    assert "O'_k = \\frac{r_k}{s}" in doc
+
+
+def test_normalisation_uses_only_observable_units():
+    """Step 3 of READOUT.md must be executable from what the operator has:
+    pen readings in mm and the two ordinate-unit sums S and C2. A synthetic
+    trial with a known pen scale, second harmonics and a lift must come back
+    as the set ordinates exactly -- no internal trace unit enters."""
+    rng = np.random.default_rng(7)
+    x = rng.uniform(0.0, 1.0, eb.N_ELEMENTS)
+    lift = 0.03
+    x_read = x + lift
+    kappa = rng.uniform(0.01, 0.06, eb.N_ELEMENTS)
+    s = 3.7  # mm per ordinate unit, unknown to the procedure
+    th = eb.THETA_K[:, None] * eb.HARMONICS[None, :]
+    readings_mm = s * (np.cos(th) @ x_read + np.cos(2.0 * th) @ (x_read * kappa))
+    measured = eb.read_coefficients(readings_mm, x_read, kappa)
+    measured -= eb.ideal_coefficients(x_read - x)
+    assert np.allclose(measured, eb.ideal_coefficients(x), atol=1e-12)
 
 
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):

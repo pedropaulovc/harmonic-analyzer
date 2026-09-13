@@ -258,9 +258,12 @@ the specification.
    other way, [−0.25, 0] against the travel stop, recorded at 87.875 mm (0.9986). `READOUT.md`
    prints both numbers; the Monte Carlo samples both one-sided bands and subtracts the same
    means.
-2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x^\text{read}_i$
-   (the read ordinates of the stations the operator set) — Michelson's normalisation to the
-   greatest term. This removes all common-mode
+2. **Normalise each trial by its own k = 0 reading** in the units the operator has: with
+   $S = \sum_i x^\text{read}_i$ and $C_2 = \sum_i x^\text{read}_i\kappa_i$ (both ordinate-unit
+   sums from step 1) the k = 0 pen reading is $r_0 = s\,(S + C_2)$, so the trial's pen scale is
+   $s = r_0/(S + C_2)$ and every reading becomes $r_k/s$ — Michelson's normalisation to the
+   greatest term, with no internal unit needed (`READOUT.md` step 3; the model's
+   `read_coefficients` is the same arithmetic). This removes all common-mode
    gain, including the magnifier setting, so the magnifier may be reset per trial to bring the
    k = 0 term to the full stroke (the CAD's `pen_driver` maps the trace peak onto the stroke).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises

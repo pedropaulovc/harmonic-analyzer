@@ -299,18 +299,19 @@ PERIOD = np.arange(720) * 2.0 * math.pi / 720
 
 
 def read_coefficients(
-    trace: Callable[[np.ndarray], np.ndarray], x: np.ndarray, c2_total: float = 0.0
+    readings_mm: np.ndarray, x_read: np.ndarray, kappa: np.ndarray
 ) -> np.ndarray:
-    """The readout PROCEDURE of tolerance-policy.md applied to a trace y(theta):
-    zero = the mean line of the trial's own full period; scale = the trial's own
-    k=0 reading, which the operator knows equals sum(x_i) (Michelson's
-    normalisation to the greatest term, and the CAD's pen_driver mapping of the
-    trace peak onto the pen stroke). ``c2_total`` is the sum of the channels'
-    second harmonics riding the k=0 reading, removed before scaling. Returns A_k
-    in ordinate units."""
-    zero = float(np.mean(trace(PERIOD)))
-    r = trace(THETA_K) - zero
-    return r * (float(np.sum(x)) / (r[0] - c2_total))
+    """Steps 3-4 of the shipped readout procedure, in the units the operator
+    has: ``readings_mm`` are the pen readings r_k off the mean line at each
+    theta_k, ``x_read`` the recorded read ordinates, ``kappa`` the table's
+    c2/c1 at each bar's station. The k=0 reading is s*(S + C2) for the
+    unknown pen scale s, with S = sum x_read and C2 = sum x_read*kappa both
+    known ordinate-unit sums, so s = r_0/(S + C2) -- no internal trace unit.
+    Returns O_k in ordinate units with the second-harmonic term removed; the
+    caller subtracts the read-vs-set vector."""
+    cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
+    s = readings_mm[0] / float(np.sum(x_read) + np.sum(x_read * kappa))
+    return readings_mm / s - cos_2k @ (x_read * kappa)
 
 
 def coefficient_errors_pct(measured: np.ndarray, x: np.ndarray) -> np.ndarray:
@@ -433,10 +434,16 @@ def nominal_design_errors(
 
         return trace
 
-    def c2(stations: np.ndarray) -> np.ndarray:
+    def kappa(stations: np.ndarray) -> np.ndarray:
+        """The table's c2/c1 per channel (0 when the correction is off)."""
         if not correct_second_harmonic:
             return np.zeros_like(stations)
-        return np.array([second_harmonic(one_cycle(float(d)), grid) for d in stations])
+        return np.array(
+            [
+                second_harmonic(one_cycle(float(d)), grid) / fundamental(float(d))
+                for d in stations
+            ]
+        )
 
     def fundamental(d: float) -> float:
         return 2.0 * float(np.mean(one_cycle(d) * np.cos(grid)))
@@ -444,7 +451,6 @@ def nominal_design_errors(
     # the calibration table: a full-scale bar's fundamental defines "1 ordinate";
     # a bar at station d is read as fundamental(d)/fundamental(d_max) (signed).
     f_full = fundamental(nom.d_max)
-    cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))
     out: dict[str, dict[str, float]] = {}
     for name, x in reference_inputs().items():
         stations = x * nom.d_max
@@ -452,15 +458,11 @@ def nominal_design_errors(
             x_read = np.array([fundamental(float(d)) / f_full for d in stations])
         else:
             x_read = x + null_lift  # what the machine actually sums, per channel
-        c2s = c2(stations)  # trace units, per channel
+        # steps 2-4 of the shipped procedure, in the operator's units: pen
+        # readings off the trial's own mean line, then read_coefficients
         trace = trace_for(stations)
-        measured = read_coefficients(trace, x_read, c2_total=float(c2s.sum()))
-        # the correction table is in trace units; convert with the trial's scale
-        zero = float(np.mean(trace(PERIOD)))
-        scale = (float(trace(THETA_K[:1])[0]) - zero - float(c2s.sum())) / float(
-            np.sum(x_read)
-        )
-        measured -= (cos_2k @ c2s) / scale
+        readings = trace(THETA_K) - float(np.mean(trace(PERIOD)))
+        measured = read_coefficients(readings, x_read, kappa(stations))
         # what the operator subtracts: the known deviation of every channel's
         # read ordinate from its set ordinate -- the null-lift vector (20*lift
         # at k=0, -lift at odd k) or, with a calibrated stick, the table's
@@ -1106,26 +1108,39 @@ reading spans the {cf["readout"]["pen_half_stroke_mm"]:.0f} mm half-stroke.
 
 ## 3. Normalise
 
-Divide every reading by the $k=0$ reading and multiply by the sum of the read
-ordinates from step 1 (Michelson's normalisation to the greatest term). Before
-dividing, subtract from the $k=0$ reading the second-harmonic total
-$\\sum_i x^{{read}}_i \\kappa_i$ in the same units (step 4's correction at $k=0$).
+Everything the operator has is in two units: pen readings $r_k$ in mm (off the
+mean line, step 2) and ordinates (step 1). From step 1 form two sums, both in
+ordinate units:
+
+- $S = \\sum_i x^{{read}}_i$ (what the machine sums at $k=0$),
+- $C_2 = \\sum_i x^{{read}}_i\\,\\kappa_i$ (the second-harmonic total riding the
+  $k=0$ reading; $\\kappa_i = c_2/c_1$ from the table at each bar's station --
+  use the READ ordinate: an idle bar still moves, its term is
+  $\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}$, not zero).
+
+The $k=0$ reading is $r_0 = s\\,(S + C_2)$ for the trial's pen scale $s$
+(mm per ordinate unit, set by the magnifier), so
+
+$$s = \\frac{{r_0}}{{S + C_2}}, \\qquad O'_k = \\frac{{r_k}}{{s}}$$
+
+puts every reading in ordinate units (Michelson's normalisation to the
+greatest term). Nothing in this step needs a unit the operator does not have.
 
 ## 4. Correct
 
-Subtract, at each $k$:
+Subtract from every $O'_k$, in ordinate units:
 
-- the second-harmonic term $\\sum_i x^{{read}}_i\\,\\kappa_i \\cos(2 i \\theta_k)$ with
-  $\\kappa_i = c_2/c_1$ from the table above at each bar's station (the
-  connecting-rod distortion, 1.4-5 % of each channel's amplitude). Use the
-  READ ordinate, not the set one: an idle bar ($x^{{set}} = 0$) still moves, so
-  its second harmonic is $\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}$,
-  not zero;
+- the second-harmonic term $\\sum_i x^{{read}}_i\\,\\kappa_i \\cos(2 i \\theta_k)$
+  (the connecting-rod distortion, 1.4-5 % of each channel's amplitude; at
+  $k=0$ it equals $C_2$, so $O'_0 - C_2 = S$ exactly);
 - the read-vs-set deviation vector $\\sum_i (x^{{read}}_i - x^{{set}}_i)\\cos(i\\theta_k)$
   with the recorded (bias-corrected) read ordinates of step 1 -- for an idle
   bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$, so this is the null
   lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$) plus the
   one-sided setting bias, plus the same for any lift constant $c$ from step 1.
+
+The result is $O_k$. This is the arithmetic `check:budget` credits: the model's
+`read_coefficients` computes exactly $r_k/s$ minus the second-harmonic term.
 
 ## 5. Report
 
