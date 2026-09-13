@@ -399,17 +399,34 @@ def read_ordinates(x: np.ndarray, nom: Nominal) -> np.ndarray:
 
 _READ_TABLES: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
 _CYCLE_TABLES: dict[tuple, "CycleTable"] = {}
+_CYCLE_DERIVATIVES: dict[tuple, dict[str, "CycleTable"]] = {}
+
+# Budget features that perturb the channel's KINEMATICS (the Nominal field each
+# one moves): their deviation changes the hook waveform's shape -- eccentricity
+# sets c2/c1 ~ e/L, the pin radius the rocker swing's nonlinearity -- not only
+# its fundamental, so the Monte Carlo samples a linearised deviated cycle for
+# them (``cycle_derivatives``). summing_hook_arm and spring_rate are pure force-
+# balance scalars (they never enter ``hook_displacement``) and stay a gain.
+WAVEFORM_FIELDS = {
+    "cam_eccentricity": "ecc",
+    "rocker_rod_pin_radius": "pin_x",
+    "lever_bar_pin_arm": "bar_pin_arm",
+    "lever_spring_hook_arm": "hook_arm",
+}
 
 
 @dataclass(frozen=True)
 class CycleTable:
     """One channel's PHYSICAL hook cycle at every reachable station (0.25 mm
-    grid), for vectorised lookup: ``cycles[s, a]`` is the hook displacement
-    (mm) at station ``stations[s]`` and crank angle ``_READ_GRID[a]``;
-    ``mean`` its per-period mean line; ``read`` the read ordinate (fundamental
-    / full-scale fundamental); ``kappa`` c2/c1. The Monte Carlo perturbs THIS
-    waveform -- so a gain error scales the second harmonic and a phase error
-    rotates it at twice the phase -- then runs the shipped correction."""
+    grid, the travel stop appended when it is not on the grid), for
+    vectorised lookup: ``cycles[s, a]`` is the hook displacement (mm) at
+    station ``stations[s]`` and crank angle ``_READ_GRID[a]``; ``mean`` its
+    per-period mean line; ``read`` the read ordinate (fundamental / full-scale
+    fundamental); ``kappa`` c2/c1. The Monte Carlo perturbs THIS waveform --
+    so a gain error scales the second harmonic and a phase error rotates it at
+    twice the phase, and a kinematic deviation reshapes it -- then runs the
+    shipped correction. A derivative table (``cycle_derivatives``) has the
+    same layout with ``cycles``/``mean`` holding d(cycle)/d(field)."""
 
     stations: np.ndarray
     cycles: np.ndarray
@@ -419,12 +436,12 @@ class CycleTable:
 
     def sample(self, d: np.ndarray, alpha: np.ndarray) -> np.ndarray:
         """Bilinear lookup of the cycle at stations ``d`` and angles ``alpha``
-        (rad, any real; periodic), broadcast together."""
+        (rad, any real; periodic), broadcast together. Station brackets come
+        from the station array itself (the last interval may be short)."""
         d, alpha = np.broadcast_arrays(d, alpha)
-        step = self.stations[1] - self.stations[0]
-        si = np.clip(d / step, 0.0, len(self.stations) - 1.0)
-        s0 = np.minimum(si.astype(int), len(self.stations) - 2)
-        sf = si - s0
+        st = self.stations
+        s0 = np.clip(np.searchsorted(st, d, side="right") - 1, 0, len(st) - 2)
+        sf = np.clip((d - st[s0]) / (st[s0 + 1] - st[s0]), 0.0, 1.0)
         n = self.cycles.shape[1]
         ai = (alpha % (2.0 * math.pi)) / (2.0 * math.pi) * n
         a0 = ai.astype(int) % n
@@ -436,22 +453,50 @@ class CycleTable:
         return top * (1.0 - sf) + bot * sf
 
 
+def _station_grid(nom: Nominal, step_mm: float) -> np.ndarray:
+    stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
+    if not math.isclose(stations[-1], nom.d_max):
+        stations = np.append(stations, nom.d_max)  # the stop, always a row
+    return stations
+
+
+def _cycles_at(stations: np.ndarray, nom: Nominal) -> np.ndarray:
+    return np.array([hook_displacement(_READ_GRID, float(d), nom) for d in stations])
+
+
 def cycle_table(nom: Nominal, step_mm: float = 0.25) -> CycleTable:
     """``CycleTable`` for ``nom``, cached (the same ~350 exact-kinematics
     solves ``read_table`` makes, kept whole instead of reduced to c1)."""
     key = astuple(nom)
     if key not in _CYCLE_TABLES:
-        stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
-        stations[-1] = nom.d_max
-        cycles = np.array(
-            [hook_displacement(_READ_GRID, float(d), nom) for d in stations]
-        )
+        stations = _station_grid(nom, step_mm)
+        cycles = _cycles_at(stations, nom)
         c1 = 2.0 * (cycles * np.cos(_READ_GRID)).mean(axis=1)
         c2 = 2.0 * (cycles * np.cos(2.0 * _READ_GRID)).mean(axis=1)
         _CYCLE_TABLES[key] = CycleTable(
             stations, cycles, cycles.mean(axis=1), c1 / c1[-1], c2 / c1
         )
     return _CYCLE_TABLES[key]
+
+
+def cycle_derivatives(nom: Nominal, step_mm: float = 0.25) -> dict[str, CycleTable]:
+    """d(cycle)/d(field) per ``WAVEFORM_FIELDS`` feature, on ``cycle_table``'s
+    grid, by central differences of the exact kinematics (h = 0.05 mm; the
+    tolerances are 0.025-0.15 mm, so first order is exact to ~1e-6 of the
+    cycle). ``read``/``kappa`` of a derivative table are unused (zeros)."""
+    key = astuple(nom)
+    if key not in _CYCLE_DERIVATIVES:
+        stations = _station_grid(nom, step_mm)
+        h = 0.05
+        out = {}
+        for feature, field in WAVEFORM_FIELDS.items():
+            hi = _cycles_at(stations, replace(nom, **{field: getattr(nom, field) + h}))
+            lo = _cycles_at(stations, replace(nom, **{field: getattr(nom, field) - h}))
+            dc = (hi - lo) / (2.0 * h)
+            zeros = np.zeros(len(stations))
+            out[feature] = CycleTable(stations, dc, dc.mean(axis=1), zeros, zeros)
+        _CYCLE_DERIVATIVES[key] = out
+    return _CYCLE_DERIVATIVES[key]
 
 
 def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndarray]:
@@ -711,15 +756,9 @@ def finite_difference_check(
         return 2.0 * float(np.mean(hook_displacement(th, d, n) * np.cos(th)))
 
     base = c1(nom)
-    fields = {
-        "cam_eccentricity": "ecc",
-        "rocker_rod_pin_radius": "pin_x",
-        "lever_bar_pin_arm": "bar_pin_arm",
-        "lever_spring_hook_arm": "hook_arm",
-    }
     analytic = gain_sensitivities(nom)
     out = {}
-    for key, field in fields.items():
+    for key, field in WAVEFORM_FIELDS.items():
         h = 0.05
         hi = c1(replace(nom, **{field: getattr(nom, field) + h}))
         lo = c1(replace(nom, **{field: getattr(nom, field) - h}))
@@ -765,10 +804,14 @@ def _channel_model(
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
+    shape: dict[str, tuple[CycleTable, np.ndarray]] = {}
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
     for key, v in dev.items():
-        if key in sens:
+        if key in WAVEFORM_FIELDS:
+            # the linearised deviated cycle: its gain AND its shape
+            shape[key] = (cycle_derivatives(nom)[key], v)
+        elif key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
         elif key in ("cam_phase", "mesh_lag_spread"):
             phi += np.radians(v)
@@ -800,7 +843,7 @@ def _channel_model(
     recorded = set_stations + bias
     x_read = np.interp(recorded, t.stations, t.read) / scale
     kappa = np.interp(recorded, t.stations, t.kappa)
-    measured = _read_draws(x, t, g, phi, d, x_read, kappa)
+    measured = _read_draws(x, t, g, phi, d, x_read, kappa, shape)
     # the NOMINAL machine through the same sampler (g = 1, phi = 0, bars at
     # their set stations, the set-station row): its residual is the closure's
     # separate nominal_residual_mae term, so the scatter scores deviations only
@@ -825,16 +868,24 @@ def _read_draws(
     d: np.ndarray,
     x_read: np.ndarray,
     kappa: np.ndarray,
+    shape: dict[str, tuple[CycleTable, np.ndarray]] | None = None,
 ) -> np.ndarray:
     """The shipped procedure on a batch of machines: pen readings from each
-    channel's physical cycle at its drawn station ``d`` (draws x 20), read at
-    j_i theta_k + phi_i with gain g_i, off each draw's own mean line; then
-    s = r0/(S + C2), the kappa correction and the read-vs-set vector with the
-    operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
+    channel's physical cycle at its drawn station ``d`` (draws x 20) -- the
+    nominal cycle plus, per ``shape`` entry (a ``cycle_derivatives`` table and
+    the draws x 20 deviations in that feature's unit), the table times the
+    deviation --
+    read at j_i theta_k + phi_i with gain g_i, off each draw's own mean line;
+    then s = r0/(S + C2), the kappa correction and the read-vs-set vector with
+    the operator's recorded ``x_read``/``kappa``. Returns O_k, shape (draws, K+1)."""
     alpha = HARMONICS[None, None, :] * THETA_K[None, :, None] + phi[:, None, :]
     u = t.sample(d[:, None, :], alpha)  # draws,k,i
+    mean = np.interp(d, t.stations, t.mean)
+    for dt, v in (shape or {}).values():
+        u = u + v[:, None, :] * dt.sample(d[:, None, :], alpha)
+        mean = mean + v * np.interp(d, dt.stations, dt.mean)
     r = np.einsum("di,dki->dk", g, u)
-    zero = np.einsum("di,di->d", g, np.interp(d, t.stations, t.mean))
+    zero = np.einsum("di,di->d", g, mean)
     readings = r - zero[:, None]
     s = readings[:, :1] / (np.sum(x_read) + np.sum(x_read * kappa))
     cos_2k = np.cos(2.0 * np.outer(THETA_K, HARMONICS))

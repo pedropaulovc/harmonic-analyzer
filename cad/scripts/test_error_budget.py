@@ -586,6 +586,68 @@ def test_monte_carlo_perturbs_the_physical_waveform_not_a_cosine(nom):
     assert np.max(np.abs(second)) > 1e-3
 
 
+def test_kinematic_deviations_reshape_the_waveform_not_just_its_gain(nom):
+    """A cam-eccentricity deviation changes c2/c1 (~ e/L) as well as the
+    fundamental, so the operator's nominal kappa row is wrong for that
+    channel; the Monte Carlo must sample the DEVIATED cycle for kinematic
+    features (Codex round 25). The linearised table reproduces the exact
+    deviated kinematics to 1e-6 of the stroke; a pure force-balance feature
+    (summing hook arm) leaves the shape alone."""
+    grid = eb._READ_GRID
+    t = eb.cycle_table(nom)
+    dv = eb.cycle_derivatives(nom)
+    tol = 0.025
+    exact = eb.hook_displacement(
+        grid, 44.0, dataclasses.replace(nom, ecc=nom.ecc + tol)
+    )
+    linear = t.sample(44.0, grid) + tol * dv["cam_eccentricity"].sample(44.0, grid)
+    assert np.max(np.abs(exact - linear)) < 1e-6 * np.max(np.abs(exact))
+
+    def kappa(u):
+        return float(np.mean(u * np.cos(2 * grid)) / np.mean(u * np.cos(grid)))
+
+    assert kappa(exact) != pytest.approx(kappa(t.sample(44.0, grid)), rel=1e-4)
+    assert "summing_hook_arm" not in eb.WAVEFORM_FIELDS
+    # through the model: an eccentricity draw on channel 1 must leave a
+    # second-harmonic residual the fixed kappa correction cannot remove
+    x = eb.reference_inputs()["all_ones"]
+    f = eb.NominalTrial(nom).magnifier_setup(x).ordinate_scale
+    sens = eb.gain_sensitivities(nom)
+    dev = {"cam_eccentricity": np.zeros((1, eb.N_ELEMENTS))}
+    dev["cam_eccentricity"][0, 0] = tol
+    e = eb._channel_model(x, nom, dev, sens, 0.25, f)[0]
+    gain_only = {"spring_rate": np.zeros((1, eb.N_ELEMENTS))}
+    gain_only["spring_rate"][0, 0] = 100.0 * (
+        eb.hook_displacement(
+            grid, f * nom.d_max, dataclasses.replace(nom, ecc=nom.ecc + tol)
+        )
+        @ np.cos(grid)
+        / (eb.hook_displacement(grid, f * nom.d_max, nom) @ np.cos(grid))
+        - 1.0
+    )
+    e_gain = eb._channel_model(x, nom, gain_only, sens, 0.25, f)[0]
+    assert np.max(np.abs(e)) > 0.01  # ~0.29 % gain on one of 20 channels
+    assert np.max(np.abs(e - e_gain)) > 1e-4  # the shape term is there
+    assert np.max(np.abs(e - e_gain)) < 0.1 * np.max(np.abs(e))  # and second order
+
+
+def test_cycle_table_always_ends_at_the_travel_stop(nom):
+    """A full scale off the 0.25 mm grid gets the stop APPENDED (a short last
+    interval), never overwritten onto the last grid row, and the lookup
+    brackets stations from the array -- so a bar at the stop reads the exact
+    full-scale cycle and one inside the short interval interpolates it."""
+    odd = dataclasses.replace(nom, d_max=88.1)
+    t = eb.cycle_table(odd)
+    assert t.stations[-3:] == pytest.approx([87.75, 88.0, 88.1])
+    grid = eb._READ_GRID
+    assert np.allclose(
+        t.sample(88.1, grid), eb.hook_displacement(grid, 88.1, odd), atol=1e-12
+    )
+    mid = t.sample(88.05, grid)
+    assert np.allclose(mid, 0.5 * (t.cycles[-2] + t.cycles[-1]), atol=1e-12)
+    assert t.read[-1] == pytest.approx(1.0)
+
+
 def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
     """A bar at the stick zero still moves (~0.028 of a full-scale bar), so a
     gain deviation on an IDLE channel must move the reading -- the nominal lift

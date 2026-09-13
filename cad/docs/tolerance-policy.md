@@ -217,8 +217,11 @@ flowchart LR
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, every feature
 uniform within ± tolerance per channel — `class: channel` drawn once per draw and shared by
 every trial, `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
-station — so a gain error scales the channel's second harmonic and a phase error rotates it, and
-the operator's fixed κ correction leaves δ·κ in the scatter — then through the shipped readout;
+station — so a gain error scales the channel's second harmonic, a phase error rotates it, and a
+kinematic deviation (eccentricity, pin radius, the lever arms: `WAVEFORM_FIELDS`) **reshapes** it
+through a linearised deviated cycle (central differences of the exact kinematics, exact to 1e-6 of
+the stroke), so the operator's fixed κ row is wrong for that channel by the amount the tolerance
+moves c2/c1 — second order, but scored, not assumed — then through the shipped readout;
 every bar at the physical amplitude its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
 deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
@@ -227,9 +230,9 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 
 | feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
 |---|---:|---:|---:|---:|---:|---|
-| cam eccentricity | 0.025 mm | 0.026 | 0.14 | 0.27 | 0.047 | offset-turn in a 4-jaw, indicate the throw |
+| cam eccentricity | 0.025 mm | 0.026 | 0.14 | 0.26 | 0.048 | offset-turn in a 4-jaw, indicate the throw |
 | rocker rod-pin radius | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.73 | DRO/CNC hole position |
-| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.70 | DRO/CNC hole position |
+| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.73 | DRO/CNC hole position |
 | lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.97 | DRO/CNC hole position |
 | summing hook arm | 0.15 mm | 0.034 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
 | **spring rate** | **1.25 %** | **0.113** | **0.60** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
