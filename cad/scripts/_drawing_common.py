@@ -243,16 +243,17 @@ def _select_view_entity(
     draw.ClearSelection2(True)
     selected = False
     if entity is not None:
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
         if entity_type == "SILHOUETTE":
-            selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-            selection_data = selection_manager.CreateSelectData()
-            selection_data.View = view
             selectable = _sw_type_info.early_bound_or_flag(
                 entity, "ISilhouetteEdge", "Select2"
             )
             selected = bool(selectable.Select2(False, selection_data))
         else:
-            selected = bool(view.SelectEntity(entity, False))
+            selectable = _early_bound(entity, "IEntity")
+            selected = bool(selectable.Select4(False, selection_data))
     elif xy is not None:
         selected = bool(
             draw.Extension.SelectByID2(
@@ -263,6 +264,10 @@ def _select_view_entity(
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(f"failed to select {label} {entity_type.lower()} {where}")
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
+    if count != 1:
+        raise RuntimeError(
+            f"selecting {label} {entity_type.lower()} produced {count} entities"
+        )
     entity = draw.SelectionManager.GetSelectedObject6(count, -1)
     if entity is None:
         raise RuntimeError(f"selected {label} {entity_type.lower()} has no entity")
@@ -299,11 +304,13 @@ def _select_annotation_entity(
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     selection_data = selection_manager.CreateSelectData()
     selection_data.View = view
-    selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
-    if not selected:
-        selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
+    selectable = _early_bound(edge_entity, "IEntity")
+    selected = adapter._attempt(lambda: selectable.Select4(False, selection_data))
     if not selected:
         raise RuntimeError(f"failed to select {label} entity in drawing view")
+    count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
+    if count != 1:
+        raise RuntimeError(f"selecting {label} entity produced {count} entities")
     return edge_entity
 
 
