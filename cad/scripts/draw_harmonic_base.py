@@ -1,15 +1,13 @@
 r"""Create the curated machinist drawing for the two-plate harmonic base.
 
 The SLDPRT remains authoritative.  This recipe supplies only the base's views,
-overall footprint dimensions, the mounting-hole table, and manufacturing notes; every
-shared sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+native footprint/socket dimensions, the ordinary-coordinate mounting-hole table,
+and manufacturing notes; every shared sheet/template, import, curation, and
+export behavior lives in ``_drawing_common``.
 
-The base is machined from one-piece gray-iron stock: the legacy lower flange and
-upper pad retain their front edges and extend 35.415 mm rearward, with four
-counterbored lag-screw mounting holes and nine assembly-drilled hardware seats.
-The plate is 457 mm long, so the whole sheet runs 1:4; the front elevation is
-also 1:4 and the pictorial isometric is 1:10.
+The base is a stepped gray-iron frame with a raised rim, four column sockets,
+and blind tapped hardware seats. The plate is 457 mm long, so the whole sheet
+runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:10.
 
 Run with SolidWorks open::
 
@@ -27,9 +25,11 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     create_section_view,
+    create_view_theoretical_datum,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
@@ -41,9 +41,11 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
+    BASE_CROSS_TAP_SPEC,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     COLUMN_X,
@@ -65,10 +67,18 @@ from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
+    LIP_W,
+    RIM_TOP,
+    STACK_HEIGHT,
+    TOP_FRONT_Z,
+    TOP_LENGTH,
+    TOP_REAR_Z,
 )
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
     COLUMN_SOCKET_DIAMETER,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -105,12 +115,13 @@ SECTION_CENTER = (0.360, 0.150)
 ISO_SCALE = (1, 10)
 ISO_CENTER = (0.350, 0.240)
 SIDE_NOTE_XY = (0.170, 0.128)
-SECTION_NOTE_XY = (0.326, 0.126)
+SECTION_NOTE_XY = (0.385, 0.126)
 ISO_NOTE_XY = (0.305, 0.212)
 
-# Per-view survivors of the native marked-dimension import. Socket locations
-# and diameter live in the plan; hidden socket/tap depth geometry lives only
-# in section A-A.
+# Per-view survivors of the native marked-dimension import. Footprint and
+# corner/edge-break dimensions live in the plan; plate thicknesses and the
+# underside edge break live in the front elevation; socket/spotface depths and
+# the pad-root fillet live only in section A-A.
 TOP_KEEP = {
     "BottomLen": (
         TOP_CENTER[0],
@@ -118,28 +129,49 @@ TOP_KEEP = {
         + max(abs(BOTTOM_FRONT_Z), abs(BOTTOM_REAR_Z)) * VIEW_SCALE / 1000.0
         + 0.008,
     ),
+    "TopLen": (
+        TOP_CENTER[0],
+        TOP_CENTER[1]
+        + max(abs(TOP_FRONT_Z), abs(TOP_REAR_Z)) * VIEW_SCALE / 1000.0
+        + 0.016,
+    ),
     "BottomWid": (
         TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017,
         TOP_CENTER[1],
     ),
+    "TopWid": (
+        TOP_CENTER[0] + TOP_LENGTH * VIEW_SCALE / 2000.0 + 0.030,
+        TOP_CENTER[1],
+    ),
+    "PadCornerRadius": (TOP_CENTER[0] - 0.090, TOP_CENTER[1] + 0.030),
+    "FlangeCornerRadius": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] + 0.030),
+    "RimInnerCornerRadius": (TOP_CENTER[0] + 0.015, TOP_CENTER[1] - 0.050),
+    "TopRimChamfer": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] - 0.020),
     "Socket0X": (TOP_CENTER[0] - 0.050, TOP_CENTER[1] - 0.050),
     "Socket0Z": (TOP_CENTER[0] - 0.085, TOP_CENTER[1]),
     "SocketDia": (TOP_CENTER[0] - 0.058, TOP_CENTER[1] + 0.043),
+}
+SIDE_KEEP = {
+    "BottomThickness": (SIDE_CENTER[0] - 0.085, SIDE_CENTER[1]),
+    "TopThickness": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1]),
+    "BottomEdgeChamfer": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1] - 0.018),
 }
 SECTION_KEEP = {
     "SocketDepth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1]),
     "SpotFaceDia": (SECTION_CENTER[0] + 0.040, SECTION_CENTER[1] + 0.010),
     "SpotFaceDepth": (SECTION_CENTER[0] + 0.038, SECTION_CENTER[1] - 0.010),
+    "PadRootRadius": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + 0.015),
 }
 DIMENSION_CALLOUTS = {
-    "SocketDia": "4X COLUMN SOCKET; MATCH FIT MHA-083",
+    "SocketDia": "4X COLUMN SOCKET; FIT MHA-083 TUBE COLUMN",
     "SpotFaceDia": "4X SPOTFACE",
 }
 
-# Hole-table origin corner (the plate's lower-left plan corner) plus every
-# visible top-seat rim, all in sheet meters. Native callouts read each hole's
-# size, end condition, thread depth, and station from the authoritative part.
-_DATUM_XY = (
+# Hole-table origin is the finished plate's lower-left theoretical sharp
+# corner.  The physical corner is filleted, so the native table is seeded from
+# the two visible outer edges and reattached to a retained view point at their
+# virtual intersection.
+_TABLE_ORIGIN_XY = (
     TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
     TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
@@ -154,6 +186,16 @@ def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
+def _front_y(y_mm: float) -> float:
+    """Sheet Y for a model-Y point in the bbox-centred front elevation."""
+    return SIDE_CENTER[1] + (y_mm - RIM_TOP / 2.0) * VIEW_SCALE / 1000.0
+
+
+def _section_y(y_mm: float) -> float:
+    """Sheet Y for a section point spanning the lower plate to the deck."""
+    return SECTION_CENTER[1] + (y_mm - STACK_HEIGHT / 2.0) * VIEW_SCALE / 1000.0
+
+
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a plan-view hole rim, offset in machine +X."""
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm)
@@ -165,7 +207,7 @@ ALL_HOLES = (
     (*STOP_SCREW_XZ, STOP_SCREW_HOLE_DIA),
     *((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ),
     *((x, z, FOOT_SCREW_HOLE_DIA) for x, z in FOOT_SCREW_XZ),
-    # Keep later seat groups after the existing FCF anchors.
+    # Keep later seat groups after the earlier mounting-seat groups.
     *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
     (*LOCK_KNOB_XZ, LOCK_SCREW_HOLE_DIA),
 )
@@ -174,13 +216,12 @@ ALL_HOLES = (
 def _visible_hole_table_entities(
     adapter: Any, view: Any
 ) -> tuple[tuple[Any, ...], Any, Any]:
-    """Return hole rims and the B/C datum edges in the top view.
+    """Return hole rims and the two outer edges used as ordinary table axes.
 
-    The plan corners are broken (CornerFillets R3.18), so no B-C corner
-    vertex exists to anchor the hole table; the caller passes the two datum
-    edges as ``datum_axes`` and the table origin lands on their VIRTUAL
-    intersection -- the theoretical sharp corner, keeping every LOC value
-    measured from B-C exactly as note 3 states.
+    The plan corners are broken by the modelled corner radii, so no finished
+    vertex exists at the table origin.  The caller supplies these visible
+    outer edges to establish their virtual intersection, while the retained
+    view point makes that same theoretical corner visible on the sheet.
     """
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     circles: list[tuple[float, float, float, Any]] = []
@@ -235,27 +276,27 @@ def _visible_hole_table_entities(
         used.add(index)
         selected_edges.append(edge)
 
-    datum_b_candidates = [
+    x_axis_candidates = [
         edge
         for parameters, edge in lines
         if abs(parameters[2] - BOTTOM_REAR_Z / 1000.0) <= 2e-6
         and abs(parameters[3]) >= 0.99
     ]
-    datum_c_candidates = [
+    y_axis_candidates = [
         edge
         for parameters, edge in lines
         if abs(parameters[0] + BOTTOM_LENGTH / 2000.0) <= 2e-6
         and abs(parameters[5]) >= 0.99
     ]
-    if not datum_b_candidates or not datum_c_candidates:
+    if not x_axis_candidates or not y_axis_candidates:
         raise RuntimeError(
-            "harmonic-base plan is missing a visible outer B/C datum edge"
+            "harmonic-base plan is missing a visible outer table-axis edge"
         )
 
     return (
         tuple(selected_edges),
-        datum_b_candidates[0],
-        datum_c_candidates[0],
+        x_axis_candidates[0],
+        y_axis_candidates[0],
     )
 
 
@@ -272,7 +313,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Title",
             "Material Specification",
             "Finish",
-            "Manufacturing Notes B",
             "Quantity",
             "Manufacturing Notes",
             "Side View Note",
@@ -284,7 +324,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes B",
             "Manufacturing Notes",
             "Side View Note",
             "Section View Note",
@@ -301,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Harmonic Base Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "harmonic base; stepped; gray iron stock",
+            3: "harmonic base; stepped; gray-iron frame",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -326,24 +365,33 @@ async def build(adapter: Any) -> dict[str, str]:
         label="base column-socket section",
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (top, side):
-        set_hidden_lines_visible(adapter, view)
-    for view in (section, iso):
+    for view in (top, side, section, iso):
         set_hidden_lines_removed(adapter, view)
 
     top_dimensions = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
+    side_dimensions = curate_view_dimensions(
+        adapter, side, keep=SIDE_KEEP, view_label="front elevation"
+    )
     section_dimensions = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
     set_dimension_callouts(
-        adapter, [*top_dimensions, *section_dimensions], DIMENSION_CALLOUTS
+        adapter,
+        [*top_dimensions, *side_dimensions, *section_dimensions],
+        DIMENSION_CALLOUTS,
     )
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
-    hole_entities, datum_b_edge, datum_c_edge = _visible_hole_table_entities(
+    table_origin = create_view_theoretical_datum(
+        adapter,
+        top,
+        point_xy=(-BOTTOM_LENGTH / 2000.0, -BOTTOM_REAR_Z / 1000.0),
+        label="harmonic-base finished-corner table origin",
+    )
+    hole_entities, table_x_axis, table_y_axis = _visible_hole_table_entities(
         adapter, top
     )
 
@@ -352,12 +400,13 @@ async def build(adapter: Any) -> dict[str, str]:
     insert_hole_table(
         adapter,
         top,
-        datum_xy=_DATUM_XY,
+        datum_xy=_TABLE_ORIGIN_XY,
+        datum_point=table_origin,
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
-        datum_axes=(datum_b_edge, datum_c_edge),
+        datum_axes=(table_x_axis, table_y_axis),
         hole_entities=hole_entities,
         # Every printed LOC is re-derived from the shared stations: X from the
-        # C face (x = -L/2), Y from the B face (z = +W/2).
+        # finished left edge, Y from the finished rear edge.
         expected_locations_mm=tuple(
             (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
             for x, z, _diameter in ALL_HOLES
@@ -380,19 +429,66 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_xy=tap_edge,
-        callout_xy=(SECTION_CENTER[0] + 0.050, SECTION_CENTER[1] - 0.025),
+        callout_xy=(0.300, 0.105),
         label="4X base column-retention bottoming taps",
+        process=(
+            f"4X {BASE_CROSS_TAP_SPEC.size} UNF-{BASE_CROSS_TAP_SPEC.thread_class} "
+            f"BOTTOMING TAP; FULL THREAD {CASTING_FULL_THREAD_DEPTH:.2f}; "
+            f"CYLINDRICAL DRILL {CASTING_TAP_DRILL_DEPTH:.2f}"
+        ),
+    )
+    # Derived envelope features are dimensioned from their finished model
+    # edges, not repeated in a note: the symmetric reveal, raised-rim width,
+    # deck height, and overall rim height.
+    add_edge_dimension(
+        adapter,
+        top,
+        p0=_plan_xy(BOTTOM_LENGTH / 2.0, 0.0),
+        p1=_plan_xy(TOP_LENGTH / 2.0, 0.0),
+        text_xy=(TOP_CENTER[0] + 0.085, TOP_CENTER[1] - 0.042),
+        orientation="horizontal",
+        label="plate side reveal",
+    )
+    add_edge_dimension(
+        adapter,
+        top,
+        p0=_plan_xy(TOP_LENGTH / 2.0, 0.0),
+        p1=_plan_xy(TOP_LENGTH / 2.0 - LIP_W, 0.0),
+        text_xy=(TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.042),
+        orientation="horizontal",
+        label="raised rim width",
+    )
+    add_edge_dimension(
+        adapter,
+        section,
+        p0=(SECTION_CENTER[0], _section_y(0.0)),
+        p1=(SECTION_CENTER[0], _section_y(STACK_HEIGHT)),
+        text_xy=(SECTION_CENTER[0] - 0.050, SECTION_CENTER[1]),
+        orientation="vertical",
+        label="deck height",
+    )
+    # Keep the vertical overall dimension outside the front-view silhouette.
+    add_edge_dimension(
+        adapter,
+        side,
+        p0=(SIDE_CENTER[0], _front_y(0.0)),
+        p1=(SIDE_CENTER[0], _front_y(RIM_TOP)),
+        text_xy=(SIDE_CENTER[0] - 0.085, SIDE_CENTER[1]),
+        orientation="vertical",
+        label="overall rim height",
     )
 
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.170, 0.115, char_height=0.002
     )
-    add_property_linked_note(
-        adapter, "Manufacturing Notes B", 0.305, 0.115, char_height=0.002
-    )
     add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     add_property_linked_note(adapter, "Section View Note", *SECTION_NOTE_XY)
+
+    # Curation and note insertion can leave the orthographic edge cache stale.
+    # Reassert HLV only after every annotation is in place.
+    for view in (top, side):
+        set_hidden_lines_visible(adapter, view)
 
     return await finalize_drawing(
         adapter,

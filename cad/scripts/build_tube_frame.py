@@ -1,7 +1,7 @@
-r"""Reproduction script: tube frame column (legacy part; book ch. 5-6).
+r"""Build the tube-frame column source part.
 
-Hollow steel column carrying the upper frame rails: Ø1.0 in (25.4 mm) tube
-with a 0.12 in wall, topped by an integral polished dome cap.
+Hollow steel column carrying the upper frame rails: Ø1.0 in (25.4 mm) open
+tube with a 0.12 in wall; its top receives a separately purchased recessed cap.
 
 Diameter: REDERIVED from the ch30 8-view set (supersedes the legacy
 Ø1.375 in, which had no book numeric and overstated the OD by ~45%). The

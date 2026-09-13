@@ -7,8 +7,8 @@ notes; shared sheet/template, import, curation, and export behavior lives in
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
 and the annulus end view is ``*Top``. The portrait sheet uses the long axis for
-the 1018.765 mm cut length at 1:5; the end view carries an explicit 2:1 override
-so the 25.4/19.3 mm annulus remains legible. The isometric is pictorial only.
+the 1018.765 mm cut length at 1:5; the aligned end view carries an explicit
+2:1 override. The isometric is pictorial only.
 
 Run with SolidWorks open::
 
@@ -28,6 +28,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -35,6 +36,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -42,7 +44,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
 )
-from tube_frame_spec import OUTER_DIA
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -60,31 +61,31 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (1018.765 mm cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
-
-# Sheet layout (meters). The length view hugs the far left; the annulus end
-# view sits upper-right; notes fill the clear middle band. The isometric fits
-# in the lower-right field between the notes and title block.
+# The aligned length/end views occupy the left column of the portrait sheet;
+# fitting notes and the pictorial view occupy the right column.
 LENGTH_CENTER = (0.055, 0.220)
-END_CENTER = (0.190, 0.360)
+END_CENTER = (LENGTH_CENTER[0], 0.360)
 ISO_CENTER = (0.205, 0.140)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP = {
     "OuterDia": (
-        END_CENTER[0] - OUTER_DIA * END_VIEW_SCALE / 1000.0 - 0.024,
+        END_CENTER[0] + 0.060,
         END_CENTER[1] + 0.010,
     ),
 }
 LENGTH_KEEP = {
-    "Length": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
-    "LowerHoleY": (LENGTH_CENTER[0] - 0.032, LENGTH_CENTER[1] - 0.088),
-    "UpperHoleY": (LENGTH_CENTER[0] - 0.032, LENGTH_CENTER[1] + 0.088),
-    "CrossHoleDia": (LENGTH_CENTER[0] + 0.034, LENGTH_CENTER[1] - 0.090),
-    "TopChamfer": (LENGTH_CENTER[0] + 0.034, LENGTH_CENTER[1] + 0.097),
+    "Length": (LENGTH_CENTER[0] + 0.045, LENGTH_CENTER[1]),
+    # Keep the station references clear of the tube and each other; the lower
+    # one remains left of the tube now that its diameter prefix is removed.
+    "LowerHoleY": (LENGTH_CENTER[0] - 0.020, LENGTH_CENTER[1] - 0.075),
+    "UpperHoleY": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1] + 0.075),
+    "CrossHoleDia": (LENGTH_CENTER[0] + 0.080, LENGTH_CENTER[1] - 0.120),
+    "TopChamfer": (LENGTH_CENTER[0] + 0.080, LENGTH_CENTER[1] + 0.120),
 }
 DIMENSION_CALLOUTS = {
     "CrossHoleDia": "2 STATIONS; DRILL THRU BOTH WALLS",
-    "TopChamfer": "TOP END ONLY; FIT MHA-133 CAP",
+    "TopChamfer": "X 45 DEG; TOP END; CAP MHA-133 MUST SEAT FULLY",
 }
 
 
@@ -137,8 +138,6 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (length, end):
-        set_hidden_lines_visible(adapter, view)
     set_hidden_lines_removed(adapter, iso)
 
     end_annotations = curate_view_dimensions(
@@ -154,13 +153,28 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions,
         {
             "OuterDia": 2,
-            "Length": 3,
+            "Length": 2,
             "LowerHoleY": 2,
             "UpperHoleY": 2,
             "CrossHoleDia": 2,
             "TopChamfer": 2,
         },
     )
+    for name in ("LowerHoleY", "UpperHoleY"):
+        references = [
+            annotation
+            for annotation in length_annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(references) != 1:
+            raise RuntimeError(
+                f"expected one {name} reference dimension, got {len(references)}"
+            )
+        set_reference_dimension(
+            adapter,
+            references[0],
+            label=f"{name} station reference",
+        )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
@@ -168,11 +182,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # cross-drilled stations through visible hidden geometry.
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.115, 0.225, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.145, 0.225, char_height=0.0025
     )
-    add_property_linked_note(adapter, "End View Note", 0.155, 0.318)
+    add_property_linked_note(adapter, "End View Note", 0.020, 0.328)
     add_property_linked_note(adapter, "Isometric View Note", 0.170, 0.085)
     add_property_linked_note(adapter, "Length View Note", 0.020, 0.083)
+    for view in (length, end):
+        set_hidden_lines_visible(adapter, view)
 
     return await finalize_drawing(
         adapter,

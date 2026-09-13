@@ -82,7 +82,6 @@ from harmonic_base_spec import (
     LIP_H,
     LIP_W,
     DRAWING_NOTES,
-    DRAWING_NOTES_B,
     SECTION_VIEW_NOTE,
     SIDE_VIEW_NOTE,
     STACK_HEIGHT,
@@ -754,8 +753,8 @@ async def build(adapter) -> dict[str, str]:
     # The mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 457.2 = 457
     # inches and blows the part up 25.4x). The thicknesses are extrude/offset
-    # feature parameters (not sketch dims), exposed here as editable constants
-    # even though nothing in drive_jobs drives them.
+    # feature parameters (not sketch dims); they are named after the features
+    # are created, then driven in the deferred batch below.
     await set_global(adapter, "BottomLength", f"{BOTTOM_LENGTH}mm")
     await set_global(adapter, "BottomWidth", f"{BOTTOM_WIDTH}mm")
     await set_global(adapter, "BottomThickness", f"{BOTTOM_THICKNESS}mm")
@@ -806,6 +805,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BOTTOM_THICKNESS)),
     )
     name_last_feature(adapter, "BottomPlate")
+    bottom_thickness_dim = name_dimensions(adapter, "BottomPlate", ["BottomThickness"])
+    drive_jobs.append((bottom_thickness_dim[0], '"BottomThickness"'))
     _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
     # Top plate shares the centred legacy footprint and starts on the flange.
     top = SketchDims()
@@ -830,6 +831,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += top.apply(adapter, "TopProfile")
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
+    top_thickness_dim = name_dimensions(adapter, "TopPlate", ["TopThickness"])
+    drive_jobs.append((top_thickness_dim[0], '"TopThickness"'))
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
     total = STACK_HEIGHT
 
@@ -838,7 +841,6 @@ async def build(adapter) -> dict[str, str]:
     # the support's 5/16 clearance drills: 6.35 mm foot + 9.247187 mm (1.456D)
     # engagement, with 0.25 mm thread beyond each tip. The separate 15.847187 mm
     # cylindrical drill depth leaves five pitches for plug-tap lead and margin.
-    # No underside counterbore or through clearance remains.
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
@@ -1137,6 +1139,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PadCorners")
+    name_dimensions(adapter, "PadCorners", ["PadCornerRadius"])
     v_pad_corners = _corner_removal(PAD_CORNER_R, deck_top - BOTTOM_THICKNESS)
     after = await volume_check(
         adapter, "pad plan corners", after - v_pad_corners, 0.01 * v_pad_corners + 2.0
@@ -1157,6 +1160,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "FlangeCorners")
+    name_dimensions(adapter, "FlangeCorners", ["FlangeCornerRadius"])
     v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
     after = await volume_check(
         adapter,
@@ -1180,6 +1184,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "RimInnerCorners")
+    name_dimensions(adapter, "RimInnerCorners", ["RimInnerCornerRadius"])
     v_rim_corners = _corner_removal(RIM_INNER_R, LIP_H)  # reentrant: ADDS
     after = await volume_check(
         adapter, "rim inner corners", after + v_rim_corners, 0.05 * v_rim_corners + 2.0
@@ -1216,6 +1221,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
+    name_dimensions(adapter, "TopRimBreaks", ["TopRimChamfer"])
     rim_area = RIM_CHAMFER**2 / 2.0
     v_rims = rim_area * (
         _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
@@ -1234,6 +1240,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "BottomEdgeBreak")
+    name_dimensions(adapter, "BottomEdgeBreak", ["BottomEdgeChamfer"])
     v_break = rim_area * _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
     after = await volume_check(
         adapter, "underside edge break", after - v_break, 0.02 * v_break + 5.0
@@ -1253,6 +1260,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PadRootFillet")
+    name_dimensions(adapter, "PadRootFillet", ["PadRootRadius"])
     v_root = _fillet_section_area(PAD_ROOT_R) * _plan_perimeter(
         TOP_LENGTH, TOP_WIDTH, PAD_CORNER_R
     )
@@ -1307,9 +1315,7 @@ async def build(adapter) -> dict[str, str]:
     after -= removed
 
     # Apply the deferred drive equations after the whole model exists, then
-    # re-check neutrality against the as-built volume. Frame components are
-    # inserted at verified transforms and lock-mated, so the old DeckTop,
-    # CboreSeat, and eight per-hole construction planes/axes are unnecessary.
+    # re-check neutrality against the as-built volume.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -1343,7 +1349,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Manufacturing Notes B": DRAWING_NOTES_B,
             "Side View Note": SIDE_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Section View Note": SECTION_VIEW_NOTE,

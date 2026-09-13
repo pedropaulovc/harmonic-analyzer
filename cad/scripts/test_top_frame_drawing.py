@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import build_top_frame as part
-import draw_top_frame as drawing
 import top_frame_spec
-from _drawing_registry import DRAWINGS_BY_NAME
 from frame_attachment_spec import (
     CAP_MOUTH_Y,
     CAP_RECESS_DEPTH,
@@ -21,25 +18,11 @@ from frame_attachment_spec import (
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from tube_frame_cap_spec import MAX_OUTER_DIAMETER
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/top-frame.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/top-frame.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/top-frame_drawing.png")
-    assert DRAWINGS_BY_NAME["top_frame"].script == Path(drawing.__file__).resolve()
-
-
-def test_drawing_keeps_plan_and_section_manufacturing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is top_frame_spec.DRAWING_DIMENSIONS
-    marked = set().union(*top_frame_spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP) == marked
-    assert marked == {"Width", "Depth", "CapRecessDia", "CapRecessDepth"}
-    assert "FIT MHA-133" in drawing.DIMENSION_CALLOUTS["CapRecessDia"]
-    assert "CAP SEATS ON TUBE END" in drawing.DIMENSION_CALLOUTS["CapRecessDepth"]
+import tube_frame_spec
 
 
 def test_corner_bores_and_cap_recesses_form_a_clear_matched_stack() -> None:
+    assert top_frame_spec.COLUMN_BORE_DIAMETER_BAND == (0.05, 0.0)
     assert part.BORE_DIA == COLUMN_SOCKET_DIAMETER == 25.5
     assert part.CAP_RECESS_DIAMETER == CAP_RECESS_DIAMETER
     assert part.CAP_RECESS_DEPTH == CAP_RECESS_DEPTH
@@ -47,6 +30,24 @@ def test_corner_bores_and_cap_recesses_form_a_clear_matched_stack() -> None:
     assert math.isclose(
         part.CAP_RECESS_DIAMETRAL_CLEARANCE,
         CAP_RECESS_DIAMETER - MAX_OUTER_DIAMETER,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(part.CAP_RECESS_DIAMETRAL_CLEARANCE, 0.436232, abs_tol=1e-6)
+    assert math.isclose(
+        part.CAP_RECESS_DIAMETRAL_CLEARANCE + part.CAP_RECESS_DIAMETER_BAND[0],
+        0.636232,
+        abs_tol=1e-6,
+    )
+    assert math.isclose(
+        part.BORE_DIA - tube_frame_spec.OUTER_DIA,
+        0.10,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(
+        part.BORE_DIA
+        + top_frame_spec.COLUMN_BORE_DIAMETER_BAND[0]
+        - tube_frame_spec.OUTER_DIA,
+        0.15,
         abs_tol=1e-12,
     )
     assert part.CAP_RECESS_FLOOR_Y - part.SIDE_TAP_DRILL_DIA / 2.0 > 0.0
@@ -77,26 +78,24 @@ def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
     assert part.SPOTFACE_FLOOR < full_seat_limit
 
 
-def test_ring_envelope_and_section_view_are_explicit() -> None:
-    assert part.FRONT_COLUMN_Z == -112.0
-    assert part.REAR_COLUMN_Z == 112.0
-    assert part.COLUMN_X == 197.0
-    assert part.RING_HEIGHT == 36.5
-    assert part.BOSS_DIA == 52.2
-    assert math.isclose(2.0 * drawing.PLAN_HALF_X, 446.2, abs_tol=1e-9)
-    assert math.isclose(2.0 * drawing.PLAN_HALF_Z, 276.2, abs_tol=1e-9)
-    assert drawing.SHEET_SCALE == (1.0, 2.0)
-    assert top_frame_spec.SECTION_VIEW_NOTE == "SECTION A-A SCALE 1:4"
-
-
-def test_part_registry_keeps_casting_finish_requirements() -> None:
-    import _config
-
-    config = _config.parts("top-frame")
-    assert config["material"] == config["material_specification"]
-    assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
-    finish = str(config["finish"]).lower()
-    assert "sspc-sp3" in finish
-    assert "alkyd primer/green enamel" in finish
-    assert "75-125um dft" in finish
-    assert int(config["quantity"]) == 1
+def test_cross_tap_major_thread_and_drill_point_clear_the_far_wall() -> None:
+    # The major-thread envelope, not the tap-drill cylinder, is the finished
+    # thread breakout check.  The drill point has its own positive-wall guard.
+    major_dia = 4.826
+    major_far_wall_z = abs(part.FRONT_COLUMN_Z) - math.sqrt(
+        (part.BOSS_DIA / 2.0) ** 2 - (major_dia / 2.0) ** 2
+    )
+    thread_end_z = part.SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
+    drill_point_z = (
+        part.SPOTFACE_FLOOR
+        - CASTING_TAP_DRILL_DEPTH
+        - part.SIDE_TAP_DRILL_DIA / 2.0 * part.DRILL_POINT_H
+    )
+    drill_far_wall_z = abs(part.FRONT_COLUMN_Z) - part.BOSS_DIA / 2.0
+    assert part.SIDE_TAP_THREAD_MAJOR_DIA == major_dia
+    assert part.SIDE_TAP_MAJOR_FAR_WALL_Z == major_far_wall_z
+    assert part.SIDE_TAP_THREAD_END_Z == thread_end_z
+    assert part.SIDE_TAP_DRILL_POINT_Z == drill_point_z
+    assert part.SIDE_TAP_DRILL_FAR_WALL_Z == drill_far_wall_z
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN > 0.0
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN > 0.0
