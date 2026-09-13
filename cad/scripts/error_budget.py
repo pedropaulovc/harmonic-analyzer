@@ -36,7 +36,7 @@ import argparse
 import json
 import math
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import astuple, dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -350,6 +350,41 @@ def read_ordinates(x: np.ndarray, nom: Nominal) -> np.ndarray:
     return np.array([read_ordinate(float(xi) * nom.d_max, nom, f_full) for xi in x])
 
 
+_READ_TABLES: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+
+
+def read_table(nom: Nominal, step_mm: float = 0.25) -> tuple[np.ndarray, np.ndarray]:
+    """(station, read ordinate) samples from the pivot zero to full scale, for
+    vectorised lookup (``np.interp``) of the ordinate a bar at ANY reachable
+    station contributes -- the Monte Carlo's physical baseline. Cached per
+    nominal: ~350 exact-kinematics solves once, not per draw."""
+    key = astuple(nom)
+    if key not in _READ_TABLES:
+        stations = np.arange(0.0, nom.d_max + step_mm / 2, step_mm)
+        stations[-1] = nom.d_max
+        f_full = read_ordinate(nom.d_max, nom, f_full=1.0)
+        _READ_TABLES[key] = (
+            stations,
+            np.array([read_ordinate(float(d), nom, f_full) for d in stations]),
+        )
+    return _READ_TABLES[key]
+
+
+def setting_bias_lift(x: np.ndarray, nom: Nominal, setting_tol: float) -> np.ndarray:
+    """The coherent read-ordinate shift a one-sided setting band leaves on each
+    bar: a bar set at the stick zero cannot go below the pivot, so its setting
+    error is uniform on [0, +tol] with mean +tol/2 -- it stands at station
+    tol/2, not 0 -- and a bar at the stop is uniform on [-tol, 0], mean -tol/2.
+    Bars in between are two-sided (mean 0). This is what the procedure tells the
+    operator to take the station as, and what the Monte Carlo subtracts."""
+    grid, table = read_table(nom)
+    d = x * nom.d_max
+    mean = np.where(x == 0.0, setting_tol / 2.0, 0.0) - np.where(
+        x == 1.0, setting_tol / 2.0, 0.0
+    )
+    return np.interp(d + mean, grid, table) - np.interp(d, grid, table)
+
+
 def nominal_design_errors(
     nom: Nominal,
     null_lift: float = 0.0,
@@ -505,13 +540,17 @@ def _channel_model(
     sens: dict[str, float],
     setting_tol: float = 0.0,
 ) -> np.ndarray:
-    """A_k read from a linear-gain machine whose channel i has gain g_i and
-    phase phi_i built from the drawn deviations ``dev[feature]`` (draws x 20),
-    normalised by the trial's own k=0 reading (= sum x_i, known to the
-    operator). Pure cosines have a zero mean line, so only the scale step of the
-    readout is modelled here. ``setting_tol`` is the station-setting half-width
-    the ``station_setting`` draws were taken from (needed for the one-sided
-    mean, below). Returns e_k in % FS, shape (draws, K_MAX+1)."""
+    """A_k read from a machine whose channel i has gain g_i and phase phi_i
+    built from the drawn deviations ``dev[feature]`` (draws x 20), on the
+    PHYSICAL amplitude of each bar -- ``read_table``'s ordinate at its station,
+    so an idle bar's ~0.028 of motion is perturbed by that channel's own spring,
+    arm, cam and phase deviations too, not only by the nominal lift -- then
+    normalised by the trial's own k=0 reading (= sum x_read, known to the
+    operator) with the read-vs-set vector subtracted, as the procedure says.
+    Pure cosines have a zero mean line, so only the scale step of the readout is
+    modelled here. ``setting_tol`` is the station-setting half-width the
+    ``station_setting`` draws were taken from (needed for the one-sided mean,
+    below). Returns e_k in % FS, shape (draws, K_MAX+1)."""
     draws = next(iter(dev.values())).shape[0]
     log_g = np.zeros((draws, N_ELEMENTS))
     phi = np.zeros((draws, N_ELEMENTS))
@@ -532,25 +571,25 @@ def _channel_model(
             # +/-tol/2 -- not a clipped point mass with mean tol/4). Each bound's
             # MEAN is a coherent lift identical in kind to the null lift the
             # procedure measures on the assembled machine (one bar at the stick
-            # zero / at the stop), so it is subtracted the same way; only the
-            # scatter about it survives.
+            # zero / at the stop), so it is subtracted the same way
+            # (setting_bias_lift, published in READOUT.md); only the scatter
+            # about it survives.
             at_zero = (x == 0.0)[None, :]
             at_full = (x == 1.0)[None, :]
             v = np.where(at_zero, np.abs(v), np.where(at_full, -np.abs(v), v))
             d = np.clip(d + v, 0.0, nom.d_max)
-            lift = (
-                np.where(x == 0.0, setting_tol / 2.0, 0.0)
-                - np.where(x == 1.0, setting_tol / 2.0, 0.0)
-            ) / nom.d_max
+            lift = setting_bias_lift(x, nom, setting_tol)
         else:
             raise KeyError(f"no model for feature {key}")
     g = np.exp(log_g)
+    grid, table = read_table(nom)
+    amplitude = np.interp(d, grid, table)  # what each bar physically contributes
     cos_k = np.cos(
         THETA_K[None, :, None] * HARMONICS[None, None, :] + phi[:, None, :]
     )  # draws,k,i
-    r = np.einsum("di,dki->dk", g * d, cos_k)
-    x_read = x + lift  # what the operator knows the machine is summing
-    measured = r * (float(np.sum(x_read)) / r[:, :1]) - ideal_coefficients(lift)
+    r = np.einsum("di,dki->dk", g * amplitude, cos_k)
+    x_read = np.interp(x * nom.d_max, grid, table) + lift  # what the operator records
+    measured = r * (float(np.sum(x_read)) / r[:, :1]) - ideal_coefficients(x_read - x)
     ideal = ideal_coefficients(x)
     return 100.0 * (measured - ideal[None, :]) / np.max(np.abs(ideal))
 
@@ -687,21 +726,42 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
     }
     # Ordinate readout. The CAD maps the trace PEAK onto output.yaml
     # pen_trace_half_mm (pen_driver: scale = stroke_half / peak|pen_y|), and the
-    # greatest term of a non-negative input is its k=0 reading. With the
+    # greatest term of a non-negative input is its k=0 reading. The procedure
+    # normalises every reading by that k=0 reading, so coefficient k carries
+    # TWO independent reading errors: its own, and the normaliser's scaled by
+    # a_k = A_k/A_0 (the coefficient's share of the greatest term). With the
     # magnifier set per trial so k=0 spans the stroke, a reading error of
-    # ``reading`` mm is reading/pen_half of the k=0 reading = of sum(x_read);
-    # against the trial's IDEAL greatest term (sum x, what the error is scored
-    # on) it is that times sum(x_read)/sum(x) -- idle bars read ~0.029 each,
-    # so a sparse trial pays for them. At a fixed magnifier (all-ones setting)
-    # multiply by N/sum(x_read) as well.
+    # ``reading`` mm is reading/pen_half of sum(x_read); against the trial's
+    # IDEAL greatest term (sum x, what the error is scored on) it is that
+    # times sum(x_read)/sum(x) -- idle bars read ~0.028 each, so a sparse
+    # trial pays for them. Scored as the MAE the benchmark and the other
+    # closure terms use: for independent uniform +/-delta reads,
+    # E|delta_k - a_k delta_0| = delta (1/2 + a_k^2/6) (|a_k| <= 1), averaged
+    # over k (k=0 reads as itself: zero error). The worst single coefficient
+    # (RSS bound delta sqrt(1 + a_k^2), sqrt 2 on an input whose k=20 term
+    # equals its k=0) is reported beside it, not gated. At a fixed magnifier
+    # (all-ones setting) multiply by N/sum(x_read) as well.
     pen_half = float(_config.machine("output", "pen_trace_half_mm"))
     reading = float(res["readout"]["reading_uncertainty_mm"])
     spans = bool(res["readout"]["greatest_term_spans_stroke"])
     magnification = {n: float(N_ELEMENTS / np.sum(x_read[n])) for n in scored}
     per_mm = 100.0 * reading / pen_half
-    spanning = {
+    share = {}
+    for n in scored:
+        coeff = ideal_coefficients(x_read[n])
+        share[n] = coeff / coeff[0]
+    scale = {
         n: per_mm * float(np.sum(x_read[n]) / np.sum(reference_inputs()[n]))
         for n in scored
+    }
+    mae_factor = {}
+    for n in scored:
+        f = 0.5 + share[n] ** 2 / 6.0
+        f[0] = 0.0  # k=0 is normalised by itself
+        mae_factor[n] = float(np.mean(f))
+    spanning = {n: scale[n] * mae_factor[n] for n in scored}
+    worst_bound = {
+        n: scale[n] * float(np.max(np.sqrt(1.0 + share[n][1:] ** 2))) for n in scored
     }
     fixed = {n: spanning[n] * magnification[n] for n in scored}
     chosen = spanning if spans else fixed
@@ -710,11 +770,16 @@ def closed_form_terms(nom: Nominal, budget: dict[str, Any]) -> dict[str, Any]:
         "assumed_reading_uncertainty_mm": reading,
         "assumed_greatest_term_spans_stroke": spans,
         "ordinate_pct_fs_per_0p1mm_reading": 100.0 * 0.1 / pen_half,
+        "one_reading_pct_fs_per_input": scale,
+        "normaliser_share_max_abs": {
+            n: float(np.max(np.abs(share[n][1:]))) for n in scored
+        },
         "pct_fs_greatest_term_spans_stroke": spanning,
+        "pct_fs_worst_coefficient_bound": worst_bound,
         "magnification_vs_all_ones": magnification,
         "pct_fs_fixed_magnifier": fixed,
         "pct_fs": max(chosen[n] for n in broad),
-        "note": "reading uncertainty = half the line width + interpolation; scales as 1/(pen full scale)",
+        "note": "MAE over k of |own read - a_k * k=0 read|, uniform +/-reading each; worst-coefficient RSS bound reported, not gated; scales as 1/(pen full scale)",
     }
     # Timebase: reading at the wrong theta. d(A_k)/d(theta) = -sum i x_i sin(i theta_k),
     # RMS over k, in % FS per rad of FUNDAMENTAL angle. One fundamental period is
@@ -772,6 +837,9 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
         "null_station_mm": d0,
         "harmonics": {f"{d:+.0f}": harmonic_content(d, nom, null=d0) for d in stations},
         "null_lift_ordinate": -d0 / nom.d_max,
+        "station_setting_tolerance_mm": float(
+            budget["critical_features"]["station_setting"]["tolerance"]
+        ),
         "nominal_design_errors": {
             "uncorrected": nominal_design_errors(nom),
             "null_lift_corrected": nominal_design_errors(
@@ -973,6 +1041,9 @@ def readout_procedure(r: dict[str, Any], nom: Nominal) -> str:
     cf = r["closed_form"]
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
+    tol = r["station_setting_tolerance_mm"]
+    at_zero = read_ordinate(tol / 2.0, nom)
+    at_stop = read_ordinate(nom.d_max - tol / 2.0, nom)
     table = "\n".join(
         f"| {d:6.1f} | {d / STICK_DIVISION_MM:6.3f} | {x:+.4f} | {k * 100:6.2f} % |"
         for d, x, k in rows
@@ -992,8 +1063,8 @@ The stick's 0 tick sits at the rocker pivot axis (stick drawing note 5); every
 station is on the lifting side. Set bar $i$ to the **linear station**
 $d_i = x_i \\cdot {nom.d_max:.0f}$ mm ($= x_i \\cdot {nom.d_max / STICK_DIVISION_MM:.3f}$
 divisions on the engraved {STICK_DIVISION_MM:.2f} mm/division scale), reading
-to 1/5 minor division (setting error +/-0.25 mm max per bar). Then look up, in
-the table, the **read ordinate** $x^{{read}}_i$ that station actually
+to 1/5 minor division (setting error +/-{tol:.2f} mm max per bar). Then look up,
+in the table, the **read ordinate** $x^{{read}}_i$ that station actually
 contributes (interpolate between rows) and record it: the ordinate is NOT
 linear in station (the null lies at {r["null_station_mm"]:+.2f} mm, unreachable,
 and the slope of ordinate per mm changes by
@@ -1001,11 +1072,22 @@ and the slope of ordinate per mm changes by
 from the pivot to full scale), so $x^{{read}}_i \\ne x_i$; the difference is
 what step 4 subtracts.
 
+**Bars at the ends of the scale are biased, not centred.** A bar set at the
+stick zero cannot sit below the pivot, so its setting error is one-sided,
+$[0, +{tol:.2f}]$ mm, and on average it stands at $+{tol / 2:.3f}$ mm, not 0;
+a bar at the travel stop is the mirror, $[-{tol:.2f}, 0]$, on average at
+${nom.d_max - tol / 2:.3f}$ mm. Record those mean stations' read ordinates --
+**{at_zero:+.4f} for a bar at zero** (not {rows[0][1]:+.4f}) and
+**{at_stop:+.4f} for a bar at the stop** (not {rows[-1][1]:+.4f}) -- so the
+read-vs-set vector of step 4 removes the bias; only the scatter about it is
+left, which is what the budget's `station_setting` term scores.
+
 | station (mm) | stick reading (div) | read ordinate $x^{{read}}$ | $\\kappa$ = c2/c1 |
 |---:|---:|---:|---:|
 {table}
 
-A bar parked at 0 reads {rows[0][1]:+.4f}: idle channels are NOT zero. Sum the
+A bar parked at 0 reads {rows[0][1]:+.4f} ({at_zero:+.4f} at its mean set
+station): idle channels are NOT zero. Sum the
 read ordinates of all 20 bars; that sum is what the machine reports at $k=0$.
 The sign is a convention of the machine-hand drive (a +X bar reads negative at
 the top of stroke); the coefficients' signs follow it uniformly.
@@ -1040,9 +1122,10 @@ Subtract, at each $k$:
   its second harmonic is $\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}$,
   not zero;
 - the read-vs-set deviation vector $\\sum_i (x^{{read}}_i - x^{{set}}_i)\\cos(i\\theta_k)$
-  -- for an idle bar $x^{{read}} = {rows[0][1]:+.4f}$ against $x^{{set}} = 0$, so this
-  is the null lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$)
-  plus the same for any lift constant $c$ from step 1.
+  with the recorded (bias-corrected) read ordinates of step 1 -- for an idle
+  bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$, so this is the null
+  lift ($20\\ell$ at $k=0$, $-\\ell$ at odd $k$, $\\ell = {lift:.4f}$) plus the
+  one-sided setting bias, plus the same for any lift constant $c$ from step 1.
 
 ## 5. Report
 

@@ -263,6 +263,57 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     assert f"\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}" in doc
     assert "crank stopped on its index" in doc
     assert "ONE direction" in doc
+    # the one-sided setting bias at the ends of the scale is published, so the
+    # read-vs-set vector the operator subtracts is the one the Monte Carlo does
+    tol = report["station_setting_tolerance_mm"]
+    at_zero = eb.read_ordinate(tol / 2.0, nom)
+    at_stop = eb.read_ordinate(nom.d_max - tol / 2.0, nom)
+    assert at_zero != pytest.approx(rows[0][1], abs=1e-4)
+    assert f"**{at_zero:+.4f} for a bar at zero**" in doc
+    assert f"**{at_stop:+.4f} for a bar at the stop**" in doc
+    assert f"bar $x^{{read}} = {at_zero:+.4f}$ against $x^{{set}} = 0$" in doc
+
+
+def test_idle_bars_are_physically_live_in_the_monte_carlo(nom):
+    """A bar at the stick zero still moves (~0.028 of a full-scale bar), so a
+    gain deviation on an IDLE channel must move the reading -- the nominal lift
+    the operator subtracts does not know about that channel's own spring. On
+    the two-channel input the 18 idle bars sum to ~0.5 of the 2.5 the machine
+    reports at k=0, so a coherent +1.25 % on them rescales the two live bars
+    through the normaliser by ~0.25 % FS -- as large as the same deviation on
+    the live bars themselves; a model that idles them at zero scores 0."""
+    x = eb.reference_inputs()["pair_1_20"]
+    sens = eb.gain_sensitivities(nom)
+    idle = (x == 0.0)[None, :]
+    on_idle = eb._channel_model(
+        x, nom, {"spring_rate": np.where(idle, 1.25, 0.0)}, sens
+    )[0]
+    on_live = eb._channel_model(
+        x, nom, {"spring_rate": np.where(idle, 0.0, 1.25)}, sens
+    )[0]
+    assert np.max(np.abs(on_idle)) > 0.1
+    assert np.max(np.abs(on_idle)) == pytest.approx(np.max(np.abs(on_live)), rel=0.05)
+
+
+def test_readout_term_counts_the_normalising_read(report):
+    """Every coefficient is divided by the pen-read k=0 value, so its error
+    carries that read too, scaled by A_k/A_0: an input whose k=20 term equals
+    its k=0 (the lifted square) pays for it, all-ones (A_k/A_0 <= 0.05) barely;
+    the worst single coefficient is the sqrt(1 + a^2) RSS bound."""
+    ro = report["closed_form"]["readout"]
+    one = ro["one_reading_pct_fs_per_input"]
+    mae = ro["pct_fs_greatest_term_spans_stroke"]
+    bound = ro["pct_fs_worst_coefficient_bound"]
+    assert ro["normaliser_share_max_abs"]["alternating"] > 0.9
+    assert ro["normaliser_share_max_abs"]["all_ones"] < 0.06
+    assert bound["alternating"] / one["alternating"] == pytest.approx(
+        math.sqrt(2.0), rel=0.03
+    )
+    assert bound["all_ones"] / one["all_ones"] == pytest.approx(1.0, rel=0.01)
+    # MAE of |own - a * normaliser| for uniform reads: delta/2 at a=0, 2 delta/3 at a=1
+    assert mae["all_ones"] / one["all_ones"] == pytest.approx(0.5 * 20 / 21, rel=0.01)
+    assert mae["alternating"] > mae["all_ones"]
+    assert mae["alternating"] / one["alternating"] < 2.0 / 3.0
 
 
 def test_stick_division_is_the_spec_constant_the_builder_engraves():

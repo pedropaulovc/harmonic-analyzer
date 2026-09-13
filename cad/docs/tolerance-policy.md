@@ -160,23 +160,25 @@ period-appropriate answer (the machine computes, the operator corrects a known t
 ## Result: the budget for the critical features
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws, every feature
-uniform within ± tolerance per channel, calibrated readout), % of the greatest term. "broad"
+uniform within ± tolerance per channel, calibrated readout, every bar at the physical amplitude
+its station reads — an idle bar's ≈ 0.028 of motion is perturbed by its own channel's
+deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
 20 alone, the consistency stress case. `allowable` is the tolerance at which the feature
 *alone* would consume 0.05 % MAE or 0.5 % pair-p99, the equal-share allocation.
 
 | feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
 |---|---:|---:|---:|---:|---:|---|
-| cam eccentricity | 0.025 mm | 0.025 | 0.14 | 0.26 | 0.048 | offset-turn in a 4-jaw, indicate the throw |
+| cam eccentricity | 0.025 mm | 0.025 | 0.14 | 0.27 | 0.047 | offset-turn in a 4-jaw, indicate the throw |
 | rocker rod-pin radius | 0.10 mm | 0.006 | 0.03 | 0.07 | 0.74 | DRO/CNC hole position |
 | lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position |
-| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 1.00 | DRO/CNC hole position |
-| summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.34 | 0.22 | ½ of the 0.30 pattern-position zone |
-| **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.13** | 0.55 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
-| cam phase | 0.25° | 0.038 | 0.21 | 0.22 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
-| mesh lag spread | 0.14° | 0.021 | 0.11 | 0.12 | 0.33 | derived from the 0.05–0.20 backlash band |
-| station setting (setup) | 0.25 mm | 0.025 | 0.24 | 0.62 | 0.20 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver |
-| **all combined** | | **0.127** | **0.67** | **1.49** | | targets 0.30 / 1.5 / 2.0 |
+| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.97 | DRO/CNC hole position |
+| summing hook arm | 0.15 mm | 0.032 | 0.18 | 0.35 | 0.22 | ½ of the 0.30 pattern-position zone |
+| **spring rate** | **1.25 %** | **0.107** | **0.58** | **1.15** | 0.54 | **matched by measurement** — spec-sheet `SET QC`: two hanging loads at eye c-c 60/70, bin from stock (±10 %) |
+| cam phase | 0.25° | 0.038 | 0.20 | 0.23 | 0.33 | lobe and notch indexed in one setup (on the drawing) |
+| mesh lag spread | 0.14° | 0.021 | 0.11 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
+| station setting (setup) | 0.25 mm | 0.024 | 0.23 | 0.53 | 0.24 | stick drawing note 5: interpolate to 1/5 of the 1.42 minor division (0.28 step) — what the released stick can deliver; bars at the stick zero / travel stop are one-sided and their mean bias is recorded, not scored |
+| **all combined** | | **0.127** | **0.67** | **1.50** | | targets 0.30 / 1.5 / 2.0 |
 
 The budget closes with a factor of two in hand on the broad inputs and just inside the
 two-channel consistency target. Read it as follows.
@@ -215,15 +217,16 @@ two-channel consistency target. Read it as follows.
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
 | nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`) | 0.016 % MAE | 0.05 |
-| ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. Scored on the worst broad input: the k = 0 reading sums the *read* ordinates (idle bars ≈ 0.029 each), so the error against the ideal greatest term is 0.5 % × Σx_read/Σx. Needs 2.0–2.3× the all-ones magnification for the broad inputs (7× two-channel): the open magnifier-range item; at a fixed all-ones setting the broad worst case is 1.2 % (`greatest_term_spans_stroke: false` scores it and fails the gate) | 0.52 % FS | 0.55 |
+| ordinate readout | the CAD's **15 mm half-stroke** (`output.yaml pen_trace_half_mm`, asserted by `verify:kinematics`) read to ±0.075 mm (half a 0.15 mm technical-pen line against the grid), **with the magnifier set per trial so the greatest (k = 0) term spans the stroke** — the CAD's `pen_driver` convention and Michelson's normalisation. Every coefficient carries **two** independent reads: its own and the k = 0 normaliser's, the latter scaled by $a_k = A_k/A_0$. Scored as the **MAE** the benchmark and the other terms use — for uniform ±δ reads $E\lvert\delta_k - a_k\delta_0\rvert = \delta(1/2 + a_k^2/6)$, averaged over k — on the worst broad input, against the ideal greatest term (the k = 0 reading sums the *read* ordinates, idle bars ≈ 0.028 each, so × Σx_read/Σx): 0.24–0.25 % on every broad input, 0.32 % two-channel. The **worst single coefficient** is a √(1 + a_k²) bound — 0.71 % on the lifted square, whose k = 20 term equals its k = 0 — reported (`pct_fs_worst_coefficient_bound`), not gated. Needs 2.0–2.3× the all-ones magnification for the broad inputs (8× two-channel): the open magnifier-range item; at a fixed all-ones setting the broad worst case is 0.57 % (`greatest_term_spans_stroke: false` scores it and fails the gate) | 0.25 % MAE | 0.30 |
 | timebase | read coefficient k with the crank stopped on its index at 2k turns, index repeatable to ±8° (uniform), scored on the worst reference input (the lifted square, 252 % FS/rad) — vs 1.24 % FS per 0.1 mm of abscissa at the CAD's 1.596 mm/turn feed (`paper_drive_geom`), 0.31 % with the coarse T24/T12 set | 0.25 % FS | 0.30 |
 | knife-edge hysteresis | hardened edge on a hardened seat, rolling-resistance length 0.005 mm at the derived 2.3 kN edge load — the 20 channel preloads (1.5 kN) **plus** the counter spring's balancing reaction (0.8 kN at the 76.2 mm arm), both bearing on the knife (3.4 % of one channel's stroke per 0.01 mm). The stall is a fixed displacement, so against a trial's greatest term it is 1.7 %/Σx_read: 0.09 % on all-ones, **0.20 % on the Gaussian** (scored), 0.68 % on the two-channel case; *measure* as trace width on a slow reversal | 0.20 % FS | 0.25 |
-| **total** | residual + RSS(scatter 0.127, readout, timebase, knife) | **0.64 % MAE** | **0.7 benchmark** |
+| **total** | residual + RSS(scatter 0.127, readout, timebase, knife) | **0.44 % MAE** | **0.7 benchmark** |
 
 `check:budget` fails if any term overruns its allowance or the total overruns the benchmark, so a
-coarser reading or a duller knife cannot be hidden behind a green scatter result. **Readout is the
-largest single term** — at the 15 mm stroke it is 0.5 % on its own, exactly Michelson's table
-quantisation, and it is why the paper's 0.7 % is hard even with perfect parts. A larger pen
+coarser reading or a duller knife cannot be hidden behind a green scatter result. **Readout and
+timebase are the largest terms** — the readout's worst single coefficient at the 15 mm stroke
+is 0.5–0.7 %, Michelson's own table quantisation, and it is why the paper's 0.7 % is hard even
+with perfect parts. A larger pen
 stroke (a CAD/`verify:kinematics` change to `pen_trace_half_mm`, once the magnifier range is
 reconciled) would reduce it proportionally; that is the one design lever left, and it is not
 machining.
@@ -248,11 +251,13 @@ the specification.
    stamped, unevenly spaced" for the same reason. Set each bar by interpolating to 1/5 of the
    stick's 1.42 mm minor division (stick drawing note 5): a 0.28 mm step gives ±0.14 mm
    rounding, ±0.25 mm with eye and parallax — the budget's setting term. A bar at a zero
-   ordinate cannot be set below the pivot, so its setting error is one-sided [0, +0.25]; the
-   mean of that (0.125 mm) is a lift of the same kind as the null lift and is folded into the
-   measured lift, so only the scatter about it survives; a full-scale bar is one-sided the other
-   way, [−0.25, 0] against the travel stop (the Monte Carlo samples both one-sided bands and
-   subtracts their known means).
+   ordinate cannot be set below the pivot, so its setting error is one-sided [0, +0.25]: on
+   average it stands at +0.125 mm, so **record its read ordinate at that station** (0.0294,
+   not the table's 0.0281 at 0) — a lift of the same kind as the null lift, removed by the same
+   read-vs-set vector, so only the scatter about it survives; a full-scale bar is one-sided the
+   other way, [−0.25, 0] against the travel stop, recorded at 87.875 mm (0.9986). `READOUT.md`
+   prints both numbers; the Monte Carlo samples both one-sided bands and subtracts the same
+   means.
 2. **Normalise each trial by its own k = 0 reading**, which equals $\sum_i x^\text{read}_i$
    (the read ordinates of the stations the operator set) — Michelson's normalisation to the
    greatest term. This removes all common-mode

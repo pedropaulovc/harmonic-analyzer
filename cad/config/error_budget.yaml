@@ -59,10 +59,14 @@ reserved:
                                    # magnification each input needs vs the all-ones setting
                                    # (2.0-2.4x for the broad inputs -- the open magnifier-range
                                    # item). `false` scores a fixed magnifier at the all-ones setting.
-    allowance_pct: 0.55            # 0.5 (the 0.5-unit quantisation of Michelson's own tables)
-                                   # scaled by sum(x_read)/sum(x) on the worst broad input --
-                                   # idle bars read ~0.029 each and inflate the k=0 term the
-                                   # reading error is a fraction of (Gaussian: 1.033x)
+    allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
+                                   # carries its own read AND the k=0 normaliser's read (scaled
+                                   # by A_k/A_0), uniform +/-reading each, averaged over k, on
+                                   # the worst broad input, scaled by sum(x_read)/sum(x) (idle
+                                   # bars read ~0.028 each and inflate the k=0 term). Lands at
+                                   # 0.25 on every broad input; the worst SINGLE coefficient
+                                   # (0.5-0.7, Michelson's 0.5-unit table quantisation) is
+                                   # reported beside it, not gated.
   timebase:                        # reading coefficient k with the crank stopped on its index,
                                    # scored on the worst reference input
     crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)
