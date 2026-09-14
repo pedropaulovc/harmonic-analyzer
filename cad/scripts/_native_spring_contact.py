@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 import _telemetry
@@ -315,3 +316,196 @@ def assert_native_contact(
             )
         span.set_attribute("certificate", "zero_overlap_bounded_distance")
         return distance_mm
+
+
+@dataclass(frozen=True, slots=True)
+class _AssemblySpringInstance:
+    name: str
+    station_z_mm: float
+
+
+_CHANNEL_SPRING_FAMILY = "channel-spring-installed"
+_CHANNEL_CONTACT_FAMILIES = (
+    _CHANNEL_SPRING_FAMILY,
+    "spring-hook",
+    "channel-lever",
+)
+_SUMMING_CONTACT_FAMILIES = ("counter-spring", "boss-hook", "gooseneck")
+_STATION_MATCH_TOLERANCE_MM = 1e-6
+
+
+def _spring_contact_family(source_stem: str) -> str | None:
+    if source_stem == _CHANNEL_SPRING_FAMILY or source_stem.startswith(
+        f"{_CHANNEL_SPRING_FAMILY}-stretch"
+    ):
+        return _CHANNEL_SPRING_FAMILY
+    families = (*_CHANNEL_CONTACT_FAMILIES[1:], *_SUMMING_CONTACT_FAMILIES)
+    return source_stem if source_stem in families else None
+
+
+def _assembly_spring_instances(
+    adapter: Any, families: tuple[str, ...]
+) -> dict[str, list[_AssemblySpringInstance]]:
+    """Enumerate each relevant top-level occurrence from its actual source part."""
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    components = adapter._attempt(lambda: assembly.GetComponents(True), default=None)
+    if components is None:
+        raise RuntimeError("native spring contact: top-level components unavailable")
+    found = {family: [] for family in families}
+    for raw in components:
+        component = _early_bound(raw, "IComponent2")
+        if component is None:
+            raise RuntimeError("native spring contact: invalid top-level component")
+        name = str(_read_member(component, "Name2") or "")
+        source = _read_member(component, "GetPathName")
+        if not name or not isinstance(source, str) or not source:
+            raise RuntimeError(
+                "native spring contact: component identity unavailable "
+                f"(name={name!r}, source={source!r})"
+            )
+        source_stem = Path(source).stem.casefold()
+        family = _spring_contact_family(source_stem)
+        if family not in found:
+            continue
+        transform = _early_bound(
+            _read_member(component, "Transform2"), "IMathTransform"
+        )
+        values = _read_member(transform, "ArrayData") if transform is not None else None
+        if not isinstance(values, (list, tuple)) or len(values) < 12:
+            raise RuntimeError(
+                f"native spring contact: transform unavailable for {name}"
+            )
+        station_z_mm = float(values[11]) * 1000.0
+        if not math.isfinite(station_z_mm):
+            raise RuntimeError(
+                f"native spring contact: non-finite station Z for {name}"
+            )
+        found[family].append(_AssemblySpringInstance(name, station_z_mm))
+    return found
+
+
+def _ordered_unique_stations(
+    family: str,
+    instances: list[_AssemblySpringInstance],
+    expected_count: int,
+) -> list[_AssemblySpringInstance]:
+    if len(instances) != expected_count:
+        raise RuntimeError(
+            f"{family}: expected exactly {expected_count} active top-level "
+            f"instance(s), found {len(instances)}: "
+            f"{sorted(instance.name for instance in instances)}"
+        )
+    ordered = sorted(instances, key=lambda instance: instance.station_z_mm)
+    for first, second in zip(ordered, ordered[1:]):
+        if abs(second.station_z_mm - first.station_z_mm) <= _STATION_MATCH_TOLERANCE_MM:
+            raise RuntimeError(
+                f"{family}: ambiguous duplicate station near "
+                f"Z={first.station_z_mm:.9g} mm: {first.name}, {second.name}"
+            )
+    return ordered
+
+
+def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
+    """Certify every configured spring seat from persisted top-level instances.
+
+    The component walk is independent of builder locals. Channel occurrences are
+    grouped by source part, ordered by their shared station Z, and required to
+    form one spring/hook/lever triplet per active configured amplitude. Summing
+    has one counter chain. No component is moved and no rebuild is requested.
+    """
+    if asm_name == "channel":
+        import _config
+        import settled_spring_seats
+
+        active_channels = _config.active_channels()
+        seats = [
+            settled_spring_seats.channel_seat(float(channel["amplitude_mm"]))
+            for channel in active_channels
+        ]
+        count = len(active_channels)
+        if count != _config.active_count():
+            raise RuntimeError(
+                f"channel calibration selected {count} active row(s), "
+                f"expected {_config.active_count()}"
+            )
+        found = _assembly_spring_instances(adapter, _CHANNEL_CONTACT_FAMILIES)
+        springs, hooks, levers = (
+            _ordered_unique_stations(family, found[family], count)
+            for family in _CHANNEL_CONTACT_FAMILIES
+        )
+        for station, (spring, hook, lever, seat) in enumerate(
+            zip(springs, hooks, levers, seats, strict=True)
+        ):
+            station_values = (
+                spring.station_z_mm,
+                hook.station_z_mm,
+                lever.station_z_mm,
+            )
+            if max(station_values) - min(station_values) > _STATION_MATCH_TOLERANCE_MM:
+                raise RuntimeError(
+                    f"channel station {station:02d}: spring/hook/lever Z mismatch "
+                    f"{spring.name}={spring.station_z_mm:.9g}, "
+                    f"{hook.name}={hook.station_z_mm:.9g}, "
+                    f"{lever.name}={lever.station_z_mm:.9g} mm"
+                )
+            lower = assert_native_contact(
+                adapter,
+                spring.name,
+                hook.name,
+                maximum_distance_mm=seat.lower_maximum_distance_mm,
+                label=f"channel {station:02d} lower native seat",
+            )
+            upper = assert_native_contact(
+                adapter,
+                spring.name,
+                lever.name,
+                maximum_distance_mm=seat.upper_maximum_distance_mm,
+                label=f"channel {station:02d} upper native seat",
+            )
+            _telemetry.success(
+                f"channel {station:02d} native contacts: lower {lower:.9g} mm, "
+                f"upper {upper:.9g} mm"
+            )
+        return
+
+    if asm_name == "summing":
+        import settled_spring_seats
+
+        seat, _gooseneck_y = settled_spring_seats.counter_seat()
+        found = _assembly_spring_instances(adapter, _SUMMING_CONTACT_FAMILIES)
+        counter, boss, gooseneck = (
+            _ordered_unique_stations(family, found[family], 1)[0]
+            for family in _SUMMING_CONTACT_FAMILIES
+        )
+        station_values = (
+            counter.station_z_mm,
+            boss.station_z_mm,
+            gooseneck.station_z_mm,
+        )
+        if max(station_values) - min(station_values) > _STATION_MATCH_TOLERANCE_MM:
+            raise RuntimeError(
+                "summing counter/boss/gooseneck Z mismatch: "
+                f"{counter.name}={counter.station_z_mm:.9g}, "
+                f"{boss.name}={boss.station_z_mm:.9g}, "
+                f"{gooseneck.name}={gooseneck.station_z_mm:.9g} mm"
+            )
+        lower = assert_native_contact(
+            adapter,
+            counter.name,
+            boss.name,
+            maximum_distance_mm=seat.lower_maximum_distance_mm,
+            label="counter lower native seat",
+        )
+        upper = assert_native_contact(
+            adapter,
+            gooseneck.name,
+            counter.name,
+            maximum_distance_mm=seat.upper_maximum_distance_mm,
+            label="counter upper native seat",
+        )
+        _telemetry.success(
+            f"counter native contacts: lower {lower:.9g} mm, upper {upper:.9g} mm"
+        )
+        return
+
+    raise ValueError(f"assembly {asm_name!r} has no native spring-contact contract")

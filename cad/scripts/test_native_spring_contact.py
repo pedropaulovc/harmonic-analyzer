@@ -279,3 +279,62 @@ def test_invalid_calibrated_maximum_fails(scene, maximum: float) -> None:
             maximum_distance_mm=maximum,
             label="invalid calibrated maximum",
         )
+
+
+def _assembly_component(name: str, source_stem: str, station_z_mm: float):
+    transform = list(_IDENTITY)
+    transform[11] = station_z_mm / 1000.0
+    return SimpleNamespace(
+        Name2=name,
+        GetPathName=lambda: f"C:/cad/out/sldprt/{source_stem}.SLDPRT",
+        Transform2=SimpleNamespace(ArrayData=transform),
+    )
+
+
+def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
+    import _config
+    import settled_spring_seats
+
+    components = [
+        _assembly_component(
+            "channel-spring-installed-stretch00-1",
+            "channel-spring-installed-stretch00",
+            -10.0,
+        ),
+        _assembly_component(
+            "channel-spring-installed-stretch00-2",
+            "channel-spring-installed-stretch00",
+            0.0,
+        ),
+        _assembly_component("spring-hook-1", "spring-hook", -10.0),
+        # A duplicated lower seat leaves the second station without its hook.
+        _assembly_component("spring-hook-2", "spring-hook", -10.0),
+        _assembly_component("channel-lever-1", "channel-lever", -10.0),
+        _assembly_component("channel-lever-2", "channel-lever", 0.0),
+    ]
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetComponents=lambda _top_only: components),
+        _attempt=lambda operation, default=None: operation(),
+    )
+    channels = [
+        {"amplitude_mm": 1.0},
+        {"amplitude_mm": 2.0},
+    ]
+    seat = SimpleNamespace(
+        lower_maximum_distance_mm=0.001,
+        upper_maximum_distance_mm=0.001,
+    )
+    monkeypatch.setattr(contact, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_config, "active_channels", lambda: channels)
+    monkeypatch.setattr(_config, "active_count", lambda: len(channels))
+    monkeypatch.setattr(settled_spring_seats, "channel_seat", lambda _amplitude: seat)
+    monkeypatch.setattr(
+        contact,
+        "assert_native_contact",
+        lambda *_args, **_kwargs: pytest.fail(
+            "ambiguous family pairing reached native contact"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="ambiguous duplicate station"):
+        contact.assert_assembly_spring_contacts(adapter, "channel")

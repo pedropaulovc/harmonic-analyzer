@@ -128,7 +128,6 @@ from _common import (
     log,
     run_build,
 )
-from _native_spring_contact import assert_native_contact
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     assembly_title_properties,
@@ -864,7 +863,6 @@ async def build(adapter) -> dict[str, str]:
     # lever rides coincident to its own rocker. rocker_by_channel[j] is the
     # rocker instance every later neighbour seat refers to.
     rocker_by_channel: dict[int, str] = {}
-    lever_by_channel: dict[int, str] = {}
     if abs(ROCKER_HUB_LENGTH - PITCH) > 1e-6 or abs(LEVER_HUB_LENGTH - PITCH) > 1e-6:
         raise RuntimeError("hub lengths must equal the station pitch")
     _hub_bottom = PIVOT[1] - ROCKER_HUB_DIA / 2.0
@@ -1248,7 +1246,6 @@ async def build(adapter) -> dict[str, str]:
         if seed is None:
             comps = await _author_channel(j, st)
             rocker_by_channel[j] = comps["rocker-arm"]
-            lever_by_channel[j] = comps["channel-lever"]
             if j >= 1:
                 seed_by_amp[amp_key] = (j, comps)
             continue
@@ -1287,7 +1284,6 @@ async def build(adapter) -> dict[str, str]:
         )
         comps = _copied_chain_instances(adapter, j)
         rocker_by_channel[j] = comps["rocker-arm"]
-        lever_by_channel[j] = comps["channel-lever"]
         ensure_component_distance_mate_flip(
             adapter,
             comps["connecting-rod"],
@@ -1565,18 +1561,14 @@ async def build(adapter) -> dict[str, str]:
             }
         )
 
-    # Insert the fixed measured spring bank in one AddComponents3 call. Returned
-    # names follow spec order, so retain each actual spring/hook instance for
-    # final native contact checks against its actual lever instance.
+    # Insert the fixed measured spring bank in one AddComponents3 call. The
+    # persisted native gate re-enumerates every actual top-level occurrence by
+    # source family and station; no ephemeral builder names carry that proof.
     for spec in grounded_specs:
         spec["ground"] = True
-    inserted_spring_bank = await place_components_batch(
+    await place_components_batch(
         adapter, grounded_specs, label="fixed measured spring bank (grounded)"
     )
-    spring_names_by_channel = {j: inserted_spring_bank[2 * j] for j in range(CHANNELS)}
-    hook_names_by_channel = {
-        j: inserted_spring_bank[2 * j + 1] for j in range(CHANNELS)
-    }
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
     # rod follow + bar amplitude) are FREE -- their drivers were recorded into
@@ -1626,30 +1618,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "channel assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    # The save helper rebuilds, saves, and reopens the reconciled persisted
-    # assembly. Certify each actual saved component pair exactly once.
-    for j in range(CHANNELS):
-        seat = settled_spring_seats.channel_seat(amplitudes[j])
-        lower_distance = assert_native_contact(
-            adapter,
-            spring_names_by_channel[j],
-            hook_names_by_channel[j],
-            maximum_distance_mm=seat.lower_maximum_distance_mm,
-            label=f"channel {j:02d} lower persisted native seat",
-        )
-        upper_distance = assert_native_contact(
-            adapter,
-            spring_names_by_channel[j],
-            lever_by_channel[j],
-            maximum_distance_mm=seat.upper_maximum_distance_mm,
-            label=f"channel {j:02d} upper persisted native seat",
-        )
-        log(
-            f"ch{j:02d} persisted native contacts: lower "
-            f"{lower_distance:.9g} mm, upper {upper_distance:.9g} mm"
-        )
-    return artefacts
+    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

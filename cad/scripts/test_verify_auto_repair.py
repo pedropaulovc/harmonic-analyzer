@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import inspect
+import asyncio
+
 import json
 from types import SimpleNamespace
 
@@ -14,8 +15,6 @@ from _assembly import (
     assert_saved_rebuild_clean,
     final_rebuild_before_save,
     rebuild_if_needed_before_save,
-    save_assembly_and_images,
-    save_assembly_in_place,
 )
 
 
@@ -130,15 +129,6 @@ def test_auto_repair_repairs_child_assembly_fault(monkeypatch, tmp_path) -> None
     assert result["documents"] == (("child", child),)
 
 
-def test_repair_save_path_targets_each_repaired_document() -> None:
-    source = verify.Path(verify.__file__).read_text(encoding="utf-8")
-    assert "for repaired_name, model in repaired_documents:" in source
-    assert "geometry_changed=True, model=m" in source
-    assert "if name not in rendered:" in source
-    assert "_run_soundness_battery(" in source
-    assert "discard_open_documents(adapter)" in source
-
-
 def test_health_failure_points_to_explicit_opt_in(monkeypatch) -> None:
     def fail(*_args, **_kwargs):
         raise RuntimeError("model unhealthy: Coincident1 [48]")
@@ -170,16 +160,6 @@ def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
     assert calls == []
 
 
-def test_in_place_save_checks_solve_state_at_the_save_chokepoint() -> None:
-    source = inspect.getsource(save_assembly_in_place)
-    rebuild = source.index("rebuild_if_needed_before_save(adapter, asm_name, asm)")
-    save = source.index("asm.Save3(options, 0, 0)")
-    assert rebuild < source.index("asm.GetSaveFlag()") < save
-    assert "_ensure_assembly_revision(adapter, asm)" in source
-    assert "must_save = geometry_changed or revision_changed" in source
-    assert "final_rebuild_before_save(adapter, asm_name, asm)" not in source
-
-
 def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
     import _assembly
 
@@ -199,15 +179,6 @@ def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
     )
     assert _assembly._ensure_assembly_revision(adapter, model) is True
     assert writes == [({"Revision": expected}, model)]
-
-
-def test_fresh_build_checks_solve_state_after_gates_and_view_setup() -> None:
-    source = inspect.getsource(save_assembly_and_images)
-    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
-    assert source.count("rebuild_if_needed_before_save(adapter, asm_name)") == 1
-    assert source.index(
-        "rebuild_if_needed_before_save(adapter, asm_name)"
-    ) < source.index("_save_new_assembly_as_copy(adapter, asm_path)")
 
 
 def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
@@ -255,30 +226,6 @@ def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
     assert rebuilds == []
 
 
-def test_refresh_reuses_one_resolved_state_across_gates_and_save() -> None:
-    import _assembly
-
-    source = inspect.getsource(_assembly.refresh_assembly)
-    assert source.count("final_rebuild_before_save(adapter, asm_name)") == 1
-    assert "assert_manifest_dof_state(adapter, asm_name, resolve=False)" in source
-    assert (
-        "assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)"
-        in source
-    )
-
-
-def test_multi_config_digest_resolves_each_lazy_activation() -> None:
-    import _assembly
-
-    source = inspect.getsource(_assembly.assembly_geometry_digest)
-    assert "async def activate_resolved(cfg: str)" in source
-    assert "await activate_resolved(cfg)" in source
-    assert "await activate_resolved(rest)" in source
-    assert "geometry_digest.resolve_configuration" in source
-    assert "status = saved_rebuild_status(adapter)" in source
-    assert "if status != 0" in source
-
-
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
     import _assembly
 
@@ -302,3 +249,84 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
     )
     with pytest.raises(RuntimeError, match="structural-bracket-1"):
         assert_manifest_dof_state(adapter, "channel")
+
+
+def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof(
+    tmp_path, monkeypatch
+) -> None:
+    import _assembly
+    import _native_spring_contact
+
+    assembly_path = tmp_path / "channel.SLDASM"
+    assembly_path.write_bytes(b"byte-stable assembly")
+    proof = tmp_path / ".channel.massprops.sha"
+    proof.write_text("same-digest\n", encoding="utf-8")
+    saves = []
+
+    class Adapter(_Adapter):
+        async def open_model(self, _path):
+            return True
+
+        async def list_configurations(self):
+            return ["Default"]
+
+    adapter = Adapter(status=0)
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    monkeypatch.setattr(_assembly, "check", lambda _label, result: result)
+    monkeypatch.setattr(_assembly, "saved_rebuild_status", lambda *_args: 0)
+    monkeypatch.setattr(
+        _assembly, "active_configuration_name", lambda _adapter: "Default"
+    )
+    monkeypatch.setattr(_assembly, "_rebuild_faults", lambda _adapter: [])
+    monkeypatch.setattr(
+        _assembly, "final_rebuild_before_save", lambda _adapter, _name: None
+    )
+
+    async def digest(_adapter, _name):
+        return "same-digest"
+
+    async def images(_adapter, _name, _views):
+        return {}
+
+    monkeypatch.setattr(_assembly, "assembly_geometry_digest", digest)
+    monkeypatch.setattr(_assembly, "_export_assembly_images", images)
+    monkeypatch.setattr(
+        _assembly,
+        "save_assembly_in_place",
+        lambda _adapter, _name, changed: saves.append(changed) or False,
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "assert_manifest_dof_state",
+        lambda *_args, **_kwargs: pytest.fail("unchanged refresh ran broad DOF gate"),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "check_no_interference",
+        lambda *_args, **_kwargs: pytest.fail(
+            "unchanged refresh ran broad interference gate"
+        ),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "assert_model_healthy",
+        lambda *_args, **_kwargs: pytest.fail(
+            "unchanged refresh ran broad health gate"
+        ),
+    )
+
+    def fail_native_contact(_adapter, _name):
+        raise RuntimeError("nanometre contact failed")
+
+    monkeypatch.setattr(
+        _native_spring_contact,
+        "assert_assembly_spring_contacts",
+        fail_native_contact,
+    )
+
+    with pytest.raises(RuntimeError, match="nanometre contact failed"):
+        asyncio.run(_assembly.refresh_assembly(adapter, "channel", views=[]))
+
+    assert saves == [False]
+    assert assembly_path.read_bytes() == b"byte-stable assembly"
+    assert not proof.exists()

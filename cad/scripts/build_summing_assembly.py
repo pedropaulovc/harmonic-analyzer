@@ -71,7 +71,6 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
-from _native_spring_contact import assert_native_contact
 from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
@@ -450,7 +449,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # Preserve the vendor +X coil frame and required half-turn clocking at the
     # complete fixed measured pose; no seed placement or corrective move follows.
-    counter = await place_component(
+    await place_component(
         adapter,
         "counter-spring",
         [*counter_pose.centre_xy, SUMMING_Z],
@@ -460,7 +459,7 @@ async def build(adapter) -> dict[str, str]:
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
     # the machine centre. Its measured origin Y is inserted directly; the post
     # is held in the top-frame rail-hub bore by its 1/4-20 set screw.
-    gooseneck = await place_component(
+    await place_component(
         adapter,
         "gooseneck",
         [COLUMN_X, gooseneck_origin_y, SUMMING_Z],
@@ -506,27 +505,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "summing assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
-    # Check the actual saved/reopened bodies after final rebuild reconciliation.
-    lower_distance = assert_native_contact(
-        adapter,
-        counter,
-        bh,
-        maximum_distance_mm=counter_seat.lower_maximum_distance_mm,
-        label="counter lower persisted native seat",
-    )
-    upper_distance = assert_native_contact(
-        adapter,
-        gooseneck,
-        counter,
-        maximum_distance_mm=counter_seat.upper_maximum_distance_mm,
-        label="counter upper persisted native seat",
-    )
-    log(
-        f"counter persisted native contacts: lower {lower_distance:.9g} mm, "
-        f"upper {upper_distance:.9g} mm"
-    )
-    return artefacts
+    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

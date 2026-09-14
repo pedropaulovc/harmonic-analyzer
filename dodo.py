@@ -1383,10 +1383,11 @@ def _stl(stem: str) -> Path:
 
 
 def _channel_spring_variants() -> list[Path]:
-    """The dynamically-generated stretched-spring parts the channel assembly inserts
-    for a non-neutral amplitude preset. They are not any task's declared target, so
-    they must be enumerated by glob -- shared by _clean_assembly (remove) and the
-    cache (pack), so a hit restores the components channel.SLDASM references."""
+    """Measured-length spring variants inserted by the channel assembly.
+    Neutral also uses stretch00. These are assembly-owned outputs, not separate
+    task targets; cleanup and cache packing share this inventory so a hit restores
+    every spring component referenced by channel.SLDASM.
+    """
     return sorted((CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT"))
 
 

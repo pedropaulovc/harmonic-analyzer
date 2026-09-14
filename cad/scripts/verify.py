@@ -100,6 +100,7 @@ from _assembly_postbuild import (
     load_dof_manifest,
 )
 from _interference_contracts import allowed_interference_pairs
+from _native_spring_contact import assert_assembly_spring_contacts
 from _common import (  # component iteration helpers (read-only)
     _early_bound,
     _read_member,
@@ -930,6 +931,11 @@ def _run_soundness_battery(
             allowed_pairs=allowed_interference_pairs(name),
         ),
     )
+    if name in ("channel", "summing"):
+        report.gate(
+            f"{name}:spring-native-contacts",
+            lambda: assert_assembly_spring_contacts(adapter, name),
+        )
     if name == CHANNEL_OWNER:
         report.gate(
             f"{name}:channel-independence",
@@ -1062,6 +1068,11 @@ async def _verify_static_one(
             allowed_pairs=allowed_interference_pairs(name),
         ),
     )
+    if name in ("channel", "summing"):
+        report.gate(
+            f"{name}:spring-native-contacts",
+            lambda: assert_assembly_spring_contacts(adapter, name),
+        )
     # component-count REMOVED: every historical failure of that gate was a stale band
     # or a gate bug (never a real regression), so it cost more in false alarms than it
     # ever caught. The expected counts survive as reference data in `_COMPONENT_BAND`.
