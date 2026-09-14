@@ -1,13 +1,7 @@
-"""Create the purchased-reference sheet for the installed 9432K31 spring.
+"""Create the four-view purchased-reference sheet for McMaster-Carr 9432K31.
 
-The supplier-native part stays in its vendor frame.  Its +X spring axis is
-shown horizontally in the Front view, with the +Z hook-eye axes normal to the
-sheet.  The part is ordered by SKU; the view is reference geometry and carries
-no fabrication dimensions.
-
-Run with SolidWorks open::
-
-    uv run python cad\\scripts\\draw_channel_spring_installed.py channel-spring-installed
+The supplier-native part remains in its vendor frame. Catalog and set-matching
+requirements accompany reference geometry, never fabrication dimensions.
 """
 
 from __future__ import annotations
@@ -17,114 +11,17 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
-from _drawing_common import (
-    DrawingOutputs,
-    add_property_linked_note,
-    curate_view_dimensions,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-    set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    stamp_drawing_summary,
-)
+from _common import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import _purchased_title_block
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from _purchased_fastener_drawing import build_purchased_spring_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["channel_spring_installed"]
 PART_STEM = SPEC.artifact_stem
-SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
-OUTPUTS = DrawingOutputs(
-    slddrw=SPEC.outputs["slddrw"],
-    pdf=SPEC.outputs["pdf"],
-    png=SPEC.outputs["png"],
-)
-SLDDRW = OUTPUTS.slddrw
-PDF = OUTPUTS.pdf
-PNG = OUTPUTS.png
-
-SHEET_SCALE = (1.0, 1.0)
-FRONT_CENTER = (0.105, 0.165)
-ISO_CENTER = (0.120, 0.095)
-
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
-TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    if not SOURCE.is_file():
-        raise FileNotFoundError(f"source part is missing: {SOURCE}")
-
-    check("open channel-spring-installed source", await adapter.open_model(str(SOURCE)))
-    properties = read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Stock Name",
-            "Supplier",
-            "Supplier SKUs",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Stock Name",
-            "Supplier",
-            "Supplier SKUs",
-            "Manufacturing Notes",
-            "Isometric View Note",
-        ),
-    )
-    drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
-    )
-    _purchased_title_block(
-        adapter,
-        drawing_model,
-        material=properties["Material Specification"],
-        finish=properties["Finish"],
-        material_property="Material Specification",
-    )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Purchased Channel Spring Reference Sheet",
-            1: "McMaster-Carr 9432K31; order by supplier SKU",
-            2: "Harmonic Analyzer Project",
-            3: "channel spring; 9432K31; purchased reference part",
-            4: "Vendor-frame Front and Isometric views; no fabrication dimensions",
-        },
-    )
-
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.205, 0.245)
-    add_property_linked_note(adapter, "Isometric View Note", 0.075, 0.055)
-    set_hidden_lines_visible(adapter, front)
-
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        pdf_title="Purchased Channel Spring Reference Sheet",
-        scale=SHEET_SCALE,
-        layout=SPEC.layout,
-    )
+    return await build_purchased_spring_drawing(adapter, SPEC)
 
 
 def _parse_args() -> argparse.Namespace:

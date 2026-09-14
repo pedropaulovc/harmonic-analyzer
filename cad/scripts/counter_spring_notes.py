@@ -12,8 +12,6 @@ from counter_spring_spec import (
 )
 
 
-DRAWING_DIMENSIONS: dict[str, set[str]] = {}
-
 DRAWING_NOTES = "\n".join(
     (
         "PURCHASED EXTENSION SPRING - REFERENCE DATA",
@@ -35,5 +33,3 @@ DRAWING_NOTES = "\n".join(
         "  SPRING PRELOADS.",
     )
 )
-
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC REFERENCE VIEW SCALE 1:4"

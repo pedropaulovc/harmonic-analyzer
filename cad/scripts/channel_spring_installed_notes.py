@@ -16,8 +16,6 @@ from channel_spring_installed_spec import (
 from spring_mount_geom import channel_force_n
 
 
-DRAWING_DIMENSIONS: dict[str, set[str]] = {}
-
 _QC_LENGTH_1_MM = 60.0
 _QC_LENGTH_2_MM = 80.0
 _QC_PIN_DIA_MM = 2.0
@@ -58,5 +56,3 @@ DRAWING_NOTES = "\n".join(
         "  COUNTERSPRING AND MAGNIFIER CALIBRATION.",
     )
 )
-
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC REFERENCE VIEW SCALE 1:1"

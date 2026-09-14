@@ -17,7 +17,7 @@ import sys
 from _common import run_build
 from _saved_part_guard import require_saved_drawing_properties
 from _spring import build_spring
-from channel_spring_installed_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from channel_spring_installed_notes import DRAWING_NOTES
 from channel_spring_installed_spec import INSTALLED_LENGTH_MM
 
 
@@ -31,7 +31,6 @@ async def build(adapter) -> dict[str, str]:
         INSTALLED_LENGTH_MM,
         drawing_properties={
             "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     require_saved_drawing_properties(
@@ -45,7 +44,6 @@ async def build(adapter) -> dict[str, str]:
             "Supplier",
             "Supplier SKUs",
             "Manufacturing Notes",
-            "Isometric View Note",
         ),
     )
     return artefacts

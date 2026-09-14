@@ -30,7 +30,7 @@ from _common import (
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _saved_part_guard import require_saved_drawing_properties
 from _stock_fastener import _blank_recipe_references
-from counter_spring_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
+from counter_spring_notes import DRAWING_NOTES
 from counter_spring_spec import INSTALLED_LENGTH_MM
 from diagnostics.diag_build_1330K524 import build_1330K524
 
@@ -66,7 +66,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     await report_mass_properties(adapter)
@@ -82,7 +81,6 @@ async def build(adapter) -> dict[str, str]:
             "Supplier",
             "Supplier SKUs",
             "Manufacturing Notes",
-            "Isometric View Note",
         ),
     )
     return artefacts
