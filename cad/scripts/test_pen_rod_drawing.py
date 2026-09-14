@@ -61,45 +61,35 @@ def test_wire_hole_is_part_owned_and_consumers_derive_from_it() -> None:
     assert source.count("add_edge_dimension(") == 2
 
 
-
-def test_front_datum_edge_resolver_returns_exact_bottom_and_left(monkeypatch) -> None:
-    bottom = object()
-    left = object()
-    rear_bottom = object()
+def test_front_datum_edge_resolver_returns_visible_bottom_and_left(monkeypatch) -> None:
+    hidden_bottom = object()
+    visible_bottom = object()
+    hidden_left = object()
+    visible_left = object()
     wrong_length = object()
+    half_section = drawing.ROD_SECTION / 2000.0
+    section = drawing.ROD_SECTION / 1000.0
+    length = drawing.ROD_LENGTH / 1000.0
     endpoints = {
-        bottom: (
-            -drawing.ROD_SECTION / 2000.0,
+        hidden_bottom: (-half_section, 0.0, 0.0, half_section, 0.0, 0.0),
+        visible_bottom: (
+            -half_section,
             0.0,
+            section,
+            half_section,
             0.0,
-            drawing.ROD_SECTION / 2000.0,
-            0.0,
-            0.0,
+            section,
         ),
-        left: (
-            -drawing.ROD_SECTION / 2000.0,
+        hidden_left: (-half_section, 0.0, 0.0, -half_section, length, 0.0),
+        visible_left: (
+            -half_section,
             0.0,
-            0.0,
-            -drawing.ROD_SECTION / 2000.0,
-            drawing.ROD_LENGTH / 1000.0,
-            0.0,
+            section,
+            -half_section,
+            length,
+            section,
         ),
-        rear_bottom: (
-            -drawing.ROD_SECTION / 2000.0,
-            0.0,
-            drawing.ROD_SECTION / 1000.0,
-            drawing.ROD_SECTION / 2000.0,
-            0.0,
-            drawing.ROD_SECTION / 1000.0,
-        ),
-        wrong_length: (
-            -drawing.ROD_SECTION / 2000.0,
-            0.0,
-            0.0,
-            -drawing.ROD_SECTION / 2000.0,
-            0.120,
-            0.0,
-        ),
+        wrong_length: (-half_section, 0.0, 0.0, -half_section, 0.120, 0.0),
     }
 
     class FakeSpan:
@@ -117,10 +107,11 @@ def test_front_datum_edge_resolver_returns_exact_bottom_and_left(monkeypatch) ->
         drawing,
         "visible_view_entities",
         lambda view, entity_kind, *, label: [
-            rear_bottom,
+            hidden_bottom,
+            visible_left,
             wrong_length,
-            left,
-            bottom,
+            hidden_left,
+            visible_bottom,
         ],
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
@@ -131,12 +122,13 @@ def test_front_datum_edge_resolver_returns_exact_bottom_and_left(monkeypatch) ->
     )
 
     resolver = drawing._visible_front_datum_edges.__wrapped__
-    assert resolver(object(), object()) == (bottom, left)
+    assert resolver(object(), object()) == (visible_bottom, visible_left)
     assert span.attributes == {
-        "edges": 4,
+        "edges": 5,
         "bottom_matches": 2,
-        "left_matches": 1,
+        "left_matches": 2,
     }
+
 
 def test_linked_notes_define_remaining_square_rod_operations() -> None:
     notes = pen_rod_spec.DRAWING_NOTES

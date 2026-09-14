@@ -109,7 +109,11 @@ def _require_dimension_value(display: Any, expected_mm: float, *, label: str) ->
 
 @_telemetry.traced("drawing.pick_pen_rod_datum_edges")
 def _visible_front_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
-    """Return exact bottom and left edges for locating the front-view hole."""
+    """Return the visible bottom and left edges for locating the front-view hole.
+
+    Each datum has coincident edges at z=0 and z=ROD_SECTION. Because the part
+    extrudes +Z from its Front sketch, the canonical maximum is nearest *Front.
+    """
     half_section_m = ROD_SECTION / 2000.0
     section_m = ROD_SECTION / 1000.0
     length_m = ROD_LENGTH / 1000.0
@@ -148,8 +152,8 @@ def _visible_front_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
     if not left:
         raise RuntimeError("pen-rod front view has no exact left edge")
     return (
-        min(bottom, key=lambda candidate: candidate[0])[1],
-        min(left, key=lambda candidate: candidate[0])[1],
+        max(bottom, key=lambda candidate: candidate[0])[1],
+        max(left, key=lambda candidate: candidate[0])[1],
     )
 
 
@@ -219,14 +223,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
     front_far_side = (FRONT_CENTER[0] + 0.0025, FRONT_CENTER[1])
     hole_center_y = front_bottom[1] + WIRE_HOLE_Y / 1000.0
-    hole_bottom = (FRONT_CENTER[0], hole_center_y - _WIRE_HOLE_DIA / 2000.0)
-    hole_side = (FRONT_CENTER[0] + _WIRE_HOLE_DIA / 2000.0, hole_center_y)
+    hole_center = (FRONT_CENTER[0], hole_center_y)
 
     wire_hole_y = add_edge_dimension(
         adapter,
         front,
         p0=front_bottom,
-        p1=hole_bottom,
+        p1=hole_center,
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
         orientation="vertical",
@@ -240,13 +243,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Locate the wire hole ACROSS the square section too: the native callout gives
     # only the drill size, so without this the cross-hole could sit off-centre and
-    # still satisfy every shown dimension. The left-face coordinate is unambiguous
-    # at this scale; the circle is entity-selected and the 2.50 mm value is verified.
+    # still satisfy every shown dimension. Both references are exact model edges,
+    # and the 2.50 mm value is verified.
     wire_hole_x = add_edge_dimension(
         adapter,
         front,
         p0=front_side,
-        p1=hole_side,
+        p1=hole_center,
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
         orientation="horizontal",
