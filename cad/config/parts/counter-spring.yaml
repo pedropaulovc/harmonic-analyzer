@@ -4,7 +4,7 @@ counter-spring:
   supplier: McMaster-Carr
   supplier_skus: [1330K524]
   material: Alloy Steel
-  material_specification: Music-wire steel, McMaster-Carr 1330K524
+  material_specification: Music-wire steel
   finish: as supplied; no additional coating
   quantity: 1
   tolerance_class: machined_block

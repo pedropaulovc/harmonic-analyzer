@@ -1667,7 +1667,7 @@ def verify_spring_base(report: Report) -> None:
                     math.dist(actual, expected) < 1e-6,
                     f"stock channel spring end misses its loaded seat at station {station:g}",
                 )
-            channel._assert_spring_mount(pose, station)
+            channel._assert_spring_mount(pose, station, state="catalog_seed")
             _expect(
                 mounts.channel_force_n(length) <= spec.MAXIMUM_LOAD_N,
                 f"stock channel spring exceeds catalog load at station {station:g}",

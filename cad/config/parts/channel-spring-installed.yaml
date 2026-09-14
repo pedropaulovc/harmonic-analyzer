@@ -4,7 +4,7 @@ channel-spring-installed:
   supplier: McMaster-Carr
   supplier_skus: [9432K31]
   material: Alloy Steel
-  material_specification: Music-wire steel, McMaster-Carr 9432K31
+  material_specification: Music-wire steel
   finish: zinc plated
   quantity: 20
   tolerance_class: machined_block

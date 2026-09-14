@@ -114,7 +114,7 @@ from __future__ import annotations
 from dataclasses import replace
 import math
 import sys
-from typing import Any
+from typing import Any, Literal
 
 import _config
 import _telemetry
@@ -624,8 +624,15 @@ async def _revolute(
     return spin
 
 
-def _assert_spring_mount(pose: spring_mounts.SpringPose, amplitude: float) -> None:
-    """Check the catalog seed envelope and directly threaded lower anchor."""
+def _assert_spring_mount(
+    pose: spring_mounts.SpringPose,
+    amplitude: float,
+    *,
+    state: Literal["catalog_seed", "native_seated"],
+) -> None:
+    """Check real mount clearances; require analytic bore tangency only for seeds."""
+    if state not in ("catalog_seed", "native_seated"):
+        raise ValueError(f"unknown stock spring mount state {state!r}")
     hole_x, hole_y = channel_kinematics.spring_hole_xy(amplitude)
     ux, uy = pose.axis_xy
     wire_r = spring_stock.WIRE_DIA_MM / 2.0
@@ -642,7 +649,7 @@ def _assert_spring_mount(pose: spring_mounts.SpringPose, amplitude: float) -> No
         - wire_r * abs(across_normal)
         - LEVER_TAB_HALF
     )
-    if abs(bore_margin) > 1e-6 or under_lever < 0.1:
+    if (state == "catalog_seed" and abs(bore_margin) > 1e-6) or under_lever < 0.1:
         raise RuntimeError(
             f"stock spring upper hook: loaded bore margin {bore_margin:.6f}, "
             f"under-lever clearance {under_lever:.3f} mm"
@@ -861,7 +868,9 @@ async def build(adapter) -> dict[str, str]:
         % ", ".join(f"{a:.2f}" for a in amplitudes)
     )
 
-    _assert_spring_mount(spring_mounts.CHANNEL_NOMINAL_POSE, 0.0)
+    _assert_spring_mount(
+        spring_mounts.CHANNEL_NOMINAL_POSE, 0.0, state="catalog_seed"
+    )
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
     bar_clearance = state["bar_bottom"] - PIVOT[1]
@@ -1660,7 +1669,10 @@ async def build(adapter) -> dict[str, str]:
         # These remain grounded display components; they are not a force solver.
         spec = spring_specs[j]
         pose = spec["pose"]
-        _assert_spring_mount(spring_mounts.channel_pose(amplitudes[j]), amplitudes[j])
+        _assert_spring_mount(
+            spring_mounts.channel_pose(amplitudes[j]), amplitudes[j], state="catalog_seed"
+        )
+        _assert_spring_mount(pose, amplitudes[j], state="native_seated")
         grounded_specs.append(
             {
                 "part": spec["part"],

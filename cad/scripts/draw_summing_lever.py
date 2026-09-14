@@ -261,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=seed_rim_right,
-        text_xy=(0.248, 0.067),
+        text_xy=(0.248, 0.075),
         label="spring-hole row X",
         orientation="horizontal",
     )

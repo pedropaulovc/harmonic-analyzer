@@ -390,10 +390,8 @@ async def build_purchased_fastener_drawing(
                 adapter, {"Installation Notes": installation_notes}, model=draw
             )
             link = '$PRP:"Installation Notes"'
-            note = _literal_note(adapter, link, 0.018, 0.187)
-            notes.append(
-                (note, link, installation_notes, (0.015, 0.169, 0.225, 0.190))
-            )
+            note = _literal_note(adapter, link, 0.018, 0.189)
+            notes.append((note, link, installation_notes, (0.015, 0.169, 0.225, 0.190)))
 
     with _telemetry.span("drawing.purchased_native_contract"):
         _rebuild(draw, phase="linked notes and final layout")
