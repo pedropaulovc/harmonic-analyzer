@@ -28,7 +28,6 @@ import sys
 
 from _common import _early_bound, _read_member, run_build
 from _fastener_catalog import fastener
-from _drawing_common import set_dimension_precision
 from _stock_fastener import StockComponent, build_stock_fastener
 from _drawing_marks import (
     _named_dimension,
@@ -73,11 +72,14 @@ def _manufacturing_controls(adapter) -> None:
             raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
         if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
             raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
-        set_dimension_precision(
-            adapter,
-            [_read_member(display, "GetAnnotation")],
-            {name: DIMENSION_PRECISION[name]},
-        )
+        display = _early_bound(display, "IDisplayDimension")
+        digits = DIMENSION_PRECISION[name]
+        result = display.SetPrecision3(digits, -1, -1, -1)
+        if (
+            result is None
+            or int(_read_member(display, "GetPrimaryPrecision2")) != digits
+        ):
+            raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
     )
@@ -91,13 +93,19 @@ def _manufacturing_controls(adapter) -> None:
     # swTolGeneral omits the redundant printed band in favour of the title block.
     for feature, name, band in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
-        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)),
+        (
+            "StockDeburrProfile",
+            "ChamferAngle",
+            math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
+        ),
     ):
         _, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = 11  # swTolType_e.swTolGeneral
         if not tolerance.SetValues(-band, band):
-            raise RuntimeError(f"{name}@{feature}: cannot retain general tolerance values")
+            raise RuntimeError(
+                f"{name}@{feature}: cannot retain general tolerance values"
+            )
         if (
             int(tolerance.Type) != 11
             or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
