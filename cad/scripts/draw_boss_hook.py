@@ -120,12 +120,16 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
 
 def _position_parent_detail_letter(adapter: Any, front: Any) -> None:
     """Keep the native parent-circle A above/right of the cut-end extension."""
-    circles = tuple(_read_member(_early_bound(front, "IView"), "GetDetailCircles") or ())
+    circles = tuple(
+        _read_member(_early_bound(front, "IView"), "GetDetailCircles") or ()
+    )
     if len(circles) != 1:
         raise RuntimeError(f"expected one parent detail circle, found {len(circles)}")
     circle = _early_bound(circles[0], "IDetailCircle")
     center = model_point_in_view(
-        adapter, front, (0.0, (TRIM.shank_end_y_mm + 1.0) / 1000, 0.0),
+        adapter,
+        front,
+        (0.0, (TRIM.shank_end_y_mm + 1.0) / 1000, 0.0),
         label="parent detail letter reference",
     )
     target = (center[0] + 0.020, center[1] + 0.014)
@@ -133,7 +137,9 @@ def _position_parent_detail_letter(adapter: Any, front: Any) -> None:
     adapter.currentModel.EditRebuild3()
     actual = tuple(float(value) for value in circle.GetLabelPosition())
     if len(actual) != 2 or math.dist(actual, target) > 1e-8:
-        raise RuntimeError(f"parent detail-circle label position did not persist: {actual}")
+        raise RuntimeError(
+            f"parent detail-circle label position did not persist: {actual}"
+        )
 
 
 def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
@@ -205,6 +211,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, front)
     detail = _end_detail(adapter, front)
     set_hidden_lines_visible(adapter, detail)
+    # Import against the new HLV geometry without waiting for a window repaint.
+    _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     # The detail claims its manufacturing dimensions before the parent import.
     detail_annotations = curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
