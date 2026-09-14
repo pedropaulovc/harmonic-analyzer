@@ -22,8 +22,8 @@ Pipeline (see plan from-other-conversation-current-tender-meteor.md, Part 3):
       couplings already ship in channel.SLDASM and must not be duplicated.
   5. crank MOTOR: a rotary constant-speed motor on the crankshaft axis -- the
      one physical input that runs the device.
-  6. 21 SPRING force elements: 20 channel springs + 1 counter spring, k from
-     k = G*d^4 / (8*D^3*n), G(steel) = 79.3 GPa, geometry per part script.
+  6. 21 SPRING force elements: 20 channel springs + 1 counter spring, using
+     purchased-spring catalogue rates unless explicitly overridden.
   7. the TWO WIRES as motion couplings: WIRE 1 vertical-rod/fixture -> wheel hub
      (Ø20), WIRE 2 wheel rim (Ø100) -> pen-rod, 5x amplification.
   8. gravity (-Y); Calculate(); export an .mp4; sample the pen-marker tip over a
@@ -41,6 +41,12 @@ solve can be brought up incrementally:
     kinematic  -> + cam concentrics + crank motor + Calculate + pen sample
     springs    -> + 21 spring force elements
     full       -> + the two wires + gravity + video + harmonic-curve compare
+
+SPRING_KCH / SPRING_KCT are optional positive stiffness overrides in N/m.
+Unset, zero or negative uses the catalogue rate (175.126835 / 311.725767 N/m).
+This is a qualitative motion study: free_length=None starts at zero installed
+preload and channel springs share a lumped-Z summing endpoint. It is NOT proof
+of static spring balance or tolerance performance.
 """
 
 from __future__ import annotations
@@ -78,12 +84,12 @@ ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 # +ARM_THICKNESS/2 = 1.25). A point on that top arc edge lets create_reference_
 # point(arc_center) recover the (0,816) centre on the SHARED rocker part.
 ROCKER_ARC_CENTER_LOCAL = [0.0, 816.0, 0.0]  # R800 arc centre (the foot's circle)
-ARC_R = 800.0                                # rocker R800 top-edge radius
+ARC_R = 800.0  # rocker R800 top-edge radius
 FOOT_COEFF_MM = 60.0  # uniform foot offset along the arc = the amplitude coeff.
 # Proven on the minimal rig: lever swings ~10 deg at 60 mm, ~0.7 deg (dead) near
 # the neutral ~0. A solid uniform value makes every channel transmit; per-channel
 # variation (the harmonic synthesis) layers on later via coeff_fn.
-ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]         # pivot bore = rocker Axis1
+ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]  # pivot bore = rocker Axis1
 # Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
 # top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
@@ -101,42 +107,39 @@ MOVING_SUBS = (
 )  # frame-1 stays fixed
 FRAME_SUB = "frame-1"
 
-CRANK_RPM = 20.0          # gentle: 1 rev / 3 s at 20 RPM
-DURATION_S = 6.0          # two crank revolutions
+CRANK_RPM = 20.0  # gentle: 1 rev / 3 s at 20 RPM
+DURATION_S = 6.0  # two crank revolutions
 N_CHANNELS = _config.active_count()  # physically-built channels (TEMP 3; see _config)
-ROCKER_MIN_DEG = 1.0      # dead-output gate: largest rocker swing must exceed this
-PEN_MIN_MM = 0.5          # dead-output gate: pen-tip travel must exceed this
+ROCKER_MIN_DEG = 1.0  # dead-output gate: largest rocker swing must exceed this
+PEN_MIN_MM = 0.5  # dead-output gate: pen-tip travel must exceed this
 
 # swMateType_e
 COINCIDENT, CONCENTRIC, DISTANCE, ANGLE = 0, 1, 5, 6
-_MATE_NAME = {0: "COINCIDENT", 1: "CONCENTRIC", 4: "TANGENT", 5: "DISTANCE",
-              6: "ANGLE", 9: "CAMFOLLOWER", 10: "GEAR", 13: "RACKPINION",
-              16: "LOCK"}
+_MATE_NAME = {
+    0: "COINCIDENT",
+    1: "CONCENTRIC",
+    4: "TANGENT",
+    5: "DISTANCE",
+    6: "ANGLE",
+    9: "CAMFOLLOWER",
+    10: "GEAR",
+    13: "RACKPINION",
+    16: "LOCK",
+}
 
 RIGID, FLEXIBLE = "rigid", "flexible"
 
-# Spring stiffness k = G*d^4 / (8*D^3*n); steel shear modulus.
-G_STEEL = 79.3e9  # Pa
-# channel spring: wire d 1.0, OD 6.5 -> mean D 5.5, active coils n 28, free 32mm
-CH_SPRING = dict(d=1.0, D=5.5, n=28.0, free_mm=32.0)
-# counter spring: wire d 1.8, OD 12.5 -> mean D 10.7, n 165, free body 315mm
-CT_SPRING = dict(d=1.8, D=10.7, n=165.0, free_mm=315.0)
+# Purchased-spring catalogue rates (N/mm -> N/m). Supplier display-coil
+# turn counts are not physical active-coil counts and cannot define stiffness.
+STOCK_KCH = (
+    float(_config.parts("channel-spring-installed")["spring_rate_n_per_mm"]) * 1000.0
+)
+STOCK_KCT = float(_config.parts("counter-spring")["spring_rate_n_per_mm"]) * 1000.0
 
-# Basic Motion spring-rate OVERRIDE (N/m). The geometric steel rates are
-# k_ch ~ 2130 N/m, k_ct ~ 514 N/m -- the isolated POC (poc_spring_adder.py)
-# proved k~2000 N/m ABORTS the fixed-step solve (omega too high), while k in the
-# low-N/m..tens-of-N/m band tracks the moving-anchor sum cleanly. The full-model
-# levers are heavier than the POC's 1.6 g bushing so they tolerate a higher rate,
-# but 2 kN/m is over the line -- default to a solver-safe band and sweep via env.
-# 0 or negative => fall back to the geometric helical rate.
-SPRING_KCH = float(os.environ.get("SPRING_KCH", "50.0"))   # N/m, channel springs
-SPRING_KCT = float(os.environ.get("SPRING_KCT", "25.0"))   # N/m, counter spring
-
-
-def _k_helical(d_mm: float, D_mm: float, n: float) -> float:
-    """Linear rate (N/m) of a helical compression/extension spring."""
-    d, D = d_mm / 1000.0, D_mm / 1000.0
-    return G_STEEL * d**4 / (8.0 * D**3 * n)
+# Only explicit positive environment overrides replace the catalogue rates.
+# Unset, zero or negative => catalogue rate (the normal stock-spring study).
+SPRING_KCH = float(os.environ.get("SPRING_KCH", "0.0"))  # N/m, channel springs
+SPRING_KCT = float(os.environ.get("SPRING_KCT", "0.0"))  # N/m, counter spring
 
 
 # ---- nested-component helpers (GetComponentByName fails on 'sub/part') -------
@@ -150,16 +153,24 @@ def _k_helical(d_mm: float, D_mm: float, n: float) -> float:
 def _components(adapter, model=None, toplevel=False):
     """``[(comp, Name2), ...]`` for every component; logs the walk + its cost."""
     import time as _t
+
     model = model or adapter.currentModel
-    model = _early_bound(model, "IAssemblyDoc")  # IAssemblyDoc for GetComponents (same dispatch)
+    model = _early_bound(
+        model, "IAssemblyDoc"
+    )  # IAssemblyDoc for GetComponents (same dispatch)
     t0 = _t.perf_counter()
-    raw = adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None) or []
+    raw = (
+        adapter._attempt(lambda: model.GetComponents(bool(toplevel)), default=None)
+        or []
+    )
     out = []
     for c in raw:
         # No flag: Name2 is a property read (issue #87).
         out.append((c, str(_read_member(c, "Name2"))))
     scope = "top-level" if toplevel else "full-tree"
-    log(f"    [enumerated {len(out)} components, {scope}, {_t.perf_counter() - t0:.1f}s]")
+    log(
+        f"    [enumerated {len(out)} components, {scope}, {_t.perf_counter() - t0:.1f}s]"
+    )
     return out
 
 
@@ -206,7 +217,7 @@ def _sub_model(adapter, sub_name):
     comp, _ = _find_one(adapter, sub_name, toplevel=True)
     if comp is None:
         raise RuntimeError(f"sub component not found: {sub_name}")
-    model = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+    model = _read_member(comp, "GetModelDoc2")
     if model is None:
         raise RuntimeError(f"GetModelDoc2 returned None for {sub_name}")
     return comp, model
@@ -271,7 +282,9 @@ def _iter_mates(adapter, model, read_values=True, progress_every=0):
                     break
                 _flag(sub, "IFeature")
                 name = str(_read_member(sub, "Name"))
-                mate = adapter._attempt(lambda s=sub: s.GetSpecificFeature2(), default=None)
+                mate = adapter._attempt(
+                    lambda s=sub: s.GetSpecificFeature2(), default=None
+                )
                 if mate is not None:
                     _flag(mate, "IMate2")
                     mtype = int(adapter._attempt(lambda m=mate: m.Type, default=-1))
@@ -307,28 +320,42 @@ def _lone_real(parts, root):
 
 
 def _family(part_name):
-    """"rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
+    """ "rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
     return part_name.rsplit("-", 1)[0]
 
 
 # ---- stage 2: float + ground + flex -----------------------------------------
 async def _flex_subs(adapter):
     from solidworks_mcp.adapters.base import (
-        ComponentRefParameters, SetComponentSolvingParameters,
+        ComponentRefParameters,
+        SetComponentSolvingParameters,
     )
+
     asm = adapter.currentModel
     for sub in MOVING_SUBS:
-        check(f"float {sub}", await adapter.float_component(ComponentRefParameters(name=sub)))
+        check(
+            f"float {sub}",
+            await adapter.float_component(ComponentRefParameters(name=sub)),
+        )
         for plane in ("Front Plane", "Top Plane", "Right Plane"):
             await coincident_mate(
-                adapter, named_ref(f"{plane}@{sub}", "PLANE"),
-                named_ref(plane, "PLANE"), label=f"ground {sub} {plane}")
+                adapter,
+                named_ref(f"{plane}@{sub}", "PLANE"),
+                named_ref(plane, "PLANE"),
+                label=f"ground {sub} {plane}",
+            )
         adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
         log(f"  set {sub} FLEXIBLE -- blocking solve, expect ~50-200s ...")
-        check(f"flexible {sub}", await adapter.set_component_solving(
-            SetComponentSolvingParameters(name=sub, solving=FLEXIBLE)))
-        log(f"  verify {sub} Solving (top-level walk; first tree access may "
-            f"trigger the deferred flex solve) ...")
+        check(
+            f"flexible {sub}",
+            await adapter.set_component_solving(
+                SetComponentSolvingParameters(name=sub, solving=FLEXIBLE)
+            ),
+        )
+        log(
+            f"  verify {sub} Solving (top-level walk; first tree access may "
+            f"trigger the deferred flex solve) ..."
+        )
         comp, _ = _find_one(adapter, sub, toplevel=True)
         solving = int(adapter._attempt(lambda c=comp: c.Solving, default=-1))
         log(f"  {sub} Solving={solving} (1=flexible)")
@@ -377,8 +404,9 @@ def _load_suppress_cache():
 
 def _save_suppress_cache(names):
     SUPPRESS_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    SUPPRESS_CACHE.write_text(json.dumps(
-        {"mtime": _channel_mtime(), "names": list(names)}, indent=0))
+    SUPPRESS_CACHE.write_text(
+        json.dumps({"mtime": _channel_mtime(), "names": list(names)}, indent=0)
+    )
     log(f"  cached {len(names)} channel suppress names -> {SUPPRESS_CACHE.name}")
 
 
@@ -392,7 +420,8 @@ async def _suppress_named(adapter, sub_name, families, mtypes, label):
     targets = []
     log(f"  {label}: scanning {sub_name} mates ...")
     for _f, _m, name, mtype, parts, val in _iter_mates(
-            adapter, model, read_values=False, progress_every=20):
+        adapter, model, read_values=False, progress_every=20
+    ):
         if mtype not in mtypes:
             continue
         lone = _lone_real(parts, root)
@@ -406,6 +435,7 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     """Suppress single-real-part DISTANCE mates whose value recurs across
     instances (pose/spin), keeping per-instance-unique values (axial holds)."""
     from collections import Counter
+
     _, model = _sub_model(adapter, sub_name)
     root = _root_title(sub_name)
     items = []  # (mate_name, family, rounded_value)
@@ -413,7 +443,8 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     # Walk WITHOUT values (the slow DisplayDimension2 round-trip); read the value
     # lazily only for the family-matching single-real-part DISTANCE candidates.
     for _f, mate, name, mtype, parts, _val in _iter_mates(
-            adapter, model, read_values=False, progress_every=20):
+        adapter, model, read_values=False, progress_every=20
+    ):
         if mtype != DISTANCE:
             continue
         lone = _lone_real(parts, root)
@@ -426,7 +457,9 @@ async def _suppress_recurring(adapter, sub_name, families, label):
     counts = Counter((fam, v) for _n, fam, v in items)
     targets = [n for n, fam, v in items if counts[(fam, v)] >= SUPPRESS_RECUR]
     kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
-    log(f"  {label}: pose buckets {sorted({(f, v) for _n, f, v in items if counts[(f, v)] >= SUPPRESS_RECUR})}")
+    log(
+        f"  {label}: pose buckets {sorted({(f, v) for _n, f, v in items if counts[(f, v)] >= SUPPRESS_RECUR})}"
+    )
     log(f"  {label}: keeping {len(kept)} per-instance axial values")
     await _do_suppress(adapter, sub_name, targets, label)
     return targets
@@ -462,11 +495,14 @@ async def _suppress_channel(adapter):
     Returns the suppressed mate names.
     """
     from collections import Counter
+
     sub_name = "channel-1"
     cached = _load_suppress_cache()
     if cached is not None:
-        log(f"  channel drivers: CACHED classification ({len(cached)} mates) -- "
-            f"skipping the ~500 s walk (MOTION_NOCACHE=1 to force a re-walk)")
+        log(
+            f"  channel drivers: CACHED classification ({len(cached)} mates) -- "
+            f"skipping the ~500 s walk (MOTION_NOCACHE=1 to force a re-walk)"
+        )
         await _do_suppress(adapter, sub_name, cached, "channel drivers (cached)")
         return cached
     _, model = _sub_model(adapter, sub_name)
@@ -475,7 +511,8 @@ async def _suppress_channel(adapter):
     recur = []  # (name, family, rounded_mm) for spin-vs-axial bucketing
     log("  classify channel-1 mates (single pass) ...")
     for _f, mate, name, mtype, parts, _val in _iter_mates(
-            adapter, model, read_values=False, progress_every=40):
+        adapter, model, read_values=False, progress_every=40
+    ):
         reals = _real_parts(parts, root)
         lone = reals[0] if len(reals) == 1 else None
         lone_fam = _family(lone) if lone else None
@@ -484,7 +521,10 @@ async def _suppress_channel(adapter):
         if lone_fam == "connecting-rod" and mtype in (DISTANCE, ANGLE):
             targets.append(name)  # free the rod fully
             continue
-        if lone_fam in ("rocker-arm", "channel-lever", "amplitude-bar") and mtype == DISTANCE:
+        if (
+            lone_fam in ("rocker-arm", "channel-lever", "amplitude-bar")
+            and mtype == DISTANCE
+        ):
             val = _mate_value(adapter, mate, mtype)  # lazy: candidates only
             if val is not None:
                 recur.append((name, lone_fam, round(val * 1000.0, 1)))
@@ -492,7 +532,9 @@ async def _suppress_channel(adapter):
     spin = [n for n, fam, v in recur if counts[(fam, v)] >= SUPPRESS_RECUR]
     kept = [(fam, v) for (fam, v), c in counts.items() if c < SUPPRESS_RECUR]
     targets.extend(spin)
-    log(f"  channel pose buckets {sorted({(f, v) for _n, f, v in recur if counts[(f, v)] >= SUPPRESS_RECUR})}")
+    log(
+        f"  channel pose buckets {sorted({(f, v) for _n, f, v in recur if counts[(f, v)] >= SUPPRESS_RECUR})}"
+    )
     log(f"  channel keeping {len(kept)} per-instance axial holds")
     _save_suppress_cache(targets)
     await _do_suppress(adapter, sub_name, targets, "channel drivers (single pass)")
@@ -505,11 +547,15 @@ async def _do_suppress(adapter, sub_name, targets, label):
     # itself (GetModelDoc2). Switching currentModel to the sub doc here makes that
     # component lookup fail ("Component not found: 'drive-train-1'").
     from solidworks_mcp.adapters.base import SuppressMateParameters
+
     log(f"  {label}: suppressing {len(targets)} mates in {sub_name}")
     for name in targets:
-        check(f"suppress {name}@{sub_name}",
-              await adapter.suppress_mate(SuppressMateParameters(
-                  name=name, suppress=True, component=sub_name)))
+        check(
+            f"suppress {name}@{sub_name}",
+            await adapter.suppress_mate(
+                SuppressMateParameters(name=name, suppress=True, component=sub_name)
+            ),
+        )
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
 
@@ -525,8 +571,10 @@ def _dump_sub_mates(adapter, sub_name):
             vstr = f" val={val * 1000.0:.2f}mm"
         elif val is not None and mtype == ANGLE:
             vstr = f" val={math.degrees(val):.2f}deg"
-        log(f"    {name:16s} {_MATE_NAME.get(mtype, mtype)!s:11s} "
-            f"lone={lone} parts={_real_parts(parts, root)}{vstr}")
+        log(
+            f"    {name:16s} {_MATE_NAME.get(mtype, mtype)!s:11s} "
+            f"lone={lone} parts={_real_parts(parts, root)}{vstr}"
+        )
 
 
 # The ONLY recorded free-DOF drivers the operation study replays: the SETUP
@@ -569,20 +617,24 @@ async def _replay_setup_drives(adapter):
             raise RuntimeError(
                 f"{stem}: replay allowlist {keys} not fully recorded in the "
                 f"DOF manifest (found {found}) -- stale artefact or renamed "
-                f"free_dof_key; rebuild the assembly")
+                f"free_dof_key; rebuild the assembly"
+            )
         _, model = _sub_model(adapter, sub)
         sub_title = str(_read_member(model, "GetTitle"))
         adapter._attempt(
-            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, 0),
-            default=None)
+            lambda t=sub_title: adapter.swApp.ActivateDoc3(t, False, 2, 0), default=None
+        )
         adapter.currentModel = adapter._attempt(
-            lambda: adapter.swApp.ActiveDoc, default=model)
-        log(f"{sub}: replaying {len(specs)} recorded setup drive spec(s) "
-            f"(engaged): {[s['key'] for s in specs]}")
+            lambda: adapter.swApp.ActiveDoc, default=model
+        )
+        log(
+            f"{sub}: replaying {len(specs)} recorded setup drive spec(s) "
+            f"(engaged): {[s['key'] for s in specs]}"
+        )
         await author_dof_drives(adapter, specs)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0),
-        default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None
+    )
     adapter.currentModel = top
 
 
@@ -595,8 +647,8 @@ async def _suppress_drivers(adapter, level, dump=False):
     # drive-train: the crank-angle driver (crank-handle <-> root) -- unique, so
     # matched by name. Frees the whole gear train to spin from the motor.
     await _suppress_named(
-        adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE),
-        "crank driver")
+        adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE), "crank driver"
+    )
 
     # channel: free the cam-follower chain. THREE families, three rules:
     #
@@ -707,15 +759,19 @@ async def _add_rod_rocker_revolutes(adapter):
         rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
         rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
         n = min(len(rods), len(rockers))
-        log(f"  in-sub rod<->rocker: {len(rods)} rods, {len(rockers)} rockers "
-            f"-> {n} channels")
+        log(
+            f"  in-sub rod<->rocker: {len(rods)} rods, {len(rockers)} rockers "
+            f"-> {n} channels"
+        )
         for i in range(n):
             rod_n, rk_n = rods[i][1], rockers[i][1]
             try:
                 res = await coincident_mate(
-                    adapter, _entity_ref(rod_n, "Axis2", "AXIS"),
+                    adapter,
+                    _entity_ref(rod_n, "Axis2", "AXIS"),
                     _entity_ref(rk_n, "Axis2", "AXIS"),
-                    label=f"ch{i:02d} rod pin <-> rocker bore (in channel)")
+                    label=f"ch{i:02d} rod pin <-> rocker bore (in channel)",
+                )
                 ok += 1 if res.get("name") else 0
             except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
                 log(f"    ch{i:02d} in-sub rod->rocker FAILED: {exc}")
@@ -741,23 +797,34 @@ async def _add_ring_centre_point(adapter):
     -> ActivateDoc3 round-trip. Returns the point feature name (e.g. "Point2").
     """
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
+
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     rod_comp, _ = _find_one(adapter, "connecting-rod-1")
     if rod_comp is None:
         raise RuntimeError("connecting-rod-1 not found for ring-centre point")
-    part = adapter._attempt(lambda: rod_comp.GetModelDoc2(), default=None)
+    part = _read_member(rod_comp, "GetModelDoc2")
     if part is None:
         raise RuntimeError("connecting-rod part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
-    pt = check("create ring-centre RefPoint", await adapter.create_reference_point(
-        CreateReferencePointParameters(mode="arc_center", edge_point=ROD_BORE_EDGE_MM)))
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None
+    )
+    adapter.currentModel = adapter._attempt(
+        lambda: adapter.swApp.ActiveDoc, default=part
+    )
+    pt = check(
+        "create ring-centre RefPoint",
+        await adapter.create_reference_point(
+            CreateReferencePointParameters(
+                mode="arc_center", edge_point=ROD_BORE_EDGE_MM
+            )
+        ),
+    )
     name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None
+    )
     adapter.currentModel = top
     if not name:
         raise RuntimeError("ring-centre RefPoint creation returned no name")
@@ -780,6 +847,7 @@ async def _add_cam_couplings(adapter):
     (artifact-A) pivot revolute.
     """
     from solidworks_mcp.adapters.base import RotateComponentParameters
+
     point_name = await _add_ring_centre_point(adapter)
     log("  enumerating components for cam pairing (single full-tree walk) ...")
     comps = _components(adapter)
@@ -802,16 +870,24 @@ async def _add_cam_couplings(adapter):
         # holds. Read the gear's spin axis from its world transform (local Z ->
         # cols 6..8, origin -> cols 9..11 in metres).
         a = _comp_xform(adapter, gear_comp)
-        await adapter.rotate_component(RotateComponentParameters(
-            name=gear_n, angle=20.0, axis_vector=[a[6], a[7], a[8]],
-            axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0], mode="exact"))
+        await adapter.rotate_component(
+            RotateComponentParameters(
+                name=gear_n,
+                angle=20.0,
+                axis_vector=[a[6], a[7], a[8]],
+                axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0],
+                mode="exact",
+            )
+        )
         if i == 0:
             log(f"    ch00 names: gear={gear_n!r} rod={rod_n!r} point={point_name!r}")
         try:
             cam = await coincident_mate(
-                adapter, _entity_ref(rod_n, point_name, "POINT"),
+                adapter,
+                _entity_ref(rod_n, point_name, "POINT"),
                 _entity_ref(gear_n, "Axis3", "AXIS"),
-                label=f"ch{i:02d} cam lobe <-> rod ring point")
+                label=f"ch{i:02d} cam lobe <-> rod ring point",
+            )
             cam_ok += 1 if cam.get("name") else 0
         except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
             log(f"    ch{i:02d} cam coupling FAILED: {exc}")
@@ -852,7 +928,7 @@ async def _add_cam_couplings(adapter):
 # little lever travel until the bars are repositioned to real coefficients (F6c).
 def _arc_y(x):
     """Part-local Y of the R800 foot arc at offset x from the pivot centre."""
-    return ROCKER_ARC_CENTER_LOCAL[1] - math.sqrt(ARC_R ** 2 - x * x)
+    return ROCKER_ARC_CENTER_LOCAL[1] - math.sqrt(ARC_R**2 - x * x)
 
 
 async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
@@ -866,29 +942,51 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
     instances' handedness doesn't matter). Returns the new axis name.
     """
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
+
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    part = adapter._attempt(lambda: rk_comp.GetModelDoc2(), default=None)
+    part = _read_member(rk_comp, "GetModelDoc2")
     if part is None:
         raise RuntimeError("rocker-arm part doc unresolved for foot axis")
     part_title = str(_read_member(part, "GetTitle"))
     y_off = _arc_y(coeff)
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None
+    )
+    adapter.currentModel = adapter._attempt(
+        lambda: adapter.swApp.ActiveDoc, default=part
+    )
     try:
-        px = ("Right Plane" if abs(coeff) <= 1e-9 else
-              check("foot-pin plane x", await adapter.create_plane(CreatePlaneParameters(
-                  mode="offset", base_plane="Right Plane",
-                  offset=coeff))).name)
-        py = check("foot-pin plane y", await adapter.create_plane(CreatePlaneParameters(
-            mode="offset", base_plane="Top Plane",
-            offset=y_off))).name
-        ax = check("foot-pin axis", await adapter.create_axis(CreateAxisParameters(
-            mode="two_planes", planes=[px, py]))).name
+        px = (
+            "Right Plane"
+            if abs(coeff) <= 1e-9
+            else check(
+                "foot-pin plane x",
+                await adapter.create_plane(
+                    CreatePlaneParameters(
+                        mode="offset", base_plane="Right Plane", offset=coeff
+                    )
+                ),
+            ).name
+        )
+        py = check(
+            "foot-pin plane y",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Top Plane", offset=y_off
+                )
+            ),
+        ).name
+        ax = check(
+            "foot-pin axis",
+            await adapter.create_axis(
+                CreateAxisParameters(mode="two_planes", planes=[px, py])
+            ),
+        ).name
     finally:
         adapter._attempt(
-            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
+            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None
+        )
         adapter.currentModel = top
     log(f"  rocker foot-pin axis = {ax!r} at part-local ({coeff:.2f}, {y_off:.2f})")
     return ax
@@ -944,9 +1042,11 @@ async def _add_foot_axis_joints(adapter, coeff_fn=None):
             ax = axis_by_coeff[round(coeffs[i], 3)]
             try:
                 res = await coincident_mate(
-                    adapter, _entity_ref(bar_n, "Axis2", "AXIS"),
+                    adapter,
+                    _entity_ref(bar_n, "Axis2", "AXIS"),
                     _entity_ref(rk_n, ax, "AXIS"),
-                    label=f"ch{i:02d} foot <-> rocker arc axis (coeff {coeffs[i]:.0f})")
+                    label=f"ch{i:02d} foot <-> rocker arc axis (coeff {coeffs[i]:.0f})",
+                )
                 ok += 1 if res.get("name") else 0
             except Exception as exc:  # noqa: BLE001 -- first-run diagnostics
                 log(f"    ch{i:02d} foot-axis FAILED: {exc}")
@@ -960,6 +1060,7 @@ async def _add_foot_axis_joints(adapter, coeff_fn=None):
 # ---- stage 5: crank motor ---------------------------------------------------
 async def _add_crank_motor(adapter):
     from solidworks_mcp.adapters.base import MotionMotorParameters
+
     cs_comp, cs_name = _find_one(adapter, "crankshaft")
     if cs_comp is None:
         raise RuntimeError("crankshaft component not found")
@@ -969,8 +1070,14 @@ async def _add_crank_motor(adapter):
     # flexible drive-train sub).
     axis = _entity_ref(cs_name, "Axis1", "AXIS")
     log(f"  crank motor on {axis.name}@{axis.component} ({CRANK_RPM} RPM) ...")
-    res = check("add_motor crank", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name="")))
+    res = check(
+        "add_motor crank",
+        await adapter.add_motor(
+            MotionMotorParameters(
+                motor_type="rotary", entity=axis, speed=CRANK_RPM, study_name=""
+            )
+        ),
+    )
     return res
 
 
@@ -990,12 +1097,15 @@ def _comp_xform(adapter, comp):
 
 def _world(a, local_mm):
     r, t = a[0:9], a[9:12]
-    return [sum(local_mm[i] * r[i * 3 + k] for i in range(3)) + t[k] * 1000.0
-            for k in range(3)]
+    return [
+        sum(local_mm[i] * r[i * 3 + k] for i in range(3)) + t[k] * 1000.0
+        for k in range(3)
+    ]
 
 
 async def _sample_pen(adapter, study_name=""):
     from solidworks_mcp.adapters.base import MotionTimeParameters
+
     samples = []
     steps = 24
     marker, _ = _find_one(adapter, "pen-marker")  # enumerate ONCE, not per step
@@ -1004,8 +1114,12 @@ async def _sample_pen(adapter, study_name=""):
         return samples
     for s in range(steps + 1):
         t = DURATION_S * s / steps
-        check(f"set_time {t:.2f}", await adapter.set_motion_time(
-            MotionTimeParameters(time=t, study_name=study_name)))
+        check(
+            f"set_time {t:.2f}",
+            await adapter.set_motion_time(
+                MotionTimeParameters(time=t, study_name=study_name)
+            ),
+        )
         a = _comp_xform(adapter, marker)
         if a is None:
             log(f"    t={t:5.2f}s pen tip=n/a (transient transform read)")
@@ -1025,21 +1139,25 @@ async def _sample_pen(adapter, study_name=""):
                 f"DEAD OUTPUT: pen-tip travelled only {span:.3f} mm "
                 f"(< {PEN_MIN_MM}) over the run -- the summing->wheel->pen chain "
                 f"never moved. The solve completed but the output is dead; check "
-                f"the spring force elements and the compliant-chain mates.")
+                f"the spring force elements and the compliant-chain mates."
+            )
     return samples
 
 
 def _rot_angle(a0, a1):
     """Relative rotation magnitude (deg) between two component transforms."""
+
     def cols(a):
         return ((a[0], a[1], a[2]), (a[3], a[4], a[5]), (a[6], a[7], a[8]))
+
     c0, c1 = cols(a0), cols(a1)
     tr = sum(c1[k][i] * c0[k][i] for k in range(3) for i in range(3))
     return math.degrees(math.acos(max(-1.0, min(1.0, (tr - 1.0) / 2.0))))
 
 
-def assert_motion_progressed(samples, duration, label="driven",
-                             min_frac=0.85, stall_frac=0.25):
+def assert_motion_progressed(
+    samples, duration, label="driven", min_frac=0.85, stall_frac=0.25
+):
     """Fail fast on a LOCKED / corrupted Basic Motion solve.
 
     Basic Motion exposes NO solver-status API. The red timeline is internal UI
@@ -1064,9 +1182,11 @@ def assert_motion_progressed(samples, duration, label="driven",
     run. Raises RuntimeError naming the stall time if the member stops tracking
     the motor before ``min_frac`` of ``duration``.
     """
-    steps = [(t1, _rot_angle(a0, a1))
-             for (t0, a0), (t1, a1) in zip(samples, samples[1:])
-             if a0 is not None and a1 is not None]
+    steps = [
+        (t1, _rot_angle(a0, a1))
+        for (t0, a0), (t1, a1) in zip(samples, samples[1:])
+        if a0 is not None and a1 is not None
+    ]
     if not steps:
         log(f"  solve-lock check: '{label}' no valid pose samples (skipped)")
         return
@@ -1077,9 +1197,10 @@ def assert_motion_progressed(samples, duration, label="driven",
             f"MOTION SOLVE LOCKED: '{label}' never moved -- the motor-driven "
             f"member is frozen for the entire run. The solve produced no motion "
             f"(corrupted study / red timeline); Basic Motion has no solver-status "
-            f"API so this pose check is the only signal.")
+            f"API so this pose check is the only signal."
+        )
 
-    typical = moving[len(moving) // 2]          # median healthy step (deg)
+    typical = moving[len(moving) // 2]  # median healthy step (deg)
     floor = stall_frac * typical
     last_good = 0.0
     for t1, d in steps:
@@ -1093,9 +1214,12 @@ def assert_motion_progressed(samples, duration, label="driven",
             f"~0. A stalled tail = an aborted Basic Motion solve (corrupted study "
             f"/ red timeline); Basic Motion exposes no solver-status API, so this "
             f"pose-rate check is the signal. Likely an over-constrained closed "
-            f"loop; use the coincident-axis foot, not distance mates.")
-    log(f"  solve-lock check: '{label}' tracked motor to t={last_good:.2f}s/"
-        f"{duration:.2f}s (typical {typical:.3f} deg/step, OK)")
+            f"loop; use the coincident-axis foot, not distance mates."
+        )
+    log(
+        f"  solve-lock check: '{label}' tracked motor to t={last_good:.2f}s/"
+        f"{duration:.2f}s (typical {typical:.3f} deg/step, OK)"
+    )
 
 
 async def _sample_rockers(adapter, study_name="", n_probe=3):
@@ -1106,6 +1230,7 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     constraint failure); crank span > 0 with rockers 0 => the cam-follower chain
     failed to transmit under the dynamic solve."""
     from solidworks_mcp.adapters.base import MotionTimeParameters
+
     probes = _by_z_rank(adapter, "rocker-arm")[:n_probe]
     crank, _ = _find_one(adapter, "crankshaft-1")
     if crank is not None:
@@ -1115,8 +1240,12 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     crank_samples = []
     for s in range(13):
         t = DURATION_S * s / 12.0
-        check(f"set_time {t:.2f}", await adapter.set_motion_time(
-            MotionTimeParameters(time=t, study_name=study_name)))
+        check(
+            f"set_time {t:.2f}",
+            await adapter.set_motion_time(
+                MotionTimeParameters(time=t, study_name=study_name)
+            ),
+        )
         row = []
         for comp, name in probes:
             a = _comp_xform(adapter, comp)
@@ -1130,8 +1259,10 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
             spans[name] = max(spans.get(name, 0.0), ang)
             row.append(f"{ang:5.1f}")
         log(f"    t={t:4.2f}s rock(deg)=[{', '.join(row)}] (last=crank)")
-    log(f"  rock spans: {dict((k, round(v, 1)) for k, v in spans.items())} "
-        f"(crank 0 => motor didn't drive; rockers 0 w/ crank>0 => cam chain broke)")
+    log(
+        f"  rock spans: {dict((k, round(v, 1)) for k, v in spans.items())} "
+        f"(crank 0 => motor didn't drive; rockers 0 w/ crank>0 => cam chain broke)"
+    )
 
     # Two complementary fail-fast gates (Basic Motion has no solver-status API):
     #  1. solve-lock: the motor-driven crank must track its constant rate the
@@ -1141,15 +1272,17 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     #     crank alone misses that -- gate the rockers too.
     if crank is not None:
         assert_motion_progressed(crank_samples, DURATION_S, "crankshaft")
-        rocker_max = max((v for k, v in spans.items() if k != "crankshaft"),
-                         default=0.0)
+        rocker_max = max(
+            (v for k, v in spans.items() if k != "crankshaft"), default=0.0
+        )
         if rocker_max < ROCKER_MIN_DEG:
             raise RuntimeError(
                 f"DEAD OUTPUT: crank drove the full run but the largest rocker "
                 f"swing was only {rocker_max:.1f} deg (< {ROCKER_MIN_DEG}) -- the "
                 f"cam-follower chain is decoupled (the solve can complete cleanly "
                 f"with a dead output, so the solve-lock check passes; this gate is "
-                f"what catches it). Check the cam couplings and the foot mates.")
+                f"what catches it). Check the cam couplings and the foot mates."
+            )
     return spans
 
 
@@ -1157,6 +1290,7 @@ async def _sample_part_rot(adapter, needle, study_name="", n_steps=12):
     """Rotation span (deg) of a single named part over the run -- e.g. the
     summing-lever rocking under the spring force balance (the analogue SUM)."""
     from solidworks_mcp.adapters.base import MotionTimeParameters
+
     comp, name = _find_one(adapter, needle)
     if comp is None:
         log(f"    {needle} not found")
@@ -1165,7 +1299,9 @@ async def _sample_part_rot(adapter, needle, study_name="", n_steps=12):
     span = 0.0
     for s in range(n_steps + 1):
         t = DURATION_S * s / n_steps
-        await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=study_name))
+        await adapter.set_motion_time(
+            MotionTimeParameters(time=t, study_name=study_name)
+        )
         a = _comp_xform(adapter, comp)
         if base is None:
             base = a
@@ -1183,6 +1319,7 @@ async def _sample_chain(adapter, study_name="", n_steps=12):
     oscillates but the summing-lever jumps once and holds, the spring force
     balance is snapping to a static equilibrium instead of tracking the inputs."""
     from solidworks_mcp.adapters.base import MotionTimeParameters
+
     parts = []
     for needle in ("channel-lever-1", "summing-lever-1", "magnifying-wheel-1"):
         comp, name = _find_one(adapter, needle)
@@ -1194,7 +1331,9 @@ async def _sample_chain(adapter, study_name="", n_steps=12):
     spans = {}
     for s in range(n_steps + 1):
         t = DURATION_S * s / n_steps
-        await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=study_name))
+        await adapter.set_motion_time(
+            MotionTimeParameters(time=t, study_name=study_name)
+        )
         row = []
         for needle, comp in parts:
             a = _comp_xform(adapter, comp)
@@ -1206,7 +1345,9 @@ async def _sample_chain(adapter, study_name="", n_steps=12):
             spans[needle] = max(spans.get(needle, 0.0), ang)
             row.append(f"{needle.split('-1')[0]}={ang:6.2f}")
         log(f"    t={t:4.2f}s  {'  '.join(row)}")
-    log(f"  chain spans(deg): {dict((k.split('-1')[0], round(v, 1)) for k, v in spans.items())}")
+    log(
+        f"  chain spans(deg): {dict((k.split('-1')[0], round(v, 1)) for k, v in spans.items())}"
+    )
     return spans
 
 
@@ -1219,6 +1360,7 @@ async def _reset_to_assembled(adapter):
     moves. set_motion_time(0) then a forced rebuild restores the mate-solved pose.
     """
     from solidworks_mcp.adapters.base import MotionTimeParameters
+
     await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
@@ -1250,25 +1392,41 @@ async def build(adapter):
 
     await _add_cam_couplings(adapter)
     check("ensure_motion_addin", await adapter.ensure_motion_addin())
-    from solidworks_mcp.adapters.base import MotionStudyParameters, MotionStudyRefParameters
-    made = check("create_motion_study", await adapter.create_motion_study(
-        MotionStudyParameters(name="", study_type="physical_simulation",
-                              duration=DURATION_S, activate=True)))
+    from solidworks_mcp.adapters.base import (
+        MotionStudyParameters,
+        MotionStudyRefParameters,
+    )
+
+    made = check(
+        "create_motion_study",
+        await adapter.create_motion_study(
+            MotionStudyParameters(
+                name="",
+                study_type="physical_simulation",
+                duration=DURATION_S,
+                activate=True,
+            )
+        ),
+    )
     log(f"  study {made['name']!r}")
     await _add_crank_motor(adapter)
 
     # springs / wires / gravity layered in later stages (see _springs/_wires).
     if level >= 2:
         from build_motion_study_springs import add_springs  # noqa: F401
+
         await add_springs(adapter)
     if level >= 3:
         from build_motion_study_springs import add_wires_gravity
+
         await add_wires_gravity(adapter, with_gravity="grav" in sys.argv[2:])
 
     await _reset_to_assembled(adapter)
     log("  Calculate() -- blocking solve of the whole device, expect ~270s ...")
-    check("calculate_motion", await adapter.calculate_motion(
-        MotionStudyRefParameters(name="")))
+    check(
+        "calculate_motion",
+        await adapter.calculate_motion(MotionStudyRefParameters(name="")),
+    )
     await _sample_rockers(adapter)
     if level >= 2:
         await _sample_chain(adapter)
@@ -1282,9 +1440,13 @@ async def build(adapter):
     artefacts = {}
     if level >= 1:
         from solidworks_mcp.adapters.base import MotionExportParameters
+
         vid = (OUT_PNG.parent / f"{ASM}-operation-{stage}.mp4").resolve()
-        res = await adapter.export_motion_video(MotionExportParameters(
-            file_path=str(vid), study_name="", frames_per_second=25.0))
+        res = await adapter.export_motion_video(
+            MotionExportParameters(
+                file_path=str(vid), study_name="", frames_per_second=25.0
+            )
+        )
         if res.is_success:
             log(f"  video {res.data['bytes']} bytes -> {vid}")
             artefacts["video"] = str(vid)
