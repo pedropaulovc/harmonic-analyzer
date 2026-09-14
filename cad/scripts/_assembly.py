@@ -1609,8 +1609,14 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.
-    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
-            "pen-set-screw"),
+    "pen": (
+        "pen-rod",
+        "pen-marker",
+        "pen-wire",
+        "pen-v-block",
+        "pen-frame",
+        "pen-set-screw",
+    ),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",
@@ -1957,7 +1963,13 @@ def check_no_interference(
             if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
                 chain_mesh_contacts.append(volume_mm3)
                 continue
-            details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
+            _telemetry.event(
+                "interference.unexpected",
+                components=names,
+                configurations=configs,
+                volume_mm3=volume_mm3,
+            )
+            details.append(f"{' & '.join(names)}: {volume_mm3:.9g} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
         isp.set_attribute("hits", len(details))
         isp.set_attribute("bounded_contacts", len(bounded_contacts))
