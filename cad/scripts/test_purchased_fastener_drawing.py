@@ -182,6 +182,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "place_view", place_view)
     monkeypatch.setattr(purchased, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(purchased, "set_hidden_lines_visible", lambda *_args: None)
     monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views, _cells: (1, 1))
     monkeypatch.setattr(
         purchased,
