@@ -92,28 +92,17 @@ def _rebuild(draw: Any, *, phase: str) -> None:
 
 @_telemetry.traced("drawing.purchased_fit_views")
 def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
-    # The initial 1:1 outlines include SOLIDWORKS' native view padding. The
-    # estimate only skips obviously oversized scales; actual regenerated bounds
-    # decide the result, including any padding that does not scale linearly.
+    # Native outlines include fixed sheet-space padding. Scaling a 1:1 outline
+    # can reject a larger view that actually fits; measure each standard scale.
     _rebuild(draw, phase="initial view extents")
-    extents = []
     for view, (name, _, _) in zip(views, cells, strict=True):
         ratio = tuple(float(value) for value in view.ScaleRatio)
         if len(ratio) != 2 or ratio != (1.0, 1.0):
             raise RuntimeError(
                 f"{name}: initial 1:1 view scale did not persist: {ratio!r}"
             )
-        extents.append(_box(view.GetOutline(), label=name))
-    limit = min(
-        min(
-            (cell[2] - cell[0]) / (box[2] - box[0]),
-            (cell[3] - cell[1]) / (box[3] - box[1]),
-        )
-        for box, (_, _, cell) in zip(extents, cells, strict=True)
-    )
+        _box(view.GetOutline(), label=name)
     for scale in _SCALES:
-        if scale[0] / scale[1] > limit:
-            continue
         with _telemetry.span(
             "drawing.purchased_scale_candidate", scale=f"{scale[0]}:{scale[1]}"
         ):
@@ -121,8 +110,17 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
                 view.UseSheetScale = 0
                 view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
             _rebuild(draw, phase="apply common view scale")
-            for view, (name, center, _) in zip(views, cells, strict=True):
-                box = _box(view.GetOutline(), label=name)
+            bounds = [
+                _box(view.GetOutline(), label=name)
+                for view, (name, _, _) in zip(views, cells, strict=True)
+            ]
+            if any(
+                box[2] - box[0] > cell[2] - cell[0]
+                or box[3] - box[1] > cell[3] - cell[1]
+                for box, (_, _, cell) in zip(bounds, cells, strict=True)
+            ):
+                continue
+            for view, (name, center, _), box in zip(views, cells, bounds, strict=True):
                 position = tuple(float(value) for value in view.Position)
                 if len(position) != 2 or not all(map(math.isfinite, position)):
                     raise RuntimeError(
@@ -399,12 +397,19 @@ async def _build_reference_sheet(
     with _telemetry.span("drawing.purchased_annotations"):
         for name, center, cell in cells:
             label = f"{name[1:].upper()}  {scale[0]}:{scale[1]}"
+            if reference_notes and name == "*Front":
+                label += "  (SHOWN AT INSTALLED LENGTH)"
             label_y = (
                 cell[3] + 0.007
                 if installation_notes and name in ("*Top", "*Isometric")
                 else cell[1] - 0.006
             )
-            note = _literal_note(adapter, label, center[0] - 0.026, label_y)
+            note = _literal_note(adapter, label, center[0], label_y)
+            bounds = _box(note.GetExtent(), label=label, kind="note")
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            x = 2 * center[0] - (bounds[0] + bounds[2]) / 2
+            if not annotation.SetPosition(x, label_y, 0.0):
+                raise RuntimeError(f"{label}: failed to center view caption")
             notes.append(
                 (
                     note,

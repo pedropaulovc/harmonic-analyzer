@@ -469,9 +469,13 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   the sum of spring-force magnitudes for each case and reports the smaller
   resolved vertical knife load beside it.
   This is not a full-crank load sweep and does not prove gravity, operating
-  loads, writing friction, dynamics, or the actual batch's force curves. Zero
-  the assembled mechanism by sliding the gooseneck and verify that it remains
-  within the measured spring's service range. Native mass/COM readback remains
+  loads, writing friction, dynamics, or the actual batch's force curves.
+  For assembly calibration, use the recorded channel-set rate mean and each
+  channel spring's initial-tension intercept, together with the measured
+  counter-spring force curve. Slide the gooseneck until the summing lever is
+  level; this setting includes the mechanism's weight and actual spring
+  preloads. Verify that the assembled mechanism remains within the measured
+  counter spring's service range. Native mass/COM readback remains
   the conservative gravity check; it includes the pen carriage reflected
   through the wheel, spring/wire weight and wheel imbalance, without helpful
   guide friction. Verify assembly fit and measured force curves before closing
