@@ -9,7 +9,7 @@ from typing import Any
 
 import _telemetry
 from _common import check, run_build
-from _drawing_common import check_drawing_layout
+from _drawing_common import _visible_document_paths, check_drawing_layout
 from _drawing_registry import DrawingLayout
 
 
@@ -20,18 +20,31 @@ async def audit(adapter: Any, drawing_path: Path, layout: DrawingLayout) -> dict
 
     check("open drawing for layout audit", await adapter.open_model(str(drawing_path)))
     drawing = adapter.currentModel
-    title = str(drawing.GetTitle())
+    title = drawing.GetTitle()
+    if not title:
+        adapter.swApp.CloseAllDocuments(True)
+        raise RuntimeError(
+            "opened drawing has an empty title; closed all documents instead of "
+            "calling CloseDoc(''), which silently no-ops"
+        )
     try:
         check_drawing_layout(adapter, layout=layout, stem=drawing_path.stem)
     finally:
         adapter.swApp.CloseDoc(title)
+        still_open = [
+            path
+            for path in _visible_document_paths(adapter)
+            if Path(path).resolve() == drawing_path
+        ]
+        if still_open:
+            raise RuntimeError(f"drawing {title!r} did not close after layout audit")
     return {"drawing": str(drawing_path)}
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("drawing", type=Path)
-    parser.add_argument("layout", choices=tuple(DrawingLayout))
+    parser.add_argument("layout", type=DrawingLayout, choices=tuple(DrawingLayout))
     return parser.parse_args()
 
 
