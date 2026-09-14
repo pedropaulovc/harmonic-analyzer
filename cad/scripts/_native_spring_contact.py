@@ -418,18 +418,27 @@ class _ActualContact:
         )
         self._assert_poses(expected)
         if native_result.state == "interfering":
+            details: dict[str, Any] = {
+                "witness": native_result.witness,
+                "overlap_measurement": "unmeasured",
+            }
+            magnitude = "unmeasured volume"
+            if native_result.volume_mm3 is not None:
+                details["overlap_measurement"] = "measured"
+                details["overlap_volume_mm3"] = native_result.volume_mm3
+                magnitude = f"{native_result.volume_mm3:.17g} mm^3"
             _telemetry.event(
                 "spring.contact.manager_omission",
                 label=self.label,
                 moving_component=self.moving,
                 fixed_component=self.fixed,
                 trial=self.trials,
-                witness=native_result.witness,
+                **details,
             )
             if self.trials == 1:
                 _telemetry.warn(
-                    f"{self.label}: assembly manager omitted native body overlap",
-                    witness=native_result.witness,
+                    f"{self.label}: assembly manager omitted native body overlap ({magnitude})",
+                    **details,
                 )
             return "interfering"
         return "clear"

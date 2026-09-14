@@ -678,6 +678,7 @@ def saved_summing_trial(
         row["pose_readbacks"]["after_ordinary_manager"] = assert_transforms(
             adapter, expected
         )
+        # This mode compares magnitudes: Boolean failures stay fatal, not upgraded.
         overlap_mm3 = native_component_overlap_mm3(
             adapter,
             moving,
