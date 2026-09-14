@@ -11,6 +11,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _edge_endpoint_key,
     PmiDrawingPlacement,
     add_edge_dimension,
     add_native_hole_callout,
@@ -26,6 +27,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
@@ -105,6 +107,52 @@ def _require_dimension_value(display: Any, expected_mm: float, *, label: str) ->
         )
 
 
+@_telemetry.traced("drawing.pick_pen_rod_datum_edges")
+def _visible_front_datum_edges(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """Return exact bottom and left edges for locating the front-view hole."""
+    half_section_m = ROD_SECTION / 2000.0
+    section_m = ROD_SECTION / 1000.0
+    length_m = ROD_LENGTH / 1000.0
+    bottom: list[tuple[tuple[float, ...], Any]] = []
+    left: list[tuple[tuple[float, ...], Any]] = []
+    edges = visible_view_entities(view, 1, label="pen-rod front edges")
+    for raw_edge in edges:
+        edge = _early_bound(raw_edge, "IEdge")
+        endpoints = _edge_endpoint_key(adapter, edge)
+        if endpoints is None:
+            continue
+        x0, y0, z0, x1, y1, z1 = endpoints
+        geometry = tuple(sorted((endpoints[:3], endpoints[3:])))
+        key = geometry[0] + geometry[1]
+        if (
+            abs(y0) <= 1e-6
+            and abs(y1) <= 1e-6
+            and abs(abs(x1 - x0) - section_m) <= 1e-6
+            and abs(z1 - z0) <= 1e-6
+        ):
+            bottom.append((key, edge))
+        if (
+            abs(x0 + half_section_m) <= 1e-6
+            and abs(x1 + half_section_m) <= 1e-6
+            and abs(abs(y1 - y0) - length_m) <= 1e-6
+            and abs(z1 - z0) <= 1e-6
+        ):
+            left.append((key, edge))
+
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("edges", len(edges))
+    span.set_attribute("bottom_matches", len(bottom))
+    span.set_attribute("left_matches", len(left))
+    if not bottom:
+        raise RuntimeError("pen-rod front view has no exact bottom edge")
+    if not left:
+        raise RuntimeError("pen-rod front view has no exact left edge")
+    return (
+        min(bottom, key=lambda candidate: candidate[0])[1],
+        min(left, key=lambda candidate: candidate[0])[1],
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -165,6 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the wire hole")
     wire_hole_edge = visible_circle_edge(adapter, front, _WIRE_HOLE_DIA)
+    bottom_edge, left_edge = _visible_front_datum_edges(adapter, front)
 
     front_bottom = (FRONT_CENTER[0], FRONT_CENTER[1] - ROD_LENGTH / 2000.0)
     front_side = (FRONT_CENTER[0] - 0.0025, FRONT_CENTER[1])
@@ -181,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(FRONT_CENTER[0] + 0.032, FRONT_CENTER[1] + 0.030),
         label="wire-hole length location",
         orientation="vertical",
-        entities=(None, wire_hole_edge),
+        entities=(bottom_edge, wire_hole_edge),
     )
     set_arc_endpoints_to_center(
         adapter, wire_hole_y, label="wire-hole length location"
@@ -201,7 +250,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
         label="wire-hole centerline location",
         orientation="horizontal",
-        entities=(None, wire_hole_edge),
+        entities=(left_edge, wire_hole_edge),
     )
     set_arc_endpoints_to_center(
         adapter, wire_hole_x, label="wire-hole centerline location"
