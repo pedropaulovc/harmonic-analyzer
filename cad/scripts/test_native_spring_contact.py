@@ -1,4 +1,4 @@
-"""Offline behavioral regressions for native spring-contact classification."""
+"""Offline behavioral regressions for static native spring contact."""
 
 from __future__ import annotations
 
@@ -69,6 +69,7 @@ class _TemporaryBody:
     def Operations2(self, operation: int, tool, error_code: int = 0):
         assert operation == 15901
         assert len(self.transforms) == len(tool.transforms) == 1
+        assert self.state == tool.state == "active"
         self.state = tool.state = "consumed"
         return self.source.scene.intersection(self.source.name, tool.source.name)
 
@@ -93,26 +94,15 @@ class _Component:
         self.Transform2 = SimpleNamespace(ArrayData=list(_IDENTITY))
         self.bodies = []
 
-    def IsFixed(self) -> bool:
-        return True
-
     def GetBodies3(self, body_type: int):
         assert body_type == 0
         return tuple(self.bodies), tuple(0 for _body in self.bodies)
 
 
-class _Manager:
-    def GetInterferences(self):
-        return ()
-
-    def Done(self) -> None:
-        return None
-
-
 class _Scene:
     def __init__(self) -> None:
         self.mode = "clear"
-        self.manager = _Manager()
+        self.distance_m = 0.0
         self.spring = _Component("spring")
         self.seat = _Component("seat")
         self.components = {
@@ -123,7 +113,6 @@ class _Scene:
             _NativeBody(self, self.spring, "spring-second"),
         ]
         self.seat.bodies = [_NativeBody(self, self.seat, "seat-body")]
-        self.Extension = SimpleNamespace(Rebuild=self.rebuild)
         self.currentModel = self
         self.swApp = self
 
@@ -145,52 +134,24 @@ class _Scene:
         )
         return detected, None, None, None
 
-    def _attempt(self, operation, default=None):
-        return operation()
-
-    def GetComponents(self, top_level_only: bool):
-        assert top_level_only is True
-        return tuple(self.components.values())
-
     def GetComponentByName(self, name: str):
         return self.components.get(name)
 
-    def ClearSelection2(self, clear_all: bool) -> None:
-        assert clear_all is True
-
-    def ToolsCheckInterference(self) -> None:
-        return None
-
-    def ClosestDistance(self, moving, fixed):
-        return 0.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
-
-    def rebuild(self, option: int) -> bool:
-        assert option == 4
-        return True
-
-    def put_pose(self, _adapter, name: str, values) -> None:
-        self.components[name].Transform2 = SimpleNamespace(ArrayData=list(values))
+    def ClosestDistance(self, first, second):
+        assert first is self.spring
+        assert second is self.seat
+        return self.distance_m, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
 
     def intersection(self, target: str, tool: str):
-        if target == "spring-first" and self.mode == "modeler-overlap":
-            return (_IntersectionBody(_MICROSCOPIC_OVERLAP_MM3),), 0
         if target != "spring-second" or tool != "seat-body":
             return None, 0
         if self.mode == "overlap":
             return (_IntersectionBody(_MICROSCOPIC_OVERLAP_MM3),), 0
         if self.mode in ("boolean-fail", "modeler-overlap"):
             return None, 1058  # swBodyOperationBooleanFail
+        if self.mode == "unknown-fail":
+            return None, 42
         return None, 0
-
-    def pair(self):
-        return contact._ActualContact(
-            self,
-            "spring",
-            "seat",
-            (1.0, 0.0, 0.0),
-            1.0,
-            "counter spring seat",
-        )
 
 
 @pytest.fixture
@@ -198,91 +159,121 @@ def scene(monkeypatch):
     value = _Scene()
     monkeypatch.setattr(contact, "_early_bound", value.bind)
     monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
-    monkeypatch.setattr(
-        contact,
-        "configured_interference_manager",
-        lambda _adapter: value.manager,
-    )
-    monkeypatch.setattr(contact, "put_component_pose", value.put_pose)
     return value
 
 
-def test_manager_omission_uses_every_actual_body_without_volume_threshold(
-    scene,
-) -> None:
+def test_later_body_overlap_cannot_pass_even_when_distance_is_zero(scene) -> None:
     scene.mode = "overlap"
-    pair = scene.pair()
+    scene.distance_m = 0.0
 
-    assert pair._interference_state(pair.originals) == "interfering"
+    with pytest.raises(RuntimeError, match="components intersect"):
+        contact.assert_native_contact(
+            scene,
+            "spring",
+            "seat",
+            maximum_distance_mm=0.01,
+            label="microscopic later-body overlap",
+        )
 
 
 def test_positive_native_predicate_rejects_unconstructible_intersection(scene) -> None:
     scene.mode = "modeler-overlap"
-    pair = scene.pair()
 
-    assert pair._interference_state(pair.originals) == "interfering"
     evidence = contact.native_component_interference(
         scene, "spring", "seat", label="unconstructible overlap"
     )
-    assert evidence.volume_mm3 is None  # Never publish the measured partial sum.
+
+    assert evidence.state == "interfering"
+    assert evidence.volume_mm3 is None
     assert evidence.boolean_failure_status == 1058
+
+
+def test_negative_native_predicate_cannot_certify_boolean_failure_as_clear(scene) -> None:
+    scene.mode = "boolean-fail"
+
+    with pytest.raises(RuntimeError, match=r"\b1058\b"):
+        contact.assert_native_contact(
+            scene,
+            "spring",
+            "seat",
+            maximum_distance_mm=0.01,
+            label="uncertain Boolean witness",
+        )
+
+
+def test_unknown_native_boolean_status_is_fatal(scene) -> None:
+    scene.mode = "unknown-fail"
+
+    with pytest.raises(RuntimeError, match=r"\b42\b"):
+        contact.assert_native_contact(
+            scene,
+            "spring",
+            "seat",
+            maximum_distance_mm=0.01,
+            label="unknown Boolean result",
+        )
 
 
 def test_successful_zero_volume_is_not_overruled_by_another_kernel(scene) -> None:
     scene.mode = "clear-modeler-overlap"
-    pair = scene.pair()
 
-    assert pair._interference_state(pair.originals) == "clear"
-
-
-def test_zero_result_native_boolean_preserves_clear_classification(scene) -> None:
-    pair = scene.pair()
-
-    assert pair._interference_state(pair.originals) == "clear"
-
-
-def test_native_boolean_failure_is_loud_and_restores_evaluated_placement(scene) -> None:
-    pair = scene.pair()
-    original = list(scene.spring.Transform2.ArrayData)
-    scene.mode = "boolean-fail"
-
-    with pytest.raises(
-        RuntimeError,
-        match=r"\b1058\b",
-    ):
-        pair.evaluate(0.25)
-
-    assert scene.spring.Transform2.ArrayData == original
-    assert scene.seat.Transform2.ArrayData == _IDENTITY
-
-
-def test_fixture_witness_rejects_omitted_overlap_despite_zero_distance(
-    scene, monkeypatch
-) -> None:
-    from diagnostics import probe_stock_spring_seating as diagnostic
-
-    monkeypatch.setattr(diagnostic, "_early_bound", scene.bind)
-    monkeypatch.setattr(
-        diagnostic, "configured_interference_manager", lambda _adapter: scene.manager
-    )
-    monkeypatch.setattr(diagnostic, "put_component_pose", scene.put_pose)
-    scene.mode = "overlap"
-    original = scene.pair().originals
-    claimed_seat = contact.ContactSolution(
-        0.0, None, 0.0, 0, "already_seated", "native_distance", 0.0
+    evidence = contact.native_component_interference(
+        scene, "spring", "seat", label="measured native clear"
     )
 
-    with pytest.raises(RuntimeError, match="interferes"):
-        diagnostic.verify_witness(
+    assert evidence.state == "clear"
+    assert evidence.volume_mm3 == 0.0
+    assert evidence.witness == "solid_intersection"
+
+
+def test_native_zero_overlap_plus_bounded_distance_passes(scene) -> None:
+    scene.distance_m = 4.25e-6
+
+    measured = contact.assert_native_contact(
+        scene,
+        "spring",
+        "seat",
+        maximum_distance_mm=0.005,
+        label="bounded static seat",
+    )
+
+    assert measured == pytest.approx(0.00425)
+
+
+def test_excessive_native_distance_fails(scene) -> None:
+    scene.distance_m = 5.01e-6
+
+    with pytest.raises(RuntimeError, match="exceeds calibrated maximum"):
+        contact.assert_native_contact(
             scene,
             "spring",
             "seat",
-            (1.0, 0.0, 0.0),
-            1.0,
-            original,
-            claimed_seat,
-            {},
-            "independent fixture witness",
+            maximum_distance_mm=0.005,
+            label="open static seat",
         )
-    assert scene.spring.Transform2.ArrayData == original["spring"]
-    assert scene.seat.Transform2.ArrayData == original["seat"]
+
+
+@pytest.mark.parametrize("distance_m", [-1e-9, float("nan"), float("inf")])
+def test_invalid_native_distance_fails(scene, distance_m: float) -> None:
+    scene.distance_m = distance_m
+
+    with pytest.raises(RuntimeError, match="finite nonnegative"):
+        contact.assert_native_contact(
+            scene,
+            "spring",
+            "seat",
+            maximum_distance_mm=0.005,
+            label="invalid static distance",
+        )
+
+
+@pytest.mark.parametrize("maximum", [-1.0, float("nan"), float("inf")])
+def test_invalid_calibrated_maximum_fails(scene, maximum: float) -> None:
+    with pytest.raises(ValueError, match="finite and nonnegative"):
+        contact.assert_native_contact(
+            scene,
+            "spring",
+            "seat",
+            maximum_distance_mm=maximum,
+            label="invalid calibrated maximum",
+        )

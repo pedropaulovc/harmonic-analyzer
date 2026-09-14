@@ -2211,6 +2211,7 @@ def task_check():
         SCRIPTS_DIR / "test_cwm_mate_guard.py",
         # A missing assembly-manager pair must not certify an overlapping spring.
         SCRIPTS_DIR / "test_native_spring_contact.py",
+        SCRIPTS_DIR / "test_settled_spring_seats.py",
         # The [out]-param binding rule is ENFORCED, not just documented: no
         # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
         # declare themselves, and _early_bound never falls back to a raw
