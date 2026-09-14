@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import math
 import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -31,6 +32,7 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_reference_dimension,
     set_hidden_lines_visible,
+    set_high_quality_shaded_with_edges,
     sheet_drawable_region,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
@@ -38,9 +40,6 @@ from frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
     CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
-    SCREW_SPOTFACE_DIAMETER,
-    TOP_SCREW_SEAT_Z,
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
@@ -166,7 +165,8 @@ ASSEMBLY_STEPS = "\n".join(
         f"   REMOVE COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
         "AND DEBURR.",
         "   THE ACTUAL MHA-132 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
-        "3. FIT MHA-077 OVER THE COLUMNS, HUB OPPOSITE THE MHA-086 END.",
+        "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET.",
+        "   FIT MHA-077 OVER THE COLUMNS, HUB OPPOSITE THE MHA-086 END.",
         "   HAND-FIT EACH BORE WITHOUT BIND OR ROCK ON ITS MATCHED COLUMN.",
         "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE CONTROLLING TOP-AXIS",
         "   HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE.",
@@ -311,7 +311,6 @@ def _visible_circle_at_height(
     target_x_m: float,
     label: str,
     radius_mm: float | None = None,
-    target_z_m: float | None = None,
 ) -> Any:
     """Resolve a visible circular edge by component identity and native geometry."""
     view = _early_bound(view, "IView")
@@ -355,7 +354,6 @@ def _visible_circle_at_height(
                 continue
             geometry_key = (
                 abs(center[0] - target_x_m),
-                abs(center[2] - target_z_m) if target_z_m is not None else 0.0,
                 center[0],
                 center[2],
                 actual_radius_mm,
@@ -365,8 +363,7 @@ def _visible_circle_at_height(
     if not candidates:
         radius_detail = "" if radius_mm is None else f", radius {radius_mm:g} mm"
         raise RuntimeError(
-            f"{label}: no {component_stem!r} circle at {height_mm:g} mm"
-            f"{radius_detail}"
+            f"{label}: no {component_stem!r} circle at {height_mm:g} mm{radius_detail}"
         )
     candidates.sort(key=lambda item: item[0])
     return candidates[0][1]
@@ -487,8 +484,10 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         if not points or text_count < 1:
             raise RuntimeError(f"{label}: missing native dimension display data")
         bounds = (
-            min(point[0] for point in points), min(point[1] for point in points),
-            max(point[0] for point in points), max(point[1] for point in points),
+            min(point[0] for point in points),
+            min(point[1] for point in points),
+            max(point[0] for point in points),
+            max(point[1] for point in points),
         )
         _telemetry.event(
             "drawing.frame_height_ink",
@@ -497,7 +496,8 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
             line_bounds=bounds,
             text=tuple(str(data.GetTextAtIndex(index)) for index in range(text_count)),
             text_positions=tuple(
-                float(value) for index in range(text_count)
+                float(value)
+                for index in range(text_count)
                 for value in data.GetTextPositionAtIndex(index)
             ),
             text_heights=tuple(
@@ -505,10 +505,14 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
             ),
         )
         if (
-            bounds[0] < region.xmin - 1e-6 or bounds[1] < region.ymin - 1e-6
-            or bounds[2] > region.xmax + 1e-6 or bounds[3] > region.ymax + 1e-6
+            bounds[0] < region.xmin - 1e-6
+            or bounds[1] < region.ymin - 1e-6
+            or bounds[2] > region.xmax + 1e-6
+            or bounds[3] > region.ymax + 1e-6
         ):
-            raise RuntimeError(f"{label}: native dimension ink {bounds!r} crosses {region!r}")
+            raise RuntimeError(
+                f"{label}: native dimension ink {bounds!r} crosses {region!r}"
+            )
     return overall, screw_axis
 
 
@@ -814,67 +818,344 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
         raise RuntimeError(f"frame package sheet order mismatch: {actual!r}")
 
 
-def _upper_frame_balloon_edges(adapter: Any, view: Any) -> dict[str, Any]:
-    """Choose exposed support-body and screw-head edges, not feet or shanks."""
-    wanted = {"rocker-arm-support", "lag-screw"}
+def _frame_visible_components(view: Any) -> dict[str, list[tuple[Any, Any]]]:
     full = {}
     for raw in view.GetVisibleDrawingComponents() or ():
-        component = _early_bound(_early_bound(raw, "IDrawingComponent").Component, "IComponent2")
+        component = _early_bound(
+            _early_bound(raw, "IDrawingComponent").Component, "IComponent2"
+        )
         full[str(component.Name2).rsplit("/", 1)[-1]] = component
-    winners = {}
+    families: dict[str, list[tuple[Any, Any]]] = {}
     for raw in view.GetVisibleComponents() or ():
         component = _early_bound(raw, "IComponent2")
-        stem = _component_stem(component)
-        if stem not in wanted:
-            continue
         name = str(component.Name2).rsplit("/", 1)[-1]
+        families.setdefault(_component_stem(component), []).append(
+            (component, full[name])
+        )
+    return families
+
+
+def _upper_frame_balloon_edges(
+    adapter: Any, view: Any, families: dict[str, list[tuple[Any, Any]]]
+) -> dict[str, Any]:
+    """Choose exposed support-body and screw-head edges, not feet or shanks."""
+    winners = {}
+    for stem in ("rocker-arm-support", "lag-screw"):
+        for component, full in families[stem]:
+            name = str(component.Name2)
+            for edge in view.GetVisibleEntities2(component, 1) or ():
+                key = _edge_endpoint_key(adapter, edge)
+                if key is None:
+                    continue
+                p0 = _component_point_in_assembly(full, key[:3])
+                p1 = _component_point_in_assembly(full, key[3:6])
+                score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
+                if stem not in winners or score > winners[stem][0]:
+                    winners[stem] = (score, edge)
+    if set(winners) != {"rocker-arm-support", "lag-screw"}:
+        raise RuntimeError("missing visible upper support-body or screw-head edge")
+    return {stem: row[1] for stem, row in winners.items()}
+
+
+def _column_midlength_target(
+    adapter: Any, view: Any, components: Sequence[tuple[Any, Any]]
+) -> tuple[Any, Any, tuple[float, float]]:
+    """Return an outer rim, its cylinder face, and the projected axial half-span."""
+    candidates = []
+    for component, full in components:
+        visible_edges = tuple(view.GetVisibleEntities2(component, 1) or ())
+        for raw_face in view.GetVisibleEntities2(component, 3) or ():
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            cylinder = tuple(float(value) for value in surface.CylinderParams)
+            if abs(abs(cylinder[4]) - 1.0) > 1e-9:
+                continue
+            radius = cylinder[6]
+            centres = []
+            for raw_edge in face.GetEdges() or ():
+                curve = _early_bound(
+                    _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
+                )
+                if curve.IsCircle():
+                    circle = tuple(float(value) for value in curve.CircleParams)
+                    if abs(circle[6] - radius) < 1e-7:
+                        centres.append(circle[:3])
+            if not centres:
+                continue
+            low, high = min(p[1] for p in centres), max(p[1] for p in centres)
+            if high - low < 1e-6:
+                continue
+            rims = []
+            for raw_edge in visible_edges:
+                curve = _early_bound(
+                    _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
+                )
+                if not curve.IsCircle():
+                    continue
+                circle = tuple(float(value) for value in curve.CircleParams)
+                if (
+                    abs(circle[6] - radius) < 1e-7
+                    and min(abs(circle[1] - low), abs(circle[1] - high)) < 1e-7
+                ):
+                    rims.append((circle[:3], raw_edge))
+            if not rims:
+                continue
+            rim_centre, rim = max(rims, key=lambda row: row[0][1])
+            midpoint = (rim_centre[0], (low + high) / 2.0, rim_centre[2])
+            start = model_point_in_view(
+                adapter,
+                view,
+                _component_point_in_assembly(full, rim_centre),
+                label="column rim projection",
+            )
+            middle = model_point_in_view(
+                adapter,
+                view,
+                _component_point_in_assembly(full, midpoint),
+                label="column midpoint projection",
+            )
+            # All four columns share the same explode translation. Rank X only;
+            # the native rim attachment below supplies the actual exploded origin.
+            candidates.append(
+                (
+                    (radius, high - low, middle[0]),
+                    rim,
+                    face,
+                    (middle[0] - start[0], middle[1] - start[1]),
+                )
+            )
+    if not candidates:
+        raise RuntimeError("no visible outer column cylinder with two native end rims")
+    _score, rim, face, delta = max(candidates, key=lambda row: row[0])
+    return rim, face, delta
+
+
+def _exposed_top_casting_edge(
+    adapter: Any, view: Any, components: Sequence[tuple[Any, Any]]
+) -> Any:
+    candidates = []
+    for component, full in components:
         for edge in view.GetVisibleEntities2(component, 1) or ():
+            curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
+            if not curve.IsLine():
+                continue
             key = _edge_endpoint_key(adapter, edge)
             if key is None:
                 continue
-            p0 = _component_point_in_assembly(full[name], key[:3])
-            p1 = _component_point_in_assembly(full[name], key[3:6])
-            score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
-            if stem not in winners or score > winners[stem][0]:
-                winners[stem] = (score, edge)
-    if set(winners) != wanted:
-        raise RuntimeError(f"missing visible upper frame component edges: {set(winners)}")
-    anchors = {stem: row[1] for stem, row in winners.items()}
-    anchors["frame-cross-screw"] = _visible_circle_at_height(
-        view,
-        component_stem="frame-cross-screw",
-        height_mm=TOP_SCREW_Y,
-        target_x_m=_LEFT_COLUMN_X_M,
-        target_z_m=TOP_SCREW_SEAT_Z / 1000.0,
-        radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
-        label="exposed left top cross-screw balloon",
+            p0 = model_point_in_view(
+                adapter,
+                view,
+                _component_point_in_assembly(full, key[:3]),
+                label="top casting edge start",
+            )
+            p1 = model_point_in_view(
+                adapter,
+                view,
+                _component_point_in_assembly(full, key[3:6]),
+                label="top casting edge end",
+            )
+            length = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+            if length >= 0.003:
+                candidates.append(((min(p0[0], p1[0]), length, *key), edge))
+    if not candidates:
+        raise RuntimeError("top casting has no exposed right-side linear edge")
+    return max(candidates, key=lambda row: row[0])[1]
+
+
+def _bind_frame_balloon(
+    adapter: Any, view: Any, note: Any, entity: Any, item: str
+) -> tuple[Any, Any, tuple[float, float, float]]:
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetAttachedEntities(dispatch_array([entity])):
+        raise RuntimeError(f"frame balloon {item} rejected its native target")
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    adapter.currentModel.GraphicsRedraw2()
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if (
+        len(attached) != 1
+        or int(adapter.swApp.IsSame(attached[0], entity)) != 1
+        or _balloon_item_number(adapter, note, label="reattached frame balloon") != item
+        or annotation.IsDangling()
+    ):
+        raise RuntimeError(
+            f"frame balloon {item} lost its native entity or BOM binding"
+        )
+    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
+    if len(points) < 6:
+        raise RuntimeError(f"frame balloon {item} has no native leader attachment")
+    return note, annotation, points[-3:]
+
+
+def _short_frame_balloon(
+    adapter: Any, view: Any, note: Any, item: str, offset: tuple[float, float]
+) -> None:
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    view.UpdateViewDisplayGeometry()
+    adapter.currentModel.GraphicsRedraw2()
+    leader = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
+    circle = tuple(float(value) for value in note.GetBalloonInfo())
+    origin = tuple(float(value) for value in annotation.GetPosition())
+    if len(leader) < 6 or len(circle) < 7:
+        raise RuntimeError(f"frame balloon {item} has incomplete placement geometry")
+    target = (leader[-3] + offset[0], leader[-2] + offset[1])
+    position = (origin[0] + target[0] - circle[0], origin[1] + target[1] - circle[1])
+    note.LockPosition = False
+    if not annotation.SetPosition(position[0], position[1], 0.0):
+        raise RuntimeError(f"frame balloon {item} rejected its short-leader position")
+    note.LockPosition = True
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    adapter.currentModel.GraphicsRedraw2()
+    actual = tuple(float(value) for value in annotation.GetPosition())
+    leader = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
+    length = sum(
+        math.hypot(
+            leader[index + 3] - leader[index], leader[index + 4] - leader[index + 1]
+        )
+        for index in range(0, len(leader) - 3, 3)
     )
-    return anchors
+    _telemetry.event(
+        "drawing.frame_short_balloon",
+        item=item,
+        target_circle=target,
+        requested_origin=position,
+        actual_origin=actual,
+        leader=leader,
+        length_m=length,
+    )
+    if (
+        any(abs(actual[index] - position[index]) > 1e-6 for index in range(2))
+        or length > 0.030
+    ):
+        raise RuntimeError(f"frame balloon {item} did not retain its short leader")
+
+
+def _frame_scale_as_noted(adapter: Any) -> None:
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet_view = _early_bound(drawing.GetFirstView(), "IView")
+    matches = []
+    for raw in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) != 6 or int(annotation.OwnerType) != 2:
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        linked = str(note.PropertyLinkedText or "")
+        if "sw-sheetscale" in linked.casefold().replace(" ", ""):
+            matches.append(note)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one native title-block scale link, found {len(matches)}"
+        )
+    note = matches[0]
+    text = (
+        "SCALE: AS NOTED"
+        if str(note.GetText()).strip().upper().startswith("SCALE")
+        else "AS NOTED"
+    )
+    if not note.SetText(text):
+        raise RuntimeError("failed to set the isometric sheet scale field to AS NOTED")
+    adapter.currentModel.EditRebuild3()
+    if str(note.GetText()).strip() != text:
+        raise RuntimeError("title-block AS NOTED scale did not persist")
 
 
 def _reattach_frame_balloons(
     adapter: Any, view: Any, balloons: Sequence[Any], items: Sequence[tuple[str, str]]
 ) -> None:
-    anchors = _upper_frame_balloon_edges(adapter, view)
+    families = _frame_visible_components(view)
+    anchors = _upper_frame_balloon_edges(adapter, view, families)
     item_by_stem = dict(items)
     notes = {
         _balloon_item_number(adapter, note, label="frame balloon"): note
         for note in balloons
     }
-    for stem, edge in anchors.items():
+    anchors["top-frame"] = _exposed_top_casting_edge(
+        adapter, view, families["top-frame"]
+    )
+    for stem, entity in anchors.items():
         item = item_by_stem[stem]
-        note = _early_bound(notes[item], "INote")
-        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-        expected_edge = _edge_endpoint_key(adapter, edge)
-        if not annotation.SetAttachedEntities(dispatch_array([edge])):
-            raise RuntimeError(f"frame balloon {item} rejected native reattachment")
-        adapter.currentModel.EditRebuild3()
-        attached = tuple(annotation.GetAttachedEntities3() or ())
-        actual_edge = _edge_endpoint_key(adapter, attached[0]) if len(attached) == 1 else None
-        actual_item = _balloon_item_number(adapter, note, label="reattached frame balloon")
-        if actual_item != item or actual_edge != expected_edge:
-            raise RuntimeError(f"frame balloon {item} lost its exact edge or BOM binding")
-    _spread_balloons(adapter, view, balloons, margin=0.012)
+        notes[item], _annotation, _point = _bind_frame_balloon(
+            adapter, view, notes[item], entity, item
+        )
+
+    item = item_by_stem["tube-frame"]
+    rim, face, delta = _column_midlength_target(adapter, view, families["tube-frame"])
+    notes[item], _annotation, rim_point = _bind_frame_balloon(
+        adapter, view, notes[item], rim, item
+    )
+    notes[item], annotation, _point = _bind_frame_balloon(
+        adapter, view, notes[item], face, item
+    )
+    midpoint = (rim_point[0] + delta[0], rim_point[1] + delta[1])
+    if not annotation.SetLeaderAttachmentPointAtIndex(0, *midpoint, 0.0):
+        raise RuntimeError("column balloon rejected its native mid-length face point")
+    adapter.currentModel.EditRebuild3()
+    view.UpdateViewDisplayGeometry()
+    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if (
+        len(points) < 6
+        or any(abs(points[-3 + index] - midpoint[index]) > 1e-6 for index in range(2))
+        or len(attached) != 1
+        or int(adapter.swApp.IsSame(attached[0], face)) != 1
+        or _balloon_item_number(adapter, notes[item], label="column midpoint balloon")
+        != item
+    ):
+        raise RuntimeError("column balloon lost its native mid-length face/BOM binding")
+
+    item = item_by_stem["frame-cross-screw"]
+    shanks = []
+    for component, full in families["frame-cross-screw"]:
+        if (
+            abs(
+                _component_point_in_assembly(full, (0.0, 0.0, 0.0))[1] * 1000.0
+                - TOP_SCREW_Y
+            )
+            > 1e-5
+        ):
+            continue
+        for raw_face in view.GetVisibleEntities2(component, 3) or ():
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if (
+                not surface.IsCylinder()
+                or abs(
+                    float(surface.CylinderParams[6]) - CROSS_SCREW_SHANK_DIA / 2000.0
+                )
+                > 1e-7
+            ):
+                continue
+            notes[item], _annotation, point = _bind_frame_balloon(
+                adapter, view, notes[item], face, item
+            )
+            shanks.append(((point[0], point[1]), face))
+    if not shanks:
+        raise RuntimeError("no visibly exposed upper cross-screw shank")
+    # The leftmost native attachment is outside the casting/column silhouettes.
+    face = min(shanks, key=lambda row: row[0])[1]
+    notes[item], _annotation, _point = _bind_frame_balloon(
+        adapter, view, notes[item], face, item
+    )
+
+    short = {
+        item_by_stem["tube-frame"]: (0.018, 0.0),
+        item_by_stem["top-frame"]: (0.014, 0.010),
+        item_by_stem["frame-cross-screw"]: (-0.016, -0.008),
+    }
+    _spread_balloons(
+        adapter,
+        view,
+        [note for item, note in notes.items() if item not in short],
+        margin=0.012,
+    )
+    for item, offset in short.items():
+        _short_frame_balloon(adapter, view, notes[item], item, offset)
     adapter.currentModel.EditRebuild3()
 
 
@@ -883,9 +1164,13 @@ def _place_package(adapter: Any) -> None:
     for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
         _activate_sheet(adapter, sheet_name)
         _add_note_block(
-            adapter, f"SHEET {sheet_number} OF {len(SHEET_NAMES)}", (0.018, 0.025),
+            adapter,
+            f"SHEET {sheet_number} OF {len(SHEET_NAMES)}",
+            (0.018, 0.025),
             label="package sheet number",
         )
+        if sheet_number in (2, 3):
+            _frame_scale_as_noted(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
@@ -899,6 +1184,12 @@ def _place_package(adapter: Any) -> None:
     set_hidden_lines_visible(adapter, front)
     _add_frame_height_dimensions(adapter, front)
     _create_joint_sections(adapter, front)
+    _add_note_block(
+        adapter,
+        "TOP CROSS-BORE AXIS HEIGHT",
+        (0.119, 0.254),
+        label="controlling height identity",
+    )
 
     _add_note_block(
         adapter,
@@ -922,6 +1213,9 @@ def _place_package(adapter: Any) -> None:
         scale=EXPLODED_ISO_SCALE,
     )
     _set_exploded_state(adapter, exploded, True, label="exploded isometric")
+    set_high_quality_shaded_with_edges(
+        adapter, exploded, label="frame exploded anchor visibility"
+    )
     table = insert_bom_table(
         adapter,
         exploded,
@@ -1033,9 +1327,7 @@ async def build(adapter: Any) -> dict[str, str]:
                         else:
                             adapter.swApp.CloseDoc(drawing_title)
             except Exception as exc:  # noqa: BLE001
-                cleanup_errors.append(
-                    f"failed to close generated frame drawing: {exc}"
-                )
+                cleanup_errors.append(f"failed to close generated frame drawing: {exc}")
 
         try:
             adapter.swApp.CloseDoc(source_title)
@@ -1044,7 +1336,9 @@ async def build(adapter: Any) -> dict[str, str]:
                     f"frame source {source_title!r} remained open after discard"
                 )
         except Exception as exc:  # noqa: BLE001
-            cleanup_errors.append(f"failed to close frame source {source_title!r}: {exc}")
+            cleanup_errors.append(
+                f"failed to close frame source {source_title!r}: {exc}"
+            )
 
         try:
             after_fingerprint = _source_fingerprint(SOURCE)
