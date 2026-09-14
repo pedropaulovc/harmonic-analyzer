@@ -7,7 +7,6 @@ import math
 import sys
 from typing import Any
 
-import _config
 import _telemetry
 from _common import _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -24,7 +23,6 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import _literal_note
 from boss_hook_spec import (
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
@@ -32,6 +30,8 @@ from boss_hook_spec import (
     CHAMFER_WIDTH_TOLERANCE_MM,
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
+    DIMENSION_PRECISION,
+    DIMENSION_TOLERANCE_TYPES,
     TRIM,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -48,7 +48,6 @@ DETAIL_CENTER = (0.280, 0.115)
 DETAIL_SCALE = (12.0, 1.0)
 FRONT_KEEP = {"FinishedOverall": (0.040, 0.165)}
 DETAIL_KEEP = {"ChamferWidth": (0.235, 0.090), "ChamferAngle": (0.340, 0.115)}
-DIMENSION_PRECISION = {"FinishedOverall": 2, "ChamferWidth": 2, "ChamferAngle": 0}
 
 
 def _end_detail(adapter: Any, front: Any) -> Any:
@@ -119,6 +118,24 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
         raise RuntimeError("native detail label position did not persist")
 
 
+def _position_parent_detail_letter(adapter: Any, front: Any) -> None:
+    """Keep the native parent-circle A above/right of the cut-end extension."""
+    circles = tuple(_read_member(_early_bound(front, "IView"), "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one parent detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    center = model_point_in_view(
+        adapter, front, (0.0, (TRIM.shank_end_y_mm + 1.0) / 1000, 0.0),
+        label="parent detail letter reference",
+    )
+    target = (center[0] + 0.020, center[1] + 0.014)
+    circle.SetLabelPosition(*target)
+    adapter.currentModel.EditRebuild3()
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, target) > 1e-8:
+        raise RuntimeError(f"parent detail-circle label position did not persist: {actual}")
+
+
 def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
     expected = {
         "FinishedOverall": (
@@ -142,11 +159,13 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
         if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
             raise RuntimeError(f"{name}: native dimension nominal changed")
         if (
-            int(tolerance.Type) != 4
+            int(tolerance.Type) != DIMENSION_TOLERANCE_TYPES[name]
             or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
             or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
         ):
             raise RuntimeError(f"{name}: native tolerance changed")
+        if int(display.GetPrimaryPrecision2()) != DIMENSION_PRECISION[name]:
+            raise RuntimeError(f"{name}: native display precision changed")
     if expected:
         raise RuntimeError(f"missing machining controls: {sorted(expected)}")
 
@@ -196,22 +215,17 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *detail_annotations]
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     _verify_controls(adapter, annotations)
-    add_property_linked_note(adapter, "Supplier", 0.175, 0.263)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.235, 0.263)
-    add_property_linked_note(adapter, "Stock Name", 0.175, 0.252, char_height=0.003)
+    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
+    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
+    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
     add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
     )
-    _literal_note(
-        adapter,
-        str(_config.parts(SPEC.artifact_stem)["installation_notes"]),
-        0.016,
-        0.060,
-    )
     for view in (front, detail):
         set_hidden_lines_visible(adapter, view)
     _position_detail_label(adapter, detail)
+    _position_parent_detail_letter(adapter, front)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

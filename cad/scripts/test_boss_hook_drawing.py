@@ -28,9 +28,9 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
     assert short_shank - maximum_axial > 17.0
 
 
-@pytest.mark.parametrize("fault", ["reference", "nominal", "tolerance", "missing"])
-def test_drawing_rejects_lost_manufacturing_control(monkeypatch, fault):
-    """A source/drawing import regression must fail before exporting a shop print."""
+@pytest.mark.parametrize("fault", [None, "reference", "nominal", "tolerance", "precision", "missing"])
+def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
+    """General is toleranced, unlike None; neither replaces a real driving size."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     annotations = []
@@ -39,17 +39,22 @@ def test_drawing_rejects_lost_manufacturing_control(monkeypatch, fault):
         ("ChamferWidth", spec.CHAMFER_WIDTH_MM / 1000, spec.CHAMFER_WIDTH_TOLERANCE_MM / 1000),
         ("ChamferAngle", math.radians(spec.CHAMFER_ANGLE_DEG), math.radians(spec.CHAMFER_ANGLE_TOLERANCE_DEG)),
     ):
-        tolerance = SimpleNamespace(Type=4, GetMinValue=lambda band=band: -band, GetMaxValue=lambda band=band: band)
+        tolerance = SimpleNamespace(Type=spec.DIMENSION_TOLERANCE_TYPES[name], GetMinValue=lambda band=band: -band, GetMaxValue=lambda band=band: band)
         dimension = SimpleNamespace(DrivenState=2, SystemValue=nominal, Tolerance=tolerance)
-        display = SimpleNamespace(GetDimension2=lambda _configuration, dimension=dimension: dimension, GetText=lambda _index: "")
-        annotations.append(SimpleNamespace(name=name, dimension=dimension, GetSpecificAnnotation=lambda display=display: display))
+        display = SimpleNamespace(GetDimension2=lambda _configuration, dimension=dimension: dimension, GetText=lambda _index: "", GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name])
+        annotations.append(SimpleNamespace(name=name, dimension=dimension, display=display, GetSpecificAnnotation=lambda display=display: display))
     if fault == "reference":
         annotations[0].dimension.DrivenState = 1
     elif fault == "nominal":
         annotations[0].dimension.SystemValue += 0.001
     elif fault == "tolerance":
         annotations[0].dimension.Tolerance.Type = 0
-    else:
+    elif fault == "precision":
+        annotations[0].display.GetPrimaryPrecision2 = lambda: 2
+    elif fault == "missing":
         annotations.pop()
-    with pytest.raises(RuntimeError):
+    if fault is None:
         drawing._verify_controls(None, annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_controls(None, annotations)

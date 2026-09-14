@@ -84,9 +84,9 @@ import math
 import sys
 from pathlib import Path
 
+from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,

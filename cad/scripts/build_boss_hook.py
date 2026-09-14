@@ -26,7 +26,7 @@ from functools import wraps
 import math
 import sys
 
-from _common import _read_member, run_build
+from _common import _early_bound, _read_member, run_build
 from _fastener_catalog import fastener
 from _drawing_common import set_dimension_precision
 from _stock_fastener import StockComponent, build_stock_fastener
@@ -47,6 +47,7 @@ from boss_hook_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
     DRAWING_DIMENSIONS,
+    DIMENSION_PRECISION,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
@@ -75,7 +76,7 @@ def _manufacturing_controls(adapter) -> None:
         set_dimension_precision(
             adapter,
             [_read_member(display, "GetAnnotation")],
-            {name: 0 if name == "ChamferAngle" else 2},
+            {name: DIMENSION_PRECISION[name]},
         )
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
@@ -86,6 +87,23 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
     )
+    # General dimensions retain their numerical acceptance bands natively;
+    # swTolGeneral omits the redundant printed band in favour of the title block.
+    for feature, name, band in (
+        ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
+        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)),
+    ):
+        _, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 11  # swTolType_e.swTolGeneral
+        if not tolerance.SetValues(-band, band):
+            raise RuntimeError(f"{name}@{feature}: cannot retain general tolerance values")
+        if (
+            int(tolerance.Type) != 11
+            or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+            or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+        ):
+            raise RuntimeError(f"{name}@{feature}: general tolerance readback changed")
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
