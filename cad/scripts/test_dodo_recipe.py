@@ -1979,7 +1979,6 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_drawing_marks.py",
         "test_cone_drawing_batch_contract.py",
         "test_fastener_catalog.py",
-        "test_direct_dimension_tolerances.py",
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
         "test_gtol_spec.py",
