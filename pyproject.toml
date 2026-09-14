@@ -54,6 +54,9 @@ dependencies = [
     "pypdf>=6.14.2",
     # Read-only inspection and evidence rendering for release glTF/GLB models.
     "meshprobe>=1.2.0,<2",
+    # Farm executor (cad/scripts/_farm.py): dispatches cache-missing part/assembly/
+    # drawing leaves as Temporal workflows to the SolidWorks build farm.
+    "temporalio>=1.32",
 ]
 
 [dependency-groups]
