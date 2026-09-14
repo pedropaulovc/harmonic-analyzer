@@ -243,16 +243,17 @@ def _select_view_entity(
     draw.ClearSelection2(True)
     selected = False
     if entity is not None:
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = selection_manager.CreateSelectData()
+        selection_data.View = view
         if entity_type == "SILHOUETTE":
-            selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-            selection_data = selection_manager.CreateSelectData()
-            selection_data.View = view
             selectable = _sw_type_info.early_bound_or_flag(
                 entity, "ISilhouetteEdge", "Select2"
             )
             selected = bool(selectable.Select2(False, selection_data))
         else:
-            selected = bool(view.SelectEntity(entity, False))
+            selectable = _early_bound(entity, "IEntity")
+            selected = bool(selectable.Select4(False, selection_data))
     elif xy is not None:
         selected = bool(
             draw.Extension.SelectByID2(
@@ -263,6 +264,10 @@ def _select_view_entity(
         where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
         raise RuntimeError(f"failed to select {label} {entity_type.lower()} {where}")
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
+    if entity is not None and count != 1:
+        raise RuntimeError(
+            f"selecting {label} {entity_type.lower()} produced {count} entities"
+        )
     entity = draw.SelectionManager.GetSelectedObject6(count, -1)
     if entity is None:
         raise RuntimeError(f"selected {label} {entity_type.lower()} has no entity")
@@ -294,16 +299,9 @@ def _select_annotation_entity(
             raise ValueError(f"{label} requires edge_xy, edge_entity, or entity")
         return _select_view_entity(adapter, view, entity_type, edge_xy, label=label)
 
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = view
-    selected = adapter._attempt(lambda: edge_entity.Select2(False, selection_data))
-    if not selected:
-        selected = adapter._attempt(lambda: view.SelectEntity(edge_entity, False))
-    if not selected:
-        raise RuntimeError(f"failed to select {label} entity in drawing view")
+    _select_view_entity(
+        adapter, view, entity_type, None, label=label, entity=edge_entity
+    )
     return edge_entity
 
 
@@ -2333,6 +2331,7 @@ def add_edge_dimension(
     orientation: str = "smart",
     entity_type: Literal["EDGE", "SILHOUETTE"] = "EDGE",
     entity_types: tuple[str, str] | None = None,
+    entities: tuple[Any | None, Any | None] | None = None,
 ) -> Any:
     """Dimension across two view entities picked at explicit sheet points.
 
@@ -2349,6 +2348,10 @@ def add_edge_dimension(
     ``"vertical"`` force the X/Y component — required when a hole is located by
     coordinate components off a datum rather than a slant centre distance (a
     slant reads ambiguous for holes not collinear with their datum).
+
+    ``entities`` may identify either pick exactly; a ``None`` entry retains the
+    corresponding coordinate pick. Explicit entities avoid ambiguous hit-test
+    results when projected edges are close together.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -2360,14 +2363,40 @@ def add_edge_dimension(
     draw.ClearSelection2(True)
     for index, (x, y) in enumerate((p0, p1)):
         selected_type = entity_types[index] if entity_types else entity_type
-        selected = draw.Extension.SelectByID2(
-            "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
-        )
+        requested_entity = entities[index] if entities else None
+        if requested_entity is None:
+            selected = draw.Extension.SelectByID2(
+                "", selected_type, x, y, 0.0, index > 0, 0, null_callout(), 0
+            )
+            location = f"at sheet ({x:g}, {y:g})"
+        elif selected_type == "SILHOUETTE":
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _sw_type_info.early_bound_or_flag(
+                requested_entity, "ISilhouetteEdge", "Select2"
+            )
+            selected = selectable.Select2(index > 0, selection_data)
+            location = "by entity"
+        else:
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _early_bound(requested_entity, "IEntity")
+            selected = selectable.Select4(index > 0, selection_data)
+            location = "by entity"
         if not selected:
             raise RuntimeError(
-                f"failed to select {label} {selected_type.lower()} {index} "
-                f"at sheet ({x:g}, {y:g})"
+                f"failed to select {label} {selected_type.lower()} {index} {location}"
             )
+        if requested_entity is not None:
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            count = int(manager.GetSelectedObjectCount2(-1))
+            if count != index + 1:
+                raise RuntimeError(
+                    f"{label} {selected_type.lower()} {index} changed the "
+                    f"selection count to {count}"
+                )
     if orientation == "horizontal":
         dimension = draw.AddHorizontalDimension2(text_xy[0], text_xy[1], 0.0)
     elif orientation == "vertical":

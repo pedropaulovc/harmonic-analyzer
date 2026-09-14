@@ -61,6 +61,75 @@ def test_wire_hole_is_part_owned_and_consumers_derive_from_it() -> None:
     assert source.count("add_edge_dimension(") == 2
 
 
+def test_front_datum_edge_resolver_returns_visible_bottom_and_left(monkeypatch) -> None:
+    hidden_bottom = object()
+    visible_bottom = object()
+    hidden_left = object()
+    visible_left = object()
+    wrong_length = object()
+    half_section = drawing.ROD_SECTION / 2000.0
+    section = drawing.ROD_SECTION / 1000.0
+    length = drawing.ROD_LENGTH / 1000.0
+    endpoints = {
+        hidden_bottom: (-half_section, 0.0, 0.0, half_section, 0.0, 0.0),
+        visible_bottom: (
+            -half_section,
+            0.0,
+            section,
+            half_section,
+            0.0,
+            section,
+        ),
+        hidden_left: (-half_section, 0.0, 0.0, -half_section, length, 0.0),
+        visible_left: (
+            -half_section,
+            0.0,
+            section,
+            -half_section,
+            length,
+            section,
+        ),
+        wrong_length: (-half_section, 0.0, 0.0, -half_section, 0.120, 0.0),
+    }
+
+    class FakeSpan:
+        def __init__(self) -> None:
+            self.attributes = {}
+
+        def set_attribute(self, key, value) -> None:
+            self.attributes[key] = value
+
+    span = FakeSpan()
+    monkeypatch.setattr(
+        drawing._telemetry.trace, "get_current_span", lambda context=None: span
+    )
+    monkeypatch.setattr(
+        drawing,
+        "visible_view_entities",
+        lambda view, entity_kind, *, label: [
+            hidden_bottom,
+            visible_left,
+            wrong_length,
+            hidden_left,
+            visible_bottom,
+        ],
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(
+        drawing,
+        "_edge_endpoint_key",
+        lambda adapter, edge: endpoints[edge],
+    )
+
+    resolver = drawing._visible_front_datum_edges.__wrapped__
+    assert resolver(object(), object()) == (visible_bottom, visible_left)
+    assert span.attributes == {
+        "edges": 5,
+        "bottom_matches": 2,
+        "left_matches": 2,
+    }
+
+
 def test_linked_notes_define_remaining_square_rod_operations() -> None:
     notes = pen_rod_spec.DRAWING_NOTES
     assert drawing.DIMENSION_CALLOUTS == {}
