@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import dodo
+from _assembly_postbuild import discard_open_documents
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     add_native_hole_callout,
@@ -137,10 +138,6 @@ async def native_callout(adapter, part_path, output, slug):
     return result
 
 
-def close_documents(adapter):
-    if not adapter.swApp.CloseAllDocuments(True):
-        raise RuntimeError("closing probe documents failed")
-    adapter.currentModel = None
 
 
 async def build(adapter, output):
@@ -196,7 +193,8 @@ async def build(adapter, output):
                         )
                     part_path = output / f"{slug}.SLDPRT"
                     check("save probe plate", await adapter.save_file(str(part_path)))
-                    close_documents(adapter)
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
                     check(
                         "reopen probe plate", await adapter.open_model(str(part_path))
                     )
@@ -210,7 +208,8 @@ async def build(adapter, output):
                     row["status"] = "passed"
                 finally:
                     receipt.write_text(json.dumps(report, indent=2), encoding="utf-8")
-                    close_documents(adapter)
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
         report["status"] = "passed"
         return {"readback": str(receipt)}
     except Exception:

@@ -695,6 +695,9 @@ for j in range(1, 20):
         f"lever-bushing gap {j - 1}",
         **_SOLV,
     )
+# Channel springs also use native-seated poses, not their analytical seeds.
+# build_channel_assembly certifies their contacts and actual mount clearances.
+_telemetry.debug("SKIP static golden poses: channel-spring-installed uses native contact seats")
 for j in range(20):
     zj = c.z_station(j)
     z_mid = zj + c.ARM_MID_DZ
@@ -730,14 +733,6 @@ for j in range(20):
         compose_rows(_rz(st["lever_tilt"]), ROT_Y_180),
         f"channel-lever ch{j:02d}",
         **_SOLV,
-    )
-    pose = spring_mount_geom.channel_pose(amplitudes[j])
-    expect(
-        CH,
-        f"channel-spring-installed-{j + 1}",
-        [*pose.centre_xy, z_mid],
-        pose.rotation_rows,
-        f"channel-spring ch{j:02d}",
     )
     expect(
         CH,
