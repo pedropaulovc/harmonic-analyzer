@@ -265,7 +265,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge=wire_hole_edge,
-        callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.017),
+        callout_xy=(FRONT_CENTER[0] + 0.034, hole_center_y + 0.010),
         label="pen-rod wire hole",
     )
 
@@ -311,22 +311,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # Anchoring right of the rod puts the target up-LEFT instead, so the leader
     # runs away from the body and the constraint disappears.
     #
-    # y=0.068 keeps the run under the right view (its box starts at y=0.090, and a
-    # leader through a view it does not annotate fails the crossing gate) and above
-    # the notes at y<=0.062; it also passes below the 115.00 line and the squareness
-    # frame, both of which start at y>=0.095.
+    # y=0.058 routes the leader below the right view while leaving the symbol
+    # above the wrapped manufacturing note; the body ends left of the title block.
     add_surface_finish(
         adapter,
         front,
         edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
-        symbol_xy=(0.170, 0.068),
+        symbol_xy=(0.170, 0.058),
         control=surface_finish_by_key(SURFACE_FINISHES, "slide_face"),
         label="pen-rod slide face finish",
     )
 
-    # The manufacturing note is wider than most sheets' notes. Keep its anchor
-    # near the left zone margin; the layout audit owns the title-block clearance.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
+    # Three explicit lines keep the manufacturing note left of the title block.
+    # Lowering its anchor leaves a clear band for the surface-finish symbol.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.045)
     add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
 
     return await finalize_drawing(
