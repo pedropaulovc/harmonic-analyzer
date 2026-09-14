@@ -4,9 +4,9 @@ The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
 each drawing package is rendered or copied into a neutral temp directory and
 handed to ``claude -p --model claude-fable-5-1 --effort medium`` (or
 ``codex exec --model gpt-6-astra`` at low reasoning) with NO repo context under
-the calibrated prompt in ``cad/scripts/prompts/``. A part print is one PNG; an
-assembly PDF is split into full-resolution page images and every page is
-supplied to one reviewer invocation. The schema-validated verdict and its
+the calibrated prompt in ``cad/scripts/prompts/``. Registry part and assembly
+PDFs are split into full-resolution page images and every page is supplied
+to one reviewer invocation. The schema-validated verdict and its
 provenance are written under ``cad/out/reports/machinist-review/``.
 
 Why the prompt is calibrated the way it is: the earlier ad-hoc reviews asked a
@@ -24,7 +24,7 @@ nothing in the invocation references the repo, every page is copied as a
 and Read is the only available tool. The event stream is scanned so any tool
 use beyond reading the copied package images flags the review as non-blind.
 
-Usage (SolidWorks-free; needs the rendered PNGs under ``cad/out/png``)::
+Usage (SolidWorks-free; needs the native PDFs under ``cad/out/pdf``)::
 
     uv run cad/scripts/machinist_review.py crank_arm pivot_shaft
     uv run cad/scripts/machinist_review.py --all --jobs 4
@@ -128,7 +128,7 @@ class Review:
 
 def package_for(name: str) -> ReviewPackage:
     spec = DRAWINGS_BY_NAME[name]
-    source = spec.outputs["pdf" if spec.source_kind == "assembly" else "png"]
+    source = spec.outputs["pdf"]
     return ReviewPackage(name=name, kind=spec.source_kind, sources=(source,))
 
 
@@ -152,7 +152,7 @@ def _package_for_pngs(paths: Sequence[Path], kind: str) -> ReviewPackage:
     resolved = tuple(path.resolve() for path in paths)
     identity = "\0".join(path.as_posix().casefold() for path in resolved).encode()
     suffix = hashlib.sha256(identity).hexdigest()[:16]
-    stem = resolved[0].stem if len(resolved) == 1 else "assembly-package"
+    stem = resolved[0].stem if len(resolved) == 1 else f"{kind}-package"
     return ReviewPackage(
         name=f"{stem}-{suffix}",
         kind=kind,
@@ -170,7 +170,7 @@ def _pdf_page_count(path: Path) -> int:
         finally:
             document.close()
     if page_count < 1:
-        raise ValueError(f"assembly PDF has no sheets: {path}")
+        raise ValueError(f"PDF has no sheets: {path}")
     return page_count
 
 
@@ -192,11 +192,7 @@ def _validate_package(package: ReviewPackage) -> int:
         suffix = source.suffix.casefold()
         if suffix not in {".pdf", ".png"}:
             raise ValueError(f"{package.name}: expected PNG or PDF source: {source}")
-        if suffix == ".pdf" and package.kind != "assembly":
-            raise ValueError(f"{package.name}: part review requires one PNG sheet")
     sheet_count = _sheet_count(package)
-    if package.kind == "part" and sheet_count != 1:
-        raise ValueError(f"{package.name}: part review requires exactly one PNG sheet")
     return sheet_count
 
 
@@ -235,13 +231,12 @@ def _review_prompt(
     prompt_text: str | None = None,
 ) -> str:
     prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
-    if package.kind == "assembly":
-        prompt += (
-            "\n\nPACKAGE INPUT\n"
-            f"This invocation includes all {sheet_count} sheet images in order. "
-            "Return one verdict for the package as a whole. Compare every sheet "
-            "against every other sheet before accepting SHIP.\n"
-        )
+    prompt += (
+        "\n\nPACKAGE INPUT\n"
+        f"This invocation includes all {sheet_count} sheet images in order. "
+        "Return one verdict for the package as a whole. Compare every sheet "
+        "against every other sheet before accepting SHIP.\n"
+    )
     if reviewer == "claude":
         prompt = (
             f"Use the Read tool to inspect every copied sheet-1.png through "
@@ -835,7 +830,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--png",
         type=Path,
         action="append",
-        help="review an arbitrary PNG; repeat to form one assembly package",
+        help="review an arbitrary PNG; repeat to form one part or assembly package",
     )
     parser.add_argument("--kind", choices=("part", "assembly"), default="part")
     parser.add_argument("--reviewer", choices=REVIEWERS)
@@ -881,9 +876,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     packages: list[ReviewPackage]
     if args.png:
-        if args.kind == "part" and len(args.png) != 1:
-            print("part review requires exactly one --png", file=sys.stderr)
-            return 2
         packages = [_package_for_pngs(args.png, args.kind)]
     elif args.all:
         packages = all_packages()
