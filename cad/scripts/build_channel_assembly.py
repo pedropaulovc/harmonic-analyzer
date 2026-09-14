@@ -4,7 +4,7 @@ The complete 20-channel motion chain between the drive train and the
 output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
-the lever tips, each caught at the plate by a little open hook fastener.
+the lever tips, each retained by a stock eyebolt threaded into the plate.
 128 components:
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
@@ -27,32 +27,23 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  channel-spring-installed x20 (M6.4: the stretched in-machine spring --
-  the free 32 mm part stays for the ch. 17 table-top inset),
-  spring-hook x20 (the open J-hook fastener seating each spring's bottom
-  eye in the plate bore -- the spring no longer threads the plate itself)
+  channel-spring-installed x20 (McMaster 9432K31, with native-seated
+  installed-length variants),
+  spring-hook x20 (McMaster 9489T111 eyebolts, supplied nuts omitted;
+  their shanks thread directly into the summing plate)
 
-Default mechanism state (DIMENSIONS.md "Channel & top-frame layout"):
-cylinder-gear notches +Y (cosine alignment), integral cam lobes +Y (UP,
-the top of the stroke -- the ch14 end views show the 0-crank tip row
-dead level at the stroke top), rod rings concentric on the cams at the
-phased ``(RING_CENTER.x, RING_CENTER.y, z_j - 3.25)`` centres - the cam carries the gears'
-+1.5 deg tooth-phase rotation. Everything downstream is SOLVED here, not
-hard-coded: the rod-pin point is the intersection of the r 127.58 lever
-circle about the pivot with the r ROD_C2C circle about the ring centre
-(arm tilt 0 -- the arms rest LEVEL, the 3.28 deg pin azimuth equals the
-tapered-strap lever angle; rod tilt 0 -- the rod hangs PLUMB from the
-arm's rod-side tip onto its cam, ch30 photos + ch14 end views);
-the bar rests its foot-notch roof on the tilted arm's top-edge arc
+Crank home retains the drive train's +1.5 degree tooth phase on the integral
+cam lobes; the lobe-up correction remains issue #749. ``channel_kinematics``
+solves the rod, rocker, bar and lever poses from that configured geometry.
+The bar rests its foot-notch roof on the tilted arm's top-edge arc
 (contact at the bar's +X edge, machine frame); the bar's top pin height
 leaves the levers essentially level (-0.002 deg at neutral, the ch14 ROM
-re-derive rest pose); the spring's top eye hangs 3.37 below the
-lever spring hole so its ring threads the O4 hole without touching (margins
-asserted > 0.1); the bottom eye now sits just ABOVE the plate (no longer
-threading it) on the arm of a spring-hook fastener whose shank seats in the
-plate's O2.0 bore (at z_j + 0.8, on the spring axis, one arm-offset +X of the eye)
--- the plate itself (the summing-lever) lives in summing.SLDASM, checked at
-the top level.
+re-derive rest pose). Purchased 9432K31 hooks seat in the existing lever
+holes and in 9489T111 lower eyes. The lower anchors thread directly into
+the summing plate, without nuts. ``spring_mount_geom`` supplies catalog
+seeds; native surface contact determines the installed lengths and bearing
+positions. Eye centres are not pin-contact points. The plate lives in summing.SLDASM, so
+its threaded engagement and clearances are also checked at the top level.
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
@@ -61,11 +52,9 @@ lies perpendicular to the lever face. Channel
 stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
 cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
 
-Mated-DOF strategy: nothing is grounded except the pivot-shaft seed (the
-lone SolidWorks auto-fix). Every other part is held by SEMANTIC, contact-
-faithful mates -- the radial fit at each real interface is a concentric/
-coincident pivot, and the axial Z is a coincident mid-plane wherever parts
-share a channel slice:
+Operational DOF use semantic contact mates; fixed hardware and the spring
+display bank retain their computed transforms. Radial joints are concentric
+or coincident, and parts within a channel slice share an axial reference:
   * rocker/lever concentric on the shaft OD; rod/bar coincident axis-to-
     axis on the named bore axes (the revolute radials);
   * the rocker is each channel's Z ANCHOR: channel 0 sits on the Front
@@ -74,9 +63,9 @@ share a channel slice:
     the lever and the amplitude bar are seated COINCIDENT to the rocker's
     mid-plane (lever Front plane / bar MidWidth plane), so a channel's
     parts share ONE Z reference;
-  * free-space structure with no in-subassembly contact partner (fulcrum-
-    shaft, ball mounts, springs, spring-hooks) is datum-located by three
-    orthogonal plane distances (the #110 frame-column idiom).
+  * the fulcrum shaft is datum-located by orthogonal plane distances;
+  * springs and lower anchors are grounded at their native-seated / threaded
+    installation transforms; these display solids are not a force solver.
 Each of the rocker/rod/bar joints keeps its operational DOF genuinely
 FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
 channel); each freed DOF's drive spec is recorded into the assembly's
@@ -122,12 +111,14 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+from dataclasses import replace
 import math
 import sys
-from typing import Any
+from typing import Any, Literal
 
 import _config
 import _telemetry
+import channel_kinematics
 from _common import (
     UNDER_CONSTRAINED,
     _early_bound,
@@ -137,11 +128,13 @@ from _common import (
     log,
     run_build,
 )
+from _native_spring_contact import solve_component_contact
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
+    assert_pose_ledger,
     bore_axis_ref,
     check_no_interference,
     coincident_mate,
@@ -210,12 +203,11 @@ from rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-d
 
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
 # reason: the rocker's rod-pin bore is NOT level with the pivot bore
-# (ROD_HOLE_Y = 15.30 vs 8.0). _arc_geometry must model that intrinsic 3.28 deg
-# lever angle or the placed pin lands 7 mm off the solved point and the J2
+# (ROD_HOLE_Y = 15.30 vs 8.0). ``channel_kinematics.arc_geometry`` must model
+# the intrinsic 3.28 deg lever angle or the placed pin lands 7 mm off and the J2
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
 from rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
-from rocker_arm_spec import CURVE_RADIUS as ARM_TOP_RADIUS  # 800: the R800 slide
 
 # centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
@@ -251,13 +243,8 @@ CAM_DZ = -3.25  # end-for-end cylinder gear: cam / rod-ring plane at z_j - 3.25
 # the low pin's rise above the pivot bore (ROD_HOLE_Y 15.30 - 8.0 = 7.30).
 # Length 127.583; the intrinsic lever angle beta (3.2813 deg above the arm's
 # +X) must come OFF the solved pin azimuth to get the arm tilt (see
-# _arc_geometry) -- at this lever the rise is 7.30 mm, so ignoring beta is no
-# longer a 0.4 mm nudge but a 7 mm catastrophe.
-_LEVER_DX = ARM_ROD_HOLE_X
-_LEVER_DY = ARM_ROD_PIN_LOCAL_Y - ARM_PIVOT_LOCAL_Y  # 7.3025
-ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)  # 127.5830
-ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))  # 3.2813
-# ARM_TOP_RADIUS (800): the R800 slide -- imported from rocker_arm_spec.CURVE_RADIUS.
+# ``channel_kinematics.arc_geometry``) -- at this lever the rise is 7.30 mm, so
+# ignoring beta is no longer a 0.4 mm nudge but a 7 mm catastrophe.
 
 # --- drive interface (default state) ----------------------------------------
 # GEAR_PHASE_DEG, X_DRUM, Y_DRIVE: imported from channel_frame_geom (the
@@ -292,22 +279,8 @@ RING_CENTER = (
 # so a copy here could drift from what check:budget certifies.
 from amplitude_bar_spec import (  # noqa: E402
     BAR_WIDTH,  # 6.35 square section
-    BOTTOM_NOTCH_HEIGHT as BAR_FOOT_NOTCH,  # 2.381
     TOP_PIN_Y as BAR_TOP_PIN_Y,  # 801.95
 )
-
-# The bar foot-notch roof rests on the rocker's top-edge arc. In the legacy
-# fix-all build the bar sat at the exact tangent (0-volume line contact,
-# filtered as coincidence). Mated, the solver lands a sub-0.005 mm^3
-# penetration sliver that trips the interference gate, so the foot is lifted
-# a hairline above the arc (the documented "design a margin, not a tangent"
-# pattern). The penetration sliver is only ~0.001 mm deep, so a 0.02 mm lift
-# clears it with 20x margin; the lift cascades through the lever tilt into the
-# spring eye, and the plate-threading loop margin (~0.11 mm) bounds it -- 0.02
-# keeps that margin clear, 0.1 broke it.
-BAR_CONTACT_GAP = _config.fit(
-    "cam_follower_contact", "contact_gap_mm"
-)  # cad/config/tolerances.yaml
 
 # --- lever bank -------------------------------------------------------------
 # FULCRUM (199.9, 1061.4): the lever fulcrum shaft axis -- imported from channel_frame_geom.
@@ -315,7 +288,6 @@ BAR_CONTACT_GAP = _config.fit(
 # (channel_lever_spec is what error_budget.nominal() reads).
 from channel_lever_spec import (  # noqa: E402
     BAR_PIN_X as LEVER_BAR_PIN_X,  # 127.0, fulcrum -> bar-pin c2c, 5"
-    LEVER_SPRING_X,  # 177.8: 7" c2c; the 254 "2:1" guess is photo-refuted (M6.4 -
 )
 
 # the lever bank ends at x ~ -30 in the ch. 30 front view and the 32 mm
@@ -357,35 +329,13 @@ KEEPER_Z_OFF = FULCRUM_SHAFT_HALF - KEEPER_BALL_TO_END  # 88.75 off centre
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF - 14.75  # 74.0
 KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
 
-# --- spring (channel_spring_installed_spec) ---------------------------------
-from _spring import COIL_BODY_LENGTH, build_spring  # noqa: E402
-from channel_spring_installed_spec import (  # noqa: E402
-    HOOK_LEAD as SPRING_HOOK_LEAD,  # 2.0 each end (no longer spans the plate)
-    INSTALLED_BODY_LENGTH as SPRING_BASE_BODY,  # 67.78: the neutral installed body
-    PLATE_EYE_Y,  # 986.24: bottom-eye y, ABOVE the plate on the hook arm
-)
-
-SPRING_BOTTOM_LEAD = SPRING_HOOK_LEAD
-SPRING_TOP_LEAD = SPRING_HOOK_LEAD
-
-SPRING_LOOP_R = 2.75  # = coil mean radius
-SPRING_WIRE_DIA = 1.0
-SPRING_EYE_DROP = 3.37  # top eye centre below the lever spring hole
-SPRING_HOLE_DIA = 4.0  # build_channel_lever.py (O3 photo read enlarged: threading)
-
-# --- spring-hook fastener (spring_hook_spec) --------------------------------
-# A little open J-hook seats shank-up in each plate bore; its +X arm, presented
-# just above the plate, threads the spring's bottom eye. So the shank sits one
-# arm-offset -X of the (vertical) spring eye and the arm reaches back to it.
-from spring_hook_spec import (  # noqa: E402
-    ELBOW_R as HOOK_ELBOW_R,
-    ROD_DIA as HOOK_ROD_DIA,
-    ARM_RUN as HOOK_ARM_RUN,
-    SHANK_RISE as HOOK_SHANK_RISE,
-)
-
-HOOK_ARM_OFFSET_X = HOOK_ELBOW_R + HOOK_ARM_RUN / 2.0  # 2.75: shank->arm-mid in +X
-HOOK_ARM_HEIGHT = HOOK_SHANK_RISE + HOOK_ELBOW_R  # 9.1: shank base -> arm centreline
+# --- purchased channel springs and retained lower anchors ------------------
+from _spring import build_spring  # noqa: E402
+import channel_lever_spec  # noqa: E402
+import channel_spring_stock_geom as spring_stock  # noqa: E402
+import spring_mount_geom as spring_mounts  # noqa: E402
+import summing_lever_spec  # noqa: E402
+from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 
 # Bushing OD radii (for the concentric "rides the shaft" seat): the bushing OD
 # face is the unambiguous concentric reference -- it is the only geometry at this
@@ -394,17 +344,6 @@ from _hole_spec import blind_cut_dia_mm  # noqa: E402
 from rocker_arm_spec import HUB_DIA as ROCKER_HUB_DIA, HUB_LENGTH as ROCKER_HUB_LENGTH  # noqa: E402
 from channel_lever_spec import HUB_LENGTH as LEVER_HUB_LENGTH  # noqa: E402
 from build_pivot_bracket import FOOT_H as PIVOT_BRACKET_FOOT_H  # noqa: E402
-from summing_lever_spec import HOLE_SPEC as SUMMING_SPRING_HOLE_SPEC  # noqa: E402
-
-# --- summing-lever plate interface (build_summing_lever.py) ------------------
-# The corrected .cs lever is a coplanar casting: the plate is mid-plane ON the
-# pivot (knife line y=979.7 after the top-frame rederive's summing cascade
-# -10.3), so its top is 982.24. The 20 channel springs meet it at PLATE_EYE_Y
-# (below); with the lever tabs down only 4.5 (fulcrum chain) the springs
-# elongate a net 5.8 vs the pre-rederive pose (installed body 61.98 -> 67.78).
-PLATE_TOP_Y = 982.24
-PLATE_THICKNESS = 5.1
-PLATE_HOLE_DIA = blind_cut_dia_mm(SUMMING_SPRING_HOLE_SPEC)
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -590,156 +529,6 @@ async def _locate_to_datum(adapter, name: str) -> None:
         )
 
 
-BAR_TOP_TO_FOOT = BAR_TOP_PIN_LOCAL[1] - BAR_FOOT_LOCAL[1]  # 801.95
-# Foot-axis -> notch-roof contact offset in the bar's UNtilted (vertical) XY
-# frame: the roof sits at the bar's +X edge (+BAR_WIDTH/2) and BAR_FOOT_NOTCH up,
-# lifted BAR_CONTACT_GAP off the arc. (Machine frame: the amplitude foot slides
-# +X off the pivot, so the roof rides the +X edge -- the mirror of the pre-#151
-# -X edge.) Rotating this by the bar tilt keeps the contact-on-arc constraint
-# exact as the bar swings.
-_CONTACT_OFF_X = BAR_WIDTH / 2.0
-_CONTACT_OFF_Y = BAR_FOOT_NOTCH - BAR_CONTACT_GAP
-
-
-def _arc_geometry() -> dict[str, float]:
-    """Amplitude-independent rocker/rod kinematics + the top-edge arc centre.
-
-    Rod-pin point P: |P - pivot| = ARM_ROD_LEVER (127.583) and
-    |P - ring centre| = ROD_C2C, +X branch (rod side). The R800 arc the bar
-    foot rides has its centre 808 mm out along the tilted arm's +Y, about the
-    pivot hole at local (0, 8).
-    """
-    ox, oy = PIVOT
-    cx, cy = RING_CENTER
-    dx, dy = cx - ox, cy - oy
-    d = math.hypot(dx, dy)
-    a = (ARM_ROD_LEVER**2 - ROD_C2C**2 + d * d) / (2.0 * d)
-    h = math.sqrt(ARM_ROD_LEVER**2 - a * a)
-    ux, uy = dx / d, dy / d
-    # -X branch (rod side, machine frame): the ring sits at machine -X of the
-    # pivot, so the rod-side intersection is the perpendicular branch with the
-    # more-negative x -- (+h*uy, -h*ux) rather than the pre-#151 (-h*uy, +h*ux)
-    # that picked the +X (mirrored) side. This IS the h-term sign flip the
-    # machine-hand re-authoring demands: the rest of the loop is x-mirror-even.
-    px = ox + a * ux + h * uy
-    py = oy + a * uy - h * ux
-    # The pin azimuth is the LEVER's direction, and the lever leans beta above
-    # the arm's local +X. In the machine frame the arm's rod-side points -X, so
-    # the azimuth is measured from -X (atan2 with x = ox - px); the ARM tilt is
-    # that azimuth MINUS beta. Beta is load-bearing: the low rod-pin bore
-    # (ROD_HOLE_Y 15.30) sits 7.30 above the pivot bore, and ignoring the 3.28
-    # deg lever angle would land the pin 7 mm off and drag the ring off the cam.
-    arm_tilt = math.degrees(math.atan2(py - oy, ox - px)) - ARM_LEVER_BETA_DEG
-    rod_tilt = math.degrees(math.atan2(px - cx, py - cy))  # machine hand: mirror
-    # of the pre-#151 -atan2 (the ring is now at -X of the pin).
-
-    t = math.radians(arm_tilt)
-    rel = ARM_ARC_CENTER_LOCAL_Y - ARM_PIVOT_LOCAL_Y
-    acx = ox + rel * math.sin(t)
-    acy = oy + rel * math.cos(t)
-    return {
-        "arm_tilt": arm_tilt,
-        "rod_tilt": rod_tilt,
-        "pin_x": px,
-        "pin_y": py,
-        "acx": acx,
-        "acy": acy,
-    }
-
-
-_ARC = _arc_geometry()
-# LEVEL rest pose is authored, not incidental: ROD_HOLE_X / ROD_C2C /
-# RING_CENTER are co-solved so the neutral arm sits flat (ch14 end views,
-# 0-crank tip row). Any drift here means one of those constants moved without
-# re-solving the closure -- fail before SolidWorks bakes the wrong pose in.
-if abs(_ARC["arm_tilt"]) > 0.02 or abs(_ARC["rod_tilt"]) > 0.02:
-    raise RuntimeError(
-        "neutral pose no longer level: arm_tilt=%.4f deg, rod_tilt=%.4f deg "
-        "-- re-solve ROD_HOLE_X (build_rocker_arm) and CENTER_DISTANCE "
-        "(build_connecting_rod) against RING_CENTER"
-        % (_ARC["arm_tilt"], _ARC["rod_tilt"])
-    )
-
-
-def solve_state(amplitude: float = 0.0) -> dict[str, float]:
-    """Solve one channel's kinematics for an amplitude-bar station ``amplitude``.
-
-    ``amplitude`` is the foot-axis X offset from the rocker pivot (mm), the
-    Fourier coefficient a_j (channels.yaml ``amplitude_mm``); 0 reproduces the
-    neutral pose bit-exactly. The mechanism is a 4-bar loop: the bar top pin
-    rides the lever's 127 mm crank, the rigid bar (801.95 mm) hangs to the foot,
-    and the foot-notch roof rests on the rocker's R800 top-edge arc. Positive
-    amplitude slides the foot +X along the arc (the machine-frame lifting side,
-    clear of the pivot shaft; the mirror of the pre-#151 -X side), tilting the
-    bar by ``bar_tilt`` and the lever by ``lever_tilt``. Solved by driving the
-    lever-reach residual to zero over the bar tilt.
-
-    The solver runs in the machine frame, so its swing root ``beta`` is the
-    PHYSICAL bar tilt (the mirror of the pre-#151 value). The reported
-    ``bar_tilt`` negates it: the bar is authored ``rows_from_euler([bar_tilt,
-    -90, 0])`` (Ry(-90), the mirror of the old Ry(+90)), and with that turn the
-    scalar that reproduces the physical pose is -degrees(beta).
-    """
-    ox, _oy = PIVOT
-    acx, acy = _ARC["acx"], _ARC["acy"]
-    fx = ox + amplitude  # foot-axis X (+X = the machine-frame lifting side)
-
-    def foot_y(beta: float) -> float:
-        s, c = math.sin(beta), math.cos(beta)
-        cx_c = fx + _CONTACT_OFF_X * c - _CONTACT_OFF_Y * s
-        ky = _CONTACT_OFF_X * s + _CONTACT_OFF_Y * c
-        disc = ARM_TOP_RADIUS**2 - (cx_c - acx) ** 2
-        if disc <= 0.0:
-            raise RuntimeError(f"foot station {amplitude:.1f} mm runs off the R800 arc")
-        return acy - ky - math.sqrt(disc)
-
-    def residual(beta: float) -> float:
-        fy = foot_y(beta)
-        tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
-        ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
-        return math.hypot(tx - FULCRUM[0], ty - FULCRUM[1]) - LEVER_BAR_PIN_X
-
-    beta = _bisect(residual, -0.30, 0.20)
-    fy = foot_y(beta)
-    tx = fx + BAR_TOP_TO_FOOT * math.sin(beta)
-    ty = fy + BAR_TOP_TO_FOOT * math.cos(beta)
-    contact_y = fy + _CONTACT_OFF_X * math.sin(beta) + _CONTACT_OFF_Y * math.cos(beta)
-    return {
-        "arm_tilt": _ARC["arm_tilt"],
-        "rod_tilt": _ARC["rod_tilt"],
-        "pin_x": _ARC["pin_x"],
-        "pin_y": _ARC["pin_y"],
-        "bar_tilt": -math.degrees(beta),
-        "bar_bottom": fy,  # foot-axis Y
-        "bar_origin_x": fx + (BAR_WIDTH / 2.0) * math.cos(beta),
-        "bar_origin_y": fy - (BAR_WIDTH / 2.0) * math.sin(beta),
-        "contact_y": contact_y,
-        "bar_pin_y": ty,
-        "lever_tilt": math.degrees(math.atan2(ty - FULCRUM[1], FULCRUM[0] - tx)),
-    }
-
-
-def _bisect(f, lo: float, hi: float, tol: float = 1e-10, iters: int = 80) -> float:
-    """Root of monotone ``f`` on [lo, hi] (the bar-tilt that closes the loop)."""
-    flo, fhi = f(lo), f(hi)
-    if flo == 0.0:
-        return lo
-    if flo * fhi > 0.0:
-        raise RuntimeError(
-            f"bar-tilt root not bracketed: f({lo})={flo:.3f}, f({hi})={fhi:.3f}"
-        )
-    for _ in range(iters):
-        mid = 0.5 * (lo + hi)
-        fmid = f(mid)
-        if abs(fmid) < tol or (hi - lo) < tol:
-            return mid
-        if (fmid > 0.0) == (fhi > 0.0):
-            hi, fhi = mid, fmid
-        else:
-            lo, flo = mid, fmid
-    return 0.5 * (lo + hi)
-
-
 async def _revolute(
     adapter,
     comp: str,
@@ -835,140 +624,217 @@ async def _revolute(
     return spin
 
 
-def _assert_spring_threading(hole_y: float, eye_y: float) -> None:
-    """Assert the eye ring threads the O4 hole without touching the lever.
-
-    The eye is a torus: ring plane vertical, containing the hole axis (Z);
-    ring-circle radius 2.75, wire radius 0.5, centre hanging DROP below the
-    hole centre. Sweep the torus surface (tube angle phi, slab depth z):
-    a tube point at radial offset rho = R + r*cos(phi), lateral (along the
-    lever, X) offset r*sin(phi), reaches slab depth z (|z| <= 1.5) on the
-    upper branch at dy = +sqrt(rho^2 - z^2) above the eye centre and must
-    stay inside the hole bore there; the lower branch at -sqrt(rho^2 - z^2)
-    must pass under the lever tab's bottom edge. Binding extremes (rho
-    2.25, z +/-1.5): sqrt(2.25^2 - 1.5^2) = 1.677 -> top |1.677 - D|,
-    bottom D + 1.677 - 3.0; with D = 3.37 margins ~0.31 / ~2.0.
-    """
-    half_t = LEVER_THICKNESS / 2.0
-    wire_r = SPRING_WIRE_DIA / 2.0
-    hole_r = SPRING_HOLE_DIA / 2.0
-    plate_bottom = hole_y - LEVER_TAB_HALF
-    worst_bore = 0.0  # max distance of the upper branch from the hole axis
-    worst_under = -math.inf  # max y of the lower branch inside the slab
-    steps = 360
-    for k in range(steps):
-        phi = 2.0 * math.pi * k / steps
-        rho = SPRING_LOOP_R + wire_r * math.cos(phi)
-        x_off = wire_r * math.sin(phi)
-        for n in range(-30, 31):
-            z = half_t * n / 30.0
-            if rho <= abs(z):
-                continue
-            dy = math.sqrt(rho * rho - z * z)
-            worst_bore = max(worst_bore, math.hypot(x_off, eye_y + dy - hole_y))
-            worst_under = max(worst_under, eye_y - dy)
-    margin_top = hole_r - worst_bore
-    margin_bot = plate_bottom - worst_under
-    if margin_top < 0.1 or margin_bot < 0.1:
+def _assert_spring_mount(
+    pose: spring_mounts.SpringPose,
+    amplitude: float,
+    *,
+    state: Literal["catalog_seed", "native_seated"],
+) -> None:
+    """Check real mount clearances; require analytic bore tangency only for seeds."""
+    if state not in ("catalog_seed", "native_seated"):
+        raise ValueError(f"unknown stock spring mount state {state!r}")
+    hole_x, hole_y = channel_kinematics.spring_hole_xy(amplitude)
+    ux, uy = pose.axis_xy
+    wire_r = spring_stock.WIRE_DIA_MM / 2.0
+    inner_r = spring_stock.COIL_ID_MM / 2.0
+    hole_r = blind_cut_dia_mm(channel_lever_spec.SPRING_EYE_HOLE_SPEC) / 2.0
+    edge_height = math.sqrt(inner_r**2 - (LEVER_THICKNESS / 2.0) ** 2)
+    drop = math.hypot(hole_x - pose.upper_eye_xy[0], hole_y - pose.upper_eye_xy[1])
+    bore_margin = hole_r + edge_height - drop
+    phi = math.radians(channel_kinematics.solve_state(amplitude)["lever_tilt"])
+    along_normal = ux * math.sin(phi) + uy * math.cos(phi)
+    across_normal = uy * math.sin(phi) - ux * math.cos(phi)
+    under_lever = (
+        (drop + edge_height) * along_normal
+        - wire_r * abs(across_normal)
+        - LEVER_TAB_HALF
+    )
+    if (state == "catalog_seed" and abs(bore_margin) > 1e-6) or under_lever < 0.1:
         raise RuntimeError(
-            f"spring eye threading margins too small: hole-void {margin_top:.3f},"
-            f" under-lever {margin_bot:.3f}"
+            f"stock spring upper hook: loaded bore margin {bore_margin:.6f}, "
+            f"under-lever clearance {under_lever:.3f} mm"
         )
+
+    anchor = ANCHOR_9489T111
+    tap = summing_lever_spec.HOLE_SPEC
+    if tap.kind != "tapped" or tap.size != anchor.thread_size:
+        raise RuntimeError("channel anchor requires its matching native through tap")
+    top = spring_mounts.PLATE_TOP_Y
+    bottom = top - summing_lever_spec.PLATE_T
+    anchor_y = spring_mounts.CHANNEL_ANCHOR_XY[1]
+    thread_top = anchor_y + anchor.thread_start_y_mm
+    thread_bottom = anchor_y + anchor.shank_end_y_mm
+    engagement = min(top, thread_top) - max(bottom, thread_bottom)
+    if engagement < summing_lever_spec.PLATE_T - 1e-6:
+        raise RuntimeError(f"channel anchor only engages {engagement:.3f} mm of plate")
+    spring_bottom = (
+        pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
+    )
+    if spring_bottom - top < 0.3:
+        raise RuntimeError("stock spring lower hook enters the summing plate")
+    spring_stock.check_length_mm(pose.length_mm)
     log(
-        f"spring eye threading: hole-void margin {margin_top:.2f},"
-        f" under-lever margin {margin_bot:.2f}"
+        f"stock spring mount: inside length {pose.length_mm:.4f} mm, "
+        f"thread engagement {engagement:.3f} mm, tail {bottom - thread_bottom:.3f} mm"
     )
 
 
-def _assert_hook_fastener(eye_y: float) -> None:
-    """Assert the spring-hook fastener bridges the spring to the plate cleanly.
+async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list[dict]:
+    """Fit supplier end surfaces before building the main channel assembly.
 
-    The spring no longer threads the plate. Its bottom eye sits ABOVE the plate
-    at the FIXED ``PLATE_EYE_Y`` (pose-independent: every channel's bottom eye is
-    pinned there, only the top eye at ``eye_y`` rides the lever). A separate open
-    J-hook (build_spring_hook.py) seats shank-up in the plate's O2.0 bore and
-    presents its +X arm at ``PLATE_EYE_Y``, where the spring eye links on. This
-    checks the pose-independent fastener geometry -- eye clear above the plate,
-    shank filling+poking through the bore, arm threading the eye with clearance --
-    plus the genuine pose-dependent invariant: the neutral body must stay stretched.
+    Each distinct amplitude uses a three-part native fixture. End corrections
+    change the installed length, not the supplier end geometry or the pull axis.
+    A rebuilt variant is measured again because a native sweep need not preserve
+    its end surface exactly when its overall path changes.
     """
-    plate_bottom = PLATE_TOP_Y - PLATE_THICKNESS
-    wire_r = SPRING_WIRE_DIA / 2.0
-    hook_r = HOOK_ROD_DIA / 2.0
-    shank_base = PLATE_EYE_Y - HOOK_ARM_HEIGHT  # arm sits HOOK_ARM_HEIGHT above base
-    shank_top = shank_base + HOOK_SHANK_RISE
-    eye_above_plate = PLATE_EYE_Y - PLATE_TOP_Y  # bottom eye clear above the casting
-    # The eye is a torus, ring plane vertical (axis +X): its LOWEST point hangs a
-    # full ring radius + wire below the centre, so the centre clearing the plate is
-    # NOT enough -- the ring bottom is what fouls the casting (the 0.85 mm dip that
-    # got past the centre-only check and showed as 20 top-level interferences).
-    eye_ring_bottom = PLATE_EYE_Y - (SPRING_LOOP_R + wire_r)
-    ring_above_plate = eye_ring_bottom - PLATE_TOP_Y
-    shank_poke = shank_top - PLATE_TOP_Y  # shank fills the bore + protrudes
-    seat_drop = plate_bottom - shank_base  # shank base reaches the bore mouth
-    bore_clear = PLATE_HOLE_DIA / 2.0 - hook_r
-    ring_clear = (SPRING_LOOP_R - wire_r) - hook_r  # eye inner radius vs arm wire
-    body = (eye_y - PLATE_EYE_Y) - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD
-    if eye_above_plate < 0.5 or ring_above_plate < 0.3:
-        raise RuntimeError(
-            f"spring bottom eye not clear above the plate: centre {eye_above_plate:.3f}"
-            f" mm, ring bottom {ring_above_plate:.3f} mm (eye {PLATE_EYE_Y:.2f}, ring"
-            f" bottom {eye_ring_bottom:.2f}, plate top {PLATE_TOP_Y:.2f}) -- the eye"
-            f" ring would foul the casting instead of hanging on the hook"
-        )
-    if shank_poke < 0.1 or abs(seat_drop) > 0.5:
-        raise RuntimeError(
-            f"hook shank does not seat the bore: poke-above {shank_poke:.3f},"
-            f" base-vs-bore-mouth {seat_drop:+.3f} (want shank to fill"
-            f" {plate_bottom:.2f}..{PLATE_TOP_Y:.2f})"
-        )
-    if bore_clear < 0.05 or ring_clear < 0.05:
-        raise RuntimeError(
-            f"hook fastener clearances too small: shank-in-bore {bore_clear:.3f},"
-            f" arm-in-eye {ring_clear:.3f}"
-        )
-    if body < COIL_BODY_LENGTH:
-        raise RuntimeError(
-            f"neutral spring body {body:.2f} mm below the free coil"
-            f" {COIL_BODY_LENGTH:.2f} mm: the rest pose dropped the lever eye too"
-            f" far -- the spring would be in compression, not tension"
-        )
-    log(
-        f"hook fastener: bottom eye y {PLATE_EYE_Y:.2f} ({eye_above_plate:.2f} above"
-        f" plate, ring bottom {ring_above_plate:.2f} above), shank poke {shank_poke:.2f},"
-        f" bore clearance {bore_clear:.2f}, arm-in-eye {ring_clear:.2f},"
-        f" neutral body {body:.2f} (free {COIL_BODY_LENGTH:.2f})"
-    )
-
-
-def _spring_spec(amplitude: float, hole_x_0: float) -> dict[str, Any]:
-    """Per-channel stretched-spring geometry (parametric-springs memory, task #10).
-
-    The lever lifts/tilts with the amplitude, so the top eye moves to
-    ``(hole_x, eye_y)``; the bottom eye stays at the FIXED summing-plate hole
-    ``(hole_x_0, PLATE_EYE_Y)`` -- the neutral bottom-eye position the plate was
-    built around. The spring is grounded along that line at the EXACT gap length
-    (length = gap - top_lead - bottom_lead), instead of a fixed 63 mm body lifted
-    bodily into the plate (the F3 80 mm interference regression). The tilt is tiny
-    (<=1.1 deg) -- the span is almost pure stretch.
-    """
-    st = solve_state(amplitude)
-    phi = math.radians(st["lever_tilt"])
-    hole_x = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi)  # lever reaches -X (machine)
-    hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
-    eye_y = hole_y - SPRING_EYE_DROP
-    dx = hole_x - hole_x_0
-    dy = eye_y - PLATE_EYE_Y
-    gap = math.hypot(dx, dy)
-    return {
-        "hole_y": hole_y,
-        "eye_y": eye_y,
-        "gap": gap,
-        "body": gap - SPRING_TOP_LEAD - SPRING_BOTTOM_LEAD,
-        "ux": dx / gap,
-        "uy": dy / gap,
-        "theta": math.degrees(math.atan2(-dx, dy)),
-    }
+    by_amplitude: dict[float, dict] = {}
+    for station, amplitude in enumerate(amplitudes):
+        if amplitude in by_amplitude:
+            continue
+        z_mid = z_station(station) + ARM_MID_DZ
+        pose = spring_mounts.channel_pose(amplitude)
+        part = "channel-spring-installed"
+        variant_index = len(by_amplitude)
+        variant = f"channel-spring-installed-stretch{variant_index:02d}"
+        if pose.length_mm != spring_mounts.CHANNEL_NOMINAL_POSE.length_mm:
+            await build_spring(adapter, variant, pose.length_mm, views=[])
+            adapter.swApp.CloseDoc(
+                _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+            )
+            part = variant
+        state = channel_kinematics.solve_state(amplitude)
+        lever_rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
+        ux, uy = pose.axis_xy
+        for iteration in range(8):
+            owned_titles = []
+            try:
+                check("create spring seating fixture", await adapter.create_assembly())
+                fixture = _early_bound(adapter.currentModel, "IModelDoc2")
+                owned_titles.append(str(fixture.GetTitle()))
+                lever = await place_component(
+                    adapter,
+                    "channel-lever",
+                    [FULCRUM[0], FULCRUM[1], z_mid],
+                    euler_from_rows(lever_rows),
+                    lever_rows,
+                )
+                spring, hook = await place_components_batch(
+                    adapter,
+                    [
+                        {
+                            "part": part,
+                            "position": [*pose.centre_xy, z_mid],
+                            "rotation": [0.0, 0.0, 0.0],
+                            "rows": pose.rotation_rows,
+                            "ground": True,
+                        },
+                        {
+                            "part": "spring-hook",
+                            "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
+                            "rotation": [0.0, 0.0, 0.0],
+                            "rows": IDENTITY,
+                            "ground": True,
+                        },
+                    ],
+                    label="native spring seating fixture",
+                )
+                assembly = _early_bound(fixture, "IAssemblyDoc")
+                for name in (lever, spring, hook):
+                    component = _early_bound(
+                        assembly.GetComponentByName(name), "IComponent2"
+                    )
+                    document = _early_bound(component.GetModelDoc2(), "IModelDoc2")
+                    owned_titles.append(str(document.GetTitle()))
+                radius = spring_stock.WIRE_DIA_MM / 2.0
+                lower = solve_component_contact(
+                    adapter,
+                    spring,
+                    hook,
+                    (-ux, -uy, 0.0),
+                    radius,
+                    label=f"channel {amplitude:g} lower",
+                )
+                upper = solve_component_contact(
+                    adapter,
+                    spring,
+                    lever,
+                    (ux, uy, 0.0),
+                    radius,
+                    label=f"channel {amplitude:g} upper",
+                )
+                seated = (
+                    lower.certificate == "already_seated"
+                    and upper.certificate == "already_seated"
+                )
+                _telemetry.event(
+                    "spring.channel_contact_iteration",
+                    amplitude_mm=amplitude,
+                    iteration=iteration + 1,
+                    inside_length_mm=pose.length_mm,
+                    lower_offset_mm=lower.offset_mm,
+                    upper_offset_mm=upper.offset_mm,
+                    lower_certificate=lower.certificate,
+                    upper_certificate=upper.certificate,
+                )
+                if seated:
+                    check_no_interference(adapter)
+                assert_pose_ledger(adapter)
+            finally:
+                for title in dict.fromkeys(owned_titles):
+                    adapter.swApp.CloseDoc(title)
+            if seated:
+                spring_stock.check_length_mm(pose.length_mm)
+                if spring_mounts.channel_force_n(pose.length_mm) > float(
+                    _config.parts("channel-spring-installed")["maximum_load_n"]
+                ):
+                    raise RuntimeError(
+                        "native-seated channel spring exceeds catalog load"
+                    )
+                by_amplitude[amplitude] = {
+                    "pose": pose,
+                    "variant_index": None
+                    if part == "channel-spring-installed"
+                    else variant_index,
+                }
+                _telemetry.event(
+                    "spring.channel_seated",
+                    amplitude_mm=amplitude,
+                    inside_length_mm=pose.length_mm,
+                    seed_length_mm=spring_mounts.channel_pose(amplitude).length_mm,
+                    iterations=iteration + 1,
+                    lower_contact_offset_mm=lower.offset_mm,
+                    upper_contact_offset_mm=upper.offset_mm,
+                )
+                break
+            lower_eye = tuple(
+                pose.lower_eye_xy[k] - pose.axis_xy[k] * lower.offset_mm
+                for k in range(2)
+            )
+            upper_eye = tuple(
+                pose.upper_eye_xy[k] + pose.axis_xy[k] * upper.offset_mm
+                for k in range(2)
+            )
+            pose = replace(
+                pose,
+                length_mm=spring_stock.check_length_mm(
+                    pose.length_mm + lower.offset_mm + upper.offset_mm
+                ),
+                lower_eye_xy=lower_eye,
+                upper_eye_xy=upper_eye,
+                centre_xy=tuple((a + b) / 2.0 for a, b in zip(lower_eye, upper_eye)),
+            )
+            await build_spring(adapter, variant, pose.length_mm, views=[])
+            adapter.swApp.CloseDoc(
+                _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+            )
+            part = variant
+        else:
+            raise RuntimeError(
+                f"native channel spring seating did not converge at {amplitude:g} mm: "
+                f"length={pose.length_mm:.12g}, lower={lower.offset_mm:.12g}, "
+                f"upper={upper.offset_mm:.12g} mm"
+            )
+    return [by_amplitude[amplitude] for amplitude in amplitudes]
 
 
 async def build(adapter) -> dict[str, str]:
@@ -983,7 +849,7 @@ async def build(adapter) -> dict[str, str]:
             "amplitude_mm must be >= 0 (the lifting side keeps the foot clear of"
             f" the pivot shaft); got {amplitudes}"
         )
-    state = solve_state(0.0)
+    state = channel_kinematics.solve_state(0.0)
     log(
         "neutral state: arm tilt %.3f deg, rod tilt %.3f deg, pin (%.2f, %.2f),"
         % (state["arm_tilt"], state["rod_tilt"], state["pin_x"], state["pin_y"])
@@ -1002,75 +868,29 @@ async def build(adapter) -> dict[str, str]:
         % ", ".join(f"{a:.2f}" for a in amplitudes)
     )
 
-    # Neutral reference design: the spring/plate threading is asserted at the
-    # neutral lever pose (the as-photographed installed length). Per-channel
-    # springs translate up with their levers (placed in the loop); their fit to
-    # the fixed summing plate is realised at the top level by the parametric
-    # spring length (parametric-springs memory).
-    phi = math.radians(state["lever_tilt"])
-    spring_hole_y = FULCRUM[1] + LEVER_SPRING_X * math.sin(phi)
-    eye_y = spring_hole_y - SPRING_EYE_DROP
-    _assert_spring_threading(spring_hole_y, eye_y)
-    _assert_hook_fastener(eye_y)
+    _assert_spring_mount(
+        spring_mounts.CHANNEL_NOMINAL_POSE, 0.0, state="catalog_seed"
+    )
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
     bar_clearance = state["bar_bottom"] - PIVOT[1]
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
-    # Per-channel stretched springs (task #10): each spans the moving lever eye to
-    # the fixed plate hole at its measured gap length. Even (a_j=0) channels reuse
-    # the base part; the rest get a distinct stretched variant, built ONCE here
-    # (lean -- no PNG views; the canonical part renders its own). The variants are
-    # length variants of channel-spring-installed, so part_properties inherits its
-    # registry row (their placement is authored machine-handed here, no per-part
-    # symmetry declaration -- the #151 mirror layer is gone).
-    phi_0 = math.radians(state["lever_tilt"])  # state = solve_state(0.0)
-    hole_x_0 = FULCRUM[0] - LEVER_SPRING_X * math.cos(phi_0)  # lever reaches -X
-    spring_specs = [_spring_spec(a, hole_x_0) for a in amplitudes]
-    # The canonical channel-spring-installed body MUST equal the neutral gap so
-    # the neutral pose mates that ONE part x20 with no generated stretch variant.
-    # If the lever anchor drifts (another OD re-anchor) they diverge -- fail loud
-    # here (and offline: verify:math spring:neutral-body-canonical) rather than
-    # silently spawning a stretch00. Non-neutral a_j still get real variants.
-    neutral_body = _spring_spec(0.0, hole_x_0)["body"]
-    if abs(neutral_body - SPRING_BASE_BODY) >= 0.05:
-        raise RuntimeError(
-            f"channel-spring-installed body {SPRING_BASE_BODY:.3f} != neutral gap "
-            f"{neutral_body:.3f}: update LEVER_EYE_Y in "
-            f"channel_spring_installed_spec.py to the re-anchored neutral eye"
-        )
-    variant_by_body: dict[float, str] = {}
+    # Native supplier surfaces, rather than ideal circular-wire offsets, own
+    # installed seating. The existing stretch-part cache carries these variants.
+    native_springs = await _prepare_native_spring_specs(adapter, amplitudes)
+    spring_specs = [
+        {"pose": row["pose"], "variant_index": row["variant_index"]}
+        for row in native_springs
+    ]
+    # Keep component source families explicit for the static build graph.
     for spec in spring_specs:
-        if abs(spec["body"] - SPRING_BASE_BODY) < 0.05:
-            spec["part"] = "channel-spring-installed"
-            continue
-        key = round(spec["body"], 2)
-        name = variant_by_body.get(key)
-        if name is None:
-            name = f"channel-spring-installed-stretch{len(variant_by_body):02d}"
-            variant_by_body[key] = name
-        spec["part"] = name
-    log(
-        f"spring variants: base {SPRING_BASE_BODY:.2f} + {len(variant_by_body)} "
-        f"stretched bodies {sorted(variant_by_body)}"
-    )
-    for key, name in variant_by_body.items():
-        # Always rebuild: a skip-if-exists short-circuit could reuse a stale
-        # stretchNN body of a different length after amplitudes/spring lengths
-        # change, because these dynamic .SLDPRTs are not declared doit targets and
-        # so survive `doit clean` of the part graph (codex review #4; clean now
-        # wipes them, and this rebuilds them fresh).
-        log(f"  building {name} body={key:.2f} (no views)")
-        await build_spring(
-            adapter,
-            name,
-            key,
-            leads=(SPRING_BOTTOM_LEAD, SPRING_TOP_LEAD),
-            views=[],
-            eye_axes=True,
-        )
-    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        spec["part"] = "channel-spring-installed"
+        if spec["variant_index"] is not None:
+            spec["part"] = (
+                f"channel-spring-installed-stretch{spec['variant_index']:02d}"
+            )
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -1433,7 +1253,8 @@ async def build(adapter) -> dict[str, str]:
         arc_c = world_point(adapter, rocker, [0.0, ARM_ARC_CENTER_LOCAL_Y, 0.0])
         foot_r = math.hypot(foot[0] - arc_c[0], foot[1] - arc_c[1])
         want_r = math.hypot(
-            (PIVOT[0] + amplitudes[j]) - _ARC["acx"], st["bar_bottom"] - _ARC["acy"]
+            (PIVOT[0] + amplitudes[j]) - channel_kinematics.ARC["acx"],
+            st["bar_bottom"] - channel_kinematics.ARC["acy"],
         )
         if abs(foot_r - want_r) > 1e-3:
             raise RuntimeError(
@@ -1550,7 +1371,9 @@ async def build(adapter) -> dict[str, str]:
     slots_by_seed: dict[int, tuple[int, int, dict[str, list[float]]]] = {}
     copied: list[dict[str, Any]] = []
     for j in range(CHANNELS):
-        st = solve_state(amplitudes[j])  # this channel's bar/lever pose
+        st = channel_kinematics.solve_state(
+            amplitudes[j]
+        )  # this channel's bar/lever pose
         amp_key = round(amplitudes[j], 6)
         seed = seed_by_amp.get(amp_key) if j >= 2 else None
         if seed is None:
@@ -1842,63 +1665,30 @@ async def build(adapter) -> dict[str, str]:
 
     for j in range(CHANNELS):
         z_mid = z_station(j) + ARM_MID_DZ
-        # Return spring (ground; cosmetic) -- placed PER CHANNEL spanning this
-        # channel's (moving) lever eye to the FIXED summing-plate hole, at the
-        # measured gap length (parametric-springs memory / task #10). NOT a fixed
-        # 63 mm body and NOT patterned: the lever tilts/lifts with the amplitude,
-        # so a fixed-length vertical spring lifts its bottom bodily into the plate
-        # (the F3 80 mm interference regression). `spec` carries the per-channel
-        # length variant + the unit span direction (coil axis, bottom->top).
-        # _assert_spring_threading is tilt-invariant (eye 3.37 below the hole),
-        # so the top eye threads the lever hole; the bottom eye lands on the fixed
-        # plate hole at (hole_x_0, PLATE_EYE_Y) by construction.
+        # The supplier frame has its origin at mid-length and coil axis +X.
+        # These remain grounded display components; they are not a force solver.
         spec = spring_specs[j]
-        _assert_spring_threading(spec["hole_y"], spec["eye_y"])
-        ux, uy = spec["ux"], spec["uy"]
-        # rows = Rz(theta).Ry90: local +Y (coil axis) -> the span direction,
-        # local +Z (eye axis) -> the in-plane normal, local +X -> world -Z for
-        # ANY theta (first row tilt-independent). The tilt is baked in here, so
-        # the grounded pose holds for every amplitude preset. theta=0 vertical.
-        spring_rows = [[0.0, 0.0, -1.0], [ux, uy, 0.0], [uy, -ux, 0.0]]
+        pose = spec["pose"]
+        _assert_spring_mount(
+            spring_mounts.channel_pose(amplitudes[j]), amplitudes[j], state="catalog_seed"
+        )
+        _assert_spring_mount(pose, amplitudes[j], state="native_seated")
         grounded_specs.append(
             {
                 "part": spec["part"],
-                "position": [
-                    hole_x_0 + SPRING_BOTTOM_LEAD * ux,
-                    PLATE_EYE_Y + SPRING_BOTTOM_LEAD * uy,
-                    z_mid,
-                ],
+                "position": [*pose.centre_xy, z_mid],
                 "rotation": [0.0, 0.0, 0.0],
-                "rows": spring_rows,
-                "kind": "spring",
-                "theta": spec["theta"],
-                "label": (
-                    f"channel-spring ch{j:02d} {spec['part'].rsplit('-', 1)[-1]} "
-                    f"body={spec['body']:.2f} tilt={spec['theta']:+.2f}"
-                ),
+                "rows": pose.rotation_rows,
+                "label": f"channel-spring ch{j:02d} inside length={pose.length_mm:.4f}",
             }
         )
-
-        # Spring-hook fastener (ground; cosmetic) -- the SEPARATE little open J-hook
-        # that connects this channel's spring to the plate (the spring no longer
-        # threads the plate itself). It seats shank-UP in the plate bore at
-        # (hole_x_0 + arm_offset, z_mid) and presents its arm just above the
-        # plate, threading the spring's bottom eye (fixed at (hole_x_0,
-        # PLATE_EYE_Y, z_mid) for every pose). The part is modeled with its arm to
-        # local +X; Ry(180) (the machine-frame z-plane turn) points that arm to
-        # machine -X, back toward the eye one arm-offset away. The eye-axis tilt
-        # (<=1.1 deg even at full amplitude) is well inside the bore/ring clearance.
         grounded_specs.append(
             {
                 "part": "spring-hook",
-                "position": [
-                    hole_x_0 + HOOK_ARM_OFFSET_X,
-                    PLATE_EYE_Y - HOOK_ARM_HEIGHT,
-                    z_mid,
-                ],
-                "rotation": [0.0, 180.0, 0.0],
-                "rows": ROT_Y_180,
-                "label": f"spring-hook ch{j:02d} bore-seat",
+                "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
+                "rotation": [0.0, 0.0, 0.0],
+                "rows": IDENTITY,
+                "label": f"spring-hook ch{j:02d} direct threaded seat",
             }
         )
 

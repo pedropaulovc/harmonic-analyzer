@@ -1,18 +1,7 @@
-r"""Throwaway: validate the 4 spring-eye arc_center edge points on the live model
-before baking them into build_motion_study_springs.py.
+r"""Check the four stock-spring support RefPoints on the active assembly.
 
-Each spring endpoint is a ring-centre RefPoint created at RUNTIME on a SHARED part
-doc (inherited by all instances, NEVER saved) -- same recipe as the cam ring
-point. arc_center needs a part-LOCAL point that lies ON the eye hole's circular
-edge. Candidate edge points (from reading the part scripts):
-  channel-lever tab hole  Ø4.0 @ local (177.8,0,0)   -> [179.8, 0, 0]
-  summing-lever hole 0    Ø4.5 @ (37.10,~5.45,-69.05) -> [39.35, 8.0, -69.05]
-  gooseneck counter eye   Ø4.0 @ pin Y163,Z0          -> [-109.0, 165.0, 0]
-  boss-hook counter eye   Ø3.0 @ arm Y15,Z0           -> [5.25, 16.5, 0]
-
-Attaches to the doc the kinematic build left open. NEVER saves.
-
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\probe_eye_points.py
+Run with cad/scripts on PYTHONPATH after opening a disposable motion assembly.
+Creates transient part features only; never saves any document.
 """
 
 from __future__ import annotations
@@ -22,41 +11,31 @@ import asyncio
 import _telemetry
 from _common import _flag, _read_member, log
 from build_motion_study import _find_one
+from build_motion_study_springs import (
+    CH_LEVER_EYE, SUM_LEVER_EYE, GOOSENECK_EYE, COUNTER_ANCHOR_EYE, _eye_point,
+)
 
 CANDIDATES = [
-    ("channel-lever-1", [179.8, 0.0, 0.0]),
-    ("summing-lever-1", [39.35, 8.0, -69.05]),
-    ("gooseneck-1", [-109.0, 165.0, 0.0]),
-    ("boss-hook-1", [6.5, 16.5, 0.0]),  # rod end-face circle @ X=6.5 (was on the side)
+    ("channel-lever-1", CH_LEVER_EYE),
+    ("summing-lever-1", SUM_LEVER_EYE),
+    ("gooseneck-1", GOOSENECK_EYE),
+    ("boss-hook-1", COUNTER_ANCHOR_EYE),
 ]
 
 
-async def _try_point(adapter, top, top_title, comp_needle, edge_point):
-    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+async def _try_point(adapter, comp_needle, local_point):
+    name = await _eye_point(adapter, comp_needle, local_point, comp_needle)
     comp, _ = _find_one(adapter, comp_needle)
-    if comp is None:
-        log(f"  {comp_needle}: component NOT FOUND")
-        return
-    part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
-    if part is None:
-        log(f"  {comp_needle}: GetModelDoc2 None")
-        return
-    part_title = str(_read_member(part, "GetTitle"))
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
-    try:
-        res = await adapter.create_reference_point(
-            CreateReferencePointParameters(mode="arc_center", edge_point=edge_point))
-        name = getattr(res.data, "name", None) if res.is_success else None
-        log(f"  {comp_needle} ({part_title}) edge={edge_point} -> "
-            f"{'OK ' + str(name) if name else 'FAIL ' + str(res.error)}")
-    except Exception as exc:  # noqa: BLE001
-        log(f"  {comp_needle} edge={edge_point} -> EXC {exc}")
-    finally:
-        adapter._attempt(
-            lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
-        adapter.currentModel = top
+    part = _read_member(comp, "GetModelDoc2")
+    feature = part.FeatureByName(name)
+    ref = _read_member(feature, "GetSpecificFeature2")
+    point = _read_member(ref, "GetRefPoint")
+    actual = tuple(float(value) * 1000.0 for value in _read_member(point, "ArrayData"))
+    if len(actual) != 3 or any(abs(a - b) > 1e-6 for a, b in zip(actual, local_point)):
+        raise RuntimeError(f"{comp_needle}: RefPoint {actual} != {local_point} mm")
+    if comp.GetCorresponding(feature) is None:
+        raise RuntimeError(f"{comp_needle}: RefPoint has no assembly correspondence")
+    log(f"  {comp_needle}: {name} = {actual} mm; assembly correspondence OK")
 
 
 async def main():
@@ -65,20 +44,18 @@ async def main():
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting (ATTACH) ...")
     await adapter.connect()
-    doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
-    if doc is None:
-        log("no ActiveDoc")
-        return
-    _flag(doc, "IModelDoc2")
-    adapter.currentModel = doc
-    top_title = str(_read_member(doc, "GetTitle"))
-    log(f"ActiveDoc = {top_title!r}")
-
-    for comp_needle, edge_point in CANDIDATES:
-        await _try_point(adapter, doc, top_title, comp_needle, edge_point)
-
-    await adapter.disconnect()
-    _telemetry.info("Disconnected (NOT saved).")
+    try:
+        doc = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=None)
+        if doc is None:
+            raise RuntimeError("no ActiveDoc")
+        _flag(doc, "IModelDoc2")
+        adapter.currentModel = doc
+        log(f"ActiveDoc = {str(_read_member(doc, 'GetTitle'))!r}")
+        for comp_needle, local_point in CANDIDATES:
+            await _try_point(adapter, comp_needle, local_point)
+    finally:
+        await adapter.disconnect()
+        _telemetry.info("Disconnected (NOT saved).")
 
 
 if __name__ == "__main__":

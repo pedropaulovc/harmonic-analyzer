@@ -1,65 +1,62 @@
-r"""Channel-spring (installed) drawing prose -- the spec-sheet data table the
-part build stamps into the SLDPRT, the isometric-view label, and the (empty)
-marked-dimension contract.
-
-Split OUT of ``channel_spring_installed_spec`` (codex #354, same treatment as
-``connecting_rod_notes``): ``_spring`` (imported by ``build_channel_assembly``
-for the spring geometry helpers) imports the spec's geometry constants, so
-table prose living in that import closure made every table edit full-rebuild
-``assembly:channel``.  Imported ONLY by ``build_channel_spring_installed`` and
-the offline drawing test.
-"""
+"""Purchased reference-sheet data for the 9432K31 channel spring."""
 
 from __future__ import annotations
 
+import _config
 from channel_spring_installed_spec import (
-    COIL_COUNT,
-    COIL_ID,
-    COIL_OD,
-    FREE_BODY_LENGTH,
-    FREE_EYE_C2C,
-    FREE_PITCH,
-    HOOK_CL_RADIUS,
-    HOOK_LEAD,
-    INSTALLED_BODY_LENGTH,
-    INSTALLED_EYE_C2C,
-    MEAN_DIA,
-    SPRING_RATE_REF,
-    WIRE_DIA,
+    FREE_LENGTH_MM,
+    INITIAL_TENSION_N,
+    INITIAL_TENSION_TOLERANCE_N,
+    INSTALLED_LENGTH_MM,
+    MAXIMUM_LOAD_N,
+    MAX_LENGTH_MM,
+    SPRING_RATE_N_PER_MM,
+    SPRING_RATE_TOLERANCE_FRACTION,
 )
+from spring_mount_geom import channel_force_n
 
-# No graphical marked dimensions -- the data table governs (see counter_spring).
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
-# The free pitch is stated (28 x 1.00 close-wound would be 28, not 32 -- the
-# body is wound slightly OPEN and the table must say so); hook leads carry
-# their measurement endpoints; the rate is a REF functional requirement; the
-# title-block QTY cell owns the 20-off count.
+_QC_LENGTH_1_MM = 60.0
+_QC_LENGTH_2_MM = 80.0
+_QC_PIN_DIA_MM = 2.0
+_QC_FORCE_1_N = channel_force_n(_QC_LENGTH_1_MM)
+_QC_FORCE_2_N = channel_force_n(_QC_LENGTH_2_MM)
+_MATCH_TOLERANCE_PERCENT = float(
+    _config._doc("error_budget")["critical_features"]["spring_rate"]["tolerance"]
+)
+
 DRAWING_NOTES = "\n".join(
     (
-        "EXTENSION SPRING DATA",
-        f"  WIRE DIA .......... {WIRE_DIA:.2f}",
-        f"  COIL OD ........... {COIL_OD:.2f}",
-        f"  COIL ID ........... {COIL_ID:.2f}",
-        f"  MEAN DIA .......... {MEAN_DIA:.2f}",
-        f"  FREE BODY LENGTH .. {FREE_BODY_LENGTH:.2f} (RELAXED)",
-        f"  INSTALLED BODY .... {INSTALLED_BODY_LENGTH:.2f} (STRETCHED)",
-        f"  TOTAL COILS ....... {COIL_COUNT}",
-        f"  FREE PITCH ........ {FREE_PITCH:.2f} (OPEN-WOUND)",
-        "  WIND .............. RIGHT HAND",
-        f"  RATE .............. ~{SPRING_RATE_REF:.2f} N/MM (REF)",
-        "  SET QC (20-SPRING ANALYZER SET): RATE = (F2-F1)/(X2-X1),",
-        "    F1/F2 THE HANGING LOAD AT EYE C-C X1 = 60.00 AND X2 = 70.00",
-        "    (~51 N AND ~72 N), EACH READ 30 S AFTER LOADING.",
-        "    ALL 20 WITHIN +/-1.25% OF THE SET MEAN. BIN FROM STOCK.",
-        f"  HOOK LEADS ......... {HOOK_LEAD:.2f} EACH END",
-        "    (BODY END TO EYE C/L)",
-        f"  ENDS .............. 270 DEG LOOP, R{HOOK_CL_RADIUS:.2f} CL;",
-        "    EYES COPLANAR (0 DEG CLOCKING)",
-        f"  FREE EYE C-C ...... {FREE_EYE_C2C:.2f}",
-        f"  INSTALLED EYE C-C . {INSTALLED_EYE_C2C:.2f}",
-        "NOTE: DRAWN AT THE INSTALLED LENGTH;",
-        f"SPRING SHIPS RELAXED AT {FREE_BODY_LENGTH:.2f} BODY.",
+        "PURCHASED EXTENSION SPRING - REFERENCE DATA",
+        "  SUPPLIER / SKU .... McMASTER-CARR / 9432K31",
+        "  END TYPE .......... MACHINE-HOOK ENDS",
+        f"  FREE LENGTH ....... {FREE_LENGTH_MM:.2f} MM INSIDE HOOKS",
+        f"  CATALOG MAX ....... {MAX_LENGTH_MM:.2f} MM AT {MAXIMUM_LOAD_N:.3f} N",
+        f"  NOMINAL RATE ...... {SPRING_RATE_N_PER_MM:.4f} N/MM "
+        f"(+/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% CATALOG)",
+        f"  INITIAL TENSION ... {INITIAL_TENSION_N:.3f} N "
+        f"(+/-{INITIAL_TENSION_TOLERANCE_N:.6f} N)",
+        f"  ILLUSTRATED LENGTH  {INSTALLED_LENGTH_MM:.2f} MM INSIDE HOOKS",
+        "  CAD COILS: REFERENCE GEOMETRY ONLY;",
+        "  DO NOT DERIVE FORCE FROM THE COILS.",
+        f"SET QC: USE Ø{_QC_PIN_DIA_MM:.2f} MM PINS; PIN C-C = "
+        f"{_QC_LENGTH_1_MM - _QC_PIN_DIA_MM:.2f}/"
+        f"{_QC_LENGTH_2_MM - _QC_PIN_DIA_MM:.2f} MM.",
+        f"  THIS REPRESENTS {_QC_LENGTH_1_MM:.2f}/{_QC_LENGTH_2_MM:.2f} MM "
+        "INSIDE-HOOK LENGTHS.",
+        f"  NOMINAL F60/F80 = {_QC_FORCE_1_N:.3f}/{_QC_FORCE_2_N:.3f} N.",
+        "  RATE = (F80-F60)/20.00 MM.",
+        "  READ EACH FORCE 30 S AFTER LOADING.",
+        f"  ALL 20 WITHIN +/-{_MATCH_TOLERANCE_PERCENT:.2f}% OF SET MEAN;",
+        "  USE ONE COMMON SET MEAN.",
+        f"  CATALOG +/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% "
+        "DOES NOT MEET THE SET-MATCH LIMIT.",
+        "  RECORD COMMON RATE MEAN AND EACH",
+        "  EXTRAPOLATED INITIAL TENSION FOR",
+        "  COUNTERSPRING AND MAGNIFIER CALIBRATION.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC REFERENCE VIEW SCALE 1:1"

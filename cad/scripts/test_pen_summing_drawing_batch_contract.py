@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the seven pen/summing drawings."""
+"""Cross-sheet offline contracts for the pen/summing drawings."""
 
 from __future__ import annotations
 

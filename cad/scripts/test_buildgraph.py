@@ -1392,16 +1392,6 @@ def test_module_deps_are_transitive():
     )
 
 
-def test_closure_follows_reused_build_scripts():
-    """A part that reuses a shared helper inherits that helper's own closure:
-    channel-spring-installed imports _spring (the shared spring builder, which
-    imports _features), so an edit to _features must mark it stale (codex
-    review #2)."""
-    deps = _helper_names("build_channel_spring_installed.py")
-    assert "_spring" in deps, deps
-    assert "_features" in deps, deps
-
-
 def test_specialized_helper_blast_radius_is_narrow():
     """_gear reaches only its real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]

@@ -1609,8 +1609,14 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
     "summing": ("summing-lever", "boss-hook"),
     # The carriage riders (v-block, marker, stirrup frame, thumb screw) are
     # lock-mated to the free rod and read under-constrained with it.
-    "pen": ("pen-rod", "pen-marker", "pen-wire", "pen-v-block", "pen-frame",
-            "pen-set-screw"),
+    "pen": (
+        "pen-rod",
+        "pen-marker",
+        "pen-wire",
+        "pen-v-block",
+        "pen-frame",
+        "pen-set-screw",
+    ),
     "drive-train": (
         "alignment-pinion",
         "cone-gear",
@@ -1869,6 +1875,22 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
         raise RuntimeError(f"feature {name!r} still present after delete")
 
 
+def configured_interference_manager(adapter: Any) -> Any:
+    """Return the native gate's manager; the caller must release it with Done."""
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    manager = _read_member(asm, "InterferenceDetectionManager")
+    if manager is None:
+        raise RuntimeError("InterferenceDetectionManager unavailable")
+    manager = _early_bound(manager, "IInterferenceDetectionMgr")
+    manager.TreatCoincidenceAsInterference = False
+    manager.TreatSubAssembliesAsComponents = True
+    manager.IncludeMultibodyPartInterferences = True
+    manager.MakeInterferingPartsTransparent = False
+    manager.CreateFastenersFolder = False
+    manager.UseTransform = False
+    return manager
+
+
 def check_no_interference(
     adapter: Any,
     *,
@@ -1898,16 +1920,7 @@ def check_no_interference(
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
-        mgr = _read_member(asm, "InterferenceDetectionManager")
-        if mgr is None:
-            raise RuntimeError("InterferenceDetectionManager unavailable")
-        mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
-        mgr.TreatCoincidenceAsInterference = False
-        mgr.TreatSubAssembliesAsComponents = True
-        mgr.IncludeMultibodyPartInterferences = True
-        mgr.MakeInterferingPartsTransparent = False
-        mgr.CreateFastenersFolder = False
-        mgr.UseTransform = False
+        mgr = configured_interference_manager(adapter)
         with _telemetry.span("interference.compute"):
             log("interference detection: computing interferences ...")
             interferences = adapter._attempt(
@@ -1957,7 +1970,13 @@ def check_no_interference(
             if len(names) == 2 and len(links) == 1 and len(sprockets) == 1:
                 chain_mesh_contacts.append(volume_mm3)
                 continue
-            details.append(f"{' & '.join(names)}: {volume_mm3:.2f} mm^3")
+            _telemetry.event(
+                "interference.unexpected",
+                components=names,
+                configurations=configs,
+                volume_mm3=volume_mm3,
+            )
+            details.append(f"{' & '.join(names)}: {volume_mm3:.9g} mm^3")
         adapter._attempt(lambda: mgr.Done(), default=None)
         isp.set_attribute("hits", len(details))
         isp.set_attribute("bounded_contacts", len(bounded_contacts))

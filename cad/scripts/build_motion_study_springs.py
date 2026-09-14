@@ -11,27 +11,32 @@ SPRINGS (add_springs):
     lever changes; the summing-lever rocks to the force balance = the analogue
     SUM of the 20 channels (the machine's whole point). All 20 are the SAME
     spring (k equal); the amplitude weighting lives in the bar lever arms, not k.
-  * 1 counter spring -- gooseneck (structural) <-> boss-hook (locked to the
+  * 1 counter spring -- gooseneck (structural) <-> stock counter anchor (locked to the
     summing-lever); a restoring bias against the channel pull.
-  k = G*d^4/(8*D^3*n) (steel) from the part geometry (CH_SPRING/CT_SPRING in
-  build_motion_study). free_length=None starts each spring at its assembled
-  length with ZERO force, so the motion is driven purely by the cam-chain length
-  changes -- no fragile pretension calibration (tune later for amplitude, F6).
+  Catalogue rates are the default; explicit positive SPRING_KCH / SPRING_KCT
+  overrides are in N/m. Supplier display coils are not force-law inputs.
+  free_length=None preserves ZERO installed preload, omitting stock initial
+  tension. Combined with the lumped-Z endpoint below, this is qualitative
+  motion only, NOT proof of static balance or tolerance performance.
 
   The summing lever arrives operationally free in summing.SLDASM; a legacy
   snapshot driver, if present in an older artefact, is suppressed here. The 20 bottom eyes share
-  ONE summing-lever datum point: every plate hole sits at the same X off the
-  knife axis, so each spring's torque arm about the (Z) knife line is identical
-  -- one point reproduces the summing torque exactly (the per-hole Z does not
-  contribute to Z-axis torque).
+  ONE summing-lever datum point at the stock anchor eye height and X offset.
+  This retains the existing lumped motion model, not an exact per-station
+  spring model: the common Z station changes each spring's 3D length and
+  direction. Per-station force fidelity is outside this endpoint cutover.
 
-Each spring endpoint is a ring-centre RefPoint created at RUNTIME via arc_center
-on the eye hole's circular edge, on the SHARED part doc (all instances inherit it
-via GetCorresponding), NEVER saved -- same recipe as the cam ring point. Local
-edge points validated live (probe_eye_points.py).
+Each spring endpoint is a RefPoint created at RUNTIME from an authoritative
+part-local support datum, on the SHARED part doc (all instances inherit it via
+GetCorresponding), NEVER saved. A direct sketch point avoids topology-dependent
+edge picks on the stock anchors' swept-wire eyes and the new tapped plate.
 """
 
 from __future__ import annotations
+
+import sys
+
+import _telemetry
 
 from _common import (
     check,
@@ -45,62 +50,152 @@ from _assembly_couplings import (
     gear_mate,
 )
 from build_motion_study import (
-    ANGLE, CH_SPRING, CT_SPRING, DISTANCE, SPRING_KCH, SPRING_KCT, _by_z_rank,
-    _components, _entity_ref, _family, _find_one, _iter_mates, _k_helical,
-    _lone_real, _read_member, _sub_model, _suppress_named,
+    ANGLE,
+    DISTANCE,
+    SPRING_KCH,
+    SPRING_KCT,
+    STOCK_KCH,
+    STOCK_KCT,
+    _by_z_rank,
+    _components,
+    _entity_ref,
+    _family,
+    _find_one,
+    _iter_mates,
+    _lone_real,
+    _read_member,
+    _sub_model,
+    _suppress_named,
 )
+import channel_lever_spec as _CL
 import gooseneck_geom as _GN
+import summing_lever_spec as _SL
+from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
-# Part-local points ON each eye hole's circular edge (mm) -> arc_center -> centre.
-CH_LEVER_EYE = [179.8, 0.0, 0.0]       # channel-lever tab hole Ø4.0 @ (177.8,0,0)
-SUM_LEVER_EYE = [39.35, 8.0, -69.05]   # summing-lever plate hole 0 Ø4.5, top face
-# gooseneck: the end screw's head-shoulder circular edge (r = head/2 about the
-# tube axis at x = end face - exposed shank) -> arc_center = the shank axis the
-# spring's top eye hangs on (2026-09-02: replaced the lug + cross-pin end face).
-GOOSENECK_EYE = [
-    _GN.ARM_END_X - _GN.SCREW_SHANK_LEN,
-    _GN.ARM_Y + _GN.SCREW_HEAD_DIA / 2.0,
+# Part-local support centres (mm), not points to select on model edges.
+CH_LEVER_EYE = (_CL.LEVER_SPRING_X, 0.0, 0.0)
+# Keep the lumped endpoint on the moving summing lever, not on the grounded
+# cosmetic spring-hook instances in channels.SLDASM. Their threaded seating
+# puts the stock eye centre this far above the plate's top face.
+SUM_LEVER_EYE = (
+    _SL.HOLE_X + ANCHOR_9489T111.eye_centre_mm[0],
+    _SL.PLATE_T / 2.0
+    - ANCHOR_9489T111.thread_start_y_mm
+    + ANCHOR_9489T111.eye_centre_mm[1],
+    _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],
+)
+# The stock double-loop spring is centred along the exposed screw shank,
+# as in spring_mount_geom.COUNTER_UPPER_EYE_X (in the assembly frame).
+GOOSENECK_EYE = (
+    _GN.ARM_END_X - _GN.SCREW_SHANK_LEN / 2.0,
+    _GN.ARM_Y,
     0.0,
-]  # [-103.25, 168.3, 0]
-BOSS_HOOK_EYE = [6.5, 16.5, 0.0]       # boss-hook rod end-face circle
+)
+COUNTER_ANCHOR_EYE = ANCHOR_9490T1.eye_centre_mm
 
-# Free length: None = start at assembled length with zero force (no pretension to
-# calibrate; motion comes from cam-chain length changes). Tunable for amplitude.
+# Free length: None = assembled length, zero installed preload. This deliberately
+# omits stock initial tension; the study remains qualitative motion only.
 CH_FREE_LEN = None
 CT_FREE_LEN = None
 
 
-async def _eye_point(adapter, comp_needle, edge_point, label, comps=None):
-    """Create a mateable eye-centre RefPoint on a SHARED part doc (never saved).
+async def _eye_point(adapter, comp_needle, local_point, label, comps=None):
+    """Create a fixed support RefPoint on a shared part doc; never save it.
 
-    arc_center on the eye hole's circular edge -> the ring centre. Selection in a
-    component's part doc requires it be the ACTIVE doc -> ActivateDoc3 round-trip.
-    All instances of the part inherit the point via GetCorresponding. Returns the
-    point feature name (e.g. "Point2").
+    Use the direct sketch-point promotion recipe from build_magnifying_wheel.
+    A 3D sketch uses part-local coordinates without a selected plane or edge.
     """
-    from solidworks_mcp.adapters.base import CreateReferencePointParameters
+    import pythoncom
+    from win32com.client import VARIANT
+
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     comp, _ = _find_one(adapter, comp_needle, comps=comps)
     if comp is None:
         raise RuntimeError(f"{comp_needle} not found for eye point {label}")
-    part = adapter._attempt(lambda: comp.GetModelDoc2(), default=None)
+    part = _read_member(comp, "GetModelDoc2")
     if part is None:
         raise RuntimeError(f"{comp_needle} part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
-    pt = check(f"eye point {label}", await adapter.create_reference_point(
-        CreateReferencePointParameters(mode="arc_center", edge_point=edge_point)))
-    name = pt.get("name") if isinstance(pt, dict) else getattr(pt, "name", None)
-    adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
-    adapter.currentModel = top
-    if not name:
-        raise RuntimeError(f"eye point {label} returned no name")
-    log(f"  eye point {label} on {part_title} = {name!r}")
-    return name
+    sketch = None
+    sketch_open = False
+    direct_db = None
+    with _telemetry.span("feature.motion_eye_point", label=label):
+        try:
+            adapter.swApp.ActivateDoc3(part_title, False, 2, 0)
+            active = _read_member(adapter.swApp, "ActiveDoc")
+            if active is None or str(_read_member(active, "GetTitle")) != part_title:
+                raise RuntimeError(
+                    f"cannot activate {part_title} for eye point {label}"
+                )
+            adapter.currentModel = part
+            part.ClearSelection2(True)
+            sketch = part.SketchManager
+            sketch.Insert3DSketch(True)
+            sketch_open = True
+            direct_db = sketch.AddToDB
+            sketch.AddToDB = True
+            point = sketch.CreatePoint(*(value / 1000.0 for value in local_point))
+            if point is None:
+                raise RuntimeError(f"eye sketch point {label} creation failed")
+            sketch.AddToDB = direct_db
+            # Same SAFEARRAY shape and native fix relation as the adapter's
+            # add_sketch_constraint; legacy SketchAddConstraints can no-op.
+            active_sketch = _read_member(sketch, "ActiveSketch")
+            entities = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH, [point])
+            relation = active_sketch.RelationManager.AddRelation(entities, 17)
+            if relation is None:
+                raise RuntimeError(f"eye sketch point {label} fix relation failed")
+            sketch.Insert3DSketch(True)
+            sketch_open = False
+            if int(_read_member(active_sketch, "GetConstrainedStatus")) != 3:
+                raise RuntimeError(f"eye sketch point {label} is not fully constrained")
+            # Select2 avoids Select4's late-bound ISelectData type mismatch.
+            if not point.Select2(False, 0):
+                raise RuntimeError(f"cannot select eye sketch point {label}")
+            feature = part.FeatureManager.InsertReferencePoint(7, 0, 0.0, 1)
+            if isinstance(feature, tuple):
+                feature = next((item for item in feature if item is not None), None)
+            if feature is None:
+                raise RuntimeError(f"eye RefPoint {label} creation failed")
+            name = _read_member(feature, "Name")
+            if not name:
+                raise RuntimeError(f"eye point {label} returned no name")
+            log(f"  eye point {label} on {part_title} = {name!r} at {local_point} mm")
+            return str(name)
+        finally:
+            original_error = sys.exception()
+            cleanup_errors = []
+            if sketch is not None and direct_db is not None:
+                try:
+                    sketch.AddToDB = direct_db
+                except Exception as exc:
+                    cleanup_errors.append(exc)
+            if sketch_open:
+                try:
+                    sketch.Insert3DSketch(True)
+                except Exception as exc:
+                    cleanup_errors.append(exc)
+            try:
+                part.ClearSelection2(True)
+            except Exception as exc:
+                cleanup_errors.append(exc)
+            try:
+                adapter.swApp.ActivateDoc3(top_title, False, 2, 0)
+                active = _read_member(adapter.swApp, "ActiveDoc")
+                if active is None or str(_read_member(active, "GetTitle")) != top_title:
+                    raise RuntimeError(f"cannot restore assembly {top_title}")
+                adapter.currentModel = top
+            except Exception as exc:
+                cleanup_errors.append(exc)
+            if cleanup_errors:
+                if original_error is not None:
+                    for exc in cleanup_errors:
+                        original_error.add_note(f"eye point cleanup failed: {exc!r}")
+                else:
+                    raise ExceptionGroup(
+                        f"eye point {label} cleanup failed", cleanup_errors
+                    )
 
 
 async def add_springs(adapter):
@@ -108,36 +203,56 @@ async def add_springs(adapter):
 
     # 1) free the summing-lever rock (the ANGLE snapshot dim) so springs move it.
     await _suppress_named(
-        adapter, "summing-1", ("summing-lever",), (ANGLE,),
-        "summing-lever rock (free for springs)")
+        adapter,
+        "summing-1",
+        ("summing-lever",),
+        (ANGLE,),
+        "summing-lever rock (free for springs)",
+    )
 
     # 2) eye datum points on the shared part docs (inherited by all instances).
     comps = _components(adapter)
-    lever_pt = await _eye_point(adapter, "channel-lever-1", CH_LEVER_EYE,
-                                "channel-lever tab", comps=comps)
-    plate_pt = await _eye_point(adapter, "summing-lever-1", SUM_LEVER_EYE,
-                                "summing-lever hole", comps=comps)
-    goose_pt = await _eye_point(adapter, "gooseneck-1", GOOSENECK_EYE,
-                                "gooseneck counter-top", comps=comps)
-    hook_pt = await _eye_point(adapter, "boss-hook-1", BOSS_HOOK_EYE,
-                               "boss-hook counter-bottom", comps=comps)
+    lever_pt = await _eye_point(
+        adapter, "channel-lever-1", CH_LEVER_EYE, "channel-lever tab", comps=comps
+    )
+    plate_pt = await _eye_point(
+        adapter,
+        "summing-lever-1",
+        SUM_LEVER_EYE,
+        "summing-lever stock anchor datum",
+        comps=comps,
+    )
+    goose_pt = await _eye_point(
+        adapter, "gooseneck-1", GOOSENECK_EYE, "gooseneck counter-top", comps=comps
+    )
+    hook_pt = await _eye_point(
+        adapter, "boss-hook-1", COUNTER_ANCHOR_EYE, "9490T1 counter-bottom", comps=comps
+    )
 
     sum_name = _find_one(adapter, "summing-lever-1", comps=comps)[1]
     levers = _by_z_rank(adapter, "channel-lever", comps=comps)
-    k_geom = _k_helical(CH_SPRING["d"], CH_SPRING["D"], CH_SPRING["n"])
-    k_ch = SPRING_KCH if SPRING_KCH > 0 else k_geom
-    log(f"  channel spring k = {k_ch:.1f} N/m (geometric {k_geom:.0f} N/m, "
-        f"override {SPRING_KCH:.1f}) ; {len(levers)} channel-levers")
+    k_ch = SPRING_KCH if SPRING_KCH > 0 else STOCK_KCH
+    log(
+        f"  channel spring k = {k_ch:.1f} N/m (catalogue {STOCK_KCH:.3f} N/m, "
+        f"override {SPRING_KCH:.1f}) ; {len(levers)} channel-levers"
+    )
 
     # 3) 20 channel springs: channel-lever tab eye <-> shared summing-lever eye.
     ok = 0
     for i, (_c, lever_n) in enumerate(levers):
         try:
-            res = await adapter.add_motion_spring(MotionSpringParameters(
-                spring_type="linear",
-                endpoints=[component_named_ref(lever_n, lever_pt, "POINT"),
-                           component_named_ref(sum_name, plate_pt, "POINT")],
-                spring_constant=k_ch, free_length=CH_FREE_LEN, study_name=""))
+            res = await adapter.add_motion_spring(
+                MotionSpringParameters(
+                    spring_type="linear",
+                    endpoints=[
+                        component_named_ref(lever_n, lever_pt, "POINT"),
+                        component_named_ref(sum_name, plate_pt, "POINT"),
+                    ],
+                    spring_constant=k_ch,
+                    free_length=CH_FREE_LEN,
+                    study_name="",
+                )
+            )
             ok += 1 if res.is_success else 0
             if not res.is_success:
                 log(f"    ch{i:02d} spring FAIL: {res.error}")
@@ -148,15 +263,23 @@ async def add_springs(adapter):
     # 4) counter spring: gooseneck (structural) <-> boss-hook (on summing-lever).
     goose_n = _find_one(adapter, "gooseneck-1", comps=comps)[1]
     hook_n = _find_one(adapter, "boss-hook-1", comps=comps)[1]
-    k_ct_geom = _k_helical(CT_SPRING["d"], CT_SPRING["D"], CT_SPRING["n"])
-    k_ct = SPRING_KCT if SPRING_KCT > 0 else k_ct_geom
-    log(f"  counter spring k = {k_ct:.1f} N/m (geometric {k_ct_geom:.0f} N/m, "
-        f"override {SPRING_KCT:.1f})")
-    cres = await adapter.add_motion_spring(MotionSpringParameters(
-        spring_type="linear",
-        endpoints=[component_named_ref(goose_n, goose_pt, "POINT"),
-                   component_named_ref(hook_n, hook_pt, "POINT")],
-        spring_constant=k_ct, free_length=CT_FREE_LEN, study_name=""))
+    k_ct = SPRING_KCT if SPRING_KCT > 0 else STOCK_KCT
+    log(
+        f"  counter spring k = {k_ct:.1f} N/m (catalogue {STOCK_KCT:.3f} N/m, "
+        f"override {SPRING_KCT:.1f})"
+    )
+    cres = await adapter.add_motion_spring(
+        MotionSpringParameters(
+            spring_type="linear",
+            endpoints=[
+                component_named_ref(goose_n, goose_pt, "POINT"),
+                component_named_ref(hook_n, hook_pt, "POINT"),
+            ],
+            spring_constant=k_ct,
+            free_length=CT_FREE_LEN,
+            study_name="",
+        )
+    )
     log(f"  counter spring: {'OK' if cres.is_success else 'FAIL ' + str(cres.error)}")
     return ok + (1 if cres.is_success else 0)
 
@@ -169,8 +292,13 @@ RATIO_SUM_WHEEL = [1.0, 1.0]
 # Part-local points on the magnifying-wheel Ø100 rim OD edge (mm); the rim is
 # extruded both-directions about the Front plane so the edge z is +/-4 or +/-8 --
 # try a few until one selects (validated live in probe_yoke_only.py: z=+4).
-RIM_EDGE_CANDIDATES = [[50.0, 0.0, 4.0], [50.0, 0.0, 8.0], [50.0, 0.0, -4.0],
-                       [50.0, 0.0, -8.0], [0.0, 50.0, 4.0]]
+RIM_EDGE_CANDIDATES = [
+    [50.0, 0.0, 4.0],
+    [50.0, 0.0, 8.0],
+    [50.0, 0.0, -4.0],
+    [50.0, 0.0, -8.0],
+    [0.0, 50.0, 4.0],
+]
 
 
 async def _suppress_pen_travel(adapter):
@@ -180,9 +308,12 @@ async def _suppress_pen_travel(adapter):
     pen-rod distance mates locate depth/across and must never be suppressed.
     """
     from solidworks_mcp.adapters.base import SuppressMateParameters
+
     _, model = _sub_model(adapter, "pen-1")
     travel_name = None
-    for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
+    for _f, mate, name, mtype, parts, _v in _iter_mates(
+        adapter, model, read_values=False
+    ):
         lone = _lone_real(parts, "pen")
         if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
             continue
@@ -193,8 +324,12 @@ async def _suppress_pen_travel(adapter):
         log("  pen-rod travel is already free (default-free artefact)")
         return
     log(f"  suppress pen-rod Y-travel {travel_name}")
-    check("suppress pen travel", await adapter.suppress_mate(
-        SuppressMateParameters(name=travel_name, suppress=True, component="pen-1")))
+    check(
+        "suppress pen travel",
+        await adapter.suppress_mate(
+            SuppressMateParameters(name=travel_name, suppress=True, component="pen-1")
+        ),
+    )
 
 
 async def _rim_point(adapter, comps=None):
@@ -203,29 +338,40 @@ async def _rim_point(adapter, comps=None):
     in the part doc requires it be ACTIVE -> ActivateDoc3 round-trip. Returns the
     point feature name (e.g. "Point3")."""
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
+
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     wh, _ = _find_one(adapter, "magnifying-wheel-1", comps=comps)
     if wh is None:
         raise RuntimeError("magnifying-wheel-1 not found for rim point")
-    part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
+    part = _read_member(wh, "GetModelDoc2")
     if part is None:
         raise RuntimeError("magnifying-wheel part doc unresolved")
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None)
-    adapter.currentModel = adapter._attempt(lambda: adapter.swApp.ActiveDoc, default=part)
+        lambda: adapter.swApp.ActivateDoc3(part_title, False, 2, 0), default=None
+    )
+    adapter.currentModel = adapter._attempt(
+        lambda: adapter.swApp.ActiveDoc, default=part
+    )
     name = None
     for ep in RIM_EDGE_CANDIDATES:
-        res = await adapter.create_reference_point(CreateReferencePointParameters(
-            mode="along_curve", edge_point=ep, along="percentage", percentage=0.0))
+        res = await adapter.create_reference_point(
+            CreateReferencePointParameters(
+                mode="along_curve", edge_point=ep, along="percentage", percentage=0.0
+            )
+        )
         if res.is_success:
-            name = res.data.get("name") if isinstance(res.data, dict) else getattr(
-                res.data, "name", None)
+            name = (
+                res.data.get("name")
+                if isinstance(res.data, dict)
+                else getattr(res.data, "name", None)
+            )
             log(f"  rim RefPoint edge_point={ep} -> {name!r}")
             break
     adapter._attempt(
-        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None)
+        lambda: adapter.swApp.ActivateDoc3(top_title, False, 2, 0), default=None
+    )
     adapter.currentModel = top
     if not name:
         raise RuntimeError("rim RefPoint creation failed on the wheel")
@@ -245,19 +391,21 @@ async def _add_wire1_gear(adapter, summing_name=None, wheel_name=None):
     comps = None
     if summing_name is None or wheel_name is None:
         comps = _components(adapter)
-    summing_name = summing_name or _find_one(
-        adapter, "summing-lever-1", comps=comps)[1]
-    wheel_name = wheel_name or _find_one(
-        adapter, "magnifying-wheel-1", comps=comps)[1]
+    summing_name = summing_name or _find_one(adapter, "summing-lever-1", comps=comps)[1]
+    wheel_name = wheel_name or _find_one(adapter, "magnifying-wheel-1", comps=comps)[1]
     if summing_name is None or wheel_name is None:
         raise RuntimeError("WIRE1 split-sub component path unresolved")
     last = None
     for alignment in ("aligned", "anti_aligned"):
         try:
             w1 = await gear_mate(
-                adapter, _entity_ref(summing_name, "Axis1", "AXIS"),
+                adapter,
+                _entity_ref(summing_name, "Axis1", "AXIS"),
                 _entity_ref(wheel_name, "Axis1", "AXIS"),
-                RATIO_SUM_WHEEL, alignment=alignment, label="WIRE1 summing->wheel")
+                RATIO_SUM_WHEEL,
+                alignment=alignment,
+                label="WIRE1 summing->wheel",
+            )
             if w1.get("name"):
                 log(f"  WIRE1 gear: {w1['name']} (alignment={alignment})")
                 return w1
@@ -289,8 +437,13 @@ async def add_wires_gravity(adapter, with_gravity=False):
 
     # 1) free the driven output DOF the wires control: wheel rock (WIRE1 spins it)
     #    + pen-rod Y travel (WIRE2 yoke drags it). The mag-lever rock stays pinned.
-    await _suppress_named(adapter, "magnifier-1", ("magnifying-wheel",), (ANGLE,),
-                          "wheel rock (free for WIRE1)")
+    await _suppress_named(
+        adapter,
+        "magnifier-1",
+        ("magnifying-wheel",),
+        (ANGLE,),
+        "wheel rock (free for WIRE1)",
+    )
     await _suppress_pen_travel(adapter)
 
     # 2) rim datum point on the shared wheel doc (before retargeting currentModel).
@@ -304,9 +457,11 @@ async def add_wires_gravity(adapter, with_gravity=False):
         raise RuntimeError("split output-chain component path unresolved")
     w1 = await _add_wire1_gear(adapter, summing_name, wheel_name)
     w2 = await coincident_mate(
-        adapter, _entity_ref(wheel_name, rim_pt, "POINT"),
+        adapter,
+        _entity_ref(wheel_name, rim_pt, "POINT"),
         _entity_ref(pen_name, "Top Plane", "PLANE"),
-        label="WIRE2 yoke rim->pen")
+        label="WIRE2 yoke rim->pen",
+    )
     log(f"  WIRE2 yoke: {w2.get('name')}")
 
     # 4) gravity (-Y), OPT-IN: on a ~1 m steel mechanism gravity forces dwarf the
@@ -315,11 +470,11 @@ async def add_wires_gravity(adapter, with_gravity=False):
     #    result, so gravity is noise here. Off by default; pass `grav` to enable.
     grav_ok = None
     if with_gravity:
-        g = await adapter.add_gravity(MotionGravityParameters(
-            axis="y", reverse=True, study_name=""))
+        g = await adapter.add_gravity(
+            MotionGravityParameters(axis="y", reverse=True, study_name="")
+        )
         grav_ok = g.is_success
         log(f"  gravity -Y: {'OK' if g.is_success else 'FAIL ' + str(g.error)}")
     else:
         log("  gravity: SKIPPED (pass `grav` to enable)")
-    return {"wire1": w1.get("name") if w1 else None, "wire2": True,
-            "gravity": grav_ok}
+    return {"wire1": w1.get("name") if w1 else None, "wire2": True, "gravity": grav_ok}

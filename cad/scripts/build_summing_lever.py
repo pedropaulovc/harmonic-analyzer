@@ -104,8 +104,10 @@ from summing_lever_notes import (
     ISOMETRIC_VIEW_NOTE,
 )
 from summing_lever_spec import (
+    ANCHOR_H,
     CHANNEL_PITCH,
     CHANNEL_Z0,
+    COUNTER_HOLE_SPEC,
     HOLE_COUNT,
     HOLE_SPEC,
     HOLE_X,
@@ -131,9 +133,10 @@ RIB_PAD = 0.1 * IN  # rib arc padding over the cylinder              2.54
 SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
 SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
 ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
-ANCHOR_H = 0.75 * IN  # summation anchor height                     19.05
+# ANCHOR_H (19.05, the boss height and the counter anchor's engagement) is the
+# pure spec's -- build_boss_hook trims the purchased shank to it.
 
-# The 20 channel spring-hook shanks seat in the part-owned native-hole pattern.
+# The 20 channel-spring anchors THREAD into the part-owned native tap pattern.
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
 # placed at the knife line y=979.7 it spans 977.16..982.24, so the top registers
 # at machine 982.24 (the whole summing chain dropped 10.3 with the top-frame
@@ -162,7 +165,8 @@ SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
-ANCHOR_BORE_R = 1.5  # summation-anchor centre hole (counter-spring hook seat)
+# No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
+# tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # The middle rib spans the lever to the +X plate edge (PLATE_W), but its z-span
 # (+-RIB_T/2 = +-2.54) crosses the channel-hole column at HOLE_X. The rib extrude
 # (feature 7) runs AFTER the holes (feature 1), so it re-fills the one hole whose
@@ -177,7 +181,7 @@ MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the (shifted) hole 
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
 
 # Assembly-facing exports (build_summing_assembly imports these).
-SPIN_REF_X = TIP_X  # local X of the summation-anchor bore = counter-spring ref
+SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
 
 
 def _circumcenter(
@@ -240,7 +244,10 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
     Machine-y registration (the M6.4 plate-top-at-998 convention) is set at
     PLACEMENT, not baked here -- see PLATE_TOP_Y and the Phase 2/3 plan."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters, LinearPatternParameters
+    from solidworks_mcp.adapters.base import (
+        ExtrusionParameters,
+        LinearPatternParameters,
+    )
 
     plate = SketchDims()
     check("create_sketch plate", await adapter.create_sketch("Top"))
@@ -258,7 +265,11 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     ]
     outline = await add_line_chain(adapter, rect)
     await define_rectilinear_chain(
-        adapter, outline, rect, label="plate", dims=plate,
+        adapter,
+        outline,
+        rect,
+        label="plate",
+        dims=plate,
         names=["PlateWidth", "PlateLength", "PlateAnchorZ"],
         drives=['"PlateW"', '"PlateL"', '"PlateL" / 2'],
     )
@@ -335,7 +346,9 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # D3 == as-built CHANNEL_PITCH, so it stays neutral.
     drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
     await volume_check(
-        adapter, "spring-hole field", v_plate - HOLE_COUNT * v_hole,
+        adapter,
+        "spring-hole field",
+        v_plate - HOLE_COUNT * v_hole,
         0.01 * HOLE_COUNT * v_hole,
     )
 
@@ -350,7 +363,12 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     cyl = SketchDims()
     check("create_sketch cylinder", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, CYL_R, "pivot cylinder", dims=cyl,
+        adapter,
+        0.0,
+        0.0,
+        CYL_R,
+        "pivot cylinder",
+        dims=cyl,
         names=("CylCx", "CylCz", "CylDia"),
         drives=(None, None, '"CylR" * 2'),
     )
@@ -402,19 +420,23 @@ async def _hex_collar(
     _hh2 = '"HexH" / 2'
     _hh4 = '"HexH" / 4'
     await define_polygon_chain(
-        adapter, lines, verts, label=name, dims=hexd,
-        names=[f"{stem}TopY",
-               f"{stem}S0dx", f"{stem}S0dy",
-               f"{stem}S1dy",
-               f"{stem}S2dx", f"{stem}S2dy",
-               f"{stem}S3dx", f"{stem}S3dy",
-               f"{stem}S4dy"],
-        drives=[_hh2,
-                _hw, _hh4,
-                _hh2,
-                _hw, _hh4,
-                _hw, _hh4,
-                _hh2],
+        adapter,
+        lines,
+        verts,
+        label=name,
+        dims=hexd,
+        names=[
+            f"{stem}TopY",
+            f"{stem}S0dx",
+            f"{stem}S0dy",
+            f"{stem}S1dy",
+            f"{stem}S2dx",
+            f"{stem}S2dy",
+            f"{stem}S3dx",
+            f"{stem}S3dy",
+            f"{stem}S4dy",
+        ],
+        drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
     await ensure_fully_defined(adapter, f"{name} sketch")
     check(f"exit_sketch {name}", await adapter.exit_sketch())
@@ -458,7 +480,9 @@ async def _edge_rib(
     rib.record(f"{stem}ArcR", '"ArcR"')
     check(
         f"{name} arc start on y-axis",
-        await adapter.add_sketch_constraint(f"{arc}.start", "origin", "vertical_points"),
+        await adapter.add_sketch_constraint(
+            f"{arc}.start", "origin", "vertical_points"
+        ),
     )
     check(
         f"{name} arc end on y-axis",
@@ -491,9 +515,13 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, top_c, _ = await _three_point_arc(adapter, p2, p3, top_int, "summation top")
+    top_arc, top_c, _ = await _three_point_arc(
+        adapter, p2, p3, top_int, "summation top"
+    )
     tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
-    bot_arc, bot_c, _ = await _three_point_arc(adapter, p4, p1, bot_int, "summation bottom")
+    bot_arc, bot_c, _ = await _three_point_arc(
+        adapter, p4, p1, bot_int, "summation bottom"
+    )
     set_sketch_direct_db(adapter, False)
 
     # Record each manual dim in creation order. Unsigned-distance anchors at
@@ -508,7 +536,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     await anchor_point_to_origin(adapter, f"{base}.start", *p1, "summation base start")
     sd.record("SumBaseStartZ", '"PlateL" / 2')  # vertical_distance = SUM_BASE
     await dimension_between(
-        adapter, f"{base}.start", f"{base}.end", "vertical_distance", PLATE_L, "summation base"
+        adapter,
+        f"{base}.start",
+        f"{base}.end",
+        "vertical_distance",
+        PLATE_L,
+        "summation base",
     )
     sd.record("SumBaseLength", '"PlateL"')
     check(
@@ -519,7 +552,12 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     sd.record("SumTipX", '"SumH"')  # horizontal_distance = |TIP_X| = SUM_H
     sd.record("SumTipZ", '"AnchorR"')  # vertical_distance = ANCHOR_R
     await dimension_between(
-        adapter, f"{tip}.start", f"{tip}.end", "vertical_distance", 2.0 * ANCHOR_R, "summation tip"
+        adapter,
+        f"{tip}.start",
+        f"{tip}.end",
+        "vertical_distance",
+        2.0 * ANCHOR_R,
+        "summation tip",
     )
     sd.record("SumTipHeight", '2 * "AnchorR"')
     # The base/tip lines pin all four corners; each curved side is then defined
@@ -527,10 +565,14 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     # so the radius is implied and a radial dim would over-define (cf. the
     # magnifying-lever dome caps). Both centres are general points (x, y both
     # nonzero) -> two dims each, no clean global knob, left auto-named.
-    await anchor_point_to_origin(adapter, f"{top_arc}.center", *top_c, "summation top centre")
+    await anchor_point_to_origin(
+        adapter, f"{top_arc}.center", *top_c, "summation top centre"
+    )
     sd.record(None, None)
     sd.record(None, None)
-    await anchor_point_to_origin(adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre")
+    await anchor_point_to_origin(
+        adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
+    )
     sd.record(None, None)
     sd.record(None, None)
     await ensure_fully_defined(adapter, "summation plate sketch")
@@ -547,27 +589,26 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
-    """Feature 6: Top-plane concentric ring (outer ANCHOR_R, bore ANCHOR_BORE_R)
-    at the -X tip -- the eye the counter-spring hook hangs from."""
+    """Feature 6: Top-plane disc (ANCHOR_R) at the -X tip, extruded ANCHOR_H --
+    the SOLID boss the counter-spring anchor is tapped into. The seat itself is
+    a native tap (``_counter_anchor_tap``), authored after the ribs, so nothing
+    is sketched here but the outside of the boss."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    # Both circles share centre (TIP_X, 0): centre-X is a dim (driven to "SumH",
-    # |TIP_X|), centre-Z (=0) is a relation (slot ignored), plus each diameter.
+    # Centre (TIP_X, 0): centre-X is a dim (driven to "SumH", |TIP_X|),
+    # centre-Z (=0) is a relation (slot ignored), plus the diameter.
     sd = SketchDims()
     check("create_sketch summation anchor", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
     await define_circle(
-        adapter, TIP_X, 0.0, ANCHOR_R, "anchor outer", dims=sd,
+        adapter,
+        TIP_X,
+        0.0,
+        ANCHOR_R,
+        "anchor outer",
+        dims=sd,
         names=("AnchorOuterX", "AnchorOuterZ", "AnchorOuterDia"),
         drives=('"SumH"', None, '2 * "AnchorR"'),
-    )
-    await define_circle(
-        adapter, TIP_X, 0.0, ANCHOR_BORE_R, "anchor bore", dims=sd,
-        names=("AnchorBoreX", "AnchorBoreZ", "AnchorBoreDia"),
-        # Bore is concentric with the outer (same centre): the outer's X dim
-        # already locates the ring, so driving the bore's X too over-constrains
-        # the solve (rebuild fails). Record it (count) but leave it undriven.
-        drives=(None, None, '2 * "AnchorBoreR"'),
     )
     set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "summation anchor sketch")
@@ -604,10 +645,14 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     line1 = check("middle rib line1", await adapter.add_line(*left, *tl_up))
-    arc1, _, _ = await _three_point_arc(adapter, tl_up, tr_up, (0.0, r), "middle rib upper")
+    arc1, _, _ = await _three_point_arc(
+        adapter, tl_up, tr_up, (0.0, r), "middle rib upper"
+    )
     line2 = check("middle rib line2", await adapter.add_line(*tr_up, *right))
     line3 = check("middle rib line3", await adapter.add_line(*right, *tr_dn))
-    arc2, _, _ = await _three_point_arc(adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower")
+    arc2, _, _ = await _three_point_arc(
+        adapter, tr_dn, tl_dn, (0.0, -r), "middle rib lower"
+    )
     line4 = check("middle rib line4", await adapter.add_line(*tl_dn, *left))
     set_sketch_direct_db(adapter, False)
 
@@ -642,9 +687,13 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         await adapter.add_sketch_dimension(arc1, None, "radial", r),
     )
     sd.record("MidRibArcR", '"ArcR"')
-    await anchor_point_to_origin(adapter, f"{line1}.start", *left, "middle rib left vertex")
+    await anchor_point_to_origin(
+        adapter, f"{line1}.start", *left, "middle rib left vertex"
+    )
     sd.record("MidRibLeftX", '"MidRibReach"')
-    await anchor_point_to_origin(adapter, f"{line2}.end", *right, "middle rib right vertex")
+    await anchor_point_to_origin(
+        adapter, f"{line2}.end", *right, "middle rib right vertex"
+    )
     sd.record("MidRibRightX", '"SumH"')
     await ensure_fully_defined(adapter, "middle rib sketch")
     check("exit_sketch middle rib", await adapter.exit_sketch())
@@ -657,6 +706,45 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "MiddleRib")
+
+
+async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
+    """Feature 8: the native through tap down the summation-anchor boss -- the
+    seat the purchased counter-spring anchor (McMaster 9490T1, ``boss-hook``)
+    threads straight into. NO NUT: this tap is the nut, so its size is the
+    anchor's own thread (``COUNTER_HOLE_SPEC``) and the anchor's trimmed shank
+    equals the boss height it engages (``ANCHOR_H``, one spec constant).
+
+    Authored LAST, after every rib: the middle rib's -X vertex lands on this
+    station, and a rib extruded after the cut would refill it (the same trap
+    the +X hole column hit -- see MID_RIB_PLATE_REACH). Ordering it here also
+    makes the gate below exact: inside the boss footprint the plate and rib
+    material sits WITHIN the boss's own +-ANCHOR_H/2 Y span, so the cut removes
+    boss height and nothing else.
+    """
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"pre-tap mass props failed: {mass.error}")
+    v_before = float(mass.data.volume)
+
+    tap_dia = blind_cut_dia_mm(COUNTER_HOLE_SPEC)
+    result = wizard_holes(
+        adapter,
+        COUNTER_HOLE_SPEC,
+        [[TIP_X, ANCHOR_H / 2.0, 0.0]],
+        (0.0, 1.0, 0.0),
+        f"counter-spring anchor tap ({COUNTER_HOLE_SPEC.size})",
+        name="CounterAnchorTap",
+        expect_dia_mm=tap_dia,
+        # Boss centre: X is |TIP_X| from the origin (driven by the same "SumH"
+        # knob as the tip), Z is 0 -> an origin-axis relation, no dimension.
+        placement_dims=[(("CounterTapX", '"SumH"'), (None, None))],
+    )
+    drive_jobs += result.placement_drive_jobs
+    v_tap = math.pi * (tap_dia / 2.0) ** 2 * ANCHOR_H
+    await volume_check(
+        adapter, "counter-spring anchor tap", v_before - v_tap, 0.02 * v_tap
+    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -679,12 +767,13 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RibPad", f"{RIB_PAD}mm")
     await set_global(adapter, "SumH", f"{SUM_H}mm")
     await set_global(adapter, "AnchorR", f"{ANCHOR_R}mm")
-    await set_global(adapter, "AnchorBoreR", f"{ANCHOR_BORE_R}mm")
     await set_global(adapter, "AnchorH", f"{ANCHOR_H}mm")
-    # (The old HoleDia knob is gone: the spring holes are now a native Hole Wizard
-    # #47 seed + linear pattern, diameter from the drill standard. HoleX stays --
-    # MidRibReach references it -- and the three station globals drive the seed
-    # while ChannelPitch also drives the pattern spacing.)
+    # (The old HoleDia/AnchorBoreR knobs are gone: both anchor seats are native
+    # Hole Wizard taps -- a #6-32 seed + linear pattern on the plate and one
+    # #10-24 through the boss -- sized by the tap standard from the purchased
+    # anchors' own threads, so a diameter knob would be a second, lying source.
+    # HoleX stays -- MidRibReach references it -- and the three station globals
+    # drive the seed while ChannelPitch also drives the pattern spacing.)
     await set_global(adapter, "HoleX", f"{HOLE_X}mm")
     await set_global(adapter, "ChannelZ0", f"{CHANNEL_Z0}mm")
     await set_global(adapter, "ChannelPitch", f"{CHANNEL_PITCH}mm")
@@ -702,17 +791,38 @@ async def build(adapter) -> dict[str, str]:
 
     await _coefficients_plate(adapter, drive_jobs)
     await _pivot_cylinder(adapter, drive_jobs)
-    await _hex_collar(adapter, flip=False, name="hex knife edge front",
-                      stem="HexKnifeFront", drive_jobs=drive_jobs)
-    await _hex_collar(adapter, flip=True, name="hex knife edge back",
-                      stem="HexKnifeBack", drive_jobs=drive_jobs)
-    await _edge_rib(adapter, flip=False, name="edge rib front",
-                    stem="EdgeRibFront", drive_jobs=drive_jobs)
-    await _edge_rib(adapter, flip=True, name="edge rib back",
-                    stem="EdgeRibBack", drive_jobs=drive_jobs)
+    await _hex_collar(
+        adapter,
+        flip=False,
+        name="hex knife edge front",
+        stem="HexKnifeFront",
+        drive_jobs=drive_jobs,
+    )
+    await _hex_collar(
+        adapter,
+        flip=True,
+        name="hex knife edge back",
+        stem="HexKnifeBack",
+        drive_jobs=drive_jobs,
+    )
+    await _edge_rib(
+        adapter,
+        flip=False,
+        name="edge rib front",
+        stem="EdgeRibFront",
+        drive_jobs=drive_jobs,
+    )
+    await _edge_rib(
+        adapter,
+        flip=True,
+        name="edge rib back",
+        stem="EdgeRibBack",
+        drive_jobs=drive_jobs,
+    )
     await _summation_plate(adapter, drive_jobs)
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
+    await _counter_anchor_tap(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -735,13 +845,15 @@ async def build(adapter) -> dict[str, str]:
     # reference to the knife-mount (keeps the lever at the knife line with no
     # drop until the ridge bearing supports exist).
     # anchor axis (Axis2) = Z line at the summation anchor -- counter-spring rock
-    # reference (the anchor BORE itself is vertical, along Y).
+    # reference (the anchor's tapped seat itself is vertical, along Y).
     # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
     # rock/suspension line the lever hangs from; the pivot revolute moves here
     # once the top-plate bearing supports are modeled.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
-    await name_bore_axis(adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis")
+    await name_bore_axis(
+        adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
+    )
 
     await apply_material(adapter, MATERIAL)
     # Green-painted casting on the machine (ch17/ch18 macros show the same
@@ -767,8 +879,12 @@ async def build(adapter) -> dict[str, str]:
     require_saved_drawing_properties(
         adapter,
         (
-            "Number", "Material Specification", "Finish", "Quantity",
-            "Manufacturing Notes", "Isometric View Note",
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     return artefacts

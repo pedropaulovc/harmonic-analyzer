@@ -7,6 +7,8 @@ dimension NAME map + notes from here; ``draw_gooseneck`` keeps exactly
 
 from __future__ import annotations
 
+import gooseneck_geom
+
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  The bend RADIUS (R51) and the horizontal ARM RUN are marked --
@@ -42,7 +44,8 @@ DRAWING_NOTES = "\n".join(
         "4. AFTER BRAZE: DRILL + TAP #6-32 UNC X 6.0 DEEP ON",
         "   THE TUBE AXIS +/-0.15, SQUARE TO THE END FACE.",
         "5. SPRING SCREW: AISI 1018 SLOTTED ROUND HEAD #6-32",
-        "   X 14 UNDER HEAD; HEAD <MOD-DIAM>10.00 X 2.00; SLOT",
+        f"   X 14 UNDER HEAD; HEAD <MOD-DIAM>{gooseneck_geom.SCREW_HEAD_DIA:.2f}"
+        f" X {gooseneck_geom.SCREW_HEAD_T:.2f}; SLOT",
         "   0.80 WIDE X 0.80 DEEP. SEAT ON END FACE: 8.00",
         "   +/-0.25 SHANK EXPOSED (SPRING EYE RIDES HERE).",
         "   NOT REMOVED IN SERVICE; MODELED INTEGRAL.",

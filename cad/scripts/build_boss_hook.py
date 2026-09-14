@@ -1,201 +1,119 @@
-r"""Reproduction script: summing-lever boss hook (book ch. 18/19, pp. 43-45).
+"""Build the counter-spring lower anchor from McMaster 9490T1.
 
-The black J-hook that hangs the counter spring from the summing-lever
-boss: an O3 rod planted in the boss top, rising clear of the boss, then
-bent 90 degrees into a horizontal arm pointing +X (toward the channels'
-mid-line) that the counter spring's bottom ring encircles nail-through-
-ring style. The p.43/p.45 photos show a hook + separate chrome link ring;
-the chain is collapsed to this single hook with the spring's own loop as
-the ring (simplification, see build_counter_spring.py).
+The single open routing eyebolt that hangs the master (counter) spring from the
+summing lever's summation-anchor boss. It threads DIRECTLY into the #10-24 tap
+through that boss (``summing_lever_spec.COUNTER_HOLE_SPEC``, sourced from this
+same anchor record) -- no nut, no separate link ring.
 
-Dimensions: cad/DIMENSIONS.md ch. 18/19 (M6.4, low). Geometry constraints
-that size it (see build_summing_assembly.py): shank at machine x 90.5
-(boss hole), rod centreline at machine y 1004.7 so the spring ring (mean
-r 5.35, wire 1.8) hanging at centre y 1001.8 touches the rod top; rod tip
-at machine x 97 so the ring's wire band (x 94.1..95.9) sits mid-rod.
+The one supplier option this production part takes is LENGTH: the vendor's
+58.7375 mm shank is cut back to the boss height it engages (19.05 mm, the
+lever's ``ANCHOR_H``) with the 45 deg deburr restored at the new end, so the
+thread ends at y -27.84475 and the factory thread phase is preserved.
 
-Layout: shank axis +Y from the origin (machine (90.5, 989.7, 0)); path =
-vertical line, 90-degree elbow (R 3), horizontal line +X. Single sweep
-along a line/arc/line chain — the old equation-curve workaround (fix on
-lines/arcs left endpoint DOFs) reverted once sketch points became
-addressable (semantic anchors, SolidworksMCP-python PRs #55/#56).
+The tracked diagnostic recipe is an exact geometric replay of the supplied
+vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
+eye plane in XY, shank axis along -Y, thread starting at y -8.79475.
+``build_summing_assembly`` positions it; nothing here moves it.
 
 Run (SolidWorks already open)::
 
-    uv run python cad\scripts\build_boss_hook.py
+    uv run python cad\\scripts\\build_boss_hook.py
 """
 
 from __future__ import annotations
 
+from functools import wraps
 import math
 import sys
 
-from _common import (
-    SketchDims,
-    anchor_point_to_origin,
-    apply_material,
-    check,
-    define_circle,
-    dimension_between,
-    drive_dimension,
-    ensure_fully_defined,
-    force_rebuild,
-    name_bore_axis,
-    name_last_feature,
-    report_mass_properties,
-    run_build,
-    save_part_and_images,
-    set_global,
-    set_sketch_direct_db,
-    volume_check,
-)
+from _common import _early_bound, _read_member, run_build
+from _fastener_catalog import fastener
+from _stock_fastener import StockComponent, build_stock_fastener
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
+    set_dimension_symmetric_angular_tolerance,
 )
 from boss_hook_spec import (
+    SHANK_LENGTH_MM,
+    FINISHED_OVERALL_MM,
+    FINISHED_OVERALL_TOLERANCE_MM,
+    CHAMFER_WIDTH_MM,
+    CHAMFER_WIDTH_TOLERANCE_MM,
+    CHAMFER_ANGLE_DEG,
+    CHAMFER_ANGLE_TOLERANCE_DEG,
     DRAWING_DIMENSIONS,
+    DIMENSION_PRECISION,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
+from diagnostics.diag_build_9490T1 import build_9490T1
+from stock_anchor_geom import ANCHOR_9490T1
 
 PART_NAME = "boss-hook"
-MATERIAL = "Plain Carbon Steel"  # black hardware
-
-# Geometry nominals live in boss_hook_geom (the prose-free module assemblies
-# import); re-imported here so the build and the assembly can never drift.
-from boss_hook_geom import ELBOW_R, ROD_DIA, SHANK_RISE  # noqa: E402
-ARM_RUN = 3.5  # straight run after the elbow; tip at x 6.5 (derived)
-# Rod centreline tops out at y = SHANK_RISE + ELBOW_R = 15 (machine 1004.7);
-# tip at x = ELBOW_R + ARM_RUN = 6.5 (machine 97).
+SPEC = fastener(PART_NAME)
+MATERIAL = SPEC.material
+ANCHOR = ANCHOR_9490T1
 
 
-async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import SweepParameters
-
-    check("create_part", await adapter.create_part())
-
-    # Editable knobs (Tools > Equations): rod diameter, the straight rise, the
-    # elbow bend radius and the arm run. The mm suffix is load-bearing -- this is
-    # an INCH document and the equation manager reads BARE numbers in document
-    # units (an unsuffixed 12 = 12 in, blowing the part up 25.4x).
-    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
-    await set_global(adapter, "ShankRise", f"{SHANK_RISE}mm")
-    await set_global(adapter, "ElbowR", f"{ELBOW_R}mm")
-    await set_global(adapter, "ArmRun", f"{ARM_RUN}mm")
-
-    drive_jobs: list[tuple[str, str]] = []
-
-    # Path in the Front plane: rise, quarter-arc elbow, horizontal arm.
-    # Direct DB keeps inference relations off the chain (auto-tangent at
-    # the elbow would collide with the explicit alignment scheme below);
-    # exact-coordinate joints still merge. add_arc draws CCW, so the elbow
-    # runs from the arm joint (top) back to the rise joint.
-    # Each manual driving dim is recorded into a per-sketch SketchDims in
-    # creation order; apply() count-asserts the total against the feature's real
-    # display-dim count and renames structurally, then the drive equations run in
-    # one deferred batch after the whole model exists.
-    path = SketchDims()
-    path_name = check("create_sketch hook path", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    rise = check("rise line", await adapter.add_line(0.0, 0.0, 0.0, SHANK_RISE))
-    elbow = check(
-        "elbow arc",
-        await adapter.add_arc(
-            ELBOW_R, SHANK_RISE,  # centre
-            ELBOW_R, SHANK_RISE + ELBOW_R,  # start (arm joint)
-            0.0, SHANK_RISE,  # end (rise joint)
-        ),
-    )
-    arm = check(
-        "arm line",
-        await adapter.add_line(
-            ELBOW_R, SHANK_RISE + ELBOW_R, ELBOW_R + ARM_RUN, SHANK_RISE + ELBOW_R
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    check("rise vertical", await adapter.add_sketch_constraint(rise, None, "vertical"))
-    check(
-        "rise start -> origin",
-        await adapter.add_sketch_constraint(f"{rise}.start", "origin", "coincident"),
-    )
-    await dimension_between(
-        adapter, f"{rise}.start", f"{rise}.end", "vertical_distance", SHANK_RISE, "rise"
-    )
-    path.record("Rise", '"ShankRise"')
-    # Elbow centre at (R, rise top); the arm joint sits straight above it,
-    # which is the tangency condition without an inference-style relation.
-    # No radius dim: the merged rise joint already sets r = ELBOW_R.
-    await anchor_point_to_origin(
-        adapter, f"{elbow}.center", ELBOW_R, SHANK_RISE, "elbow centre"
-    )
-    # Elbow centre is off both axes: anchor_point_to_origin emits a
-    # horizontal_distance (= ElbowR) then a vertical_distance (= ShankRise).
-    path.record("ElbowCx", '"ElbowR"')
-    path.record("ElbowCy", '"ShankRise"')
-    check(
-        "arm joint above elbow centre",
-        await adapter.add_sketch_constraint(
-            f"{elbow}.start", f"{elbow}.center", "vertical_points"
-        ),
-    )
-    check("arm horizontal", await adapter.add_sketch_constraint(arm, None, "horizontal"))
-    await dimension_between(
-        adapter, f"{arm}.start", f"{arm}.end", "horizontal_distance", ARM_RUN, "arm run"
-    )
-    path.record("ArmRun", '"ArmRun"')
-    await ensure_fully_defined(adapter, "hook path")
-    check("exit_sketch hook path", await adapter.exit_sketch())
-    name_last_feature(adapter, "HookPath")
-    drive_jobs += path.apply(adapter, "HookPath")
-
-    # Wire profile at the path start (origin, Top plane). On-origin circle: only
-    # the diameter is a dim (the centre is a coincident relation).
-    profile = SketchDims()
-    check("create_sketch wire profile", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, ROD_DIA / 2.0, "wire profile", dims=profile,
-        names=("WireCx", "WireCz", "RodDia"),
-        drives=(None, None, '"RodDia"'),
-    )
-    await ensure_fully_defined(adapter, "wire profile sketch")
-    check("exit_sketch wire profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "WireProfile")
-    drive_jobs += profile.apply(adapter, "WireProfile")
-
-    check(
-        "sweep hook",
-        # Path sketch was renamed to "HookPath" above; select it by the new name
-        # (the captured path_name still holds the stale auto "Sketch1").
-        await adapter.create_sweep(SweepParameters(path="HookPath")),
-    )
-    name_last_feature(adapter, "Hook")
-
-    # Pappus: planar path, volume = path length x wire area.
-    path_len = SHANK_RISE + math.pi / 2.0 * ELBOW_R + ARM_RUN
-    v_expected = path_len * math.pi * (ROD_DIA / 2.0) ** 2
-    await volume_check(adapter, "hook", v_expected, 0.02 * v_expected)
-
-    # Apply the deferred drive equations now -- after the whole model + a rebuild
-    # exists, so every target resolves. Each equation evaluates to the value just
-    # built, so the geometry must not move -- the re-check below is the proof.
-    await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
-    await volume_check(adapter, "driven hook (equations neutral)", v_expected, 0.02 * v_expected)
-
-    # Named shank axis (local Y through the origin) so the hook locks to the
-    # summing lever and rides it (the counter spring pulls through the hook in
-    # the M6 Motion study).
-    await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "shank axis")
-
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
+def _manufacturing_controls(adapter) -> None:
+    """Tolerance and mark actual cutting dimensions before the stock helper saves."""
     clear_dimensions_for_drawing(adapter)
-    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    for feature, name, nominal in (
+        ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_MM / 1000),
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_MM / 1000),
+        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_DEG)),
+    ):
+        display, dimension = _named_dimension(adapter, feature, name)
+        if int(dimension.DrivenState) != 2:
+            raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
+        if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
+            raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
+        display = _early_bound(display, "IDisplayDimension")
+        digits = DIMENSION_PRECISION[name]
+        result = display.SetPrecision3(digits, -1, -1, -1)
+        if (
+            result is None
+            or int(_read_member(display, "GetPrimaryPrecision2")) != digits
+        ):
+            raise RuntimeError(f"{name}@{feature}: native precision did not persist")
+    set_dimension_symmetric_tolerance(
+        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
+    )
+    # General dimensions retain their numerical acceptance bands natively;
+    # swTolGeneral omits the redundant printed band in favour of the title block.
+    for feature, name, band in (
+        ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
+        (
+            "StockDeburrProfile",
+            "ChamferAngle",
+            math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
+        ),
+    ):
+        _, dimension = _named_dimension(adapter, feature, name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 11  # swTolType_e.swTolGeneral
+        if not tolerance.SetValues(-band, band):
+            raise RuntimeError(
+                f"{name}@{feature}: cannot retain general tolerance values"
+            )
+        if (
+            int(tolerance.Type) != 11
+            or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+            or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+        ):
+            raise RuntimeError(f"{name}@{feature}: general tolerance readback changed")
+    for feature, names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -204,7 +122,31 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    return await save_part_and_images(adapter, PART_NAME)
+
+
+@wraps(build_9490T1)
+async def _modified_anchor(adapter, truth=None, **parameters):
+    receipt = await build_9490T1(adapter, truth, **parameters)
+    _manufacturing_controls(adapter)
+    return receipt
+
+
+async def build(adapter) -> dict[str, str]:
+    return await build_stock_fastener(
+        adapter,
+        part_name=PART_NAME,
+        components=(
+            StockComponent(
+                ANCHOR.sku,
+                _modified_anchor,
+                parameters={"shank_length_mm": SHANK_LENGTH_MM},
+            ),
+        ),
+        material=MATERIAL,
+        # Shank axis = the vendor -Y axis through the eye centre (Front n Right),
+        # the stable mate reference the old sketched part named "shank axis".
+        screw_axis_planes=("Front Plane", "Right Plane"),
+    )
 
 
 if __name__ == "__main__":

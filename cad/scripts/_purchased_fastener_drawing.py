@@ -174,7 +174,12 @@ def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
 
 @_telemetry.traced("drawing.purchased_title_block")
 def _purchased_title_block(
-    adapter: Any, draw: Any, *, material: str, finish: str
+    adapter: Any,
+    draw: Any,
+    *,
+    material: str,
+    finish: str,
+    material_property: str = "Material",
 ) -> list[tuple[Any, str, str]]:
     """Retarget this drawing's material/finish cells, never the saved template."""
     apply_custom_properties(adapter, {"Finish": finish}, model=draw)
@@ -184,7 +189,7 @@ def _purchased_title_block(
         raise RuntimeError("purchased drawing template has no sheet view")
     sheet_view = _early_bound(sheet_view, "IView")
     replacements = {
-        property_link("Material"): (property_link("Material"), material),
+        property_link("Material"): (property_link(material_property), material),
         property_link("Finish"): ('$PRP:"Finish"', finish),
     }
     matched = {token: 0 for token in replacements}
@@ -243,6 +248,7 @@ async def build_purchased_fastener_drawing(
         properties = read_required_properties(model, _PROPERTIES, required=_PROPERTIES)
         registry = _config.parts(stock.part_name)
         finish = registry["finish"]
+        installation_notes = str(registry.get("installation_notes", "")).strip()
         if not isinstance(finish, str) or not finish.strip():
             raise RuntimeError(
                 f"{stock.part_name}: registered purchased finish is empty"
@@ -338,18 +344,23 @@ async def build_purchased_fastener_drawing(
     with _telemetry.span("drawing.purchased_annotations"):
         for name, center, cell in _VIEW_CELLS:
             label = f"{name[1:].upper()}  {scale[0]}:{scale[1]}"
-            note = _literal_note(adapter, label, center[0] - 0.026, cell[1] - 0.006)
+            label_y = (
+                cell[3] + 0.007
+                if installation_notes and name in ("*Top", "*Isometric")
+                else cell[1] - 0.006
+            )
+            note = _literal_note(adapter, label, center[0] - 0.026, label_y)
             notes.append(
                 (
                     note,
                     label,
                     label,
-                    (cell[0], cell[1] - 0.012, cell[2], cell[1] - 0.001),
+                    (cell[0], label_y - 0.006, cell[2], label_y + 0.001),
                 )
             )
         text = (
-            "PURCHASED PART / REFERENCE ONLY\n"
-            "ORDER BY SUPPLIER SKU. DO NOT FABRICATE FROM THIS SHEET.\n"
+            "PURCHASED PART / REFERENCE GEOMETRY\n"
+            "ORDER BY SUPPLIER SKU; INSTALL PER NOTES WHERE SHOWN.\n"
             "GENERAL TOLERANCES AND EDGE-BREAK NOTES DO NOT APPLY."
         )
         note = _literal_note(adapter, text, 0.018, 0.072)
@@ -372,6 +383,15 @@ async def build_purchased_fastener_drawing(
                     (0.050, y - 0.007, 0.260, y + 0.001),
                 )
             )
+        if installation_notes:
+            # Registry-owned installation requirements are drawing-local, like
+            # purchased Finish: never force instructions into title-block cells.
+            apply_custom_properties(
+                adapter, {"Installation Notes": installation_notes}, model=draw
+            )
+            link = '$PRP:"Installation Notes"'
+            note = _literal_note(adapter, link, 0.018, 0.189)
+            notes.append((note, link, installation_notes, (0.015, 0.169, 0.225, 0.190)))
 
     with _telemetry.span("drawing.purchased_native_contract"):
         _rebuild(draw, phase="linked notes and final layout")

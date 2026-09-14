@@ -130,6 +130,16 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Raised Knurled-Head Thumb Screw",
         "91882A221",
     ),
+    "spring-hook": _stock(
+        "spring-hook",
+        "Black-Oxide Steel #6-32 Routing Eyebolt (Supplied Nut Omitted)",
+        "9489T111",
+    ),
+    "boss-hook": _stock(
+        "boss-hook",
+        "Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)",
+        "9490T1",
+    ),
 }
 
 

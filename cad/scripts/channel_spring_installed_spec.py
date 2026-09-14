@@ -1,61 +1,32 @@
-r"""Channel-spring (installed) dimensional contract -- the single source of truth
-shared by the part build (``build_channel_spring_installed.py``) and its
-manufacturing drawing (``draw_channel_spring_installed.py``).
+"""Purchased-data contract for McMaster-Carr 9432K31.
 
-PURE DATA, no SolidWorks/COM imports.  Like the counter spring this is a SPEC
-SHEET (side view + data table, NO graphical marked dimensions).  This is the
-SAME spring as the free channel spring, drawn at its INSTALLED (stretched)
-length, so the table states BOTH the free body length and the installed body
-length distinctly.  Values MUST match ``_spring`` / build_channel_spring_installed.
+This module is pure Python data: catalogue geometry comes from the verified
+supplier-geometry module, the installed length comes from the actual mount
+pose, and force values come from the purchased part row.  Lengths are catalogue
+inside-hook measurements, never coil-body or eye-centre distances.
 """
 
 from __future__ import annotations
 
 import _config
+import channel_spring_stock_geom as stock
+from spring_mount_geom import (
+    CHANNEL_INITIAL_TENSION_N,
+    CHANNEL_NOMINAL_POSE,
+    CHANNEL_RATE_N_PER_MM,
+)
 
-# --- Nominal geometry (DIMENSIONS.md ch. 17; matches ``_spring``). ---
-FREE_BODY_LENGTH = float(
-    _config.parts("channel-spring-installed")["free_length_mm"]
-)  # relaxed body (the ch.17 p.41 inset callout)
-COIL_OD = 6.5
-WIRE_DIA = 1.0
-COIL_COUNT = 28
 
-# Installed (in-machine) eye anchor heights -- the assembly-facing placement
-# contract (build_channel_assembly imports these; moved here from
-# build_channel_spring_installed so the assembly needs no builder import).
-LEVER_EYE_Y = 1058.0234  # LIVE neutral top eye = lever spring hole 1061.3934 -
-# drop 3.37. The hole: FULCRUM (199.9, 1061.4) + 177.8 along the neutral lever
-# (tilt -0.002 deg, level rest pose, ch14 ROM re-derive) = y 1061.3934. Was
-# 1062.5234 before the 2026-08-02 top-frame rederive dropped the fulcrum chain
-# 4.5 (rail top 1040.7 -> 1036.2, fulcrum 1065.9 -> 1061.4). The assembly's
-# solve_state is the authority -- verify:math spring:neutral-body-canonical
-# guards this value.
-PLATE_EYE_Y = 986.24  # bottom eye centre, ABOVE the .cs plate (top 982.24) on the
-# spring-hook arm: plate bottom 977.14 + hook arm height (SHANK_RISE 7.6 + ELBOW_R
-# 1.5 = 9.1). Was 996.54: the summing chain dropped 10.3 with the top-frame
-# rederive (crossbar underside 1010 -> 999.7), taking plate + hook + eye along.
-# High enough that the eye's O5.5 ring clears the plate (its bottom 982.99 >
-# 982.24). The spring no longer threads the plate -- the hook bridges it.
+_PART = _config.parts("channel-spring-installed")
 
-COIL_ID = COIL_OD - 2.0 * WIRE_DIA  # 4.5
-MEAN_DIA = COIL_OD - WIRE_DIA  # 5.5
-HOOK_LEAD = 2.0 * WIRE_DIA
-HOOK_CL_RADIUS = MEAN_DIA / 2.0
-FREE_EYE_C2C = FREE_BODY_LENGTH + 2.0 * HOOK_LEAD
-# Installed (in-machine) stretched body length -- exact (67.7834, +5.8 vs the
-# pre-rederive 61.9834: top eye -4.5, bottom eye -10.3); the table
-# renders it .2f. build_channel_spring_installed and the channel assembly both
-# derive from this single value.
-INSTALLED_BODY_LENGTH = LEVER_EYE_Y - PLATE_EYE_Y - 2.0 * HOOK_LEAD
-INSTALLED_EYE_C2C = round(INSTALLED_BODY_LENGTH + 2.0 * HOOK_LEAD, 2)
-FREE_PITCH = FREE_BODY_LENGTH / COIL_COUNT  # 1.14 -- NOT close-wound
-# Nominal rate k = G d^4 / (8 Dm^3 n), ASTM A228 G = 79.3 GPa -- stated REF so
-# the table carries a functional requirement, not just geometry.
-SPRING_RATE_REF = 79300.0 * WIRE_DIA**4 / (8.0 * MEAN_DIA**3 * COIL_COUNT)
+FREE_LENGTH_MM = stock.FREE_LENGTH_MM
+MAX_LENGTH_MM = stock.MAX_LENGTH_MM
+INSTALLED_LENGTH_MM = stock.check_length_mm(CHANNEL_NOMINAL_POSE.length_mm)
+SPRING_RATE_N_PER_MM = CHANNEL_RATE_N_PER_MM
+INITIAL_TENSION_N = CHANNEL_INITIAL_TENSION_N
+MAXIMUM_LOAD_N = float(_PART["maximum_load_n"])
 
-# The spec-sheet data table + marked-dimension contract (DRAWING_DIMENSIONS /
-# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``channel_spring_installed_notes``
-# -- ``_spring`` (in the channel-assembly closure) imports this module, so
-# drawing-only data here would put every table edit in the assembly rebuild
-# closure (codex #354).
+# Supplier-stated scatter.  This is catalogue acceptance data, not the tighter
+# 20-spring common-set matching requirement used by the analyzer.
+SPRING_RATE_TOLERANCE_FRACTION = float(_PART["spring_rate_tolerance_fraction"])
+INITIAL_TENSION_TOLERANCE_N = float(_PART["initial_tension_tolerance_n"])

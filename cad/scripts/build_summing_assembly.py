@@ -44,6 +44,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 
 from _common import (
     apply_custom_properties,
@@ -66,12 +67,15 @@ from _assembly import (
     lock_mate,
     named_ref,
     place_component,
+    reledger_to_solved,
     reset_dof_manifest,
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _cwm import put_component_pose
+from _native_spring_contact import solve_component_contact
 from _interference_contracts import allowed_interference_pairs
-from _transforms import IDENTITY, ROT_Y_180, ROT_Y_POS90
+from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
 from build_knife_hanger_stud import (
     SHANK_DIA as BOLT_MAJOR_DIA,
@@ -87,15 +91,11 @@ from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
 
 ASM_NAME = "summing"
 
-# --- machine anchors ---------------------------------------------------------
-KNIFE = (-15.0, 979.7)  # summing-lever knife-edge line (x, y), along Z
-# (Cascade A rederive: crossbar underside 1010 -> 999.7, whole chain -10.30)
-COLUMN_X = -197.0  # east column (the crank side is machine -X)
+from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
 # --- knife bearing supports (build_knife_mount) -----------------------------
-from summing_lever_spec import HEX_H, HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
+from summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 
-KNIFE_CONTACT_Y = KNIFE[1] + HEX_H / 2.0  # knife-edge contact ridge line (984.834)
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
 # --- knife-hanger hardware (two bolts + two separate washers) ----------------
@@ -173,136 +173,146 @@ def _assert_knife_hanger_stack() -> None:
     )
 
 
-# --- counter-spring chain (boss_hook_geom / counter_spring_spec) ------------
-# boss_hook_geom, NOT build_boss_hook: the part build's import closure carries
-# boss_hook_spec's drawing prose, which would fold note edits into this
-# assembly's full-rebuild recipe (codex #361).
-from boss_hook_geom import ELBOW_R, ROD_DIA as HOOK_ROD_DIA, SHANK_RISE  # noqa: E402
-from counter_spring_spec import (  # noqa: E402
-    BOTTOM_HOOK_LEAD as CS_BOTTOM_LEAD,
-    COIL_BODY_LENGTH as CS_BODY_LENGTH,
-    COIL_OD as CS_COIL_OD,
-    HOOK_CL_RADIUS as CS_HOOK_R,
-    TOP_HOOK_LEAD as CS_TOP_LEAD,
-    WIRE_DIA as CS_WIRE_DIA,
-)
-# gooseneck_geom, NOT build_gooseneck, for the same reason (gooseneck_spec's
-# DRAWING_NOTES would ride along in the closure).
-from gooseneck_geom import (  # noqa: E402
-    ARM_END_X as GN_ARM_END_X,
-    ARM_Y as GN_ARM_Y,
-    SCREW_HEAD_DIA as GN_HEAD_DIA,
-    SCREW_HEAD_T as GN_HEAD_T,
-    SCREW_SHANK_DIA as GN_SHANK_DIA,
-    SCREW_SHANK_LEN as GN_SHANK_LEN,
-    TUBE_DIA as GN_TUBE_DIA,
-)
+# --- purchased counter spring and directly threaded lower anchor -----------
+import counter_spring_stock_geom as counter_stock  # noqa: E402
+import gooseneck_geom  # noqa: E402
+import spring_mount_geom as spring_mounts  # noqa: E402
+import summing_lever_spec  # noqa: E402
+from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 
-BOSS_HOOK_POS = (-90.5, 989.7, SUMMING_Z)  # rides the lever: Cascade A -10.3
-SPRING_POS = (-95.0, 1041.8, SUMMING_Z)  # coil-bottom origin; ring at y 1001.8
-# (the pre-shift 1052.0 hang left the hook rod poking 0.05 past the ring inner
-# top; the +0.1 air-gap correction is preserved through the -10.3 shift)
-GOOSENECK_POS = (COLUMN_X, 1210.0, SUMMING_Z)  # part origin = leg mid-height;
-# placed Ry(180), so a part-frame x lands at machine COLUMN_X - x
-SPRING_AIR_GAP_MIN = 0.25  # wire band / coil vs the screw head and the end face
+BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
+# Analytical seeds only: unchanged supplier bodies determine final native seats.
+SPRING_SEED_POS = (*spring_mounts.COUNTER_REFERENCE_POSE.centre_xy, SUMMING_Z)
+GOOSENECK_SEED_POS = (COLUMN_X, spring_mounts.GOOSENECK_ORIGIN_Y, SUMMING_Z)
 
 
-def _assert_counter_spring_top_hang() -> None:
-    """Top eye around the gooseneck's axial end screw, a hair of air above it.
+def _assert_counter_spring_top_hang(
+    pose: spring_mounts.SpringPose | None = None,
+    gooseneck_y: float | None = None,
+) -> None:
+    """Bound retention/envelopes, not native wire contact.
 
-    The eye (a 270-degree loop of mean radius CS_HOOK_R on the coil axis,
-    CS_TOP_LEAD above the coil body, lying in the YZ plane after the Ry(+90)
-    placement) encircles the screw shank that runs along the tube axis
-    (machine -X after the Ry(180) placement). Three facts, all analytic:
-
-    * VERTICAL -- the shank top sits 0..0.5 below the eye's inner top (the
-      same air-gap convention as the bottom hang, so the interference gate
-      stays zero while the geometry reads as hanging).
-    * AXIAL -- the eye's wire band (+/- half a wire about the coil axis x)
-      lies on the EXPOSED shank, at least SPRING_AIR_GAP_MIN clear of both
-      the head shoulder and the arm end face.
-    * COIL -- the coil body hangs under the eye and its top rises above the
-      tube underside, so the coil's O.D. must also clear the end face in x
-      by SPRING_AIR_GAP_MIN (the ch19 p.45 photo shows exactly this: eye
-      pressed toward the head, coil partly under the tube end).
-    * HEAD -- the head is wider than the eye (it must retain a slack eye)
-      and sits INSIDE the coil's x band, above the coil: where the two
-      overlap in x its underside must clear the coil's top wire by
-      SPRING_AIR_GAP_MIN; were the head ever outside the coil band, the x
-      clearance would have to hold instead."""
-    eye_y = SPRING_POS[1] + CS_BODY_LENGTH + CS_TOP_LEAD  # 1370.7
-    eye_inner_r = CS_HOOK_R - CS_WIRE_DIA / 2.0  # 4.45
-    shank_y = GOOSENECK_POS[1] + GN_ARM_Y  # 1373.3
-    gap = (eye_y + eye_inner_r) - (shank_y + GN_SHANK_DIA / 2.0)
-    if not 0.0 < gap < 0.5:
-        raise RuntimeError(f"counter-spring eye/screw air gap {gap:.3f} not in (0, 0.5)")
-    if shank_y - GN_SHANK_DIA / 2.0 <= eye_y - eye_inner_r:
-        raise RuntimeError("counter-spring eye does not encircle the screw shank")
-
-    end_face_x = GOOSENECK_POS[0] - GN_ARM_END_X  # -101.75
-    head_x = GOOSENECK_POS[0] - (GN_ARM_END_X - GN_SHANK_LEN)  # -93.75
-    eye_x = SPRING_POS[0]  # -95: coil axis, the eye's plane
-    band = CS_WIRE_DIA / 2.0
-    to_head = head_x - (eye_x + band)
-    to_end_face = (eye_x - band) - end_face_x
-    if min(to_head, to_end_face) < SPRING_AIR_GAP_MIN:
-        raise RuntimeError(
-            f"counter-spring eye band off the exposed shank: head {to_head:.3f},"
-            f" end face {to_end_face:.3f} (min {SPRING_AIR_GAP_MIN})"
-        )
-
-    coil_top = SPRING_POS[1] + CS_BODY_LENGTH  # 1367.1 (helix centreline)
-    tube_bottom = shank_y - GN_TUBE_DIA / 2.0  # 1365.3
-    coil_x0, coil_x1 = eye_x - CS_COIL_OD / 2.0, eye_x + CS_COIL_OD / 2.0
-    coil_to_end_face = coil_x0 - end_face_x
-    if coil_top > tube_bottom and coil_to_end_face < SPRING_AIR_GAP_MIN:
-        raise RuntimeError(
-            f"counter-spring coil under the tube end: clearance {coil_to_end_face:.3f}"
-            f" (coil top {coil_top:.2f} above tube underside {tube_bottom:.2f})"
-        )
-
-    if GN_HEAD_DIA <= 2.0 * eye_inner_r:
-        raise RuntimeError(
-            f"screw head O{GN_HEAD_DIA} cannot retain the O{2.0 * eye_inner_r:.1f} eye"
-        )
-    head_x0, head_x1 = head_x, head_x + GN_HEAD_T  # -93.75..-91.75
-    head_bottom = shank_y - GN_HEAD_DIA / 2.0  # 1368.3
-    coil_wire_top = coil_top + band  # 1368.0
-    head_in_coil_band = head_x0 < coil_x1 and head_x1 > coil_x0
-    head_to_coil = (
-        head_bottom - coil_wire_top
-        if head_in_coil_band
-        else min(abs(head_x0 - coil_x1), abs(coil_x0 - head_x1))
+    Defaults check the analytical insertion seeds offline. The assembly passes
+    its actual translated pose and gooseneck height after native seating; only
+    the native body predicate certifies contact. The half-turn clocking keeps
+    the raised end on the open side of the arm.
+    """
+    pose = spring_mounts.COUNTER_REFERENCE_POSE if pose is None else pose
+    gooseneck_y = GOOSENECK_SEED_POS[1] if gooseneck_y is None else gooseneck_y
+    ux, uy = pose.axis_xy
+    screw_y = gooseneck_y + gooseneck_geom.ARM_Y
+    retention = (gooseneck_geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
+    if retention < 1.0:
+        raise RuntimeError(f"counter eye head retention only {retention:.3f} mm radial")
+    band = (
+        abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
+        + uy * counter_stock.LOOP_HALF_RISE_MM
+        + counter_stock.WIRE_RADIUS_MM
     )
-    if head_to_coil < SPRING_AIR_GAP_MIN:
+    axial_gap = min(
+        pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
+        spring_mounts.GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN
+        - pose.upper_eye_xy[0],
+    ) - band
+    if axial_gap < spring_mounts.MIN_CLEARANCE_MM:
         raise RuntimeError(
-            f"screw head into the coil: clearance {head_to_coil:.3f}"
-            f" ({'vertical' if head_in_coil_band else 'axial'}, min {SPRING_AIR_GAP_MIN})"
+            f"double-loop band does not fit exposed shank: {axial_gap:.3f} mm"
+        )
+    coil_top = (
+        pose.centre_xy[1]
+        + uy * counter_stock.coil_end_x_mm(pose.length_mm)
+        + abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
+        + counter_stock.WIRE_RADIUS_MM
+    )
+    main_coil_gap = screw_y - gooseneck_geom.TUBE_DIA / 2.0 - coil_top
+    tube_gap, head_gap = spring_mounts.counter_half_turn_clearances(pose, screw_y)
+    if min(main_coil_gap, tube_gap, head_gap) < spring_mounts.MIN_CLEARANCE_MM:
+        raise RuntimeError(
+            f"counter coil/support clearance: main {main_coil_gap:.3f}, "
+            f"half-turn/tube {tube_gap:.3f}, half-turn/head {head_gap:.3f} mm"
         )
     log(
-        f"counter-spring top hang: eye inner top {eye_y + eye_inner_r:.2f}, shank top"
-        f" {shank_y + GN_SHANK_DIA / 2.0:.2f}, air gap {gap:.2f}; band to head"
-        f" {to_head:.2f}, to end face {to_end_face:.2f}; coil to end face"
-        f" {coil_to_end_face:.2f}; head underside to coil wire {head_to_coil:.2f}"
+        f"counter upper support: head retention {retention:.3f}, "
+        f"eye axial gap {axial_gap:.3f}, main coil {main_coil_gap:.3f}, "
+        f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
     )
 
 
 def _assert_counter_spring_hang() -> None:
-    """Bottom ring around the boss-hook arm, a hair of air above the rod.
-
-    Physical hanging would put the ring's inner top ON the rod (contact);
-    we model a 0..0.5 air gap instead so the interference check stays
-    zero (the original sense -- rod top ABOVE the ring inner top -- was
-    inverted and encoded a 0.05 wire/rod overlap)."""
-    ring_y = SPRING_POS[1] - CS_BOTTOM_LEAD  # 1001.8
-    ring_inner_top = ring_y + (CS_COIL_OD - CS_WIRE_DIA) / 2.0 - CS_WIRE_DIA / 2.0
-    rod_top = BOSS_HOOK_POS[1] + SHANK_RISE + ELBOW_R + HOOK_ROD_DIA / 2.0
-    gap = ring_inner_top - rod_top
-    if not 0.0 < gap < 0.5:
-        raise RuntimeError(f"counter-spring ring/rod air gap {gap:.3f} not in (0, 0.5)")
+    """Require full direct thread engagement and a tensioned supplier spring."""
+    anchor = ANCHOR_9490T1
+    tap = summing_lever_spec.COUNTER_HOLE_SPEC
+    if tap.kind != "tapped" or tap.size != anchor.thread_size:
+        raise RuntimeError("counter anchor requires its matching native through tap")
+    thread_top = BOSS_HOOK_POS[1] + anchor.thread_start_y_mm
+    boss_top = KNIFE[1] + summing_lever_spec.ANCHOR_H / 2.0
+    if abs(thread_top - boss_top) > 1e-6:
+        raise RuntimeError("counter anchor thread start is not at the boss face")
+    if spring_mounts.COUNTER_SHANK_LENGTH_MM < summing_lever_spec.ANCHOR_H - 1e-6:
+        raise RuntimeError("trimmed counter anchor does not engage the full boss")
+    pose = spring_mounts.COUNTER_REFERENCE_POSE
+    counter_stock.validate_length_mm(pose.length_mm)
     log(
-        f"counter-spring hang: ring inner top {ring_inner_top:.2f}, rod top"
-        f" {rod_top:.2f}, air gap {gap:.2f}"
+        f"counter lower anchor: {tap.size} direct through tap, "
+        f"{summing_lever_spec.ANCHOR_H:.3f} mm engagement; "
+        f"spring inside length {pose.length_mm:.4f} mm, "
+        f"reference force {spring_mounts.counter_force_n(pose.length_mm):.3f} N"
+    )
+
+
+def _seat_counter_native_contacts(adapter, counter: str, boss_hook: str, gooseneck: str) -> None:
+    """Translate rigid supplier geometry to its two independently certified seats."""
+    seed = spring_mounts.COUNTER_REFERENCE_POSE
+    ux, uy = seed.axis_xy
+    lower_direction = (-ux, -uy, 0.0)
+    upper_direction = (0.0, -1.0, 0.0)
+    bracket = spring_mounts.MIN_CLEARANCE_MM / 2.0
+
+    def land(name: str, direction: tuple[float, float, float], offset: float) -> None:
+        target = component_transform(adapter, name)
+        for axis, value in enumerate(direction):
+            target[9 + axis] += value * offset / 1000.0
+        put_component_pose(adapter, name, target)
+        actual = component_transform(adapter, name)
+        if len(actual) != len(target) or max(abs(a - b) for a, b in zip(actual, target)) > 1e-12:
+            raise RuntimeError(f"{name}: native seating transform readback mismatch")
+        reledger_to_solved(adapter, name)
+
+    lower = solve_component_contact(
+        adapter, counter, boss_hook, lower_direction, bracket,
+        label="counter lower native seat",
+    )
+    land(counter, lower_direction, lower.offset_mm)
+    upper = solve_component_contact(
+        adapter, gooseneck, counter, upper_direction, bracket,
+        label="counter upper native seat",
+    )
+    land(gooseneck, upper_direction, upper.offset_mm)
+    # A fresh already_seated certificate witnesses the CURRENT native placement.
+    # A bracketed result instead proposes another move and must not pass this
+    # check. The full assembly gate independently retains zero overlap.
+    for label, moving, fixed, direction in (
+        ("counter lower", counter, boss_hook, lower_direction),
+        ("counter upper", gooseneck, counter, upper_direction),
+    ):
+        contact = solve_component_contact(
+            adapter, moving, fixed, direction, bracket, label=f"{label} native seat verification",
+        )
+        if contact.certificate != "already_seated":
+            raise RuntimeError(f"{label}: current native seat is not certified ({contact!r})")
+    actual_centre = component_origin(adapter, counter)
+    dx, dy = (actual_centre[i] - seed.centre_xy[i] for i in range(2))
+    pose = replace(
+        seed,
+        centre_xy=tuple(actual_centre[:2]),
+        lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
+        upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
+    )
+    _assert_counter_spring_top_hang(pose, component_origin(adapter, gooseneck)[1])
+    log(
+        f"counter native seats: lower {lower.offset_mm:.9g} mm along -axis, "
+        f"gooseneck {upper.offset_mm:.9g} mm along -Y; "
+        f"unchanged supplier inside length {pose.length_mm:.9g} mm"
     )
 
 
@@ -479,45 +489,42 @@ async def build(adapter) -> dict[str, str]:
         verify=(sl, sl_o),
         free_dof_key="lever_rock",
     )
-    # Boss hook: rigidly rides the lever (locked), carrying the counter spring.
-    # Keyed to the lever's anchor axis (Axis2, the summation-anchor eye the
-    # counter spring hangs from at machine ~(-91, 979.7)) rather than the pivot
-    # axis -- the lock just freezes the current pose, so the handle is chosen
-    # for physical meaning (the eye), not the rock centre.
-    # Ry(180): the boss-hook is a planar-XY wire form modeled with its open jaw
-    # toward local +X; turned about Y it faces the machine crank side (-X),
-    # hanging the counter-spring over the lever's anchor eye at ~(-91, 979.7).
+    # The purchased, trimmed open eye threads directly into the lever's boss.
+    # Locking records that rigid threaded connection while preserving lever rock.
     bh = await place_component(
         adapter,
         "boss-hook",
         list(BOSS_HOOK_POS),
-        [0.0, 180.0, 0.0],
-        ROT_Y_180,
+        [0.0, 0.0, 0.0],
+        IDENTITY,
         ground=False,
     )
     await lock_mate(
         adapter,
-        named_ref(f"Axis1@{bh}", "AXIS"),
+        named_ref(f"ScrewAxis@{bh}", "AXIS"),
         named_ref(f"Axis2@{sl}", "AXIS"),
         label="boss-hook keyed",
     )
-    # Ry(+90): the end loops land in the YZ plane, encircling the hook arm
-    # (bottom) and the gooseneck's axial end-screw shank (top)
-    # nail-through-ring style.
-    await place_component(
-        adapter, "counter-spring", list(SPRING_POS), [0.0, 90.0, 0.0], ROT_Y_POS90
+    # Preserve the vendor +X coil frame and its required half-turn clocking.
+    counter = await place_component(
+        adapter,
+        "counter-spring",
+        list(SPRING_SEED_POS),
+        euler_from_rows(spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows),
+        spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows,
     )
-    # Ry(180), like the boss-hook: the gooseneck's overhang arm reaches from
+    # Ry(180): the gooseneck's overhang arm reaches from
     # the east column toward the machine centre. The post is held in the
     # top-frame casting's rail-hub bore by its 1/4-20 set screw
     # (frame.SLDASM) -- there is no separate clamp part.
-    await place_component(
+    gooseneck = await place_component(
         adapter,
         "gooseneck",
-        list(GOOSENECK_POS),
+        list(GOOSENECK_SEED_POS),
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
+    _seat_counter_native_contacts(adapter, counter, bh, gooseneck)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free washer, bolt, or

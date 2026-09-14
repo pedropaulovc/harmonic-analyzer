@@ -1,61 +1,98 @@
-"""Offline contracts for the boss-hook drawing."""
+"""Offline manufacturing boundaries for the modified purchased anchor."""
 
-from __future__ import annotations
+import math
+from types import SimpleNamespace
 
-from pathlib import Path
+import pytest
 
-import boss_hook_spec
-import build_boss_hook as part
+import boss_hook_spec as spec
 import draw_boss_hook as drawing
-from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import TAP_DRILL_MM
+from stock_anchor_geom import ANCHOR_9490T1 as anchor
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/boss-hook.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/boss-hook.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/boss-hook_drawing.png")
-    assert DRAWINGS_BY_NAME["boss_hook"].script == Path(drawing.__file__).resolve()
+def test_finished_overall_preserves_factory_thread_datum():
+    cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
+    assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
+    assert spec.TRIM.shank_length_mm == pytest.approx(19.05)
+    assert spec.FINISHED_OVERALL_MM == pytest.approx(36.6395)
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is boss_hook_spec.DRAWING_DIMENSIONS
-    marked = set().union(*boss_hook_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
-    assert kept == marked
+def test_deburr_band_clears_receiver_and_retains_full_threads():
+    minimum = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
+    maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
+    assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
+    # Include the adverse angular corner, not only the nominal 45-degree leg.
+    maximum_axial = maximum / math.tan(
+        math.radians(spec.CHAMFER_ANGLE_DEG - spec.CHAMFER_ANGLE_TOLERANCE_DEG)
+    )
+    short_shank = spec.SHANK_LENGTH_MM - spec.FINISHED_OVERALL_TOLERANCE_MM
+    assert short_shank - maximum_axial > 17.0
 
 
-def test_notes_describe_the_wire_hook() -> None:
-    notes = boss_hook_spec.DRAWING_NOTES
-    assert "WIRE" in notes
-    assert "R3 +/-0.20" in notes
-    assert "END-FACE AXIAL" in notes
-    assert "WIRE CENTERLINE, FROM END FACE" in notes
-    assert "(MAX DIA - MIN DIA)/3.00 <= 0.05" in notes
-    assert "FLAT SURFACE PLATE; 0.25 MAX GAP" in notes
-    assert "5X MAGNIFICATION" in notes
-    assert "AISI" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (4.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(4, 1)" in source
-    assert "scale=(2, 1)" in source
-    assert boss_hook_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    config = _config.parts("boss-hook")
-    assert config["material"] == "ASTM A108 Grade 1018 steel"
-    assert config["material"] == config["material_specification"]
-    assert "steel" in str(config["material_specification"]).lower()
-    assert config["finish"]
-    assert int(config["quantity"]) == 1
+@pytest.mark.parametrize(
+    "fault", [None, "reference", "nominal", "tolerance", "precision", "missing"]
+)
+def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
+    """General is toleranced, unlike None; neither replaces a real driving size."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
+    )
+    annotations = []
+    for name, nominal, band in (
+        (
+            "FinishedOverall",
+            spec.FINISHED_OVERALL_MM / 1000,
+            spec.FINISHED_OVERALL_TOLERANCE_MM / 1000,
+        ),
+        (
+            "ChamferWidth",
+            spec.CHAMFER_WIDTH_MM / 1000,
+            spec.CHAMFER_WIDTH_TOLERANCE_MM / 1000,
+        ),
+        (
+            "ChamferAngle",
+            math.radians(spec.CHAMFER_ANGLE_DEG),
+            math.radians(spec.CHAMFER_ANGLE_TOLERANCE_DEG),
+        ),
+    ):
+        tolerance = SimpleNamespace(
+            Type=spec.DIMENSION_TOLERANCE_TYPES[name],
+            GetMinValue=lambda band=band: -band,
+            GetMaxValue=lambda band=band: band,
+        )
+        dimension = SimpleNamespace(
+            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _configuration, dimension=dimension: dimension,
+            GetText=lambda _index: "",
+            GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
+        )
+        annotations.append(
+            SimpleNamespace(
+                name=name,
+                dimension=dimension,
+                display=display,
+                GetSpecificAnnotation=lambda display=display: display,
+            )
+        )
+    if fault == "reference":
+        annotations[0].dimension.DrivenState = 1
+    elif fault == "nominal":
+        annotations[0].dimension.SystemValue += 0.001
+    elif fault == "tolerance":
+        # swTolNONE must remain invalid; a no-tolerance spec is a regression.
+        annotations[0].dimension.Tolerance.Type = 0
+    elif fault == "precision":
+        annotations[0].display.GetPrimaryPrecision2 = lambda: (
+            spec.DIMENSION_PRECISION["FinishedOverall"] + 1
+        )
+    elif fault == "missing":
+        annotations.pop()
+    if fault is None:
+        drawing._verify_controls(None, annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_controls(None, annotations)

@@ -365,18 +365,6 @@ def wizard_holes(
         data = fm.CreateDefinition(SW_FM_HOLE_WZD)
         data = _early_bound(data, "IWizardHoleFeatureData2")
         data.InitializeHole(hole_type, _STD_ANSI_INCH, fastener, spec.size, end)
-        if hole_type == 4:  # taps carry a class + their own thread end condition
-            # Pre-create sets are the support-foot precedent for these two;
-            # every other customization (fit, dim overrides) must go through
-            # the post-create ModifyDefinition flow.
-            for prop, val in (
-                ("ThreadClass", spec.thread_class),
-                ("ThreadEndCondition", end),
-            ):
-                try:
-                    setattr(data, prop, val)
-                except Exception:  # noqa: BLE001
-                    pass
         feat = fm.CreateFeature(data)
         if feat is None:
             raise RuntimeError(
@@ -536,6 +524,13 @@ def wizard_holes(
     # reads 0.0 for everything it did not set).
     defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
+    if hole_type == 4 and spec.end != "blind":
+        # InitializeHole/CreateFeature discard pre-create thread properties:
+        # the drill cuts through, but its native callout reports blind depth 0.
+        # The populated definition accepts the thread end via ModifyDefinition.
+        # swWzdHoleThreadEndCondition_e uses the same 0/1/2 values as _ENDS.
+        edits.append(("ThreadEndCondition", end))
+        edits.append(("ThreadClass", spec.thread_class))
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
         # applies it to counterbore/countersink features only (per the
@@ -586,7 +581,18 @@ def wizard_holes(
         for prop, val in edits:
             try:
                 setattr(defn, prop, val)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                if prop in ("ThreadEndCondition", "ThreadClass"):
+                    try:
+                        defn.ReleaseSelectionAccess()
+                    except Exception as cleanup_exc:  # noqa: BLE001
+                        _telemetry.warn(
+                            f"hole wizard {label}: selection cleanup after "
+                            f"{prop} rejection failed: {cleanup_exc}"
+                        )
+                    raise RuntimeError(
+                        f"hole wizard {label}: {prop} rejected"
+                    ) from exc
                 # Properties alias per hole Type; the inapplicable ones reject
                 # or no-op. The caller's analytic volume check is the hard
                 # gate that the surviving writes produced the right geometry.
@@ -597,6 +603,19 @@ def wizard_holes(
             raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
+    if hole_type == 4:
+        actual_thread_end = int(defn.ThreadEndCondition)
+        if actual_thread_end != end:
+            raise RuntimeError(
+                f"hole wizard {label}: thread end condition "
+                f"{actual_thread_end} != requested {end}"
+            )
+        actual_thread_class = str(defn.ThreadClass)
+        if actual_thread_class != spec.thread_class:
+            raise RuntimeError(
+                f"hole wizard {label}: thread class "
+                f"{actual_thread_class!r} != requested {spec.thread_class!r}"
+            )
 
     def _dim(prop: str) -> float:
         try:
@@ -610,18 +629,22 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
-    # The post-create definition reads 0.0 for HoleDiameter on EVERY hole Type
-    # on this seat (diag_hole_wizard 2026-07-21: all 7 cases read 0.000 while
-    # the cut geometry was exact), so the ``expect_dia_mm`` tripwire would
-    # always trip on it. The populated knob for a thru hole is
-    # ThruHoleDiameter (the same property the clearance drift check reads) --
-    # fall back to it so the tripwire gates against the real table value.
+    # Tap holes expose their drill diameter through the tap-specific members,
+    # not HoleDiameter/ThruHoleDiameter. Native #6-32 and #10-24 controls prove
+    # ThruTapDrillDiameter for through taps and TapDrillDiameter for blind taps.
+    if spec.kind in ("tapped", "tapped_bottoming"):
+        diameter_member = (
+            "TapDrillDiameter" if spec.end == "blind" else "ThruTapDrillDiameter"
+        )
+        hole_dia_mm = _dim(diameter_member)
+    else:
+        hole_dia_mm = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
     # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
     # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
     # independently by volume. ThreadDepth is populated and is gated below.
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=_dim("HoleDiameter") or _dim("ThruHoleDiameter"),
+        hole_dia_mm=hole_dia_mm,
         depth_mm=_dim("HoleDepth"),
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),

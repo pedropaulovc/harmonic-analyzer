@@ -31,6 +31,8 @@ from crank_pin_spec import (
 from crankshaft_spec import SHAFT_DIA as _CS_DIA
 from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
 from pinion_cam_pin_geometry import PIN_DIA
+import summing_lever_spec
+from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
 def _smooth_annulus_limit_mm3(
@@ -169,13 +171,26 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     ),
 }
 
-_SUMMING_ALLOWED_PAIRS = _numbered_pairs(
-    "knife-hanger-stud",
-    range(1, 3),
-    "knife-mount",
-    _smooth_annulus_limit_mm3(12.7, 10.716, 11.3735),
-    second_number=None,
+_COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
+    ANCHOR_9490T1.thread_major_dia_mm,
+    blind_cut_dia_mm(summing_lever_spec.COUNTER_HOLE_SPEC),
+    summing_lever_spec.ANCHOR_H,
 )
+_CHANNEL_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
+    ANCHOR_9489T111.thread_major_dia_mm,
+    blind_cut_dia_mm(summing_lever_spec.HOLE_SPEC),
+    summing_lever_spec.PLATE_T,
+)
+_SUMMING_ALLOWED_PAIRS = {
+    **_numbered_pairs(
+        "knife-hanger-stud",
+        range(1, 3),
+        "knife-mount",
+        _smooth_annulus_limit_mm3(12.7, 10.716, 11.3735),
+        second_number=None,
+    ),
+    frozenset(("boss-hook-1", "summing-lever-1")): _COUNTER_ANCHOR_THREAD_LIMIT,
+}
 
 _PEN_ALLOWED_PAIRS = {
     frozenset(("pen-set-screw-1", "pen-frame-1")): _smooth_annulus_limit_mm3(
@@ -250,6 +265,12 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
 # envelope. Bound its exact nested tap engagement by the same conservative
 # smooth-annulus contract as every other migrated stock thread.
 _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
+    **_numbered_pairs(
+        "channel-1/spring-hook",
+        range(1, summing_lever_spec.HOLE_COUNT + 1),
+        "summing-1/summing-lever",
+        _CHANNEL_ANCHOR_THREAD_LIMIT,
+    ),
     frozenset(
         (
             "frame-1/harmonic-base-1",

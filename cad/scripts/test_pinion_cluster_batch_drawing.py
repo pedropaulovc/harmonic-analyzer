@@ -248,6 +248,10 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         {
             frozenset(("knife-hanger-stud-1", "knife-mount-1")): 456.48979768633853,
             frozenset(("knife-hanger-stud-2", "knife-mount-2")): 456.48979768633853,
+            # 9490T1 #10-24 through the 0.75-in boss; #25 tap drill.
+            frozenset(("boss-hook-1", "summing-lever-1")): _annulus_limit(
+                4.826, 3.797, 19.05
+            ),
         }
     )
 
@@ -306,15 +310,21 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.8448, 2.261, 3.9
             ),
         },
-        "summing": _expected_numbered_pairs(
-            "knife-hanger-stud",
-            range(1, 3),
-            "knife-mount",
-            12.7,
-            10.716,
-            11.3735,
-            second_number=None,
-        ),
+        "summing": {
+            **_expected_numbered_pairs(
+                "knife-hanger-stud",
+                range(1, 3),
+                "knife-mount",
+                12.7,
+                10.716,
+                11.3735,
+                second_number=None,
+            ),
+            # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
+            frozenset(("boss-hook-1", "summing-lever-1")): _annulus_limit(
+                4.826, 3.797, 19.05
+            ),
+        },
         "pen": {
             frozenset(("pen-set-screw-1", "pen-frame-1")): _annulus_limit(
                 2.8448, 2.261, 5.0
@@ -396,6 +406,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "harmonic-analyzer": {
+            # Twenty stock 9489T111 #6-32 anchors engage only the 0.2-in
+            # summing-lever plate; #36 tap drill, not the full stock shank.
+            **_expected_numbered_pairs(
+                "channel-1/spring-hook",
+                range(1, 21),
+                "summing-1/summing-lever",
+                3.5052,
+                2.705,
+                5.08,
+            ),
             frozenset(
                 (
                     "frame-1/harmonic-base-1",
@@ -463,21 +483,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     special_pairs = {
         "drive-train": cam_pairs | crank_pairs,
     }
-    expected_counts = {
-        "drive-train": 8,
-        "frame": 13,
-        "magnifier": 3,
-        "summing": 2,
-        "pen": 2,
-        "paper-drive": 29,
-        "harmonic-analyzer": 12,
-    }
-
-    assert sum(len(pairs) for pairs in threaded_by_assembly.values()) == 65
-    assert sum(expected_counts.values()) == 69
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
-        assert len(allowed) == expected_counts[name]
         assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
         for pair, expected_limit in expected_threaded.items():
             assert allowed[pair] == pytest.approx(expected_limit)

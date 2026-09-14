@@ -1,7 +1,7 @@
 summing-lever:
   number: MHA-073
   material_family: ferrous_noncritical
-  finish: green enamel; knife edges + anchor bore machined
+  finish: green enamel; knife edges machined, spring-anchor seats tapped
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"

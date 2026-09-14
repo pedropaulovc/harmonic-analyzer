@@ -1,8 +1,18 @@
 spring-hook:
+  title: Channel Spring Anchor
   number: MHA-090
+  stock_name: 'Black-Oxide Steel #6-32 Routing Eyebolt (Supplied Nut Omitted)'
+  supplier: McMaster-Carr
+  supplier_skus: [9489T111]
   material: Plain Carbon Steel
-  material_specification: AISI 1018 steel wire, 1.4 dia, annealed (cold-formable)
-  finish: black oxide
+  material_specification: Black-oxide steel, McMaster-Carr 9489T111
+  finish: black oxide as supplied
+  installation_notes: |-
+    INSTALLATION - CHANNEL LOWER ANCHOR
+    DISCARD SUPPLIED HEX NUT; NO NUT INSTALLED.
+    THREAD DIRECTLY INTO SUMMING LEVER MHA-073
+    TAPPED PLATE. CLOCK EYE TO SPRING PULL PLANE.
+    USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.
   quantity: 20
   tolerance_class: machined_block
-  process: "formed wire"
+  process: purchased
