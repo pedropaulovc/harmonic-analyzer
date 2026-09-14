@@ -26,6 +26,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
@@ -35,8 +36,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _holes import TAP_DRILL_MM
 from build_pen_hanger import (
     BLOCK_HALF,
+    SCREW_HOLE_XY,
+    SCREW_TAP_SPEC,
     STRAP_BOT_X,
     STRAP_TOP_X,
     STRAP_TOP_Y,
@@ -152,10 +156,19 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
-    # Do not add a native callout here: R2026x renders a through tapped Hole
-    # Wizard feature as the contradictory "thread depth 0.00".  The linked
-    # manufacturing note carries the complete #8-32 UNC-2B THRU requirement,
-    # while the center mark and modeled hole remain associative.
+    # Pick the tap-drill rim, not the cosmetic thread or the hole centre.
+    # Keep its native size/class/THRU callout above the manufacturing notes.
+    add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=(
+            _fx(SCREW_HOLE_XY[0] + TAP_DRILL_MM[SCREW_TAP_SPEC.size] / 2.0),
+            _fy(SCREW_HOLE_XY[1]),
+        ),
+        callout_xy=(0.115, 0.215),
+        label="hanger-screw through tap",
+        process="TAP",
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.150)
     add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)

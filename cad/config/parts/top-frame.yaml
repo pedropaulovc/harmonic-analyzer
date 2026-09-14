@@ -1,7 +1,7 @@
 top-frame:
   number: MHA-077
   material_family: ferrous_noncritical
-  finish: SSPC-SP3;ALKYD PRIMER/GREEN ENAMEL;TOTAL 75-125um DFT;COLOR NONCRITICAL;MASK FIT BORES,CAP SEATS,BOSS END LANDS AND TAPPED HOLES;OIL BARE MACHINED SURFACES
+  finish: ALKYD PRIME/GREEN ENAMEL;MASK SEATS/BORES/THREADS;LIGHT OIL BARE METAL
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
