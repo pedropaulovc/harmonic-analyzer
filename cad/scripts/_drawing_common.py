@@ -1267,22 +1267,21 @@ def add_native_hole_callout(
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
     if process:
-        # A Hole Wizard callout keeps its whole format string
-        # (``<MOD-DIAM><DIM> THRU ALL``) in the PREFIX compartment, so the
-        # process is PREPENDED to what is there -- replacing it silently drops
-        # the size and depth (measured 2026-09-02: the sheet read "#14 DRILL").
+        # Prefix the definition, not GetText(Prefix)'s resolved values: writing
+        # resolved thread text severs its Hole Wizard variables. Native save /
+        # reopen proof retains all five variables with PrefixDefinition (5).
         display = _sw_type_info.early_bound_or_flag(
             display, "IDisplayDimension", "SetText", "GetText"
         )
-        existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        existing = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
         if not existing.strip():
             raise RuntimeError(f"hole callout has no format text to prefix ({label})")
         prefix = process.rstrip() + " " + existing.lstrip()
         display.SetText(1, prefix)
-        if str(display.GetText(1) or "") != prefix:
+        if str(display.GetText(5) or "") != prefix:
             raise RuntimeError(
                 f"hole callout process prefix did not persist ({label}): "
-                f"{display.GetText(1)!r}"
+                f"{display.GetText(5)!r}"
             )
         _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
