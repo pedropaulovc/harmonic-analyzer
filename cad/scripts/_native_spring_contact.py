@@ -16,6 +16,7 @@ import _telemetry
 from _assembly import configured_interference_manager
 from _common import _early_bound, _read_member
 from _cwm import put_component_pose
+from solidworks_mcp.adapters.com_variant import dispatch_array
 
 NATIVE_CONTACT_DISTANCE_TOLERANCE_MM = 1e-5
 _POSITION_CONVERGENCE_MM = 1e-6
@@ -32,6 +33,20 @@ class ContactSolution:
     certificate: Literal["already_seated", "bracketed_native_contact"]
     witness: Literal["native_distance", "native_collision_bracket"]
     final_distance_mm: float
+
+
+@dataclass(frozen=True, slots=True)
+class NativeInterferenceEvidence:
+    state: Literal["interfering", "clear"]
+    volume_mm3: float | None
+    witness: Literal["solid_intersection", "modeler_predicate"]
+    boolean_failure_status: int | None
+
+
+class _NativeBooleanFailure(RuntimeError):
+    def __init__(self, label: str, status: int) -> None:
+        self.status = status
+        super().__init__(f"{label}: native body intersection failed (status={status})")
 
 
 def _warn_distance_disagreement(label: str, distance_mm: float) -> None:
@@ -126,9 +141,7 @@ def native_component_overlap_mm3(
             ):  # DisjointBodies / NoIntersect
                 continue
             if status != 0:
-                raise RuntimeError(
-                    f"{label}: native body intersection failed (status={status})"
-                )
+                raise _NativeBooleanFailure(label, status)
             for raw in intersections or ():
                 body = _early_bound(raw, "IBody2")
                 if body is None or body.GetType() != 0:
@@ -155,6 +168,110 @@ def native_component_overlap_mm3(
         volume_mm3=volume_mm3,
     )
     return volume_mm3
+
+
+@_telemetry.traced("spring.contact.modeler_predicate", label_param="label")
+def _modeler_interference(
+    adapter: Any,
+    moving_component: str,
+    fixed_component: str,
+    *,
+    label: str,
+) -> Literal["interfering", "clear"]:
+    """Query fresh copies; failed Operations2 operands have already been consumed.
+
+    Option 1 excludes coincident-only contact. Option 4 returns participating
+    bodies, NOT overlap solids, so their volumes must never be used here.
+    """
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    moving, moving_transform = _component_solids(assembly, moving_component, label)
+    fixed, fixed_transform = _component_solids(assembly, fixed_component, label)
+    modeler = _early_bound(_read_member(adapter.swApp, "GetModeler"), "IModeler")
+    if modeler is None:
+        raise RuntimeError(f"{label}: native modeler unavailable")
+    for moving_body in moving:
+        for fixed_body in fixed:
+            target = _transformed_body_copy(moving_body, moving_transform, label)
+            tool = _transformed_body_copy(fixed_body, fixed_transform, label)
+            # The three VARIANT outputs are [in,out]; initialize them explicitly.
+            result = modeler.CheckInterference3(
+                dispatch_array([target]),
+                dispatch_array([tool]),
+                1,
+                None,
+                None,
+                None,
+            )
+            target = tool = None
+            if not isinstance(result, tuple) or len(result) != 4 or result[0] is None:
+                raise RuntimeError(f"{label}: malformed native interference predicate")
+            if result[0]:
+                _telemetry.event(
+                    "spring.contact.modeler_interference",
+                    moving_component=moving_component,
+                    fixed_component=fixed_component,
+                )
+                return "interfering"
+    return "clear"
+
+
+@_telemetry.traced("spring.contact.native_predicate", label_param="label")
+def native_component_interference(
+    adapter: Any,
+    moving_component: str,
+    fixed_component: str,
+    *,
+    label: str,
+) -> NativeInterferenceEvidence:
+    """Keep measured volumes authoritative; only upgrade BooleanFail to collision.
+
+    A successful volume sums every body pair. If construction fails, no total
+    exists: a positive independent modeler predicate may prove interference, but
+    its volume remains None. A negative predicate leaves the original failure
+    fatal. Successful zero-volume seats never consult the second kernel.
+    """
+    try:
+        volume_mm3 = native_component_overlap_mm3(
+            adapter,
+            moving_component,
+            fixed_component,
+            label=label,
+        )
+    except _NativeBooleanFailure as failure:
+        if (
+            failure.status != 1058
+        ):  # swBodyOperationBooleanFail; other errors stay fatal.
+            raise
+        state = _modeler_interference(
+            adapter,
+            moving_component,
+            fixed_component,
+            label=label,
+        )
+        if state != "interfering":
+            raise
+        _telemetry.event(
+            "spring.contact.boolean_failure_interference",
+            moving_component=moving_component,
+            fixed_component=fixed_component,
+            boolean_failure_status=failure.status,
+        )
+        _telemetry.warn(
+            f"{label}: native modeler proves interference after BooleanFail",
+            boolean_failure_status=failure.status,
+        )
+        return NativeInterferenceEvidence(
+            "interfering",
+            None,
+            "modeler_predicate",
+            failure.status,
+        )
+    return NativeInterferenceEvidence(
+        "interfering" if volume_mm3 > 0.0 else "clear",
+        volume_mm3,
+        "solid_intersection",
+        None,
+    )
 
 
 class _ActualContact:
@@ -293,26 +410,26 @@ class _ActualContact:
         self._assert_poses(expected)
         if state == "interfering":
             return state
-        volume_mm3 = native_component_overlap_mm3(
+        native_result = native_component_interference(
             self.adapter,
             self.moving,
             self.fixed,
             label=self.label,
         )
         self._assert_poses(expected)
-        if volume_mm3 > 0.0:
+        if native_result.state == "interfering":
             _telemetry.event(
                 "spring.contact.manager_omission",
                 label=self.label,
                 moving_component=self.moving,
                 fixed_component=self.fixed,
                 trial=self.trials,
-                overlap_volume_mm3=volume_mm3,
+                witness=native_result.witness,
             )
             if self.trials == 1:
                 _telemetry.warn(
                     f"{self.label}: assembly manager omitted native body overlap",
-                    overlap_volume_mm3=volume_mm3,
+                    witness=native_result.witness,
                 )
             return "interfering"
         return "clear"
@@ -356,6 +473,10 @@ class _ActualContact:
             return state, distance
         except BaseException as exc:
             primary = exc
+            exc.add_note(
+                f"{self.label}: native trial {self.trials}, "
+                f"offset={offset_mm:.17g} mm, measurement={measurement}"
+            )
             raise
         finally:
             try:

@@ -58,8 +58,10 @@ class _TemporaryBody:
     def __init__(self, source: _NativeBody) -> None:
         self.source = source
         self.transforms = []
+        self.state = "active"
 
     def ApplyTransform(self, transform) -> bool:
+        assert self.state == "active"
         assert transform.ArrayData == self.source.owner.Transform2.ArrayData
         self.transforms.append(transform)
         return True
@@ -67,6 +69,7 @@ class _TemporaryBody:
     def Operations2(self, operation: int, tool, error_code: int = 0):
         assert operation == 15901
         assert len(self.transforms) == len(tool.transforms) == 1
+        self.state = tool.state = "consumed"
         return self.source.scene.intersection(self.source.name, tool.source.name)
 
 
@@ -122,9 +125,25 @@ class _Scene:
         self.seat.bodies = [_NativeBody(self, self.seat, "seat-body")]
         self.Extension = SimpleNamespace(Rebuild=self.rebuild)
         self.currentModel = self
+        self.swApp = self
 
     def bind(self, value, interface: str):
         return value
+
+    def GetModeler(self):
+        return self
+
+    def CheckInterference3(self, targets, tools, options, faces1, faces2, bodies):
+        assert not options & 2  # Coincident-only contact is not an overlap.
+        target, tool = targets[0], tools[0]
+        assert target.state == tool.state == "active"
+        assert len(target.transforms) == len(tool.transforms) == 1
+        detected = (
+            self.mode in ("modeler-overlap", "clear-modeler-overlap")
+            and target.source.name == "spring-second"
+            and tool.source.name == "seat-body"
+        )
+        return detected, None, None, None
 
     def _attempt(self, operation, default=None):
         return operation()
@@ -153,11 +172,13 @@ class _Scene:
         self.components[name].Transform2 = SimpleNamespace(ArrayData=list(values))
 
     def intersection(self, target: str, tool: str):
+        if target == "spring-first" and self.mode == "modeler-overlap":
+            return (_IntersectionBody(_MICROSCOPIC_OVERLAP_MM3),), 0
         if target != "spring-second" or tool != "seat-body":
             return None, 0
         if self.mode == "overlap":
             return (_IntersectionBody(_MICROSCOPIC_OVERLAP_MM3),), 0
-        if self.mode == "boolean-fail":
+        if self.mode in ("boolean-fail", "modeler-overlap"):
             return None, 1058  # swBodyOperationBooleanFail
         return None, 0
 
@@ -176,6 +197,7 @@ class _Scene:
 def scene(monkeypatch):
     value = _Scene()
     monkeypatch.setattr(contact, "_early_bound", value.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
     monkeypatch.setattr(
         contact,
         "configured_interference_manager",
@@ -192,6 +214,25 @@ def test_manager_omission_uses_every_actual_body_without_volume_threshold(
     pair = scene.pair()
 
     assert pair._interference_state(pair.originals) == "interfering"
+
+
+def test_positive_native_predicate_rejects_unconstructible_intersection(scene) -> None:
+    scene.mode = "modeler-overlap"
+    pair = scene.pair()
+
+    assert pair._interference_state(pair.originals) == "interfering"
+    evidence = contact.native_component_interference(
+        scene, "spring", "seat", label="unconstructible overlap"
+    )
+    assert evidence.volume_mm3 is None  # Never publish the measured partial sum.
+    assert evidence.boolean_failure_status == 1058
+
+
+def test_successful_zero_volume_is_not_overruled_by_another_kernel(scene) -> None:
+    scene.mode = "clear-modeler-overlap"
+    pair = scene.pair()
+
+    assert pair._interference_state(pair.originals) == "clear"
 
 
 def test_zero_result_native_boolean_preserves_clear_classification(scene) -> None:

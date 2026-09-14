@@ -35,6 +35,7 @@ from _common import _early_bound, _read_member, check, run_build
 from _cwm import put_component_pose
 from _native_spring_contact import (
     NATIVE_CONTACT_DISTANCE_TOLERANCE_MM,
+    native_component_interference,
     native_component_overlap_mm3,
     solve_component_contact,
 )
@@ -235,14 +236,14 @@ def actual_contact(adapter, moving, fixed):
                 raise
             primary.add_note(f"interference cleanup failed: {cleanup}")
     assert_transforms(adapter, expected)
-    overlap_mm3 = native_component_overlap_mm3(
+    native_result = native_component_interference(
         adapter, moving, fixed, label=f"fixture witness {moving} / {fixed}"
     )
     assert_transforms(adapter, expected)
-    evidence["native_overlap_mm3"] = overlap_mm3
+    evidence["native_interference"] = asdict(native_result)
     evidence["collision_state"] = (
         "interfering"
-        if evidence["assembly_interferences"] or overlap_mm3 > 0.0
+        if evidence["assembly_interferences"] or native_result.state == "interfering"
         else "clear"
     )
     evidence["distance_witness"] = (
