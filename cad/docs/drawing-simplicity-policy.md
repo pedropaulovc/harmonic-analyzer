@@ -156,10 +156,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    steps, and contradictions across all sheets. The review also asks for what
    a fitter needs: assembled views, an exploded view, a parts list with
    balloons, ordered assembly steps, the assembly-level fits and checks, and
-   the parked/engaged setup. The current three-view sheets
+   the parked/engaged setup. Legacy three-view sheets
    (`drawing_recipe_assembly.md`) are orientation placeholders and are
-   EXPECTED to fail that review until they are built out; single-sheet part
-   prints are the gate this policy enforces today.
+   EXPECTED to fail that review until they are built out.
 10. **Inspection assumes a hobby shop, not a CMM.** Surface plate, height
    gauge, indicators, V-blocks, sine bar and gauge blocks are fair game, so a
    geometric control is never rejected as uninspectable, only as
@@ -183,8 +182,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 `uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders the
 verdict a blind senior machinist gives each drawing package under the calibrated
-prompt in `cad/scripts/prompts/`. Parts use their single PNG; assemblies render
-every PDF page and submit all sheet images to one review. A package passes when
+prompt in `cad/scripts/prompts/`. Part and assembly packages render every native
+PDF page at 300 dpi and submit all sheet images to one review, using the rubric
+for that package kind. A downscaled contact-sheet preview is not a substitute
+for reviewing every page. A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
 finding. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
