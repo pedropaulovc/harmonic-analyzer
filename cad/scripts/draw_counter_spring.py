@@ -30,6 +30,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _purchased_fastener_drawing import _purchased_title_block
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -59,7 +60,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open counter-spring source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -89,6 +90,13 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _purchased_title_block(
+        adapter,
+        drawing_model,
+        material=properties["Material Specification"],
+        finish=properties["Finish"],
+        material_property="Material Specification",
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -106,7 +114,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, iso)
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.275, 0.245)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.205, 0.245)
     add_property_linked_note(adapter, "Isometric View Note", 0.065, 0.050)
     set_hidden_lines_visible(adapter, front)
 

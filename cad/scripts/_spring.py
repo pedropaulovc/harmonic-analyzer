@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 import _config
+import _telemetry
 from _common import (
     POLISHED_STEEL,
     apply_color,
@@ -36,6 +37,7 @@ STOCK_PROPERTIES = {
 }
 
 
+@_telemetry.traced("spring.build_variant", label_param="part_name")
 async def build_spring(
     adapter: Any,
     part_name: str,

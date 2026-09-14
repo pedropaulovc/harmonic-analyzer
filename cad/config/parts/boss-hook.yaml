@@ -1,16 +1,18 @@
 boss-hook:
-  title: Counter-Spring Lower Anchor
+  title: Counter Spring Anchor
   number: MHA-005
   stock_name: 'Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)'
   supplier: McMaster-Carr
   supplier_skus: [9490T1]
   material: Plain Carbon Steel
   material_specification: Zinc-plated steel, McMaster-Carr 9490T1
-  finish: >-
-    zinc plating as supplied; cut the shank to 19.05 and restore the 45 deg end
-    deburr, then thread the anchor directly into the summing lever's tapped
-    boss, eye clocked to the pull plane, with removable medium-strength
-    threadlocker
+  finish: zinc plating as supplied
+  installation_notes: |-
+    INSTALLATION - COUNTER LOWER ANCHOR
+    TRIM SHANK TO 19.05; RESTORE 45 DEG END DEBURR.
+    THREAD DIRECTLY INTO SUMMING LEVER MHA-073
+    TAPPED BOSS; NO NUT. CLOCK EYE TO PULL PLANE.
+    USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.
   quantity: 1
   tolerance_class: machined_block
   process: purchased

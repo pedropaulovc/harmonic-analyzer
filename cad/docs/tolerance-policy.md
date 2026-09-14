@@ -457,7 +457,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   been replaced by catalog force curves: twenty hook-ended **9432K31** channel
   springs (0.175127 N/mm, 1.77929 N initial tension) and one double-loop
   **1330K524** counter spring (0.311726 N/mm, 17.0812 N initial tension).
-  At the neutral CAD setting, inside-hook lengths are 64.9842 and 351.4494 mm;
+  At the neutral catalog seed, inside-hook lengths are 64.9842 and 351.4494 mm;
   counter demand is 47.459 N against its 17.081–69.303 N catalog range.
   The static-capacity gate is unconditional; the old static-balance waiver is
   removed. This nominal calculation does not by itself prove gravity, operating
@@ -476,6 +476,23 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   summing lever; there are no nuts at the plate or boss. Existing upper lever
   holes are retained, with no upper pins. The gooseneck head is Ø12 mm to retain
   the counter's double loop.
+  Assembly seating uses the native supplier surfaces, not the ideal-circle
+  offsets used to initialize the model. Supplier and replica probes found the
+  same 3.7–4.4 µm departure from the nominal round-wire envelope at the counter
+  contact. The builders bracket actual assembly interference and take the clear
+  endpoint to 0.000001 mm positional convergence; they do not waive small
+  intersection volumes. A current seat has zero reported interference and either
+  native minimum separation at most 0.000010 mm, or positive native interference
+  at a position no more than 0.000001 mm inward. The latter is an explicit
+  collision bracket, not an overlap allowance at the saved position.
+  Minimum-distance readings are retained and disagreements are warned: the
+  production channel fixture reports 22.2 nm at a clear endpoint within 1 nm of
+  a native collision. No artificial clearance offset is added.
+  Channel variants are rebuilt and remeasured at their corrected installed
+  lengths. The counter's length and pull axis stay fixed while its
+  lower seating and gooseneck position are resolved. The force budget remains a
+  catalog-nominal engineering model, not an elastic-contact simulation; measured
+  force curves and assembled zeroing remain required.
 - **The cam lobes stand 1.5° off vertical at crank home** (#749). The drive train locks every
   cylinder gear at Rz(+1.5°) — half its tooth pitch, tooth-in-gap against the phase-0 cones
   (`gear_train.cylinder_lock_phase_deg`) — and the cam lobe is a tooth crest, so at crank home

@@ -133,7 +133,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # elevation leg at x>0.16).
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.114)
     add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.095)
+    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.077)
 
     return await finalize_drawing(
         adapter,

@@ -1875,6 +1875,22 @@ def delete_assembly_feature(adapter: Any, name: str) -> None:
         raise RuntimeError(f"feature {name!r} still present after delete")
 
 
+def configured_interference_manager(adapter: Any) -> Any:
+    """Return the native gate's manager; the caller must release it with Done."""
+    asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    manager = _read_member(asm, "InterferenceDetectionManager")
+    if manager is None:
+        raise RuntimeError("InterferenceDetectionManager unavailable")
+    manager = _early_bound(manager, "IInterferenceDetectionMgr")
+    manager.TreatCoincidenceAsInterference = False
+    manager.TreatSubAssembliesAsComponents = True
+    manager.IncludeMultibodyPartInterferences = True
+    manager.MakeInterferingPartsTransparent = False
+    manager.CreateFastenersFolder = False
+    manager.UseTransform = False
+    return manager
+
+
 def check_no_interference(
     adapter: Any,
     *,
@@ -1904,16 +1920,7 @@ def check_no_interference(
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
-        mgr = _read_member(asm, "InterferenceDetectionManager")
-        if mgr is None:
-            raise RuntimeError("InterferenceDetectionManager unavailable")
-        mgr = _early_bound(mgr, "IInterferenceDetectionMgr")
-        mgr.TreatCoincidenceAsInterference = False
-        mgr.TreatSubAssembliesAsComponents = True
-        mgr.IncludeMultibodyPartInterferences = True
-        mgr.MakeInterferingPartsTransparent = False
-        mgr.CreateFastenersFolder = False
-        mgr.UseTransform = False
+        mgr = configured_interference_manager(adapter)
         with _telemetry.span("interference.compute"):
             log("interference detection: computing interferences ...")
             interferences = adapter._attempt(

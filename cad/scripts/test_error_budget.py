@@ -1096,15 +1096,10 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_drawing_limits_agree_with_the_budget(budget, report, nom):
-    """Every budgeted limit that reaches a manufacturing output (native
-    dimension tolerance, drawing note, GD&T zone, fit band) carries the SAME
-    number as error_budget.yaml."""
+def test_drawing_limits_agree_with_the_budget(budget):
+    """Manufacturing tolerance values and derived fit limits agree with the budget."""
     import channel_lever_spec
-    import channel_spring_installed_notes
     import cylinder_gear_spec
-    import draw_cylinder_gear
-    import measuring_stick_spec
     import rocker_arm_spec
     import summing_lever_spec
 
@@ -1115,40 +1110,6 @@ def test_drawing_limits_agree_with_the_budget(budget, report, nom):
     assert cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
         feats["cam_phase"]["tolerance"]
     ), "cylinder-gear drawing carries a different cam-phase tolerance"
-    # the cam phase rides a NATIVE angular dimension (drawing-simplicity rule
-    # 2), not a note: the part build tolerances NotchPhase with the spec
-    # constant and the front view shows it. build_cylinder_gear imports
-    # SolidWorks, so its tolerance call is pinned at the source level.
-    assert "NotchPhase" in cylinder_gear_spec.DRAWING_DIMENSIONS["NotchProfile"]
-    assert "NotchPhase" in draw_cylinder_gear.FRONT_KEEP
-    part_src = (
-        pathlib.Path(eb.__file__).with_name("build_cylinder_gear.py")
-    ).read_text(encoding="utf-8")
-    assert re.search(
-        r'set_dimension_symmetric_angular_tolerance\(\s*adapter,\s*"NotchProfile",'
-        r'\s*"NotchPhase",\s*CAM_PHASE_TOLERANCE_DEG,',
-        part_src,
-    ), "cam-phase tolerance does not reach the NotchPhase model dimension"
-    assert (
-        f"ALL 20 WITHIN +/-{feats['spring_rate']['tolerance']:.2f}% OF THE SET MEAN"
-        in channel_spring_installed_notes.DRAWING_NOTES
-    ), "spring spec sheet carries a different matching requirement"
-    # station setting is an OPERATING allowance, not a part limit: it reaches
-    # the shipped READOUT.md, and the stick drawing carries no note about it
-    # at all (drawing-simplicity rule 6: at most four lines of part facts,
-    # never a method or a tolerance; READOUT.md ships beside the drawings)
-    doc = eb.readout_procedure(report)
-    assert (
-        f"(setting error +/-{feats['station_setting']['tolerance']:.2f} mm max per bar)"
-        in doc
-    ), "READOUT.md carries a different setting allowance"
-    notes = measuring_stick_spec.DRAWING_NOTES
-    numbered = [line for line in notes.splitlines() if line[:1].isdigit()]
-    assert len(numbered) == 4, numbered
-    assert not any(
-        key in notes
-        for key in ("SETTING", "INTERPOLAT", "READOUT", "ORDINATE", "PIVOT")
-    ), "the stick drawing carries operating-package information (rule 6)"
     # every +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
         ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),

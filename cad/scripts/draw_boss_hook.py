@@ -1,9 +1,9 @@
 """Create the purchased reference drawing for the counter-spring lower anchor.
 
-The anchor is McMaster 9490T1 ordered by SKU, so the sheet identifies it and
-carries no fabrication dimensions. The cut-to-length shank and the
-direct-into-the-boss threading ride the title block's Stock Name and Finish
-cells, which the shared purchased-fastener helper links and verifies.
+The anchor is McMaster 9490T1 ordered by SKU; the views identify supplier
+geometry. The separate linked installation notes carry
+the shank trim and direct-into-the-boss threading; Finish contains only the
+supplied finish.
 
 Run with SolidWorks open::
 

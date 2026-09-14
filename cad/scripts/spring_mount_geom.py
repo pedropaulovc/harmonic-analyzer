@@ -100,7 +100,7 @@ def _pose(
 
 
 def channel_pose(amplitude: float = 0.0) -> SpringPose:
-    """Stock hook ends seated in the existing lever hole and threaded lower eye."""
+    """Catalog-nominal seed; assembly builders resolve the native end surfaces."""
     hx, hy = channel_kinematics.spring_hole_xy(amplitude)
     ax, ay = CHANNEL_ANCHOR_XY
     dx, dy = hx - ax, hy - ay
@@ -179,7 +179,7 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Loaded screw height for the counter's half-turn installation clocking."""
+    """Ideal circular-wire support seed for the counter's half-turn clocking."""
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
     tube = counter_stock.WIRE_RADIUS_MM + gooseneck_geom.SCREW_SHANK_DIA / 2.0

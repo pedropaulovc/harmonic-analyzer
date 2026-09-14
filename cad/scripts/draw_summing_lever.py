@@ -90,9 +90,9 @@ _S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
 # (TIP_X - ANCHOR_R) on the left to the plate right edge (PLATE_W).
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 
-FRONT_CENTER = (0.155, 0.205)
-TOP_CENTER = (0.155, 0.105)  # third-angle: plan below the front profile
-ISO_CENTER = (0.335, 0.195)
+FRONT_CENTER = (0.225, 0.235)
+TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
+ISO_CENTER = (0.350, 0.225)
 
 
 def _front_xy(mx: float, my: float) -> tuple[float, float]:
@@ -112,14 +112,12 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
 
 
 FRONT_KEEP = {
-    "CylDia": (0.075, 0.230),
+    "CylDia": (0.145, 0.260),
 }
 TOP_KEEP = {
-    "PlateWidth": (0.230, 0.135),
-    "PlateLength": (0.245, TOP_CENTER[1]),
-    # Left of the anchor eye, above the notes block -- the old (0.055, 0.070)
-    # planted the Ø19.05 text inside the Manufacturing Notes paragraph.
-    "AnchorOuterDia": (0.052, 0.132),
+    "PlateWidth": (0.300, 0.160),
+    "PlateLength": (0.395, TOP_CENTER[1]),
+    "AnchorOuterDia": (0.145, 0.175),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -182,7 +180,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=anchor_tap_edge,
-        callout_xy=(0.060, 0.125),
+        callout_xy=(0.145, 0.155),
         label="anchor tap",
     )
 
@@ -205,7 +203,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(knife_edge[0] + 0.015, knife_edge[1] + 0.015),
+        symbol_xy=(0.185, 0.100),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
@@ -218,7 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=anchor_tap_fcf_edge,
         frame_xy=(
             anchor_tap_fcf_edge[0] - 0.010,
-            anchor_tap_fcf_edge[1] + 0.026,
+            anchor_tap_fcf_edge[1] + 0.055,
         ),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
@@ -235,7 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=anchor_tap_bottom,
-        text_xy=(0.146, 0.050),
+        text_xy=(0.216, 0.075),
         label="anchor tap X location",
         orientation="horizontal",
     )
@@ -263,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=seed_rim_right,
-        text_xy=(0.178, 0.042),
+        text_xy=(0.248, 0.067),
         label="spring-hole row X",
         orientation="horizontal",
     )
@@ -274,7 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=plate_end_edge,
         p1=seed_rim_top,
-        text_xy=(0.196, 0.069),
+        text_xy=(0.266, 0.094),
         label="spring-hole start Z",
         orientation="vertical",
     )
@@ -285,7 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=seed_rim_top,
         p1=second_rim_bottom,
-        text_xy=(0.205, 0.0765),
+        text_xy=(0.275, 0.1015),
         label="spring-hole pitch",
         orientation="vertical",
     )
@@ -295,7 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=seed_rim_bottom,
-        callout_xy=(0.222, 0.052),
+        callout_xy=(0.310, 0.087),
         label="spring-hole seed",
     )
     seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, HOLE_Z_FIRST)
@@ -303,7 +301,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=seed_rim_left,
-        frame_xy=(0.222, 0.088),
+        frame_xy=(0.310, 0.115),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
@@ -312,8 +310,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.305, 0.150)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
+    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
 
     return await finalize_drawing(
         adapter,
@@ -321,6 +319,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Summing Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=3,
     )
 
 
