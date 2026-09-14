@@ -104,8 +104,6 @@ class Nominal:
     spring_initial_tension: float  # channel catalog initial tension, N
     counter_initial_tension: float  # counter catalog initial tension, N
     sum_hole_x: float  # manufactured hook-row position relative to the knife, mm
-    sum_arm: float  # loaded channel force's perpendicular arm, mm
-    counter_arm: float  # loaded counter force's perpendicular arm magnitude, mm
     d_max: float  # amplitude-bar full-scale station
     # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
     lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
@@ -147,8 +145,6 @@ def nominal() -> Nominal:
         spring_initial_tension=channel_spring_installed_spec.INITIAL_TENSION_N,
         counter_initial_tension=counter_spring_spec.INITIAL_TENSION_N,
         sum_hole_x=summing_lever_spec.HOLE_X,
-        sum_arm=spring_mount_geom.CHANNEL_NOMINAL_POSE.moment_arm_mm,
-        counter_arm=-spring_mount_geom.COUNTER_REFERENCE_POSE.moment_arm_mm,
         d_max=float(_config.machine("amplitude", "max_travel_mm")),
         lever_r_min=lever_band[0],
         lever_r_built=lever_band[1],
@@ -1136,61 +1132,152 @@ def closed_form_terms(
     u_fs = (
         linear_gain(nom) * nom.d_max
     )  # hook displacement of one channel at full station
-    # Both spring banks pull up. Mean-line zero removes their constant torque;
-    # knife friction still depends on the total preload. Rotational stiffness
-    # cancels between stall displacement and channel signal, leaving the loaded
-    # lift-torque numerator rather than the un-tensioned approximation k*a.
-    preload = nom.spring_initial_tension + nom.spring_rate * (
-        channel_spring_installed_spec.INSTALLED_LENGTH_MM
-        - channel_spring_installed_spec.FREE_LENGTH_MM
+    # Mean-line zero removes the stationary spring torque from the trace, but
+    # knife rolling resistance still depends on the bank load.  Load every
+    # included station vector through the same pose/force/moment solver used to
+    # set the CAD's counter spring.  Reference vectors use the actual ordinate
+    # scale selected for that trial; the configured CAD vector is deliberately
+    # full-length and independent of the active_count build-speed knob.
+    inputs = reference_inputs()
+    scored = list(budget["reference_inputs"])
+    broad = [n for n in scored if n != "pair_1_20"]
+    case_stations = {
+        "configured_cad": np.asarray(_config.amplitudes(), dtype=float),
+        **{
+            name: setups[name].ordinate_scale * inputs[name] * nom.d_max
+            for name in scored
+        },
+    }
+    if any(stations.size != N_ELEMENTS for stations in case_stations.values()):
+        raise ValueError("every spring-bank load case must contain all 20 channels")
+    balances = {
+        name: spring_mount_geom.solve_bank_balance(
+            stations,
+            channel_rate_n_per_mm=nom.spring_rate,
+            channel_initial_tension_n=nom.spring_initial_tension,
+            counter_rate_n_per_mm=nom.counter_rate,
+            counter_initial_tension_n=nom.counter_initial_tension,
+        )
+        for name, stations in case_stations.items()
+    }
+
+    def balance_case(name: str) -> dict[str, Any]:
+        balance = balances[name]
+        pose = balance.counter_pose
+        return {
+            "kind": "configured CAD" if name == "configured_cad" else "scored reference",
+            "stations_mm": list(balance.stations_mm),
+            "channel_force_sum_N": balance.channel_force_sum_n,
+            "channel_vertical_load_N": balance.channel_vertical_force_n,
+            "channel_moment_N_mm": balance.channel_moment_n_mm,
+            "counter_catalog_force_range_N": [
+                balance.counter_minimum_force_n,
+                balance.counter_maximum_force_n,
+            ],
+            "counter_catalog_moment_range_N_mm": [
+                balance.counter_minimum_moment_n_mm,
+                balance.counter_maximum_moment_n_mm,
+            ],
+            "static_balance": balance.static_balance,
+            "counter_setting_inside_length_mm": (
+                pose.length_mm if pose is not None else None
+            ),
+            "counter_force_N": balance.counter_force_n,
+            "counter_moment_arm_mm": (
+                -pose.moment_arm_mm if pose is not None else None
+            ),
+            "counter_vertical_load_N": balance.counter_vertical_force_n,
+            "knife_vertical_load_N": balance.knife_vertical_load_n,
+            "conservative_knife_load_N": balance.conservative_knife_load_n,
+        }
+
+    load_cases = {name: balance_case(name) for name in case_stations}
+    worst_required_case = max(
+        balances, key=lambda name: balances[name].channel_moment_n_mm
     )
-    counter_needed = N_ELEMENTS * preload * nom.sum_arm / nom.counter_arm
-    counter_max_ext = (
-        counter_spring_spec.MAX_LENGTH_MM - counter_spring_spec.FREE_LENGTH_MM
+    worst_required = balances[worst_required_case]
+    feasible_knife_cases = [
+        name
+        for name, balance in balances.items()
+        if balance.conservative_knife_load_n is not None
+    ]
+    worst_knife_case = (
+        max(
+            feasible_knife_cases,
+            key=lambda name: balances[name].conservative_knife_load_n,
+        )
+        if feasible_knife_cases
+        else None
     )
-    counter_minimum = nom.counter_initial_tension
-    counter_available = min(
-        counter_spring_spec.MAXIMUM_LOAD_N,
-        counter_minimum + nom.counter_rate * counter_max_ext,
+    worst_vertical_case = (
+        max(
+            feasible_knife_cases,
+            key=lambda name: balances[name].knife_vertical_load_n,
+        )
+        if feasible_knife_cases
+        else None
     )
-    counter_required_length = (
-        counter_spring_spec.FREE_LENGTH_MM
-        + (counter_needed - counter_minimum) / nom.counter_rate
-    )
-    knife_load = N_ELEMENTS * preload + counter_needed
     f_r = float(res["knife"]["rolling_resistance_mm"])
+    # This transfer denominator remains the neutral-pose small-signal response.
+    # It converts a case-specific stationary knife load into a stall displacement;
+    # it is not a claim that the denominator is station-exact.
     channel_response = spring_force_model.channel_response(
         nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
     )
-    stall_one = 100.0 * knife_load * f_r / (channel_response.lift_torque_n * u_fs)
-    # The stall is a fixed displacement -- one channel's full-scale hook motion
-    # times stall_one/100. In a trial's own ordinate units (one unit = scale x
-    # the full-scale hook motion) that is stall_one/scale, so against the
-    # trial's ideal greatest term sum(x) it is stall_one / (scale * sum x): a
-    # trial the operator had to scale down to fit the pen pays 1/scale.
-    scored = list(budget["reference_inputs"])
-    broad = [n for n in scored if n != "pair_1_20"]
-    inputs = reference_inputs()
-    knife_per_input = {
-        n: stall_one / (setups[n].ordinate_scale * float(np.sum(inputs[n])))
-        for n in scored
+    stall_one_per_input = {
+        name: (
+            100.0
+            * balances[name].conservative_knife_load_n
+            * f_r
+            / (channel_response.lift_torque_n * u_fs)
+            if balances[name].conservative_knife_load_n is not None
+            else math.inf
+        )
+        for name in scored
     }
+    # The stall is a fixed displacement.  In a trial's ordinate units it pays
+    # 1/ordinate_scale, and scoring against the ideal greatest term pays
+    # 1/sum(x).  Only the numerator's knife load varies by stationary case.
+    knife_per_input = {
+        name: stall_one_per_input[name]
+        / (setups[name].ordinate_scale * float(np.sum(inputs[name])))
+        for name in scored
+    }
+    worst_broad = max(broad, key=lambda name: knife_per_input[name])
     knife = {
-        "assumed_preload_N_per_spring": preload,
-        "counter_spring_needed_N": counter_needed,
-        "counter_spring_available_N": counter_available,
-        "counter_spring_minimum_N": counter_minimum,
-        "counter_spring_required_inside_length_mm": counter_required_length,
-        "counter_spring_reference_inside_length_mm": counter_spring_spec.INSTALLED_LENGTH_MM,
-        "counter_spring_force_headroom_N": counter_available - counter_needed,
-        "counter_spring_max_extension_mm": counter_max_ext,
-        "static_balance": counter_minimum <= counter_needed <= counter_available,
-        "assumed_knife_load_N": knife_load,
+        "load_cases": load_cases,
+        "static_balance": all(balance.static_balance for balance in balances.values()),
+        "unbalanced_cases": [
+            name for name, balance in balances.items() if not balance.static_balance
+        ],
+        "worst_required_counter_case": worst_required_case,
+        "worst_required_channel_moment_N_mm": worst_required.channel_moment_n_mm,
+        "worst_required_counter_setting_inside_length_mm": (
+            worst_required.counter_pose.length_mm
+            if worst_required.counter_pose is not None
+            else None
+        ),
+        "worst_required_counter_force_N": worst_required.counter_force_n,
+        "maximum_conservative_knife_load_case": worst_knife_case,
+        "maximum_conservative_knife_load_N": (
+            balances[worst_knife_case].conservative_knife_load_n
+            if worst_knife_case is not None
+            else None
+        ),
+        "maximum_vertical_knife_load_case": worst_vertical_case,
+        "maximum_vertical_knife_load_N": (
+            balances[worst_vertical_case].knife_vertical_load_n
+            if worst_vertical_case is not None
+            else None
+        ),
         "assumed_rolling_resistance_mm": f_r,
-        "stall_pct_of_one_channel_fs": stall_one,
+        "neutral_small_signal_lift_torque_N": channel_response.lift_torque_n,
+        "neutral_small_signal_hook_displacement_mm": u_fs,
+        "stall_pct_of_one_channel_fs_per_input": stall_one_per_input,
         "pct_fs_per_input": knife_per_input,
-        "pct_fs": max(knife_per_input[n] for n in broad),
-        "note": "catalog extension rates and initial tensions, not display-coil formulas; match the channel set and zero by sliding the gooseneck, including actual weight/preloads; verify gravity against the force headroom and measure reversal trace width",
+        "worst_broad_input": worst_broad,
+        "pct_fs": knife_per_input[worst_broad],
+        "note": "all 20 configured CAD stations and every scaled scored reference are statically balanced with catalog force and pose-dependent physical moment arms; knife stall uses each case's conservative sum of spring-force magnitudes (reported beside the smaller resolved vertical load) over the explicitly neutral small-signal transfer; rest/preload only -- no gravity, writing friction, dynamics, or full-crank sweep; match the channel set, zero by sliding the gooseneck, verify measured force curves, and retain #748 minimum-magnifier-pose and #749 cam-phase limitations",
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
     # rod by c when the ordinate changes sign -- DC for a fixed-sign station.
@@ -1579,7 +1666,7 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     p("# Coefficient-error budget (error_budget.py)")
     p(
         f"nominal: ecc {n['ecc']:.3f}  rod {n['rod']:.2f}  pin ({n['pin_x']:.3f}, {n['pin_y']:.3f})  "
-        f"bar-pin/hook {n['bar_pin_arm']:.1f}/{n['hook_arm']:.1f}  sum arm a {n['sum_arm']:.2f}  "
+        f"bar-pin/hook {n['bar_pin_arm']:.1f}/{n['hook_arm']:.1f}  "
         f"spring {n['spring_rate']:.3f} N/mm  d_max {n['d_max']:.0f}"
     )
     p(
@@ -1795,11 +1882,14 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
             f"{max(home['residual_lobe_up'][n]['mae'] for n in home['residual_lobe_up'] if n != 'pair_1_20'):.3f})"
         )
     knife = r["closed_form"]["knife"]
-    if not knife["static_balance"]:
+    for name in knife["unbalanced_cases"]:
+        case = knife["load_cases"][name]
+        lo, hi = case["counter_catalog_moment_range_N_mm"]
         bad.append(
-            "counter spring cannot balance the channel preload: "
-            f"{knife['counter_spring_minimum_N']:.2f}..{knife['counter_spring_available_N']:.2f} N available vs "
-            f"{knife['counter_spring_needed_N']:.0f} N needed"
+            f"counter spring cannot balance {case['kind']} case {name}: "
+            f"channel moment {case['channel_moment_N_mm']:.2f} N mm is outside "
+            f"catalog counter moment {lo:.2f}..{hi:.2f} N mm; "
+            "no catalog-valid counter setting"
         )
     # TODO(#748): CAD-gate the magnifier's minimum pose.
     mag = r["closed_form"]["magnifier"]

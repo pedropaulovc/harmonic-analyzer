@@ -414,12 +414,8 @@ def test_scale_rule_solves_the_table_instead_of_scaling_by_proportion(report, no
 
 
 def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, nom):
-    """A fixed 0.25 mm setting error and a fixed knife stall are a larger share
-    of a trial the pen forced to a smaller scale: every capped broad input's
-    scaled bars sum (read ordinates, which exceed the set ones by the idle
-    lift) to the same capacity, the knife term is stall/(scale * sum x), and
-    the station-setting Monte Carlo on all-ones at its 0.21 scale reads
-    1/scale times the full-scale value."""
+    """A fixed setting error and each case's fixed knife stall grow in ordinate
+    units when the pen forces that input to a smaller physical station scale."""
     cf = report["closed_form"]
     mag, knife = cf["magnifier"], cf["knife"]
     cap = mag["ordinate_capacity_full_scale_bars"]
@@ -431,7 +427,7 @@ def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, n
             assert s["ordinate_scale"] * float(np.sum(x)) < read_sum
             assert read_sum == pytest.approx(cap, rel=0.03)  # C_2 rides the k=0 peak
             assert knife["pct_fs_per_input"][name] == pytest.approx(
-                knife["stall_pct_of_one_channel_fs"]
+                knife["stall_pct_of_one_channel_fs_per_input"][name]
                 / (s["ordinate_scale"] * float(np.sum(x)))
             )
     # bars at 0.5 (interior: no one-sided fold at either end of the scale)
@@ -444,6 +440,53 @@ def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, n
     capped = eb._channel_model(x, nom, dev, sens, 0.25, f)
     assert np.mean(np.abs(capped)) / np.mean(np.abs(full)) == pytest.approx(
         1.0 / f, rel=0.1
+    )
+
+
+def test_knife_load_cases_include_configured_and_scaled_reference_vectors(
+    budget, report, nom
+):
+    """Every physical preload case is explicit and each scored stall uses its
+    own station-dependent spring-bank load over the neutral transfer scale."""
+    import spring_mount_geom as mounts
+
+    knife = report["closed_form"]["knife"]
+    cases = knife["load_cases"]
+
+    inputs = eb.reference_inputs()
+    loads = []
+    for name in budget["reference_inputs"]:
+        setup = report["closed_form"]["magnifier"]["per_input"][name]
+        stations = setup["ordinate_scale"] * inputs[name] * nom.d_max
+        case = cases[name]
+        poses = [mounts.channel_pose(float(station)) for station in stations]
+        forces = [
+            nom.spring_initial_tension
+            + nom.spring_rate
+            * (pose.length_mm - eb.channel_spring_installed_spec.FREE_LENGTH_MM)
+            for pose in poses
+        ]
+        assert case["channel_moment_N_mm"] == pytest.approx(
+            sum(force * pose.moment_arm_mm for force, pose in zip(forces, poses))
+        )
+        assert case["conservative_knife_load_N"] >= case["knife_vertical_load_N"]
+        loads.append(case["conservative_knife_load_N"])
+        expected_stall = (
+            100.0
+            * case["conservative_knife_load_N"]
+            * knife["assumed_rolling_resistance_mm"]
+            / (
+                knife["neutral_small_signal_lift_torque_N"]
+                * knife["neutral_small_signal_hook_displacement_mm"]
+            )
+        )
+        assert knife["stall_pct_of_one_channel_fs_per_input"][name] == pytest.approx(
+            expected_stall
+        )
+
+    assert len(set(round(load_n, 9) for load_n in loads)) > 1
+    assert knife["worst_required_counter_case"] == max(
+        cases, key=lambda name: cases[name]["channel_moment_N_mm"]
     )
 
 
@@ -488,30 +531,76 @@ def test_station_setting_scatter_never_goes_below_the_pivot(nom):
     assert np.max(np.abs(read(zero))) > 0.5  # the residual scatter is real, at odd k
 
 
-def test_counter_spring_catalog_range_must_balance_channel_preload(budget, report, nom):
-    """The selected counter spring brackets the nominal balancing force, while
-    a physically weaker spring still trips the hard capacity gate."""
-    knife = report["closed_form"]["knife"]
-    assert knife["counter_spring_minimum_N"] <= knife["counter_spring_needed_N"]
-    assert knife["counter_spring_needed_N"] <= knife["counter_spring_available_N"]
-    assert knife["static_balance"] is True
+def test_counter_spring_catalog_range_gates_every_station_case(
+    budget, report, nom, monkeypatch
+):
+    """A counter capacity between neutral and a high configured bank must fail.
 
-    weak_nom = dataclasses.replace(nom, counter_rate=nom.counter_rate / 100.0)
-    trial = eb.NominalTrial(weak_nom)
+    The former neutral*20 gate passed this boundary; the physical station gate
+    rejects the configured case instead of extrapolating a counter pose beyond
+    the catalog range.
+    """
+    import counter_spring_stock_geom as counter_stock
+    import spring_mount_geom as mounts
+
+    neutral_stations = np.zeros(eb.N_ELEMENTS)
+    loaded_stations = np.full(eb.N_ELEMENTS, nom.d_max)
+    neutral = mounts.solve_bank_balance(
+        neutral_stations,
+        channel_rate_n_per_mm=nom.spring_rate,
+        channel_initial_tension_n=nom.spring_initial_tension,
+        counter_rate_n_per_mm=nom.counter_rate,
+        counter_initial_tension_n=nom.counter_initial_tension,
+    )
+    loaded = mounts.solve_bank_balance(
+        loaded_stations,
+        channel_rate_n_per_mm=nom.spring_rate,
+        channel_initial_tension_n=nom.spring_initial_tension,
+        counter_rate_n_per_mm=nom.counter_rate,
+        counter_initial_tension_n=nom.counter_initial_tension,
+    )
+    assert loaded.channel_moment_n_mm > neutral.channel_moment_n_mm
+
+    max_pose = mounts.counter_pose(counter_stock.MAX_LENGTH_MM)
+    boundary_moment = (neutral.channel_moment_n_mm + loaded.channel_moment_n_mm) / 2.0
+    boundary_force = boundary_moment / -max_pose.moment_arm_mm
+    boundary_rate = (boundary_force - nom.counter_initial_tension) / (
+        counter_stock.MAX_LENGTH_MM - counter_stock.FREE_LENGTH_MM
+    )
+    boundary_nom = dataclasses.replace(nom, counter_rate=boundary_rate)
+
+    old_neutral_force = (
+        eb.N_ELEMENTS
+        * mounts.channel_force_n(mounts.channel_pose(0.0).length_mm)
+        * mounts.channel_pose(0.0).moment_arm_mm
+        / -mounts.COUNTER_REFERENCE_POSE.moment_arm_mm
+    )
+    old_available_force = min(
+        mounts.COUNTER_MAXIMUM_LOAD_N,
+        nom.counter_initial_tension
+        + boundary_rate * (counter_stock.MAX_LENGTH_MM - counter_stock.FREE_LENGTH_MM),
+    )
+    assert nom.counter_initial_tension <= old_neutral_force <= old_available_force
+
+    monkeypatch.setattr(eb._config, "amplitudes", lambda: loaded_stations.tolist())
+    trial = eb.NominalTrial(boundary_nom)
     setups = {
         name: trial.magnifier_setup(eb.reference_inputs()[name])
         for name in budget["reference_inputs"]
     }
-    weak_closed_form = eb.closed_form_terms(weak_nom, budget, setups)
-    weak_knife = weak_closed_form["knife"]
+    closed_form = eb.closed_form_terms(boundary_nom, budget, setups)
+    knife = closed_form["knife"]
+    assert knife["load_cases"]["configured_cad"]["static_balance"] is False
     assert (
-        weak_knife["counter_spring_available_N"] < weak_knife["counter_spring_needed_N"]
+        knife["load_cases"]["configured_cad"]["counter_setting_inside_length_mm"]
+        is None
     )
-    assert weak_knife["static_balance"] is False
+    assert knife["static_balance"] is False
+    assert "configured_cad" in knife["unbalanced_cases"]
 
-    weak_report = {**report, "closed_form": weak_closed_form}
-    bad = eb.budget_closes(weak_report)
-    assert any(b.startswith("counter spring cannot balance") for b in bad), bad
+    failed_report = {**report, "closed_form": closed_form}
+    bad = eb.budget_closes(failed_report)
+    assert any("configured_cad" in failure for failure in bad), bad
 
 
 def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, report, nom):

@@ -4,6 +4,8 @@ from dataclasses import replace
 
 import pytest
 
+import _config
+
 import build_channel_assembly as channel
 import channel_spring_stock_geom as channel_stock
 import gooseneck_geom
@@ -17,6 +19,32 @@ def test_counter_leading_half_turn_clears_tube_and_head() -> None:
     tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(pose, screw_y)
     assert tube_gap >= spring_mount_geom.MIN_CLEARANCE_MM
     assert head_gap >= spring_mount_geom.MIN_CLEARANCE_MM
+
+
+def test_bank_balance_uses_each_configured_station_force_and_moment() -> None:
+    """A heterogeneous nonzero bank cannot collapse to neutral force times 20."""
+    neutral = spring_mount_geom.solve_bank_balance([0.0] * 20)
+    fundamental = float(_config.machine("amplitude", "fundamental_station_mm"))
+    heterogeneous = [
+        fundamental / harmonic if harmonic % 2 else 0.0
+        for harmonic in range(1, 21)
+    ]
+    loaded = spring_mount_geom.solve_bank_balance(heterogeneous)
+
+    assert loaded.stations_mm == pytest.approx(heterogeneous)
+    assert loaded.channel_force_sum_n != pytest.approx(neutral.channel_force_sum_n)
+    assert loaded.channel_moment_n_mm != pytest.approx(neutral.channel_moment_n_mm)
+    assert loaded.counter_pose is not None
+    assert neutral.counter_pose is not None
+    assert loaded.counter_pose.length_mm != pytest.approx(
+        neutral.counter_pose.length_mm
+    )
+
+    configured = spring_mount_geom.solve_bank_balance(_config.amplitudes())
+    assert configured.counter_pose is not None
+    assert configured.counter_pose.length_mm == pytest.approx(
+        spring_mount_geom.COUNTER_REFERENCE_POSE.length_mm
+    )
 
 
 def test_native_mount_keeps_clearance_gates_without_requiring_analytic_tangency() -> None:
