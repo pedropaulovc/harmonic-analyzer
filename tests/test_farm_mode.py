@@ -563,6 +563,7 @@ def _write_config(tmp_path: Path, **overrides) -> Path:
         (tmp_path / name).write_bytes(b"-----BEGIN " + name.encode() + b"-----\n")
     (tmp_path / "token.jwt").write_text(TOKEN + "\n", encoding="ascii")
     (tmp_path / "empty.jwt").write_bytes(b"")
+    (tmp_path / "blank.jwt").write_text(" \n\n", encoding="ascii")
     config = {
         "temporal_address": "farm.example.invalid:7233",
         "namespace": "solidworks",
@@ -586,6 +587,7 @@ def _write_config(tmp_path: Path, **overrides) -> Path:
         ({"token": ""}, "token must be a non-empty string"),
         ({"token": "missing.jwt"}, "token file is not readable"),
         ({"token": "empty.jwt"}, "token file is empty"),
+        ({"token": "blank.jwt"}, "token file is empty"),
     ],
 )
 def test_config_problems_name_the_path_and_key(tmp_path, overrides, problem):

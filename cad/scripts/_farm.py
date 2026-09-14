@@ -91,8 +91,8 @@ def load_config(path: Path | None = None) -> dict:
     """The submitter's farm config with certificate and token paths resolved.
 
     Every problem is a ``RuntimeError("farm config <path>: <problem>")`` naming
-    the path and offending key only; certificate and token contents are never
-    read here.
+    the path and offending key only; certificate contents are never read here
+    and the token is read only to reject a blank file.
     """
     path = path or config_path()
     try:
@@ -118,7 +118,7 @@ def load_config(path: Path | None = None) -> dict:
         if not file.is_file() or not os.access(file, os.R_OK):
             raise RuntimeError(f"farm config {path}: {key} file is not readable")
         config[key] = str(file)
-    if Path(config["token"]).stat().st_size == 0:
+    if not Path(config["token"]).read_text(encoding="ascii").strip():
         raise RuntimeError(f"farm config {path}: token file is empty")
     return config
 
