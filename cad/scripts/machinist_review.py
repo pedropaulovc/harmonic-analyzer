@@ -233,10 +233,13 @@ def _review_prompt(
     prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
     prompt += (
         "\n\nPACKAGE INPUT\n"
-        f"This invocation includes all {sheet_count} sheet images in order. "
-        "Return one verdict for the package as a whole. Compare every sheet "
-        "against every other sheet before accepting SHIP.\n"
+        f"Sheet count: {sheet_count}.\n"
+        "Return one verdict for the package as a whole.\n"
     )
+    if sheet_count > 1:
+        prompt += (
+            "Compare every sheet against every other sheet before accepting SHIP.\n"
+        )
     if reviewer == "claude":
         prompt = (
             f"Use the Read tool to inspect every copied sheet-1.png through "
@@ -264,7 +267,11 @@ def build_claude_command(
     ):
         raise ValueError("review inputs must be inside the neutral workdir")
     schema_json = json.dumps(
-        json.loads(schema.read_text(encoding="utf-8") if schema_content is None else schema_content),
+        json.loads(
+            schema.read_text(encoding="utf-8")
+            if schema_content is None
+            else schema_content
+        ),
         separators=(",", ":"),
     )
     return [
@@ -587,9 +594,16 @@ def review_package(
         stdout: str | bytes | None = None
         stderr: str | bytes | None = None
         attempt_record: dict[str, Any] = {
-            "attempt": attempts, "cwd": str(workdir), "images": [], "command": None,
-            "outcome": "failed", "error": None, "exit_code": None,
-            "stdout_file": None, "stderr_file": None, "artifacts": [],
+            "attempt": attempts,
+            "cwd": str(workdir),
+            "images": [],
+            "command": None,
+            "outcome": "failed",
+            "error": None,
+            "exit_code": None,
+            "stdout_file": None,
+            "stderr_file": None,
+            "artifacts": [],
         }
         attempt_records.append(attempt_record)
         try:
@@ -674,7 +688,9 @@ def review_package(
                 if content is not None:
                     path = retained_dir / f"{stream}.txt"
                     path.write_bytes(
-                        content if isinstance(content, bytes) else content.encode("utf-8")
+                        content
+                        if isinstance(content, bytes)
+                        else content.encode("utf-8")
                     )
                     attempt_record[f"{stream}_file"] = str(path)
             # Inputs are already identified by the source hashes, image paths,
@@ -849,7 +865,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
     parser.add_argument(
-        "--prompt-file", type=Path,
+        "--prompt-file",
+        type=Path,
         help="UTF-8 rubric override; package and blind-inspection instructions still apply",
     )
     parser.add_argument("--index", action="store_true", help="only rebuild index.md")
@@ -906,7 +923,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ]
     prompt_text = (
         args.prompt_file.read_text(encoding="utf-8")
-        if args.prompt_file is not None else None
+        if args.prompt_file is not None
+        else None
     )
 
     reviews: list[Review] = []
