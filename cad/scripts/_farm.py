@@ -74,17 +74,40 @@ def config_path() -> Path:
     return DEFAULT_CONFIG_PATH
 
 
+_CONFIG_KEYS = ("temporal_address", "namespace", "ca_cert", "client_cert", "client_key")
+_CONFIG_FILE_KEYS = ("ca_cert", "client_cert", "client_key")
+
+
 def load_config(path: Path | None = None) -> dict:
-    """The submitter's farm config with certificate paths resolved to absolute."""
+    """The submitter's farm config with certificate paths resolved to absolute.
+
+    Every problem is a ``RuntimeError("farm config <path>: <problem>")`` naming
+    the path and offending key only; certificate contents are never read here.
+    """
     path = path or config_path()
     try:
-        config = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         raise RuntimeError(
-            f"farm: {path} not found; run `farm.py credentials issue` first"
+            f"farm config {path}: not found; run `farm.py credentials issue` first"
         ) from None
-    for key in ("ca_cert", "client_cert", "client_key"):
-        config[key] = str((path.parent / config[key]).resolve())
+    except OSError as exc:
+        raise RuntimeError(f"farm config {path}: {exc.strerror}") from None
+    try:
+        config = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"farm config {path}: invalid JSON ({exc.msg})") from None
+    if not isinstance(config, dict):
+        raise RuntimeError(f"farm config {path}: expected a JSON object")
+    for key in _CONFIG_KEYS:
+        value = config.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise RuntimeError(f"farm config {path}: {key} must be a non-empty string")
+    for key in _CONFIG_FILE_KEYS:
+        file = (path.parent / config[key]).resolve()
+        if not file.is_file() or not os.access(file, os.R_OK):
+            raise RuntimeError(f"farm config {path}: {key} file is not readable")
+        config[key] = str(file)
     return config
 
 
