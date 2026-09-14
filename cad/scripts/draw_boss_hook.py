@@ -105,6 +105,12 @@ def _end_detail(adapter: Any, front: Any) -> Any:
 
 def _position_detail_label(adapter: Any, detail: Any) -> None:
     """Move the native dynamic label beside the detail, clear of the title block."""
+    # Pin the final sheet scale before positioning a dynamic label; changing
+    # it during finalization moves the label after its readback has passed.
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError("cannot pin sheet scale before detail label placement")
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
         raise RuntimeError(f"expected one native detail label, found {len(notes)}")
