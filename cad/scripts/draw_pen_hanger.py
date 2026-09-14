@@ -30,6 +30,7 @@ from _drawing_common import (
     add_property_linked_note,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -174,6 +175,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)
     add_property_linked_note(adapter, "Top View Note", 0.170, 0.195)
     add_property_linked_note(adapter, "Isometric View Note", 0.286, 0.104)
+
+    # Materialize the iso's cosmetic thread before the strict final note cleanup;
+    # otherwise its descriptive label first appears during the native drawing save.
+    import_cosmetic_threads(adapter, iso)
 
     return await finalize_drawing(
         adapter,
