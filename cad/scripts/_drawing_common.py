@@ -3887,6 +3887,23 @@ def add_auto_balloons_across_views(
     return all_balloons
 
 
+def drawing_viewport_pixel_size(adapter: Any) -> tuple[float, float]:
+    """Return one current viewport pixel in drawing-sheet X/Y metres."""
+    view = _early_bound(adapter.currentModel.ActiveView, "IModelView")
+    transform = _early_bound(view.Transform, "IMathTransform")
+    data = tuple(float(value) for value in transform.ArrayData)
+    if len(data) < 13 or not all(math.isfinite(value) for value in data[:13]):
+        raise RuntimeError("drawing viewport has no finite model-to-pixel transform")
+    scale = abs(data[12])
+    pixels_per_metre = (
+        scale * math.hypot(data[0], data[1]),
+        scale * math.hypot(data[3], data[4]),
+    )
+    if any(not math.isfinite(value) or value <= 0.0 for value in pixels_per_metre):
+        raise RuntimeError("drawing viewport has a degenerate sheet-to-pixel mapping")
+    return (1.0 / pixels_per_metre[0], 1.0 / pixels_per_metre[1])
+
+
 @_telemetry.traced("drawing.position_bom_balloon", label_param="label")
 def position_bom_balloon(
     adapter: Any,
@@ -3897,7 +3914,7 @@ def position_bom_balloon(
     label: str,
     position_tolerance_m: float = 1e-6,
 ) -> None:
-    """Move one uniquely identified BOM balloon to a checked sheet position."""
+    """Move the anchor strictly; ``position_tolerance_m`` floors one-pixel ink bounds."""
     if position_tolerance_m <= 0.0:
         raise ValueError("balloon position tolerance must be positive")
     matches = [
@@ -3935,48 +3952,38 @@ def position_bom_balloon(
         f"stack_master={bool(note.IsStackedBalloonMaster())}, "
         f"magnetic_lines={magnetic_lines}"
     )
-    trajectory = []
-    previous_error = None
-    # A large move can reflow the leader/text and change the anchor-to-circle
-    # offset. Correct only the freshly measured residual, never cached geometry.
-    for attempt in range(7):
-        circle = rendered_balloon_circle(note, label=label)
-        anchor = annotation.GetPosition()
-        if anchor is None or len(anchor) < 2:
-            raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-        anchor_xy = (float(anchor[0]), float(anchor[1]))
-        residual = (position_xy[0] - circle[0], position_xy[1] - circle[1])
-        error = max(abs(value) for value in residual)
-        state = {
-            "attempt": attempt, "anchor_xy": anchor_xy, "circle_xy": circle[:2],
-            "anchor_to_circle_xy": (circle[0] - anchor_xy[0], circle[1] - anchor_xy[1]),
-            "residual_xy": residual, "max_error_m": error,
-        }
-        trajectory.append(state)
-        _telemetry.info(f"{label}: item {item_number} rendered placement {state!r}")
-        if error <= position_tolerance_m:
-            note.LockPosition = True
-            _telemetry.event("drawing.balloon_position_trajectory", item=item_number, trajectory=trajectory)
-            return
-        if previous_error is not None and error >= previous_error - 1e-12:
-            raise RuntimeError(f"{label}: item {item_number} rendered correction stalled: {trajectory!r}")
-        if attempt == 6:
-            raise RuntimeError(f"{label}: item {item_number} rendered correction exhausted: {trajectory!r}")
-        previous_error = error
-        target_anchor = (anchor_xy[0] + residual[0], anchor_xy[1] + residual[1])
-        state["requested_anchor_xy"] = target_anchor
-        note.LockPosition = False
-        if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
-            raise RuntimeError(f"{label}: failed to position item {item_number}: {trajectory!r}")
-        note.LockPosition = True
-        adapter.currentModel.EditRebuild3()
-        adapter.currentModel.GraphicsRedraw2()
-        current_note = annotation.GetSpecificAnnotation()
-        if current_note is None:
-            raise RuntimeError(f"{label}: item {item_number} note vanished after positioning")
-        note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetAnnotation"
-        )
+    circle = rendered_balloon_circle(note, label=label)
+    anchor = annotation.GetPosition()
+    if anchor is None or len(anchor) < 2:
+        raise RuntimeError(f"{label}: item {item_number} has no position read-back")
+    target_anchor = (
+        float(anchor[0]) + position_xy[0] - circle[0],
+        float(anchor[1]) + position_xy[1] - circle[1],
+    )
+    note.LockPosition = False
+    if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
+        raise RuntimeError(f"{label}: failed to position item {item_number}")
+    note.LockPosition = True
+    adapter.currentModel.EditRebuild3()
+    adapter.currentModel.GraphicsRedraw2()
+    current_note = annotation.GetSpecificAnnotation()
+    if current_note is None:
+        raise RuntimeError(f"{label}: item {item_number} note vanished after positioning")
+    actual_anchor = tuple(float(value) for value in annotation.GetPosition())
+    actual_xy = rendered_balloon_circle(current_note, label=label)[:2]
+    pixel_bounds = tuple(max(position_tolerance_m, value) for value in drawing_viewport_pixel_size(adapter))
+    residual = tuple(actual - expected for actual, expected in zip(actual_xy, position_xy))
+    state = {"requested_anchor": target_anchor, "actual_anchor": actual_anchor,
+             "target_circle": position_xy, "actual_circle": actual_xy,
+             "residual_xy": residual, "pixel_bounds_m": pixel_bounds}
+    _telemetry.info(f"{label}: item {item_number} pixel-bounded placement {state!r}")
+    if len(actual_anchor) < 2 or not all(math.isfinite(value) for value in actual_anchor[:2]) or any(
+        abs(actual_anchor[index] - target_anchor[index]) > position_tolerance_m
+        for index in range(2)
+    ):
+        raise RuntimeError(f"{label}: item {item_number} native anchor did not persist: {state!r}")
+    if any(abs(residual[index]) > pixel_bounds[index] for index in range(2)):
+        raise RuntimeError(f"{label}: item {item_number} rendered circle exceeds viewport resolution: {state!r}")
 
 
 def stamp_drawing_summary(
