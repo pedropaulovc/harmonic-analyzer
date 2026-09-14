@@ -175,7 +175,11 @@ def _add_outer_diameter_reference(
         label="outer diameter reference",
         diameter=True,
     )
-    od_suffix = ")\nAS-PROCURED\nMHA-035/MHA-077 SOCKETS: SLIP BY HAND"
+    od_suffix = (
+        ")\nMHA-035/MHA-077 SOCKETS:"
+        "\nMATCH-FIT TO ASSIGNED ACTUAL TUBE"
+        "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
+    )
     display.SetText(2, od_suffix)
     if str(display.GetText(2) or "") != od_suffix:
         raise RuntimeError("OD reference fit text did not persist")

@@ -179,7 +179,7 @@ _DIM_DETAILING_SCOPES = {
 # nominal half-span box around its IAnnotation.GetPosition anchor instead.
 _NOMINAL_BALLOON_HALF_M = 0.006
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius
-# is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
+# is measured from its rendered full-circle arc (4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
 
@@ -3333,6 +3333,47 @@ def _balloon_item_key(adapter: Any, note: Any) -> tuple[int, str]:
     return (int(leading) if leading else sys.maxsize, text)
 
 
+def rendered_balloon_circle(note: Any, *, label: str) -> tuple[float, float, float]:
+    """Return sheet X/Y/radius from the unique rendered full-circle primitive.
+
+    INote.GetBalloonInfo can retain its original center after a successful move,
+    rebuild, redraw, and PDF export. IAnnotation.GetDisplayData reflects the ink.
+    """
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: balloon has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetDisplayData"
+    )
+    display = annotation.GetDisplayData()
+    if display is None:
+        raise RuntimeError(f"{label}: balloon has no rendered display data")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayData", "GetArcCount", "GetArcAtIndex2"
+    )
+    circle = None
+    for index in range(int(display.GetArcCount())):
+        arc = tuple(float(value) for value in (display.GetArcAtIndex2(index) or ()))
+        # Native schema: four metadata values, start XYZ, end XYZ, center XYZ,
+        # normal XYZ, rotation direction. Closed start/end identifies a circle.
+        if len(arc) < 17 or not all(math.isfinite(value) for value in arc[4:16]):
+            raise RuntimeError(f"{label}: invalid rendered arc data: {arc!r}")
+        if any(abs(arc[4 + axis] - arc[7 + axis]) > 1e-9 for axis in range(3)):
+            continue
+        radius = math.hypot(arc[4] - arc[10], arc[5] - arc[11])
+        if (not math.isfinite(radius) or radius <= 0.0
+                or abs(arc[13]) > 1e-9 or abs(arc[14]) > 1e-9
+                or abs(abs(arc[15]) - 1.0) > 1e-9):
+            raise RuntimeError(f"{label}: invalid rendered sheet-circle geometry: {arc!r}")
+        if circle is not None:
+            raise RuntimeError(f"{label}: multiple rendered full-circle balloon primitives")
+        circle = (arc[10], arc[11], radius)
+    if circle is None:
+        raise RuntimeError(f"{label}: no rendered full-circle balloon primitive")
+    return circle
+
+
 def _spread_balloons(
     adapter: Any,
     view: Any,
@@ -3381,20 +3422,9 @@ def _spread_balloons(
     radii: list[float] = []
     for note in balloons:
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetAnnotation", "GetBalloonInfo", "GetBomBalloonText"
+            note, "INote", "GetAnnotation", "GetBomBalloonText"
         )
-        # The balloon circle's own rendered radius. GetBalloonInfo returns
-        # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
-        # the CIRCLE, not the note+leader box, so the leader cannot pollute it.
-        info = adapter._attempt(lambda n=note: n.GetBalloonInfo())
-        if not info or len(info) < 7:
-            raise RuntimeError(
-                "balloon spread: GetBalloonInfo did not return the balloon "
-                "circle -- the separation below is derived from the MEASURED "
-                "radius, so a balloon whose circle cannot be read cannot be "
-                "placed without guessing"
-            )
-        radii.append(float(info[6]))
+        radii.append(rendered_balloon_circle(note, label="balloon spread")[2])
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -3462,17 +3492,10 @@ def _spread_balloons(
     #   the colliding circles.
     #
     # So: keep the radial direction, enforce a minimum angular separation. The
-    # separation is derived from the balloon's MEASURED radius (GetBalloonInfo,
-    # above), not a guess -- 4.72 mm on this sheet. A monotone push-apart cannot
-    # reorder the balloons, and order-preserving placement about a shared centre
+    # separation is derived from the rendered full-circle radius, not a guess.
+    # A monotone push-apart cannot reorder balloons; placement about a shared centre
     # is what rules crossings out, so this keeps radial's proof while paying
     # radial's price only where circles genuinely touch.
-    #
-    # (History: this WAS documented as blocked -- "needs the balloon's rendered
-    # diameter, which nothing here reads yet". True of this file, never of the
-    # API: INote::GetBalloonInfo returns the circle's centre and radius outright,
-    # and had been in the generated binding all along. The claim was never tested
-    # and the sheet carried the defect for it.)
     gap = _min_angular_gap(min(radius_x, radius_y), max(radii), clearance=clearance)
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a in items], min_gap=gap
@@ -3912,56 +3935,47 @@ def position_bom_balloon(
         f"stack_master={bool(note.IsStackedBalloonMaster())}, "
         f"magnetic_lines={magnetic_lines}"
     )
-    note.LockPosition = False
-    info = note.GetBalloonInfo()
-    anchor = annotation.GetPosition()
-    if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
-        raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-    actual_xy = (float(info[0]), float(info[1]))
-    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
-    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
-    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
-    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
-    # stale circle data, and redraw before judging each rendered-circle readback.
-    for _attempt in range(3):
+    trajectory = []
+    previous_error = None
+    # A large move can reflow the leader/text and change the anchor-to-circle
+    # offset. Correct only the freshly measured residual, never cached geometry.
+    for attempt in range(7):
+        circle = rendered_balloon_circle(note, label=label)
+        anchor = annotation.GetPosition()
+        if anchor is None or len(anchor) < 2:
+            raise RuntimeError(f"{label}: item {item_number} has no position read-back")
+        anchor_xy = (float(anchor[0]), float(anchor[1]))
+        residual = (position_xy[0] - circle[0], position_xy[1] - circle[1])
+        error = max(abs(value) for value in residual)
+        state = {
+            "attempt": attempt, "anchor_xy": anchor_xy, "circle_xy": circle[:2],
+            "anchor_to_circle_xy": (circle[0] - anchor_xy[0], circle[1] - anchor_xy[1]),
+            "residual_xy": residual, "max_error_m": error,
+        }
+        trajectory.append(state)
+        _telemetry.info(f"{label}: item {item_number} rendered placement {state!r}")
+        if error <= position_tolerance_m:
+            note.LockPosition = True
+            _telemetry.event("drawing.balloon_position_trajectory", item=item_number, trajectory=trajectory)
+            return
+        if previous_error is not None and error >= previous_error - 1e-12:
+            raise RuntimeError(f"{label}: item {item_number} rendered correction stalled: {trajectory!r}")
+        if attempt == 6:
+            raise RuntimeError(f"{label}: item {item_number} rendered correction exhausted: {trajectory!r}")
+        previous_error = error
+        target_anchor = (anchor_xy[0] + residual[0], anchor_xy[1] + residual[1])
+        state["requested_anchor_xy"] = target_anchor
         note.LockPosition = False
-        moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
-        if not moved:
-            raise RuntimeError(f"{label}: failed to position item {item_number}")
+        if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
+            raise RuntimeError(f"{label}: failed to position item {item_number}: {trajectory!r}")
         note.LockPosition = True
         adapter.currentModel.EditRebuild3()
         adapter.currentModel.GraphicsRedraw2()
         current_note = annotation.GetSpecificAnnotation()
         if current_note is None:
-            raise RuntimeError(
-                f"{label}: item {item_number} note vanished after positioning"
-            )
+            raise RuntimeError(f"{label}: item {item_number} note vanished after positioning")
         note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetBalloonInfo"
-        )
-        moved_anchor = annotation.GetPosition()
-        moved_info = note.GetBalloonInfo()
-        _telemetry.info(
-            f"{label}: item {item_number} attempt {_attempt + 1} "
-            f"anchor={tuple(float(value) for value in moved_anchor[:2]) if moved_anchor else None}, "
-            f"circle={tuple(float(value) for value in moved_info[:2]) if moved_info else None}"
-        )
-        if moved_info and all(
-            abs(float(moved_info[index]) - expected) <= position_tolerance_m
-            for index, expected in enumerate(position_xy)
-        ):
-            break
-    info = note.GetBalloonInfo()
-    if info is None or len(info) < 2:
-        raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")
-    actual_xy = (float(info[0]), float(info[1]))
-    if any(
-        abs(actual - expected) > position_tolerance_m
-        for actual, expected in zip(actual_xy, position_xy)
-    ):
-        raise RuntimeError(
-            f"{label}: item {item_number} circle moved to {actual_xy}, "
-            f"expected {position_xy}"
+            current_note, "INote", "GetAnnotation"
         )
 
 
@@ -4035,28 +4049,14 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     if note is None:
         return None
     note = _sw_type_info.early_bound_or_flag(
-        note, "INote", "GetExtent", "GetText", "IsBomBalloon", "GetBalloonInfo"
+        note, "INote", "GetExtent", "GetText", "IsBomBalloon"
     )
     text = str(adapter._attempt(lambda: note.GetText(), default="") or "")
     diagnostic_name = f"{name} {text!r}" if text else name
-    # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
-    # balloon circle to the pointed-at component (same leader-polluted-box dead
-    # end as GD&T symbols), so neighboring balloons' boxes always intersect near
-    # the view. GetBalloonInfo describes the CIRCLE instead -- centre + radius,
-    # no leader -- so box the circle it actually draws.
+    # A BOM balloon's GetExtent includes its leader. Bound the rendered circle,
+    # not the annotation origin or INote's potentially stale geometry cache.
     if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
-        info = adapter._attempt(lambda: note.GetBalloonInfo())
-        if not info or len(info) < 7:
-            raise RuntimeError(
-                f"{name}: GetBalloonInfo did not return the balloon circle -- "
-                "refusing to fall back to a nominal box, which would audit a "
-                "guess against placement derived from the measured radius and "
-                "silently disagree with it"
-            )
-        # Centre from GetBalloonInfo, NOT GetPosition: GetPosition is the
-        # annotation ANCHOR, which is measurably offset from the circle centre
-        # (probed on pen-assembly), so it boxed the balloon off-centre.
-        cx, cy, half = float(info[0]), float(info[1]), float(info[6])
+        cx, cy, half = rendered_balloon_circle(note, label=diagnostic_name)
         return LayoutElement(
             diagnostic_name,
             "note",
@@ -4744,8 +4744,8 @@ def check_drawing_layout(
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
     carried 2 leader crossings behind a `_KNOWN_LEADER_CROSSINGS` ratchet, on the
     reasoning that fixing them needed a design decision. It did not -- it needed
-    the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
-    :func:`_spread_balloons`). The ratchet was deleted with the defect.
+    the balloon's rendered radius (see :func:`_spread_balloons`). The ratchet was
+    deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter, layout=layout)

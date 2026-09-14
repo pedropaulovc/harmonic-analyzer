@@ -16,12 +16,6 @@ west-rail fulcrum-keeper taps.
 from __future__ import annotations
 
 
-# The column socket is the running fit around the 25.4 mm tube.  The band is
-# written upper/lower (the shared fit-limit convention); the builder converts
-# it to the model setter's lower/upper ordering.
-COLUMN_BORE_DIAMETER_BAND = (0.05, 0.0)
-
-
 # --- Marked-dimension contract -------------------------------------------------
 #
 # The hole sizes remain associative callouts; named Hole Wizard placement
@@ -64,8 +58,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 
-# Only facts that cannot be read from the native views/callouts belong here.
-# Keep this block deliberately short: dimensions, fit limits, coating and
-# machining method live on the model/title block or on the attached callouts.
-DRAWING_NOTES = "CAPS ARE SEPARATE PURCHASED PARTS."
+# The nominal socket geometry stays fixed; the assigned actual tube governs fit.
+DRAWING_NOTES = (
+    "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-083 TUBE.\n"
+    "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
+    "RETAIN CORNER AND ORIENTATION MATCH MARKS."
+)
 DRAWING_NOTES_B = ""

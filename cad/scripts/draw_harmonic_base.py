@@ -139,13 +139,12 @@ GEOMETRY_TOP_KEEP = {
     "TopLen": (TOP_CENTER[0], 0.230),
     "BottomWid": (0.238, 0.172),
     "TopWid": (0.217, 0.200),
-    "PadCornerRadius": (0.040, 0.210),
-    "FlangeCornerRadius": (0.040, 0.230),
+    "PadCornerRadius": (0.070, 0.236),
+    "FlangeCornerRadius": (0.040, 0.215),
     "RimInnerCornerRadius": (0.055, 0.185),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
-    "TopRimChamfer": (0.230, 0.124),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
 SECTION_KEEP = {
@@ -153,7 +152,6 @@ SECTION_KEEP = {
 }
 GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
-    "TopRimChamfer": "X 45 DEG; UPPER RIM",
     "RimInnerCornerRadius": "RIM INNER",
 }
 HOLE_CALLOUTS = {
@@ -167,7 +165,7 @@ HOLE_TAG_POSITIONS = {
     "A4": (0.326, 0.215),
     "C1": (0.247, 0.216),
     "D1": (0.250, 0.168),
-    "E1": (0.270, 0.165),
+    "E1": (0.253, 0.181),
     "E2": (0.262, 0.226),
     "E3": (0.282, 0.185),
     "F1": (0.267, 0.182),
@@ -279,26 +277,29 @@ def _set_cross_tap_total_quantity(display: Any) -> None:
         definition_part: str(display.GetText(definition_part) or "")
         for definition_part in (5, 6, 7, 8)
     }
-    matches = [
-        (definition_part, definition)
-        for definition_part, definition in definitions.items()
-        if definition.lstrip().startswith("2X")
-        and "<hw-tapdrldia>" in definition
-        and "<hw-tapdrldepth>" in definition
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one native 2X drill definition: {definitions!r}")
-    definition_part, definition = matches[0]
-    body = definition.lstrip()
-    leading = definition[:len(definition) - len(body)]
-    updated = leading + f"{len(COLUMN_SOCKET_XZ)}X" + body[2:]
-    text_part = definition_part - 4
-    display.SetText(text_part, updated)
+    # swDimensionTextCalloutAboveDefinition=7 pairs with writable
+    # swDimensionTextCalloutAbove=3; the raw count is not its resolved "2X".
+    definition = definitions[7]
     if (
-        str(display.GetText(definition_part)) != updated
-        or not str(display.GetText(text_part)).lstrip().startswith("4X")
+        not definition.lstrip().startswith("<NUM_INST>X ")
+        or definition.count("<NUM_INST>") != 1
+        or "<hw-tapdrldia>" not in definition
+        or "<hw-tapdrldepth>" not in definition
+        or not str(display.GetText(3) or "").lstrip().startswith("2X ")
     ):
-        raise RuntimeError("aggregate cross-tap quantity did not persist")
+        raise RuntimeError(f"expected one native two-instance drill definition: {definitions!r}")
+    quantity = len(COLUMN_SOCKET_XZ)
+    updated = definition.replace("<NUM_INST>", str(quantity), 1)
+    display.SetText(3, updated)
+    if (
+        str(display.GetText(7)) != updated
+        or not str(display.GetText(3)).lstrip().startswith(f"{quantity}X ")
+        or any(
+            str(display.GetText(part) or "") != definitions[part]
+            for part in (5, 6, 8)
+        )
+    ):
+        raise RuntimeError("aggregate cross-tap quantity or untouched native definitions did not persist")
 
 
 @_telemetry.traced("drawing.base_rim_width")
@@ -436,14 +437,28 @@ def _serial_edge(view: Any) -> Any:
     return min(candidates, key=lambda item: item[0])[1]
 
 
-def _spread_hole_tags(view: Any) -> None:
+def _spread_hole_tags(view: Any, table: Any) -> None:
+    table_locations = {}
+    for row in range(1, int(table.RowCount)):
+        tag = str(table.DisplayedText2(row, 0, False) or "").strip()
+        if not tag or tag in table_locations:
+            raise RuntimeError(f"duplicate or empty native hole-table tag at row {row}: {tag!r}")
+        table_locations[tag] = tuple(
+            float(table.DisplayedText2(row, column, False))
+            for column in (1, 2)
+        )
     remaining = dict(HOLE_TAG_POSITIONS)
+    found = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
         if int(annotation.GetType()) != 6:
             continue
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
         tag = str(note.GetText()).strip()
+        if tag in table_locations:
+            if tag in found:
+                raise RuntimeError(f"duplicate native hole-table view tag: {tag}")
+            found.add(tag)
         position = remaining.pop(tag, None)
         if position is None:
             continue
@@ -451,13 +466,36 @@ def _spread_hole_tags(view: Any) -> None:
             raise RuntimeError(f"failed to give native hole tag {tag} a leader")
         if not annotation.SetPosition2(*position, 0.0):
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
+        if str(note.GetText()).strip() != tag:
+            raise RuntimeError(f"moving native hole tag changed its text: {tag}")
+        if tag in ("E1", "F1"):
+            points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+            if len(points) < 6 or len(points) % 3:
+                raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
+            expected = tuple(
+                origin + coordinate * VIEW_SCALE / 1000.0
+                for origin, coordinate in zip(_TABLE_ORIGIN_XY, table_locations[tag])
+            )
+            endpoint = points[-3:-1]
+            if sum((actual - wanted) ** 2 for actual, wanted in zip(endpoint, expected)) > 0.001 ** 2:
+                raise RuntimeError(
+                    f"native {tag} leader does not reach its table hole: "
+                    f"table_mm={table_locations[tag]!r}, end={endpoint!r}, centre={expected!r}"
+                )
+            _telemetry.info(
+                f"native hole binding: tag={tag}, table_mm={table_locations[tag]!r}, "
+                f"leader_end={endpoint!r}, centre={expected!r}"
+            )
     if remaining:
         raise RuntimeError(f"native hole-table tags not found: {sorted(remaining)}")
+    if found != set(table_locations):
+        raise RuntimeError(f"native table/view tag bijection failed: missing={set(table_locations) - found}")
 
 
 def _section_geometry_controls(adapter: Any, view: Any) -> None:
     levels: dict[float, list[tuple[float, Any]]] = {STACK_HEIGHT: [], RIM_TOP: []}
     roots = []
+    chamfers: dict[str, list[tuple[float, Any]]] = {"UPPER RIM": [], "UNDERSIDE": []}
     for raw in visible_view_entities(view, 1, label="base section rim and root"):
         edge = _early_bound(raw, "IEdge")
         curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -470,6 +508,17 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
                 roots.append((values[2], edge))
         elif curve.IsLine():
             x0, y0, z0, x1, y1, z1 = tuple(edge.GetCurveParams2())[:6]
+            # Section A-A is a YZ cut: these native diagonal edges expose
+            # both equal legs of the actual 45-degree chamfer.
+            if (
+                abs(x1 - x0) < 1e-7
+                and abs(abs(y1 - y0) - RIM_CHAMFER / 1000.0) < 1e-7
+                and abs(abs(z1 - z0) - RIM_CHAMFER / 1000.0) < 1e-7
+            ):
+                if abs(max(y0, y1) - RIM_TOP / 1000.0) < 1e-7:
+                    chamfers["UPPER RIM"].append(((z0 + z1) / 2.0, edge))
+                elif abs(min(y0, y1)) < 1e-7:
+                    chamfers["UNDERSIDE"].append(((z0 + z1) / 2.0, edge))
             if abs(y1 - y0) > 1e-7:
                 continue
             span = ((x1 - x0) ** 2 + (z1 - z0) ** 2) ** 0.5
@@ -478,6 +527,8 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
                     candidates.append((span, edge))
     if any(not candidates for candidates in levels.values()) or not roots:
         raise RuntimeError("base section lacks exact deck/rim edges or pad-root arc")
+    if any(not candidates for candidates in chamfers.values()):
+        raise RuntimeError("base section lacks the actual equal-leg upper/underside chamfer edges")
     drawing = adapter.currentModel
     if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate base section controls")
@@ -526,6 +577,31 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
     if int(root.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base root-radius precision did not persist")
     root.ArcExtensionLineOrOppositeSide = False
+    for label, candidates in chamfers.items():
+        edge = (
+            min(candidates, key=lambda item: item[0])[1]
+            if label == "UPPER RIM"
+            else max(candidates, key=lambda item: item[0])[1]
+        )
+        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+        drawing.ClearSelection2(True)
+        for index, vertex in enumerate(vertices):
+            if vertex is None or not view.SelectEntity(vertex, index > 0):
+                raise RuntimeError(f"failed to select actual {label} chamfer endpoints")
+        text_xy = (0.400, 0.184) if label == "UPPER RIM" else (0.395, 0.090)
+        display = drawing.AddHorizontalDimension2(*text_xy, 0.0)
+        drawing.ClearSelection2(True)
+        if display is None:
+            raise RuntimeError(f"failed to dimension the section {label} chamfer")
+        display = _early_bound(display, "IDisplayDimension")
+        actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+        if abs(actual_mm - RIM_CHAMFER) > 1e-5:
+            raise RuntimeError(f"section {label} chamfer measured {actual_mm}, expected {RIM_CHAMFER} mm")
+        caption = f"X 45 DEG\n{label}"
+        display.SetText(4, caption)
+        display.SetPrecision3(1, -1, -1, -1)
+        if int(display.GetPrimaryPrecision2()) != 1 or str(display.GetText(4)) != caption:
+            raise RuntimeError(f"section {label} chamfer precision or caption did not persist")
 
 
 ALL_HOLES = (
@@ -633,6 +709,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open harmonic-base source", await adapter.open_model(str(SOURCE)))
+    for index in range(len(COLUMN_SOCKET_XZ)):
+        name = "SocketDia" if index == 0 else f"Socket{index}Dia"
+        raw = adapter.currentModel.Parameter(f"{name}@ColumnSocketProfile")
+        if raw is None:
+            raise RuntimeError(f"source is missing the native {name} socket dimension")
+        dimension = _early_bound(raw, "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != 0:  # swTolNONE; the assigned tube governs fit
+            raise RuntimeError(f"{name} retains a fixed bore tolerance; rebuild the match-fit source")
     read_required_properties(
         adapter.currentModel,
         (
@@ -706,7 +791,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 "PadCornerRadius",
                 "FlangeCornerRadius",
                 "RimInnerCornerRadius",
-                "TopRimChamfer",
                 "BottomThickness",
             )
         },
@@ -733,26 +817,14 @@ async def build(adapter: Any) -> dict[str, str]:
     overall_height.SetPrecision3(1, -1, -1, -1)
     if int(overall_height.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base overall reference precision did not persist")
-    _add_base_height(
+    flange_to_rim = _add_base_height(
         adapter, side, _horizontal_base_edge(side, RIM_TOP),
         RIM_TOP - BOTTOM_THICKNESS, (0.245, 0.100), "visible flange-to-rim height",
         lower_entity=_horizontal_base_edge(side, BOTTOM_THICKNESS),
     )
-    underside_chamfer = _add_base_height(
-        adapter,
-        side,
-        _horizontal_base_edge(side, RIM_CHAMFER),
-        RIM_CHAMFER,
-        (0.220, 0.083),
-        "underside chamfer leg",
-    )
-    underside_chamfer.SetText(4, "X 45 DEG; UNDERSIDE")
-    underside_chamfer.SetPrecision3(1, -1, -1, -1)
-    if (
-        int(underside_chamfer.GetPrimaryPrecision2()) != 1
-        or str(underside_chamfer.GetText(4)) != "X 45 DEG; UNDERSIDE"
-    ):
-        raise RuntimeError("underside chamfer precision or callout did not persist")
+    flange_to_rim.SetPrecision3(1, -1, -1, -1)
+    if int(flange_to_rim.GetPrimaryPrecision2()) != 1:
+        raise RuntimeError("base flange-to-rim height precision did not persist")
 
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
@@ -779,7 +851,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ) or ()))
     if len(deck_point) != 5 or abs(deck_point[1] - STACK_HEIGHT / 1000.0) > 1e-7:
         raise RuntimeError(f"native deck leader point is not on the deck plane: {deck_point!r}")
-    add_surface_finish(
+    deck_finish = add_surface_finish(
         adapter, top,
         symbol_xy=(0.040, 0.138),
         control=deck_control,
@@ -791,9 +863,9 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, top, deck_point[:3], label="qualified deck face finish anchor",
         ),
     )
-    add_surface_finish(
+    underside_finish = add_surface_finish(
         adapter, side,
-        symbol_xy=(0.070, 0.052),
+        symbol_xy=(0.040, 0.052),
         control=surface_finish_by_key(SURFACE_FINISHES, "underside"),
         label="underside finish before paint",
         char_height=0.0025,
@@ -803,6 +875,11 @@ async def build(adapter: Any) -> dict[str, str]:
             label="underside finish edge",
         ),
     )
+    for label, symbol in (("deck", deck_finish), ("underside", underside_finish)):
+        annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
+        annotation.BentLeaderLength = 0.035
+        if abs(float(annotation.BentLeaderLength) - 0.035) > 1e-7:
+            raise RuntimeError(f"{label} finish leader did not clear its roughness text")
     for view in (top, side):
         set_hidden_lines_visible(adapter, view)
 
@@ -843,7 +920,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _section_geometry_controls(adapter, section)
     add_note(
         adapter,
-        "A1-A4: BORE LIMITS GOVERN\nMATCH-FINISH MHA-083 TUBE OD\nTO SLIP BY HAND",
+        "A1-A4 BORE DIAMETERS: REFERENCE ONLY\n"
+        "MATCH SOCKETS TO ASSIGNED ACTUAL MHA-083 TUBES\n"
+        "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK\n"
+        "RETAIN CORNER/ORIENTATION MATCH MARKS",
         0.235,
         0.255,
     )
@@ -893,7 +973,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"base hole table exceeds the inner border: {table_height} m"
         )
     drawing_model.EditRebuild3()
-    _spread_hole_tags(hole_top)
+    _spread_hole_tags(hole_top, hole_table)
     tap_callout = add_native_hole_callout(
         adapter,
         hole_side,

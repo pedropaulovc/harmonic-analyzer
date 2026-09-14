@@ -62,7 +62,6 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
 from _holes import (
     DRILL_POINT_H,
@@ -135,7 +134,6 @@ from frame_attachment_spec import (
     COLUMN_SOCKET_DIAMETER,
     SCREW_SPOTFACE_DIAMETER,
 )
-from _fit_limits import deviations
 from _visibility import blank_reference_geometry
 
 import _telemetry
@@ -152,13 +150,14 @@ IN = 25.4
 # Four column sockets and their interrupted front/back retaining taps. The
 # physical stations are shared with the tube and assembly; only the X pitch is
 # local to the frame casting family.
+# Bore diameters are nominal CAD geometry only. Match-fit production sockets
+# to their assigned actual MHA-083 tubes, not to a fixed diameter band.
 COLUMN_X = 197.0
 COLUMN_SOCKET_XZ = tuple(
     (sx * COLUMN_X, z)
     for sx in (-1.0, 1.0)
     for z in (FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z)
 )
-COLUMN_SOCKET_DIAMETER_BAND = (0.05, 0.0)  # upper/lower deviations
 BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
 BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
 BASE_CROSS_TAP_SPEC = HoleSpec(
@@ -1303,13 +1302,6 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    for socket_dia_name in ("SocketDia", "Socket1Dia", "Socket2Dia", "Socket3Dia"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "ColumnSocketProfile",
-            socket_dia_name,
-            *deviations(COLUMN_SOCKET_DIAMETER_BAND),
-        )
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
