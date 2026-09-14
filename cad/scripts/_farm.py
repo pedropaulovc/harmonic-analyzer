@@ -7,7 +7,9 @@ fails admission on the farm). This module must never import the pool package.
 
 Configuration is the same ``~/.solidworks-pool/config.json`` that ``farm.py``
 writes (``farm.py credentials issue``); ``SOLIDWORKS_POOL_CONFIG`` overrides the
-path. Certificate paths in the file are relative to the config directory.
+path. Certificate and token paths in the file are relative to the config
+directory. The farm's external frontend requires both the mTLS client
+certificate and the bearer token (``Authorization: Bearer <jwt>``).
 """
 
 from __future__ import annotations
@@ -74,15 +76,23 @@ def config_path() -> Path:
     return DEFAULT_CONFIG_PATH
 
 
-_CONFIG_KEYS = ("temporal_address", "namespace", "ca_cert", "client_cert", "client_key")
-_CONFIG_FILE_KEYS = ("ca_cert", "client_cert", "client_key")
+_CONFIG_KEYS = (
+    "temporal_address",
+    "namespace",
+    "ca_cert",
+    "client_cert",
+    "client_key",
+    "token",
+)
+_CONFIG_FILE_KEYS = ("ca_cert", "client_cert", "client_key", "token")
 
 
 def load_config(path: Path | None = None) -> dict:
-    """The submitter's farm config with certificate paths resolved to absolute.
+    """The submitter's farm config with certificate and token paths resolved.
 
     Every problem is a ``RuntimeError("farm config <path>: <problem>")`` naming
-    the path and offending key only; certificate contents are never read here.
+    the path and offending key only; certificate and token contents are never
+    read here.
     """
     path = path or config_path()
     try:
@@ -108,6 +118,8 @@ def load_config(path: Path | None = None) -> dict:
         if not file.is_file() or not os.access(file, os.R_OK):
             raise RuntimeError(f"farm config {path}: {key} file is not readable")
         config[key] = str(file)
+    if Path(config["token"]).stat().st_size == 0:
+        raise RuntimeError(f"farm config {path}: token file is empty")
     return config
 
 
@@ -159,6 +171,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     client = await Client.connect(
         address,
         namespace=config["namespace"],
+        api_key=Path(config["token"]).read_text(encoding="ascii").strip(),
         tls=TLSConfig(
             server_root_ca_cert=Path(config["ca_cert"]).read_bytes(),
             domain=address.rsplit(":", 1)[0],

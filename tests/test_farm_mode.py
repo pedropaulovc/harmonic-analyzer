@@ -555,15 +555,21 @@ def test_help_and_non_run_commands_skip_the_preflight(monkeypatch):
 # --- _farm: config and the Temporal boundary ---------------------------------
 
 
+TOKEN = "eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJzdWJtaXR0ZXItdGVzdCJ9.c2ln"
+
+
 def _write_config(tmp_path: Path, **overrides) -> Path:
     for name in ("ca.pem", "client.pem", "client-key.pem"):
         (tmp_path / name).write_bytes(b"-----BEGIN " + name.encode() + b"-----\n")
+    (tmp_path / "token.jwt").write_text(TOKEN + "\n", encoding="ascii")
+    (tmp_path / "empty.jwt").write_bytes(b"")
     config = {
         "temporal_address": "farm.example.invalid:7233",
         "namespace": "solidworks",
         "ca_cert": "ca.pem",
         "client_cert": "client.pem",
         "client_key": "client-key.pem",
+        "token": "token.jwt",
     }
     config.update(overrides)
     path = tmp_path / "config.json"
@@ -577,6 +583,9 @@ def _write_config(tmp_path: Path, **overrides) -> Path:
         ({"namespace": ""}, "namespace must be a non-empty string"),
         ({"client_key": 7}, "client_key must be a non-empty string"),
         ({"client_cert": "missing.pem"}, "client_cert file is not readable"),
+        ({"token": ""}, "token must be a non-empty string"),
+        ({"token": "missing.jwt"}, "token file is not readable"),
+        ({"token": "empty.jwt"}, "token file is empty"),
     ],
 )
 def test_config_problems_name_the_path_and_key(tmp_path, overrides, problem):
@@ -584,6 +593,15 @@ def test_config_problems_name_the_path_and_key(tmp_path, overrides, problem):
     with pytest.raises(RuntimeError) as failure:
         _farm.load_config(path)
     assert str(failure.value) == f"farm config {path}: {problem}"
+
+
+def test_config_without_a_token_is_refused_before_any_connection(tmp_path):
+    path = _write_config(tmp_path)
+    config = json.loads(path.read_text(encoding="utf-8"))
+    del config["token"]
+    path.write_text(json.dumps(config), encoding="utf-8")
+    with pytest.raises(RuntimeError, match=r"token must be a non-empty string$"):
+        _farm.load_config(path)
 
 
 @pytest.mark.parametrize(
@@ -658,6 +676,7 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     assert connect["tls"].server_root_ca_cert == b"-----BEGIN ca.pem-----\n"
     assert connect["tls"].client_cert == b"-----BEGIN client.pem-----\n"
     assert connect["tls"].client_private_key == b"-----BEGIN client-key.pem-----\n"
+    assert connect["api_key"] == TOKEN, "the JWT is sent as Authorization: Bearer"
 
     [(workflow, request, options)] = calls["start"]
     assert workflow == "BuildLeaf"
