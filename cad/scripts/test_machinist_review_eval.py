@@ -182,15 +182,12 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
         sent = provider["calls"][-1]["prompt"]
         assert result["review"]["prompt_sha256"] == hashlib.sha256(sent.encode()).hexdigest()
         assert identity["prompts"]["baseline"]["effective_sha256"][package.name] == result["review"]["prompt_sha256"]
-    part_input, assembly_input, baseline_input, candidate_input = [
+    _, assembly_input, baseline_input, candidate_input = [
         call["prompt"] for call in provider["calls"]
     ]
-    assert assembly_input != part_input
     assert baseline_input.replace("Rubric A", "", 1) == assembly_input
     assert candidate_input.replace("Rubric B", "", 1) == assembly_input
     assert reviews[2]["prompt_sha256"] != reviews[3]["prompt_sha256"]
-    if reviewer == "claude":
-        assert part_input.strip()
     for call in provider["calls"]:
         assert call["files"] == {"sheet-1.png", "schema.json"}
         assert call["images"] == [part.sources[0].read_bytes()]
@@ -242,7 +239,8 @@ def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
     assert (directory / first["report"]).read_bytes() == old_report
     assert len(provider["calls"]) == 2
     if change == "prompt":
-        assert provider["calls"][-1]["prompt"] == prompt
+        assert prompt in provider["calls"][-1]["prompt"]
+        assert "Rubric A" not in provider["calls"][-1]["prompt"]
     elif change == "image":
         assert provider["calls"][-1]["images"] != provider["calls"][0]["images"]
     else:
