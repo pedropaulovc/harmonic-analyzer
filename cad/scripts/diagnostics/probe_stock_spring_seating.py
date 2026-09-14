@@ -42,6 +42,7 @@ from _transforms import IDENTITY, ROT_Y_180, compose_rows, euler_from_rows
 
 ROOT = Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / "cad/out/reports/stock-spring-seating.json"
+SAVED_SUMMING_OUTPUT = OUTPUT.with_name("stock-spring-seating-saved-summing.json")
 PARTS = (
     "boss-hook",
     "counter-spring",
@@ -234,9 +235,21 @@ def actual_contact(adapter, moving, fixed):
                 raise
             primary.add_note(f"interference cleanup failed: {cleanup}")
     assert_transforms(adapter, expected)
-    evidence["native_distance_certified"] = (
-        not evidence["assembly_interferences"]
+    overlap_mm3 = native_component_overlap_mm3(
+        adapter, moving, fixed, label=f"fixture witness {moving} / {fixed}"
+    )
+    assert_transforms(adapter, expected)
+    evidence["native_overlap_mm3"] = overlap_mm3
+    evidence["collision_state"] = (
+        "interfering"
+        if evidence["assembly_interferences"] or overlap_mm3 > 0.0
+        else "clear"
+    )
+    evidence["distance_witness"] = (
+        "certified"
+        if evidence["collision_state"] == "clear"
         and evidence["distance_mm"] <= NATIVE_CONTACT_DISTANCE_TOLERANCE_MM
+        else "uncertified"
     )
     return evidence
 
@@ -356,10 +369,10 @@ def verify_witness(
         rebuild_placement(model)
         assert_transforms(adapter, {**base, moving: clear})
         evidence["clear"] = actual_contact(adapter, moving, fixed)
-        if evidence["clear"]["assembly_interferences"]:
+        if evidence["clear"]["collision_state"] != "clear":
             raise RuntimeError(label + ": claimed clear endpoint actually interferes")
         if solution.witness == "native_distance":
-            if not evidence["clear"]["native_distance_certified"]:
+            if evidence["clear"]["distance_witness"] != "certified":
                 raise RuntimeError(
                     label + ": independent native distance exceeds 10 nm"
                 )
@@ -375,14 +388,14 @@ def verify_witness(
             rebuild_placement(model)
             assert_transforms(adapter, {**base, moving: inside})
             evidence["interfering"] = actual_contact(adapter, moving, fixed)
-            if not evidence["interfering"]["assembly_interferences"]:
+            if evidence["interfering"]["collision_state"] != "interfering":
                 raise RuntimeError(
                     label + ": claimed inside endpoint is actually clear"
                 )
             evidence["bracket_width_mm"] = (
                 solution.clear_offset_mm - solution.interfering_offset_mm
             )
-            if not evidence["clear"]["native_distance_certified"]:
+            if evidence["clear"]["distance_witness"] != "certified":
                 message = (
                     f"{label}: native collision transition is within 1 nm, but "
                     f"ClosestDistance is {evidence['clear']['distance_mm']:.17g} mm; "
@@ -504,7 +517,7 @@ async def fixture(adapter, label, row):
         expected = {**seed, moving: target}
         row["rebuilt_transforms"] = assert_transforms(adapter, expected)
         row["rebuilt_actual_contact"] = actual_contact(adapter, moving, fixed)
-        if row["rebuilt_actual_contact"]["assembly_interferences"]:
+        if row["rebuilt_actual_contact"]["collision_state"] != "clear":
             raise RuntimeError(label + ": rebuilt actual assembly interferes")
         repeated = solve_component_contact(
             adapter, moving, fixed, direction, maximum, label=label + " re-solve"
@@ -515,7 +528,7 @@ async def fixture(adapter, label, row):
             raise RuntimeError(label + ": applied seat requires another displacement")
         row["final_transforms"] = assert_transforms(adapter, expected)
         row["final_actual_contact"] = actual_contact(adapter, moving, fixed)
-        if row["final_actual_contact"]["assembly_interferences"]:
+        if row["final_actual_contact"]["collision_state"] != "clear":
             raise RuntimeError(label + ": re-solve changed the clear native seat")
         row["repeated_witness_check"] = {}
         verify_witness(
@@ -530,13 +543,13 @@ async def fixture(adapter, label, row):
             label + " repeated witness",
         )
         row["post_witness_actual_contact"] = actual_contact(adapter, moving, fixed)
-        if row["post_witness_actual_contact"]["assembly_interferences"]:
+        if row["post_witness_actual_contact"]["collision_state"] != "clear":
             raise RuntimeError(
                 label + ": endpoint verification did not restore the clear seat"
             )
         if (
             repeated.witness == "native_distance"
-            and not row["post_witness_actual_contact"]["native_distance_certified"]
+            and row["post_witness_actual_contact"]["distance_witness"] != "certified"
         ):
             raise RuntimeError(label + ": restored distance witness exceeds 10 nm")
         row["status"] = "passed"
@@ -814,7 +827,7 @@ async def saved_summing_comparison(adapter, report):
                 offset,
                 row,
             )
-            OUTPUT.write_text(
+            SAVED_SUMMING_OUTPUT.write_text(
                 json.dumps(report, indent=2, allow_nan=False) + "\n",
                 encoding="utf-8",
             )
@@ -883,13 +896,13 @@ async def probe(adapter):
         }
         try:
             await saved_summing_comparison(adapter, report)
-            return {"report": str(OUTPUT)}
+            return {"report": str(SAVED_SUMMING_OUTPUT)}
         except BaseException:
             report["status"] = "failed"
             report["error"] = traceback.format_exc()
             raise
         finally:
-            OUTPUT.write_text(
+            SAVED_SUMMING_OUTPUT.write_text(
                 json.dumps(report, indent=2, allow_nan=False) + "\n",
                 encoding="utf-8",
             )
