@@ -1525,11 +1525,11 @@ class _FakeNote:
 
 class _MovingBalloon(_FakeNote):
     """Native-like rendered ink moves while GetBalloonInfo remains cached."""
-    def __init__(self, reflow=False):
+    def __init__(self, pixel_error_m=0.0):
         super().__init__(0.11, 0.19, radius=0.005, item="2")
         self.placed = (0.15, 0.25)
         self.LockPosition = False
-        self._reflow = reflow
+        self._pixel_error_m = pixel_error_m
         self._offset = (0.004, -0.002)
 
     def GetBalloonInfo(self):
@@ -1539,8 +1539,7 @@ class _MovingBalloon(_FakeNote):
         return (self.placed[0] - self._offset[0], self.placed[1] - self._offset[1], 0.042)
 
     def SetPosition(self, x, y, _z):
-        if self._reflow:
-            self._offset = (0.004226191, -0.001696022)
+        self._offset = (0.004 + self._pixel_error_m, -0.002 + self._pixel_error_m)
         self.placed = (x + self._offset[0], y + self._offset[1])
         return True
 
@@ -1563,14 +1562,16 @@ class _MovingBalloon(_FakeNote):
         return (0.0, 0.0, 0.0, 1.0, 1.0, 0.0)
 
 
-@pytest.mark.parametrize("reflow", (False, True))
-def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch, reflow):
+def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch):
     monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
-    note = _MovingBalloon(reflow=reflow)
+    note = _MovingBalloon()
     model = SimpleNamespace(
         GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
         EditRebuild3=lambda: True,
         GraphicsRedraw2=lambda: None,
+        ActiveView=SimpleNamespace(Transform=SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 1000, 0, 0, 0)
+        )),
     )
     adapter = _FakeAdapter(model)
     target = (0.10, 0.18)
@@ -1582,6 +1583,31 @@ def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(m
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
         (0.095, 0.175, 0.105, 0.185)
     )
+
+
+@pytest.mark.parametrize("pixels_per_metre,accepted", ((1000.0, True), (2000.0, False)))
+def test_balloon_placement_acceptance_tracks_current_viewport_resolution(monkeypatch, pixels_per_metre, accepted):
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    note = _MovingBalloon(pixel_error_m=0.00075)
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
+        EditRebuild3=lambda: True,
+        GraphicsRedraw2=lambda: None,
+        ActiveView=SimpleNamespace(Transform=SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, pixels_per_metre, 0, 0, 0)
+        )),
+    )
+    def place():
+        drawing_common.position_bom_balloon(
+            _FakeAdapter(model), [note], item_number="2",
+            position_xy=(0.10, 0.18), label="quantized native preview",
+        )
+    if accepted:
+        place()
+        assert note.placed == pytest.approx((0.10075, 0.18075))
+    else:
+        with pytest.raises(RuntimeError):
+            place()
 
 
 @pytest.mark.parametrize("geometry", ("missing", "partial", "ambiguous", "zero_radius", "nonfinite"))

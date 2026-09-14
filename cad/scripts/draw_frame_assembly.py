@@ -29,6 +29,7 @@ from _drawing_common import (
     model_point_in_view,
     position_bom_balloon,
     rendered_balloon_circle,
+    drawing_viewport_pixel_size,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -968,6 +969,9 @@ def _frame_balloon_binding_readback(
         "actual_leader_points": points,
         "annotation_position": position,
         "rendered_circle": circle,
+        "viewport_pixel_bounds_m": tuple(
+            max(1e-6, value) for value in drawing_viewport_pixel_size(adapter)
+        ),
         "anchor_to_circle_xy": (
             (circle[0] - position[0], circle[1] - position[1])
             if len(position) >= 2 else None
@@ -1033,7 +1037,7 @@ def _short_frame_balloon(
     if length > 0.030:
         failures.append("leader_length")
     circle = after["rendered_circle"]
-    if any(abs(circle[index] - target[index]) > 1e-6 for index in range(2)):
+    if any(abs(circle[index] - target[index]) > after["viewport_pixel_bounds_m"][index] for index in range(2)):
         failures.append("circle_position")
     state = {"before": before, "after": after, "target_circle": target,
              "length_m": length, "failed_checks": failures}
