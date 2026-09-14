@@ -2942,7 +2942,7 @@ async def refresh_assembly(
         _telemetry.event("refresh.noop_broad_gates_skipped", asm=asm_name)
         log(
             f"refresh {asm_name}: fingerprint unchanged, no repairs -- broad "
-            "DOF/interference/health gates reused; strict spring contact still runs"
+            "DOF/interference/health gates reused"
         )
 
     with _telemetry.span("save", asm=asm_name, changed=geometry_changed):

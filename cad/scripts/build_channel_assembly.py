@@ -27,7 +27,7 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  channel-spring-installed x20 (McMaster 9432K31, with native-seated
+  channel-spring-installed x20 (McMaster 9432K31, with fixed measured
   installed-length variants),
   spring-hook x20 (McMaster 9489T111 eyebolts, supplied nuts omitted;
   their shanks thread directly into the summing plate)
@@ -40,10 +40,10 @@ The bar rests its foot-notch roof on the tilted arm's top-edge arc
 leaves the levers essentially level (-0.002 deg at neutral, the ch14 ROM
 re-derive rest pose). Purchased 9432K31 hooks seat in the existing lever
 holes and in 9489T111 lower eyes. The lower anchors thread directly into
-the summing plate, without nuts. ``spring_mount_geom`` supplies catalog
-seeds; native surface contact determines the installed lengths and bearing
-positions. Eye centres are not pin-contact points. The plate lives in summing.SLDASM, so
-its threaded engagement and clearances are also checked at the top level.
+the summing plate, without nuts. ``settled_spring_seats`` loads the fixed
+measured placement table for each supported amplitude; the build performs
+no native fitting or trial motion. Eye centres are not pin-contact points. The
+lower anchors' threaded engagement and clearances are checked at the top level.
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run

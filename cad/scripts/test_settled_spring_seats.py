@@ -147,6 +147,27 @@ def test_axis_outside_strict_unit_tolerance_is_rejected(isolated_calibration):
         channel_seat(0.0)
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("centre_xy", [4.0, 6.001], "centre_xy must match the eye-point midpoint"),
+        (
+            "axis_xy",
+            [-0.6, -0.8],
+            "axis_xy must be parallel and co-directed with the eye-point vector",
+        ),
+    ],
+)
+def test_pose_metadata_must_describe_its_eye_points(
+    isolated_calibration, field, value, message
+):
+    channel_record, _ = isolated_calibration
+    channel_record["pose"][field] = value
+
+    with pytest.raises(ValueError, match=message):
+        channel_seat(0.0)
+
+
 def test_unknown_clocking_literal_is_rejected(isolated_calibration):
     channel_record, _ = isolated_calibration
     channel_record["pose"]["clocking"] = "standrad"

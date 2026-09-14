@@ -291,6 +291,48 @@ def _assembly_component(name: str, source_stem: str, station_z_mm: float):
     )
 
 
+class _AssemblyContactScene:
+    def __init__(
+        self,
+        components: list[tuple[str, str, float]],
+        distances_mm: dict[tuple[str, str], float],
+    ) -> None:
+        self.currentModel = self
+        self.swApp = self
+        self.distances_mm = distances_mm
+        self.components = {}
+        for name, source_stem, station_z_mm in components:
+            component = _Component(name)
+            component.Transform2.ArrayData[11] = station_z_mm / 1000.0
+            component.GetPathName = lambda stem=source_stem: (
+                f"C:/cad/out/sldprt/{stem}.SLDPRT"
+            )
+            component.bodies = [_NativeBody(self, component, f"{name}-body")]
+            self.components[name] = component
+
+    def bind(self, value, interface: str):
+        return value
+
+    @staticmethod
+    def _attempt(operation, default=None):
+        return operation()
+
+    def GetComponents(self, top_only: bool):
+        assert top_only
+        return tuple(self.components.values())
+
+    def GetComponentByName(self, name: str):
+        return self.components.get(name)
+
+    def ClosestDistance(self, first, second):
+        distance_mm = self.distances_mm[(first.Name2, second.Name2)]
+        return distance_mm / 1000.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+
+    @staticmethod
+    def intersection(target: str, tool: str):
+        return None, 0
+
+
 def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
     import _config
     import settled_spring_seats
@@ -327,6 +369,7 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
     monkeypatch.setattr(contact, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(_config, "active_channels", lambda: channels)
     monkeypatch.setattr(_config, "active_count", lambda: len(channels))
+    monkeypatch.setattr(_config, "machine", lambda *_keys: 10.0)
     monkeypatch.setattr(settled_spring_seats, "channel_seat", lambda _amplitude: seat)
     monkeypatch.setattr(
         contact,
@@ -338,3 +381,83 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="ambiguous duplicate station"):
         contact.assert_assembly_spring_contacts(adapter, "channel")
+
+
+def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
+    monkeypatch,
+) -> None:
+    import _config
+    import settled_spring_seats
+
+    channels = [
+        {"index": 0, "amplitude_mm": 1.0},
+        {"index": 1, "amplitude_mm": 2.0},
+    ]
+    tight = SimpleNamespace(
+        lower_maximum_distance_mm=0.003,
+        upper_maximum_distance_mm=0.001,
+    )
+    loose = SimpleNamespace(
+        lower_maximum_distance_mm=0.005,
+        upper_maximum_distance_mm=0.001,
+    )
+    seats = {1.0: tight, 2.0: loose}
+    scene = _AssemblyContactScene(
+        [
+            (
+                "channel-spring-installed-stretch01-1",
+                "channel-spring-installed-stretch01",
+                0.0,
+            ),
+            ("channel-lever-2", "channel-lever", 0.0008),
+            ("spring-hook-1", "spring-hook", -10.0008),
+            (
+                "channel-spring-installed-stretch00-1",
+                "channel-spring-installed-stretch00",
+                -10.0,
+            ),
+            ("spring-hook-2", "spring-hook", -0.0008),
+            ("channel-lever-1", "channel-lever", -9.9992),
+        ],
+        {
+            (
+                "channel-spring-installed-stretch00-1",
+                "spring-hook-1",
+            ): 0.004,
+            (
+                "channel-spring-installed-stretch00-1",
+                "channel-lever-1",
+            ): 0.0,
+            (
+                "channel-spring-installed-stretch01-1",
+                "spring-hook-2",
+            ): 0.002,
+            (
+                "channel-spring-installed-stretch01-1",
+                "channel-lever-2",
+            ): 0.0,
+        },
+    )
+    monkeypatch.setattr(contact, "_early_bound", scene.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
+    monkeypatch.setattr(_config, "active_channels", lambda: channels)
+    monkeypatch.setattr(_config, "active_count", lambda: len(channels))
+    monkeypatch.setattr(_config, "machine", lambda *_keys: 10.0)
+    monkeypatch.setattr(
+        settled_spring_seats,
+        "channel_seat",
+        lambda amplitude: seats[amplitude],
+    )
+
+    # Swapping the tight and loose bounds would let both measured lower
+    # distances pass, so this failure proves the config/station assignment.
+    assert tight.lower_maximum_distance_mm < 0.004 <= loose.lower_maximum_distance_mm
+    assert 0.002 <= tight.lower_maximum_distance_mm
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "channel 00 lower native seat: native distance .* "
+            "exceeds calibrated maximum"
+        ),
+    ):
+        contact.assert_assembly_spring_contacts(scene, "channel")

@@ -14,6 +14,7 @@ import _config
 from spring_mount_geom import SpringPose
 
 _UNIT_AXIS_ABS_TOL = 1e-12
+_CENTRE_ABS_TOL_MM = 1e-9
 _VALID_CLOCKINGS = ("standard", "half_turn")
 
 
@@ -58,6 +59,38 @@ def _spring_pose(values: dict, *, expected_clocking: str) -> SpringPose:
         math.hypot(*axis_xy), 1.0, rel_tol=0.0, abs_tol=_UNIT_AXIS_ABS_TOL
     ):
         raise ValueError("Calibrated native spring axis_xy must be unit length")
+    midpoint_xy = (
+        (lower_eye_xy[0] + upper_eye_xy[0]) / 2.0,
+        (lower_eye_xy[1] + upper_eye_xy[1]) / 2.0,
+    )
+    if any(
+        not math.isclose(actual, expected, rel_tol=0.0, abs_tol=_CENTRE_ABS_TOL_MM)
+        for actual, expected in zip(centre_xy, midpoint_xy, strict=True)
+    ):
+        raise ValueError(
+            "Calibrated native spring centre_xy must match the eye-point midpoint"
+        )
+    eye_delta_xy = (
+        upper_eye_xy[0] - lower_eye_xy[0],
+        upper_eye_xy[1] - lower_eye_xy[1],
+    )
+    eye_span_mm = math.hypot(*eye_delta_xy)
+    cross = axis_xy[0] * eye_delta_xy[1] - axis_xy[1] * eye_delta_xy[0]
+    dot = axis_xy[0] * eye_delta_xy[0] + axis_xy[1] * eye_delta_xy[1]
+    if (
+        eye_span_mm == 0.0
+        or not math.isclose(
+            cross,
+            0.0,
+            rel_tol=0.0,
+            abs_tol=_UNIT_AXIS_ABS_TOL * eye_span_mm,
+        )
+        or dot <= 0.0
+    ):
+        raise ValueError(
+            "Calibrated native spring axis_xy must be parallel and co-directed "
+            "with the eye-point vector"
+        )
     clocking = values["clocking"]
     if clocking not in _VALID_CLOCKINGS:
         raise ValueError(

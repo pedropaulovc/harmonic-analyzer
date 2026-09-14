@@ -331,7 +331,7 @@ _CHANNEL_CONTACT_FAMILIES = (
     "channel-lever",
 )
 _SUMMING_CONTACT_FAMILIES = ("counter-spring", "boss-hook", "gooseneck")
-_STATION_MATCH_TOLERANCE_MM = 1e-6
+_STATION_LOOKUP_TOLERANCE_MM = 1e-3
 
 
 def _spring_contact_family(source_stem: str) -> str | None:
@@ -384,25 +384,64 @@ def _assembly_spring_instances(
     return found
 
 
-def _ordered_unique_stations(
+def _ordered_family(
     family: str,
     instances: list[_AssemblySpringInstance],
     expected_count: int,
 ) -> list[_AssemblySpringInstance]:
     if len(instances) != expected_count:
         raise RuntimeError(
-            f"{family}: expected exactly {expected_count} active top-level "
+            f"{family}: expected exactly {expected_count} top-level "
             f"instance(s), found {len(instances)}: "
             f"{sorted(instance.name for instance in instances)}"
         )
     ordered = sorted(instances, key=lambda instance: instance.station_z_mm)
     for first, second in zip(ordered, ordered[1:]):
-        if abs(second.station_z_mm - first.station_z_mm) <= _STATION_MATCH_TOLERANCE_MM:
+        if second.station_z_mm == first.station_z_mm:
             raise RuntimeError(
-                f"{family}: ambiguous duplicate station near "
+                f"{family}: ambiguous duplicate station at "
                 f"Z={first.station_z_mm:.9g} mm: {first.name}, {second.name}"
             )
     return ordered
+
+
+def _match_station_family(
+    springs: list[_AssemblySpringInstance],
+    family: str,
+    instances: list[_AssemblySpringInstance],
+) -> list[_AssemblySpringInstance]:
+    """Assign one occurrence to each spring station using only its origin Z.
+
+    The 1e-3 mm window identifies corresponding occurrences only. It is never
+    used as contact clearance: ``assert_native_contact`` applies each measured
+    seat's calibrated distance bound and its independent zero-overlap proof.
+    """
+    unmatched = list(instances)
+    matched = []
+    for spring in springs:
+        candidates = [
+            instance
+            for instance in unmatched
+            if abs(instance.station_z_mm - spring.station_z_mm)
+            <= _STATION_LOOKUP_TOLERANCE_MM
+        ]
+        if len(candidates) != 1:
+            kind = "missing" if not candidates else "ambiguous"
+            raise RuntimeError(
+                f"{family}: {kind} station pairing for {spring.name} at "
+                f"Z={spring.station_z_mm:.9g} mm; found "
+                f"{[candidate.name for candidate in candidates]} within "
+                f"{_STATION_LOOKUP_TOLERANCE_MM:g} mm"
+            )
+        match = candidates[0]
+        unmatched.remove(match)
+        matched.append(match)
+    if unmatched:
+        raise RuntimeError(
+            f"{family}: unmatched top-level instances after station pairing: "
+            f"{sorted(instance.name for instance in unmatched)}"
+        )
+    return matched
 
 
 def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
@@ -428,26 +467,33 @@ def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
                 f"channel calibration selected {count} active row(s), "
                 f"expected {_config.active_count()}"
             )
+        pitch = float(_config.machine("channels", "station_pitch_mm"))
+        if not math.isfinite(pitch) or pitch <= 0.0:
+            raise RuntimeError(
+                "channel native contact requires positive configured station pitch"
+            )
         found = _assembly_spring_instances(adapter, _CHANNEL_CONTACT_FAMILIES)
-        springs, hooks, levers = (
-            _ordered_unique_stations(family, found[family], count)
-            for family in _CHANNEL_CONTACT_FAMILIES
+        springs = _ordered_family(
+            _CHANNEL_SPRING_FAMILY,
+            found[_CHANNEL_SPRING_FAMILY],
+            count,
         )
+        hooks = _match_station_family(
+            springs,
+            "spring-hook",
+            _ordered_family("spring-hook", found["spring-hook"], count),
+        )
+        levers = _match_station_family(
+            springs,
+            "channel-lever",
+            _ordered_family("channel-lever", found["channel-lever"], count),
+        )
+        # active_channels() is config-row/index order. Because the configured
+        # pitch is positive, ascending actual station Z has that same order;
+        # therefore each measured seat/bound stays attached to its amplitude.
         for station, (spring, hook, lever, seat) in enumerate(
             zip(springs, hooks, levers, seats, strict=True)
         ):
-            station_values = (
-                spring.station_z_mm,
-                hook.station_z_mm,
-                lever.station_z_mm,
-            )
-            if max(station_values) - min(station_values) > _STATION_MATCH_TOLERANCE_MM:
-                raise RuntimeError(
-                    f"channel station {station:02d}: spring/hook/lever Z mismatch "
-                    f"{spring.name}={spring.station_z_mm:.9g}, "
-                    f"{hook.name}={hook.station_z_mm:.9g}, "
-                    f"{lever.name}={lever.station_z_mm:.9g} mm"
-                )
             lower = assert_native_contact(
                 adapter,
                 spring.name,
@@ -473,33 +519,31 @@ def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
 
         seat, _gooseneck_y = settled_spring_seats.counter_seat()
         found = _assembly_spring_instances(adapter, _SUMMING_CONTACT_FAMILIES)
-        counter, boss, gooseneck = (
-            _ordered_unique_stations(family, found[family], 1)[0]
-            for family in _SUMMING_CONTACT_FAMILIES
+        counter = _ordered_family("counter-spring", found["counter-spring"], 1)
+        boss = _match_station_family(
+            counter,
+            "boss-hook",
+            _ordered_family("boss-hook", found["boss-hook"], 1),
         )
-        station_values = (
-            counter.station_z_mm,
-            boss.station_z_mm,
-            gooseneck.station_z_mm,
+        gooseneck = _match_station_family(
+            counter,
+            "gooseneck",
+            _ordered_family("gooseneck", found["gooseneck"], 1),
         )
-        if max(station_values) - min(station_values) > _STATION_MATCH_TOLERANCE_MM:
-            raise RuntimeError(
-                "summing counter/boss/gooseneck Z mismatch: "
-                f"{counter.name}={counter.station_z_mm:.9g}, "
-                f"{boss.name}={boss.station_z_mm:.9g}, "
-                f"{gooseneck.name}={gooseneck.station_z_mm:.9g} mm"
-            )
+        counter_instance = counter[0]
+        boss_instance = boss[0]
+        gooseneck_instance = gooseneck[0]
         lower = assert_native_contact(
             adapter,
-            counter.name,
-            boss.name,
+            counter_instance.name,
+            boss_instance.name,
             maximum_distance_mm=seat.lower_maximum_distance_mm,
             label="counter lower native seat",
         )
         upper = assert_native_contact(
             adapter,
-            gooseneck.name,
-            counter.name,
+            gooseneck_instance.name,
+            counter_instance.name,
             maximum_distance_mm=seat.upper_maximum_distance_mm,
             label="counter upper native seat",
         )
