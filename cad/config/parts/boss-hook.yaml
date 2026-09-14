@@ -6,10 +6,9 @@ boss-hook:
   supplier_skus: [9490T1]
   material: Plain Carbon Steel
   material_specification: Zinc-plated steel, McMaster-Carr 9490T1
-  finish: zinc plating as supplied
+  finish: SUPPLIED ZINC PLATING; OIL BARE CUT END
   installation_notes: |-
     INSTALLATION - COUNTER LOWER ANCHOR
-    TRIM SHANK TO 19.05; RESTORE 45 DEG END DEBURR.
     THREAD DIRECTLY INTO SUMMING LEVER MHA-073
     TAPPED BOSS; NO NUT. CLOCK EYE TO PULL PLANE.
     USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.

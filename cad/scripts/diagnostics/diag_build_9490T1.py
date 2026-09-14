@@ -90,6 +90,11 @@ from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,
+    SketchDims,
+    anchor_point_to_origin,
+    dimension_between,
+    drive_dimension,
+    force_rebuild,
     add_line_chain,
     check,
     define_circle,
@@ -364,7 +369,7 @@ async def _trim_factory_shank(adapter, cut: ShankTrim) -> None:
     y = cut.shank_end_y_mm
     with no_sketch_inference(adapter):
         check("create trim sketch", await adapter.create_sketch("Front"))
-        await add_line_chain(
+        lines = await add_line_chain(
             adapter,
             [
                 [-2 * radius, A.shank_end_y_mm - A.thread_major_dia_mm],
@@ -373,8 +378,54 @@ async def _trim_factory_shank(adapter, cut: ShankTrim) -> None:
                 [-2 * radius, y],
             ],
         )
+        dims = SketchDims()
+        for line, direction in zip(
+            lines, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+        ):
+            check(
+                "trim profile relation",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+        await anchor_point_to_origin(
+            adapter,
+            f"{lines[0]}.start",
+            -2 * radius,
+            A.shank_end_y_mm - A.thread_major_dia_mm,
+            "trim cutter margin",
+        )
+        dims.record("CutterLeft")
+        dims.record("CutterBottom")
+        await dimension_between(
+            adapter,
+            f"{lines[0]}.start",
+            f"{lines[0]}.end",
+            "horizontal_distance",
+            4 * radius,
+            "trim cutter width",
+        )
+        dims.record("CutterWidth")
+        # This point is the exterior eye-top datum in the supplier frame, not
+        # another cut control. It adds no profile or solid geometry.
+        eye_top = _sketch_manager(adapter).CreatePoint(0, A.eye_od_mm / 2000, 0)
+        if eye_top is None:
+            raise RuntimeError("cannot create stock eye-top datum point")
+        datum = adapter._register_sketch_entity("Point", eye_top)
+        await anchor_point_to_origin(
+            adapter, datum, 0, A.eye_od_mm / 2, "stock eye top"
+        )
+        dims.record("StockEyeTop")
+        await dimension_between(
+            adapter,
+            datum,
+            f"{lines[2]}.start",
+            "vertical_distance",
+            A.eye_od_mm / 2 - y,
+            "finished overall",
+        )
+        dims.record("FinishedOverall")
         check("close trim sketch", await adapter.exit_sketch())
         name_last_feature(adapter, "StockTrimProfile")
+        dims.apply(adapter, "StockTrimProfile")
         check(
             "trim stock shank",
             await adapter.create_cut_extrude(
@@ -385,7 +436,7 @@ async def _trim_factory_shank(adapter, cut: ShankTrim) -> None:
         )
         name_last_feature(adapter, "StockTrim")
         check("create deburr sketch", await adapter.create_sketch("Front"))
-        await add_line_chain(
+        lines = await add_line_chain(
             adapter,
             [
                 [radius - chamfer, y],
@@ -394,18 +445,101 @@ async def _trim_factory_shank(adapter, cut: ShankTrim) -> None:
                 [radius, y + chamfer],
             ],
         )
+        dims = SketchDims()
+        for line, direction in zip(
+            lines[:3], ("horizontal", "vertical", "horizontal"), strict=True
+        ):
+            check(
+                "deburr profile relation",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+        await anchor_point_to_origin(
+            adapter,
+            f"{lines[1]}.start",
+            radius + chamfer,
+            y,
+            "deburr cutter outer corner",
+        )
+        dims.record("CutterRadius")
+        dims.record("CutEnd")
+        await dimension_between(
+            adapter,
+            f"{lines[3]}.start",
+            "origin",
+            "horizontal_distance",
+            radius,
+            "stock major radius",
+        )
+        dims.record("StockMajorRadius")
+        await dimension_between(
+            adapter,
+            f"{lines[3]}.start",
+            f"{lines[3]}.end",
+            "horizontal_distance",
+            chamfer,
+            "end chamfer width",
+        )
+        dims.record("ChamferWidth")
+        # Select both actual segments. Smart Dimension on one segment plus its
+        # vertex did not yield a driving angular control in this profile.
+        from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+        model = adapter.currentModel
+        model.ClearSelection2(True)
+        _select_sketch_entities(adapter, [lines[0], lines[3]], 0)
+        display, status = _early_bound(
+            model.Extension, "IModelDocExtension"
+        ).AddSpecificDimension(
+            (radius + 2 * chamfer) / 1000, (y + chamfer / 2) / 1000, 0, 3, 0
+        )
+        model.ClearSelection2(True)
+        if display is None:
+            raise RuntimeError(f"cannot create native chamfer angle: {status}")
+        display = _early_bound(display, "IDisplayDimension")
+        angle = _early_bound(display.GetDimension2(0), "IDimension")
+        expected_angle = math.pi / 4
+        actual_angle = abs(float(angle.SystemValue))
+        if abs(actual_angle - expected_angle) > 1e-8:
+            if (
+                abs(math.pi - actual_angle - expected_angle) > 1e-8
+                or not display.SupplementaryAngle()
+            ):
+                raise RuntimeError(
+                    f"chamfer angle measured {math.degrees(actual_angle)} degrees"
+                )
+        angle.DrivenState = 2  # swDimensionDriving
+        if (
+            int(angle.DrivenState) != 2
+            or abs(abs(float(angle.SystemValue)) - expected_angle) > 1e-8
+        ):
+            raise RuntimeError(
+                "native chamfer angle is not a driving 45-degree control"
+            )
+        dims.record("ChamferAngle")
         axis = _sketch_manager(adapter).CreateCenterLine(
             0, (y - chamfer) / 1000, 0, 0, (y + 2 * chamfer) / 1000, 0
         )
         if axis is None:
             raise RuntimeError("stock deburr axis failed")
+        axis_id = adapter._register_sketch_entity("Line", axis)
+        check(
+            "fix supplier shank axis",
+            await adapter.add_sketch_constraint(axis_id, None, "fix"),
+        )
         check("close deburr sketch", await adapter.exit_sketch())
         name_last_feature(adapter, "StockDeburrProfile")
+        dims.apply(adapter, "StockDeburrProfile")
         check(
             "deburr trimmed stock",
             await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
         )
         name_last_feature(adapter, "StockDeburr")
+        await drive_dimension(
+            adapter,
+            "CutEnd@StockDeburrProfile",
+            '"FinishedOverall@StockTrimProfile" - "StockEyeTop@StockTrimProfile"',
+        )
+    await force_rebuild(adapter)
     solid_bodies = bodies(adapter)
     if len(solid_bodies) != 1:
         raise RuntimeError("stock trim must leave one solid anchor")

@@ -1,13 +1,9 @@
-"""Cross-sheet offline contracts for the pen/summing drawings.
-
-`boss-hook` left this table when the counter-spring anchor became a purchased
-McMaster eyebolt: its sheet is the shared purchased-part reference drawing,
-which has no notes surface to check.
-"""
+"""Cross-sheet offline contracts for the pen/summing drawings."""
 
 from __future__ import annotations
 
 import _config
+import boss_hook_spec
 import gooseneck_spec
 import measuring_stick_spec
 import output_fixture_spec
@@ -17,6 +13,7 @@ import pen_wire_spec
 
 
 SHEETS = (
+    ("boss-hook", boss_hook_spec),
     ("gooseneck", gooseneck_spec),
     ("measuring-stick", measuring_stick_spec),
     ("output-fixture", output_fixture_spec),

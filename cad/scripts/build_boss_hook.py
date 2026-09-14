@@ -22,25 +22,87 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+from functools import wraps
+import math
 import sys
 
-from _common import run_build
+from _common import _read_member, run_build
 from _fastener_catalog import fastener
+from _drawing_common import set_dimension_precision
 from _stock_fastener import StockComponent, build_stock_fastener
+from _drawing_marks import (
+    _named_dimension,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
+    set_dimension_symmetric_angular_tolerance,
+)
+from boss_hook_spec import (
+    SHANK_LENGTH_MM,
+    FINISHED_OVERALL_MM,
+    FINISHED_OVERALL_TOLERANCE_MM,
+    CHAMFER_WIDTH_MM,
+    CHAMFER_WIDTH_TOLERANCE_MM,
+    CHAMFER_ANGLE_DEG,
+    CHAMFER_ANGLE_TOLERANCE_DEG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    ISOMETRIC_VIEW_NOTE,
+)
 from diagnostics.diag_build_9490T1 import build_9490T1
 from stock_anchor_geom import ANCHOR_9490T1
-from summing_lever_spec import ANCHOR_H
 
 PART_NAME = "boss-hook"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 ANCHOR = ANCHOR_9490T1
 
-# Finished shank length = the tapped boss it threads into, so the thread engages
-# the full boss and ends flush with its underside. ONE source: the lever's spec.
-# It is a CUT length on a purchased part, so it is quoted the way the shop cuts
-# it -- to 0.001 -- rather than as the raw 0.75 in binary float (19.05).
-SHANK_LENGTH_MM = round(ANCHOR_H, 3)
+
+def _manufacturing_controls(adapter) -> None:
+    """Tolerance and mark actual cutting dimensions before the stock helper saves."""
+    clear_dimensions_for_drawing(adapter)
+    for feature, name, nominal in (
+        ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_MM / 1000),
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_MM / 1000),
+        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_DEG)),
+    ):
+        display, dimension = _named_dimension(adapter, feature, name)
+        if int(dimension.DrivenState) != 2:
+            raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
+        if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
+            raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
+        set_dimension_precision(
+            adapter,
+            [_read_member(display, "GetAnnotation")],
+            {name: 0 if name == "ChamferAngle" else 2},
+        )
+    set_dimension_symmetric_tolerance(
+        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
+    )
+    for feature, names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+
+
+@wraps(build_9490T1)
+async def _modified_anchor(adapter, truth=None, **parameters):
+    receipt = await build_9490T1(adapter, truth, **parameters)
+    _manufacturing_controls(adapter)
+    return receipt
 
 
 async def build(adapter) -> dict[str, str]:
@@ -50,7 +112,7 @@ async def build(adapter) -> dict[str, str]:
         components=(
             StockComponent(
                 ANCHOR.sku,
-                build_9490T1,
+                _modified_anchor,
                 parameters={"shank_length_mm": SHANK_LENGTH_MM},
             ),
         ),
