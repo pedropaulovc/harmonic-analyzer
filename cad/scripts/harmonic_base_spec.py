@@ -10,9 +10,12 @@ silently drift.
 
 from __future__ import annotations
 
+from _gtol_spec import PlanarFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+
 MM_PER_IN = 25.4
 
-# --- Two-plate welded base (book ch. 6), centred on the part origin. ---
+# --- Two-level base envelope, centred on the part origin. ---
 BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
 FORMER_BOTTOM_WIDTH = 11.0 * MM_PER_IN  # 279.4 (28 cm callout)
 BOTTOM_FRONT_Z = -FORMER_BOTTOM_WIDTH / 2.0
@@ -35,26 +38,31 @@ RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
 
-# --- Marked-dimension contract. The plan carries both plate envelopes, the
-# finished corner radii/edge break, and one representative socket's centre
-# coordinates/4X diameter. Front elevation carries plate thicknesses; section
-# A-A carries socket/spotface depths and the pad-root fillet. The cross tap is a
-# native Hole Wizard callout from that same section. ---
+# The deck is black in the source photographs. Machining and black coating of
+# the full underside is the user's reconstruction choice, not photo evidence.
+# These whole faces are cut before painting; there are no locally masked feet.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT),
+        production_method="BEFORE PAINT",
+    ),
+    SurfaceFinishControl(
+        "underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0),
+        production_method="BEFORE PAINT",
+    ),
+)
+
+# Mark only dimensions imported by the drawing. Hole-table dimensions and the
+# exact-edge rim, root, height and underside-chamfer controls remain native.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
     "TopProfile": {"TopLen", "TopWid"},
     "BottomPlate": {"BottomThickness"},
-    "TopPlate": {"TopThickness"},
     "PadCorners": {"PadCornerRadius"},
     "FlangeCorners": {"FlangeCornerRadius"},
     "RimInnerCorners": {"RimInnerCornerRadius"},
     "TopRimBreaks": {"TopRimChamfer"},
-    "BottomEdgeBreak": {"BottomEdgeChamfer"},
-    "PadRootFillet": {"PadRootRadius"},
-    "ColumnSocketProfile": {"Socket0X", "Socket0Z", "SocketDia"},
-    "ColumnSockets": {"SocketDepth"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia"},
-    "BaseSpotFaceRear": {"SpotFaceDepth"},
 }
 
 # Keep this block to short, part-specific facts that are not already legible

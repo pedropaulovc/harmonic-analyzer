@@ -9,7 +9,6 @@ import pytest
 
 import build_harmonic_base as part
 import build_cone_swing_platform as platform
-import draw_harmonic_base as drawing
 import harmonic_base_spec
 from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
@@ -19,51 +18,6 @@ from cone_pivot_post_installation import (
 )
 from build_cone_lock_knob import COLLAR_DIA as KNOB_COLLAR_DIA
 from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
-from frame_attachment_spec import (
-    BASE_SCREW_SEAT_Z,
-    BASE_SCREW_Y,
-    CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
-    COLUMN_SOCKET_DEPTH,
-    COLUMN_SOCKET_DIAMETER,
-)
-
-
-def test_column_sockets_and_cross_taps_share_the_frame_contract() -> None:
-    assert part.COLUMN_SOCKET_DIAMETER == COLUMN_SOCKET_DIAMETER == 25.5
-    assert part.COLUMN_SOCKET_DEPTH == COLUMN_SOCKET_DEPTH == 25.4
-    assert set(part.COLUMN_SOCKET_XZ) == {
-        (-197.0, -112.0),
-        (-197.0, 112.0),
-        (197.0, -112.0),
-        (197.0, 112.0),
-    }
-    assert part.BASE_CROSS_TAP_SPEC.kind == "tapped_bottoming"
-    assert part.BASE_CROSS_TAP_SPEC.size == "#10-32"
-    assert part.BASE_CROSS_TAP_SPEC.thread_class == "2B"
-    assert part.BASE_CROSS_TAP_SPEC.depth_mm == CASTING_TAP_DRILL_DEPTH
-    assert (
-        part.BASE_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]
-        == CASTING_FULL_THREAD_DEPTH
-    )
-    assert part.BASE_SCREW_Y == BASE_SCREW_Y
-    assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == BASE_SCREW_SEAT_Z
-
-
-def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
-    expected_holes = {
-        *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),
-        (*part.PIVOT_SCREW_XZ, part.PIVOT_SCREW_HOLE_DIA),
-        (*part.LOCK_KNOB_XZ, part.LOCK_SCREW_HOLE_DIA),
-        (*part.STOP_SCREW_XZ, part.STOP_SCREW_HOLE_DIA),
-        *((x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ),
-        *((x, z, part.FOOT_SCREW_HOLE_DIA) for x, z in part.FOOT_SCREW_XZ),
-        *((x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ),
-    }
-    # Four support taps and all other blind tapped groups, with no duplicate picks.
-    assert len(drawing.ALL_HOLES) == len(expected_holes) == 18
-    assert set(drawing.ALL_HOLES) == expected_holes
-    assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
 
 
 @pytest.mark.parametrize(

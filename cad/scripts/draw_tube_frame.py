@@ -73,7 +73,7 @@ ISO_VIEW_SCALE = (1, 10)
 # fitting notes and the pictorial view fill the upper-right field.
 LENGTH_CENTER = (0.110, 0.220)
 END_CENTER = (LENGTH_CENTER[0], 0.360)
-ISO_CENTER = (0.220, 0.250)
+ISO_CENTER = (0.220, 0.280)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
@@ -270,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "TopChamfer": 2,
         },
     )
-    for name in ("LowerHoleY", "UpperHoleY", "TopChamfer"):
+    for name in ("Length", "LowerHoleY", "UpperHoleY", "TopChamfer"):
         references = [
             annotation
             for annotation in dimensions
@@ -318,10 +318,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # cross-drilled stations through visible hidden geometry.
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.145, 0.398, char_height=0.0022
+        adapter, "Manufacturing Notes", 0.145, 0.198, char_height=0.0022
     )
     add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
-    add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.185)
+    add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
     for view in (length, end):
         set_hidden_lines_visible(adapter, view)
