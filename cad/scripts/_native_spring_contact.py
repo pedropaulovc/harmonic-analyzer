@@ -11,7 +11,6 @@ from _common import _early_bound, _read_member
 from solidworks_mcp.adapters.com_variant import dispatch_array
 
 
-
 @dataclass(frozen=True, slots=True)
 class NativeInterferenceEvidence:
     state: Literal["interfering", "clear"]
@@ -24,8 +23,6 @@ class _NativeBooleanFailure(RuntimeError):
     def __init__(self, label: str, status: int) -> None:
         self.status = status
         super().__init__(f"{label}: native body intersection failed (status={status})")
-
-
 
 
 def _component_solids(assembly: Any, name: str, label: str) -> tuple[list[Any], Any]:
@@ -243,10 +240,7 @@ def assert_native_contact(
         or first_component == second_component
     ):
         raise ValueError("native contact requires two distinct component names")
-    if (
-        not math.isfinite(maximum_distance_mm)
-        or maximum_distance_mm < 0.0
-    ):
+    if not math.isfinite(maximum_distance_mm) or maximum_distance_mm < 0.0:
         raise ValueError(
             "native contact maximum distance must be finite and nonnegative"
         )
@@ -321,5 +315,3 @@ def assert_native_contact(
             )
         span.set_attribute("certificate", "zero_overlap_bounded_distance")
         return distance_mm
-
-

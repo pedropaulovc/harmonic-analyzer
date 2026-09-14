@@ -188,7 +188,9 @@ def test_positive_native_predicate_rejects_unconstructible_intersection(scene) -
     assert evidence.boolean_failure_status == 1058
 
 
-def test_negative_native_predicate_cannot_certify_boolean_failure_as_clear(scene) -> None:
+def test_negative_native_predicate_cannot_certify_boolean_failure_as_clear(
+    scene,
+) -> None:
     scene.mode = "boolean-fail"
 
     with pytest.raises(RuntimeError, match=r"\b1058\b"):
