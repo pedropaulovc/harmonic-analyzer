@@ -827,12 +827,12 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     assert not stores
 
 
-def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
+def test_cached_drawing_miss_builds_audits_then_stores(tmp_path, monkeypatch):
     dodo = _load_dodo()
     output = tmp_path / "platen-guide.SLDDRW"
     outcomes = iter((False, False))
     restores = []
-    builds = []
+    actions = []
     stores = []
 
     monkeypatch.setattr(
@@ -850,11 +850,19 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
 
-    def build(*_args, **_kwargs):
-        builds.append(True)
-        output.write_bytes(b"drawing")
+    def execute(cmd, *_args, **_kwargs):
+        action = (
+            "audit"
+            if Path(cmd[1]).name == "audit_drawing_layout.py"
+            else "build"
+        )
+        actions.append(action)
+        if action == "build":
+            output.write_bytes(b"drawing")
+            return
+        assert output.is_file()
 
-    monkeypatch.setattr(dodo, "_exec_com", build)
+    monkeypatch.setattr(dodo, "_exec_com", execute)
     monkeypatch.setattr(
         dodo._cache,
         "store",
@@ -864,7 +872,7 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     dodo._cached_drawing_action("platen_guide")
 
     assert len(restores) == 2
-    assert builds == [True]
+    assert actions == ["build", "audit"]
     assert len(stores) == 1
     assert stores[0][1] == [output]
 

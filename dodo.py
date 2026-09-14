@@ -1442,6 +1442,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
     from hitting against a same-recipe part with different IDs.
     """
     spec = DRAWINGS_BY_NAME[stem]
+    audit_script = (SCRIPTS_DIR / "audit_drawing_layout.py").resolve()
     script = spec.script.resolve()
     # Traverse first: helpers imported BY the registry must remain dependencies.
     runtime = _helper_deps(script)
@@ -1468,6 +1469,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
     return sorted(
         {
             str(script),
+            str(audit_script),
             str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
@@ -1485,12 +1487,18 @@ def _cached_drawing_action(stem: str) -> None:
     """Restore a matched part+drawing pair or build and publish the drawing.
 
     Mirrors the part/assembly cache contract exactly: HIT always skips COM work;
-    MISS takes the seat, re-probes after any wait, builds once, then stores outside
-    the seat. The spans and console therefore state one unambiguous disposition.
+    MISS takes the seat, re-probes after any wait, builds and audits once, then
+    stores outside the seat. The spans and console state one disposition.
     """
     spec = DRAWINGS_BY_NAME[stem]
     label = f"drawing:{stem}"
     cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
+    audit_cmd = [
+        sys.executable,
+        str((SCRIPTS_DIR / "audit_drawing_layout.py").resolve()),
+        str(spec.outputs["slddrw"].resolve()),
+        spec.layout.value,
+    ]
     outputs = _drawing_cache_outputs(stem)
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
@@ -1519,6 +1527,11 @@ def _cached_drawing_action(stem: str) -> None:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
             _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+            _exec_com(
+                audit_cmd,
+                f"drawing layout audit:{stem}",
+                log_stem=f"drawing-audit-{stem}",
+            )
 
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
