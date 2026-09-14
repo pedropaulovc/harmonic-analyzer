@@ -4,7 +4,7 @@ Uses one multi-point placement sketch per feature so every instance shares one
 native size/thread identity while retaining deterministic, individually driven
 stations:
 1. ``CreateDefinition(swFmHoleWzd)`` -> ``InitializeHole(type, standard,
-   fastener, size, end)`` -> property overrides -> select the placement face
+   fastener, size, end)`` -> select the placement face
    as an OBJECT (coordinate SelectByID2 mis-resolves on bodies whose end faces
    touch the same plane) -> ``CreateFeature``.
 2. Multi-point: the wizard lands with ONE auto placement point; its placement
@@ -12,8 +12,11 @@ stations:
    and the remaining stations are added (model->sketch via the sketch's
    ``ModelToSketchTransform``; MathUtility takes an explicit VARIANT array).
    Net: ONE ``HoleWzd`` feature, N hole instances.
+3. Apply feature overrides and nonblind tap class/termination to the created
+   definition with ``AccessSelections`` / ``ModifyDefinition``; verify the
+   committed thread metadata. Pre-create thread settings do not persist.
 
-Thread policy: everything is **ANSI inch (UNC)** -- see
+Thread policy: everything is **ANSI inch (UNC/UNF)** -- see
 ``memory/fastener-policy-us-customary.md``. The wizard table supplies the cut
 diameters (tap drill for taps, fit diameter for clearances), so scripts get
 the ACTUAL dimensions back (:class:`WizardHoleResult`) for analytic volume
@@ -542,12 +545,10 @@ def wizard_holes(
     defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
     if hole_type == 4 and spec.end != "blind":
-        # InitializeHole/CreateFeature discard pre-create thread properties:
-        # the drill cuts through, but its native callout reports blind depth 0.
-        # The populated definition accepts the thread end via ModifyDefinition.
-        # swWzdHoleThreadEndCondition_e uses the same 0/1/2 values as _ENDS.
-        edits.append(("ThreadEndCondition", end))
-        edits.append(("ThreadClass", spec.thread_class))
+        # InitializeHole/CreateFeature discard pre-create thread metadata.
+        # Apply it to the populated feature: otherwise a through-wall tap can
+        # print a zero blind thread depth and omit its ANSI thread class.
+        edits.extend((("ThreadClass", spec.thread_class), ("ThreadEndCondition", end)))
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
         # applies it to counterbore/countersink features only (per the
@@ -595,42 +596,43 @@ def wizard_holes(
         # null-VARIANT idiom applies only to LATE-bound calls).
         if not defn.AccessSelections(model, None):
             raise RuntimeError(f"hole wizard {label}: AccessSelections failed")
-        for prop, val in edits:
+        try:
+            for prop, val in edits:
+                try:
+                    setattr(defn, prop, val)
+                except Exception as exc:  # noqa: BLE001
+                    if prop in ("ThreadClass", "ThreadEndCondition"):
+                        raise RuntimeError(
+                            f"hole wizard {label}: {prop} rejected"
+                        ) from exc
+                    # Dimensional properties alias per hole Type. The caller's
+                    # analytic volume gate verifies the surviving overrides.
+                    _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
+            # ModifyDefinition needs the definition's underlying IDispatch.
+            if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+                raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
+        except BaseException:
             try:
-                setattr(defn, prop, val)
-            except Exception as exc:  # noqa: BLE001
-                if prop in ("ThreadEndCondition", "ThreadClass"):
-                    try:
-                        defn.ReleaseSelectionAccess()
-                    except Exception as cleanup_exc:  # noqa: BLE001
-                        _telemetry.warn(
-                            f"hole wizard {label}: selection cleanup after "
-                            f"{prop} rejection failed: {cleanup_exc}"
-                        )
-                    raise RuntimeError(f"hole wizard {label}: {prop} rejected") from exc
-                # Properties alias per hole Type; the inapplicable ones reject
-                # or no-op. The caller's analytic volume check is the hard
-                # gate that the surviving writes produced the right geometry.
-                _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
-        # ModifyDefinition wants the definition as its underlying dispatch --
-        # hand it defn._oleobj_ (the raw IDispatch) rather than the wrapper.
-        if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
-            raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
+                defn.ReleaseSelectionAccess()
+            except Exception as cleanup_exc:  # noqa: BLE001
+                _telemetry.warn(
+                    f"hole wizard {label}: selection cleanup failed: {cleanup_exc}"
+                )
+            raise
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if hole_type == 4:
-        actual_thread_end = int(defn.ThreadEndCondition)
-        if actual_thread_end != end:
-            raise RuntimeError(
-                f"hole wizard {label}: thread end condition "
-                f"{actual_thread_end} != requested {end}"
-            )
-        actual_thread_class = str(defn.ThreadClass)
-        if actual_thread_class != spec.thread_class:
-            raise RuntimeError(
-                f"hole wizard {label}: thread class "
-                f"{actual_thread_class!r} != requested {spec.thread_class!r}"
-            )
+        # Check the committed definition for both legacy blind and through taps.
+        for prop, expected in (
+            ("ThreadClass", spec.thread_class),
+            ("ThreadEndCondition", end),
+            ("EndCondition", end),
+        ):
+            actual = getattr(defn, prop)
+            if actual != expected:
+                raise RuntimeError(
+                    f"hole wizard {label}: {prop} {actual!r} != requested {expected!r}"
+                )
 
     def _dim(prop: str) -> float:
         try:
