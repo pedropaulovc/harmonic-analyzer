@@ -82,8 +82,6 @@ from harmonic_base_spec import (
     LIP_H,
     LIP_W,
     DRAWING_NOTES,
-    SECTION_VIEW_NOTE,
-    SIDE_VIEW_NOTE,
     STACK_HEIGHT,
     TOP_LENGTH,
     TOP_THICKNESS,
@@ -143,7 +141,6 @@ import _telemetry
 
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 # Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
 # COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
@@ -1282,6 +1279,7 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    ref_planes.append(str(getattr(serial_plane, "name", serial_plane)))
     pre_serial = float((await adapter.get_mass_properties()).data.volume)
     check(
         "import serial DXF",
@@ -1349,9 +1347,6 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Side View Note": SIDE_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Section View Note": SECTION_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

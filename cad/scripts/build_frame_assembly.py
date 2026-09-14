@@ -90,9 +90,14 @@ from __future__ import annotations
 
 import math
 import sys
+from pathlib import Path
+from typing import Any
+
+import _telemetry
 
 from _common import (
     OUT_SLDPRT,
+    _early_bound,
     apply_custom_properties,
     apply_summary_info,
     check,
@@ -112,6 +117,7 @@ from _assembly import (
 from _assembly_patterns import (
     assert_pattern_targets,
     grid_component_pattern,
+    ensure_global_pattern_axis,
     PatternDirection,
 )
 from _transforms import (
@@ -192,6 +198,7 @@ from tube_frame_cap_spec import (
 from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA as COLUMN_OUTER_DIA
 
 ASM_NAME = "frame"
+FRAME_EXPLODED = "FRAME_EXPLODED"
 
 BASE_TOP_Y = STACK_HEIGHT
 COLUMN_X = 197.0
@@ -356,6 +363,221 @@ def _part(name: str) -> str:
             f"missing part {path}; run build_{name.replace('-', '_')}.py first"
         )
     return str(path)
+
+
+def _explode_transform(component: Any) -> tuple[float, ...]:
+    transform = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{component.Name2}: missing total presentation transform")
+    values = tuple(float(value) for value in transform.ArrayData)
+    if len(values) != 16 or not all(math.isfinite(value) for value in values):
+        raise RuntimeError(f"{component.Name2}: invalid presentation transform {values!r}")
+    return values
+
+
+@_telemetry.traced("assembly.frame_explode")
+def _create_frame_explode(adapter: Any) -> None:
+    """Author twelve global translations; leave the operational model collapsed."""
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    assembly = _early_bound(model, "IAssemblyDoc")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if str(configuration.Name) != "Default":
+        raise RuntimeError("FRAME_EXPLODED requires the builder's Default configuration")
+    if int(assembly.GetExplodedViewCount2("Default")):
+        raise RuntimeError("new frame assembly unexpectedly contains exploded views")
+
+    quantities = {
+        "harmonic-base": 1, "tube-frame": 4, "tube-frame-cap": 4,
+        "top-frame": 1, "rocker-arm-support": 1, "lag-screw": 4,
+        "nameplate": 1, "fillister-screw": 4, "frame-cross-screw": 8,
+        "gooseneck-set-screw": 1,
+    }
+    components = tuple(
+        _early_bound(component, "IComponent2")
+        for component in (assembly.GetComponents(True) or ())
+    )
+    groups: dict[str, list[Any]] = {stem: [] for stem in quantities}
+    for component in components:
+        stem = Path(str(component.GetPathName() or "")).stem.casefold()
+        if stem not in groups:
+            raise RuntimeError(f"FRAME_EXPLODED: unexpected component {component.Name2}: {stem}")
+        groups[stem].append(component)
+    actual_counts = {stem: len(group) for stem, group in groups.items()}
+    if actual_counts != quantities:
+        raise RuntimeError(f"FRAME_EXPLODED component counts: {actual_counts!r} != {quantities!r}")
+    for group in groups.values():
+        group.sort(key=lambda component: str(component.Name2))
+    baseline = {str(component.Name2): _explode_transform(component) for component in components}
+    if len(baseline) != sum(quantities.values()):
+        raise RuntimeError("FRAME_EXPLODED: duplicate component identities")
+    expected = {name: [0.0, 0.0, 0.0] for name in baseline}
+    front, rear, upper, lower = [], [], [], []
+    for component in groups["frame-cross-screw"]:
+        _, y, z = baseline[str(component.Name2)][9:12]
+        if abs(y * 1000.0 - TOP_SCREW_Y) <= 1e-3:
+            upper.append(component)
+        elif abs(y * 1000.0 - BASE_SCREW_Y) <= 1e-3:
+            lower.append(component)
+        else:
+            raise RuntimeError(f"{component.Name2}: unexpected cross-screw Y {y * 1000.0:g} mm")
+        if z == 0.0:
+            raise RuntimeError(f"{component.Name2}: cross screw on assembly mid-plane")
+        (front if z < 0.0 else rear).append(component)
+    if tuple(map(len, (front, rear, upper, lower))) != (4, 4, 4, 4):
+        raise RuntimeError("FRAME_EXPLODED: cross-screw station split is not 4/4/4/4")
+    plans = (
+        ("tube caps lift", groups["tube-frame-cap"], "y", 0.250),
+        ("top frame clears columns", [*groups["top-frame"], *upper, *groups["gooseneck-set-screw"]], "y", 0.150),
+        ("front cross screws withdraw", front, "z", -0.050),
+        ("rear cross screws withdraw", rear, "z", 0.050),
+        ("gooseneck screw withdraws", groups["gooseneck-set-screw"], "x", -0.050),
+        ("columns clear base seats", groups["tube-frame"], "y", 0.060),
+        ("support lifts from deck", [*groups["rocker-arm-support"], *groups["lag-screw"]], "y", 0.035),
+        ("support moves beside base", [*groups["rocker-arm-support"], *groups["lag-screw"]], "x", -0.320),
+        ("support screws withdraw", groups["lag-screw"], "y", 0.050),
+        ("nameplate lifts from deck", [*groups["nameplate"], *groups["fillister-screw"]], "y", 0.025),
+        ("nameplate moves beside base", [*groups["nameplate"], *groups["fillister-screw"]], "x", 0.080),
+        ("nameplate screws withdraw", groups["fillister-screw"], "y", 0.035),
+    )
+    # Reuse the native assembly axes already used by component patterns. Unlike
+    # manipulator indices, Mark=2 direction entities are independent of each
+    # selected component's local frame. Verify their geometry and signed sense.
+    axes = {}
+    for index, key in enumerate("xyz"):
+        axis_name = ensure_global_pattern_axis(adapter, key)
+        feature = _early_bound(assembly.FeatureByName(axis_name), "IFeature")
+        if feature is None or str(feature.GetTypeName2()) != "RefAxis":
+            raise RuntimeError(f"FRAME_EXPLODED: missing reference axis {axis_name}")
+        axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
+        points = tuple(float(value) for value in axis.GetRefAxisParams())
+        if len(points) != 6 or not all(math.isfinite(value) for value in points):
+            raise RuntimeError(f"{axis_name}: invalid axis endpoints {points!r}")
+        vector = tuple(points[i + 3] - points[i] for i in range(3))
+        length = math.sqrt(sum(value * value for value in vector))
+        if length <= 1e-12 or any(
+            abs(vector[i] / length) > 1e-9 for i in range(3) if i != index
+        ):
+            raise RuntimeError(f"{axis_name}: not aligned with world {key.upper()}: {vector!r}")
+        axes[key] = (axis_name, vector[index] > 0.0)
+
+    if not assembly.CreateExplodedView():
+        raise RuntimeError("FRAME_EXPLODED: CreateExplodedView failed")
+    names = tuple(assembly.GetExplodedViewNames2("Default") or ())
+    if len(names) != 1:
+        raise RuntimeError(f"FRAME_EXPLODED: unexpected created views {names!r}")
+    # Exploded views are configuration-tree AsmExploder features, not ordinary
+    # assembly features discoverable through FeatureByName.
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        str(names[0]), "EXPLODEDVIEWS", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"FRAME_EXPLODED: cannot select created exploded view {names[0]!r}")
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    if int(selection.GetSelectedObjectType3(1, 0)) != 43:  # swSelEXPLVIEWS
+        raise RuntimeError("FRAME_EXPLODED: selection is not an exploded-view feature")
+    feature = _early_bound(selection.GetSelectedObject6(1, 0), "IFeature")
+    if feature is None or str(feature.GetTypeName2()) != "AsmExploder":
+        raise RuntimeError("FRAME_EXPLODED: selected object is not an AsmExploder")
+    feature.Name = FRAME_EXPLODED
+    model.ClearSelection2(True)
+    if not model.EditRebuild3() or tuple(assembly.GetExplodedViewNames2("Default") or ()) != (FRAME_EXPLODED,):
+        raise RuntimeError("FRAME_EXPLODED: exploded-view feature rename did not persist")
+    if not assembly.ShowExploded2(True, FRAME_EXPLODED):
+        raise RuntimeError("FRAME_EXPLODED: cannot activate authored view")
+    try:
+        for index in range(int(configuration.GetNumberOfExplodeSteps()) - 1, -1, -1):
+            seed = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
+            if seed is None or not configuration.DeleteExplodeStep(str(seed.Name)):
+                raise RuntimeError(f"FRAME_EXPLODED: cannot remove auto step {index}")
+        if int(configuration.GetNumberOfExplodeSteps()) != 0:
+            raise RuntimeError("FRAME_EXPLODED: auto steps remain")
+        for step_index, (label, moved, key, distance) in enumerate(plans, 1):
+            with _telemetry.span("assembly.frame_explode.step", label=label):
+                model.ClearSelection2(True)
+                selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                data = _early_bound(selection.CreateSelectData(), "ISelectData")
+                if data is None:
+                    raise RuntimeError(f"{label}: cannot create component selection data")
+                data.Mark = 1
+                for component in moved:
+                    if not component.Select4(True, data, False):
+                        raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                axis_name, positive = axes[key]
+                if not model.Extension.SelectByID2(
+                    axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
+                ):
+                    raise RuntimeError(f"{label}: cannot select global direction {axis_name} with mark 2")
+                # Explicit entity only; -1 omits the component-local manipulator.
+                # Early-bound wrapper returns (IExplodeStep, error); omit [out].
+                result = configuration.AddExplodeStep2(
+                    abs(distance), -1, (distance > 0.0) != positive,
+                    0.0, -1, False, True, False,
+                )
+                model.ClearSelection2(True)
+                if not isinstance(result, tuple) or len(result) != 2:
+                    raise RuntimeError(f"{label}: incomplete AddExplodeStep2 result {result!r}")
+                raw_step, error = result
+                if int(error) != 0 or raw_step is None:
+                    raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
+                step = _early_bound(raw_step, "IExplodeStep")
+                step.Name = f"FRAME {label.upper()}"
+                if str(step.Name) != f"FRAME {label.upper()}" or not model.EditRebuild3():
+                    raise RuntimeError(f"{label}: step name/rebuild failed")
+                if int(configuration.GetNumberOfExplodeSteps()) != step_index:
+                    raise RuntimeError(f"{label}: authored step count is not {step_index}")
+                actual = {
+                    str(_early_bound(component, "IComponent2").Name2)
+                    for component in (step.GetComponents() or ())
+                }
+                intended = {str(component.Name2) for component in moved}
+                if actual != intended or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9:
+                    raise RuntimeError(f"{label}: step component/distance readback mismatch: {actual!r}")
+                for name in intended:
+                    expected[name]["xyz".index(key)] += distance
+                # Read every instance, including unmoved ones: mixed local frames
+                # and native pattern followers must never silently change intent.
+                for component in components:
+                    name = str(component.Name2)
+                    current = _explode_transform(component)
+                    delta = tuple(current[i + 9] - baseline[name][i + 9] for i in range(3))
+                    _telemetry.event(
+                        "assembly.frame_explode.translation", step=label, component=name,
+                        expected_mm=[value * 1000.0 for value in expected[name]],
+                        actual_mm=[value * 1000.0 for value in delta],
+                    )
+                    if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                        raise RuntimeError(
+                            f"{label}: {name} world translation mm "
+                            f"{tuple(value * 1000.0 for value in delta)!r} != "
+                            f"{tuple(value * 1000.0 for value in expected[name])!r}; "
+                            f"direction={axis_name}, signed distance={distance * 1000.0:g} mm"
+                        )
+                    if any(abs(current[i] - baseline[name][i]) > 1e-9 for i in (*range(9), 12)):
+                        raise RuntimeError(f"{label}: {name} presentation rotated or scaled")
+    finally:
+        model.ClearSelection2(True)
+        if not assembly.ShowExploded2(False, FRAME_EXPLODED) or not model.EditRebuild3():
+            raise RuntimeError("FRAME_EXPLODED: failed to restore collapsed operational assembly")
+        for component in components:
+            name = str(component.Name2)
+            current = _explode_transform(component)
+            transform = _early_bound(component.Transform2, "IMathTransform")
+            operational = tuple(float(value) for value in transform.ArrayData)
+            if len(operational) != 16 or any(
+                abs(values[i] - baseline[name][i]) > 1e-9
+                for values in (current, operational) for i in range(16)
+            ):
+                raise RuntimeError(f"FRAME_EXPLODED: collapse changed operational transform of {name}")
+    if int(configuration.GetNumberOfExplodeSteps()) != len(plans):
+        raise RuntimeError("FRAME_EXPLODED: collapsed presentation lost authored steps")
+    if tuple(assembly.GetExplodedViewNames2("Default") or ()) != (FRAME_EXPLODED,):
+        raise RuntimeError("FRAME_EXPLODED: collapsed presentation lost named view")
+    if str(assembly.GetExplodedViewConfigurationName(FRAME_EXPLODED)) != "Default":
+        raise RuntimeError("FRAME_EXPLODED: named presentation is not owned by Default")
+    _telemetry.success("FRAME_EXPLODED: 12 native steps verified in world space; all 29 instances restored")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -666,6 +888,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "frame assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    _create_frame_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
