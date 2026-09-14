@@ -48,6 +48,7 @@ from _drawing_common import (
 )
 
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
@@ -87,7 +88,6 @@ from harmonic_base_spec import (
     STACK_HEIGHT,
     SURFACE_FINISHES,
     TOP_LENGTH,
-    TOP_REAR_Z,
 )
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
@@ -342,9 +342,7 @@ def _add_rim_width(adapter: Any, view: Any) -> Any:
     return display
 
 
-def _horizontal_base_edge(
-    view: Any, height_mm: float, *, z_mm: float | None = None,
-) -> Any:
+def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
     candidates = []
     for raw in visible_view_entities(view, 1, label="base height edges"):
         edge = _early_bound(raw, "IEdge")
@@ -356,7 +354,6 @@ def _horizontal_base_edge(
             and abs(y1 - y0) < 1e-7
             and abs(z1 - z0) < 1e-7
             and abs(x1 - x0) > 1e-6
-            and (z_mm is None or abs(z0 - z_mm / 1000.0) < 1e-7)
         ):
             candidates.append((abs(x1 - x0), edge))
     if not candidates:
@@ -767,18 +764,31 @@ async def build(adapter: Any) -> dict[str, str]:
         f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
         (0.125, 0.130),
     )
-    deck_edge_z = TOP_REAR_Z - LIP_W
+    deck_control = surface_finish_by_key(SURFACE_FINISHES, "deck")
+    deck_face = _resolve_faces(
+        _early_bound(top.ReferencedDocument, "IModelDoc2"),
+        {"deck": deck_control.face},
+    )["deck"]
+    deck_box = tuple(float(value) for value in deck_face.GetBox())
+    if len(deck_box) != 6:
+        raise RuntimeError("qualified deck face has no native bounding box")
+    deck_point = tuple(float(value) for value in (deck_face.GetClosestPointOn(
+        deck_box[0] + (deck_box[3] - deck_box[0]) / 4.0,
+        (deck_box[1] + deck_box[4]) / 2.0,
+        deck_box[2] + 3.0 * (deck_box[5] - deck_box[2]) / 4.0,
+    ) or ()))
+    if len(deck_point) != 5 or abs(deck_point[1] - STACK_HEIGHT / 1000.0) > 1e-7:
+        raise RuntimeError(f"native deck leader point is not on the deck plane: {deck_point!r}")
     add_surface_finish(
         adapter, top,
         symbol_xy=(0.040, 0.138),
-        control=surface_finish_by_key(SURFACE_FINISHES, "deck"),
+        control=deck_control,
         label="deck finish before paint",
         char_height=0.0025,
-        entity=_horizontal_base_edge(top, STACK_HEIGHT, z_mm=deck_edge_z),
+        entity_type="FACE",
+        entity=deck_face,
         leader_attach_xy=model_point_in_view(
-            adapter, top,
-            (-TOP_LENGTH / 4000.0, STACK_HEIGHT / 1000.0, deck_edge_z / 1000.0),
-            label="deck finish edge",
+            adapter, top, deck_point[:3], label="qualified deck face finish anchor",
         ),
     )
     add_surface_finish(
