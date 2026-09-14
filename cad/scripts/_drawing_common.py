@@ -22,8 +22,8 @@ import _config
 import _telemetry
 from _common import (
     _build_id,
+    _close_drawing_and_verify,
     _early_bound,
-    _visible_document_paths,
     apply_custom_properties,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
@@ -4708,9 +4708,10 @@ def collect_layout_elements(
 def check_drawing_layout(
     adapter: Any, *, layout: DrawingLayout, stem: str = ""
 ) -> None:
-    """Diagnose a colliding, border-crossing, or leader-crossed layout.
+    """Reject a colliding, border-crossing, or leader-crossed saved layout.
 
-    This is an explicit diagnostic, not part of the drawing build hot path.
+    Drawing cache misses run this check after reopening the saved sheet and
+    before publishing its artifacts.
 
     ``stem`` names the sheet in failures. Every sheet is held to ZERO on every
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
@@ -4935,15 +4936,7 @@ async def finalize_drawing(
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".
-    title = str(drawing_model.GetTitle())
-    adapter.swApp.CloseDoc(title)
-    still_open = [
-        p
-        for p in _visible_document_paths(adapter)
-        if Path(p).resolve() == outputs.slddrw.resolve()
-    ]
-    if still_open:
-        raise RuntimeError(f"drawing {title!r} did not close after export")
+    _close_drawing_and_verify(adapter, outputs.slddrw, drawing_model)
     return artifacts
 
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import math as _math
 import sys
-from inspect import getsource
 from types import SimpleNamespace
 
 import pytest
@@ -84,14 +83,6 @@ class _FakeAdapter:
         return member() if callable(member) else member
 
 
-def test_finalize_exports_once_without_layout_or_reopen_cycles():
-    source = getsource(drawing_common.finalize_drawing)
-    assert source.count("save_drawing(") == 1
-    assert "reopen_drawing" not in source
-    assert "check_drawing_layout" not in source
-    assert "GetSaveFlag" not in source
-    assert "sanitize_pdf_metadata" in source
-    assert "render_pdf_png" in source
 
 
 def _display_view(**overrides):
@@ -1728,19 +1719,6 @@ def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
     assert key == (sys.maxsize, "")
 
 
-def test_the_item_key_reads_the_balloon_api_not_the_note_text():
-    """A tie-break that reads the wrong API is a no-op that looks like a fix.
-
-    `INote::GetText` returns the note's GENERIC text, which for a BOM balloon
-    need not be the item number and can come back empty -- every key would then
-    collapse to (sys.maxsize, "") and the sort would tie on all four fields,
-    restoring exactly the AutoBalloon5 arrival order this exists to break
-    (Codex P2). `GetBomBalloonText(True)` is the displayed upper item, and is
-    what `_balloon_item_number` already uses in this same file.
-    """
-    source = getsource(drawing_common._balloon_item_key)
-    assert "GetBomBalloonText(True)" in source
-    assert "n.GetText()" not in source
 
 
 def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():

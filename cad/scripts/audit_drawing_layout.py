@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import check, run_build
-from _drawing_common import _visible_document_paths, check_drawing_layout
+from _common import _close_drawing_and_verify, check, run_build
+from _drawing_common import check_drawing_layout
 from _drawing_registry import DrawingLayout
 
 
@@ -19,25 +19,10 @@ async def audit(adapter: Any, drawing_path: Path, layout: DrawingLayout) -> dict
         raise FileNotFoundError(f"drawing is missing: {drawing_path}")
 
     check("open drawing for layout audit", await adapter.open_model(str(drawing_path)))
-    drawing = adapter.currentModel
-    title = drawing.GetTitle()
-    if not title:
-        adapter.swApp.CloseAllDocuments(True)
-        raise RuntimeError(
-            "opened drawing has an empty title; closed all documents instead of "
-            "calling CloseDoc(''), which silently no-ops"
-        )
     try:
         check_drawing_layout(adapter, layout=layout, stem=drawing_path.stem)
     finally:
-        adapter.swApp.CloseDoc(title)
-        still_open = [
-            path
-            for path in _visible_document_paths(adapter)
-            if Path(path).resolve() == drawing_path
-        ]
-        if still_open:
-            raise RuntimeError(f"drawing {title!r} did not close after layout audit")
+        _close_drawing_and_verify(adapter, drawing_path)
     return {"drawing": str(drawing_path)}
 
 

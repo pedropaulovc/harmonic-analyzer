@@ -1444,11 +1444,14 @@ def _drawing_file_deps(stem: str) -> list[str]:
     spec = DRAWINGS_BY_NAME[stem]
     audit_script = (SCRIPTS_DIR / "audit_drawing_layout.py").resolve()
     script = spec.script.resolve()
-    # Traverse first: helpers imported BY the registry must remain dependencies.
-    runtime = _helper_deps(script)
+    # Traverse both process roots: an audit-helper change must invalidate every
+    # drawing cache entry just as a recipe-helper change does.
+    runtime = sorted({*_helper_deps(script), *_helper_deps(audit_script)})
     registry = (SCRIPTS_DIR / "_drawing_registry.py").resolve()
     if str(registry) in runtime:
-        consumers = sorted({script, *(Path(path) for path in runtime)} - {registry})
+        consumers = sorted(
+            {script, audit_script, *(Path(path) for path in runtime)} - {registry}
+        )
         if drawing_registry_reads_selected(
             tuple(path.read_text(encoding="utf-8") for path in consumers), stem
         ):
