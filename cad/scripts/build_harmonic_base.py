@@ -38,7 +38,6 @@ from _common import (
     CASTING_GREEN,
     PANEL_BLACK,
     SketchDims,
-    _early_bound,
     add_line_chain,
     apply_color,
     apply_material,
@@ -74,6 +73,7 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _part_pmi import _resolve_faces, author_part_pmi
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -83,6 +83,7 @@ from harmonic_base_spec import (
     LIP_W,
     DRAWING_NOTES,
     STACK_HEIGHT,
+    SURFACE_FINISHES,
     TOP_LENGTH,
     TOP_THICKNESS,
     TOP_WIDTH,
@@ -692,49 +693,33 @@ def _com_get(obj, name: str):
     return value() if callable(value) else value
 
 
-async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
-    """Face-level PANEL_BLACK on the deck the rim frames: the largest planar
-    +Y face lying at ``deck_y_mm`` (the pad top inside the lip; the lip's own
-    top sits LIP_H higher, the seat floors face -Y or are conical). Walks the
-    body's faces instead of a coordinate pick -- ``SelectByID2`` face picks
-    are view-dependent. Face appearances sit above the body colour in the
-    display hierarchy, so the rest of the casting stays green."""
+async def _paint_machined_faces_black(adapter) -> None:
+    """Black overrides on the two qualified machined planes; green elsewhere."""
     from solidworks_mcp.adapters.com_variant import double_array
 
-    doc = adapter.currentModel
-    part_h = _early_bound(doc, "IPartDoc")
-    bodies = part_h.GetBodies2(0, True) or []
-    target = None
-    target_area = 0.0
-    y_m = deck_y_mm / 1000.0
-    for body in bodies:
-        for face in _com_get(body, "GetFaces") or []:
-            normal = face.Normal
-            if not normal or float(normal[1]) < 0.99:
-                continue
-            box = _com_get(face, "GetBox")
-            if (
-                not box
-                or abs(float(box[4]) - y_m) > 1e-6
-                or abs(float(box[1]) - y_m) > 1e-6
-            ):
-                continue
-            area = float(_com_get(face, "GetArea"))
-            if area > target_area:
-                target, target_area = face, area
-    if target is None:
-        raise RuntimeError(f"deck face at y {deck_y_mm} not found")
-    a_deck = (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6
-    if abs(target_area - a_deck) > 0.05 * a_deck:
-        raise RuntimeError(
-            f"deck face area {target_area * 1e6:.0f} mm^2 != {a_deck * 1e6:.0f} (minus seats)"
-        )
+    faces = _resolve_faces(
+        adapter.currentModel, {control.key: control.face for control in SURFACE_FINISHES}
+    )
+    expected_areas = {
+        "deck": (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6,
+        "underside": BOTTOM_LENGTH * BOTTOM_WIDTH * 1e-6,
+    }
     values = double_array([*PANEL_BLACK, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
-    target.MaterialPropertyValues = values
-    back = tuple(float(v) for v in (target.MaterialPropertyValues or ())[:3])
-    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, PANEL_BLACK)):
-        raise RuntimeError(f"deck face colour readback mismatch: {back}")
-    _telemetry.info(f"deck face painted black ({target_area * 1e6:.0f} mm^2)")
+    for key, face in faces.items():
+        area = float(face.GetArea())
+        expected = expected_areas[key]
+        if abs(area - expected) > 0.05 * expected:
+            raise RuntimeError(
+                f"{key} face area {area * 1e6:.0f} mm^2 != "
+                f"{expected * 1e6:.0f} (minus openings/edge breaks)"
+            )
+        face.MaterialPropertyValues = values
+        back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
+        if len(back) != 3 or any(
+            abs(actual - wanted) > 1 / 255 for actual, wanted in zip(back, PANEL_BLACK)
+        ):
+            raise RuntimeError(f"{key} black face colour did not persist: {back}")
+        _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1330,7 +1315,7 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
-    await _paint_deck_black(adapter, total)
+    await _paint_machined_faces_black(adapter)
 
     # Verify the annotated footprint without view-dependent screen picks.
     await bbox_extent_check(
@@ -1342,6 +1327,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

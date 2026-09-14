@@ -27,6 +27,7 @@ from _drawing_common import (
     finalize_drawing,
     insert_bom_table,
     model_point_in_view,
+    position_bom_balloon,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -88,6 +89,11 @@ EXPLODED_ISO_CENTER = (0.140, 0.198)
 EXPLODED_ISO_SCALE = (1.0, 7.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.172)
 ASSEMBLY_ISO_SCALE = (1.0, 7.0)
+SHEET_SCALES = {
+    SHEET_NAMES[0]: SHEET_SCALE,
+    SHEET_NAMES[1]: EXPLODED_ISO_SCALE,
+    SHEET_NAMES[2]: ASSEMBLY_ISO_SCALE,
+}
 BOM_ANCHOR = (0.018, 0.414)
 
 # Drawing-selection coordinate only. The manufacturing column pitch remains
@@ -157,8 +163,9 @@ SOURCE_CONFIGURATION = "Default"
 ASSEMBLY_STEPS = "\n".join(
     (
         "MATCH-FIT AND ASSEMBLY SEQUENCE",
-        "1. DECK UP. ASSIGN EACH MHA-083 TO ONE MHA-035 SOCKET; HAND-FIT TO",
-        "   FULL SHOULDER SEATING WITHOUT BIND OR ROCK; MATCH-MARK CORNER/ORIENTATION.",
+        "1. ROUGH-CUT MHA-083 OVERSIZE. DECK UP; HAND-FIT EACH BASE SOCKET",
+        "   FOR FULL SHOULDER SEATING WITHOUT BIND OR ROCK; MATCH-MARK",
+        "   EACH COLUMN/MHA-035 CORNER AND ORIENTATION.",
         "2. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
         "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
         "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS.",
@@ -171,19 +178,23 @@ ASSEMBLY_STEPS = "\n".join(
         "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE CONTROLLING TOP-AXIS",
         "   HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE.",
         "   CLAMP; MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
-        "4. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
+        "4. AT THAT HEIGHT, FINAL MATCH-CUT EACH IDENTIFIED COLUMN TO THE",
+        "   ACTUAL BASE/TOP/CAP STACK: MHA-133 FULLY ON ITS INSIDE SEAT,",
+        "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS.",
+        "   FINISH THE TOP CHAMFER; RESEAT COLUMNS AND RESET THE TOP-AXIS HEIGHT.",
+        "5. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
         "   AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD SEGMENTS.",
         f"   REMOVE MHA-077/COLUMNS; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f},",
         "   DEBURR, AND VERIFY FREE PASSAGE OF THE ACTUAL MHA-132 SHANK.",
-        "5. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THE SIDES",
+        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THE SIDES",
         "   USED FOR PILOT-DRILLING; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
-        "6. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
+        "7. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
         "   AFTER MATCH MARKS ALIGN AND MHA-132 HEADS SEAT, PUSH EACH CAP OVER",
         "   THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S INSIDE SEAT.",
-        "7. SEAT MHA-089 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
+        "8. SEAT MHA-089 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
         "   MHA-039 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
-        "8. INSTALL MHA-086 DECORATED FACE UP; SEAT ALL FOUR MHA-030 HEADS.",
-        "9. START MHA-118 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
+        "9. INSTALL MHA-086 DECORATED FACE UP; SEAT ALL FOUR MHA-030 HEADS.",
+        "10. START MHA-118 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
@@ -762,7 +773,7 @@ def _append_template_sheet(
     donor_title = ""
     try:
         donor, donor_sheet = new_project_drawing(
-            adapter, layout=layout, scale=SHEET_SCALE
+            adapter, layout=layout, scale=SHEET_SCALES[new_name]
         )
         donor = _early_bound(donor, "IModelDoc2")
         donor_sheet = _early_bound(donor_sheet, "ISheet")
@@ -796,7 +807,7 @@ def _append_template_sheet(
 def _create_mixed_package_sheets(adapter: Any) -> None:
     """Create landscape/portrait/landscape sheets from the project templates."""
     target, initial = new_project_drawing(
-        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALE
+        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
     )
     target = _early_bound(target, "IModelDoc2")
     initial = _early_bound(initial, "ISheet")
@@ -857,79 +868,37 @@ def _upper_frame_balloon_edges(
     return {stem: row[1] for stem, row in winners.items()}
 
 
-def _column_midlength_target(
-    adapter: Any, view: Any, components: Sequence[tuple[Any, Any]]
-) -> tuple[Any, Any, tuple[float, float]]:
-    """Return an outer rim, its cylinder face, and the projected axial half-span."""
+def _bind_left_column_balloon(
+    adapter: Any, view: Any, note: Any, item: str,
+    components: Sequence[tuple[Any, Any]],
+) -> tuple[Any, Any, Any]:
+    """Bind to an actual outer tube rim on the open left side of the view."""
     candidates = []
-    for component, full in components:
-        visible_edges = tuple(view.GetVisibleEntities2(component, 1) or ())
-        for raw_face in view.GetVisibleEntities2(component, 3) or ():
-            face = _early_bound(raw_face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            if not surface.IsCylinder():
-                continue
-            cylinder = tuple(float(value) for value in surface.CylinderParams)
-            if abs(abs(cylinder[4]) - 1.0) > 1e-9:
-                continue
-            radius = cylinder[6]
-            centres = []
-            for raw_edge in face.GetEdges() or ():
-                curve = _early_bound(
-                    _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
-                )
-                if curve.IsCircle():
-                    circle = tuple(float(value) for value in curve.CircleParams)
-                    if abs(circle[6] - radius) < 1e-7:
-                        centres.append(circle[:3])
-            if not centres:
-                continue
-            low, high = min(p[1] for p in centres), max(p[1] for p in centres)
-            if high - low < 1e-6:
-                continue
-            rims = []
-            for raw_edge in visible_edges:
-                curve = _early_bound(
-                    _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
-                )
-                if not curve.IsCircle():
-                    continue
-                circle = tuple(float(value) for value in curve.CircleParams)
-                if (
-                    abs(circle[6] - radius) < 1e-7
-                    and min(abs(circle[1] - low), abs(circle[1] - high)) < 1e-7
-                ):
-                    rims.append((circle[:3], raw_edge))
-            if not rims:
-                continue
-            rim_centre, rim = max(rims, key=lambda row: row[0][1])
-            midpoint = (rim_centre[0], (low + high) / 2.0, rim_centre[2])
-            start = model_point_in_view(
-                adapter,
-                view,
-                _component_point_in_assembly(full, rim_centre),
-                label="column rim projection",
+    for component, _full in components:
+        rims = []
+        for raw_edge in view.GetVisibleEntities2(component, 1) or ():
+            curve = _early_bound(
+                _early_bound(raw_edge, "IEdge").GetCurve(), "ICurve"
             )
-            middle = model_point_in_view(
-                adapter,
-                view,
-                _component_point_in_assembly(full, midpoint),
-                label="column midpoint projection",
-            )
-            # All four columns share the same explode translation. Rank X only;
-            # the native rim attachment below supplies the actual exploded origin.
-            candidates.append(
-                (
-                    (radius, high - low, middle[0]),
-                    rim,
-                    face,
-                    (middle[0] - start[0], middle[1] - start[1]),
-                )
-            )
+            if not curve.IsCircle():
+                continue
+            circle = tuple(float(value) for value in curve.CircleParams)
+            if abs(abs(circle[4]) - 1.0) < 1e-9:
+                rims.append((circle[6], circle[1], raw_edge))
+        if not rims:
+            continue
+        radius = max(row[0] for row in rims)
+        rim = max(
+            (row for row in rims if abs(row[0] - radius) < 1e-7),
+            key=lambda row: row[1],
+        )[2]
+        note, _annotation, point = _bind_frame_balloon(adapter, view, note, rim, item)
+        candidates.append((point[:2], rim))
     if not candidates:
-        raise RuntimeError("no visible outer column cylinder with two native end rims")
-    _score, rim, face, delta = max(candidates, key=lambda row: row[0])
-    return rim, face, delta
+        raise RuntimeError("no visible outer column rim for the BOM balloon")
+    rim = min(candidates, key=lambda row: row[0])[1]
+    note, annotation, _point = _bind_frame_balloon(adapter, view, note, rim, item)
+    return note, annotation, rim
 
 
 def _exposed_top_casting_edge(
@@ -964,6 +933,41 @@ def _exposed_top_casting_edge(
     return max(candidates, key=lambda row: row[0])[1]
 
 
+def _frame_balloon_binding_readback(
+    adapter: Any, annotation: Any, entity: Any, item: str,
+) -> dict[str, Any]:
+    """Keep entity, BOM, and leader failures distinct in native diagnostics."""
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+    same = [int(adapter.swApp.IsSame(actual, entity)) for actual in attached]
+    actual_item = str(note.GetBomBalloonText(True) or "").strip()
+    dangling = bool(annotation.IsDangling())
+    failures = []
+    if len(attached) != 1:
+        failures.append("entity_count")
+    if same != [1]:
+        failures.append("entity_identity")
+    if actual_item != item:
+        failures.append("bom_item")
+    if dangling:
+        failures.append("dangling")
+    if len(points) < 6:
+        failures.append("leader_points")
+    return {
+        "expected_item": item,
+        "actual_item": actual_item,
+        "expected_entity_type": type(entity).__name__,
+        "actual_entity_types": [type(actual).__name__ for actual in attached],
+        "entity_is_same": same,
+        "dangling": dangling,
+        "actual_leader_points": points,
+        "annotation_position": tuple(annotation.GetPosition() or ()),
+        "balloon_info": tuple(note.GetBalloonInfo() or ()),
+        "failed_checks": failures,
+    }
+
+
 def _bind_frame_balloon(
     adapter: Any, view: Any, note: Any, entity: Any, item: str
 ) -> tuple[Any, Any, tuple[float, float, float]]:
@@ -975,19 +979,10 @@ def _bind_frame_balloon(
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
     note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-    attached = tuple(annotation.GetAttachedEntities3() or ())
-    if (
-        len(attached) != 1
-        or int(adapter.swApp.IsSame(attached[0], entity)) != 1
-        or _balloon_item_number(adapter, note, label="reattached frame balloon") != item
-        or annotation.IsDangling()
-    ):
-        raise RuntimeError(
-            f"frame balloon {item} lost its native entity or BOM binding"
-        )
-    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
-    if len(points) < 6:
-        raise RuntimeError(f"frame balloon {item} has no native leader attachment")
+    state = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    if state["failed_checks"]:
+        raise RuntimeError(f"frame balloon reattachment failed: {state!r}")
+    points = state["actual_leader_points"]
     return note, annotation, points[-3:]
 
 
@@ -998,71 +993,47 @@ def _short_frame_balloon(
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
-    leader = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
-    circle = tuple(float(value) for value in note.GetBalloonInfo())
-    origin = tuple(float(value) for value in annotation.GetPosition())
-    if len(leader) < 6 or len(circle) < 7:
-        raise RuntimeError(f"frame balloon {item} has incomplete placement geometry")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if len(attached) != 1:
+        raise RuntimeError(f"frame balloon {item} has no unique native attachment")
+    entity = attached[0]
+    before = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    if before["failed_checks"]:
+        raise RuntimeError(f"frame balloon {item} has invalid placement input: {before!r}")
+    leader = before["actual_leader_points"]
+    # Native readback: the FIRST point meets the balloon; the LAST is the rim/
+    # face arrowtip. Sheet XY determines placement and length; Z is view depth.
     target = (leader[-3] + offset[0], leader[-2] + offset[1])
-    position = (origin[0] + target[0] - circle[0], origin[1] + target[1] - circle[1])
-    note.LockPosition = False
-    if not annotation.SetPosition(position[0], position[1], 0.0):
-        raise RuntimeError(f"frame balloon {item} rejected its short-leader position")
-    note.LockPosition = True
-    adapter.currentModel.EditRebuild3()
+    _telemetry.event("drawing.frame_short_balloon_before", item=item, target=target, **before)
+    position_bom_balloon(
+        adapter, [note], item_number=item, position_xy=target,
+        label="frame short-leader balloon",
+    )
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
-    actual = tuple(float(value) for value in annotation.GetPosition())
-    leader = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
+    after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    leader = after["actual_leader_points"]
     length = sum(
         math.hypot(
             leader[index + 3] - leader[index], leader[index + 4] - leader[index + 1]
         )
         for index in range(0, len(leader) - 3, 3)
     )
-    _telemetry.event(
-        "drawing.frame_short_balloon",
-        item=item,
-        target_circle=target,
-        requested_origin=position,
-        actual_origin=actual,
-        leader=leader,
-        length_m=length,
-    )
-    if (
-        any(abs(actual[index] - position[index]) > 1e-6 for index in range(2))
-        or length > 0.030
-    ):
-        raise RuntimeError(f"frame balloon {item} did not retain its short leader")
+    failures = list(after["failed_checks"])
+    if length > 0.030:
+        failures.append("leader_length")
+    circle = after["balloon_info"]
+    if len(circle) < 7 or any(abs(circle[index] - target[index]) > 1e-6 for index in range(2)):
+        failures.append("circle_position")
+    state = {"before": before, "after": after, "target_circle": target,
+             "length_m": length, "failed_checks": failures}
+    _telemetry.event("drawing.frame_short_balloon", item=item, **state)
+    if failures:
+        raise RuntimeError(f"frame balloon {item} short placement failed: {state!r}")
 
 
-def _frame_scale_as_noted(adapter: Any) -> None:
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    sheet_view = _early_bound(drawing.GetFirstView(), "IView")
-    matches = []
-    for raw in sheet_view.GetAnnotations() or ():
-        annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 6 or int(annotation.OwnerType) != 2:
-            continue
-        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-        linked = str(note.PropertyLinkedText or "")
-        if "sw-sheetscale" in linked.casefold().replace(" ", ""):
-            matches.append(note)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"expected one native title-block scale link, found {len(matches)}"
-        )
-    note = matches[0]
-    text = (
-        "SCALE: AS NOTED"
-        if str(note.GetText()).strip().upper().startswith("SCALE")
-        else "AS NOTED"
-    )
-    if not note.SetText(text):
-        raise RuntimeError("failed to set the isometric sheet scale field to AS NOTED")
-    adapter.currentModel.EditRebuild3()
-    if str(note.GetText()).strip() != text:
-        raise RuntimeError("title-block AS NOTED scale did not persist")
 
 
 def _reattach_frame_balloons(
@@ -1085,29 +1056,9 @@ def _reattach_frame_balloons(
         )
 
     item = item_by_stem["tube-frame"]
-    rim, face, delta = _column_midlength_target(adapter, view, families["tube-frame"])
-    notes[item], _annotation, rim_point = _bind_frame_balloon(
-        adapter, view, notes[item], rim, item
+    notes[item], _annotation, _rim = _bind_left_column_balloon(
+        adapter, view, notes[item], item, families["tube-frame"]
     )
-    notes[item], annotation, _point = _bind_frame_balloon(
-        adapter, view, notes[item], face, item
-    )
-    midpoint = (rim_point[0] + delta[0], rim_point[1] + delta[1])
-    if not annotation.SetLeaderAttachmentPointAtIndex(0, *midpoint, 0.0):
-        raise RuntimeError("column balloon rejected its native mid-length face point")
-    adapter.currentModel.EditRebuild3()
-    view.UpdateViewDisplayGeometry()
-    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0))
-    attached = tuple(annotation.GetAttachedEntities3() or ())
-    if (
-        len(points) < 6
-        or any(abs(points[-3 + index] - midpoint[index]) > 1e-6 for index in range(2))
-        or len(attached) != 1
-        or int(adapter.swApp.IsSame(attached[0], face)) != 1
-        or _balloon_item_number(adapter, notes[item], label="column midpoint balloon")
-        != item
-    ):
-        raise RuntimeError("column balloon lost its native mid-length face/BOM binding")
 
     item = item_by_stem["frame-cross-screw"]
     shanks = []
@@ -1144,7 +1095,7 @@ def _reattach_frame_balloons(
     )
 
     short = {
-        item_by_stem["tube-frame"]: (0.018, 0.0),
+        item_by_stem["tube-frame"]: (-0.018, -0.012),
         item_by_stem["top-frame"]: (0.014, 0.010),
         item_by_stem["frame-cross-screw"]: (-0.016, -0.008),
     }
@@ -1163,14 +1114,18 @@ def _place_package(adapter: Any) -> None:
     _create_mixed_package_sheets(adapter)
     for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
         _activate_sheet(adapter, sheet_name)
+        sheet = _early_bound(
+            _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+        )
+        sheet_scale = SHEET_SCALES[sheet_name]
+        if not sheet.SetScale(float(sheet_scale[0]), float(sheet_scale[1]), False, False):
+            raise RuntimeError(f"failed to set native frame sheet scale: {sheet_name}")
         _add_note_block(
             adapter,
             f"SHEET {sheet_number} OF {len(SHEET_NAMES)}",
             (0.018, 0.025),
             label="package sheet number",
         )
-        if sheet_number in (2, 3):
-            _frame_scale_as_noted(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
@@ -1307,6 +1262,7 @@ async def build(adapter: Any) -> dict[str, str]:
             scale=SHEET_SCALE,
             expected_sheet_names=SHEET_NAMES,
             sheet_layouts=SHEET_LAYOUTS,
+            sheet_scales=SHEET_SCALES,
         )
     finally:
         primary_error = sys.exception()

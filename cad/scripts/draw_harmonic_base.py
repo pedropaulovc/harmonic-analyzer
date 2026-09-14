@@ -27,12 +27,14 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
+    add_surface_finish,
     create_blank_drawing_sheets,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
     finalize_drawing,
     insert_hole_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -46,6 +48,7 @@ from _drawing_common import (
 )
 
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
@@ -82,7 +85,9 @@ from harmonic_base_spec import (
     LIP_W,
     RIM_TOP,
     STACK_HEIGHT,
+    SURFACE_FINISHES,
     TOP_LENGTH,
+    TOP_REAR_Z,
 )
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
@@ -134,13 +139,12 @@ GEOMETRY_TOP_KEEP = {
     "TopLen": (TOP_CENTER[0], 0.230),
     "BottomWid": (0.238, 0.172),
     "TopWid": (0.217, 0.200),
-    "PadCornerRadius": (0.055, 0.205),
-    "FlangeCornerRadius": (0.040, 0.215),
-    "RimInnerCornerRadius": (0.055, 0.195),
+    "PadCornerRadius": (0.040, 0.210),
+    "FlangeCornerRadius": (0.040, 0.230),
+    "RimInnerCornerRadius": (0.055, 0.185),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
-    "TopThickness": (0.245, 0.100),
     "TopRimChamfer": (0.230, 0.124),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
@@ -150,9 +154,10 @@ SECTION_KEEP = {
 GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
     "TopRimChamfer": "X 45 DEG; UPPER RIM",
+    "RimInnerCornerRadius": "RIM INNER",
 }
 HOLE_CALLOUTS = {
-    "SpotFaceDia": "4X SPOTFACE\nCLEAN UP\nTAP AXES",
+    "SpotFaceDia": "4X SPOTFACE\nON 10-32\nCROSS-SCREW\nHOLES\nFRONT/REAR\nCLEAN UP",
 }
 
 # Native table tags keep their source association while short leaders separate
@@ -196,9 +201,7 @@ def _plan_xy(
 
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a hole-sheet plan rim, offset in machine +X."""
-    return _plan_xy(
-        x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER
-    )
+    return _plan_xy(x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER)
 
 
 @_telemetry.traced("drawing.base_cross_tap_edge")
@@ -270,6 +273,34 @@ def _check_cross_tap_callout(display: Any) -> None:
         )
 
 
+def _set_cross_tap_total_quantity(display: Any) -> None:
+    """Aggregate both two-hole features without resolving their size/depth tokens."""
+    definitions = {
+        definition_part: str(display.GetText(definition_part) or "")
+        for definition_part in (5, 6, 7, 8)
+    }
+    matches = [
+        (definition_part, definition)
+        for definition_part, definition in definitions.items()
+        if definition.lstrip().startswith("2X")
+        and "<hw-tapdrldia>" in definition
+        and "<hw-tapdrldepth>" in definition
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one native 2X drill definition: {definitions!r}")
+    definition_part, definition = matches[0]
+    body = definition.lstrip()
+    leading = definition[:len(definition) - len(body)]
+    updated = leading + f"{len(COLUMN_SOCKET_XZ)}X" + body[2:]
+    text_part = definition_part - 4
+    display.SetText(text_part, updated)
+    if (
+        str(display.GetText(definition_part)) != updated
+        or not str(display.GetText(text_part)).lstrip().startswith("4X")
+    ):
+        raise RuntimeError("aggregate cross-tap quantity did not persist")
+
+
 @_telemetry.traced("drawing.base_rim_width")
 def _add_rim_width(adapter: Any, view: Any) -> Any:
     """Measure the two unchamfered rim-wall stations through exact model edges."""
@@ -311,7 +342,9 @@ def _add_rim_width(adapter: Any, view: Any) -> Any:
     return display
 
 
-def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
+def _horizontal_base_edge(
+    view: Any, height_mm: float, *, z_mm: float | None = None,
+) -> Any:
     candidates = []
     for raw in visible_view_entities(view, 1, label="base height edges"):
         edge = _early_bound(raw, "IEdge")
@@ -323,6 +356,7 @@ def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
             and abs(y1 - y0) < 1e-7
             and abs(z1 - z0) < 1e-7
             and abs(x1 - x0) > 1e-6
+            and (z_mm is None or abs(z0 - z_mm / 1000.0) < 1e-7)
         ):
             candidates.append((abs(x1 - x0), edge))
     if not candidates:
@@ -331,8 +365,14 @@ def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
 
 
 def _add_base_height(
-    adapter: Any, view: Any, upper_edge: Any, expected_mm: float,
-    text_xy: tuple[float, float], label: str, *, lower_entity: Any | None = None,
+    adapter: Any,
+    view: Any,
+    upper_edge: Any,
+    expected_mm: float,
+    text_xy: tuple[float, float],
+    label: str,
+    *,
+    lower_entity: Any | None = None,
 ) -> Any:
     drawing = adapter.currentModel
     if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
@@ -347,16 +387,24 @@ def _add_base_height(
     if display is None:
         raise RuntimeError(f"failed to create {label}")
     display = _early_bound(display, "IDisplayDimension")
-    actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    actual_mm = (
+        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    )
     if abs(actual_mm - expected_mm) > 1e-5:
         raise RuntimeError(f"{label} measured {actual_mm}, expected {expected_mm} mm")
     return display
 
 
 def _attached_note(
-    adapter: Any, view: Any, edge: Any, text: str, position: tuple[float, float],
+    adapter: Any,
+    view: Any,
+    edge: Any,
+    text: str,
+    position: tuple[float, float],
 ) -> None:
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
+        view_name(adapter, view)
+    ):
         raise RuntimeError("failed to activate base feature-note view")
     note = add_note(adapter, text, *position)
     if note is None:
@@ -438,39 +486,49 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
         raise RuntimeError("failed to activate base section controls")
     drawing.ClearSelection2(True)
     for index, candidates in enumerate(levels.values()):
-        if not view.SelectEntity(max(candidates, key=lambda item: item[0])[1], index > 0):
+        if not view.SelectEntity(
+            max(candidates, key=lambda item: item[0])[1], index > 0
+        ):
             raise RuntimeError("failed to select exact base rim-step edges")
     step = drawing.AddHorizontalDimension2(0.393, 0.215, 0.0)
     drawing.ClearSelection2(True)
     if step is None:
         raise RuntimeError("failed to create base rim-step dimension")
     step = _early_bound(step, "IDisplayDimension")
-    actual = float(_early_bound(step.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    actual = (
+        float(_early_bound(step.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    )
     if abs(actual - LIP_H) > 1e-5:
         raise RuntimeError(f"base rim step measured {actual}, expected {LIP_H} mm")
     step.SetText(4, "RIM ABOVE\nDECK")
     step.SetPrecision3(1, -1, -1, -1)
     if int(step.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base rim-step precision did not persist")
-    selection_data = _early_bound(drawing.SelectionManager, "ISelectionMgr").CreateSelectData()
+    selection_data = _early_bound(
+        drawing.SelectionManager, "ISelectionMgr"
+    ).CreateSelectData()
     selection_data.View = view
-    if not _early_bound(min(roots, key=lambda item: item[0])[1], "IEntity").Select4(False, selection_data):
+    if not _early_bound(min(roots, key=lambda item: item[0])[1], "IEntity").Select4(
+        False, selection_data
+    ):
         raise RuntimeError("failed to select the actual pad-to-flange root arc")
     root = drawing.AddRadialDimension2(0.355, 0.192, 0.0)
     drawing.ClearSelection2(True)
     if root is None:
         raise RuntimeError("failed to dimension the actual pad-to-flange root")
     root = _early_bound(root, "IDisplayDimension")
-    actual = float(_early_bound(root.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    actual = (
+        float(_early_bound(root.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    )
     if abs(actual - PAD_ROOT_R) > 1e-5:
-        raise RuntimeError(f"base root radius measured {actual}, expected {PAD_ROOT_R} mm")
+        raise RuntimeError(
+            f"base root radius measured {actual}, expected {PAD_ROOT_R} mm"
+        )
     root.SetText(4, "ROOT")
     root.SetPrecision3(1, -1, -1, -1)
     if int(root.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base root-radius precision did not persist")
     root.ArcExtensionLineOrOppositeSide = False
-
-
 
 
 ALL_HOLES = (
@@ -639,29 +697,57 @@ async def build(adapter: Any) -> dict[str, str]:
         GEOMETRY_CALLOUTS,
     )
     set_dimension_precision(
-        adapter, [*top_dimensions, *side_dimensions],
-        {name: 1 for name in (
-            "BottomLen", "BottomWid", "TopLen", "TopWid", "PadCornerRadius",
-            "FlangeCornerRadius", "RimInnerCornerRadius",
-            "TopRimChamfer",
-        )},
+        adapter,
+        [*top_dimensions, *side_dimensions],
+        {
+            name: 1
+            for name in (
+                "BottomLen",
+                "BottomWid",
+                "TopLen",
+                "TopWid",
+                "PadCornerRadius",
+                "FlangeCornerRadius",
+                "RimInnerCornerRadius",
+                "TopRimChamfer",
+                "BottomThickness",
+            )
+        },
     )
 
     rim_width = _add_rim_width(adapter, top)
-    rim_width.SetText(4, "FROM PAD OUTER EDGE")
+    rim_width.SetText(4, "FROM PAD OUTER EDGE\nTO RIM INNER FACE")
+    rim_width.SetPrecision3(1, -1, -1, -1)
+    if int(rim_width.GetPrimaryPrecision2()) != 1:
+        raise RuntimeError("base rim-width precision did not persist")
     overall_height = _add_base_height(
-        adapter, side, _horizontal_base_edge(side, RIM_TOP), RIM_TOP,
-        (0.052, 0.099), "overall rim height",
+        adapter,
+        side,
+        _horizontal_base_edge(side, RIM_TOP),
+        RIM_TOP,
+        (0.052, 0.099),
+        "overall rim height",
     )
     set_reference_dimension(
-        adapter, overall_height.GetAnnotation(), label="derived overall rim height",
+        adapter,
+        overall_height.GetAnnotation(),
+        label="derived overall rim height",
     )
     overall_height.SetPrecision3(1, -1, -1, -1)
     if int(overall_height.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base overall reference precision did not persist")
+    _add_base_height(
+        adapter, side, _horizontal_base_edge(side, RIM_TOP),
+        RIM_TOP - BOTTOM_THICKNESS, (0.245, 0.100), "visible flange-to-rim height",
+        lower_entity=_horizontal_base_edge(side, BOTTOM_THICKNESS),
+    )
     underside_chamfer = _add_base_height(
-        adapter, side, _horizontal_base_edge(side, RIM_CHAMFER), RIM_CHAMFER,
-        (0.220, 0.083), "underside chamfer leg",
+        adapter,
+        side,
+        _horizontal_base_edge(side, RIM_CHAMFER),
+        RIM_CHAMFER,
+        (0.220, 0.083),
+        "underside chamfer leg",
     )
     underside_chamfer.SetText(4, "X 45 DEG; UNDERSIDE")
     underside_chamfer.SetPrecision3(1, -1, -1, -1)
@@ -675,8 +761,37 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:10", 0.305, 0.135)
     _attached_note(
-        adapter, top, _serial_edge(top),
-        f'STAMPED ID "{SERIAL_TEXT}"\nAPPROX AS SHOWN', (0.125, 0.130),
+        adapter,
+        top,
+        _serial_edge(top),
+        f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
+        (0.125, 0.130),
+    )
+    deck_edge_z = TOP_REAR_Z - LIP_W
+    add_surface_finish(
+        adapter, top,
+        symbol_xy=(0.040, 0.138),
+        control=surface_finish_by_key(SURFACE_FINISHES, "deck"),
+        label="deck finish before paint",
+        char_height=0.0025,
+        entity=_horizontal_base_edge(top, STACK_HEIGHT, z_mm=deck_edge_z),
+        leader_attach_xy=model_point_in_view(
+            adapter, top,
+            (-TOP_LENGTH / 4000.0, STACK_HEIGHT / 1000.0, deck_edge_z / 1000.0),
+            label="deck finish edge",
+        ),
+    )
+    add_surface_finish(
+        adapter, side,
+        symbol_xy=(0.070, 0.052),
+        control=surface_finish_by_key(SURFACE_FINISHES, "underside"),
+        label="underside finish before paint",
+        char_height=0.0025,
+        entity=_horizontal_base_edge(side, 0.0),
+        leader_attach_xy=model_point_in_view(
+            adapter, side, (-BOTTOM_LENGTH / 4000.0, 0.0, 0.0),
+            label="underside finish edge",
+        ),
     )
     for view in (top, side):
         set_hidden_lines_visible(adapter, view)
@@ -714,11 +829,13 @@ async def build(adapter: Any) -> dict[str, str]:
         [*hole_dimensions, *section_dimensions],
         HOLE_CALLOUTS,
     )
+    set_dimension_precision(adapter, section_dimensions, {"SpotFaceDia": 1})
     _section_geometry_controls(adapter, section)
     add_note(
         adapter,
         "A1-A4: BORE LIMITS GOVERN\nMATCH-FINISH MHA-083 TUBE OD\nTO SLIP BY HAND",
-        0.235, 0.255,
+        0.235,
+        0.255,
     )
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
@@ -762,7 +879,9 @@ async def build(adapter: Any) -> dict[str, str]:
         float(hole_table.GetRowHeight(row)) for row in range(int(hole_table.RowCount))
     )
     if table_height > HOLE_TABLE_ANCHOR[1] - 0.025:
-        raise RuntimeError(f"base hole table exceeds the inner border: {table_height} m")
+        raise RuntimeError(
+            f"base hole table exceeds the inner border: {table_height} m"
+        )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top)
     tap_callout = add_native_hole_callout(
@@ -774,9 +893,10 @@ async def build(adapter: Any) -> dict[str, str]:
         process=(
             "MHA-132 TUBE CROSS-SCREWS\nCONTINUOUS IN-PHASE THREAD\n"
             "BOTH CASTING WALLS\nON A1-A4 X CENTRES\n"
-            "AXES NORMAL TO SIDE FACES\n2 EACH FRONT/REAR"
+            "AXES NORMAL TO SIDE FACES\n2 EACH FRONT/REAR FACE"
         ),
     )
+    _set_cross_tap_total_quantity(tap_callout)
     _check_cross_tap_callout(tap_callout)
     base_edge = _horizontal_base_edge(hole_side, 0.0)
     endpoints = (base_edge.GetStartVertex(), base_edge.GetEndVertex())
@@ -790,8 +910,13 @@ async def build(adapter: Any) -> dict[str, str]:
     if base_point[0] >= 0.0 or abs(base_point[1]) > 1e-7:
         raise RuntimeError("cross-axis datum is not the left base-underside vertex")
     tap_height = _add_base_height(
-        adapter, hole_side, _cross_tap_edge(hole_side, x_mm=-COLUMN_X), BASE_SCREW_Y,
-        (0.185, 0.110), "cross-tap axis height", lower_entity=left_base_vertex,
+        adapter,
+        hole_side,
+        _cross_tap_edge(hole_side, x_mm=-COLUMN_X),
+        BASE_SCREW_Y,
+        (0.205, 0.110),
+        "cross-tap axis height",
+        lower_entity=left_base_vertex,
     )
     tap_height.SetText(1, "AXIS ")
     tap_height.SetText(4, "FROM BASE\nUNDERSIDE")

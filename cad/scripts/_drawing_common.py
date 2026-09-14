@@ -4779,6 +4779,7 @@ async def finalize_drawing(
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
     sheet_layouts: Mapping[str, DrawingLayout] | None = None,
+    sheet_scales: Mapping[str, tuple[float, float]] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
@@ -4816,6 +4817,13 @@ async def finalize_drawing(
         ):
             raise TypeError("every sheet layout must be a DrawingLayout")
         resolved_layouts = dict(sheet_layouts)
+    if sheet_scales is not None and set(sheet_scales) != set(sheet_names):
+        missing = sorted(set(sheet_names) - set(sheet_scales))
+        unknown = sorted(set(sheet_scales) - set(sheet_names))
+        raise ValueError(
+            f"sheet scale mapping must cover every sheet exactly; "
+            f"missing={missing!r}, unknown={unknown!r}"
+        )
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
@@ -4827,10 +4835,11 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        sheet_scale = scale if sheet_scales is None else sheet_scales[sheet_name]
         # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
         # the 1:1 the template pinned (each view still carries its own explicit
         # scale), so re-pin it once here before asserting the contract.
-        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+        if not sheet.SetScale(float(sheet_scale[0]), float(sheet_scale[1]), False, False):
             raise RuntimeError(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
             )
@@ -4839,7 +4848,7 @@ async def finalize_drawing(
             sheet,
             layout=resolved_layouts[sheet_name],
             phase=f"before save {sheet_name}",
-            scale=scale,
+            scale=sheet_scale,
         )
         properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
@@ -4873,7 +4882,7 @@ async def finalize_drawing(
                 sheet,
                 layout=resolved_layouts[sheet_name],
                 phase=f"explicit property source {sheet_name}",
-                scale=scale,
+                scale=sheet_scale,
             )
         views = tuple(iter_views(adapter))
         first_view = views[0] if views else None
