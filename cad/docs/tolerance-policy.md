@@ -269,7 +269,7 @@ does not discharge the physical operating assumptions or the two waivers below.
   Use the spec sheet's `SET QC` procedure; if a batch cannot supply a matched set,
   select another batch rather than modifying the approved lever holes.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
-  ±0.048 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
+  ±0.047 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
   legitimate decision (it consumes 0.05 % MAE); `check:budget` pins the drawing note to the
   yaml so the two cannot silently diverge.
@@ -542,7 +542,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   marker/readout uncertainty. A prescribed pen-motion equation proves neither.
 - `amplitude.max_travel_mm` 88 vs. the ledger's ±146 mm foot travel: the budget uses 88; a
   larger full scale improves every readout term proportionally.
-- The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.048): keep or relax
+- The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.047): keep or relax
   is a stated decision, pinned either way by `check:budget`.
 
 ## Scope of manufacturing outputs

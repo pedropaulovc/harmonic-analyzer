@@ -467,7 +467,10 @@ def test_knife_load_cases_include_configured_and_scaled_reference_vectors(
             for pose in poses
         ]
         assert case["channel_moment_N_mm"] == pytest.approx(
-            sum(force * pose.moment_arm_mm for force, pose in zip(forces, poses))
+            sum(
+                force * pose.moment_arm_mm
+                for force, pose in zip(forces, poses, strict=True)
+            )
         )
         assert case["conservative_knife_load_N"] >= case["knife_vertical_load_N"]
         loads.append(case["conservative_knife_load_N"])
