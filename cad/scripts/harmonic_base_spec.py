@@ -68,8 +68,6 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"
-SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
 
 # Base/frame parts carry no datums or feature-control frames under the drawing
 # simplicity policy.

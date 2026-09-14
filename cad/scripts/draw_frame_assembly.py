@@ -1,9 +1,9 @@
 r"""Create the native multi-sheet frame assembly drawing package.
 
 The released ``frame.SLDASM`` stays authoritative and byte-for-byte unchanged.
-This recipe creates a transient exploded state in the open assembly, uses that
-state for one native drawing view, saves the drawing package, and then closes
-the dirty source assembly without saving it.
+This recipe consumes the builder-owned ``FRAME_EXPLODED`` presentation for one
+native drawing view. It never creates, edits, deletes, or saves assembly
+presentation definitions.
 """
 
 from __future__ import annotations
@@ -76,12 +76,12 @@ SHEET_LAYOUTS = {
 if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
 SHEET_SCALE = (1.0, 6.0)
-WORKING_FRONT_CENTER = (0.080, 0.155)
+WORKING_FRONT_CENTER = (0.090, 0.155)
 BASE_SECTION_CENTER = (0.190, 0.165)
 TOP_SECTION_CENTER = (0.325, 0.165)
 JOINT_SECTION_SCALE = (1.0, 4.0)
-EXPLODED_ISO_CENTER = (0.145, 0.205)
-EXPLODED_ISO_SCALE = (1.0, 6.0)
+EXPLODED_ISO_CENTER = (0.140, 0.208)
+EXPLODED_ISO_SCALE = (1.0, 7.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.145)
 ASSEMBLY_ISO_SCALE = (1.0, 10.0)
 BOM_ANCHOR = (0.018, 0.414)
@@ -143,13 +143,8 @@ if TUBE_CROSS_HOLE_DIAMETER <= CROSS_SCREW_SHANK_DIA:
 if CROSS_SCREW_SHANK_LEN >= CASTING_FULL_THREAD_DEPTH:
     raise AssertionError("stock cross screw must seat before reaching the tap bottom")
 
-# Distances are drawing-only displacements, not assembly requirements. The
-# sequence first moves a part and its fasteners together, then pulls each
-# fastener along its actual installation axis so mating faces remain readable.
-_EXPLODE_Y = 1
-_EXPLODE_X = 0
-_EXPLODE_Z = 2
-EXPLODE_STEP_COUNT = 12
+EXPLODED_VIEW_NAME = "FRAME_EXPLODED"
+SOURCE_CONFIGURATION = "Default"
 
 # These instructions carry only requirements that exist at assembly: matched
 # fits, the one-setup coaxial casting threads, transfer-drilled tube holes,
@@ -241,13 +236,20 @@ def _add_note_block(
     if note is None:
         raise RuntimeError(f"failed to add {label}")
     note = _early_bound(note, "INote")
-    if str(note.GetText() or "") != text:
-        raise RuntimeError(f"{label} text did not persist")
+    actual = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+    expected = text.replace("\r\n", "\n").replace("\r", "\n")
+    if actual != expected:
+        raise RuntimeError(
+            f"{label} text did not persist "
+            f"(actual_length={len(actual)}, expected_length={len(expected)})"
+        )
     return note
 
 
 def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> None:
     bound = _early_bound(view, "IView")
+    if str(bound.ReferencedConfiguration) != SOURCE_CONFIGURATION:
+        raise RuntimeError(f"{label}: view must reference the Default configuration")
     returned = bool(bound.ShowExploded(show))
     actual = bool(bound.IsExploded())
     if actual != show:
@@ -417,7 +419,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         cap_top,
-        text_xy=(0.017, WORKING_FRONT_CENTER[1]),
+        text_xy=(0.028, 0.175),
         label="finished frame overall height",
     )
     overall = _checked_height_dimension(
@@ -445,7 +447,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         screw_head,
-        text_xy=(0.027, WORKING_FRONT_CENTER[1]),
+        text_xy=(0.041, 0.205),
         label="installed top cross-screw axis height",
     )
     screw_axis = set_arc_endpoints_to_center(
@@ -501,291 +503,32 @@ def _component_stem(component: Any) -> str:
     return Path(path).stem.casefold()
 
 
-def _component_origin(component: Any) -> tuple[float, float, float]:
-    component = _early_bound(component, "IComponent2")
-    transform = _early_bound(component.Transform2, "IMathTransform")
-    if transform is None:
-        raise RuntimeError(f"component {component.Name2!r} has no transform")
-    values = tuple(float(value) for value in transform.ArrayData)
-    if len(values) != 16:
+def _validate_persisted_explode(source_model: Any) -> None:
+    """Consume the builder-owned presentation without changing the assembly."""
+    assembly = _early_bound(source_model, "IAssemblyDoc")
+    manager = _early_bound(source_model.ConfigurationManager, "IConfigurationManager")
+    configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if str(configuration.Name) != SOURCE_CONFIGURATION:
+        raise RuntimeError("frame source must open in its Default configuration")
+    names = tuple(assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ())
+    if names != (EXPLODED_VIEW_NAME,):
         raise RuntimeError(
-            f"component {component.Name2!r} transform has {len(values)} values"
+            f"frame source exploded views {names!r} != {(EXPLODED_VIEW_NAME,)!r}"
         )
-    return values[9], values[10], values[11]
-
-
-def _top_level_component_groups(
-    assembly: Any,
-) -> dict[str, tuple[Any, ...]]:
-    assembly = _early_bound(assembly, "IAssemblyDoc")
-    expected_total = sum(BOM_QUANTITIES.values())
-    count = int(assembly.GetComponentCount(True))
-    components = _as_tuple(
-        assembly.GetComponents(True), label="frame top-level components"
-    )
-    if count != expected_total or len(components) != expected_total:
-        raise RuntimeError(
-            "frame top-level component count mismatch: "
-            f"API={count}, returned={len(components)}, expected={expected_total}"
-        )
-    grouped: dict[str, list[Any]] = {stem: [] for stem in BOM_COMPONENTS}
-    unexpected: list[str] = []
-    for component in components:
-        stem = _component_stem(component)
-        if stem not in grouped:
-            unexpected.append(stem)
-            continue
-        grouped[stem].append(component)
-    wrong = {
-        stem: len(items)
-        for stem, items in grouped.items()
-        if len(items) != BOM_QUANTITIES[stem]
-    }
-    if unexpected or wrong:
-        raise RuntimeError(
-            f"frame component families mismatch: unexpected={unexpected}, counts={wrong}"
-        )
-    return {stem: tuple(items) for stem, items in grouped.items()}
-
-
-def _select_explode_components(
-    source_model: Any, components: Sequence[Any], *, label: str
-) -> tuple[str, ...]:
-    source_model.ClearSelection2(True)
-    selection_manager = _early_bound(source_model.SelectionManager, "ISelectionMgr")
-    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
-    if selection_data is None:
-        raise RuntimeError(f"{label}: failed to create component selection data")
-    selection_data.Mark = 1
-    if int(selection_data.Mark) != 1:
-        raise RuntimeError(f"{label}: selection mark 1 did not persist")
-    names: list[str] = []
+    components = tuple(assembly.GetComponents(True) or ())
+    if len(components) != sum(BOM_QUANTITIES.values()):
+        raise RuntimeError("frame source must contain exactly 29 components")
     for raw_component in components:
         component = _early_bound(raw_component, "IComponent2")
-        name = str(component.Name2 or "")
-        if not name or not component.Select4(True, selection_data, False):
-            raise RuntimeError(f"{label}: failed to select component {name!r}")
-        names.append(name)
-    if len(names) != len(set(names)):
-        raise RuntimeError(f"{label}: duplicate component identities {names!r}")
-    return tuple(names)
-
-
-def _add_native_explode_step(
-    source_model: Any,
-    configuration: Any,
-    *,
-    components: Sequence[Any],
-    axis: int,
-    reverse: bool,
-    distance_m: float,
-    label: str,
-) -> Any:
-    if axis not in {_EXPLODE_X, _EXPLODE_Y, _EXPLODE_Z} or distance_m <= 0.0:
-        raise ValueError(f"{label}: invalid explode direction or distance")
-    expected_names = _select_explode_components(source_model, components, label=label)
-    before = int(configuration.GetNumberOfExplodeSteps())
-    # AddExplodeStep2's generated early-bound wrapper returns
-    # (IExplodeStep, swCreateExplodeStepError_e). The final [out] argument is
-    # omitted deliberately; passing a BYREF VARIANT is the wrong convention for
-    # InvokeTypes and silently loses the error code.
-    result = configuration.AddExplodeStep2(
-        float(distance_m),
-        int(axis),
-        bool(reverse),
-        0.0,
-        -1,
-        False,
-        True,
-        False,
-    )
-    source_model.ClearSelection2(True)
-    if not isinstance(result, tuple) or len(result) != 2:
-        raise RuntimeError(f"{label}: incomplete AddExplodeStep2 result {result!r}")
-    raw_step, error = result
-    if int(error) != 0 or raw_step is None:
-        raise RuntimeError(f"{label}: explode step failed with error {error!r}")
-    step = _early_bound(raw_step, "IExplodeStep")
-    step.Name = f"FRAME {label.upper()}"
-    if str(step.Name or "") != f"FRAME {label.upper()}":
-        raise RuntimeError(f"{label}: explode-step name did not persist")
-    if not bool(source_model.EditRebuild3()):
-        raise RuntimeError(f"{label}: rebuild failed after explode-step creation")
-    after = int(configuration.GetNumberOfExplodeSteps())
-    if after != before + 1:
-        raise RuntimeError(f"{label}: explode-step count {before} -> {after}")
-    actual_components = _as_tuple(
-        step.GetComponents(), label=f"{label} explode-step components"
-    )
-    actual_names = {
-        str(_early_bound(component, "IComponent2").Name2 or "")
-        for component in actual_components
-    }
-    if actual_names != set(expected_names):
-        raise RuntimeError(
-            f"{label}: explode components {sorted(actual_names)!r} != "
-            f"{sorted(expected_names)!r}"
-        )
-    if abs(float(step.ExplodeDistance) - distance_m) > 1e-9:
-        raise RuntimeError(f"{label}: explode distance did not persist")
-    return step
-
-
-def _create_temporary_native_explode(
-    adapter: Any, source_model: Any
-) -> tuple[Any, str]:
-    assembly = _early_bound(source_model, "IAssemblyDoc")
-    configuration_manager = _early_bound(
-        source_model.ConfigurationManager, "IConfigurationManager"
-    )
-    configuration = _early_bound(
-        configuration_manager.ActiveConfiguration, "IConfiguration"
-    )
-    configuration_name = str(configuration.Name or "")
-    if not configuration_name:
-        raise RuntimeError("frame assembly has no active configuration")
-    existing = int(assembly.GetExplodedViewCount2(configuration_name))
-    if existing:
-        raise RuntimeError(
-            f"frame source already carries {existing} exploded view(s); "
-            "refusing to alter a released definition"
-        )
-    if not assembly.CreateExplodedView():
-        raise RuntimeError("failed to create transient frame exploded view")
-    names = _as_tuple(
-        assembly.GetExplodedViewNames2(configuration_name),
-        label="frame exploded-view names",
-    )
-    if len(names) != 1:
-        raise RuntimeError(f"frame exploded-view count mismatch: {names!r}")
-    explode_name = str(names[0] or "")
-    if not explode_name or not assembly.ShowExploded2(True, explode_name):
-        raise RuntimeError(f"failed to activate frame exploded view {explode_name!r}")
-
-    # CreateExplodedView can seed heuristic steps. They are unsuitable for a
-    # checked package, so remove them before adding the deterministic sequence.
-    for index in range(int(configuration.GetNumberOfExplodeSteps()) - 1, -1, -1):
-        seed = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
-        seed_name = str(seed.Name or "") if seed is not None else ""
-        if not seed_name or not configuration.DeleteExplodeStep(seed_name):
-            raise RuntimeError(f"failed to remove auto explode step {seed_name!r}")
-    if int(configuration.GetNumberOfExplodeSteps()) != 0:
-        raise RuntimeError("auto explode steps remain before authored sequence")
-
-    groups = _top_level_component_groups(assembly)
-    lower_cross_screws: list[Any] = []
-    top_cross_screws: list[Any] = []
-    front_cross_screws: list[Any] = []
-    rear_cross_screws: list[Any] = []
-    for component in groups["frame-cross-screw"]:
-        _x, y_m, z_m = _component_origin(component)
-        y_mm = y_m * 1000.0
-        if abs(y_mm - BASE_SCREW_Y) <= 1e-3:
-            lower_cross_screws.append(component)
-        elif abs(y_mm - TOP_SCREW_Y) <= 1e-3:
-            top_cross_screws.append(component)
-        else:
+        total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+        base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
+        if any(
+            abs(float(actual) - float(expected)) > 1e-9
+            for actual, expected in zip(total.ArrayData, base.ArrayData, strict=True)
+        ):
             raise RuntimeError(
-                f"frame cross screw has unexpected axis height {y_mm:g} mm"
+                f"frame source must open collapsed: {component.Name2!r} is displaced"
             )
-        if z_m < 0.0:
-            front_cross_screws.append(component)
-        elif z_m > 0.0:
-            rear_cross_screws.append(component)
-        else:
-            raise RuntimeError("frame cross screw lies on the assembly mid-plane")
-    if (len(lower_cross_screws), len(top_cross_screws)) != (4, 4):
-        raise RuntimeError("frame cross screws do not split into four lower/four top")
-    if (len(front_cross_screws), len(rear_cross_screws)) != (4, 4):
-        raise RuntimeError("frame cross screws do not split into four front/four rear")
-
-    plans = (
-        ("tube caps lift", groups["tube-frame-cap"], _EXPLODE_Y, False, 0.050),
-        (
-            "top frame clears columns",
-            (
-                *groups["top-frame"],
-                *top_cross_screws,
-                *groups["gooseneck-set-screw"],
-            ),
-            _EXPLODE_Y,
-            False,
-            0.150,
-        ),
-        (
-            "front cross screws withdraw",
-            front_cross_screws,
-            _EXPLODE_Z,
-            True,
-            0.050,
-        ),
-        (
-            "rear cross screws withdraw",
-            rear_cross_screws,
-            _EXPLODE_Z,
-            False,
-            0.050,
-        ),
-        (
-            "gooseneck screw withdraws",
-            groups["gooseneck-set-screw"],
-            _EXPLODE_X,
-            True,
-            0.050,
-        ),
-        ("columns clear base seats", groups["tube-frame"], _EXPLODE_Y, False, 0.060),
-        (
-            "support lifts from deck",
-            (*groups["rocker-arm-support"], *groups["lag-screw"]),
-            _EXPLODE_Y,
-            False,
-            0.035,
-        ),
-        (
-            "support moves beside base",
-            (*groups["rocker-arm-support"], *groups["lag-screw"]),
-            _EXPLODE_X,
-            True,
-            0.320,
-        ),
-        ("support screws withdraw", groups["lag-screw"], _EXPLODE_Y, False, 0.050),
-        (
-            "nameplate lifts from deck",
-            (*groups["nameplate"], *groups["fillister-screw"]),
-            _EXPLODE_Y,
-            False,
-            0.025,
-        ),
-        (
-            "nameplate moves beside base",
-            (*groups["nameplate"], *groups["fillister-screw"]),
-            _EXPLODE_X,
-            False,
-            0.080,
-        ),
-        (
-            "nameplate screws withdraw",
-            groups["fillister-screw"],
-            _EXPLODE_Y,
-            False,
-            0.035,
-        ),
-    )
-    for label, components, axis, reverse, distance_m in plans:
-        _add_native_explode_step(
-            source_model,
-            configuration,
-            components=components,
-            axis=axis,
-            reverse=reverse,
-            distance_m=distance_m,
-            label=label,
-        )
-    if int(configuration.GetNumberOfExplodeSteps()) != EXPLODE_STEP_COUNT:
-        raise RuntimeError("frame explode sequence did not retain all authored steps")
-    if int(assembly.GetExplodedViewCount2(configuration_name)) != 1:
-        raise RuntimeError("frame transient exploded-view count changed")
-    return assembly, explode_name
 
 
 def _normalized_bom_identity(text: str) -> str:
@@ -821,6 +564,19 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
+    # Use the portrait sheet width rather than wrapping descriptions into a
+    # narrow table over the exploded view. Native minimum heights retain text.
+    for column, width in (
+        (item_column, 0.022),
+        (part_column, 0.038),
+        (description_column, 0.162),
+        (quantity_column, 0.022),
+    ):
+        actual_width = float(table.SetColumnWidth(column, width, 0))
+        if abs(actual_width - width) > 1e-6:
+            raise RuntimeError(f"frame BOM column width did not persist: {column}")
+    for row in range(rows):
+        table.SetRowHeight(row, 0.006, 0)
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -918,15 +674,22 @@ def _paste_blank_sheet(
         raise RuntimeError(f"{label}: failed to rename pasted sheet {new_name!r}")
 
 
-def _activate_frame_package(adapter: Any, target: Any, target_title: str) -> Any:
+def _activate_frame_package(adapter: Any, target: Any) -> Any:
+    target_title = str(target.GetTitle() or "")
+    if not target_title:
+        raise RuntimeError("frame package drawing has no title")
     activation = adapter.swApp.ActivateDoc3(target_title, False, 2, 0)
     if not activation:
         raise RuntimeError("failed to reactivate frame package drawing")
     activated, errors = activation
-    if activated is None or int(errors) != 0:
+    if int(errors) != 0:
         raise RuntimeError(
             f"failed to reactivate frame package drawing (errors={errors})"
         )
+    if activated is None:
+        activated = adapter.swApp.ActiveDoc
+    if activated is None:
+        raise RuntimeError("frame package drawing did not become active")
     activated = _early_bound(activated, "IModelDoc2")
     if int(adapter.swApp.IsSame(activated, target)) != 1:
         raise RuntimeError("reactivated document is not the frame package drawing")
@@ -937,7 +700,6 @@ def _activate_frame_package(adapter: Any, target: Any, target_title: str) -> Any
 def _append_template_sheet(
     adapter: Any,
     target: Any,
-    target_title: str,
     *,
     layout: DrawingLayout,
     new_name: str,
@@ -955,7 +717,7 @@ def _append_template_sheet(
         if not donor_title or not donor_name:
             raise RuntimeError(f"{label}: donor drawing is incomplete")
         _copy_selected_sheet(donor, donor_name, label=label)
-        _activate_frame_package(adapter, target, target_title)
+        _activate_frame_package(adapter, target)
         _paste_blank_sheet(
             adapter,
             target,
@@ -967,8 +729,8 @@ def _append_template_sheet(
         cleanup_error: BaseException | None = None
         if donor_title:
             try:
-                _activate_frame_package(adapter, target, target_title)
                 adapter.swApp.CloseDoc(donor_title)
+                _activate_frame_package(adapter, target)
             except BaseException as exc:
                 cleanup_error = exc
         if cleanup_error is not None:
@@ -987,15 +749,11 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
     initial.SetName(SHEET_NAMES[0])
     if str(initial.GetName() or "") != SHEET_NAMES[0]:
         raise RuntimeError("failed to name the frame package primary sheet")
-    target_title = str(target.GetTitle() or "")
-    if not target_title:
-        raise RuntimeError("frame package drawing has no title")
 
     for sheet_name in SHEET_NAMES[1:]:
         _append_template_sheet(
             adapter,
             target,
-            target_title,
             layout=SHEET_LAYOUTS[sheet_name],
             new_name=sheet_name,
             label=f"{sheet_name} frame sheet",
@@ -1058,8 +816,8 @@ def _place_package(adapter: Any) -> None:
     )
     _add_note_block(
         adapter,
-        "EXPLODED VIEW 1:6 - SEE SHEET 3 FOR INSTALLATION ORDER",
-        (0.065, 0.080),
+        "EXPLODED VIEW 1:7 - SEE SHEET 3 FOR INSTALLATION ORDER",
+        (0.045, 0.075),
         label="exploded-view caption",
     )
 
@@ -1116,18 +874,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not source_title:
         raise RuntimeError("frame source assembly has no document title")
 
-    assembly: Any | None = None
-    explode_name = ""
     artifacts: dict[str, str] | None = None
     try:
-        assembly, explode_name = _create_temporary_native_explode(adapter, source_model)
-        if not assembly.ShowExploded2(False, explode_name):
-            raise RuntimeError(
-                f"failed to collapse transient exploded view {explode_name!r} "
-                "before placing drawing views"
-            )
-        if not bool(source_model.EditRebuild3()):
-            raise RuntimeError("frame source rebuild failed after collapse")
+        _validate_persisted_explode(source_model)
         _place_package(adapter)
         artifacts = await finalize_drawing(
             adapter,
@@ -1141,17 +890,6 @@ async def build(adapter: Any) -> dict[str, str]:
     finally:
         primary_error = sys.exception()
         cleanup_errors: list[str] = []
-        if assembly is not None and explode_name:
-            try:
-                if not assembly.ShowExploded2(False, explode_name):
-                    cleanup_errors.append(
-                        f"failed to collapse transient exploded view {explode_name!r}"
-                    )
-            except Exception as exc:  # noqa: BLE001
-                cleanup_errors.append(
-                    f"failed to collapse transient exploded view: {exc}"
-                )
-
         # A failed placement leaves an unsaved drawing active. Its views retain
         # the source assembly, so release the drawing before discarding source.
         if artifacts is None:
@@ -1182,9 +920,12 @@ async def build(adapter: Any) -> dict[str, str]:
             cleanup_errors.append(f"failed to close frame source {source_title!r}: {exc}")
 
         try:
-            if _source_fingerprint(SOURCE) != fingerprint:
+            after_fingerprint = _source_fingerprint(SOURCE)
+            if after_fingerprint != fingerprint:
                 cleanup_errors.append(
-                    "frame drawing generation changed the released source assembly"
+                    "frame drawing generation changed the released source assembly "
+                    f"(size, mtime_ns, SHA256): {fingerprint!r} -> "
+                    f"{after_fingerprint!r}"
                 )
         except Exception as exc:  # noqa: BLE001
             cleanup_errors.append(f"failed to verify frame source fingerprint: {exc}")
