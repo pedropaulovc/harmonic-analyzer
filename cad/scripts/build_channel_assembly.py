@@ -1602,26 +1602,6 @@ async def build(adapter) -> dict[str, str]:
             "channel-lever",
         ),
     )
-    for j in range(CHANNELS):
-        seat = settled_spring_seats.channel_seat(amplitudes[j])
-        lower_distance = assert_native_contact(
-            adapter,
-            spring_names_by_channel[j],
-            hook_names_by_channel[j],
-            maximum_distance_mm=seat.lower_maximum_distance_mm,
-            label=f"channel {j:02d} lower fixed native seat",
-        )
-        upper_distance = assert_native_contact(
-            adapter,
-            spring_names_by_channel[j],
-            lever_by_channel[j],
-            maximum_distance_mm=seat.upper_maximum_distance_mm,
-            label=f"channel {j:02d} upper fixed native seat",
-        )
-        log(
-            f"ch{j:02d} native contacts: lower {lower_distance:.9g} mm, "
-            f"upper {upper_distance:.9g} mm"
-        )
     write_dof_manifest(ASM_NAME)
     check_no_interference(adapter)
     # Title-block identity for the assembly drawing (draw_channel_assembly.py):
@@ -1646,7 +1626,30 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "channel assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    # The save helper rebuilds, saves, and reopens the reconciled persisted
+    # assembly. Certify each actual saved component pair exactly once.
+    for j in range(CHANNELS):
+        seat = settled_spring_seats.channel_seat(amplitudes[j])
+        lower_distance = assert_native_contact(
+            adapter,
+            spring_names_by_channel[j],
+            hook_names_by_channel[j],
+            maximum_distance_mm=seat.lower_maximum_distance_mm,
+            label=f"channel {j:02d} lower persisted native seat",
+        )
+        upper_distance = assert_native_contact(
+            adapter,
+            spring_names_by_channel[j],
+            lever_by_channel[j],
+            maximum_distance_mm=seat.upper_maximum_distance_mm,
+            label=f"channel {j:02d} upper persisted native seat",
+        )
+        log(
+            f"ch{j:02d} persisted native contacts: lower "
+            f"{lower_distance:.9g} mm, upper {upper_distance:.9g} mm"
+        )
+    return artefacts
 
 
 if __name__ == "__main__":

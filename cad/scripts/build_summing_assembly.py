@@ -479,24 +479,6 @@ async def build(adapter) -> dict[str, str]:
         required_stems=("summing-lever", "boss-hook"),
         allowed_stems=("summing-lever", "boss-hook"),
     )
-    lower_distance = assert_native_contact(
-        adapter,
-        counter,
-        bh,
-        maximum_distance_mm=counter_seat.lower_maximum_distance_mm,
-        label="counter lower fixed native seat",
-    )
-    upper_distance = assert_native_contact(
-        adapter,
-        gooseneck,
-        counter,
-        maximum_distance_mm=counter_seat.upper_maximum_distance_mm,
-        label="counter upper fixed native seat",
-    )
-    log(
-        f"counter native contacts: lower {lower_distance:.9g} mm, "
-        f"upper {upper_distance:.9g} mm"
-    )
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
@@ -524,7 +506,27 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "summing assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    # Check the actual saved/reopened bodies after final rebuild reconciliation.
+    lower_distance = assert_native_contact(
+        adapter,
+        counter,
+        bh,
+        maximum_distance_mm=counter_seat.lower_maximum_distance_mm,
+        label="counter lower persisted native seat",
+    )
+    upper_distance = assert_native_contact(
+        adapter,
+        gooseneck,
+        counter,
+        maximum_distance_mm=counter_seat.upper_maximum_distance_mm,
+        label="counter upper persisted native seat",
+    )
+    log(
+        f"counter persisted native contacts: lower {lower_distance:.9g} mm, "
+        f"upper {upper_distance:.9g} mm"
+    )
+    return artefacts
 
 
 if __name__ == "__main__":
