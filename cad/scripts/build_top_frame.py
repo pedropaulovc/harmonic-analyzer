@@ -95,7 +95,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _visibility import blank_reference_geometry
 from _holes import (
@@ -112,7 +111,6 @@ from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
-    OUTER_PROFILE_TOLERANCE_MM,
 )
 from cone_pivot_post_installation import (
     FRAME_COLUMN_Z_CENTER,
@@ -183,7 +181,8 @@ HUB_GUSSET_HALF_IN = 8.0  # full-depth span |z - 3.088| <= 8
 HUB_GUSSET_HALF_OUT = 30.0  # feathers to the underside at |z - 3.088| = 30
 SET_POCKET = 16.0  # cast pocket (square) around the set-screw tap
 SET_POCKET_DEPTH = 2.0
-SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="blind", depth_mm=8.0)
+# The tap opens into the gooseneck bore; it has no blind thread-depth limit.
+SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="through_next")
 
 # --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
 SPOTFACE_DIA = SCREW_SPOTFACE_DIAMETER
@@ -207,7 +206,17 @@ if CAP_RECESS_FLOOR_Y - SIDE_TAP_DRILL_DIA / 2.0 <= 0.0:
     raise AssertionError("cap recess breaks into the cross-screw drill")
 
 # --- Fulcrum keepers (west rail top face; shaft-end brackets, ch17 p.40) ----
-KEEPER_TAP_SPEC = HoleSpec("tapped", "#8-32", end="blind", depth_mm=10.0)
+# Keep 10 mm usable thread for the stock keeper screw's 8.6624 mm insertion.
+# The 36.5 mm rail leaves ample metal for a 16 mm drill: the 6 mm allowance
+# accommodates a standard plug tap's five-pitch lead, including the general
+# depth tolerances, without requiring a bottoming tap.
+KEEPER_TAP_SPEC = HoleSpec(
+    "tapped",
+    "#8-32",
+    end="blind",
+    depth_mm=16.0,
+    overrides_mm={"ThreadDepth": 10.0},
+)
 KEEPER_TAP_X = 199.9  # fulcrum line (build_channel_assembly FULCRUM[0])
 KEEPER_TAP_Z_FRONT = SUMMING_Z - 74.0  # -70.912
 KEEPER_TAP_Z_REAR = SUMMING_Z + 74.0  # +77.088
@@ -250,7 +259,7 @@ if STUD_Z_REAR + STUD_HOLE_DIA / 2.0 >= INNER_Z + GUSSET:
 if HUB_GUSSET_T / 2.0 > WEB_T / 2.0:
     raise AssertionError("hub V-gussets escape the east-rail web")
 if (
-    abs(KEEPER_TAP_X - COLUMN_X) + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
+    abs(KEEPER_TAP_X - COLUMN_X) + THREAD_MAJOR_MM[KEEPER_TAP_SPEC.size] / 2.0
     > WEB_T / 2.0
 ):
     raise AssertionError("keeper taps break out of the west-rail web")
@@ -439,7 +448,7 @@ def _side_tap_removal() -> float:
 
 
 def _set_tap_removal() -> float:
-    """Material the 1/4-20 x 8 set-screw tap removes (break-in to the bore)."""
+    """Material removed by the 1/4-20 tap through to the gooseneck bore."""
     r_h = TAP_DRILL_MM["1/4-20"] / 2.0
     r_v = GOOSENECK_BORE_DIA / 2.0
     floor_x = OUTER_X - SET_POCKET_DEPTH  # 212.1 (magnitudes, east side)
@@ -1315,12 +1324,6 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    set_dimension_symmetric_tolerance(
-        adapter, "OuterProfile", "Width", OUTER_PROFILE_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "OuterProfile", "Depth", OUTER_PROFILE_TOLERANCE_MM
-    )
     for recess_dia_name in (
         "CapRecessDia",
         "CapRecess1Dia",

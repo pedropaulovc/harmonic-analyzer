@@ -16,8 +16,6 @@ west-rail fulcrum-keeper taps.
 from __future__ import annotations
 
 
-OUTER_PROFILE_TOLERANCE_MM = 0.25
-
 # The column socket is the running fit around the 25.4 mm tube.  The band is
 # written upper/lower (the shared fit-limit convention); the builder converts
 # it to the model setter's lower/upper ordering.

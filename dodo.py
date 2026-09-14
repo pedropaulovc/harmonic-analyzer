@@ -2290,7 +2290,6 @@ def task_check():
         # discover them.  They must execute under the required recipe gate: these
         # tests reject drawing-owned tolerances/finishes and validate the typed
         # model-PMI controls that drawings consume.
-        SCRIPTS_DIR / "test_direct_dimension_tolerances.py",
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_spec.py",

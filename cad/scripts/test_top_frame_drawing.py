@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import math
 
+import _config
+import fulcrum_keeper_spec as keeper
+from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 import build_top_frame as part
 import top_frame_spec
 from frame_attachment_spec import (
@@ -99,3 +102,18 @@ def test_cross_tap_major_thread_and_drill_point_clear_the_far_wall() -> None:
     assert part.SIDE_TAP_DRILL_FAR_WALL_Z == drill_far_wall_z
     assert part.SIDE_TAP_THREAD_WALL_MARGIN > 0.0
     assert part.SIDE_TAP_DRILL_WALL_MARGIN > 0.0
+
+
+def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
+    major, length, _, _, pitch = FILLISTER_SIZES["90280A194"]
+    insertion = length - (keeper.FOOT_H - keeper.CBORE_DEPTH_MM)
+    spec = part.KEEPER_TAP_SPEC
+    full_thread = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
+    depth_tolerance = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
+
+    assert insertion >= major
+    assert full_thread - insertion >= 0.25
+    assert spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
+    drill_point = part.TAP_DRILL_MM[spec.size] / 2.0 * part.DRILL_POINT_H
+    assert spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
+    assert abs(part.KEEPER_TAP_X - part.COLUMN_X) + major / 2.0 < part.WEB_T / 2.0
