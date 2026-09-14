@@ -67,13 +67,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
 from tube_frame_spec import (
     COLUMN_LENGTH,
-    COLUMN_LENGTH_TOLERANCE_MM,
     CROSS_HOLE_DIAMETER,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -83,8 +79,8 @@ from tube_frame_spec import (
     LENGTH_VIEW_NOTE,
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
-    OUTER_DIA_BAND,
     TOP_END_CHAMFER,
+    TOP_END_CALLOUT,
     UPPER_CROSS_HOLE_Y,
     WALL_THICKNESS,
 )
@@ -96,7 +92,6 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # installed geometry with the base, top frame, and purchased cap through
 # tube_frame_spec/frame_attachment_spec.
 
-TOP_END_CHAMFER_BAND = (0.15, -0.10)
 
 
 def _transverse_hole_removal(
@@ -222,8 +217,8 @@ async def build(adapter) -> dict[str, str]:
     v_column = v_annulus - 2.0 * v_cross
     await volume_check(adapter, "cross-drilled column", v_column, 0.005 * v_cross + 1.0)
 
-    # Top-only C0.50 x 45 break clears the purchased cap's R0.3175 inner
-    # corner. The lower socketed end remains square.
+    # Top-only nominal C0.50 x 45 break provides the cap lead-in. Full seating
+    # by hand is the drawing acceptance; the lower socketed end remains square.
     check(
         "chamfer tube top",
         await adapter.add_chamfer(
@@ -244,18 +239,6 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "AnnulusProfile", "OuterDia", *deviations(OUTER_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "Column", "Length", COLUMN_LENGTH_TOLERANCE_MM
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "TopEndBreak",
-        "TopChamfer",
-        *deviations(TOP_END_CHAMFER_BAND),
-    )
     await volume_check(
         adapter, "driven open tube (equations neutral)", v_total, 0.001 * v_total
     )
@@ -279,6 +262,7 @@ async def build(adapter) -> dict[str, str]:
             "End View Note": END_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Length View Note": LENGTH_VIEW_NOTE,
+            "Top End Callout": TOP_END_CALLOUT,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

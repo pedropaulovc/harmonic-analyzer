@@ -71,7 +71,3 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # machining method live on the model/title block or on the attached callouts.
 DRAWING_NOTES = "CAPS ARE SEPARATE PURCHASED PARTS."
 DRAWING_NOTES_B = ""
-
-TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:2"
-SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:4"

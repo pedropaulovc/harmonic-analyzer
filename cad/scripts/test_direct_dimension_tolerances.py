@@ -14,7 +14,6 @@ import crank_drive_gear_spec
 import crank_pinion_spec
 import crankshaft_spec
 import top_frame_spec
-import tube_frame_spec
 
 
 def test_direct_tolerance_values_are_named_in_part_specs() -> None:
@@ -32,6 +31,4 @@ def test_direct_tolerance_values_are_named_in_part_specs() -> None:
     assert crankshaft_spec.SHAFT_DIA_BAND == (0.00, -0.02)
     assert crankshaft_spec.JOURNAL_DIA_BAND == (0.00, -0.02)
     assert cone_swing_platform_spec.PLATE_LENGTH_TOLERANCE_MM == 0.25
-    assert tube_frame_spec.OUTER_DIA_BAND == (0.00, -0.05)
-    assert tube_frame_spec.COLUMN_LENGTH_TOLERANCE_MM == 0.25
     assert top_frame_spec.OUTER_PROFILE_TOLERANCE_MM == 0.25

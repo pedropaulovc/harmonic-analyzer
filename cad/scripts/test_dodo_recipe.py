@@ -141,16 +141,17 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     assert revision_source in drawing["file_dep"]
 
 
-def test_drawing_tasks_depend_only_on_their_selected_layout_template():
+def test_drawing_tasks_depend_on_all_selected_layout_templates():
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_drawing()}
 
     assert tasks.keys() == dodo.DRAWINGS_BY_NAME.keys()
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
-        selected = {str(path.resolve()) for path in spec.assets}
-        assert selected == {str(dodo.DRAWING_TEMPLATES[spec.layout].path.resolve())}, (
-            stem
-        )
+        layouts = dict.fromkeys((spec.layout, *spec.additional_layouts))
+        selected = {
+            str(dodo.DRAWING_TEMPLATES[layout].path.resolve()) for layout in layouts
+        }
+        assert {str(path.resolve()) for path in spec.assets} == selected, stem
         template_deps = {
             str(Path(path).resolve())
             for path in tasks[stem]["file_dep"]

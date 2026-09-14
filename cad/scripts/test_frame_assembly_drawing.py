@@ -8,11 +8,16 @@ def test_frame_assembly_keeps_registered_identity_and_outputs() -> None:
     spec = DRAWINGS_BY_NAME["frame_assembly"]
     assert spec.source_kind == "assembly"
     assert spec.part == "frame"
-    assert spec.layout is DrawingLayout.LANDSCAPE
+    assert spec.layout is drawing.SHEET_LAYOUTS[drawing.SHEET_NAMES[0]]
     assert drawing.SOURCE == spec.source
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
     )
+    assert drawing.SHEET_LAYOUTS == {
+        "ASSEMBLED + JOINT SECTIONS": DrawingLayout.LANDSCAPE,
+        "EXPLODED VIEW + BOM": DrawingLayout.PORTRAIT,
+        "FITTING + ASSEMBLY": DrawingLayout.LANDSCAPE,
+    }
 
 
 def test_frame_package_covers_every_as_built_component_family() -> None:
