@@ -18,6 +18,11 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.roughness_um == 1.6
     assert control.face.normal == (-1, 0, 0)
     assert control.face.offset_mm == pen_rod_spec.ROD_SECTION / 2.0
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "surface_finishes=SURFACE_FINISHES" in part_source
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "slide_face")' in drawing_source
+    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -44,6 +49,16 @@ def test_wire_hole_is_part_owned_and_consumers_derive_from_it() -> None:
     assert drawing.WIRE_HOLE_SPEC is pen_rod_spec.WIRE_HOLE_SPEC
     assert drawing._WIRE_HOLE_DIA == blind_cut_dia_mm(pen_rod_spec.WIRE_HOLE_SPEC)
     assert pen_rod_spec.WIRE_HOLE_Y < pen_rod_spec.ROD_LENGTH
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "HoleSpec(" not in part_source
+    assert "\n        WIRE_HOLE_SPEC," in part_source
+    assert "expect_dia_mm=blind_cut_dia_mm(WIRE_HOLE_SPEC)" in part_source
+    assert "wire_cut.hole_dia_mm" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_native_hole_callout(") == 1
+    # Two located dims for the wire hole: along the rod (length) AND across the
+    # section (centerline), so the cross-hole cannot drift off-centre.
+    assert source.count("add_edge_dimension(") == 2
 
 
 def test_front_datum_edge_resolver_returns_visible_bottom_and_left(monkeypatch) -> None:
@@ -127,8 +142,9 @@ def test_linked_notes_define_remaining_square_rod_operations() -> None:
     assert "V-BLOCK" in notes
     assert drill_process(pen_rod_spec.WIRE_HOLE_SPEC) in notes
     assert "X.XX" not in notes
-    assert len(notes.splitlines()) == 3
-    assert max(map(len, notes.splitlines())) <= 60
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+    assert "def _manufacturing_notes" not in source
 
 
 def test_native_gdt_controls_slide_faces_and_ends() -> None:
@@ -150,15 +166,29 @@ def test_native_gdt_controls_slide_faces_and_ends() -> None:
     assert by_key["opposite_slide_face_parallelism"].face.normal == (1, 0, 0)
     assert by_key["bottom_end_squareness"].face.normal == (0, -1, 0)
 
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "project_part_pmi(" in source
+    assert "controls=GEOMETRIC_CONTROLS" in source
+    assert "add_feature_control_frame(" not in source
+    assert "add_datum_feature(" not in source
+    assert source.count("add_surface_finish(") == 1
 
 
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    assert drawing.TOP_VIEW_SCALE == 4.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("scale=(1, 1)") == 3
+    assert source.count("scale=(4, 1)") == 1
     assert pen_rod_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 4:1"
+    assert 'add_property_linked_note(adapter, "Top View Note"' in source
 
 
-def test_part_config_has_critical_properties() -> None:
+def test_part_stamps_make_critical_properties() -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_properties" in source
+    assert "clear_dimensions_for_drawing" in source
     import _config
 
     config = _config.parts("pen-rod")

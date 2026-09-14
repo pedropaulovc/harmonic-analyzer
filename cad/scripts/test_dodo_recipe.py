@@ -168,9 +168,6 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     stems = ("platen_guide", "bracket_screw", "pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     sources = {dodo.RELEASE_VERSION_FILE}
-    audit_script = dodo.SCRIPTS_DIR / "audit_drawing_layout.py"
-    sources.add(audit_script)
-    sources.update(Path(path) for path in dodo._helper_deps(audit_script))
     for stem in stems:
         spec = dodo.DRAWINGS_BY_NAME[stem]
         sources.update((spec.script, *spec.assets))
@@ -394,26 +391,6 @@ def test_registry_imported_helper_remains_in_complete_drawing_closure(
     registry.write_text(
         registry.read_text(encoding="utf-8")
         + "\nfrom _drawing_recipe_extra import VALUE\n",
-        encoding="utf-8",
-    )
-    before = snapshot()
-    helper.write_text("VALUE = 2\n", encoding="utf-8")
-    after = snapshot()
-    for stem in before:
-        assert all(a != b for a, b in zip(before[stem], after[stem])), stem
-
-
-def test_audit_imported_helper_remains_in_complete_drawing_closure(
-    isolated_drawing_keys,
-):
-    _dodo, root, snapshot = isolated_drawing_keys()
-    scripts = root / "cad" / "scripts"
-    helper = scripts / "_drawing_audit_extra.py"
-    helper.write_text("VALUE = 1\n", encoding="utf-8")
-    audit = scripts / "audit_drawing_layout.py"
-    audit.write_text(
-        audit.read_text(encoding="utf-8")
-        + "\nfrom _drawing_audit_extra import VALUE\n",
         encoding="utf-8",
     )
     before = snapshot()
@@ -838,9 +815,9 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         dodo,
-        "_exec_com",
+        "_exec",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("cache HIT built or audited drawing")
+            AssertionError("cache HIT built drawing")
         ),
     )
 
@@ -850,12 +827,12 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     assert not stores
 
 
-def test_cached_drawing_miss_builds_audits_then_stores(tmp_path, monkeypatch):
+def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     dodo = _load_dodo()
     output = tmp_path / "platen-guide.SLDDRW"
     outcomes = iter((False, False))
     restores = []
-    actions = []
+    builds = []
     stores = []
 
     monkeypatch.setattr(
@@ -873,19 +850,11 @@ def test_cached_drawing_miss_builds_audits_then_stores(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
 
-    def execute(cmd, *_args, **_kwargs):
-        action = (
-            "audit"
-            if Path(cmd[1]).name == "audit_drawing_layout.py"
-            else "build"
-        )
-        actions.append(action)
-        if action == "build":
-            output.write_bytes(b"drawing")
-            return
-        assert output.is_file()
+    def build(*_args, **_kwargs):
+        builds.append(True)
+        output.write_bytes(b"drawing")
 
-    monkeypatch.setattr(dodo, "_exec_com", execute)
+    monkeypatch.setattr(dodo, "_exec_com", build)
     monkeypatch.setattr(
         dodo._cache,
         "store",
@@ -895,50 +864,9 @@ def test_cached_drawing_miss_builds_audits_then_stores(tmp_path, monkeypatch):
     dodo._cached_drawing_action("platen_guide")
 
     assert len(restores) == 2
-    assert actions == ["build", "audit"]
+    assert builds == [True]
     assert len(stores) == 1
     assert stores[0][1] == [output]
-
-
-def test_cached_drawing_audit_failure_prevents_cache_publication(
-    tmp_path, monkeypatch
-):
-    dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
-    outcomes = iter((False, False))
-    stores = []
-
-    monkeypatch.setattr(
-        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
-    )
-    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
-    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
-    monkeypatch.setattr(
-        dodo._cache,
-        "restore",
-        lambda *_args, **_kwargs: next(outcomes),
-    )
-    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
-    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
-
-    def execute(cmd, *_args, **_kwargs):
-        if Path(cmd[1]).name == "audit_drawing_layout.py":
-            raise RuntimeError("layout rejected")
-        output.write_bytes(b"drawing")
-
-    monkeypatch.setattr(dodo, "_exec_com", execute)
-    monkeypatch.setattr(
-        dodo._cache,
-        "store",
-        lambda *args, **_kwargs: stores.append(args) or "stored",
-    )
-
-    with pytest.raises(RuntimeError, match="layout rejected"):
-        dodo._cached_drawing_action("platen_guide")
-
-    assert stores == []
-
-
 
 
 def test_cache_status_covers_drawings():

@@ -2114,35 +2114,6 @@ def _visible_document_paths(adapter: Any) -> list[str]:
     return paths
 
 
-def _close_drawing_and_verify(
-    adapter: Any,
-    drawing_path: str | Path,
-    drawing_model: Any | None = None,
-) -> None:
-    """Close one saved drawing by title and prove its visible document is gone."""
-    path = Path(drawing_path).resolve()
-    model = drawing_model if drawing_model is not None else adapter.currentModel
-    title = model.GetTitle()
-    if not title:
-        model_path = str(model.GetPathName() or "")
-        if not model_path or Path(model_path).resolve() != path:
-            raise RuntimeError(
-                f"drawing {path} has no usable title or matching document path"
-            )
-        # CloseDoc wants the document title, not a path. A saved document's file
-        # name is the only safe fallback when this SOLIDWORKS build returns an
-        # empty GetTitle() value.
-        title = path.name
-    adapter.swApp.CloseDoc(str(title))
-    still_open = [
-        visible_path
-        for visible_path in _visible_document_paths(adapter)
-        if Path(visible_path).resolve() == path
-    ]
-    if still_open:
-        raise RuntimeError(f"drawing {title!r} did not close")
-
-
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
@@ -2160,10 +2131,10 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     # The part/assembly/drawing this process is building -- surfaced in the span
     # NAMES so the trace title + waterfall say WHICH target is processing, not a
     # generic "build". A part script is build_<stem>.py; an assembly script is
-    # build_<stem>_assembly.py; a drawing script is draw_<stem>.py. Both
-    # refresh_assembly.py and audit_drawing_layout.py take the target as argv[1].
-    if script in {"audit_drawing_layout", "refresh_assembly"} and len(sys.argv) > 1:
-        target = Path(sys.argv[1]).stem.removesuffix(".SLDASM").replace("_", "-")
+    # build_<stem>_assembly.py; a drawing script is draw_<stem>.py;
+    # refresh_assembly.py takes the stem as argv[1].
+    if script == "refresh_assembly" and len(sys.argv) > 1:
+        target = sys.argv[1].removesuffix(".SLDASM").replace("_", "-")
     elif script.startswith("draw_"):
         target = script.removeprefix("draw_")
     else:
