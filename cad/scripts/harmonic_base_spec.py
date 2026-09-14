@@ -60,13 +60,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Keep this block to short, part-specific facts that are not already legible
 # in a native dimension, hole table, or feature callout.  Finish and masking
 # live in the registry's Finish field.
-DRAWING_NOTES = "\n".join(
-    (
-        "TOP-DECK BLIND TAPPED SEATS: USE THE ASSOCIATIVE HOLE TABLE.",
-        "CROSS TAPS: BOTTOMING-TAPPED SIDE WALLS; SEE SECTION A-A.",
-        "STAMPED SERIAL IDENTIFIER: LEAVE BRIGHT BESIDE THE NAMEPLATE.",
-    )
-)
+DRAWING_NOTES = "STAMPED SERIAL IDENTIFIER: LEAVE BRIGHT BESIDE THE NAMEPLATE."
 
 
 # Base/frame parts carry no datums or feature-control frames under the drawing

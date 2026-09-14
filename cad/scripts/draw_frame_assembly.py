@@ -18,6 +18,9 @@ import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _balloon_item_number,
+    _edge_endpoint_key,
+    _spread_balloons,
     add_component_bom_balloons,
     create_section_view,
     finalize_drawing,
@@ -48,6 +51,7 @@ from frame_cross_screw_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from solidworks_mcp.adapters.com_variant import dispatch_array
 
 
 SPEC = DRAWINGS_BY_NAME["frame_assembly"]
@@ -80,10 +84,10 @@ WORKING_FRONT_CENTER = (0.090, 0.155)
 BASE_SECTION_CENTER = (0.190, 0.165)
 TOP_SECTION_CENTER = (0.325, 0.165)
 JOINT_SECTION_SCALE = (1.0, 4.0)
-EXPLODED_ISO_CENTER = (0.140, 0.208)
+EXPLODED_ISO_CENTER = (0.140, 0.198)
 EXPLODED_ISO_SCALE = (1.0, 7.0)
-ASSEMBLY_ISO_CENTER = (0.345, 0.145)
-ASSEMBLY_ISO_SCALE = (1.0, 10.0)
+ASSEMBLY_ISO_CENTER = (0.345, 0.172)
+ASSEMBLY_ISO_SCALE = (1.0, 7.0)
 BOM_ANCHOR = (0.018, 0.414)
 
 # Drawing-selection coordinate only. The manufacturing column pitch remains
@@ -153,41 +157,39 @@ SOURCE_CONFIGURATION = "Default"
 ASSEMBLY_STEPS = "\n".join(
     (
         "MATCH-FIT AND ASSEMBLY SEQUENCE",
-        "PARTS ARRIVE COMPLETE TO THEIR CONTROLLED PART DRAWINGS.",
-        "1. COLUMNS OUT: RUN AN ACTUAL MHA-132 THROUGH BOTH CASTING THREAD",
-        "   SEGMENTS AT EVERY BASE/TOP SOCKET. EACH HEAD MUST SEAT BEFORE ITS",
-        "   TIP BOTTOMS; REMOVE THE SCREWS.",
-        "2. DECK UP. ASSIGN EACH MHA-083 TO ONE MHA-035 SOCKET; HAND-FIT TO",
+        "1. DECK UP. ASSIGN EACH MHA-083 TO ONE MHA-035 SOCKET; HAND-FIT TO",
         "   FULL SHOULDER SEATING WITHOUT BIND OR ROCK; MATCH-MARK CORNER/ORIENTATION.",
-        "3. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
+        "2. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
         "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
-        "   SMALLER THAN THE 4.0386 TAP MINOR; PROTECT BOTH THREAD SEGMENTS.",
+        "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS.",
         f"   REMOVE COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
         "AND DEBURR.",
         "   THE ACTUAL MHA-132 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
-        "4. FIT MHA-077 OVER ALL COLUMNS, HUB EAST. SET BOTH FRONT AND REAR",
-        "   CROSS-BORE AXES TO THE SHEET-1 HEIGHT DIMENSION; CLAMP LEVEL/SQUARE.",
-        "   MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
-        "5. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
-        "   AXIS THROUGH BOTH TUBE WALLS AS STEP 3; PROTECT BOTH THREAD SEGMENTS.",
+        "3. FIT MHA-077 OVER THE COLUMNS, HUB OPPOSITE THE MHA-086 END.",
+        "   HAND-FIT EACH BORE WITHOUT BIND OR ROCK ON ITS MATCHED COLUMN.",
+        "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE SHEET-1 HEIGHT DIMENSION.",
+        "   COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE AT EACH AXIS.",
+        "   CLAMP; MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
+        "4. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
+        "   AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD SEGMENTS.",
         f"   REMOVE MHA-077/COLUMNS; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f},",
         "   DEBURR, AND VERIFY FREE PASSAGE OF THE ACTUAL MHA-132 SHANK.",
-        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THEIR MARKED",
+        "5. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THEIR MARKED",
         "   ENTRY SIDES; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
-        "7. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
+        "6. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
         "   AFTER MATCH MARKS ALIGN AND MHA-132 HEADS SEAT, PUSH EACH CAP OVER",
         "   THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S INSIDE SEAT.",
-        "8. SEAT MHA-089 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
-        "   MHA-039 TOP-DOWN AND DRAW DOWN EVENLY.",
-        "9. INSTALL MHA-086 DECORATED FACE UP WITH FOUR MHA-030 SCREWS.",
-        "10. START MHA-118 IN EAST HUB; LEAVE CUP POINT CLEAR OF GOOSENECK BORE.",
+        "7. SEAT MHA-089 ON DECK, WINDOWS TOWARD LONG SIDES; INSTALL FOUR",
+        "   MHA-039 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
+        "8. INSTALL MHA-086 DECORATED FACE UP; SEAT ALL FOUR MHA-030 HEADS.",
+        "9. START MHA-118 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
     (
         "ASSEMBLY-ONLY CHECKS",
-        "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED AND THE",
-        "   TOP FRAME IS LEVEL/SQUARE WITH FRONT/REAR AXES AT THE SHEET-1 HEIGHT.",
+        "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED.",
+        "   EACH FRONT/REAR TOP AXIS MEETS THE HEIGHT FROM THE BASE UNDERSIDE.",
         "2. ALL EIGHT MHA-132 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
         "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
         "   NEAR AND FAR CASTING THREAD SEGMENTS.",
@@ -271,10 +273,10 @@ def _checked_height_dimension(
         raise RuntimeError(
             f"{label} measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
-    if int(display.SetPrecision3(2, -1, -1, -1)) < 0:
+    if int(display.SetPrecision3(1, -1, -1, -1)) < 0:
         raise RuntimeError(f"failed to set {label} precision")
-    if int(display.GetPrimaryPrecision2()) != 2:
-        raise RuntimeError(f"{label} did not retain two-place precision")
+    if int(display.GetPrimaryPrecision2()) != 1:
+        raise RuntimeError(f"{label} did not retain one-place precision")
     adapter.currentModel.EditRebuild3()
     return display
 
@@ -726,12 +728,12 @@ def _append_template_sheet(
         )
     finally:
         primary_error = sys.exception()
-        cleanup_error: BaseException | None = None
+        cleanup_error: Exception | None = None
         if donor_title:
             try:
                 adapter.swApp.CloseDoc(donor_title)
                 _activate_frame_package(adapter, target)
-            except BaseException as exc:
+            except Exception as exc:
                 cleanup_error = exc
         if cleanup_error is not None:
             if primary_error is None:
@@ -764,8 +766,68 @@ def _create_mixed_package_sheets(adapter: Any) -> None:
         raise RuntimeError(f"frame package sheet order mismatch: {actual!r}")
 
 
+def _upper_frame_balloon_edges(adapter: Any, view: Any) -> dict[str, Any]:
+    """Choose exposed support-body and screw-head edges, not feet or shanks."""
+    wanted = {"rocker-arm-support", "lag-screw"}
+    full = {}
+    for raw in view.GetVisibleDrawingComponents() or ():
+        component = _early_bound(_early_bound(raw, "IDrawingComponent").Component, "IComponent2")
+        full[str(component.Name2).rsplit("/", 1)[-1]] = component
+    winners = {}
+    for raw in view.GetVisibleComponents() or ():
+        component = _early_bound(raw, "IComponent2")
+        stem = _component_stem(component)
+        if stem not in wanted:
+            continue
+        name = str(component.Name2).rsplit("/", 1)[-1]
+        for edge in view.GetVisibleEntities2(component, 1) or ():
+            key = _edge_endpoint_key(adapter, edge)
+            if key is None:
+                continue
+            p0 = _component_point_in_assembly(full[name], key[:3])
+            p1 = _component_point_in_assembly(full[name], key[3:6])
+            score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
+            if stem not in winners or score > winners[stem][0]:
+                winners[stem] = (score, edge)
+    if set(winners) != wanted:
+        raise RuntimeError(f"missing visible upper frame component edges: {set(winners)}")
+    return {stem: row[1] for stem, row in winners.items()}
+
+
+def _reattach_frame_balloons(
+    adapter: Any, view: Any, balloons: Sequence[Any], items: Sequence[tuple[str, str]]
+) -> None:
+    anchors = _upper_frame_balloon_edges(adapter, view)
+    item_by_stem = dict(items)
+    notes = {
+        _balloon_item_number(adapter, note, label="frame balloon"): note
+        for note in balloons
+    }
+    for stem, edge in anchors.items():
+        item = item_by_stem[stem]
+        note = _early_bound(notes[item], "INote")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        expected_edge = _edge_endpoint_key(adapter, edge)
+        if not annotation.SetAttachedEntities(dispatch_array([edge])):
+            raise RuntimeError(f"frame balloon {item} rejected native reattachment")
+        adapter.currentModel.EditRebuild3()
+        attached = tuple(annotation.GetAttachedEntities3() or ())
+        actual_edge = _edge_endpoint_key(adapter, attached[0]) if len(attached) == 1 else None
+        actual_item = _balloon_item_number(adapter, note, label="reattached frame balloon")
+        if actual_item != item or actual_edge != expected_edge:
+            raise RuntimeError(f"frame balloon {item} lost its exact edge or BOM binding")
+    _spread_balloons(adapter, view, balloons, margin=0.012)
+    adapter.currentModel.EditRebuild3()
+
+
 def _place_package(adapter: Any) -> None:
     _create_mixed_package_sheets(adapter)
+    for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
+        _activate_sheet(adapter, sheet_name)
+        _add_note_block(
+            adapter, f"SHEET {sheet_number} OF {len(SHEET_NAMES)}", (0.018, 0.025),
+            label="package sheet number",
+        )
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
@@ -807,13 +869,14 @@ def _place_package(adapter: Any) -> None:
         label="frame",
     )
     balloon_items = _validate_frame_bom(adapter, table)
-    add_component_bom_balloons(
+    balloons = add_component_bom_balloons(
         adapter,
         exploded,
         items=balloon_items,
         label="frame exploded-view BOM coverage",
         margin=0.012,
     )
+    _reattach_frame_balloons(adapter, exploded, balloons, balloon_items)
     _add_note_block(
         adapter,
         "EXPLODED VIEW 1:7 - SEE SHEET 3 FOR INSTALLATION ORDER",
@@ -836,8 +899,8 @@ def _place_package(adapter: Any) -> None:
     _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.115), label="assembly checks")
     _add_note_block(
         adapter,
-        "FINISHED ASSEMBLY 1:10",
-        (0.300, 0.078),
+        "FINISHED ASSEMBLY 1:7",
+        (0.300, 0.074),
         label="assembly isometric caption",
     )
 

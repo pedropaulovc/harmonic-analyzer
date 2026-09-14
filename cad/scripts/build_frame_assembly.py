@@ -558,19 +558,25 @@ def _create_frame_explode(adapter: Any) -> None:
                     if any(abs(current[i] - baseline[name][i]) > 1e-9 for i in (*range(9), 12)):
                         raise RuntimeError(f"{label}: {name} presentation rotated or scaled")
     finally:
-        model.ClearSelection2(True)
-        if not assembly.ShowExploded2(False, FRAME_EXPLODED) or not model.EditRebuild3():
-            raise RuntimeError("FRAME_EXPLODED: failed to restore collapsed operational assembly")
-        for component in components:
-            name = str(component.Name2)
-            current = _explode_transform(component)
-            transform = _early_bound(component.Transform2, "IMathTransform")
-            operational = tuple(float(value) for value in transform.ArrayData)
-            if len(operational) != 16 or any(
-                abs(values[i] - baseline[name][i]) > 1e-9
-                for values in (current, operational) for i in range(16)
-            ):
-                raise RuntimeError(f"FRAME_EXPLODED: collapse changed operational transform of {name}")
+        primary_error = sys.exception()
+        try:
+            model.ClearSelection2(True)
+            if not assembly.ShowExploded2(False, FRAME_EXPLODED) or not model.EditRebuild3():
+                raise RuntimeError("FRAME_EXPLODED: failed to restore collapsed operational assembly")
+            for component in components:
+                name = str(component.Name2)
+                current = _explode_transform(component)
+                transform = _early_bound(component.Transform2, "IMathTransform")
+                operational = tuple(float(value) for value in transform.ArrayData)
+                if len(operational) != 16 or any(
+                    abs(values[i] - baseline[name][i]) > 1e-9
+                    for values in (current, operational) for i in range(16)
+                ):
+                    raise RuntimeError(f"FRAME_EXPLODED: collapse changed operational transform of {name}")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"FRAME_EXPLODED: cleanup after authoring failure: {cleanup_error}")
     if int(configuration.GetNumberOfExplodeSteps()) != len(plans):
         raise RuntimeError("FRAME_EXPLODED: collapsed presentation lost authored steps")
     if tuple(assembly.GetExplodedViewNames2("Default") or ()) != (FRAME_EXPLODED,):

@@ -20,6 +20,7 @@ import argparse
 import sys
 from typing import Any
 
+from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
@@ -28,6 +29,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
+    create_blank_drawing_sheets,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
@@ -52,6 +54,8 @@ from build_harmonic_base import (
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     COLUMN_X,
+    COLUMN_SOCKET_XZ,
+    COLUMN_SOCKET_DIAMETER,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
     HOLD_DOWN_TAP_DRILL_DIA,
@@ -82,6 +86,7 @@ from frame_attachment_spec import (
     BASE_SCREW_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -99,99 +104,85 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 4.0)  # 1:4 whole sheet keeps this data-dense print legible
-PLAN_SCALE = SHEET_SCALE
-VIEW_SCALE = PLAN_SCALE[0] / PLAN_SCALE[1]
+SHEET_SCALE = (1.0, 4.0)
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS")
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
 
-# Sheet layout (meters). The full-height native hole table owns the left
-# column, where it may extend below the title-block top without entering that
-# right-side keep-out. Views, controls, and notes occupy the remaining field.
-TOP_CENTER = (0.230, 0.205)
-SIDE_CENTER = (0.230, 0.145)
-SECTION_CENTER = (0.360, 0.150)
+# Two landscape B sheets keep each annotation authoritative and readable:
+# exterior geometry on sheet 1; the associative hole table, sockets and
+# cross-taps on sheet 2.
+TOP_CENTER = (0.145, 0.185)
+SIDE_CENTER = (0.145, 0.100)
 ISO_SCALE = (1, 10)
-ISO_CENTER = (0.350, 0.240)
-SIDE_NOTE_XY = (0.170, 0.128)
-SECTION_NOTE_XY = (0.385, 0.126)
-ISO_NOTE_XY = (0.305, 0.212)
+ISO_CENTER = (0.335, 0.190)
+HOLE_TOP_CENTER = (0.280, 0.195)
+HOLE_SIDE_CENTER = (0.280, 0.095)
+SECTION_CENTER = (0.375, 0.135)
+HOLE_TABLE_ANCHOR = (0.018, 0.260)
 
-# Per-view survivors of the native marked-dimension import. Footprint and
-# corner/edge-break dimensions live in the plan; plate thicknesses and the
-# underside edge break live in the front elevation; socket/spotface depths and
-# the pad-root fillet live only in section A-A.
-TOP_KEEP = {
-    "BottomLen": (
-        TOP_CENTER[0],
-        TOP_CENTER[1]
-        + max(abs(BOTTOM_FRONT_Z), abs(BOTTOM_REAR_Z)) * VIEW_SCALE / 1000.0
-        + 0.008,
-    ),
-    "TopLen": (
-        TOP_CENTER[0],
-        TOP_CENTER[1]
-        + max(abs(TOP_FRONT_Z), abs(TOP_REAR_Z)) * VIEW_SCALE / 1000.0
-        + 0.016,
-    ),
-    "BottomWid": (
-        TOP_CENTER[0] + BOTTOM_LENGTH * VIEW_SCALE / 2000.0 + 0.017,
-        TOP_CENTER[1],
-    ),
-    "TopWid": (
-        TOP_CENTER[0] + TOP_LENGTH * VIEW_SCALE / 2000.0 + 0.030,
-        TOP_CENTER[1],
-    ),
-    "PadCornerRadius": (TOP_CENTER[0] - 0.090, TOP_CENTER[1] + 0.030),
-    "FlangeCornerRadius": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] + 0.030),
-    "RimInnerCornerRadius": (TOP_CENTER[0] + 0.015, TOP_CENTER[1] - 0.050),
-    "BottomEdgeChamfer": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] - 0.020),
-    "Socket0X": (TOP_CENTER[0] - 0.050, TOP_CENTER[1] - 0.050),
-    "Socket0Z": (TOP_CENTER[0] - 0.085, TOP_CENTER[1]),
-    "SocketDia": (TOP_CENTER[0] - 0.058, TOP_CENTER[1] + 0.043),
+# Per-view survivors of the native marked-dimension import. Sheet 1 owns the
+# exterior envelope and edge geometry. Sheet 2 owns socket and hole definition.
+GEOMETRY_TOP_KEEP = {
+    "BottomLen": (TOP_CENTER[0], 0.244),
+    "TopLen": (TOP_CENTER[0], 0.230),
+    "BottomWid": (0.238, 0.172),
+    "TopWid": (0.217, 0.200),
+    "PadCornerRadius": (0.055, 0.205),
+    "FlangeCornerRadius": (0.040, 0.215),
+    "RimInnerCornerRadius": (0.055, 0.195),
+    "BottomEdgeChamfer": (0.070, 0.247),
 }
 SIDE_KEEP = {
-    "BottomThickness": (SIDE_CENTER[0] - 0.085, SIDE_CENTER[1]),
-    "TopThickness": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1]),
-    "TopRimChamfer": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1] + 0.018),
+    "BottomThickness": (0.073, 0.095),
+    "TopThickness": (0.228, 0.094),
+    "TopRimChamfer": (0.230, 0.124),
+}
+HOLE_TOP_KEEP = {
+    "SocketDia": (0.280, 0.245),
 }
 SECTION_KEEP = {
     "SocketDepth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1]),
-    "SpotFaceDia": (SECTION_CENTER[0] + 0.040, SECTION_CENTER[1] + 0.010),
-    "SpotFaceDepth": (SECTION_CENTER[0] + 0.038, SECTION_CENTER[1] - 0.010),
-    "PadRootRadius": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + 0.015),
+    "SpotFaceDia": (0.399, 0.157),
+    "SpotFaceDepth": (0.399, 0.113),
+    "PadRootRadius": (0.392, 0.180),
 }
-DIMENSION_CALLOUTS = {
+GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
-    "SocketDia": "4X COLUMN SOCKET; FIT MHA-083 TUBE; SLIP BY HAND",
-    "TopRimChamfer": "X 45 DEG; UPPER RIM EDGES",
-    "BottomEdgeChamfer": "X 45 DEG; UNDERSIDE EDGES",
+    "TopRimChamfer": "X 45 DEG; UPPER RIM",
+    "BottomEdgeChamfer": "X 45 DEG; UNDERSIDE",
+}
+HOLE_CALLOUTS = {
+    "SocketDia": "4X COLUMN SOCKET\nFIT MHA-083 TUBE; SLIP BY HAND",
     "SpotFaceDia": "4X SPOTFACE",
 }
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
-# corner.  The physical corner is filleted, so the native table is seeded from
-# the two visible outer edges and reattached to a retained view point at their
-# virtual intersection.
+# corner. The physical corner is filleted, so the native table is seeded from
+# the two visible outer edges and reattached to a retained view point there.
 _TABLE_ORIGIN_XY = (
-    TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
-    TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
+    HOLE_TOP_CENTER[0] - BOTTOM_LENGTH * VIEW_SCALE / 2000.0,
+    HOLE_TOP_CENTER[1] - BOTTOM_REAR_Z * VIEW_SCALE / 1000.0,
 )
-HOLE_TABLE_ANCHOR = (0.015, 0.265)
 
 
-def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
-    """Sheet point for a plan station (machine X, Z in mm), top view."""
+def _plan_xy(
+    x_mm: float, z_mm: float, *, center: tuple[float, float] = TOP_CENTER
+) -> tuple[float, float]:
+    """Sheet point for a machine X/Z station in one top view."""
     return (
-        TOP_CENTER[0] + x_mm * VIEW_SCALE / 1000.0,
-        TOP_CENTER[1] - z_mm * VIEW_SCALE / 1000.0,
+        center[0] + x_mm * VIEW_SCALE / 1000.0,
+        center[1] - z_mm * VIEW_SCALE / 1000.0,
     )
 
 
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
-    """Sheet pick on a plan-view hole rim, offset in machine +X."""
-    return _plan_xy(x_mm + diameter_mm / 2.0, z_mm)
+    """Sheet pick on a hole-sheet plan rim, offset in machine +X."""
+    return _plan_xy(
+        x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER
+    )
 
 
 @_telemetry.traced("drawing.base_cross_tap_edge")
@@ -227,12 +218,28 @@ def _check_cross_tap_callout(display: Any) -> None:
         "hw-tapdrldepth": BASE_CROSS_TAP_SPEC.depth_mm,
         "hw-threaddepth": BASE_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"],
     }
+    expected_strings = {
+        "hw-threaddesc": "10-32 UNF",
+        "hw-threadclass": BASE_CROSS_TAP_SPEC.thread_class,
+    }
     found = set()
     for raw in display.GetHoleCalloutVariables() or ():
-        variable = _early_bound(raw, "ICalloutVariable")
-        name = str(variable.VariableName)
-        if name not in expected:
+        late = dynamic_dispatch(raw._oleobj_)
+        name = str(late.VariableName)
+        if name in expected_strings:
+            if int(late.Type) != 3:
+                raise RuntimeError(f"base tap callout {name} is not a string variable")
+            actual = str(_early_bound(raw, "ICalloutStringVariable").String or "")
+            if actual.strip(" -") != expected_strings[name]:
+                raise RuntimeError(
+                    f"base tap callout {name}: {actual!r} != {expected_strings[name]!r}"
+                )
+            found.add(name)
             continue
+        if name not in expected:
+            raise RuntimeError(f"unexpected base tap callout variable {name!r}")
+        if int(late.Type) != 1:
+            raise RuntimeError(f"base tap callout {name} is not a length variable")
         length = _early_bound(raw, "ICalloutLengthVariable")
         actual_mm = float(length.Length) * 1000.0
         if abs(actual_mm - expected[name]) > 1e-5:
@@ -240,9 +247,10 @@ def _check_cross_tap_callout(display: Any) -> None:
                 f"base tap callout {name}: {actual_mm} != {expected[name]} mm"
             )
         found.add(name)
-    if found != set(expected):
+    required = set(expected) | set(expected_strings)
+    if found != required:
         raise RuntimeError(
-            f"base tap callout is missing native variables: {set(expected) - found}"
+            f"base tap callout is missing native variables: {required - found}"
         )
 
 
@@ -275,9 +283,7 @@ def _add_rim_width(adapter: Any, view: Any) -> Any:
         edge = max(items, key=lambda item: item[0])[1]
         if not view.SelectEntity(edge, index > 0):
             raise RuntimeError(f"failed to select base rim wall {index}")
-    display = drawing.AddHorizontalDimension2(
-        TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.042, 0.0
-    )
+    display = drawing.AddHorizontalDimension2(0.240, 0.155, 0.0)
     drawing.ClearSelection2(True)
     if display is None:
         raise RuntimeError("failed to create base rim-width dimension")
@@ -289,13 +295,47 @@ def _add_rim_width(adapter: Any, view: Any) -> Any:
     return display
 
 
-@_telemetry.traced("drawing.base_iso_annotation_visibility")
-def _hide_iso_annotations(view: Any) -> None:
-    for raw in _early_bound(view, "IView").GetAnnotations() or ():
-        annotation = _early_bound(raw, "IAnnotation")
-        annotation.Visible = 3  # swAnnotationHidden
-        if int(annotation.Visible) != 3:
-            raise RuntimeError("base isometric annotation did not hide")
+def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
+    candidates = []
+    for raw in visible_view_entities(view, 1, label="base height edges"):
+        edge = _early_bound(raw, "IEdge")
+        if not _early_bound(edge.GetCurve(), "ICurve").IsLine():
+            continue
+        x0, y0, z0, x1, y1, z1 = tuple(edge.GetCurveParams2())[:6]
+        if (
+            abs(y0 - height_mm / 1000.0) < 1e-7
+            and abs(y1 - y0) < 1e-7
+            and abs(z1 - z0) < 1e-7
+            and abs(x1 - x0) > 1e-6
+        ):
+            candidates.append((abs(x1 - x0), edge))
+    if not candidates:
+        raise RuntimeError(f"base front lacks a horizontal edge at {height_mm} mm")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _add_base_height(
+    adapter: Any, view: Any, upper_edge: Any, expected_mm: float,
+    text_xy: tuple[float, float], label: str,
+) -> Any:
+    drawing = adapter.currentModel
+    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate {label} view")
+    drawing.ClearSelection2(True)
+    for index, edge in enumerate((_horizontal_base_edge(view, 0.0), upper_edge)):
+        if not view.SelectEntity(edge, index > 0):
+            raise RuntimeError(f"failed to select {label} edge {index}")
+    display = drawing.AddVerticalDimension2(*text_xy, 0.0)
+    drawing.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to create {label}")
+    display = _early_bound(display, "IDisplayDimension")
+    actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    if abs(actual_mm - expected_mm) > 1e-5:
+        raise RuntimeError(f"{label} measured {actual_mm}, expected {expected_mm} mm")
+    return display
+
+
 
 
 ALL_HOLES = (
@@ -307,6 +347,7 @@ ALL_HOLES = (
     # Keep later seat groups after the earlier mounting-seat groups.
     *((x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ),
     (*LOCK_KNOB_XZ, LOCK_SCREW_HOLE_DIA),
+    *((x, z, COLUMN_SOCKET_DIAMETER) for x, z in COLUMN_SOCKET_XZ),
 )
 
 
@@ -412,9 +453,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Side View Note",
-            "Section View Note",
-            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -422,14 +460,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Side View Note",
-            "Section View Note",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="harmonic-base package")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -446,64 +482,96 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to set end-only section cutting line")
     if extension.GetUserPreferenceInteger(542, 0) != 1:
         raise RuntimeError("section cutting-line style did not persist")
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
-    # Explicit per-view scale prevents coordinate-based picks drifting.
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=PLAN_SCALE)
-    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=(1, 4))
-    section_line_x = _plan_xy(COLUMN_X, 0.0)[0]
-    section = create_section_view(
-        adapter,
-        top,
-        line_start=(section_line_x, TOP_CENTER[1] - 0.040),
-        line_end=(section_line_x, TOP_CENTER[1] + 0.040),
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=(1, 4),
-        label="base column-socket section",
-    )
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate harmonic-base geometry sheet")
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (top, side, section, iso):
+    for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
     top_dimensions = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter, top, keep=GEOMETRY_TOP_KEEP, view_label="geometry top"
     )
     side_dimensions = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="front elevation"
+        adapter, side, keep=SIDE_KEEP, view_label="geometry front"
+    )
+    set_dimension_callouts(
+        adapter,
+        [*top_dimensions, *side_dimensions],
+        GEOMETRY_CALLOUTS,
+    )
+
+    _add_rim_width(adapter, top)
+    _add_base_height(
+        adapter, side, _horizontal_base_edge(side, RIM_TOP), RIM_TOP,
+        (0.052, 0.106), "overall rim height",
+    )
+
+    add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
+    add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
+    add_note(adapter, "ISOMETRIC VIEW SCALE 1:10", 0.305, 0.135)
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.275, 0.100, char_height=0.002
+    )
+    for view in (top, side):
+        set_hidden_lines_visible(adapter, view)
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate harmonic-base holes sheet")
+    hole_top = place_view(
+        adapter, str(SOURCE), "*Top", *HOLE_TOP_CENTER, scale=SHEET_SCALE
+    )
+    hole_side = place_view(
+        adapter, str(SOURCE), "*Front", *HOLE_SIDE_CENTER, scale=SHEET_SCALE
+    )
+    section_line_x = _plan_xy(COLUMN_X, 0.0, center=HOLE_TOP_CENTER)[0]
+    section = create_section_view(
+        adapter,
+        hole_top,
+        line_start=(section_line_x, HOLE_TOP_CENTER[1] - 0.040),
+        line_end=(section_line_x, HOLE_TOP_CENTER[1] + 0.040),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SHEET_SCALE,
+        label="base column-socket section",
+    )
+    for view in (hole_top, hole_side, section):
+        set_hidden_lines_removed(adapter, view)
+
+    hole_dimensions = curate_view_dimensions(
+        adapter, hole_top, keep=HOLE_TOP_KEEP, view_label="holes top"
     )
     section_dimensions = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
     set_dimension_callouts(
         adapter,
-        [*top_dimensions, *side_dimensions, *section_dimensions],
-        DIMENSION_CALLOUTS,
+        [*hole_dimensions, *section_dimensions],
+        HOLE_CALLOUTS,
     )
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
+    if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
     table_origin = create_view_theoretical_datum(
         adapter,
-        top,
+        hole_top,
         point_xy=(-BOTTOM_LENGTH / 2000.0, -BOTTOM_REAR_Z / 1000.0),
         label="harmonic-base finished-corner table origin",
     )
     hole_entities, table_x_axis, table_y_axis = _visible_hole_table_entities(
-        adapter, top
+        adapter, hole_top
     )
-
-    # One complete hole table for the top-side mounting seats. Section A-A
-    # separately defines the horizontal column-retention taps.
-    insert_hole_table(
+    hole_table = insert_hole_table(
         adapter,
-        top,
+        hole_top,
         datum_xy=_TABLE_ORIGIN_XY,
         datum_point=table_origin,
         hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in ALL_HOLES),
         datum_axes=(table_x_axis, table_y_axis),
         hole_entities=hole_entities,
-        # Every printed LOC is re-derived from the shared stations: X from the
-        # finished left edge, Y from the finished rear edge.
         expected_locations_mm=tuple(
             (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
             for x, z, _diameter in ALL_HOLES
@@ -512,33 +580,34 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="harmonic-base mounting",
     )
+    hole_feature = _early_bound(
+        _early_bound(hole_table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
+    )
+    hole_feature.CombineSameSize = True
+    if not hole_feature.CombineSameSize or hole_feature.CombineTags:
+        raise RuntimeError("base hole table did not retain individual coordinate tags")
+    if int(hole_table.RowCount) != len(ALL_HOLES) + 1:
+        raise RuntimeError("combining base hole sizes changed individual table rows")
+    for row in range(int(hole_table.RowCount)):
+        hole_table.SetRowHeight(row, 0.007, 0)
+    table_height = sum(
+        float(hole_table.GetRowHeight(row)) for row in range(int(hole_table.RowCount))
+    )
+    if table_height > HOLE_TABLE_ANCHOR[1] - 0.025:
+        raise RuntimeError(f"base hole table exceeds the inner border: {table_height} m")
     tap_callout = add_native_hole_callout(
         adapter,
-        side,
-        edge=_cross_tap_edge(side),
-        callout_xy=(0.300, 0.105),
+        hole_side,
+        edge=_cross_tap_edge(hole_side),
+        callout_xy=(0.290, 0.118),
         label="base column-retention taps",
         process="FRONT AND REAR",
     )
     _check_cross_tap_callout(tap_callout)
-    # Derived envelope features are dimensioned from their finished model
-    # edges, not repeated in a note: the symmetric reveal, raised-rim width,
-    # deck height, and overall rim height.
-    reveal_dimension = add_edge_dimension(
-        adapter,
-        top,
-        p0=_plan_xy(BOTTOM_LENGTH / 2.0, 0.0),
-        p1=_plan_xy(TOP_LENGTH / 2.0, 0.0),
-        text_xy=(TOP_CENTER[0] + 0.085, TOP_CENTER[1] - 0.042),
-        orientation="horizontal",
-        label="plate side reveal",
+    _add_base_height(
+        adapter, hole_side, _cross_tap_edge(hole_side), BASE_SCREW_Y,
+        (0.350, 0.097), "cross-tap axis height",
     )
-    set_reference_dimension(
-        adapter,
-        _early_bound(reveal_dimension, "IDisplayDimension").GetAnnotation(),
-        label="derived plate side reveal",
-    )
-    _add_rim_width(adapter, top)
     deck_dimension = add_edge_dimension(
         adapter,
         section,
@@ -554,7 +623,7 @@ async def build(adapter: Any) -> dict[str, str]:
             (COLUMN_X / 1000.0, STACK_HEIGHT / 1000.0, 0.0),
             label="base section deck",
         ),
-        text_xy=(SECTION_CENTER[0] + 0.050, SECTION_CENTER[1]),
+        text_xy=(SECTION_CENTER[0] + 0.032, SECTION_CENTER[1]),
         orientation="vertical",
         label="deck height",
     )
@@ -563,39 +632,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(deck_dimension, "IDisplayDimension").GetAnnotation(),
         label="derived deck height",
     )
-    # Keep the vertical overall dimension outside the front-view silhouette.
-    add_edge_dimension(
-        adapter,
-        side,
-        p0=model_point_in_view(
-            adapter,
-            side,
-            (0.0, 0.0, 0.0),
-            label="base front underside",
-        ),
-        p1=model_point_in_view(
-            adapter,
-            side,
-            (0.0, RIM_TOP / 1000.0, 0.0),
-            label="base front rim top",
-        ),
-        text_xy=(SIDE_CENTER[0] - 0.105, SIDE_CENTER[1]),
-        orientation="vertical",
-        label="overall rim height",
-    )
-
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.170, 0.115, char_height=0.002
-    )
-    add_property_linked_note(adapter, "Side View Note", *SIDE_NOTE_XY)
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    add_property_linked_note(adapter, "Section View Note", *SECTION_NOTE_XY)
-
-    # Curation and note insertion can leave the orthographic edge cache stale.
-    # Reassert HLV only after every annotation is in place.
-    for view in (top, side):
+    add_note(adapter, "TOP HOLES / SOCKETS VIEW SCALE 1:4", 0.245, 0.255)
+    add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
+    for view in (hole_top, hole_side):
         set_hidden_lines_visible(adapter, view)
-    _hide_iso_annotations(iso)
 
     return await finalize_drawing(
         adapter,
@@ -603,7 +643,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=14,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
     )
 
 
