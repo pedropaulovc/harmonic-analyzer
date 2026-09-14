@@ -298,7 +298,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.065)
+    # The title block occupies the lower-right strip; keep this caption beside
+    # the narrow isometric instead of beneath it where the two texts collide.
+    add_property_linked_note(adapter, "Isometric View Note", 0.355, 0.115)
 
     return await finalize_drawing(
         adapter,
