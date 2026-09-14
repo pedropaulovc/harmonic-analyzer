@@ -107,7 +107,6 @@ from _holes import (
     wizard_holes,
 )
 from top_frame_spec import (
-    COLUMN_BORE_DIAMETER_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
@@ -1342,13 +1341,6 @@ async def build(adapter) -> dict[str, str]:
         "CapRecessDepth",
         *deviations(CAP_RECESS_DEPTH_BAND),
     )
-    for bore_dia_name in ("B0Dia", "B1Dia", "B2Dia", "B3Dia"):
-        set_dimension_bilateral_tolerance(
-            adapter,
-            "BoreProfile",
-            bore_dia_name,
-            *deviations(COLUMN_BORE_DIAMETER_BAND),
-        )
     await volume_check(adapter, "driven casting (equations neutral)", volume, 200.0)
 
     # Hide the construction offset planes -- shown reference geometry renders

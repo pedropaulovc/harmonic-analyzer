@@ -61,7 +61,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PadCorners": {"PadCornerRadius"},
     "FlangeCorners": {"FlangeCornerRadius"},
     "RimInnerCorners": {"RimInnerCornerRadius"},
-    "TopRimBreaks": {"TopRimChamfer"},
     "BaseSpotFaceRearProfile": {"SpotFaceDia"},
 }
 

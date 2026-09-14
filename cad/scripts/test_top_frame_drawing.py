@@ -8,7 +8,6 @@ import _config
 import fulcrum_keeper_spec as keeper
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 import build_top_frame as part
-import top_frame_spec
 from frame_attachment_spec import (
     CAP_MOUTH_Y,
     CAP_RECESS_DEPTH,
@@ -24,8 +23,7 @@ from tube_frame_cap_spec import MAX_OUTER_DIAMETER
 import tube_frame_spec
 
 
-def test_corner_bores_and_cap_recesses_form_a_clear_matched_stack() -> None:
-    assert top_frame_spec.COLUMN_BORE_DIAMETER_BAND == (0.05, 0.0)
+def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> None:
     assert part.BORE_DIA == COLUMN_SOCKET_DIAMETER == 25.5
     assert part.CAP_RECESS_DIAMETER == CAP_RECESS_DIAMETER
     assert part.CAP_RECESS_DEPTH == CAP_RECESS_DEPTH
@@ -41,16 +39,11 @@ def test_corner_bores_and_cap_recesses_form_a_clear_matched_stack() -> None:
         0.636232,
         abs_tol=1e-6,
     )
+    # CAD reference clearance is unchanged; actual sockets are matched to
+    # their assigned tubes rather than accepted against a fixed bore band.
     assert math.isclose(
         part.BORE_DIA - tube_frame_spec.OUTER_DIA,
         0.10,
-        abs_tol=1e-12,
-    )
-    assert math.isclose(
-        part.BORE_DIA
-        + top_frame_spec.COLUMN_BORE_DIAMETER_BAND[0]
-        - tube_frame_spec.OUTER_DIA,
-        0.15,
         abs_tol=1e-12,
     )
     assert part.CAP_RECESS_FLOOR_Y - part.SIDE_TAP_DRILL_DIA / 2.0 > 0.0

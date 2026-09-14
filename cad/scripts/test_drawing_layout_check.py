@@ -1255,7 +1255,7 @@ def test_a_clean_sheet_passes(monkeypatch):
 def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
     """pen-assembly USED to be grandfathered for 2 crossings while the fix was
     thought to need a design decision. It needed the balloon radius, which
-    GetBalloonInfo always exposed. The exemption died with the defect, and no
+    the rendered full-circle arc exposes. The exemption died with the defect, and no
     sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
     _stub_layout(monkeypatch, 1)
     with pytest.raises(RuntimeError):
@@ -1500,6 +1500,17 @@ class _FakeNote:
     def GetBalloonInfo(self):
         return (0, 0, 0, 0, 0, 0, self._radius)
 
+    def GetDisplayData(self):
+        return self
+
+    def GetArcCount(self):
+        return 1
+
+    def GetArcAtIndex2(self, _index):
+        cx, cy = self.placed or (0.0, 0.0)
+        point = (cx + self._radius, cy, 0.0)
+        return (0, 0, -1, -1, *point, *point, cx, cy, 0.0, 0.0, 0.0, 1.0, 1.0)
+
     def GetAnnotation(self):
         return self
 
@@ -1510,6 +1521,83 @@ class _FakeNote:
     def SetPosition(self, x, y, _z):
         self.placed = (x, y)
         return True
+
+
+class _MovingBalloon(_FakeNote):
+    """Native-like rendered ink moves while GetBalloonInfo remains cached."""
+    def __init__(self, reflow=False):
+        super().__init__(0.11, 0.19, radius=0.005, item="2")
+        self.placed = (0.15, 0.25)
+        self.LockPosition = False
+        self._reflow = reflow
+        self._offset = (0.004, -0.002)
+
+    def GetBalloonInfo(self):
+        return (0.20, 0.30, 0.0, 0.205, 0.30, 0.0, self._radius)
+
+    def GetPosition(self):
+        return (self.placed[0] - self._offset[0], self.placed[1] - self._offset[1], 0.042)
+
+    def SetPosition(self, x, y, _z):
+        if self._reflow:
+            self._offset = (0.004226191, -0.001696022)
+        self.placed = (x + self._offset[0], y + self._offset[1])
+        return True
+
+    def GetSpecificAnnotation(self):
+        return self
+
+    def IsStackedBalloon(self):
+        return False
+
+    def IsStackedBalloonMaster(self):
+        return False
+
+    def IsBomBalloon(self):
+        return True
+
+    def GetText(self):
+        return "2"
+
+    def GetExtent(self):
+        return (0.0, 0.0, 0.0, 1.0, 1.0, 0.0)
+
+
+@pytest.mark.parametrize("reflow", (False, True))
+def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch, reflow):
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    note = _MovingBalloon(reflow=reflow)
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
+        EditRebuild3=lambda: True,
+        GraphicsRedraw2=lambda: None,
+    )
+    adapter = _FakeAdapter(model)
+    target = (0.10, 0.18)
+    drawing_common.position_bom_balloon(
+        adapter, [note], item_number="2", position_xy=target, label="stale native cache"
+    )
+    assert note.placed == pytest.approx(target)
+    box = drawing_common._note_element(adapter, note, "B2")
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
+        (0.095, 0.175, 0.105, 0.185)
+    )
+
+
+@pytest.mark.parametrize("geometry", ("missing", "partial", "ambiguous", "zero_radius", "nonfinite"))
+def test_rendered_balloon_circle_rejects_unusable_ink(geometry):
+    note = _FakeNote(0.1, 0.2, radius=0.0 if geometry == "zero_radius" else 0.005)
+    arc = list(note.GetArcAtIndex2(0))
+    if geometry == "partial":
+        arc[7] += 0.001
+    if geometry == "nonfinite":
+        arc[10] = float("nan")
+    count = 0 if geometry == "missing" else 2 if geometry == "ambiguous" else 1
+    note.GetDisplayData = lambda: SimpleNamespace(
+        GetArcCount=lambda: count, GetArcAtIndex2=lambda _index: arc
+    )
+    with pytest.raises(RuntimeError):
+        drawing_common.rendered_balloon_circle(note, label="invalid native circle")
 
 
 def _ring_positions(notes):

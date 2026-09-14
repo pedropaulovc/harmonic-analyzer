@@ -28,6 +28,7 @@ from _drawing_common import (
     insert_bom_table,
     model_point_in_view,
     position_bom_balloon,
+    rendered_balloon_circle,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_center,
@@ -163,9 +164,9 @@ SOURCE_CONFIGURATION = "Default"
 ASSEMBLY_STEPS = "\n".join(
     (
         "MATCH-FIT AND ASSEMBLY SEQUENCE",
-        "1. ROUGH-CUT MHA-083 OVERSIZE. DECK UP; HAND-FIT EACH BASE SOCKET",
-        "   FOR FULL SHOULDER SEATING WITHOUT BIND OR ROCK; MATCH-MARK",
-        "   EACH COLUMN/MHA-035 CORNER AND ORIENTATION.",
+        "1. ROUGH-CUT MHA-083 OVERSIZE. DECK UP; FIT EACH MHA-035 SOCKET",
+        "   TO ITS ASSIGNED ACTUAL TUBE: CLOSE HAND-SLIP, NO PERCEPTIBLE ROCK,",
+        "   FULL SHOULDER SEATING. RETAIN COLUMN/CORNER/ORIENTATION MATCH MARKS.",
         "2. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
         "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
         "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS.",
@@ -174,10 +175,11 @@ ASSEMBLY_STEPS = "\n".join(
         "   THE ACTUAL MHA-132 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
         "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET.",
         "   FIT MHA-077 OVER THE COLUMNS, HUB OPPOSITE THE MHA-086 END.",
-        "   HAND-FIT EACH BORE WITHOUT BIND OR ROCK ON ITS MATCHED COLUMN.",
+        "   FIT EACH TOP SOCKET TO ITS ASSIGNED ACTUAL MHA-083 TUBE:",
+        "   CLOSE HAND-SLIP WITH NO PERCEPTIBLE ROCK.",
         "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE CONTROLLING TOP-AXIS",
         "   HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE.",
-        "   CLAMP; MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
+        "   CLAMP; RETAIN EACH TOP CORNER/COLUMN ORIENTATION MATCH MARK.",
         "4. AT THAT HEIGHT, FINAL MATCH-CUT EACH IDENTIFIED COLUMN TO THE",
         "   ACTUAL BASE/TOP/CAP STACK: MHA-133 FULLY ON ITS INSIDE SEAT,",
         "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS.",
@@ -954,6 +956,8 @@ def _frame_balloon_binding_readback(
         failures.append("dangling")
     if len(points) < 6:
         failures.append("leader_points")
+    position = tuple(annotation.GetPosition() or ())
+    circle = rendered_balloon_circle(note, label=f"frame balloon {item}")
     return {
         "expected_item": item,
         "actual_item": actual_item,
@@ -962,8 +966,12 @@ def _frame_balloon_binding_readback(
         "entity_is_same": same,
         "dangling": dangling,
         "actual_leader_points": points,
-        "annotation_position": tuple(annotation.GetPosition() or ()),
-        "balloon_info": tuple(note.GetBalloonInfo() or ()),
+        "annotation_position": position,
+        "rendered_circle": circle,
+        "anchor_to_circle_xy": (
+            (circle[0] - position[0], circle[1] - position[1])
+            if len(position) >= 2 else None
+        ),
         "failed_checks": failures,
     }
 
@@ -1024,8 +1032,8 @@ def _short_frame_balloon(
     failures = list(after["failed_checks"])
     if length > 0.030:
         failures.append("leader_length")
-    circle = after["balloon_info"]
-    if len(circle) < 7 or any(abs(circle[index] - target[index]) > 1e-6 for index in range(2)):
+    circle = after["rendered_circle"]
+    if any(abs(circle[index] - target[index]) > 1e-6 for index in range(2)):
         failures.append("circle_position")
     state = {"before": before, "after": after, "target_circle": target,
              "length_m": length, "failed_checks": failures}
