@@ -39,7 +39,10 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
+    view_name,
 )
 
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -77,9 +80,6 @@ from harmonic_base_spec import (
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
-    CASTING_FULL_THREAD_DEPTH,
-    CASTING_TAP_DRILL_DEPTH,
-    COLUMN_SOCKET_DIAMETER,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -146,7 +146,7 @@ TOP_KEEP = {
     "PadCornerRadius": (TOP_CENTER[0] - 0.090, TOP_CENTER[1] + 0.030),
     "FlangeCornerRadius": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] + 0.030),
     "RimInnerCornerRadius": (TOP_CENTER[0] + 0.015, TOP_CENTER[1] - 0.050),
-    "TopRimChamfer": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] - 0.020),
+    "BottomEdgeChamfer": (TOP_CENTER[0] + 0.075, TOP_CENTER[1] - 0.020),
     "Socket0X": (TOP_CENTER[0] - 0.050, TOP_CENTER[1] - 0.050),
     "Socket0Z": (TOP_CENTER[0] - 0.085, TOP_CENTER[1]),
     "SocketDia": (TOP_CENTER[0] - 0.058, TOP_CENTER[1] + 0.043),
@@ -154,7 +154,7 @@ TOP_KEEP = {
 SIDE_KEEP = {
     "BottomThickness": (SIDE_CENTER[0] - 0.085, SIDE_CENTER[1]),
     "TopThickness": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1]),
-    "BottomEdgeChamfer": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1] - 0.018),
+    "TopRimChamfer": (SIDE_CENTER[0] + 0.075, SIDE_CENTER[1] + 0.018),
 }
 SECTION_KEEP = {
     "SocketDepth": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1]),
@@ -163,7 +163,10 @@ SECTION_KEEP = {
     "PadRootRadius": (SECTION_CENTER[0] - 0.040, SECTION_CENTER[1] + 0.015),
 }
 DIMENSION_CALLOUTS = {
-    "SocketDia": "4X COLUMN SOCKET; FIT MHA-083 TUBE COLUMN",
+    "TopLen": "PAD CENTERED ON FLANGE",
+    "SocketDia": "4X COLUMN SOCKET; FIT MHA-083 TUBE; SLIP BY HAND",
+    "TopRimChamfer": "X 45 DEG; UPPER RIM EDGES",
+    "BottomEdgeChamfer": "X 45 DEG; UNDERSIDE EDGES",
     "SpotFaceDia": "4X SPOTFACE",
 }
 
@@ -186,19 +189,113 @@ def _plan_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
-def _front_y(y_mm: float) -> float:
-    """Sheet Y for a model-Y point in the bbox-centred front elevation."""
-    return SIDE_CENTER[1] + (y_mm - RIM_TOP / 2.0) * VIEW_SCALE / 1000.0
-
-
-def _section_y(y_mm: float) -> float:
-    """Sheet Y for a section point spanning the lower plate to the deck."""
-    return SECTION_CENTER[1] + (y_mm - STACK_HEIGHT / 2.0) * VIEW_SCALE / 1000.0
-
-
 def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, float]:
     """Sheet pick on a plan-view hole rim, offset in machine +X."""
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm)
+
+
+@_telemetry.traced("drawing.base_cross_tap_edge")
+def _cross_tap_edge(view: Any) -> Any:
+    """Pick the tap entry itself, not the nearby larger spotface circle."""
+    center = (COLUMN_X / 1000.0, BASE_SCREW_Y / 1000.0, BASE_SCREW_SEAT_Z / 1000.0)
+    radius = BASE_CROSS_TAP_DRILL_DIA / 2000.0
+    matches = []
+    for raw in visible_view_entities(view, 1, label="base cross-tap entry"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        values = tuple(float(value) for value in curve.CircleParams)
+        if abs(values[6] - radius) > 1e-7:
+            continue
+        if any(abs(values[index] - center[index]) > 1e-7 for index in range(3)):
+            continue
+        if abs(abs(values[5]) - 1.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one base cross-tap entry edge, found {len(matches)}"
+        )
+    return matches[0]
+
+
+@_telemetry.traced("drawing.base_cross_tap_readback")
+def _check_cross_tap_callout(display: Any) -> None:
+    expected = {
+        "hw-tapdrldia": BASE_CROSS_TAP_DRILL_DIA,
+        "hw-tapdrldepth": BASE_CROSS_TAP_SPEC.depth_mm,
+        "hw-threaddepth": BASE_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"],
+    }
+    found = set()
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = _early_bound(raw, "ICalloutVariable")
+        name = str(variable.VariableName)
+        if name not in expected:
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        actual_mm = float(length.Length) * 1000.0
+        if abs(actual_mm - expected[name]) > 1e-5:
+            raise RuntimeError(
+                f"base tap callout {name}: {actual_mm} != {expected[name]} mm"
+            )
+        found.add(name)
+    if found != set(expected):
+        raise RuntimeError(
+            f"base tap callout is missing native variables: {set(expected) - found}"
+        )
+
+
+@_telemetry.traced("drawing.base_rim_width")
+def _add_rim_width(adapter: Any, view: Any) -> Any:
+    """Measure the two unchamfered rim-wall stations through exact model edges."""
+    stations = (TOP_LENGTH / 2000.0, (TOP_LENGTH / 2.0 - LIP_W) / 1000.0)
+    candidates: list[list[tuple[float, Any]]] = [[], []]
+    for raw in visible_view_entities(view, 1, label="base rim wall edges"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsLine():
+            continue
+        values = tuple(float(value) for value in edge.GetCurveParams2())
+        x0, y0, z0, x1, y1, z1 = values[:6]
+        if abs(x0 - x1) > 1e-7 or abs(y0 - y1) > 1e-7 or z0 * z1 > 0:
+            continue
+        if not STACK_HEIGHT / 1000.0 - 1e-7 <= y0 <= RIM_TOP / 1000.0 + 1e-7:
+            continue
+        for index, station in enumerate(stations):
+            if abs(x0 - station) <= 1e-7:
+                candidates[index].append((y0, edge))
+    if any(not items for items in candidates):
+        raise RuntimeError("base rim width lacks exact outer/inner wall edges")
+    drawing = adapter.currentModel
+    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate base rim view")
+    drawing.ClearSelection2(True)
+    for index, items in enumerate(candidates):
+        edge = max(items, key=lambda item: item[0])[1]
+        if not view.SelectEntity(edge, index > 0):
+            raise RuntimeError(f"failed to select base rim wall {index}")
+    display = drawing.AddHorizontalDimension2(
+        TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.042, 0.0
+    )
+    drawing.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to create base rim-width dimension")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual_mm = float(dimension.SystemValue) * 1000.0
+    if abs(actual_mm - LIP_W) > 1e-5:
+        raise RuntimeError(f"base rim width measured {actual_mm}, expected {LIP_W} mm")
+    return display
+
+
+@_telemetry.traced("drawing.base_iso_annotation_visibility")
+def _hide_iso_annotations(view: Any) -> None:
+    for raw in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        annotation.Visible = 3  # swAnnotationHidden
+        if int(annotation.Visible) != 3:
+            raise RuntimeError("base isometric annotation did not hide")
 
 
 ALL_HOLES = (
@@ -415,32 +512,19 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="harmonic-base mounting",
     )
-    tap_edge = model_point_in_view(
+    tap_callout = add_native_hole_callout(
         adapter,
-        section,
-        (
-            COLUMN_X / 1000.0,
-            (BASE_SCREW_Y + BASE_CROSS_TAP_DRILL_DIA / 2.0) / 1000.0,
-            (BASE_SCREW_SEAT_Z - COLUMN_SOCKET_DIAMETER) / 1000.0,
-        ),
-        label="base cross-tap longitudinal edge",
-    )
-    add_native_hole_callout(
-        adapter,
-        section,
-        edge_xy=tap_edge,
+        side,
+        edge=_cross_tap_edge(side),
         callout_xy=(0.300, 0.105),
-        label="4X base column-retention bottoming taps",
-        process=(
-            f"4X {BASE_CROSS_TAP_SPEC.size} UNF-{BASE_CROSS_TAP_SPEC.thread_class} "
-            f"BOTTOMING TAP; FULL THREAD {CASTING_FULL_THREAD_DEPTH:.2f}; "
-            f"CYLINDRICAL DRILL {CASTING_TAP_DRILL_DEPTH:.2f}"
-        ),
+        label="base column-retention taps",
+        process="FRONT AND REAR",
     )
+    _check_cross_tap_callout(tap_callout)
     # Derived envelope features are dimensioned from their finished model
     # edges, not repeated in a note: the symmetric reveal, raised-rim width,
     # deck height, and overall rim height.
-    add_edge_dimension(
+    reveal_dimension = add_edge_dimension(
         adapter,
         top,
         p0=_plan_xy(BOTTOM_LENGTH / 2.0, 0.0),
@@ -449,31 +533,53 @@ async def build(adapter: Any) -> dict[str, str]:
         orientation="horizontal",
         label="plate side reveal",
     )
-    add_edge_dimension(
+    set_reference_dimension(
         adapter,
-        top,
-        p0=_plan_xy(TOP_LENGTH / 2.0, 0.0),
-        p1=_plan_xy(TOP_LENGTH / 2.0 - LIP_W, 0.0),
-        text_xy=(TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.042),
-        orientation="horizontal",
-        label="raised rim width",
+        _early_bound(reveal_dimension, "IDisplayDimension").GetAnnotation(),
+        label="derived plate side reveal",
     )
-    add_edge_dimension(
+    _add_rim_width(adapter, top)
+    deck_dimension = add_edge_dimension(
         adapter,
         section,
-        p0=(SECTION_CENTER[0], _section_y(0.0)),
-        p1=(SECTION_CENTER[0], _section_y(STACK_HEIGHT)),
-        text_xy=(SECTION_CENTER[0] - 0.050, SECTION_CENTER[1]),
+        p0=model_point_in_view(
+            adapter,
+            section,
+            (COLUMN_X / 1000.0, 0.0, 0.0),
+            label="base section underside",
+        ),
+        p1=model_point_in_view(
+            adapter,
+            section,
+            (COLUMN_X / 1000.0, STACK_HEIGHT / 1000.0, 0.0),
+            label="base section deck",
+        ),
+        text_xy=(SECTION_CENTER[0] + 0.050, SECTION_CENTER[1]),
         orientation="vertical",
         label="deck height",
+    )
+    set_reference_dimension(
+        adapter,
+        _early_bound(deck_dimension, "IDisplayDimension").GetAnnotation(),
+        label="derived deck height",
     )
     # Keep the vertical overall dimension outside the front-view silhouette.
     add_edge_dimension(
         adapter,
         side,
-        p0=(SIDE_CENTER[0], _front_y(0.0)),
-        p1=(SIDE_CENTER[0], _front_y(RIM_TOP)),
-        text_xy=(SIDE_CENTER[0] - 0.085, SIDE_CENTER[1]),
+        p0=model_point_in_view(
+            adapter,
+            side,
+            (0.0, 0.0, 0.0),
+            label="base front underside",
+        ),
+        p1=model_point_in_view(
+            adapter,
+            side,
+            (0.0, RIM_TOP / 1000.0, 0.0),
+            label="base front rim top",
+        ),
+        text_xy=(SIDE_CENTER[0] - 0.105, SIDE_CENTER[1]),
         orientation="vertical",
         label="overall rim height",
     )
@@ -489,6 +595,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Reassert HLV only after every annotation is in place.
     for view in (top, side):
         set_hidden_lines_visible(adapter, view)
+    _hide_iso_annotations(iso)
 
     return await finalize_drawing(
         adapter,
@@ -496,8 +603,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Harmonic Base Manufacturing Drawing",
         scale=SHEET_SCALE,
         redundant_note_substrings=("Tapped Hole",),
-        # Seven top-side tapped groups plus the sectioned cross-tap group.
-        expected_redundant_notes=8,
         layout=SPEC.layout,
     )
 

@@ -9,8 +9,8 @@ the cross-tap callout.
 
 The sheet is split into two columns that never share ink: graphics on the left
 (plan on top, front elevation beneath it, section beside it, and the pictorial
-isometric in the lower corner) with only short property-linked view labels and
-one concise part fact in the right column.
+isometric in the lower corner) with short view labels and one concise part
+fact in the right column.
 
 Run with SolidWorks open::
 
@@ -34,18 +34,18 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
+    _select_view_entity,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_high_quality_shaded_with_edges,
+    visible_view_entities,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_top_frame import (
     BAR_X0,
-    BORE_DIA,
     BOSS_DIA,
     COLUMN_X,
     FRONT_COLUMN_Z,
@@ -66,6 +66,7 @@ from build_top_frame import (
     TOP_SCREW_SEAT_Z,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -82,8 +83,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)  # 1:2 whole sheet (446.2 mm envelope over the bosses)
-VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.5
+SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet; leave air for section/detail views
+VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]  # 0.333333
 
 # Plan extents including the proud corner bosses (the straight rails alone
 # stop at x +/-214.1 / z +/-131.0): x +/-223.1 -> 446.2 and z +/-138.1 ->
@@ -102,16 +103,17 @@ NOTE_CHAR_HEIGHT = 0.002
 
 # Views. The plan defines the outside profile and hole pattern; the front
 # elevation establishes the cutting plane through one complete corner stack.
-TOP_CENTER = (0.170, 0.178)
-FRONT_CENTER = (0.170, 0.085)
-SECTION_CENTER = (0.340, 0.090)
-ISO_CENTER = (0.052, 0.053)
+TOP_CENTER = (0.145, 0.215)
+FRONT_CENTER = (0.145, 0.103)
+SECTION_CENTER = (0.340, 0.205)
+ISO_CENTER = (0.055, 0.040)
 ISO_SCALE = (1, 10)
+LEFT_CENTER = (0.225, 0.040)
+LEFT_SCALE = (1, 4)
 
-TOP_VIEW_NOTE_XY = (0.166, 0.104)
-FRONT_VIEW_NOTE_XY = (0.166, 0.070)
-SECTION_VIEW_NOTE_XY = (0.305, 0.052)
-ISO_VIEW_NOTE_XY = (0.028, 0.033)
+TOP_VIEW_NOTE_XY = (0.225, 0.158)
+FRONT_VIEW_NOTE_XY = (0.145, 0.067)
+ISO_VIEW_NOTE_XY = (0.028, 0.022)
 
 # Note column, read top to bottom.
 MANUFACTURING_NOTES_XY = (NOTE_COLUMN_X, 0.263)
@@ -121,37 +123,40 @@ MANUFACTURING_NOTES_XY = (NOTE_COLUMN_X, 0.263)
 # plan envelope, web, boss/socket, and crossbar geometry.  Section A-A owns the
 # recessed cap seat because it is internal in both ordinary orthographic views.
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.011),
-    "Depth": (0.048, TOP_CENTER[1]),
-    "WinWidth": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.021),
-    "WinDepth": (0.038, TOP_CENTER[1] + 0.030),
-    "WebOuterWidth": (TOP_CENTER[0] + 0.020, TOP_CENTER[1] + 0.016),
-    "WebOuterDepth": (0.028, TOP_CENTER[1] - 0.021),
-    "WebInnerWidth": (TOP_CENTER[0] + 0.020, TOP_CENTER[1] - 0.016),
-    "WebInnerDepth": (0.018, TOP_CENTER[1] - 0.042),
-    "B0X": (0.300, TOP_CENTER[1] + 0.052),
-    "B0Z": (0.300, TOP_CENTER[1] + 0.036),
-    "C0Dia": (TOP_CENTER[0] + PLAN_HALF_W + 0.020, TOP_CENTER[1] + 0.026),
-    "B0Dia": (TOP_CENTER[0] + PLAN_HALF_W + 0.020, TOP_CENTER[1] - 0.026),
-    "HubDia": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] + 0.026),
-    "RibWidth": (0.100, TOP_CENTER[1] + 0.020),
-    "PocketRun": (0.100, TOP_CENTER[1] + 0.004),
-    "SetTapZ": (0.100, TOP_CENTER[1] - 0.028),
-    "GnX": (0.100, TOP_CENTER[1] + 0.052),
-    "GnZ": (0.100, TOP_CENTER[1] + 0.036),
-    "BarAnchorX": (0.120, TOP_CENTER[1] + 0.052),
-    "BarAnchorZ": (0.120, TOP_CENTER[1] + 0.036),
-    "BarFootSpan": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] + 0.012),
-    "GussetRunE": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] - 0.012),
-    "BarSideE": (TOP_CENTER[0] - 0.030, TOP_CENTER[1] - 0.026),
-    "StudFrontX": (0.070, TOP_CENTER[1] + 0.020),
-    "StudFrontZ": (0.070, TOP_CENTER[1] + 0.004),
-    "StudRearX": (0.070, TOP_CENTER[1] - 0.012),
-    "StudRearZ": (0.070, TOP_CENTER[1] - 0.028),
-    "KeeperFrontX": (0.260, TOP_CENTER[1] + 0.020),
-    "KeeperFrontZ": (0.260, TOP_CENTER[1] + 0.004),
-    "KeeperRearX": (0.260, TOP_CENTER[1] - 0.012),
-    "KeeperRearZ": (0.260, TOP_CENTER[1] - 0.028),
+    # Plan envelope and web depths live in clear outside lanes.
+    "Width": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.004),
+    "Depth": (0.030, TOP_CENTER[1]),
+    "WinWidth": (TOP_CENTER[0], TOP_CENTER[1] + PLAN_HALF_D + 0.001),
+    "WinDepth": (0.050, TOP_CENTER[1] + 0.032),
+    "WebOuterWidth": (TOP_CENTER[0], TOP_CENTER[1] - PLAN_HALF_D - 0.005),
+    "WebOuterDepth": (0.030, TOP_CENTER[1] - 0.020),
+    "WebInnerWidth": (TOP_CENTER[0], TOP_CENTER[1] - PLAN_HALF_D - 0.013),
+    "WebInnerDepth": (0.050, TOP_CENTER[1] - 0.034),
+    # Socket, hub, pocket, and gooseneck locations use a right-hand station
+    # lane outside the plan, one feature per line.
+    "B0X": (0.244, TOP_CENTER[1] + 0.037),
+    "B0Z": (0.244, TOP_CENTER[1] + 0.025),
+    "C0Dia": (0.244, TOP_CENTER[1] + 0.013),
+    "B0Dia": (0.244, TOP_CENTER[1] + 0.001),
+    "HubDia": (0.244, TOP_CENTER[1] - 0.011),
+    "RibWidth": (0.244, TOP_CENTER[1] - 0.023),
+    "PocketRun": (0.244, TOP_CENTER[1] - 0.035),
+    "SetTapZ": (0.244, TOP_CENTER[1] - 0.047),
+    "GnX": (0.244, TOP_CENTER[1] - 0.059),
+    "GnZ": (0.244, TOP_CENTER[1] - 0.071),
+    # Crossbar envelope and junction features use the lower outside lane.
+    "BarFootSpan": (0.120, TOP_CENTER[1] - PLAN_HALF_D - 0.005),
+    "GussetRunE": (0.120, TOP_CENTER[1] - PLAN_HALF_D - 0.013),
+    "BarSideE": (0.120, TOP_CENTER[1] - PLAN_HALF_D - 0.021),
+    # Four station labels use one left/right pair of outside lanes.
+    "StudFrontX": (0.030, TOP_CENTER[1] + 0.020),
+    "StudFrontZ": (0.030, TOP_CENTER[1] + 0.008),
+    "StudRearX": (0.030, TOP_CENTER[1] - 0.004),
+    "StudRearZ": (0.030, TOP_CENTER[1] - 0.016),
+    "KeeperFrontX": (0.270, TOP_CENTER[1] + 0.020),
+    "KeeperFrontZ": (0.270, TOP_CENTER[1] + 0.008),
+    "KeeperRearX": (0.270, TOP_CENTER[1] - 0.004),
+    "KeeperRearZ": (0.270, TOP_CENTER[1] - 0.016),
 }
 FRONT_KEEP = {
     "PocketRise": (FRONT_CENTER[0] + PLAN_HALF_W + 0.010, FRONT_CENTER[1]),
@@ -165,42 +170,15 @@ SECTION_KEEP = {
     "CapRecessDepth": (SECTION_CENTER[0] + 0.040, SECTION_CENTER[1] + 0.010),
 }
 DIMENSION_CALLOUTS = {
-    "WebOuterWidth": "WEB RING OUTER WIDTH",
-    "WebOuterDepth": "WEB RING OUTER DEPTH",
-    "WebInnerWidth": "WEB RING INNER WIDTH",
-    "WebInnerDepth": "WEB RING INNER DEPTH",
-    "B0X": "4X COLUMN SOCKET CENTRES X; NATIVE HALF-PITCH",
-    "B0Z": "4X COLUMN SOCKET CENTRES Z; NATIVE HALF-PITCH",
-    "C0Dia": "4X CORNER BOSS OD",
-    "B0Dia": "4X COLUMN SOCKET; FIT MHA-083 TUBE; SEE SOURCE FIT LIMITS",
-    "HubDia": "UNDERSIDE GOOSENECK HUB BOSS OD",
-    "HubBossExtent": "GOOSENECK HUB BOSS AXIAL EXTENT",
-    "RibWidth": "GOOSENECK HUB RIB WIDTH",
-    "PocketRun": "GOOSENECK SET-SCREW POCKET",
-    "PocketRise": "GOOSENECK SET-SCREW POCKET",
-    "SetTapZ": "GOOSENECK SET-SCREW TAP CENTRE Z",
-    "GnX": "GOOSENECK BORE CENTRE X",
-    "GnZ": "GOOSENECK BORE CENTRE Z",
-    "BarAnchorX": "INTEGRAL CROSSBAR CENTRE X",
-    "BarAnchorZ": "INTEGRAL CROSSBAR CENTRE Z",
-    "BarFootSpan": "INTEGRAL CROSSBAR FOOT SPAN",
-    "GussetRunE": "4X CROSSBAR-JUNCTION GUSSET LEG",
-    "BarSideE": "INTEGRAL CROSSBAR CLEAR SPAN",
-    "StudFrontX": "FRONT HANGER HOLE CENTRE X",
-    "StudFrontZ": "FRONT HANGER HOLE CENTRE Z",
-    "StudRearX": "REAR HANGER HOLE CENTRE X",
-    "StudRearZ": "REAR HANGER HOLE CENTRE Z",
-    "KeeperFrontX": "FRONT KEEPER TAP CENTRE X",
-    "KeeperFrontZ": "FRONT KEEPER TAP CENTRE Z",
-    "KeeperRearX": "REAR KEEPER TAP CENTRE X",
-    "KeeperRearZ": "REAR KEEPER TAP CENTRE Z",
-    "BossTopExtent": "4X BOSS TOP EXTENT",
-    "BossBottomExtent": "4X BOSS BOTTOM EXTENT",
-    "RingHeight": "WEB RING HEIGHT",
-    "CapRecessDia": (
-        "4X CAP SKIRT RECESS; FIT MHA-133 / 9275K141 CAP; SEE SOURCE FIT LIMITS"
-    ),
-    "CapRecessDepth": "CAP SEAT; CAP SEATS ON TUBE END",
+    "B0X": "4X SOCKET CENTRES",
+    "B0Z": "4X SOCKET CENTRES",
+    "C0Dia": "4X",
+    "B0Dia": "4X SOCKET; FIT MHA-083 TUBE; SLIP BY HAND",
+    "GussetRunE": "4X",
+    "BossTopExtent": "4X",
+    "BossBottomExtent": "4X",
+    "CapRecessDia": ("4X CAP RECESS; FIT MHA-133 / 9275K141 CAP; SLIP BY HAND"),
+    "CapRecessDepth": "4X CAP SEAT",
 }
 
 
@@ -218,10 +196,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Top View Note",
-            "Front View Note",
-            "Section View Note",
-            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -229,10 +203,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "Top View Note",
-            "Front View Note",
-            "Section View Note",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -274,9 +244,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="top-frame corner section",
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=LEFT_SCALE)
     for view in (top, front):
         set_hidden_lines_visible(adapter, view)
-    for view in (section, iso):
+    for view in (section, iso, left):
         set_hidden_lines_removed(adapter, view)
 
     top_dimensions = curate_view_dimensions(
@@ -288,32 +259,37 @@ async def build(adapter: Any) -> dict[str, str]:
     section_dimensions = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
-    set_dimension_callouts(
-        adapter,
-        [*top_dimensions, *front_dimensions, *section_dimensions],
-        DIMENSION_CALLOUTS,
-    )
+    dimension_annotations = [*top_dimensions, *front_dimensions, *section_dimensions]
+    # A prior generated drawing may have stored below-callout text on a model
+    # dimension.  Clear every retained lane before applying this recipe's
+    # concise manufacturing facts, otherwise removed labels survive import.
+    dimension_callouts = {name: "" for name in (*TOP_KEEP, *FRONT_KEEP, *SECTION_KEEP)}
+    dimension_callouts.update(DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, dimension_annotations, dimension_callouts)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError(
             "failed to add ASME center marks to the ring bores and stud holes"
         )
 
-    tap_edge = model_point_in_view(
+    front_tap_edge = model_point_in_view(
         adapter,
-        section,
+        front,
         (
             COLUMN_X / 1000.0,
             SIDE_TAP_DRILL_DIA / 2000.0,
-            (-TOP_SCREW_SEAT_Z + BORE_DIA) / 1000.0,
+            -TOP_SCREW_SEAT_Z / 1000.0,
         ),
-        label="top-frame cross-tap longitudinal edge",
+        label="top-frame front column-retention tap edge",
     )
     add_native_hole_callout(
         adapter,
-        section,
-        edge_xy=tap_edge,
-        callout_xy=(SECTION_CENTER[0] + 0.045, SECTION_CENTER[1] - 0.025),
-        label="4X upper column-retention bottoming taps",
+        front,
+        edge_xy=front_tap_edge,
+        callout_xy=(
+            FRONT_CENTER[0] + PLAN_HALF_W + 0.012,
+            FRONT_CENTER[1] + 0.010,
+        ),
+        label="front/rear column-retention bottoming taps",
         process="BOTTOMING TAP",
     )
     stud_edge = model_point_in_view(
@@ -352,42 +328,100 @@ async def build(adapter: Any) -> dict[str, str]:
         label="2X fulcrum-keeper blind taps",
         process="TAP",
     )
-    gooseneck_edge = model_point_in_view(
+    bore_candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(
+        top, 1, label="top gooseneck clearance-bore circles"
+    ):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        radius_error = abs(params[6] - GOOSENECK_BORE_DIA / 2.0)
+        center_error = abs(params[0] - GOOSENECK_X) + abs(params[2] - GOOSENECK_Z)
+        bore_candidates.append((radius_error, center_error, edge))
+    if not bore_candidates:
+        raise RuntimeError("top view has no gooseneck clearance-bore circles")
+    bore_error, center_error, gooseneck_edge = min(
+        bore_candidates, key=lambda item: item[0] + item[1]
+    )
+    if bore_error > 0.01 or center_error > 0.02:
+        raise RuntimeError(
+            "top view has no gooseneck clearance-bore circle at "
+            f"({GOOSENECK_X:g}, {GOOSENECK_Z:g}) mm with "
+            f"{GOOSENECK_BORE_DIA / 2.0:g} mm radius"
+        )
+    _select_view_entity(
         adapter,
         top,
-        (
-            GOOSENECK_X / 1000.0,
-            HALF_H / 1000.0,
-            (GOOSENECK_Z + GOOSENECK_BORE_DIA / 2.0) / 1000.0,
-        ),
-        label="top-frame gooseneck bore edge",
+        "EDGE",
+        None,
+        label="gooseneck clearance-bore diameter",
+        entity=gooseneck_edge,
     )
+    diameter_xy = (TOP_CENTER[0] - 0.105, TOP_CENTER[1] + 0.040)
+    draw = adapter.currentModel
+    display = draw.AddDiameterDimension2(diameter_xy[0], diameter_xy[1], 0.0)
+    if display is None:
+        raise RuntimeError("failed to add gooseneck clearance-bore diameter")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - GOOSENECK_BORE_DIA) > 1e-6:
+        raise RuntimeError(
+            "gooseneck clearance-bore diameter readback "
+            f"{measured_mm:g} mm != {GOOSENECK_BORE_DIA:g} mm"
+        )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(diameter_xy[0], diameter_xy[1], 0.0):
+        raise RuntimeError("failed to position gooseneck clearance-bore diameter")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    set_hidden_lines_visible(adapter, left)
+    tap_candidates: list[tuple[float, float, float, Any]] = []
+    tap_x = -(OUTER_X - SET_POCKET_DEPTH)
+    tap_radius = TAP_DRILL_MM[SET_TAP_SPEC.size] / 2.0
+    for raw_edge in visible_view_entities(
+        left, 1, label="left gooseneck set-tap circles"
+    ):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        raw_params = tuple(float(value) for value in curve.CircleParams)
+        params = tuple(value * 1000.0 for value in raw_params)
+        radius_error = abs(params[6] - tap_radius)
+        center_error = (
+            abs(params[0] - tap_x) + abs(params[1]) + abs(params[2] - GOOSENECK_Z)
+        )
+        normal_error = (
+            abs(raw_params[3] + 1.0) + abs(raw_params[4]) + abs(raw_params[5])
+        )
+        tap_candidates.append((radius_error, center_error, normal_error, edge))
+    if not tap_candidates:
+        raise RuntimeError("left view has no set-tap circular edges")
+    radius_error, center_error, normal_error, set_tap_edge = min(
+        tap_candidates, key=lambda item: item[0] + item[1] + item[2]
+    )
+    if radius_error > 0.01 or center_error > 0.02 or normal_error > 0.02:
+        raise RuntimeError(
+            f"left view has no exact set-tap edge at ({tap_x:g}, 0, {GOOSENECK_Z:g}) mm"
+        )
     add_native_hole_callout(
         adapter,
-        top,
-        edge_xy=gooseneck_edge,
-        callout_xy=(TOP_CENTER[0] - 0.105, TOP_CENTER[1] + 0.040),
-        label="gooseneck post clearance bore",
-        process="DRILL",
-    )
-    set_tap_edge = model_point_in_view(
-        adapter,
-        iso,
-        (
-            -(OUTER_X - SET_POCKET_DEPTH) / 1000.0,
-            TAP_DRILL_MM[SET_TAP_SPEC.size] / 2000.0,
-            GOOSENECK_Z / 1000.0,
-        ),
-        label="top-frame gooseneck set-tap edge",
-    )
-    add_native_hole_callout(
-        adapter,
-        iso,
-        edge_xy=set_tap_edge,
-        callout_xy=(ISO_CENTER[0] + 0.050, ISO_CENTER[1] + 0.035),
+        left,
+        edge=set_tap_edge,
+        callout_xy=(LEFT_CENTER[0] + 0.043, LEFT_CENTER[1] + 0.022),
         label="gooseneck set-screw blind tap",
         process="TAP",
     )
+    set_hidden_lines_removed(adapter, left)
 
     add_property_linked_note(
         adapter,
@@ -395,15 +429,29 @@ async def build(adapter: Any) -> dict[str, str]:
         *MANUFACTURING_NOTES_XY,
         char_height=NOTE_CHAR_HEIGHT,
     )
-    add_property_linked_note(adapter, "Top View Note", *TOP_VIEW_NOTE_XY)
-    add_property_linked_note(adapter, "Front View Note", *FRONT_VIEW_NOTE_XY)
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_VIEW_NOTE_XY)
-    add_property_linked_note(adapter, "Section View Note", *SECTION_VIEW_NOTE_XY)
+    top_note = add_note(adapter, "PLAN VIEW SCALE 1:3", *TOP_VIEW_NOTE_XY)
+    front_note = add_note(adapter, "FRONT VIEW SCALE 1:3", *FRONT_VIEW_NOTE_XY)
+    if top_note is None or front_note is None:
+        raise RuntimeError("failed to label top/front view scales")
+    iso_note = add_note(
+        adapter,
+        f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}",
+        *ISO_VIEW_NOTE_XY,
+    )
+    if iso_note is None:
+        raise RuntimeError("failed to label isometric view scale")
+    left_note = add_note(
+        adapter,
+        "LEFT VIEW - SET-SCREW TAP (SCALE 1:4)",
+        LEFT_CENTER[0] - 0.034,
+        LEFT_CENTER[1] - 0.016,
+    )
+    if left_note is None:
+        raise RuntimeError("failed to label left set-screw-tap view")
     # Hole callouts, center marks, and linked notes can invalidate an earlier
     # HLV transition.  Reassert the orthographic display state after curation.
     for view in (top, front):
         set_hidden_lines_visible(adapter, view)
-    set_high_quality_shaded_with_edges(adapter, iso, label="top-frame isometric")
 
     return await finalize_drawing(
         adapter,

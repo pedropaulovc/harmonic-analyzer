@@ -348,7 +348,12 @@ def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
     assert all(
-        spec.assets == (DRAWING_TEMPLATES[spec.layout].path,) for spec in DRAWINGS
+        spec.assets
+        == tuple(
+            DRAWING_TEMPLATES[layout].path
+            for layout in dict.fromkeys((spec.layout, *spec.additional_layouts))
+        )
+        for spec in DRAWINGS
     )
 
 

@@ -112,10 +112,7 @@ from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
-    FRONT_VIEW_NOTE,
     OUTER_PROFILE_TOLERANCE_MM,
-    SECTION_VIEW_NOTE,
-    TOP_VIEW_NOTE,
 )
 from cone_pivot_post_installation import (
     FRAME_COLUMN_Z_CENTER,
@@ -137,7 +134,6 @@ from tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 
 PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 # --- Plan geometry (machine == part-local x/z; part y = machine y - 1017.95) --
 COLUMN_X = 197.0  # column stations (frame.SLDASM)
@@ -1368,10 +1364,6 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Manufacturing Notes B": DRAWING_NOTES_B,
-            "Top View Note": TOP_VIEW_NOTE,
-            "Front View Note": FRONT_VIEW_NOTE,
-            "Section View Note": SECTION_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

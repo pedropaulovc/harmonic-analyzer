@@ -24,11 +24,9 @@ MM_PER_IN = 25.4
 # end receives a separately purchased recessed cap. The tube cut length follows
 # the shared installed cap stack, keeping the finished cap top at Y=1044.8. ---
 OUTER_DIA = 1.0 * MM_PER_IN  # 25.4
-OUTER_DIA_BAND = (0.00, -0.05)  # (upper, lower) deviations
 WALL_THICKNESS = 0.12 * MM_PER_IN  # 3.048
 INNER_DIA = OUTER_DIA - 2.0 * WALL_THICKNESS  # 19.304
 COLUMN_LENGTH = TUBE_CUT_LENGTH
-COLUMN_LENGTH_TOLERANCE_MM = 0.25
 TOP_END_CHAMFER = TUBE_TOP_CHAMFER
 
 # --- Matched cross-drilling stations, part-local Y from the inserted end. ---
@@ -46,10 +44,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopEndBreak": {"TopChamfer"},
 }
 
-# Part-specific facts that cannot be inferred from the native views/dimensions.
+TOP_END_CALLOUT = "TOP OD EDGE; MHA-133 CAP\nMUST SEAT FULLY BY HAND"
+
+# Part-specific assembly acceptance that native dimensions cannot express.
 DRAWING_NOTES = "\n".join(
     (
-        "ID AS SUPPLIED.",
         "MATCH-DRILL WITH BASE MHA-035 AND TOP FRAME MHA-077.",
         "MATCH-MARK COLUMN, CORNER AND ORIENTATION.",
     )

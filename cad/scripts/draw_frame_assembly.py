@@ -19,8 +19,6 @@ from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
-    add_edge_dimension,
-    create_blank_drawing_sheets,
     create_section_view,
     finalize_drawing,
     insert_bom_table,
@@ -30,7 +28,6 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_reference_dimension,
     set_hidden_lines_visible,
-    set_high_quality_shaded_with_edges,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from frame_attachment_spec import (
@@ -50,6 +47,7 @@ from frame_cross_screw_spec import (
     THREAD as CROSS_SCREW_THREAD,
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
 
 SPEC = DRAWINGS_BY_NAME["frame_assembly"]
@@ -64,24 +62,29 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-if SPEC.layout is not DrawingLayout.LANDSCAPE:
-    raise AssertionError("the frame package requires the landscape ASME B template")
 
 SHEET_NAMES = (
     "ASSEMBLED + JOINT SECTIONS",
     "EXPLODED VIEW + BOM",
     "FITTING + ASSEMBLY",
 )
+SHEET_LAYOUTS = {
+    SHEET_NAMES[0]: DrawingLayout.LANDSCAPE,
+    SHEET_NAMES[1]: DrawingLayout.PORTRAIT,
+    SHEET_NAMES[2]: DrawingLayout.LANDSCAPE,
+}
+if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
+    raise AssertionError("the frame package primary sheet must remain landscape")
 SHEET_SCALE = (1.0, 6.0)
 WORKING_FRONT_CENTER = (0.080, 0.155)
 BASE_SECTION_CENTER = (0.190, 0.165)
 TOP_SECTION_CENTER = (0.325, 0.165)
 JOINT_SECTION_SCALE = (1.0, 4.0)
-EXPLODED_ISO_CENTER = (0.305, 0.170)
-EXPLODED_ISO_SCALE = (1.0, 8.0)
+EXPLODED_ISO_CENTER = (0.145, 0.205)
+EXPLODED_ISO_SCALE = (1.0, 6.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.145)
 ASSEMBLY_ISO_SCALE = (1.0, 10.0)
-BOM_ANCHOR = (0.018, 0.263)
+BOM_ANCHOR = (0.018, 0.414)
 
 # Drawing-selection coordinate only. The manufacturing column pitch remains
 # defined by the released source assembly and the part drawings.
@@ -274,28 +277,148 @@ def _checked_height_dimension(
     return display
 
 
+def _component_point_in_assembly(
+    component: Any, point: Sequence[float]
+) -> tuple[float, float, float]:
+    """Transform one component-local point through its exact native transform."""
+    values = tuple(
+        float(value)
+        for value in _early_bound(
+            _early_bound(component, "IComponent2").Transform2, "IMathTransform"
+        ).ArrayData
+    )
+    if len(values) != 16 or len(point) != 3:
+        raise RuntimeError("frame drawing component transform is incomplete")
+    x, y, z = (float(value) for value in point)
+    scale = values[12]
+    return (
+        scale * (x * values[0] + y * values[3] + z * values[6]) + values[9],
+        scale * (x * values[1] + y * values[4] + z * values[7]) + values[10],
+        scale * (x * values[2] + y * values[5] + z * values[8]) + values[11],
+    )
+
+
+def _visible_circle_at_height(
+    view: Any,
+    *,
+    component_stem: str,
+    height_mm: float,
+    target_x_m: float,
+    label: str,
+    radius_mm: float | None = None,
+) -> Any:
+    """Resolve a visible circular edge by component identity and native geometry."""
+    view = _early_bound(view, "IView")
+    full_components: dict[str, Any] = {}
+    for raw_drawing_component in _as_tuple(
+        view.GetVisibleDrawingComponents(),
+        label=f"{label} visible drawing components",
+    ):
+        drawing_component = _early_bound(raw_drawing_component, "IDrawingComponent")
+        component = _early_bound(drawing_component.Component, "IComponent2")
+        name = str(component.Name2 or "").rsplit("/", 1)[-1]
+        if name in full_components:
+            raise RuntimeError(f"{label}: duplicate visible component {name!r}")
+        full_components[name] = component
+
+    candidates: list[tuple[tuple[float, ...], Any]] = []
+    for visible_component in _as_tuple(
+        view.GetVisibleComponents(), label=f"{label} visible components"
+    ):
+        visible_component = _early_bound(visible_component, "IComponent2")
+        if _component_stem(visible_component) != component_stem:
+            continue
+        name = str(visible_component.Name2 or "").rsplit("/", 1)[-1]
+        full_component = full_components.get(name)
+        if full_component is None:
+            raise RuntimeError(f"{label}: component {name!r} has no full peer")
+        for raw_edge in tuple(view.GetVisibleEntities2(visible_component, 1) or ()):
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve is None or not curve.IsCircle():
+                continue
+            parameters = tuple(float(value) for value in curve.CircleParams)
+            if len(parameters) < 7:
+                raise RuntimeError(f"{label}: circular edge has incomplete parameters")
+            center = _component_point_in_assembly(full_component, parameters[:3])
+            actual_height_mm = center[1] * 1000.0
+            actual_radius_mm = parameters[6] * 1000.0
+            if abs(actual_height_mm - height_mm) > 1e-5:
+                continue
+            if radius_mm is not None and abs(actual_radius_mm - radius_mm) > 1e-5:
+                continue
+            geometry_key = (
+                abs(center[0] - target_x_m),
+                center[0],
+                center[2],
+                actual_radius_mm,
+                *parameters[:3],
+            )
+            candidates.append((geometry_key, edge))
+    if not candidates:
+        radius_detail = "" if radius_mm is None else f", radius {radius_mm:g} mm"
+        raise RuntimeError(
+            f"{label}: no {component_stem!r} circle at {height_mm:g} mm"
+            f"{radius_detail}"
+        )
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
+def _add_entity_height_dimension(
+    adapter: Any,
+    view: Any,
+    entity0: Any,
+    entity1: Any,
+    *,
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    view = _early_bound(view, "IView")
+    if not drawing.ActivateView(str(view.GetName2() or "")):
+        raise RuntimeError(f"failed to activate view for {label}")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, entity0), (True, entity1)):
+        selection_data = _early_bound(
+            selection_manager.CreateSelectData(), "ISelectData"
+        )
+        selection_data.View = view
+        if not _early_bound(raw_entity, "IEntity").Select4(append, selection_data):
+            raise RuntimeError(f"failed to select exact entity for {label}")
+    display = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if display is None:
+        raise RuntimeError(f"failed to create {label}")
+    return display
+
+
 def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
     """Add native overall and top-cross-screw setup heights."""
-    bottom_pick = model_point_in_view(
-        adapter,
+    base_bottom = _visible_circle_at_height(
         front,
-        (_LEFT_COLUMN_X_M, 0.0, -TOP_SCREW_SEAT_Z / 1000.0),
-        label="frame base underside dimension pick",
+        component_stem="harmonic-base",
+        height_mm=0.0,
+        target_x_m=_LEFT_COLUMN_X_M,
+        label="frame base underside",
     )
-    cap_top_pick = model_point_in_view(
-        adapter,
+    cap_top = _visible_circle_at_height(
         front,
-        (_LEFT_COLUMN_X_M, CAP_TOP_Y / 1000.0, -TOP_SCREW_SEAT_Z / 1000.0),
-        label="finished cap top dimension pick",
+        component_stem="tube-frame-cap",
+        height_mm=CAP_TOP_Y,
+        target_x_m=_LEFT_COLUMN_X_M,
+        label="finished cap top",
     )
-    overall = add_edge_dimension(
+    overall = _add_entity_height_dimension(
         adapter,
         front,
-        p0=bottom_pick,
-        p1=cap_top_pick,
+        base_bottom,
+        cap_top,
         text_xy=(0.017, WORKING_FRONT_CENTER[1]),
         label="finished frame overall height",
-        orientation="vertical",
     )
     overall = _checked_height_dimension(
         adapter,
@@ -309,29 +432,21 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         label="finished frame overall height reference",
     )
 
-    screw_center = (
-        _LEFT_COLUMN_X_M,
-        TOP_SCREW_Y / 1000.0,
-        -TOP_SCREW_SEAT_Z / 1000.0,
+    screw_head = _visible_circle_at_height(
+        front,
+        component_stem="frame-cross-screw",
+        height_mm=TOP_SCREW_Y,
+        target_x_m=_LEFT_COLUMN_X_M,
+        radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
+        label="installed top cross-screw head",
     )
-    screw_edge_pick = model_point_in_view(
+    screw_axis = _add_entity_height_dimension(
         adapter,
         front,
-        (
-            screw_center[0] + CROSS_SCREW_HEAD_DIA / 2000.0,
-            screw_center[1],
-            screw_center[2],
-        ),
-        label="top cross-screw head dimension pick",
-    )
-    screw_axis = add_edge_dimension(
-        adapter,
-        front,
-        p0=bottom_pick,
-        p1=screw_edge_pick,
+        base_bottom,
+        screw_head,
         text_xy=(0.027, WORKING_FRONT_CENTER[1]),
         label="installed top cross-screw axis height",
-        orientation="vertical",
     )
     screw_axis = set_arc_endpoints_to_center(
         adapter, screw_axis, label="installed top cross-screw axis height"
@@ -762,9 +877,137 @@ def _validate_frame_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
+def _copy_selected_sheet(draw: Any, sheet_name: str, *, label: str) -> None:
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        sheet_name,
+        "SHEET",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(f"{label}: failed to select sheet {sheet_name!r}")
+    draw.EditCopy()
+
+
+def _paste_blank_sheet(
+    adapter: Any, drawing: Any, *, new_name: str, label: str
+) -> None:
+    drawing = _early_bound(drawing, "IModelDoc2")
+    ddoc = _early_bound(drawing, "IDrawingDoc")
+    before = tuple(ddoc.GetSheetNames() or ())
+    returned = bool(ddoc.PasteSheet(2, 2))  # move to end; preserve view names
+    after = tuple(ddoc.GetSheetNames() or ())
+    added = tuple(name for name in after if name not in before)
+    if len(after) != len(before) + 1 or len(added) != 1:
+        raise RuntimeError(
+            f"{label}: sheet paste failed (returned={returned!r}, "
+            f"before={before!r}, after={after!r})"
+        )
+    if not returned:
+        _telemetry.warn(f"{label}: PasteSheet returned false but created {added[0]!r}")
+    if not ddoc.ActivateSheet(added[0]):
+        raise RuntimeError(f"{label}: failed to activate pasted sheet {added[0]!r}")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    sheet.SetName(new_name)
+    if str(sheet.GetName() or "") != new_name:
+        raise RuntimeError(f"{label}: failed to rename pasted sheet {new_name!r}")
+
+
+def _activate_frame_package(adapter: Any, target: Any, target_title: str) -> Any:
+    activation = adapter.swApp.ActivateDoc3(target_title, False, 2, 0)
+    if not activation:
+        raise RuntimeError("failed to reactivate frame package drawing")
+    activated, errors = activation
+    if activated is None or int(errors) != 0:
+        raise RuntimeError(
+            f"failed to reactivate frame package drawing (errors={errors})"
+        )
+    activated = _early_bound(activated, "IModelDoc2")
+    if int(adapter.swApp.IsSame(activated, target)) != 1:
+        raise RuntimeError("reactivated document is not the frame package drawing")
+    adapter.currentModel = activated
+    return activated
+
+
+def _append_template_sheet(
+    adapter: Any,
+    target: Any,
+    target_title: str,
+    *,
+    layout: DrawingLayout,
+    new_name: str,
+    label: str,
+) -> None:
+    donor_title = ""
+    try:
+        donor, donor_sheet = new_project_drawing(
+            adapter, layout=layout, scale=SHEET_SCALE
+        )
+        donor = _early_bound(donor, "IModelDoc2")
+        donor_sheet = _early_bound(donor_sheet, "ISheet")
+        donor_title = str(donor.GetTitle() or "")
+        donor_name = str(donor_sheet.GetName() or "")
+        if not donor_title or not donor_name:
+            raise RuntimeError(f"{label}: donor drawing is incomplete")
+        _copy_selected_sheet(donor, donor_name, label=label)
+        _activate_frame_package(adapter, target, target_title)
+        _paste_blank_sheet(
+            adapter,
+            target,
+            new_name=new_name,
+            label=label,
+        )
+    finally:
+        primary_error = sys.exception()
+        cleanup_error: BaseException | None = None
+        if donor_title:
+            try:
+                _activate_frame_package(adapter, target, target_title)
+                adapter.swApp.CloseDoc(donor_title)
+            except BaseException as exc:
+                cleanup_error = exc
+        if cleanup_error is not None:
+            if primary_error is None:
+                raise cleanup_error
+            _telemetry.warn(f"{label}: donor cleanup failed: {cleanup_error}")
+
+
+def _create_mixed_package_sheets(adapter: Any) -> None:
+    """Create landscape/portrait/landscape sheets from the project templates."""
+    target, initial = new_project_drawing(
+        adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALE
+    )
+    target = _early_bound(target, "IModelDoc2")
+    initial = _early_bound(initial, "ISheet")
+    initial.SetName(SHEET_NAMES[0])
+    if str(initial.GetName() or "") != SHEET_NAMES[0]:
+        raise RuntimeError("failed to name the frame package primary sheet")
+    target_title = str(target.GetTitle() or "")
+    if not target_title:
+        raise RuntimeError("frame package drawing has no title")
+
+    for sheet_name in SHEET_NAMES[1:]:
+        _append_template_sheet(
+            adapter,
+            target,
+            target_title,
+            layout=SHEET_LAYOUTS[sheet_name],
+            new_name=sheet_name,
+            label=f"{sheet_name} frame sheet",
+        )
+
+    actual = tuple(_early_bound(target, "IDrawingDoc").GetSheetNames() or ())
+    if actual != SHEET_NAMES:
+        raise RuntimeError(f"frame package sheet order mismatch: {actual!r}")
+
+
 def _place_package(adapter: Any) -> None:
-    new_project_drawing(adapter, layout=SPEC.layout, scale=SHEET_SCALE)
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="frame assembly package")
+    _create_mixed_package_sheets(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
@@ -795,7 +1038,6 @@ def _place_package(adapter: Any) -> None:
         scale=EXPLODED_ISO_SCALE,
     )
     _set_exploded_state(adapter, exploded, True, label="exploded isometric")
-    set_high_quality_shaded_with_edges(adapter, exploded, label="exploded isometric")
     table = insert_bom_table(
         adapter,
         exploded,
@@ -816,8 +1058,8 @@ def _place_package(adapter: Any) -> None:
     )
     _add_note_block(
         adapter,
-        "EXPLODED VIEW 1:8 - SEE SHEET 3 FOR INSTALLATION ORDER",
-        (0.245, 0.078),
+        "EXPLODED VIEW 1:6 - SEE SHEET 3 FOR INSTALLATION ORDER",
+        (0.065, 0.080),
         label="exploded-view caption",
     )
 
@@ -831,9 +1073,6 @@ def _place_package(adapter: Any) -> None:
     )
     _set_exploded_state(
         adapter, instruction_iso, False, label="assembly instruction isometric"
-    )
-    set_high_quality_shaded_with_edges(
-        adapter, instruction_iso, label="assembly instruction isometric"
     )
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
     _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.115), label="assembly checks")
@@ -882,6 +1121,13 @@ async def build(adapter: Any) -> dict[str, str]:
     artifacts: dict[str, str] | None = None
     try:
         assembly, explode_name = _create_temporary_native_explode(adapter, source_model)
+        if not assembly.ShowExploded2(False, explode_name):
+            raise RuntimeError(
+                f"failed to collapse transient exploded view {explode_name!r} "
+                "before placing drawing views"
+            )
+        if not bool(source_model.EditRebuild3()):
+            raise RuntimeError("frame source rebuild failed after collapse")
         _place_package(adapter)
         artifacts = await finalize_drawing(
             adapter,
@@ -890,28 +1136,65 @@ async def build(adapter: Any) -> dict[str, str]:
             pdf_title="Frame Assembly Drawing Package",
             scale=SHEET_SCALE,
             expected_sheet_names=SHEET_NAMES,
+            sheet_layouts=SHEET_LAYOUTS,
         )
     finally:
-        collapse_error = ""
+        primary_error = sys.exception()
+        cleanup_errors: list[str] = []
         if assembly is not None and explode_name:
             try:
                 if not assembly.ShowExploded2(False, explode_name):
-                    collapse_error = (
+                    cleanup_errors.append(
                         f"failed to collapse transient exploded view {explode_name!r}"
                     )
-            except Exception as exc:
-                collapse_error = f"failed to collapse transient exploded view: {exc}"
-        adapter.swApp.CloseDoc(source_title)
-        if adapter.swApp.GetOpenDocumentByName(str(SOURCE.resolve())) is not None:
-            raise RuntimeError(
-                f"frame source {source_title!r} remained open after discard"
-            )
-        if _source_fingerprint(SOURCE) != fingerprint:
-            raise RuntimeError(
-                "frame drawing generation changed the released source assembly"
-            )
-        if collapse_error:
-            raise RuntimeError(collapse_error)
+            except Exception as exc:  # noqa: BLE001
+                cleanup_errors.append(
+                    f"failed to collapse transient exploded view: {exc}"
+                )
+
+        # A failed placement leaves an unsaved drawing active. Its views retain
+        # the source assembly, so release the drawing before discarding source.
+        if artifacts is None:
+            try:
+                active_model = adapter.currentModel
+                if active_model is not None:
+                    active_model = _early_bound(active_model, "IModelDoc2")
+                    if int(active_model.GetType()) == 3:  # swDocDRAWING
+                        drawing_title = str(active_model.GetTitle() or "")
+                        if not drawing_title:
+                            cleanup_errors.append(
+                                "generated frame drawing has no title for close"
+                            )
+                        else:
+                            adapter.swApp.CloseDoc(drawing_title)
+            except Exception as exc:  # noqa: BLE001
+                cleanup_errors.append(
+                    f"failed to close generated frame drawing: {exc}"
+                )
+
+        try:
+            adapter.swApp.CloseDoc(source_title)
+            if adapter.swApp.GetOpenDocumentByName(str(SOURCE.resolve())) is not None:
+                cleanup_errors.append(
+                    f"frame source {source_title!r} remained open after discard"
+                )
+        except Exception as exc:  # noqa: BLE001
+            cleanup_errors.append(f"failed to close frame source {source_title!r}: {exc}")
+
+        try:
+            if _source_fingerprint(SOURCE) != fingerprint:
+                cleanup_errors.append(
+                    "frame drawing generation changed the released source assembly"
+                )
+        except Exception as exc:  # noqa: BLE001
+            cleanup_errors.append(f"failed to verify frame source fingerprint: {exc}")
+
+        if cleanup_errors:
+            message = "; ".join(cleanup_errors)
+            if primary_error is not None:
+                _telemetry.warn(f"frame drawing cleanup after failure: {message}")
+            else:
+                raise RuntimeError(message)
 
     if artifacts is None:
         raise RuntimeError("frame drawing package returned no artifacts")

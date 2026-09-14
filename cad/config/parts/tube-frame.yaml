@@ -2,7 +2,7 @@ tube-frame:
   number: MHA-083
   material: ASTM A513 T5 SAE1020 DOM 1x.120in
   material_specification: ASTM A513 T5 SAE1020 DOM 1x.120in
-  finish: OD POLISHED Ra 1.6; OIL AFTER INSPECTION; ENDS FACED; ID AS-PROCURED
+  finish: OD POLISHED; OIL AFTER INSPECTION; ID AS-PROCURED
   quantity: 4
   tolerance_class: plate_profile
   process: "machined (steel)"

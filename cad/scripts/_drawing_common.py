@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 
 import _config
@@ -1741,6 +1741,7 @@ def render_pdf_png(
     *,
     layout: DrawingLayout,
     expected_pages: int = 1,
+    page_layouts: Sequence[DrawingLayout] | None = None,
 ) -> None:
     """Render a drawing PDF to its preview PNG.
 
@@ -1748,65 +1749,93 @@ def render_pdf_png(
     drawings use the registered preview path for a contact sheet, keeping the
     doit/cache/release artifact contract to one PNG. The historical 2x2 layout
     is retained through four pages; larger drawings use the smallest near-square
-    grid that fits every page.
+    grid that fits every page. Mixed packages validate and render each PDF page
+    against its own registered ASME B orientation without stretching the contact
+    preview.
     """
+    if page_layouts is None:
+        layouts = (layout,) * expected_pages
+    else:
+        layouts = tuple(page_layouts)
+        if len(layouts) != expected_pages:
+            raise ValueError(
+                f"page layout count {len(layouts)} != expected pages {expected_pages}"
+            )
+        if any(not isinstance(item, DrawingLayout) for item in layouts):
+            raise TypeError("every page layout must be a DrawingLayout")
     import pypdfium2 as pdfium
     from PIL import Image
 
-    template = DRAWING_TEMPLATES[layout]
+    contact_template = DRAWING_TEMPLATES[layout]
     document = pdfium.PdfDocument(str(pdf))
     if len(document) != expected_pages:
         raise RuntimeError(
             f"drawing PDF has {len(document)} pages, expected {expected_pages}"
         )
     images: list[Any] = []
-    for index in range(expected_pages):
+    for index, page_layout in enumerate(layouts):
         page = document[index]
-        image = page.render(scale=template.dpi / 72.0).to_pil()
+        page_template = DRAWING_TEMPLATES[page_layout]
+        expected_points = (
+            page_template.width_m / 0.0254 * 72.0,
+            page_template.height_m / 0.0254 * 72.0,
+        )
+        actual_points = (float(page.get_width()), float(page.get_height()))
+        point_tolerance = 72.0 / page_template.dpi + 1e-6
+        if any(
+            abs(actual - expected) > point_tolerance
+            for actual, expected in zip(actual_points, expected_points, strict=True)
+        ):
+            document.close()
+            raise RuntimeError(
+                f"PDF page {index + 1} is {actual_points[0]:g} x "
+                f"{actual_points[1]:g} pt, expected {expected_points[0]:g} x "
+                f"{expected_points[1]:g} pt for {page_layout.value}"
+            )
+        image = page.render(scale=page_template.dpi / 72.0).to_pil()
         page.close()
-        expected_width, expected_height = template.pixel_size
+        expected_width, expected_height = page_template.pixel_size
         actual_width, actual_height = image.size
         if (
             actual_width in (expected_width, expected_width + 1)
             and actual_height in (expected_height, expected_height + 1)
-            and image.size != template.pixel_size
+            and image.size != page_template.pixel_size
         ):
             image = image.crop((0, 0, expected_width, expected_height))
-        if image.size != template.pixel_size:
+        if image.size != page_template.pixel_size:
             document.close()
             raise RuntimeError(
-                f"{layout.value} ASME B PNG page {index + 1} is {image.size}, "
-                f"expected {template.pixel_size}"
+                f"{page_layout.value} ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {page_template.pixel_size}"
             )
         images.append(image)
     document.close()
     png.parent.mkdir(parents=True, exist_ok=True)
     if expected_pages == 1:
-        images[0].save(png, dpi=(template.dpi, template.dpi))
+        images[0].save(png, dpi=(contact_template.dpi, contact_template.dpi))
         return
 
     columns, rows = _contact_preview_grid(expected_pages)
     cell_size = (
-        template.pixel_size[0] // columns,
-        template.pixel_size[1] // rows,
+        contact_template.pixel_size[0] // columns,
+        contact_template.pixel_size[1] // rows,
     )
-    scale = min(
-        cell_size[0] / template.pixel_size[0],
-        cell_size[1] / template.pixel_size[1],
-    )
-    preview_size = (
-        round(template.pixel_size[0] * scale),
-        round(template.pixel_size[1] * scale),
-    )
-    contact = Image.new("RGB", template.pixel_size, "white")
+    contact = Image.new("RGB", contact_template.pixel_size, "white")
     for index, image in enumerate(images):
+        scale = min(cell_size[0] / image.width, cell_size[1] / image.height)
+        preview_size = (
+            round(image.width * scale),
+            round(image.height * scale),
+        )
         cell = image.resize(preview_size, Image.Resampling.LANCZOS)
         column = index % columns
         row = index // columns
         x = column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2
         y = row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2
         contact.paste(cell.convert("RGB"), (x, y))
-    contact.save(png, dpi=(template.dpi, template.dpi))
+    contact.save(
+        png, dpi=(contact_template.dpi, contact_template.dpi)
+    )
 
 
 def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
@@ -4750,6 +4779,7 @@ async def finalize_drawing(
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
+    sheet_layouts: Mapping[str, DrawingLayout] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
@@ -4771,6 +4801,22 @@ async def finalize_drawing(
             f"drawing sheet contract mismatch: {sheet_names!r} != "
             f"{expected_sheet_names!r}"
         )
+    if sheet_layouts is None:
+        resolved_layouts = {name: layout for name in sheet_names}
+    else:
+        if set(sheet_layouts) != set(sheet_names):
+            missing = sorted(set(sheet_names) - set(sheet_layouts))
+            unknown = sorted(set(sheet_layouts) - set(sheet_names))
+            raise ValueError(
+                f"sheet layout mapping must cover every sheet exactly; "
+                f"missing={missing!r}, unknown={unknown!r}"
+            )
+        if any(
+            not isinstance(sheet_layout, DrawingLayout)
+            for sheet_layout in sheet_layouts.values()
+        ):
+            raise TypeError("every sheet layout must be a DrawingLayout")
+        resolved_layouts = dict(sheet_layouts)
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
@@ -4792,7 +4838,7 @@ async def finalize_drawing(
         assert_asme_b_sheet(
             adapter,
             sheet,
-            layout=layout,
+            layout=resolved_layouts[sheet_name],
             phase=f"before save {sheet_name}",
             scale=scale,
         )
@@ -4826,7 +4872,7 @@ async def finalize_drawing(
             assert_asme_b_sheet(
                 adapter,
                 sheet,
-                layout=layout,
+                layout=resolved_layouts[sheet_name],
                 phase=f"explicit property source {sheet_name}",
                 scale=scale,
             )
@@ -4930,6 +4976,7 @@ async def finalize_drawing(
         outputs.png,
         layout=layout,
         expected_pages=len(sheet_names),
+        page_layouts=tuple(resolved_layouts[name] for name in sheet_names),
     )
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:
