@@ -1,7 +1,7 @@
 harmonic-base:
   number: MHA-035
   material_family: ferrous_noncritical
-  finish: ALKYD PRIMER + ENAMEL (RAL6000; BLACK DECK);MASK MOUNTING FACES/BORES/THREADS;OIL BARE MACHINED FACES
+  finish: ALKYD PRIME/ENAMEL (RAL6000/BLACK DECK);MASK SEATS/BORES/THREADS/ID;OIL BARE METAL
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"

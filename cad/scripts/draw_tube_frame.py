@@ -6,9 +6,9 @@ notes; shared sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
-and the square-cut annulus end view is ``*Bottom``. The portrait sheet uses the
-long axis for the 1018.765 mm cut length at 1:5; the aligned end view carries an
-2:1 override. The isometric is pictorial only.
+and the chamfered end view is ``*Top``, aligned above it in third-angle
+projection. The portrait sheet uses the long axis for the 1018.765 mm cut
+length at 1:5; the end view carries a 2:1 override. The isometric is pictorial only.
 
 Run with SolidWorks open::
 
@@ -41,10 +41,10 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -94,26 +94,51 @@ def _add_outer_diameter_reference(
     adapter: Any,
     view: Any,
     *,
-    edge_xy: tuple[float, float],
     text_xy: tuple[float, float],
 ) -> Any:
-    """Add an associative, outside-arrow OD reference on the selected arc."""
+    """Dimension the full-OD circle at the top chamfer's cylindrical shoulder."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate OD reference view {name!r}")
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        "", "EDGE", edge_xy[0], edge_xy[1], 0.0, False, 0, null_callout(), 0
-    ):
+    # Select the model edge, not a sheet-coordinate hit within the pick aperture
+    # of the smaller top rim. The full OD survives at the chamfer's lower edge.
+    center = (0.0, (COLUMN_LENGTH - TOP_END_CHAMFER) / 1000.0, 0.0)
+    radius = OUTER_DIA / 2000.0
+    matches = []
+    for raw in visible_view_entities(view, 1, label="tube top full-OD shoulder"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        values = tuple(float(value) for value in curve.CircleParams)
+        if abs(values[6] - radius) > 1e-7:
+            continue
+        if any(abs(values[index] - center[index]) > 1e-7 for index in range(3)):
+            continue
+        if abs(abs(values[4]) - 1.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
         raise RuntimeError(
-            f"failed to select OD near arc at sheet ({edge_xy[0]:g}, {edge_xy[1]:g})"
+            f"expected one tube top full-OD shoulder edge, found {len(matches)}"
         )
+    draw.ClearSelection2(True)
+    if not view.SelectEntity(matches[0], False):
+        raise RuntimeError("failed to select tube top full-OD shoulder edge")
     display = draw.AddDiameterDimension2(text_xy[0], text_xy[1], 0.0)
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError("failed to add OD reference dimension")
+    native = _early_bound(display, "IDisplayDimension")
+    measured_mm = float(
+        _early_bound(native.GetDimension2(0), "IDimension").SystemValue
+    ) * 1000.0
+    if abs(measured_mm - OUTER_DIA) > 1e-5:
+        raise RuntimeError(
+            f"tube OD reference measured {measured_mm:g}, expected {OUTER_DIA:g} mm"
+        )
     display = _sw_type_info.early_bound_or_flag(
         display,
         "IDisplayDimension",
@@ -205,23 +230,16 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     length = place_view(adapter, str(SOURCE), "*Front", *LENGTH_CENTER, scale=(1, 5))
-    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(2, 1))
+    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
     set_hidden_lines_removed(adapter, iso)
 
     curate_view_dimensions(adapter, end, keep=END_KEEP, view_label="end")
-    outer_edge = model_point_in_view(
-        adapter,
-        end,
-        (OUTER_DIA / 2000.0, 0.0, 0.0),
-        label="outer diameter near arc",
-    )
     outer_diameter = _add_outer_diameter_reference(
         adapter,
         end,
-        edge_xy=outer_edge,
         text_xy=(END_CENTER[0] + 0.090, END_CENTER[1] + 0.020),
     )
     length_annotations = curate_view_dimensions(
@@ -245,7 +263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         dimensions,
         {
-            "Length": 2,
+            "Length": 1,
             "LowerHoleY": 2,
             "UpperHoleY": 2,
             "CrossHoleDia": 2,
@@ -302,7 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.145, 0.398, char_height=0.0022
     )
-    add_note(adapter, f"BOTTOM {property_link('End View Note')}", 0.060, 0.400)
+    add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.185)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
     for view in (length, end):

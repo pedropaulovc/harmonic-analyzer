@@ -31,6 +31,7 @@ from _drawing_common import (
     set_arc_endpoints_to_center,
     set_reference_dimension,
     set_hidden_lines_visible,
+    sheet_drawable_region,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from frame_attachment_spec import (
@@ -79,11 +80,11 @@ SHEET_LAYOUTS = {
 }
 if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
-SHEET_SCALE = (1.0, 6.0)
-WORKING_FRONT_CENTER = (0.090, 0.155)
-BASE_SECTION_CENTER = (0.190, 0.165)
-TOP_SECTION_CENTER = (0.325, 0.165)
-JOINT_SECTION_SCALE = (1.0, 4.0)
+SHEET_SCALE = (1.0, 8.0)
+WORKING_FRONT_CENTER = (0.053763, 0.163612)
+BASE_SECTION_CENTER = (0.170714, 0.1823453)
+TOP_SECTION_CENTER = (0.335290, 0.1815266)
+JOINT_SECTION_SCALE = (1.0, 3.0)
 EXPLODED_ISO_CENTER = (0.140, 0.198)
 EXPLODED_ISO_SCALE = (1.0, 7.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.172)
@@ -167,15 +168,15 @@ ASSEMBLY_STEPS = "\n".join(
         "   THE ACTUAL MHA-132 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
         "3. FIT MHA-077 OVER THE COLUMNS, HUB OPPOSITE THE MHA-086 END.",
         "   HAND-FIT EACH BORE WITHOUT BIND OR ROCK ON ITS MATCHED COLUMN.",
-        "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE SHEET-1 HEIGHT DIMENSION.",
-        "   COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE AT EACH AXIS.",
+        "   SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE CONTROLLING TOP-AXIS",
+        "   HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES FROM THE BASE UNDERSIDE.",
         "   CLAMP; MATCH-MARK EACH TOP CORNER AND COLUMN ORIENTATION.",
         "4. THROUGH THE EXISTING MHA-077 CASTING BORES, PILOT-TRANSFER EACH TOP",
         "   AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD SEGMENTS.",
         f"   REMOVE MHA-077/COLUMNS; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f},",
         "   DEBURR, AND VERIFY FREE PASSAGE OF THE ACTUAL MHA-132 SHANK.",
-        "5. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THEIR MARKED",
-        "   ENTRY SIDES; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
+        "5. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-132 FROM THE SIDES",
+        "   USED FOR PILOT-DRILLING; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
         "6. VERIFY EACH MHA-077 CAP RECESS CLEARS ITS ACTUAL MHA-133 SKIRT.",
         "   AFTER MATCH MARKS ALIGN AND MHA-132 HEADS SEAT, PUSH EACH CAP OVER",
         "   THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S INSIDE SEAT.",
@@ -310,6 +311,7 @@ def _visible_circle_at_height(
     target_x_m: float,
     label: str,
     radius_mm: float | None = None,
+    target_z_m: float | None = None,
 ) -> Any:
     """Resolve a visible circular edge by component identity and native geometry."""
     view = _early_bound(view, "IView")
@@ -353,6 +355,7 @@ def _visible_circle_at_height(
                 continue
             geometry_key = (
                 abs(center[0] - target_x_m),
+                abs(center[2] - target_z_m) if target_z_m is not None else 0.0,
                 center[0],
                 center[2],
                 actual_radius_mm,
@@ -406,14 +409,14 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         component_stem="harmonic-base",
         height_mm=0.0,
-        target_x_m=_LEFT_COLUMN_X_M,
+        target_x_m=-_LEFT_COLUMN_X_M,
         label="frame base underside",
     )
     cap_top = _visible_circle_at_height(
         front,
         component_stem="tube-frame-cap",
         height_mm=CAP_TOP_Y,
-        target_x_m=_LEFT_COLUMN_X_M,
+        target_x_m=-_LEFT_COLUMN_X_M,
         label="finished cap top",
     )
     overall = _add_entity_height_dimension(
@@ -421,7 +424,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         cap_top,
-        text_xy=(0.028, 0.175),
+        text_xy=(0.092, 0.244),
         label="finished frame overall height",
     )
     overall = _checked_height_dimension(
@@ -440,7 +443,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         component_stem="frame-cross-screw",
         height_mm=TOP_SCREW_Y,
-        target_x_m=_LEFT_COLUMN_X_M,
+        target_x_m=-_LEFT_COLUMN_X_M,
         radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
         label="installed top cross-screw head",
     )
@@ -449,7 +452,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         front,
         base_bottom,
         screw_head,
-        text_xy=(0.041, 0.205),
+        text_xy=(0.086, 0.254),
         label="installed top cross-screw axis height",
     )
     screw_axis = set_arc_endpoints_to_center(
@@ -461,6 +464,51 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
         expected_mm=TOP_SCREW_Y,
         label="installed top cross-screw axis height",
     )
+
+    # An outside dimension can put its text to either side of the requested
+    # anchor. Inspect the native shoulder/witness ink, not that anchor alone.
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    properties = tuple(sheet.GetProperties2())
+    region = sheet_drawable_region(
+        adapter, sheet, width=float(properties[5]), height=float(properties[6])
+    )
+    for label, display in (("overall reference", overall), ("top axis", screw_axis)):
+        display = _early_bound(display, "IDisplayDimension")
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        data = _early_bound(display.GetDisplayData(), "IDisplayData")
+        text_count = int(data.GetTextCount())
+        points = []
+        for index in range(int(data.GetLineCount())):
+            line = tuple(float(value) for value in data.GetLineAtIndex2(index))
+            if len(line) < 10:
+                raise RuntimeError(f"{label}: incomplete native dimension line")
+            points.extend(((line[4], line[5]), (line[7], line[8])))
+        if not points or text_count < 1:
+            raise RuntimeError(f"{label}: missing native dimension display data")
+        bounds = (
+            min(point[0] for point in points), min(point[1] for point in points),
+            max(point[0] for point in points), max(point[1] for point in points),
+        )
+        _telemetry.event(
+            "drawing.frame_height_ink",
+            label=label,
+            annotation_position=tuple(annotation.GetPosition()),
+            line_bounds=bounds,
+            text=tuple(str(data.GetTextAtIndex(index)) for index in range(text_count)),
+            text_positions=tuple(
+                float(value) for index in range(text_count)
+                for value in data.GetTextPositionAtIndex(index)
+            ),
+            text_heights=tuple(
+                float(data.GetTextHeightAtIndex(index)) for index in range(text_count)
+            ),
+        )
+        if (
+            bounds[0] < region.xmin - 1e-6 or bounds[1] < region.ymin - 1e-6
+            or bounds[2] > region.xmax + 1e-6 or bounds[3] > region.ymax + 1e-6
+        ):
+            raise RuntimeError(f"{label}: native dimension ink {bounds!r} crosses {region!r}")
     return overall, screw_axis
 
 
@@ -791,7 +839,17 @@ def _upper_frame_balloon_edges(adapter: Any, view: Any) -> dict[str, Any]:
                 winners[stem] = (score, edge)
     if set(winners) != wanted:
         raise RuntimeError(f"missing visible upper frame component edges: {set(winners)}")
-    return {stem: row[1] for stem, row in winners.items()}
+    anchors = {stem: row[1] for stem, row in winners.items()}
+    anchors["frame-cross-screw"] = _visible_circle_at_height(
+        view,
+        component_stem="frame-cross-screw",
+        height_mm=TOP_SCREW_Y,
+        target_x_m=_LEFT_COLUMN_X_M,
+        target_z_m=TOP_SCREW_SEAT_Z / 1000.0,
+        radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
+        label="exposed left top cross-screw balloon",
+    )
+    return anchors
 
 
 def _reattach_frame_balloons(
@@ -845,8 +903,14 @@ def _place_package(adapter: Any) -> None:
     _add_note_block(
         adapter,
         "WORKING POSITION - A-A BASE JOINT / B-B TOP JOINT",
-        (0.018, 0.263),
+        (0.130, 0.263),
         label="working-view heading",
+    )
+    _add_note_block(
+        adapter,
+        "SCALE 1:8",
+        (0.030, 0.065),
+        label="working-view scale",
     )
 
     _activate_sheet(adapter, SHEET_NAMES[1])
