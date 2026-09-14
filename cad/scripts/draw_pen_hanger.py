@@ -165,12 +165,12 @@ async def build(adapter: Any) -> dict[str, str]:
             _fx(SCREW_HOLE_XY[0] + TAP_DRILL_MM[SCREW_TAP_SPEC.size] / 2.0),
             _fy(SCREW_HOLE_XY[1]),
         ),
-        callout_xy=(0.115, 0.215),
+        callout_xy=(0.145, 0.215),
         label="hanger-screw through tap",
         process="TAP",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.150)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.175)
     add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)
     add_property_linked_note(adapter, "Top View Note", 0.170, 0.195)
     add_property_linked_note(adapter, "Isometric View Note", 0.286, 0.104)
@@ -181,6 +181,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Hanger Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=("#8-32 Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

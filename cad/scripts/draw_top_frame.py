@@ -56,10 +56,8 @@ from build_top_frame import (
     BORE_CHAMFER,
     CAP_RECESS_DIAMETER,
     BOSS_ABOVE,
-    BOSS_BELOW,
     FLANGE,
     FLANGE_BOT_Y,
-    GUSSET,
     EDGE_CHAMFER,
     ROOT_FILLET_R,
     OUTER_Z,
@@ -68,7 +66,6 @@ from build_top_frame import (
     INNER_Z,
     RING_HEIGHT,
     WEB_T,
-    WEB_IN_X,
     WEB_OUT_X,
     WEB_IN_Z,
     WEB_OUT_Z,
@@ -80,7 +77,6 @@ from build_top_frame import (
     GOOSENECK_X,
     GOOSENECK_Z,
     HALF_H,
-    HUB_BOSS_DIA,
     HUB_BOSS_DROP,
     HUB_GUSSET_T,
     HUB_GUSSET_HALF_IN,
@@ -125,6 +121,10 @@ DETAIL_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 # 276.2 envelope; the boss stack is 47.3 tall around the 36.5 rail band.
 PLAN_HALF_X = COLUMN_X + BOSS_DIA / 2.0
 PLAN_HALF_Z = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0
+FRAME_ORIGIN_AXES = (
+    ((-PLAN_HALF_X, 0.0, 0.0), (PLAN_HALF_X, 0.0, 0.0)),
+    ((0.0, 0.0, -PLAN_HALF_Z), (0.0, 0.0, PLAN_HALF_Z)),
+)
 GEOMETRY_PLAN_HALF_W = PLAN_HALF_X * GEOMETRY_VIEW_SCALE / 1000.0
 GEOMETRY_PLAN_HALF_D = PLAN_HALF_Z * GEOMETRY_VIEW_SCALE / 1000.0
 DETAIL_PLAN_HALF_W = PLAN_HALF_X * DETAIL_VIEW_SCALE / 1000.0
@@ -161,7 +161,7 @@ GEOMETRY_FRONT_NOTE_XY = (0.025, 0.120)
 GEOMETRY_ISO_NOTE_XY = (0.042, 0.018)
 DETAIL_TOP_NOTE_XY = (0.280, 0.250)
 DETAIL_FRONT_NOTE_XY = (0.040, 0.065)
-MANUFACTURING_NOTES_XY = (0.245, 0.085)
+MANUFACTURING_NOTES_XY = (0.040, 0.045)
 
 # The first sheet contains only the frame/window and T-rail definition.
 GEOMETRY_TOP_KEEP = {
@@ -186,8 +186,8 @@ GEOMETRY_CALLOUTS = {
 DETAIL_TOP_KEEP = {
     "StudRearZ": (0.065, DETAIL_TOP_CENTER[1] - 0.030),
     "KeeperRearZ": (0.300, DETAIL_TOP_CENTER[1] - 0.028),
-    "C0Dia": (0.050, DETAIL_TOP_CENTER[1] + 0.033),
-    "B0Dia": (0.065, 0.259),
+    "C0Dia": (0.045, 0.254),
+    "B0Dia": (0.070, 0.237),
     "StudFrontX": (0.170, 0.245),
     "StudFrontZ": (0.055, DETAIL_TOP_CENTER[1] + 0.015),
     "KeeperFrontX": (0.285, 0.240),
@@ -198,63 +198,69 @@ HUB_TOP_KEEP = {
     "GnZ": (0.040, HUB_TOP_CENTER[1] - 0.015),
 }
 HUB_LEFT_KEEP = {
-    "PocketRun": (HUB_LEFT_CENTER[0], 0.060),
     "PocketRise": (0.060, HUB_LEFT_CENTER[1]),
 }
 DETAIL_FRONT_KEEP: dict[str, tuple[float, float]] = {}
 DETAIL_SECTION_KEEP = {
-    "BossTopExtent": (
-        DETAIL_SECTION_CENTER[0] + 0.060,
-        DETAIL_SECTION_CENTER[1] + 0.032,
-    ),
     "BossBottomExtent": (
-        DETAIL_SECTION_CENTER[0] + 0.060,
-        DETAIL_SECTION_CENTER[1] - 0.032,
+        0.390,
+        0.107,
     ),
     "RingHeight": (
-        DETAIL_SECTION_CENTER[0] + 0.040,
-        DETAIL_SECTION_CENTER[1] - 0.012,
+        0.375,
+        0.118,
     ),
     "CapRecessDia": (
         DETAIL_SECTION_CENTER[0] - 0.040,
         DETAIL_SECTION_CENTER[1] + 0.020,
     ),
     "CapRecessDepth": (
-        DETAIL_SECTION_CENTER[0] + 0.040,
-        DETAIL_SECTION_CENTER[1] + 0.010,
+        0.397,
+        0.153,
     ),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X",
-    "B0Dia": "4X SOCKET\nFIT MHA-083 TUBE; SLIP BY HAND",
+    "B0Dia": "4X SOCKET; LIMITS GOVERN\nFIT MHA-083 TUBE OD\nTO SLIP BY HAND",
 }
 SECTION_CALLOUTS = {
-    "BossTopExtent": "4X",
     "BossBottomExtent": "4X",
     "CapRecessDia": "4X CAP RECESS",
     "CapRecessDepth": "4X CAP SEAT",
 }
 
 
-def _add_ring_midline(adapter: Any, view: Any) -> None:
-    """Expose the common model origin for the coordinate dimensions."""
+def _add_view_centerlines(
+    adapter: Any,
+    view: Any,
+    axes: tuple[tuple[tuple[float, float, float], tuple[float, float, float]], ...],
+) -> None:
+    """Create only the owned axes, in the target view's actual sketch frame."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    drawing.EditSheet()
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    for start, end in (
-        ((-PLAN_HALF_X, 0.0, 0.0), (PLAN_HALF_X, 0.0, 0.0)),
-        ((0.0, 0.0, -PLAN_HALF_Z), (0.0, 0.0, PLAN_HALF_Z)),
-    ):
-        points = [
-            model_point_in_view(
-                adapter, view, tuple(value/1000.0 for value in point),
-                label="frame origin centerline",
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate drawing centreline view")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    for start, end in axes:
+        points = []
+        for xyz in (start, end):
+            x, y = model_point_in_view(
+                adapter, view, tuple(value/1000.0 for value in xyz),
+                label="drawing centreline endpoint",
             )
-            for point in (start, end)
-        ]
-        if sketch_manager.CreateCenterLine(*points[0], 0.0, *points[1], 0.0) is None:
-            raise RuntimeError("failed to create frame origin centerline")
+            point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+            points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+        if segment is None:
+            raise RuntimeError("failed to create owned drawing centreline")
+        segment = _early_bound(segment, "ISketchSegment")
+        segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+        if int(segment.Color) != 0:
+            raise RuntimeError("owned drawing centreline color did not persist")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
 
@@ -701,19 +707,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (detail_top, detail_front):
         set_hidden_lines_visible(adapter, view)
     set_hidden_lines_visible(adapter, detail_section)
-    section_axis = [
-        model_point_in_view(
-            adapter, detail_section, (COLUMN_X/1000.0, 0.0, z/1000.0),
-            label="section cross-screw axis",
-        )
-        for z in (-PLAN_HALF_Z, PLAN_HALF_Z)
-    ]
-    ddoc.EditSheet()
-    section_sketch = _early_bound(drawing_model.SketchManager, "ISketchManager")
-    if section_sketch.CreateCenterLine(*section_axis[0], 0.0, *section_axis[1], 0.0) is None:
-        raise RuntimeError("failed to draw section cross-screw centreline")
-    drawing_model.ClearSelection2(True)
-    drawing_model.EditRebuild3()
+    _add_view_centerlines(
+        adapter, detail_section,
+        (((COLUMN_X, 0.0, -PLAN_HALF_Z), (COLUMN_X, 0.0, PLAN_HALF_Z)),),
+    )
 
     detail_top_dimensions = curate_view_dimensions(
         adapter,
@@ -751,7 +748,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, detail_annotations, detail_callouts)
     set_dimension_precision(
         adapter, detail_annotations,
-        {"C0Dia": 1, "BossTopExtent": 1, "BossBottomExtent": 1, "RingHeight": 1},
+        {"C0Dia": 1, "BossBottomExtent": 1, "RingHeight": 1},
     )
     _checked_dimension(
         adapter, detail_section,
@@ -764,7 +761,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, detail_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top-frame hole pattern")
-    _add_ring_midline(adapter, detail_top)
+    _add_view_centerlines(adapter, detail_top, FRAME_ORIGIN_AXES)
     _checked_dimension(
         adapter, detail_top,
         p0=(-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
@@ -882,7 +879,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=keeper_edge,
-        callout_xy=(0.320, 0.165),
+        callout_xy=(0.345, 0.225),
         label="2X fulcrum-keeper blind taps",
         process="TAP",
     )
@@ -899,8 +896,8 @@ async def build(adapter: Any) -> dict[str, str]:
     cap_fit_note = add_note(
         adapter,
         "CAP RECESS FIT MHA-133 / 9275K141; SLIP BY HAND",
-        0.245,
-        0.075,
+        0.040,
+        0.055,
     )
     if add_note(adapter, "A-A: CROSS SCREWS THROUGH SOCKETS TO FAR WALLS", 0.040, 0.035) is None:
         raise RuntimeError("failed to identify section cross-screw relation")
@@ -930,10 +927,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*hub_top_dimensions, *hub_left_dimensions],
         {name: "" for name in (*HUB_TOP_KEEP, *HUB_LEFT_KEEP)},
     )
+    set_dimension_callouts(adapter, hub_left_dimensions, {"PocketRise": "SQ POCKET"})
     set_dimension_precision(
         adapter, hub_left_dimensions, {name: 1 for name in HUB_LEFT_KEEP},
     )
-    _add_ring_midline(adapter, hub_top)
+    _add_view_centerlines(adapter, hub_top, FRAME_ORIGIN_AXES)
     if add_note(adapter, "HUB LOCATION SCALE 1:3", 0.030, 0.260) is None:
         raise RuntimeError("failed to label hub location view")
     hub_bottom_parent = place_view(
@@ -1146,8 +1144,11 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        # Separate hub location/side and underside imports add automatic Hole
+        # Wizard notes. This three-sheet composition has six across all sheets;
+        # the associative feature callouts replace them, and the total stays gated.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=2,
+        expected_redundant_notes=6,
     )
 
 
