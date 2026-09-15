@@ -118,7 +118,11 @@ def load_config(path: Path | None = None) -> dict:
         if not file.is_file() or not os.access(file, os.R_OK):
             raise RuntimeError(f"farm config {path}: {key} file is not readable")
         config[key] = str(file)
-    if not Path(config["token"]).read_text(encoding="ascii").strip():
+    try:
+        token = Path(config["token"]).read_text(encoding="ascii").strip()
+    except UnicodeDecodeError:
+        raise RuntimeError(f"farm config {path}: token file is not an ASCII JWT") from None
+    if not token:
         raise RuntimeError(f"farm config {path}: token file is empty")
     return config
 
