@@ -330,3 +330,17 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
     assert saves == [False]
     assert assembly_path.read_bytes() == b"byte-stable assembly"
     assert not proof.exists()
+
+
+@pytest.mark.parametrize(
+    ("operation", "assembly_name"),
+    [
+        ("save_assembly_and_images", "channel"),
+        ("refresh_assembly", "summing"),
+    ],
+)
+def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name):
+    import _assembly
+
+    with pytest.raises(ValueError):
+        asyncio.run(getattr(_assembly, operation)(None, assembly_name))
