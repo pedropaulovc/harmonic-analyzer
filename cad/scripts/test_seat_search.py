@@ -68,7 +68,7 @@ class _WireOnWire(_FakeContact):
     """
 
     def evaluate(self, offset_mm: float):
-        state, distance = super().evaluate(offset_mm)
+        state, _distance = super().evaluate(offset_mm)
         if state == "interfering":
             return state, None
         gap = offset_mm - self.contact
