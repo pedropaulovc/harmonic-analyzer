@@ -778,12 +778,46 @@ async def build(adapter: Any) -> dict[str, str]:
         label="T rail manufacturing section",
     )
     _orient_cut_section(adapter, rail_section, (0.0, 0.0, 1.0))
+    rail_edges = []
+    for raw_edge in visible_view_entities(
+        geometry_front, 1, label="front rail-height plane inventory"
+    ):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None or not _early_bound(curve, "ICurve").IsLine():
+            continue
+        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+        if any(vertex is None for vertex in vertices):
+            continue
+        start, end = [
+            tuple(float(value)*1000.0 for value in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in vertices
+        ]
+        if (
+            abs(start[1]-end[1]) > 1e-6 or abs(start[2]-end[2]) > 1e-6
+            or not min(start[0], end[0]) < rail_cut_x < max(start[0], end[0])
+        ):
+            continue
+        rail_edges.append((edge, (rail_cut_x, start[1], start[2])))
+    height_edges = []
+    for plane_y in (HALF_H, -HALF_H):
+        candidates = [
+            item for item in rail_edges if abs(item[1][1]-plane_y) < 1e-6
+        ]
+        if not candidates:
+            raise RuntimeError(
+                f"front rail has no visible edge on Y={plane_y:g}; "
+                f"native section-station edge points={[point for _, point in rail_edges]}"
+            )
+        # *Front looks from +Z: choose its actual frontmost edge, not a
+        # constructed point on the hidden opposite rail/chamfer.
+        height_edges.append(max(candidates, key=lambda item: item[1][2]))
     _checked_dimension(
         adapter, geometry_front,
-        p0=(rail_cut_x, HALF_H, -OUTER_Z+EDGE_CHAMFER),
-        p1=(rail_cut_x, -HALF_H, -WEB_OUT_Z),
+        p0=height_edges[0][1], p1=height_edges[1][1],
         text_xy=(0.238, 0.091), label="front projection rail height",
-        expected_mm=RING_HEIGHT, orientation="vertical", exact_linear=True,
+        expected_mm=RING_HEIGHT, orientation="vertical",
+        entities=(height_edges[0][0], height_edges[1][0]),
         reference=True, suffix="RAIL HEIGHT",
     )
     set_hidden_lines_visible(adapter, rail_section)

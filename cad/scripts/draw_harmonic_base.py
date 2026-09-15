@@ -33,6 +33,7 @@ from _drawing_common import (
     create_view_theoretical_datum,
     curate_view_dimensions,
     finalize_drawing,
+    dimension_name,
     insert_hole_table,
     model_point_in_view,
     new_project_drawing,
@@ -53,6 +54,7 @@ from _surface_finish import surface_finish_by_key
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
+    BASE_SPOTFACE_PLANE_Z,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
     COLUMN_X,
@@ -92,6 +94,7 @@ from harmonic_base_spec import (
 from frame_attachment_spec import (
     BASE_SCREW_SEAT_Z,
     BASE_SCREW_Y,
+    SCREW_SPOTFACE_DIAMETER,
 )
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -141,21 +144,18 @@ GEOMETRY_TOP_KEEP = {
     "TopWid": (0.217, 0.200),
     "PadCornerRadius": (0.070, 0.236),
     "FlangeCornerRadius": (0.040, 0.215),
-    "RimInnerCornerRadius": (0.055, 0.185),
+    "RimInnerCornerRadius": (0.077, 0.226),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
-SECTION_KEEP = {
-    "SpotFaceDia": (0.400, 0.157),
-}
+SECTION_KEEP: dict[str, tuple[float, float]] = {}
 GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
+    "PadCornerRadius": "PAD",
+    "FlangeCornerRadius": "FLANGE",
     "RimInnerCornerRadius": "RIM INNER",
-}
-HOLE_CALLOUTS = {
-    "SpotFaceDia": "4X SPOTFACE\nON 10-32\nCROSS-SCREW\nHOLES\nFRONT/REAR\nCLEAN UP",
 }
 
 # Native table tags keep their source association while short leaders separate
@@ -164,15 +164,15 @@ HOLE_TAG_POSITIONS = {
     "A3": (0.325, 0.176),
     "A4": (0.326, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.250, 0.168),
-    "E1": (0.253, 0.181),
+    "D1": (0.239, 0.172),
+    "E1": (0.257, 0.155),
     "E2": (0.262, 0.226),
-    "E3": (0.282, 0.185),
-    "F1": (0.267, 0.182),
+    "E3": (0.287, 0.192),
+    "F1": (0.265, 0.192),
     "F2": (0.277, 0.224),
-    "F3": (0.291, 0.167),
+    "F3": (0.287, 0.155),
     "F4": (0.293, 0.223),
-    "G1": (0.291, 0.174),
+    "G1": (0.306, 0.187),
     "G2": (0.289, 0.206),
     "G3": (0.312, 0.173),
     "G4": (0.312, 0.214),
@@ -226,6 +226,45 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
             f"expected one base cross-tap entry edge, found {len(matches)}"
         )
     return matches[0]
+
+
+def _add_cross_spotface_dimension(adapter: Any, view: Any) -> None:
+    """Dimension the actual front spotface entry, not its section projection."""
+    center = (-COLUMN_X / 1000.0, BASE_SCREW_Y / 1000.0, BASE_SPOTFACE_PLANE_Z / 1000.0)
+    matches = []
+    for raw in visible_view_entities(view, 1, label="base front spotface entry"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        values = tuple(float(value) for value in curve.CircleParams)
+        if (
+            abs(values[6] - SCREW_SPOTFACE_DIAMETER / 2000.0) < 1e-7
+            and all(abs(values[index] - center[index]) < 1e-7 for index in range(3))
+            and abs(abs(values[5]) - 1.0) < 1e-7
+        ):
+            matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one actual front spotface entry, found {len(matches)}")
+    drawing = adapter.currentModel
+    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate front spotface view")
+    drawing.ClearSelection2(True)
+    if not view.SelectEntity(matches[0], False):
+        raise RuntimeError("failed to select the actual front spotface circle")
+    display = drawing.AddDiameterDimension2(0.193, 0.155, 0.0)
+    drawing.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to dimension the actual front spotface")
+    display = _early_bound(display, "IDisplayDimension")
+    actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    if abs(actual_mm - SCREW_SPOTFACE_DIAMETER) > 1e-5:
+        raise RuntimeError(f"front spotface measured {actual_mm}, expected {SCREW_SPOTFACE_DIAMETER} mm")
+    caption = "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR\nCLEAN UP"
+    display.SetText(4, caption)
+    display.SetPrecision3(1, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != 1 or str(display.GetText(4)) != caption:
+        raise RuntimeError("front spotface precision or caption did not persist")
 
 
 @_telemetry.traced("drawing.base_cross_tap_readback")
@@ -468,7 +507,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
             raise RuntimeError(f"failed to reposition native hole tag {tag}")
         if str(note.GetText()).strip() != tag:
             raise RuntimeError(f"moving native hole tag changed its text: {tag}")
-        if tag in ("E1", "F1"):
+        if tag in ("D1", "E1", "F1", "E3", "F3", "G1"):
             points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
             if len(points) < 6 or len(points) % 3:
                 raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
@@ -588,7 +627,7 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
         for index, vertex in enumerate(vertices):
             if vertex is None or not view.SelectEntity(vertex, index > 0):
                 raise RuntimeError(f"failed to select actual {label} chamfer endpoints")
-        text_xy = (0.400, 0.184) if label == "UPPER RIM" else (0.395, 0.090)
+        text_xy = (0.400, 0.184) if label == "UPPER RIM" else (0.395, 0.103)
         display = drawing.AddHorizontalDimension2(*text_xy, 0.0)
         drawing.ClearSelection2(True)
         if display is None:
@@ -778,6 +817,14 @@ async def build(adapter: Any) -> dict[str, str]:
         [*top_dimensions, *side_dimensions],
         GEOMETRY_CALLOUTS,
     )
+    for annotation in top_dimensions:
+        name = dimension_name(adapter, annotation)
+        if name not in ("PadCornerRadius", "FlangeCornerRadius", "RimInnerCornerRadius"):
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArcExtensionLineOrOppositeSide = False
+        if display.ArcExtensionLineOrOppositeSide:
+            raise RuntimeError(f"{name} leader did not stay on its native corner arc")
     set_dimension_precision(
         adapter,
         [*top_dimensions, *side_dimensions],
@@ -905,26 +952,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (hole_top, hole_side, section):
         set_hidden_lines_removed(adapter, view)
 
-    hole_dimensions = curate_view_dimensions(
+    curate_view_dimensions(
         adapter, hole_top, keep=HOLE_TOP_KEEP, view_label="holes top"
     )
-    section_dimensions = curate_view_dimensions(
+    curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
-    set_dimension_callouts(
-        adapter,
-        [*hole_dimensions, *section_dimensions],
-        HOLE_CALLOUTS,
-    )
-    set_dimension_precision(adapter, section_dimensions, {"SpotFaceDia": 1})
     _section_geometry_controls(adapter, section)
+    _add_cross_spotface_dimension(adapter, hole_side)
     add_note(
         adapter,
         "A1-A4 BORE DIAMETERS: REFERENCE ONLY\n"
         "MATCH SOCKETS TO ASSIGNED ACTUAL MHA-083 TUBES\n"
         "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK\n"
         "RETAIN CORNER/ORIENTATION MATCH MARKS",
-        0.235,
+        0.190,
         0.255,
     )
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
