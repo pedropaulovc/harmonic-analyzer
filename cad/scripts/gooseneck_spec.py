@@ -32,9 +32,10 @@ DRAWING_NOTES = "\n".join(
     (
         "1. TUBE <MOD-DIAM>16.00 +/-0.10 X 2.0 WALL; CUT ENDS",
         "   SQUARE.",
-        "2. FORM CENTERLINE (R51 = CENTERLINE RADIUS):",
-        "   442.3 STRAIGHT LEG TO BEND TANGENT, R51 90-DEG",
-        "   BEND, 44.25 STRAIGHT ARM TO END FACE. LINEAR",
+        f"2. FORM CENTERLINE (R{gooseneck_geom.BEND_R:.0f} = CENTERLINE RADIUS):",
+        f"   442.3 STRAIGHT LEG TO BEND TANGENT, R{gooseneck_geom.BEND_R:.0f}"
+        " 90-DEG",
+        f"   BEND, {gooseneck_geom.ARM_RUN:.2f} STRAIGHT ARM TO END FACE. LINEAR",
         "   +/-0.5; RADIUS +/-0.5; ANGLE +/-1 DEG. LEG + ARM",
         "   CENTERLINES COPLANAR (ELEVATION PLANE) WITHIN 1.0.",
         "3. END PLUG: AISI 1018 <MOD-DIAM>12.00 (LIGHT PRESS IN",

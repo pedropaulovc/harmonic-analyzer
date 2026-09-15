@@ -4,7 +4,7 @@ One of the 20 cast third-class levers at the top of the machine: fulcrum
 pivot at one end (Ø6.5 hole riding the common Ø6.35 fulcrum shaft - the
 p.40 ball clevis is the shaft's END mount, mirroring the rocker-pivot
 design), channel-spring pull from a narrow end tab (Ø4 hook hole at
-177.8 = 7"), driven in between by its amplitude bar pinned Ø2 at 127
+175.05), driven in between by its amplitude bar pinned Ø2 at 127
 (5"). Section 9.5 tall x 3.0 thick: 20 levers at the 7.0565 channel
 pitch cap the thickness (the M2 12.5 "width" violated the pitch), and
 3.0 lets the bar's 3.2 top slot straddle the lever at the pin.
@@ -13,8 +13,12 @@ The earlier 254 (10", "clean 2:1") length is REFUTED by the calibrated
 ch. 30 front view: the lever bank ends at x ~ -30 (not +54), the
 summing-lever plate (44.45 wide, pivot bolt read at x ~ +13..17) sits
 directly under the tab line, and the 32 mm channel springs can only
-bridge lever tab -> plate if the tab holes are at x ~ -22 - i.e.
-c2c = 177.8 from the -199.9 fulcrum (motion ratio 177.8/127 = 1.4).
+bridge lever tab -> plate if the tab holes are at x ~ -22. The reach is
+now pinned EXACTLY by that bridge: the hook hole must sit plumb over the
+summing-lever anchor, |x| 24.85 (spring_mount_geom.CHANNEL_ANCHOR_XY, the
+solver frame's mirror of this paragraph's photo signs), so c2c = 175.05
+from the |x| 199.9 fulcrum (motion ratio 175.05/127 = 1.378). The
+photo-read 7" (177.8) left the spring 2.75 mm off plumb at neutral.
 The p.39 close-up also shows the bar pin only ~4-5 bar-heights from the
 tip (50.8/9.5 = 5.3 fits; 127/9.5 = 13 does not). The tab itself is the
 narrow stepped end visible on p.39/p.41: bar height 9.5 steps to a 6.0
@@ -69,32 +73,33 @@ from _drawing_marks import (
 from _saved_part_guard import require_saved_drawing_properties
 from channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
+    BAR_PIN_X,
+    BAR_TALL,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     HUB_DIA,
     HUB_LENGTH,
+    LEVER_SPRING_X,
+    LEVER_THICKNESS,
+    PIVOT_HOLE_DIA,
     SPRING_EYE_HOLE_SPEC,
+    TAB_HALF,
+    TAB_START_X,
+    TIP_ARC_CX,
+    TIP_RADIUS,
 )
 
 PART_NAME = "channel-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
-LEVER_SPRING_X = 177.8  # DIMENSIONS.md ch17: fulcrum->spring-hole c2c, 7" (derived,
-# M6.4: supersedes the 254 "2:1" guess - see docstring)
-BAR_TALL = 9.5  # DIMENSIONS.md ch17: bar height, p.39 vs spring OD (low)
-LEVER_THICKNESS = 3.0  # DIMENSIONS.md ch17: fits 7.06 pitch + 3.2 bar slot (derived)
-PIVOT_HOLE_DIA = 6.5  # DIMENSIONS.md ch17: rides the 6.35 fulcrum shaft (derived)
+# Every nominal above comes from channel_lever_spec -- the ONE source the
+# drawing reads too (DIMENSIONS.md ch17; the reach is set by the plumb spring
+# axis, see the spec's comment).  Standard native drill holes for the
+# amplitude-bar pin and spring eye are part-owned by the spec as well.
 if abs(HUB_LENGTH - _config.machine("channels", "station_pitch_mm")) > 1e-6:
     raise AssertionError("channel_lever_spec.HUB_LENGTH must equal the channel station pitch")
 HUB_PROUD = (HUB_LENGTH - LEVER_THICKNESS) / 2.0  # 2.028 each face
-BAR_PIN_X = 127.0  # 5" from the fulcrum (bar line -72.9, fulcrum -199.9)
-# Standard native drill holes for the amplitude-bar pin and spring eye are
-# part-owned by channel_lever_spec.
-TAB_START_X = 169.0  # bar steps down to the end tab (p.39/p.41, low)
-TAB_HALF = 3.0  # tab 6.0 tall, centred on the bar axis
-TIP_RADIUS = 3.0  # rounded tab tip; tip overhang = 182.8 + 3 - 177.8 = 8
-TIP_ARC_CX = LEVER_SPRING_X + 5.0  # 182.8
 
 HALF_BAR = BAR_TALL / 2.0
 THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > extrude width
@@ -108,8 +113,8 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations): the lever's design constants. A GUI
     # fine-tune edits THESE globals -- never an auto "D1@Sketch1". The mm suffix
     # is load-bearing: this is an INCH document and the equation manager reads
-    # BARE numbers in document units (an unsuffixed 177.8 = 177.8 in, blowing the
-    # part up 25.4x). Derived globals (TipArcCx) reference others as equation
+    # BARE numbers in document units (an unsuffixed 175.05 = 175.05 in, blowing
+    # the part up 25.4x). Derived globals (TipArcCx) reference others as equation
     # strings so the tip stays a fixed overhang past the spring hole.
     await set_global(adapter, "LeverSpringX", f"{LEVER_SPRING_X}mm")
     await set_global(adapter, "BarTall", f"{BAR_TALL}mm")

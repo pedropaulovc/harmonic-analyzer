@@ -121,11 +121,13 @@ w_i = \frac{J_i}{D_\theta},\qquad D_\theta=-\frac{\partial \tau_{\mathrm{total}}
 $$
 
 where $d_i$ is the amplitude-bar station (the ordinate), $K = (\text{hook}/\text{bar-pin})\cdot
-e/r_\text{pin}$ = 0.0907 mm of spring-hook motion per mm of station (cam throw
-$e$ = 8.64, rod-pin radius $r_\text{pin}$ = 133.3, lever arms 177.8/127.0), $s_i$ the channel
+e/r_\text{pin}$ = 0.0893 mm of spring-hook motion per mm of station (cam throw
+$e$ = 8.64, rod-pin radius $r_\text{pin}$ = 133.3, lever arms 175.05/127.0), $s_i$ the channel
 spring rate and $J_i$ the loaded spring's torque response per millimetre of vertical
-hook lift. The manufactured hook-row position is 39.85 mm; the force's perpendicular
-arm is 40.0925 mm. The counter force acts at a 75.9402 mm perpendicular arm.
+hook lift. The manufactured hook-row position is 39.85 mm; both springs hang plumb in
+the neutral pose (the lever reach and the gooseneck arm end are dimensioned for it), so
+each force's perpendicular arm is exactly its horizontal offset: 39.85 mm for a channel
+spring, 76.20 mm for the counter.
 Coefficient $k$ is read at $\theta_k = k\pi/20$. The common stiffness denominator
 is removed by calibration, but each channel's numerator remains.
 
@@ -136,7 +138,7 @@ The second term is pretension stiffness: mean-line zero removes constant torque,
 not its derivative. Anchor centres rotate with the lever; spring eyes slide on
 their seats. `spring_force_model.py` also follows the counter eye's radial contact
 with the fixed screw. At the nominal installation, total stiffness is
-8667.216 N·mm/rad, and each channel's lift-torque response is 7.002174 N.
+8697.911 N·mm/rad, and each channel's lift-torque response is 6.978804 N.
 Omitting pretension overstates pen gain by about 14.5%.
 
 **Gain sensitivities** (% of channel gain per feature unit; analytic |
@@ -147,10 +149,10 @@ finite-difference on the exact kinematics):
 | cam eccentricity `cylinder_gear_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
 | rocker rod-pin radius `rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
 | channel-lever bar-pin arm `channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.76 | |
-| channel-lever spring-hook arm `channel_lever_spec.LEVER_SPRING_X` | 177.8 | +0.56 \| +0.56 | |
-| summing-lever hole position `summing_lever_spec.HOLE_X` | 39.85 mm | +2.584 %/mm | moving the hole changes both the arm and the force direction |
-| channel spring rate | 0.175127 N/mm (catalog) | +1.00077 %/% | loaded numerator; the common stiffness denominator calibrates out |
-| channel initial tension | 1.77929 N (catalog) | −0.04330 %/N | DC zeroing does not remove its small geometric gain contribution |
+| channel-lever spring-hook arm `channel_lever_spec.LEVER_SPRING_X` | 175.05 | +0.57 \| +0.57 | set by the plumb spring axis (fulcrum 199.9 − anchor 24.85), not a round 7" |
+| summing-lever hole position `summing_lever_spec.HOLE_X` | 39.85 mm | +2.667 %/mm | moving the hole changes both the arm and the force direction — and takes the lever reach with it |
+| channel spring rate | 0.175127 N/mm (catalog) | +1.00000 %/% | loaded numerator; the common stiffness denominator calibrates out |
+| channel initial tension | 1.77929 N (catalog) | 0.00000 %/N | with the axis plumb the pretension's geometric gain term vanishes; DC zeroing removes its offset |
 | rocker slide radius, rod length, cam OD roundness, gear runout | — | < 0.1 %/mm | DC or 2·i harmonic only; not gain |
 
 Phase: 1° of cam phase = 1.75 % of that channel's amplitude at the readout points where

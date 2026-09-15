@@ -12,21 +12,32 @@ from _hole_spec import HoleSpec
 
 
 # --- Nominal geometry (DIMENSIONS.md "Chapter 17"). ---
-LEVER_SPRING_X = 177.8  # fulcrum -> spring-hole c2c, 7"
+# The spring-hole reach is SET BY THE VERTICAL SPRING AXIS, not by a round 7":
+# the channel spring must hang plumb in the saved neutral pose, so the lever's
+# spring hole has to sit on the summing-lever anchor's machine X.  Fulcrum
+# 199.9 (channel_frame_geom.LEVER_FULCRUM_XY) - anchor 24.85
+# (spring_mount_geom.CHANNEL_ANCHOR_XY = knife -15 + summing_lever_spec.HOLE_X
+# 39.85) = 175.05.  The neutral lever tilt is -0.00223 deg, so the exact
+# projection correction 175.05 / cos(phi) - 175.05 is 1.3e-7 mm -- six orders
+# below the +/-0.10 hook-arm allocation (error_budget.yaml), hence the flat
+# nominal.  Was 177.8 (7"), which left the spring leaning 2.75 mm off plumb.
+LEVER_SPRING_X = 175.05  # fulcrum -> spring-hole c2c, plumb over the anchor
 BAR_TALL = 9.5  # bar height
 LEVER_THICKNESS = 3.0
 PIVOT_HOLE_DIA = 6.5  # fulcrum bore riding the 6.35 fulcrum shaft
 BAR_PIN_X = 127.0  # fulcrum -> bar-pin c2c, 5"
 BAR_PIN_HOLE_SPEC = HoleSpec("drilled_number", "#47")
 SPRING_EYE_HOLE_SPEC = HoleSpec("drilled_number", "#21")
-TAB_START_X = 169.0  # bar steps down to the end tab
+TAB_START_X = 169.0  # bar steps down to the end tab; photo-read, so it stays
+# put while the reach shortens: 14.05 of 6.0-tall tab, 4.0 of it between the
+# step and the #21 hole edge
 TAB_HALF = 3.0  # tab 6.0 tall
 TIP_RADIUS = 3.0  # rounded tab tip
-TIP_ARC_CX = LEVER_SPRING_X + 5.0  # 182.8
+TIP_ARC_CX = LEVER_SPRING_X + 5.0  # 180.05: 8.0 tip overhang past the hole
 
 # --- Derived spans. ---
 NOSE_RADIUS = BAR_TALL / 2.0  # 4.75 fulcrum nose
-TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 185.8 overall length
+TIP_END_X = TIP_ARC_CX + TIP_RADIUS  # 183.05 overall length
 
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
@@ -51,8 +62,8 @@ DRAWING_NOTES = "\n".join(
         "   REAM DIA 6.50 +0.03/0 THRU, Ra 1.6.",
         "4. DATUM C IS THE LONG TOP FACE; ALL HOLE AXES AND TIP R3 CENTRE",
         "   ARE BASIC 4.75 BELOW C.",
-        "5. BASIC FROM B: BAR-PIN 127.00; SHOULDER 169.00;",
-        "   SPRING-HOLE 177.80; TIP R3 CENTRE 182.80.",
+        f"5. BASIC FROM B: BAR-PIN {BAR_PIN_X:.2f}; SHOULDER {TAB_START_X:.2f};",
+        f"   SPRING-HOLE {LEVER_SPRING_X:.2f}; TIP R3 CENTRE {TIP_ARC_CX:.2f}.",
         "6. SPRING-HOLE AND TIP R3 CENTRES ARE NOT CONCENTRIC.",
         "7. PROFILE FCF APPLIES ALL AROUND OUTER PERIMETER",
         "   EXCEPT DATUM C; STRAIGHTS TANGENT TO RADII.",
