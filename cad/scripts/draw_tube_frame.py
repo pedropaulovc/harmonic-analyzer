@@ -176,8 +176,8 @@ def _add_outer_diameter_reference(
         diameter=True,
     )
     od_suffix = (
-        ")\nMHA-035/MHA-077 SOCKETS:"
-        "\nMATCH-FIT TO ASSIGNED ACTUAL TUBE"
+        ")\nSOCKETS MHA-035/MHA-077 ARE"
+        "\nMATCH-FIT TO THIS ASSIGNED TUBE"
         "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
     )
     display.SetText(2, od_suffix)
@@ -322,7 +322,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # cross-drilled stations through visible hidden geometry.
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.145, 0.198, char_height=0.0022
+        adapter, "Manufacturing Notes", 0.135, 0.198
     )
     add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
