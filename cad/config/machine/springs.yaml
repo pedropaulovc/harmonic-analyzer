@@ -1,9 +1,11 @@
 # Fixed native placements; preserve full floating-point round-trip precision.
 # Distance guards bound measurement uncertainty, never placement clearance.
 # boolean_stability_mm seats each contact that far past the native Boolean's
-# collision/clear boundary (which is not the physical contact: the Boolean fails
-# within ~25 um of tangency and the gate reads failure as interference), covering
-# the ~2 um that boundary scatters between spring rebuilds and documents.
+# collision/clear boundary. That boundary is not the physical contact: the Boolean
+# fails while ClosestDistance still reads ~2.4e-5 mm and the gate reads the failure
+# as interference. Where it starts succeeding scatters ~6e-7 mm between a fixture
+# and the mated assembly and ~2.3e-6 mm between rebuilds of the same swept spring,
+# so 6e-6 mm clears the measured scatter ~2.6x over.
 # channels.yaml must exactly match a preset vector below. Custom stations require
 # new native calibration; builds never interpolate or search for a replacement.
 springs:

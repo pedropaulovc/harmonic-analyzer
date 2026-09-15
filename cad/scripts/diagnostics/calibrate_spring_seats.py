@@ -15,14 +15,14 @@ uses, on the same three-part fixtures the retired in-build search used:
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
 side, where the distance is measured and recorded. The boundary is NOT the
-physical contact: SolidWorks' Boolean fails (status 1058) within ~25 um of the
-tangent hook-on-bore pose and the gate treats that failure as interference, so
-the boundary is where the Boolean starts succeeding -- and that edge scatters
-~2 um between rebuilds of the same spring and ~0.6 um between a fixture and the
-mated assembly (2026-09-15: two calibration runs, then `assembly:channel`
-rejecting a fixture-certified seat by 0.6 um). A seat placed ON the edge is a
-coin flip at the gate; the allowance covers the measured scatter and nothing
-else. The channel variant is rebuilt at its corrected inside length and
+physical contact: SolidWorks' Boolean fails (status 1058) while ClosestDistance
+still reads ~2.4e-5 mm at the tangent hook-on-bore pose, and the gate treats
+that failure as interference -- so the boundary is where the Boolean starts
+succeeding, and that edge MOVES: ~2.3e-6 mm between rebuilds of the same swept
+spring and ~6e-7 mm between a fixture and the mated assembly (2026-09-15: two
+calibration runs, then `assembly:channel` rejecting a fixture-certified seat by
+6.3e-7 mm). A seat placed ON the edge is a coin flip at the gate; the allowance
+covers the measured scatter and nothing else. The channel variant is rebuilt at its corrected inside length and
 re-measured until both boundaries sit at the allowance within half of it.
 Every seed comes from ``spring_mount_geom`` (the catalogue-nominal poses),
 never from the table being replaced, so a stale table cannot bias the new one.
@@ -471,6 +471,10 @@ async def calibrate(
             float(a) for name in presets for a in table[name]["amplitudes_mm"]
         )
     )
+    if any(a < 0.0 or not math.isfinite(a) for a in amplitudes):
+        raise ValueError(
+            f"preset amplitudes must be finite and nonnegative: {amplitudes}"
+        )
     report: dict = {
         "status": "started",
         "presets": presets,
@@ -527,8 +531,6 @@ def main() -> int:
         "full saved-assembly acceptance is required by the build gates.",
     )
     args = parser.parse_args()
-    if any(a < 0.0 or not math.isfinite(a) for a in _config.amplitudes()):
-        raise ValueError("configured amplitudes must be finite and nonnegative")
     with dodo._com_seat("calibrate-spring-seats"):
         return run_build(
             lambda adapter: calibrate(

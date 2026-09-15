@@ -278,7 +278,7 @@ does not discharge the physical operating assumptions or the two waivers below.
 - **The lever arms need no `precision` grade for accuracy**: at the general ±0.10 they use 1/7
   to 1/10 of their allowable. Their bores still carry the `shaft_in_bushing` fit, which is
   what the tighter size limit on the *bore* is for.
-- **Summing-lever hole position is the relevant plate gain tolerance** (2.584 %/mm across the
+- **Summing-lever hole position is the relevant plate gain tolerance** (2.667 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if lobe and notch are cut in one setup.** ±0.25° is 0.13 mm at the notch.
   Crank in one direction only; a reversal re-seats every mesh on the other flank
