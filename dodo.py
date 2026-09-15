@@ -119,6 +119,7 @@ from _buildgraph import (  # noqa: E402
 )
 
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
+import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
@@ -908,7 +909,17 @@ def _run(
     on the machine. The seat is acquired OUTSIDE this span -- its wait is a sibling
     ``com.seat.wait <label>`` span -- so ``task <label>`` starts once the seat is held
     and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
-    gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``."""
+    gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``.
+
+    Under the farm executor only the cached part/assembly/drawing leaves are
+    dispatched; a COM task routed through here has no farm workflow, so it fails
+    loud instead of silently taking the local seat."""
+    if com and _farm.enabled():
+        raise RuntimeError(
+            f"{label}: SolidWorks gate tasks (verify:soundness/verify:kinematics/"
+            "export/preflight/release) are not farm-dispatchable; run with "
+            "HARMONIC_EXECUTOR=local"
+        )
     with _com_seat(label) if com else contextlib.nullcontext() as waited:
         if com:
             _sw_ensure_once()  # top-level sibling of the task span (once/worker)
@@ -1501,6 +1512,10 @@ def _cached_drawing_action(stem: str) -> None:
             return
         probe.set_attribute("cache", "miss")
 
+    if _farm.enabled():
+        _farm_build(label, key, outputs)
+        return
+
     with _com_seat(label) as waited:
         with _telemetry.span(
             f"cache.reprobe {label}",
@@ -1570,6 +1585,32 @@ def _cache_key(file_deps: list[str], label: str | None = None) -> str:
     return _cache.cache_key(file_deps, ContentChecker._digest, label)
 
 
+def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
+    """Build one cache-missing leaf on the farm, then restore its published key.
+
+    The worker runs the same doit task with the cache in ``rw`` mode and stores
+    ``key``; this side never takes the COM seat and never runs ``cache.store``.
+    A farm failure is the task's failure (worker, category, exit code, log blob all
+    in the message); a success whose key is still absent is an infrastructure
+    fault and fails just as loud.
+    """
+    result = _farm.run_leaf(label, key)
+    if result.state != "succeeded":
+        raise RuntimeError(
+            f"{label} failed on {result.worker_id} [{result.failure_category}] "
+            f"exit {result.exit_code}: {result.failure_message} "
+            f"(log: {result.log_blob})"
+        )
+    with _telemetry.span(
+        f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
+    ) as restore:
+        if not _cache.restore(key, outputs, label):
+            raise RuntimeError(
+                f"{label}: farm reported success but cache key {key[:12]} is absent"
+            )
+        restore.set_attribute("cache", "hit")
+
+
 def _cached_part_action(stem: str, script: Path) -> None:
     """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
     are downloaded and the SolidWorks build is skipped; otherwise build, then push.
@@ -1594,6 +1635,11 @@ def _cached_part_action(stem: str, script: Path) -> None:
             _stamp_part_execution(stem)
             return
         probe.set_attribute("cache", "miss")
+
+    if _farm.enabled():
+        _farm_build(label, key, outputs)
+        _stamp_part_execution(stem)
+        return
 
     with _com_seat(label) as waited:
         # Re-probe under the seat: we may have blocked for the seat for minutes while
@@ -1867,6 +1913,12 @@ def build_or_refresh(stem, dependencies, changed, targets):
             _record_recipe_digest()
             return
         probe.set_attribute("cache", "miss")
+
+    if _farm.enabled():
+        _farm_build(label, cache_key, cache_outputs)
+        _stamp_assembly_execution(stem)
+        _record_recipe_digest()
+        return
 
     with _com_seat(label) as waited:
         # Re-probe under the seat: a peer builder may have published this assembly
@@ -2745,17 +2797,20 @@ def task_build():
     offline ``check:*`` gates are listed FIRST so workers burn through that ~1 min of
     SolidWorks-free work before piling onto the COM seat, and the parts are in
     per-seat order so two cold builders diverge and split the fleet cache.
+
+    Under the farm executor the ``verify:*`` gates are omitted: they hold a local
+    COM seat on the assembled models, which the farm submitter by design does not
+    have (``_run`` refuses them). ``build.py`` says so once per farm run.
     """
-    return {
-        "actions": None,
-        "task_dep": (
-            [f"check:{s}" for s in _CHECK_NAMES]
-            + [f"part:{s}" for s in _seat_part_order()]
-            + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
-            + [f"drawing:{s}" for s in _drawing_order()]
-            + [f"verify:{s}" for s in _VERIFY_NAMES]
-        ),
-    }
+    deps = (
+        [f"check:{s}" for s in _CHECK_NAMES]
+        + [f"part:{s}" for s in _seat_part_order()]
+        + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
+        + [f"drawing:{s}" for s in _drawing_order()]
+    )
+    if not _farm.enabled():
+        deps += [f"verify:{s}" for s in _VERIFY_NAMES]
+    return {"actions": None, "task_dep": deps}
 
 
 def task_build_bare():
