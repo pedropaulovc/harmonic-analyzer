@@ -10,10 +10,11 @@ the signal-flow chain summing -> magnifier -> pen (the value) plus paper-drive
 
 Cross-subassembly fits proven by the top-level interference check:
 
-* channel spring-hook fasteners (channel.SLDASM) seat shank-up in the
-  summing-lever plate's O4.5 holes (summing.SLDASM), each presenting its arm
-  just above the plate where the spring's bottom eye links on -- gated
-  analytically by build_channel_assembly._assert_hook_fastener;
+* channel spring anchors (channel.SLDASM) thread DOWN into the 20 #6-32 taps
+  through the summing-lever plate (summing.SLDASM), each eye standing above
+  the plate where the spring's lower eye links on and each trimmed shank
+  stopping 1/16 in above the plate's underside -- gated analytically by
+  build_channel_assembly._assert_spring_mount;
 * knife-hanger studs (summing.SLDASM) rise through the top-frame casting's
   integral crossbar (frame.SLDASM), whose set screw grips the gooseneck post
   at the east-rail hub;

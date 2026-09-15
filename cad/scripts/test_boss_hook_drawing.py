@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _stock_trim_drawing as trim_drawing
 import boss_hook_spec as spec
 import draw_boss_hook as drawing
 from _hole_spec import TAP_DRILL_MM
@@ -35,9 +36,9 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
 )
 def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
     """General is toleranced, unlike None; neither replaces a real driving size."""
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
-        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
+        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
     )
     annotations = []
     for name, nominal, band in (
