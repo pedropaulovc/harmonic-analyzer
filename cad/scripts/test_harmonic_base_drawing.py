@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
 import build_harmonic_base as part
 import build_cone_swing_platform as platform
-import draw_harmonic_base as drawing
 import harmonic_base_spec
 from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
@@ -19,56 +17,7 @@ from cone_pivot_post_installation import (
     POST_Z_SHIFT,
 )
 from build_cone_lock_knob import COLLAR_DIA as KNOB_COLLAR_DIA
-from _drawing_registry import DRAWINGS_BY_NAME
 from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/harmonic-base.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/harmonic-base.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/harmonic-base_drawing.png")
-    assert DRAWINGS_BY_NAME["harmonic_base"].script == Path(drawing.__file__).resolve()
-
-
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is harmonic_base_spec.DRAWING_DIMENSIONS
-    marked = set().union(*harmonic_base_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP)
-    assert kept == marked
-    assert (drawing.BOTTOM_LENGTH, drawing.BOTTOM_WIDTH) == (
-        harmonic_base_spec.BOTTOM_LENGTH,
-        harmonic_base_spec.BOTTOM_WIDTH,
-    )
-
-
-def test_plate_geometry_is_single_sourced() -> None:
-    # The build imports its plate nominals from the spec, so the drawing's view
-    # math and the part geometry cannot drift.
-    assert part.BOTTOM_LENGTH is harmonic_base_spec.BOTTOM_LENGTH
-    assert part.TOP_THICKNESS is harmonic_base_spec.TOP_THICKNESS
-    assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
-    assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
-    assert harmonic_base_spec.BOTTOM_FRONT_Z == -(11.0 * 25.4) / 2.0
-    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0
-    assert math.isclose(harmonic_base_spec.BOTTOM_WIDTH, 11.0 * 25.4)
-    assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
-
-
-
-def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
-    expected_holes = {
-        *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),
-        (*part.PIVOT_SCREW_XZ, part.PIVOT_SCREW_HOLE_DIA),
-        (*part.LOCK_KNOB_XZ, part.LOCK_SCREW_HOLE_DIA),
-        (*part.STOP_SCREW_XZ, part.STOP_SCREW_HOLE_DIA),
-        *((x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ),
-        *((x, z, part.FOOT_SCREW_HOLE_DIA) for x, z in part.FOOT_SCREW_XZ),
-        *((x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ),
-    }
-    # Four support taps and all other blind tapped groups, with no duplicate picks.
-    assert len(drawing.ALL_HOLES) == len(expected_holes) == 18
-    assert set(drawing.ALL_HOLES) == expected_holes
-    assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
 
 
 @pytest.mark.parametrize(

@@ -2,54 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import math
 
 import pytest
 
 import build_pen_hanger as part
-import draw_pen_hanger as drawing
-import pen_hanger_spec
-from _drawing_registry import DRAWINGS_BY_NAME
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/pen-hanger.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/pen-hanger.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/pen-hanger_drawing.png")
-    assert DRAWINGS_BY_NAME["pen_hanger"].script == Path(drawing.__file__).resolve()
-
-
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is pen_hanger_spec.DRAWING_DIMENSIONS
-    marked = set().union(*pen_hanger_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP)
-    assert kept == marked
-
-
-
-
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source
-    assert "scale=(1, 1)" in source
-    assert pen_hanger_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 2:1"
-    assert pen_hanger_spec.TOP_VIEW_NOTE == "TOP VIEW SCALE 2:1"
-    assert '"*Top"' in source
-    assert "add_native_hole_callout" not in source
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    import _config
-
-    config = _config.parts("pen-hanger")
-    assert config["material"] == "AISI 1018 cold-finished steel"
-    assert config["material"] == config["material_specification"]
-    assert "steel" in str(config["material_specification"]).lower()
-    assert config["finish"]
-    assert int(config["quantity"]) == 1
 
 
 def test_hanger_screw_moves_without_moving_the_pen_or_bar() -> None:

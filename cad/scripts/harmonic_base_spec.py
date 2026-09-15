@@ -10,9 +10,12 @@ silently drift.
 
 from __future__ import annotations
 
+from _gtol_spec import PlanarFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+
 MM_PER_IN = 25.4
 
-# --- Two-plate welded base (book ch. 6), centred on the part origin. ---
+# --- Two-level base envelope, centred on the part origin. ---
 BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
 FORMER_BOTTOM_WIDTH = 11.0 * MM_PER_IN  # 279.4 (28 cm callout)
 BOTTOM_FRONT_Z = -FORMER_BOTTOM_WIDTH / 2.0
@@ -35,63 +38,38 @@ RIM_TOP = STACK_HEIGHT + LIP_H  # 53.3: the casting's overall height
 if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
     raise AssertionError("base plates are not centred")
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows. ``build_harmonic_base`` marks exactly these; ``draw_harmonic_base``
-# keeps exactly their union. Only the BOTTOM plate's plan footprint is a marked
-# sketch dimension -- it is the overall envelope; the top plate is fixed by the
-# side reveal note (note 2), and the plate THICKNESSES are
-# parameters (not sketch dims) carried in note 2 as well. Keeping the marked set
-# to the two overalls avoids stacking four dimensions on a 457 mm plan that
-# barely fits the sheet. ---
+# The deck is black in the source photographs. Machining and black coating of
+# the full underside is the user's reconstruction choice, not photo evidence.
+# These whole faces are cut before painting; there are no locally masked feet.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT),
+        production_method="BEFORE PAINT",
+    ),
+    SurfaceFinishControl(
+        "underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0),
+        production_method="BEFORE PAINT",
+    ),
+)
+
+# Mark only dimensions imported by the drawing. Hole-table dimensions and the
+# exact-edge rim, root, height and underside-chamfer controls remain native.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
+    "TopProfile": {"TopLen", "TopWid"},
+    "BottomPlate": {"BottomThickness"},
+    "PadCorners": {"PadCornerRadius"},
+    "FlangeCorners": {"FlangeCornerRadius"},
+    "RimInnerCorners": {"RimInnerCornerRadius"},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia"},
 }
 
-# Lines stay short so two lower-field note columns remain clear of the side
-# elevation and title block.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. MACHINE FROM SOLID STOCK TO THE FINISHED PROFILE SHOWN; NO DRAFT.",
-        "   PAD-TO-FLANGE ROOT R0.50 MAX; LOWER FLANGE 12.70 THICK;",
-        "   DECK 50.80, TOTAL HEIGHT 53.30 OVER THE RIM.",
-        "2. UPPER PAD 444.50 X 266.70;",
-        "   NEAR LONG SIDE 6.35 +/-0.10 FROM B;",
-        "   NEAR LEFT END 6.35 +/-0.10 FROM C.",
-        "3. DATUM A = UNDERSIDE FACE; B = LONG-SIDE FACE; C = LEFT-END FACE;",
-        "   HOLE-TABLE ORIGIN = B-C. LOCATIONS ARE BASIC.",
-        "4. FOUR DIA 13.00 THRU / DIA 23.00 C'BORES FROM UNDERSIDE,",
-        "   9.52 +/-0.10 DEEP. PLAN RIMS ARE THE DIA 13.00 THRU FEATURES.",
-        "   C'BORE AND THRU-HOLE AXES: LEAST-SQUARES CYLINDER FITS OVER",
-        "   FULL SURFACES; SEPARATION AT C'BORE MOUTH/BOTTOM: 0.05 MAX.",
-    )
-)
-DRAWING_NOTES_B = "\n".join(
-    (
-        "5. BLIND UNC-2B TAPS: FULL THREAD / CYLINDRICAL DRILL DEPTH.",
-        "   BOTTOMING: PIVOT #10-24 9.775/12; BLOCK #8-32 6.90/10;",
-        "   FOOT #4-40 8.975/11; NAMEPLATE #4-40 6/9. LEAD >=2P.",
-        "   PLUG: LOCK 1/4-20 19.30/25.65; STOP #8-32 16/20.",
-        "   PLUG LEAD >=5P; P = THREAD PITCH; DRILL POINT EXTRA.",
-        '5A. STAMP SERIAL "2" 3.50 HIGH X 0.30 DEEP ON THE RIM TOP',
-        "   BESIDE THE NAMEPLATE (SEE MODEL); BRIGHT, UNPAINTED.",
-        "6. DURING COATING, MASK DATUM A/B/C FACES AND ALL BORES/THREADS;",
-        "   COAT PAD SIDES, ROOTS AND RIM. DECK INSIDE THE RIM: BLACK",
-        "   ENAMEL, SAME SYSTEM AND DFT AS THE FINISH CALLOUT.",
-        "7. VERTICAL PLAN CORNERS: FLANGE R22.22, PAD AND RIM R15.88",
-        "   (CONCENTRIC), RIM INNER CORNERS R8.88, ALL FULL HEIGHT.",
-        "   FLANGE TOP RIM, RIM TOP AND UNDERSIDE RIM C1.59 X 45 DEG.",
-        "8. RAISED RIM 7.00 WIDE X 2.50 HIGH, OUTER FACES FLUSH WITH THE",
-        "   PAD SIDES; DECK STAYS AT 50.80.",
-    )
-)
-SIDE_VIEW_NOTE = "FRONT VIEW 1:4"
+# Keep this block to short, part-specific facts that are not already legible
+# in a native dimension, hole table, or feature callout.  Finish and masking
+# live in the registry's Finish field.
+DRAWING_NOTES = "STAMP SERIAL IDENTIFIER AT THE INDICATED ID LOCATION."
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "through-hole true position": "0.20",
-    "tapped-hole true position": "0.50",
-    "datum B perpendicularity to A": "0.10",
-    "datum C perpendicularity to A and B": "0.10",
-    "top-pad parallelism to A": "0.10",
-}
+# Base/frame parts carry no datums or feature-control frames under the drawing
+# simplicity policy.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

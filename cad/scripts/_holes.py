@@ -4,7 +4,7 @@ Uses one multi-point placement sketch per feature so every instance shares one
 native size/thread identity while retaining deterministic, individually driven
 stations:
 1. ``CreateDefinition(swFmHoleWzd)`` -> ``InitializeHole(type, standard,
-   fastener, size, end)`` -> property overrides -> select the placement face
+   fastener, size, end)`` -> select the placement face
    as an OBJECT (coordinate SelectByID2 mis-resolves on bodies whose end faces
    touch the same plane) -> ``CreateFeature``.
 2. Multi-point: the wizard lands with ONE auto placement point; its placement
@@ -12,8 +12,11 @@ stations:
    and the remaining stations are added (model->sketch via the sketch's
    ``ModelToSketchTransform``; MathUtility takes an explicit VARIANT array).
    Net: ONE ``HoleWzd`` feature, N hole instances.
+3. Apply feature overrides and nonblind tap class/termination to the created
+   definition with ``AccessSelections`` / ``ModifyDefinition``; verify the
+   committed thread metadata. Pre-create thread settings do not persist.
 
-Thread policy: everything is **ANSI inch (UNC)** -- see
+Thread policy: everything is **ANSI inch (UNC/UNF)** -- see
 ``memory/fastener-policy-us-customary.md``. The wizard table supplies the cut
 diameters (tap drill for taps, fit diameter for clearances), so scripts get
 the ACTUAL dimensions back (:class:`WizardHoleResult`) for analytic volume
@@ -111,14 +114,17 @@ class WizardHoleResult:
 
 
 def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
-    """Return the planar face with outward normal ``normal`` (a principal
-    +/-X/Y/Z unit tuple) whose plane contains and bounding box spans every
-    point of ``points_mm`` -- the face the holes are drilled from.
+    """Return the closest eligible planar face with the requested outward normal.
+
+    Eligibility still permits ``tol_mm`` plane/bounds drift, but proximity to
+    the requested point's plane outranks face area. This matters after a shallow
+    spotface: its small exact floor and the much larger original face can both
+    fall inside the tolerance, yet Hole Wizard depth must start at the floor.
+    Equal-plane ambiguity falls back to the largest spanning face.
 
     Coordinate ``SelectByID2`` is unreliable for this (a point on the target
-    plane can resolve to a side face that merely touches the plane, sending
-    the drill axis sideways -- the rocker-arm-support live failure), so the
-    face OBJECT found by enumeration is the reliable path.
+    plane can resolve to a side face that merely touches the plane), so the
+    enumerated face object remains the selection anchor.
     """
     axis = max(range(3), key=lambda k: abs(normal[k]))
     sign = 1.0 if normal[axis] > 0 else -1.0
@@ -139,7 +145,9 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
             "face-exploding features"
         )
     best = None
+    best_key = None
     seed = None  # spans at least the FIRST point (co-planar-disjoint fallback)
+    seed_key = None
     for f in faces:
         f = _early_bound(f, "IFace2")
         try:
@@ -149,32 +157,44 @@ def find_planar_face(model, normal, points_mm, tol_mm: float = 1.0):
         if n[axis] * sign < 0.99 or any(abs(n[k]) > 0.01 for k in others):
             continue
         box = [v * 1000.0 for v in f.GetBox()]
-        if abs(box[axis] - plane_mm) > tol_mm:
+        plane_error = abs(box[axis] - plane_mm)
+        if plane_error > tol_mm:
             continue
+        area = float(f.GetArea())
+        rank = (plane_error, -area)
         spans = all(
             box[k] - tol_mm <= p[k] <= box[k + 3] + tol_mm
             for p in points_mm
             for k in others
         )
-        if spans and (best is None or f.GetArea() > best.GetArea()):
+        if spans and (best_key is None or rank < best_key):
             best = f
+            best_key = rank
         first = all(
             box[k] - tol_mm <= points_mm[0][k] <= box[k + 3] + tol_mm for k in others
         )
-        if first and (seed is None or f.GetArea() > seed.GetArea()):
+        if first and (seed_key is None or rank < seed_key):
             seed = f
-    if best is None and seed is not None and len(points_mm) > 1:
-        # No single face spans every point: the stations sit on CO-PLANAR
-        # DISJOINT faces (e.g. the top-frame side-screw spot floors, one per
-        # boss). The seed face only supplies the placement-sketch PLANE --
-        # each instance lands at its absolute sketch point regardless of
-        # which co-planar face seeded it -- so the first-point face is a
-        # valid anchor (top-frame SideTaps* live case, 2026-08-03).
-        _telemetry.debug(
-            "find_planar_face: no single face spans all points; seeding from "
-            "the first point's co-planar face"
-        )
+            seed_key = rank
+    selection_mode = "spanning"
+    if (
+        seed is not None
+        and len(points_mm) > 1
+        and (best is None or seed_key[0] < best_key[0])
+    ):
+        # The stations occupy disjoint, co-planar faces (one spotface floor per
+        # boss). A larger offset face may span every station, but plane
+        # proximity is the primary contract. The first-point face supplies the
+        # placement-sketch plane; all instances still land at absolute points.
         best = seed
+        best_key = seed_key
+        selection_mode = "first-point"
+    if best is not None:
+        _telemetry.event(
+            "hole_wizard.placement_face_selected",
+            plane_error_mm=round(best_key[0], 6),
+            selection_mode=selection_mode,
+        )
     return best
 
 
@@ -525,12 +545,10 @@ def wizard_holes(
     defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     edits: list[tuple[str, object]] = []
     if hole_type == 4 and spec.end != "blind":
-        # InitializeHole/CreateFeature discard pre-create thread properties:
-        # the drill cuts through, but its native callout reports blind depth 0.
-        # The populated definition accepts the thread end via ModifyDefinition.
-        # swWzdHoleThreadEndCondition_e uses the same 0/1/2 values as _ENDS.
-        edits.append(("ThreadEndCondition", end))
-        edits.append(("ThreadClass", spec.thread_class))
+        # InitializeHole/CreateFeature discard pre-create thread metadata.
+        # Apply it to the populated feature: otherwise a through-wall tap can
+        # print a zero blind thread depth and omit its ANSI thread class.
+        edits.extend((("ThreadClass", spec.thread_class), ("ThreadEndCondition", end)))
     if spec.kind == "clearance" and spec.end != "blind":
         # HoleFit is a NO-OP on a plain (type-2) clearance hole: the API
         # applies it to counterbore/countersink features only (per the
@@ -578,44 +596,43 @@ def wizard_holes(
         # null-VARIANT idiom applies only to LATE-bound calls).
         if not defn.AccessSelections(model, None):
             raise RuntimeError(f"hole wizard {label}: AccessSelections failed")
-        for prop, val in edits:
+        try:
+            for prop, val in edits:
+                try:
+                    setattr(defn, prop, val)
+                except Exception as exc:  # noqa: BLE001
+                    if prop in ("ThreadClass", "ThreadEndCondition"):
+                        raise RuntimeError(
+                            f"hole wizard {label}: {prop} rejected"
+                        ) from exc
+                    # Dimensional properties alias per hole Type. The caller's
+                    # analytic volume gate verifies the surviving overrides.
+                    _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
+            # ModifyDefinition needs the definition's underlying IDispatch.
+            if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
+                raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
+        except BaseException:
             try:
-                setattr(defn, prop, val)
-            except Exception as exc:  # noqa: BLE001
-                if prop in ("ThreadEndCondition", "ThreadClass"):
-                    try:
-                        defn.ReleaseSelectionAccess()
-                    except Exception as cleanup_exc:  # noqa: BLE001
-                        _telemetry.warn(
-                            f"hole wizard {label}: selection cleanup after "
-                            f"{prop} rejection failed: {cleanup_exc}"
-                        )
-                    raise RuntimeError(
-                        f"hole wizard {label}: {prop} rejected"
-                    ) from exc
-                # Properties alias per hole Type; the inapplicable ones reject
-                # or no-op. The caller's analytic volume check is the hard
-                # gate that the surviving writes produced the right geometry.
-                _telemetry.debug(f"hole wizard {label}: property {prop} rejected")
-        # ModifyDefinition wants the definition as its underlying dispatch --
-        # hand it defn._oleobj_ (the raw IDispatch) rather than the wrapper.
-        if not feat.ModifyDefinition(defn._oleobj_, model, null_callout()):
-            raise RuntimeError(f"hole wizard {label}: ModifyDefinition failed")
+                defn.ReleaseSelectionAccess()
+            except Exception as cleanup_exc:  # noqa: BLE001
+                _telemetry.warn(
+                    f"hole wizard {label}: selection cleanup failed: {cleanup_exc}"
+                )
+            raise
         model.EditRebuild3()
         defn = _early_bound(feat.GetDefinition(), "IWizardHoleFeatureData2")
     if hole_type == 4:
-        actual_thread_end = int(defn.ThreadEndCondition)
-        if actual_thread_end != end:
-            raise RuntimeError(
-                f"hole wizard {label}: thread end condition "
-                f"{actual_thread_end} != requested {end}"
-            )
-        actual_thread_class = str(defn.ThreadClass)
-        if actual_thread_class != spec.thread_class:
-            raise RuntimeError(
-                f"hole wizard {label}: thread class "
-                f"{actual_thread_class!r} != requested {spec.thread_class!r}"
-            )
+        # Check the committed definition for both legacy blind and through taps.
+        for prop, expected in (
+            ("ThreadClass", spec.thread_class),
+            ("ThreadEndCondition", end),
+            ("EndCondition", end),
+        ):
+            actual = getattr(defn, prop)
+            if actual != expected:
+                raise RuntimeError(
+                    f"hole wizard {label}: {prop} {actual!r} != requested {expected!r}"
+                )
 
     def _dim(prop: str) -> float:
         try:
@@ -629,23 +646,22 @@ def wizard_holes(
             f"hole wizard {label}: stored size {stored_size!r} "
             f"!= requested {spec.size!r}"
         )
-    # Tap holes expose their drill diameter through the tap-specific members,
-    # not HoleDiameter/ThruHoleDiameter. Native #6-32 and #10-24 controls prove
-    # ThruTapDrillDiameter for through taps and TapDrillDiameter for blind taps.
-    if spec.kind in ("tapped", "tapped_bottoming"):
+    # Use the tap-specific drill members selected by the actual termination.
+    # Generic HoleDiameter/HoleDepth can read zero for native tapped features.
+    if hole_type == 4:
         diameter_member = (
             "TapDrillDiameter" if spec.end == "blind" else "ThruTapDrillDiameter"
         )
-        hole_dia_mm = _dim(diameter_member)
+        depth_member = "TapDrillDepth" if spec.end == "blind" else "ThruTapDrillDepth"
+        cut_diameter = _dim(diameter_member)
+        cut_depth = _dim(depth_member)
     else:
-        hole_dia_mm = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
-    # HoleDepth likewise reads 0.0 on the legacy blind path. Its documented
-    # HoleWizard5 Depth input remains spec.depth_mm, and callers verify the cut
-    # independently by volume. ThreadDepth is populated and is gated below.
+        cut_diameter = _dim("HoleDiameter") or _dim("ThruHoleDiameter")
+        cut_depth = _dim("HoleDepth")
     result = WizardHoleResult(
         name=str(feat.Name),
-        hole_dia_mm=hole_dia_mm,
-        depth_mm=_dim("HoleDepth"),
+        hole_dia_mm=cut_diameter,
+        depth_mm=cut_depth,
         cbore_dia_mm=_dim("CounterBoreDiameter"),
         cbore_depth_mm=_dim("CounterBoreDepth"),
         placement_drive_jobs=placement_drive_jobs,

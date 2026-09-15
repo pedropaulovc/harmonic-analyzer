@@ -38,18 +38,19 @@ from _common import (
     CASTING_GREEN,
     PANEL_BLACK,
     SketchDims,
-    _early_bound,
     add_line_chain,
     apply_color,
     apply_material,
     bbox_extent_check,
     check,
+    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
     name_last_feature,
+    name_dimensions,
     REFERENCES_DIR,
     report_mass_properties,
     run_build,
@@ -65,11 +66,13 @@ from _drawing_marks import (
 from _holes import (
     DRILL_POINT_H,
     THREAD_MAJOR_MM,
+    TAP_DRILL_MM,
     HoleSpec,
     blind_cut_dia_mm,
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _part_pmi import _resolve_faces, author_part_pmi
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -78,15 +81,16 @@ from harmonic_base_spec import (
     LIP_H,
     LIP_W,
     DRAWING_NOTES,
-    DRAWING_NOTES_B,
-    SIDE_VIEW_NOTE,
     STACK_HEIGHT,
+    SURFACE_FINISHES,
     TOP_LENGTH,
     TOP_THICKNESS,
     TOP_WIDTH,
 )
 import nameplate_spec
 from cone_pivot_post_installation import (
+    FRAME_FRONT_COLUMN_Z,
+    FRAME_REAR_COLUMN_Z,
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
     POST_X_SHIFT,
@@ -121,18 +125,55 @@ from pinion_spring_geometry import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
+from frame_attachment_spec import (
+    BASE_SCREW_SEAT_Z,
+    BASE_SCREW_Y,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    COLUMN_SOCKET_DEPTH,
+    COLUMN_SOCKET_DIAMETER,
+    SCREW_SPOTFACE_DIAMETER,
+)
+from _visibility import blank_reference_geometry
 
 import _telemetry
 
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
 
 # Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
 # COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
 # = 18.1 x 11.0 in (annotated); legacy 18.0 x 11.0 kept, top plate 0.25 in reveal
 # per side, thicknesses from the legacy HarmonicBase.cs (photo-verify M2 note).
 IN = 25.4
+
+# Four column sockets and their interrupted front/back retaining taps. The
+# physical stations are shared with the tube and assembly; only the X pitch is
+# local to the frame casting family.
+# Bore diameters are nominal CAD geometry only. Match-fit production sockets
+# to their assigned actual MHA-083 tubes, not to a fixed diameter band.
+COLUMN_X = 197.0
+COLUMN_SOCKET_XZ = tuple(
+    (sx * COLUMN_X, z)
+    for sx in (-1.0, 1.0)
+    for z in (FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z)
+)
+BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
+BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
+BASE_CROSS_TAP_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "#10-32",
+    end="blind",
+    depth_mm=CASTING_TAP_DRILL_DEPTH,
+    thread_class="2B",
+    overrides_mm={"ThreadDepth": CASTING_FULL_THREAD_DEPTH},
+)
+BASE_CROSS_TAP_DRILL_DIA = TAP_DRILL_MM[BASE_CROSS_TAP_SPEC.size]
+BASE_SCREW_FACES = (("front", -1.0, True), ("rear", 1.0, False))
+if BASE_SPOTFACE_DEPTH <= 0.0:
+    raise AssertionError("base cross-screw spotface must cut inward from the side")
+if CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH < 2.0 * 25.4 / 32.0:
+    raise AssertionError("base cross tap lacks two-pitch bottoming-tap lead")
 
 # Rocker-support hold-down seats (machine = part-local: frame.SLDASM places the
 # base unrotated at the origin). The support contract transforms its unchanged
@@ -394,6 +435,38 @@ BLOCK_SCREW_HOLE_DIA = blind_cut_dia_mm(BLOCK_SEAT_SPEC)
 FOOT_SCREW_HOLE_DIA = blind_cut_dia_mm(FOOT_SEAT_SPEC)
 NAMEPLATE_SCREW_HOLE_DIA = blind_cut_dia_mm(NAMEPLATE_SEAT_SPEC)
 
+# Socket cylinders occupy Y=25.4..50.8, overlapping the deepest vertical-seat
+# envelopes. Check plan walls against every known base cavity, not just the
+# visually nearest nameplate holes.
+COLUMN_SOCKET_NEAREST_OCCUPANT_WALL = min(
+    math.dist(socket, occupant) - (COLUMN_SOCKET_DIAMETER + occupant_dia) / 2.0
+    for socket in COLUMN_SOCKET_XZ
+    for occupants, occupant_dia in (
+        (HOLE_XZ, THREAD_MAJOR_MM[HOLD_DOWN_THREAD]),
+        ((PIVOT_SCREW_XZ,), PIVOT_SCREW_HOLE_DIA),
+        ((LOCK_KNOB_XZ,), LOCK_SCREW_HOLE_DIA),
+        ((STOP_SCREW_XZ,), STOP_SCREW_HOLE_DIA),
+        (BLOCK_SCREW_XZ, BLOCK_SCREW_HOLE_DIA),
+        (FOOT_SCREW_XZ, FOOT_SCREW_HOLE_DIA),
+        (NAMEPLATE_SCREW_XZ, NAMEPLATE_SCREW_HOLE_DIA),
+    )
+    for occupant in occupants
+)
+if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
+    raise AssertionError(
+        "base column socket leaves less than 1 mm wall to another base cavity"
+    )
+COLUMN_SOCKET_RIM_CLEARANCE = min(
+    min(
+        TOP_LENGTH / 2.0 - LIP_W - abs(x),
+        TOP_WIDTH / 2.0 - LIP_W - abs(z),
+    )
+    - COLUMN_SOCKET_DIAMETER / 2.0
+    for x, z in COLUMN_SOCKET_XZ
+)
+if COLUMN_SOCKET_RIM_CLEARANCE < 1.0:
+    raise AssertionError("base column socket crowds the raised rim")
+
 
 def require_blind_seat_fit(
     label: str, seat: HoleSpec, engagement: float, *, tip_reserve: float = 0.25
@@ -536,6 +609,26 @@ def _fillet_section_area(r: float) -> float:
     return (1.0 - math.pi / 4.0) * r * r
 
 
+def _interrupted_cross_hole_removal(
+    hole_dia: float, cylindrical_depth: float, socket_dia: float
+) -> float:
+    """Volume cut from casting by a blind cross hole interrupted by a socket."""
+    hole_r = hole_dia / 2.0
+    socket_r = socket_dia / 2.0
+    step = 0.001
+    volume = 0.0
+    x = -hole_r
+    while x < hole_r:
+        dx = x + step / 2.0
+        hole_chord = 2.0 * math.sqrt(max(0.0, hole_r * hole_r - dx * dx))
+        socket_span = 2.0 * math.sqrt(max(0.0, socket_r * socket_r - dx * dx))
+        volume += hole_chord * (cylindrical_depth - socket_span) * step
+        x += step
+    # The 118-degree point lies wholly in the far casting wall.
+    volume += math.pi / 3.0 * hole_r**3 * DRILL_POINT_H
+    return volume
+
+
 def _plan_perimeter(length: float, width: float, corner_r: float) -> float:
     """Outline length of a length x width rectangle with corner_r plan corners.
 
@@ -599,49 +692,33 @@ def _com_get(obj, name: str):
     return value() if callable(value) else value
 
 
-async def _paint_deck_black(adapter, deck_y_mm: float) -> None:
-    """Face-level PANEL_BLACK on the deck the rim frames: the largest planar
-    +Y face lying at ``deck_y_mm`` (the pad top inside the lip; the lip's own
-    top sits LIP_H higher, the seat floors face -Y or are conical). Walks the
-    body's faces instead of a coordinate pick -- ``SelectByID2`` face picks
-    are view-dependent. Face appearances sit above the body colour in the
-    display hierarchy, so the rest of the casting stays green."""
+async def _paint_machined_faces_black(adapter) -> None:
+    """Black overrides on the two qualified machined planes; green elsewhere."""
     from solidworks_mcp.adapters.com_variant import double_array
 
-    doc = adapter.currentModel
-    part_h = _early_bound(doc, "IPartDoc")
-    bodies = part_h.GetBodies2(0, True) or []
-    target = None
-    target_area = 0.0
-    y_m = deck_y_mm / 1000.0
-    for body in bodies:
-        for face in _com_get(body, "GetFaces") or []:
-            normal = face.Normal
-            if not normal or float(normal[1]) < 0.99:
-                continue
-            box = _com_get(face, "GetBox")
-            if (
-                not box
-                or abs(float(box[4]) - y_m) > 1e-6
-                or abs(float(box[1]) - y_m) > 1e-6
-            ):
-                continue
-            area = float(_com_get(face, "GetArea"))
-            if area > target_area:
-                target, target_area = face, area
-    if target is None:
-        raise RuntimeError(f"deck face at y {deck_y_mm} not found")
-    a_deck = (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6
-    if abs(target_area - a_deck) > 0.05 * a_deck:
-        raise RuntimeError(
-            f"deck face area {target_area * 1e6:.0f} mm^2 != {a_deck * 1e6:.0f} (minus seats)"
-        )
+    faces = _resolve_faces(
+        adapter.currentModel, {control.key: control.face for control in SURFACE_FINISHES}
+    )
+    expected_areas = {
+        "deck": (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6,
+        "underside": BOTTOM_LENGTH * BOTTOM_WIDTH * 1e-6,
+    }
     values = double_array([*PANEL_BLACK, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
-    target.MaterialPropertyValues = values
-    back = tuple(float(v) for v in (target.MaterialPropertyValues or ())[:3])
-    if len(back) != 3 or any(abs(b - w) > 1 / 255 for b, w in zip(back, PANEL_BLACK)):
-        raise RuntimeError(f"deck face colour readback mismatch: {back}")
-    _telemetry.info(f"deck face painted black ({target_area * 1e6:.0f} mm^2)")
+    for key, face in faces.items():
+        area = float(face.GetArea())
+        expected = expected_areas[key]
+        if abs(area - expected) > 0.05 * expected:
+            raise RuntimeError(
+                f"{key} face area {area * 1e6:.0f} mm^2 != "
+                f"{expected * 1e6:.0f} (minus openings/edge breaks)"
+            )
+        face.MaterialPropertyValues = values
+        back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
+        if len(back) != 3 or any(
+            abs(actual - wanted) > 1 / 255 for actual, wanted in zip(back, PANEL_BLACK)
+        ):
+            raise RuntimeError(f"{key} black face colour did not persist: {back}")
+        _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -657,14 +734,21 @@ async def build(adapter) -> dict[str, str]:
     # The mm suffix is load-bearing -- this is an INCH document and the equation
     # manager reads BARE numbers in document units (an unsuffixed 457.2 = 457
     # inches and blows the part up 25.4x). The thicknesses are extrude/offset
-    # feature parameters (not sketch dims), exposed here as editable constants
-    # even though nothing in drive_jobs drives them.
+    # feature parameters (not sketch dims); they are named after the features
+    # are created, then driven in the deferred batch below.
     await set_global(adapter, "BottomLength", f"{BOTTOM_LENGTH}mm")
     await set_global(adapter, "BottomWidth", f"{BOTTOM_WIDTH}mm")
     await set_global(adapter, "BottomThickness", f"{BOTTOM_THICKNESS}mm")
     await set_global(adapter, "TopLength", f"{TOP_LENGTH}mm")
     await set_global(adapter, "TopWidth", f"{TOP_WIDTH}mm")
     await set_global(adapter, "TopThickness", f"{TOP_THICKNESS}mm")
+    await set_global(adapter, "ColumnX", f"{COLUMN_X}mm")
+    await set_global(adapter, "ColumnZ", f"{abs(FRAME_FRONT_COLUMN_Z)}mm")
+    await set_global(adapter, "SocketDia", f"{COLUMN_SOCKET_DIAMETER}mm")
+    await set_global(adapter, "SocketDepth", f"{COLUMN_SOCKET_DEPTH}mm")
+    await set_global(adapter, "BaseScrewY", f"{BASE_SCREW_Y}mm")
+    await set_global(adapter, "SpotFaceDia", f"{SCREW_SPOTFACE_DIAMETER}mm")
+    await set_global(adapter, "SpotFaceDepth", f"{BASE_SPOTFACE_DEPTH}mm")
     for i, (x, z) in enumerate(HOLE_XZ):
         await set_global(adapter, f"Hole{i}X", f"{x}mm")
         await set_global(adapter, f"Hole{i}Z", f"{-z}mm")
@@ -674,6 +758,7 @@ async def build(adapter) -> dict[str, str]:
     # are collected here and applied in one deferred batch at the end (every
     # target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
+    ref_planes: list[str] = []
 
     # Bottom plate: centred on the origin.
     bottom = SketchDims()
@@ -701,6 +786,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=BOTTOM_THICKNESS)),
     )
     name_last_feature(adapter, "BottomPlate")
+    bottom_thickness_dim = name_dimensions(adapter, "BottomPlate", ["BottomThickness"])
+    drive_jobs.append((bottom_thickness_dim[0], '"BottomThickness"'))
     _telemetry.info(f"volume after bottom plate: {await _volume(adapter):.1f} mm^3")
     # Top plate shares the centred legacy footprint and starts on the flange.
     top = SketchDims()
@@ -725,6 +812,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += top.apply(adapter, "TopProfile")
     extrude_at_offset(adapter, TOP_THICKNESS, BOTTOM_THICKNESS)
     name_last_feature(adapter, "TopPlate")
+    top_thickness_dim = name_dimensions(adapter, "TopPlate", ["TopThickness"])
+    drive_jobs.append((top_thickness_dim[0], '"TopThickness"'))
     _telemetry.info(f"volume after top plate: {await _volume(adapter):.1f} mm^3")
     total = STACK_HEIGHT
 
@@ -733,7 +822,6 @@ async def build(adapter) -> dict[str, str]:
     # the support's 5/16 clearance drills: 6.35 mm foot + 9.247187 mm (1.456D)
     # engagement, with 0.25 mm thread beyond each tip. The separate 15.847187 mm
     # cylindrical drill depth leaves five pitches for plug-tap lead and margin.
-    # No underside counterbore or through clearance remains.
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,
@@ -827,6 +915,151 @@ async def build(adapter) -> dict[str, str]:
             )
         after = after_cut
 
+    # Four blind column sockets from the deck. Their Ø25.50 +0.05/0 limits
+    # match MHA-083's Ø25.40 +0/-0.05 OD for 0.10..0.20 diametral clearance.
+    socket_plane = check(
+        "create_plane column socket mouths",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=STACK_HEIGHT
+            )
+        ),
+    )
+    socket_plane_name = str(getattr(socket_plane, "name", socket_plane))
+    ref_planes.append(socket_plane_name)
+    sockets = SketchDims()
+    check(
+        "create_sketch column sockets", await adapter.create_sketch(socket_plane_name)
+    )
+    for i, (x, z) in enumerate(COLUMN_SOCKET_XZ):
+        await define_circle(
+            adapter,
+            x,
+            -z,
+            COLUMN_SOCKET_DIAMETER / 2.0,
+            f"column socket ({x:+.0f}, {z:+.0f})",
+            dims=sockets,
+            names=(
+                f"Socket{i}X",
+                f"Socket{i}Z",
+                "SocketDia" if i == 0 else f"Socket{i}Dia",
+            ),
+            drives=(
+                '"ColumnX"',
+                '"ColumnZ"',
+                '"SocketDia"',
+            ),
+        )
+    await ensure_fully_defined(adapter, "column socket sketch")
+    check("exit_sketch column sockets", await adapter.exit_sketch())
+    name_last_feature(adapter, "ColumnSocketProfile")
+    drive_jobs += sockets.apply(adapter, "ColumnSocketProfile")
+    check(
+        "cut blind column sockets",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=COLUMN_SOCKET_DEPTH, reverse_direction=False)
+        ),
+    )
+    name_last_feature(adapter, "ColumnSockets")
+    socket_depth_dim = name_dimensions(adapter, "ColumnSockets", ["SocketDepth"])
+    drive_jobs.append((socket_depth_dim[0], '"SocketDepth"'))
+    v_sockets = (
+        len(COLUMN_SOCKET_XZ)
+        * math.pi
+        * (COLUMN_SOCKET_DIAMETER / 2.0) ** 2
+        * COLUMN_SOCKET_DEPTH
+    )
+    after = await volume_check(
+        adapter, "column sockets", after - v_sockets, 0.005 * v_sockets + 10.0
+    )
+
+    # Ø9 spot seats on the front/rear pad faces, then bottoming-tapped paths
+    # continue through the near casting, interrupted socket, and far casting.
+    v_spot = math.pi * (SCREW_SPOTFACE_DIAMETER / 2.0) ** 2 * BASE_SPOTFACE_DEPTH
+    for side, sign, reverse in BASE_SCREW_FACES:
+        spot_plane = check(
+            f"create_plane base spotface {side}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset",
+                    base_plane="Front Plane",
+                    offset=sign * BASE_SPOTFACE_PLANE_Z,
+                )
+            ),
+        )
+        spot_plane_name = str(getattr(spot_plane, "name", spot_plane))
+        ref_planes.append(spot_plane_name)
+        spot = SketchDims()
+        check(
+            f"create_sketch base spotface {side}",
+            await adapter.create_sketch(spot_plane_name),
+        )
+        for i, x in enumerate((-COLUMN_X, COLUMN_X)):
+            await define_circle(
+                adapter,
+                x,
+                BASE_SCREW_Y,
+                SCREW_SPOTFACE_DIAMETER / 2.0,
+                f"base spotface {side} ({x:+.0f})",
+                dims=spot,
+                names=(
+                    f"Spot{i}X",
+                    f"Spot{i}Y",
+                    "SpotFaceDia" if i == 0 else f"Spot{i}Dia",
+                ),
+                drives=(
+                    '"ColumnX"',
+                    '"BaseScrewY"',
+                    '"SpotFaceDia"',
+                ),
+            )
+        await ensure_fully_defined(adapter, f"base spotface {side} sketch")
+        check(f"exit_sketch base spotface {side}", await adapter.exit_sketch())
+        profile_name = f"BaseSpotFace{side.capitalize()}Profile"
+        name_last_feature(adapter, profile_name)
+        drive_jobs += spot.apply(adapter, profile_name)
+        check(
+            f"cut base spotface {side}",
+            await adapter.create_cut_extrude(
+                ExtrusionParameters(
+                    depth=BASE_SPOTFACE_DEPTH, reverse_direction=reverse
+                )
+            ),
+        )
+        feature_name = f"BaseSpotFace{side.capitalize()}"
+        name_last_feature(adapter, feature_name)
+        spot_depth_dim = name_dimensions(adapter, feature_name, ["SpotFaceDepth"])
+        drive_jobs.append((spot_depth_dim[0], '"SpotFaceDepth"'))
+        after = await volume_check(
+            adapter,
+            f"base spotfaces {side}",
+            after - 2.0 * v_spot,
+            0.01 * v_spot + 2.0,
+        )
+
+        z_face = sign * BASE_SCREW_SEAT_Z
+        tap_points = [[x, BASE_SCREW_Y, z_face] for x in (-COLUMN_X, COLUMN_X)]
+        wizard_holes(
+            adapter,
+            BASE_CROSS_TAP_SPEC,
+            tap_points,
+            (0.0, 0.0, sign),
+            f"base frame cross taps {side}",
+            name=f"BaseCrossTaps{side.capitalize()}",
+            expect_dia_mm=BASE_CROSS_TAP_DRILL_DIA,
+        )
+        v_cross = _interrupted_cross_hole_removal(
+            BASE_CROSS_TAP_DRILL_DIA,
+            CASTING_TAP_DRILL_DEPTH,
+            COLUMN_SOCKET_DIAMETER,
+        )
+        after = await volume_check(
+            adapter,
+            f"base cross taps {side}",
+            after - 2.0 * v_cross,
+            0.015 * v_cross + 3.0,
+        )
+
     # Raised rim FIRST (2026-09 photo re-derive, see LIP_W): one ring feature
     # -- outer rectangle on the pad's plan outline, inner rectangle LIP_W in --
     # boss-extruded from RIM_OVERLAP below the pad top to LIP_H above it, so
@@ -887,6 +1120,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PadCorners")
+    name_dimensions(adapter, "PadCorners", ["PadCornerRadius"])
     v_pad_corners = _corner_removal(PAD_CORNER_R, deck_top - BOTTOM_THICKNESS)
     after = await volume_check(
         adapter, "pad plan corners", after - v_pad_corners, 0.01 * v_pad_corners + 2.0
@@ -907,6 +1141,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "FlangeCorners")
+    name_dimensions(adapter, "FlangeCorners", ["FlangeCornerRadius"])
     v_flange_corners = _corner_removal(FLANGE_CORNER_R, BOTTOM_THICKNESS)
     after = await volume_check(
         adapter,
@@ -930,6 +1165,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "RimInnerCorners")
+    name_dimensions(adapter, "RimInnerCorners", ["RimInnerCornerRadius"])
     v_rim_corners = _corner_removal(RIM_INNER_R, LIP_H)  # reentrant: ADDS
     after = await volume_check(
         adapter, "rim inner corners", after + v_rim_corners, 0.05 * v_rim_corners + 2.0
@@ -966,6 +1202,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "TopRimBreaks")
+    name_dimensions(adapter, "TopRimBreaks", ["TopRimChamfer"])
     rim_area = RIM_CHAMFER**2 / 2.0
     v_rims = rim_area * (
         _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
@@ -984,6 +1221,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "BottomEdgeBreak")
+    name_dimensions(adapter, "BottomEdgeBreak", ["BottomEdgeChamfer"])
     v_break = rim_area * _plan_perimeter(BOTTOM_LENGTH, BOTTOM_WIDTH, FLANGE_CORNER_R)
     after = await volume_check(
         adapter, "underside edge break", after - v_break, 0.02 * v_break + 5.0
@@ -1003,6 +1241,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "PadRootFillet")
+    name_dimensions(adapter, "PadRootFillet", ["PadRootRadius"])
     v_root = _fillet_section_area(PAD_ROOT_R) * _plan_perimeter(
         TOP_LENGTH, TOP_WIDTH, PAD_CORNER_R
     )
@@ -1024,6 +1263,7 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
+    ref_planes.append(str(getattr(serial_plane, "name", serial_plane)))
     pre_serial = float((await adapter.get_mass_properties()).data.volume)
     check(
         "import serial DXF",
@@ -1057,18 +1297,17 @@ async def build(adapter) -> dict[str, str]:
     after -= removed
 
     # Apply the deferred drive equations after the whole model exists, then
-    # re-check neutrality against the as-built volume. Frame components are
-    # inserted at verified transforms and lock-mated, so the old DeckTop,
-    # CboreSeat, and eight per-hole construction planes/axes are unnecessary.
+    # re-check neutrality against the as-built volume.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
+    blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
-    await _paint_deck_black(adapter, total)
+    await _paint_machined_faces_black(adapter)
 
     # Verify the annotated footprint without view-dependent screen picks.
     await bbox_extent_check(
@@ -1080,14 +1319,12 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "Manufacturing Notes B": DRAWING_NOTES_B,
-            "Side View Note": SIDE_VIEW_NOTE,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

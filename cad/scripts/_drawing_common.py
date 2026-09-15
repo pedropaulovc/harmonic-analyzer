@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 
 import _config
@@ -179,7 +179,7 @@ _DIM_DETAILING_SCOPES = {
 # nominal half-span box around its IAnnotation.GetPosition anchor instead.
 _NOMINAL_BALLOON_HALF_M = 0.006
 # Ink gap left between two balloon circles pushed apart on the ring. Their radius
-# is MEASURED per sheet (INote::GetBalloonInfo -- 4.72 mm on pen-assembly), so
+# is measured from its rendered full-circle arc (4.72 mm on pen-assembly), so
 # this is only the clearance between them, not a stand-in for the circle itself.
 _BALLOON_CLEARANCE_M = 0.0015
 
@@ -1265,22 +1265,21 @@ def add_native_hole_callout(
     if not annotation.SetPosition2(callout_xy[0], callout_xy[1], 0.0):
         raise RuntimeError(f"failed to position native hole callout ({label})")
     if process:
-        # A Hole Wizard callout keeps its whole format string
-        # (``<MOD-DIAM><DIM> THRU ALL``) in the PREFIX compartment, so the
-        # process is PREPENDED to what is there -- replacing it silently drops
-        # the size and depth (measured 2026-09-02: the sheet read "#14 DRILL").
+        # Prefix the definition, not GetText(Prefix)'s resolved values: writing
+        # resolved thread text severs its Hole Wizard variables. Native save /
+        # reopen proof retains all five variables with PrefixDefinition (5).
         display = _sw_type_info.early_bound_or_flag(
             display, "IDisplayDimension", "SetText", "GetText"
         )
-        existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+        existing = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
         if not existing.strip():
             raise RuntimeError(f"hole callout has no format text to prefix ({label})")
         prefix = process.rstrip() + " " + existing.lstrip()
         display.SetText(1, prefix)
-        if str(display.GetText(1) or "") != prefix:
+        if str(display.GetText(5) or "") != prefix:
             raise RuntimeError(
                 f"hole callout process prefix did not persist ({label}): "
-                f"{display.GetText(1)!r}"
+                f"{display.GetText(5)!r}"
             )
         _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
@@ -1739,6 +1738,7 @@ def render_pdf_png(
     *,
     layout: DrawingLayout,
     expected_pages: int = 1,
+    page_layouts: Sequence[DrawingLayout] | None = None,
 ) -> None:
     """Render a drawing PDF to its preview PNG.
 
@@ -1746,65 +1746,93 @@ def render_pdf_png(
     drawings use the registered preview path for a contact sheet, keeping the
     doit/cache/release artifact contract to one PNG. The historical 2x2 layout
     is retained through four pages; larger drawings use the smallest near-square
-    grid that fits every page.
+    grid that fits every page. Mixed packages validate and render each PDF page
+    against its own registered ASME B orientation without stretching the contact
+    preview.
     """
+    if page_layouts is None:
+        layouts = (layout,) * expected_pages
+    else:
+        layouts = tuple(page_layouts)
+        if len(layouts) != expected_pages:
+            raise ValueError(
+                f"page layout count {len(layouts)} != expected pages {expected_pages}"
+            )
+        if any(not isinstance(item, DrawingLayout) for item in layouts):
+            raise TypeError("every page layout must be a DrawingLayout")
     import pypdfium2 as pdfium
     from PIL import Image
 
-    template = DRAWING_TEMPLATES[layout]
+    contact_template = DRAWING_TEMPLATES[layout]
     document = pdfium.PdfDocument(str(pdf))
     if len(document) != expected_pages:
         raise RuntimeError(
             f"drawing PDF has {len(document)} pages, expected {expected_pages}"
         )
     images: list[Any] = []
-    for index in range(expected_pages):
+    for index, page_layout in enumerate(layouts):
         page = document[index]
-        image = page.render(scale=template.dpi / 72.0).to_pil()
+        page_template = DRAWING_TEMPLATES[page_layout]
+        expected_points = (
+            page_template.width_m / 0.0254 * 72.0,
+            page_template.height_m / 0.0254 * 72.0,
+        )
+        actual_points = (float(page.get_width()), float(page.get_height()))
+        point_tolerance = 72.0 / page_template.dpi + 1e-6
+        if any(
+            abs(actual - expected) > point_tolerance
+            for actual, expected in zip(actual_points, expected_points, strict=True)
+        ):
+            document.close()
+            raise RuntimeError(
+                f"PDF page {index + 1} is {actual_points[0]:g} x "
+                f"{actual_points[1]:g} pt, expected {expected_points[0]:g} x "
+                f"{expected_points[1]:g} pt for {page_layout.value}"
+            )
+        image = page.render(scale=page_template.dpi / 72.0).to_pil()
         page.close()
-        expected_width, expected_height = template.pixel_size
+        expected_width, expected_height = page_template.pixel_size
         actual_width, actual_height = image.size
         if (
             actual_width in (expected_width, expected_width + 1)
             and actual_height in (expected_height, expected_height + 1)
-            and image.size != template.pixel_size
+            and image.size != page_template.pixel_size
         ):
             image = image.crop((0, 0, expected_width, expected_height))
-        if image.size != template.pixel_size:
+        if image.size != page_template.pixel_size:
             document.close()
             raise RuntimeError(
-                f"{layout.value} ASME B PNG page {index + 1} is {image.size}, "
-                f"expected {template.pixel_size}"
+                f"{page_layout.value} ASME B PNG page {index + 1} is {image.size}, "
+                f"expected {page_template.pixel_size}"
             )
         images.append(image)
     document.close()
     png.parent.mkdir(parents=True, exist_ok=True)
     if expected_pages == 1:
-        images[0].save(png, dpi=(template.dpi, template.dpi))
+        images[0].save(png, dpi=(contact_template.dpi, contact_template.dpi))
         return
 
     columns, rows = _contact_preview_grid(expected_pages)
     cell_size = (
-        template.pixel_size[0] // columns,
-        template.pixel_size[1] // rows,
+        contact_template.pixel_size[0] // columns,
+        contact_template.pixel_size[1] // rows,
     )
-    scale = min(
-        cell_size[0] / template.pixel_size[0],
-        cell_size[1] / template.pixel_size[1],
-    )
-    preview_size = (
-        round(template.pixel_size[0] * scale),
-        round(template.pixel_size[1] * scale),
-    )
-    contact = Image.new("RGB", template.pixel_size, "white")
+    contact = Image.new("RGB", contact_template.pixel_size, "white")
     for index, image in enumerate(images):
+        scale = min(cell_size[0] / image.width, cell_size[1] / image.height)
+        preview_size = (
+            round(image.width * scale),
+            round(image.height * scale),
+        )
         cell = image.resize(preview_size, Image.Resampling.LANCZOS)
         column = index % columns
         row = index // columns
         x = column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2
         y = row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2
         contact.paste(cell.convert("RGB"), (x, y))
-    contact.save(png, dpi=(template.dpi, template.dpi))
+    contact.save(
+        png, dpi=(contact_template.dpi, contact_template.dpi)
+    )
 
 
 def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
@@ -3305,6 +3333,47 @@ def _balloon_item_key(adapter: Any, note: Any) -> tuple[int, str]:
     return (int(leading) if leading else sys.maxsize, text)
 
 
+def rendered_balloon_circle(note: Any, *, label: str) -> tuple[float, float, float]:
+    """Return sheet X/Y/radius from the unique rendered full-circle primitive.
+
+    INote.GetBalloonInfo can retain its original center after a successful move,
+    rebuild, redraw, and PDF export. IAnnotation.GetDisplayData reflects the ink.
+    """
+    note = _sw_type_info.early_bound_or_flag(note, "INote", "GetAnnotation")
+    annotation = note.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: balloon has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetDisplayData"
+    )
+    display = annotation.GetDisplayData()
+    if display is None:
+        raise RuntimeError(f"{label}: balloon has no rendered display data")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayData", "GetArcCount", "GetArcAtIndex2"
+    )
+    circle = None
+    for index in range(int(display.GetArcCount())):
+        arc = tuple(float(value) for value in (display.GetArcAtIndex2(index) or ()))
+        # Native schema: four metadata values, start XYZ, end XYZ, center XYZ,
+        # normal XYZ, rotation direction. Closed start/end identifies a circle.
+        if len(arc) < 17 or not all(math.isfinite(value) for value in arc[4:16]):
+            raise RuntimeError(f"{label}: invalid rendered arc data: {arc!r}")
+        if any(abs(arc[4 + axis] - arc[7 + axis]) > 1e-9 for axis in range(3)):
+            continue
+        radius = math.hypot(arc[4] - arc[10], arc[5] - arc[11])
+        if (not math.isfinite(radius) or radius <= 0.0
+                or abs(arc[13]) > 1e-9 or abs(arc[14]) > 1e-9
+                or abs(abs(arc[15]) - 1.0) > 1e-9):
+            raise RuntimeError(f"{label}: invalid rendered sheet-circle geometry: {arc!r}")
+        if circle is not None:
+            raise RuntimeError(f"{label}: multiple rendered full-circle balloon primitives")
+        circle = (arc[10], arc[11], radius)
+    if circle is None:
+        raise RuntimeError(f"{label}: no rendered full-circle balloon primitive")
+    return circle
+
+
 def _spread_balloons(
     adapter: Any,
     view: Any,
@@ -3353,20 +3422,9 @@ def _spread_balloons(
     radii: list[float] = []
     for note in balloons:
         note = _sw_type_info.early_bound_or_flag(
-            note, "INote", "GetAnnotation", "GetBalloonInfo", "GetBomBalloonText"
+            note, "INote", "GetAnnotation", "GetBomBalloonText"
         )
-        # The balloon circle's own rendered radius. GetBalloonInfo returns
-        # (centre xyz, arc-point xyz, radius) -- unlike GetExtent it describes
-        # the CIRCLE, not the note+leader box, so the leader cannot pollute it.
-        info = adapter._attempt(lambda n=note: n.GetBalloonInfo())
-        if not info or len(info) < 7:
-            raise RuntimeError(
-                "balloon spread: GetBalloonInfo did not return the balloon "
-                "circle -- the separation below is derived from the MEASURED "
-                "radius, so a balloon whose circle cannot be read cannot be "
-                "placed without guessing"
-            )
-        radii.append(float(info[6]))
+        radii.append(rendered_balloon_circle(note, label="balloon spread")[2])
         annotation = adapter._attempt(lambda n=note: n.GetAnnotation())
         if annotation is None:
             raise RuntimeError("balloon spread: balloon without an annotation")
@@ -3434,17 +3492,10 @@ def _spread_balloons(
     #   the colliding circles.
     #
     # So: keep the radial direction, enforce a minimum angular separation. The
-    # separation is derived from the balloon's MEASURED radius (GetBalloonInfo,
-    # above), not a guess -- 4.72 mm on this sheet. A monotone push-apart cannot
-    # reorder the balloons, and order-preserving placement about a shared centre
+    # separation is derived from the rendered full-circle radius, not a guess.
+    # A monotone push-apart cannot reorder balloons; placement about a shared centre
     # is what rules crossings out, so this keeps radial's proof while paying
     # radial's price only where circles genuinely touch.
-    #
-    # (History: this WAS documented as blocked -- "needs the balloon's rendered
-    # diameter, which nothing here reads yet". True of this file, never of the
-    # API: INote::GetBalloonInfo returns the circle's centre and radius outright,
-    # and had been in the generated binding all along. The claim was never tested
-    # and the sheet carried the defect for it.)
     gap = _min_angular_gap(min(radius_x, radius_y), max(radii), clearance=clearance)
     angles = _push_apart_on_ring(
         [theta for theta, _x, _y, _i, _a in items], min_gap=gap
@@ -3836,6 +3887,23 @@ def add_auto_balloons_across_views(
     return all_balloons
 
 
+def drawing_viewport_pixel_size(adapter: Any) -> tuple[float, float]:
+    """Return one current viewport pixel in drawing-sheet X/Y metres."""
+    view = _early_bound(adapter.currentModel.ActiveView, "IModelView")
+    transform = _early_bound(view.Transform, "IMathTransform")
+    data = tuple(float(value) for value in transform.ArrayData)
+    if len(data) < 13 or not all(math.isfinite(value) for value in data[:13]):
+        raise RuntimeError("drawing viewport has no finite model-to-pixel transform")
+    scale = abs(data[12])
+    pixels_per_metre = (
+        scale * math.hypot(data[0], data[1]),
+        scale * math.hypot(data[3], data[4]),
+    )
+    if any(not math.isfinite(value) or value <= 0.0 for value in pixels_per_metre):
+        raise RuntimeError("drawing viewport has a degenerate sheet-to-pixel mapping")
+    return (1.0 / pixels_per_metre[0], 1.0 / pixels_per_metre[1])
+
+
 @_telemetry.traced("drawing.position_bom_balloon", label_param="label")
 def position_bom_balloon(
     adapter: Any,
@@ -3846,7 +3914,7 @@ def position_bom_balloon(
     label: str,
     position_tolerance_m: float = 1e-6,
 ) -> None:
-    """Move one uniquely identified BOM balloon to a checked sheet position."""
+    """Move the anchor strictly; ``position_tolerance_m`` floors one-pixel ink bounds."""
     if position_tolerance_m <= 0.0:
         raise ValueError("balloon position tolerance must be positive")
     matches = [
@@ -3884,57 +3952,38 @@ def position_bom_balloon(
         f"stack_master={bool(note.IsStackedBalloonMaster())}, "
         f"magnetic_lines={magnetic_lines}"
     )
-    note.LockPosition = False
-    info = note.GetBalloonInfo()
+    circle = rendered_balloon_circle(note, label=label)
     anchor = annotation.GetPosition()
-    if info is None or len(info) < 2 or anchor is None or len(anchor) < 2:
+    if anchor is None or len(anchor) < 2:
         raise RuntimeError(f"{label}: item {item_number} has no position read-back")
-    actual_xy = (float(info[0]), float(info[1]))
-    delta = tuple(expected - actual for actual, expected in zip(actual_xy, position_xy))
-    target_anchor = (float(anchor[0]) + delta[0], float(anchor[1]) + delta[1])
-    # GetBalloonInfo can lag the note's new origin until the graphics pipeline
-    # redraws. Retry the SAME absolute anchor, never a cumulative delta against
-    # stale circle data, and redraw before judging each rendered-circle readback.
-    for _attempt in range(3):
-        note.LockPosition = False
-        moved = bool(annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0))
-        if not moved:
-            raise RuntimeError(f"{label}: failed to position item {item_number}")
-        note.LockPosition = True
-        adapter.currentModel.EditRebuild3()
-        adapter.currentModel.GraphicsRedraw2()
-        current_note = annotation.GetSpecificAnnotation()
-        if current_note is None:
-            raise RuntimeError(
-                f"{label}: item {item_number} note vanished after positioning"
-            )
-        note = _sw_type_info.early_bound_or_flag(
-            current_note, "INote", "GetBalloonInfo"
-        )
-        moved_anchor = annotation.GetPosition()
-        moved_info = note.GetBalloonInfo()
-        _telemetry.info(
-            f"{label}: item {item_number} attempt {_attempt + 1} "
-            f"anchor={tuple(float(value) for value in moved_anchor[:2]) if moved_anchor else None}, "
-            f"circle={tuple(float(value) for value in moved_info[:2]) if moved_info else None}"
-        )
-        if moved_info and all(
-            abs(float(moved_info[index]) - expected) <= position_tolerance_m
-            for index, expected in enumerate(position_xy)
-        ):
-            break
-    info = note.GetBalloonInfo()
-    if info is None or len(info) < 2:
-        raise RuntimeError(f"{label}: item {item_number} circle has no final read-back")
-    actual_xy = (float(info[0]), float(info[1]))
-    if any(
-        abs(actual - expected) > position_tolerance_m
-        for actual, expected in zip(actual_xy, position_xy)
+    target_anchor = (
+        float(anchor[0]) + position_xy[0] - circle[0],
+        float(anchor[1]) + position_xy[1] - circle[1],
+    )
+    note.LockPosition = False
+    if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
+        raise RuntimeError(f"{label}: failed to position item {item_number}")
+    note.LockPosition = True
+    adapter.currentModel.EditRebuild3()
+    adapter.currentModel.GraphicsRedraw2()
+    current_note = annotation.GetSpecificAnnotation()
+    if current_note is None:
+        raise RuntimeError(f"{label}: item {item_number} note vanished after positioning")
+    actual_anchor = tuple(float(value) for value in annotation.GetPosition())
+    actual_xy = rendered_balloon_circle(current_note, label=label)[:2]
+    pixel_bounds = tuple(max(position_tolerance_m, value) for value in drawing_viewport_pixel_size(adapter))
+    residual = tuple(actual - expected for actual, expected in zip(actual_xy, position_xy))
+    state = {"requested_anchor": target_anchor, "actual_anchor": actual_anchor,
+             "target_circle": position_xy, "actual_circle": actual_xy,
+             "residual_xy": residual, "pixel_bounds_m": pixel_bounds}
+    _telemetry.info(f"{label}: item {item_number} pixel-bounded placement {state!r}")
+    if len(actual_anchor) < 2 or not all(math.isfinite(value) for value in actual_anchor[:2]) or any(
+        abs(actual_anchor[index] - target_anchor[index]) > position_tolerance_m
+        for index in range(2)
     ):
-        raise RuntimeError(
-            f"{label}: item {item_number} circle moved to {actual_xy}, "
-            f"expected {position_xy}"
-        )
+        raise RuntimeError(f"{label}: item {item_number} native anchor did not persist: {state!r}")
+    if any(abs(residual[index]) > pixel_bounds[index] for index in range(2)):
+        raise RuntimeError(f"{label}: item {item_number} rendered circle exceeds viewport resolution: {state!r}")
 
 
 def stamp_drawing_summary(
@@ -4007,28 +4056,14 @@ def _note_element(adapter: Any, annotation: Any, name: str) -> LayoutElement | N
     if note is None:
         return None
     note = _sw_type_info.early_bound_or_flag(
-        note, "INote", "GetExtent", "GetText", "IsBomBalloon", "GetBalloonInfo"
+        note, "INote", "GetExtent", "GetText", "IsBomBalloon"
     )
     text = str(adapter._attempt(lambda: note.GetText(), default="") or "")
     diagnostic_name = f"{name} {text!r}" if text else name
-    # A BOM balloon's GetExtent includes its LEADER -- the box spans from the
-    # balloon circle to the pointed-at component (same leader-polluted-box dead
-    # end as GD&T symbols), so neighboring balloons' boxes always intersect near
-    # the view. GetBalloonInfo describes the CIRCLE instead -- centre + radius,
-    # no leader -- so box the circle it actually draws.
+    # A BOM balloon's GetExtent includes its leader. Bound the rendered circle,
+    # not the annotation origin or INote's potentially stale geometry cache.
     if bool(adapter._attempt(lambda: note.IsBomBalloon(), default=False)):
-        info = adapter._attempt(lambda: note.GetBalloonInfo())
-        if not info or len(info) < 7:
-            raise RuntimeError(
-                f"{name}: GetBalloonInfo did not return the balloon circle -- "
-                "refusing to fall back to a nominal box, which would audit a "
-                "guess against placement derived from the measured radius and "
-                "silently disagree with it"
-            )
-        # Centre from GetBalloonInfo, NOT GetPosition: GetPosition is the
-        # annotation ANCHOR, which is measurably offset from the circle centre
-        # (probed on pen-assembly), so it boxed the balloon off-centre.
-        cx, cy, half = float(info[0]), float(info[1]), float(info[6])
+        cx, cy, half = rendered_balloon_circle(note, label=diagnostic_name)
         return LayoutElement(
             diagnostic_name,
             "note",
@@ -4716,8 +4751,8 @@ def check_drawing_layout(
     defect class -- there is no grandfathered case. There WAS one: pen-assembly
     carried 2 leader crossings behind a `_KNOWN_LEADER_CROSSINGS` ratchet, on the
     reasoning that fixing them needed a design decision. It did not -- it needed
-    the balloon's rendered radius, which INote::GetBalloonInfo had all along (see
-    :func:`_spread_balloons`). The ratchet was deleted with the defect.
+    the balloon's rendered radius (see :func:`_spread_balloons`). The ratchet was
+    deleted with the defect.
     """
     with _telemetry.span("drawing.layout_audit"):
         elements, leaders, region = collect_layout_elements(adapter, layout=layout)
@@ -4748,6 +4783,8 @@ async def finalize_drawing(
     redundant_note_substrings: Sequence[str] = (),
     expected_redundant_notes: int = 0,
     expected_sheet_names: tuple[str, ...] | None = None,
+    sheet_layouts: Mapping[str, DrawingLayout] | None = None,
+    sheet_scales: Mapping[str, tuple[float, float]] | None = None,
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
     drawing_model = adapter.currentModel
@@ -4769,6 +4806,29 @@ async def finalize_drawing(
             f"drawing sheet contract mismatch: {sheet_names!r} != "
             f"{expected_sheet_names!r}"
         )
+    if sheet_layouts is None:
+        resolved_layouts = {name: layout for name in sheet_names}
+    else:
+        if set(sheet_layouts) != set(sheet_names):
+            missing = sorted(set(sheet_names) - set(sheet_layouts))
+            unknown = sorted(set(sheet_layouts) - set(sheet_names))
+            raise ValueError(
+                f"sheet layout mapping must cover every sheet exactly; "
+                f"missing={missing!r}, unknown={unknown!r}"
+            )
+        if any(
+            not isinstance(sheet_layout, DrawingLayout)
+            for sheet_layout in sheet_layouts.values()
+        ):
+            raise TypeError("every sheet layout must be a DrawingLayout")
+        resolved_layouts = dict(sheet_layouts)
+    if sheet_scales is not None and set(sheet_scales) != set(sheet_names):
+        missing = sorted(set(sheet_names) - set(sheet_scales))
+        unknown = sorted(set(sheet_scales) - set(sheet_names))
+        raise ValueError(
+            f"sheet scale mapping must cover every sheet exactly; "
+            f"missing={missing!r}, unknown={unknown!r}"
+        )
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
@@ -4780,19 +4840,20 @@ async def finalize_drawing(
         sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
         if sheet is None:
             raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+        sheet_scale = scale if sheet_scales is None else sheet_scales[sheet_name]
         # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
         # the 1:1 the template pinned (each view still carries its own explicit
         # scale), so re-pin it once here before asserting the contract.
-        if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
+        if not sheet.SetScale(float(sheet_scale[0]), float(sheet_scale[1]), False, False):
             raise RuntimeError(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
             )
         assert_asme_b_sheet(
             adapter,
             sheet,
-            layout=layout,
+            layout=resolved_layouts[sheet_name],
             phase=f"before save {sheet_name}",
-            scale=scale,
+            scale=sheet_scale,
         )
         properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
         if len(properties) < 8:
@@ -4824,9 +4885,9 @@ async def finalize_drawing(
             assert_asme_b_sheet(
                 adapter,
                 sheet,
-                layout=layout,
+                layout=resolved_layouts[sheet_name],
                 phase=f"explicit property source {sheet_name}",
-                scale=scale,
+                scale=sheet_scale,
             )
         views = tuple(iter_views(adapter))
         first_view = views[0] if views else None
@@ -4928,6 +4989,7 @@ async def finalize_drawing(
         outputs.png,
         layout=layout,
         expected_pages=len(sheet_names),
+        page_layouts=tuple(resolved_layouts[name] for name in sheet_names),
     )
     artifacts["png"] = str(outputs.png.resolve())
     if set(artifacts) != {"drawing", "pdf", "png"}:

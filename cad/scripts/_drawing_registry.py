@@ -69,6 +69,7 @@ class DrawingSpec:
     # "part" (default) draws a cad/out/sldprt SLDPRT; "assembly" draws the
     # cad/out/sldasm SLDASM of the assembly build named by ``part``.
     source_kind: str = "part"
+    additional_layouts: tuple[DrawingLayout, ...] = ()
 
     @property
     def script(self) -> Path:
@@ -97,7 +98,8 @@ class DrawingSpec:
 
     @property
     def assets(self) -> tuple[Path, ...]:
-        return (DRAWING_TEMPLATES[self.layout].path,)
+        layouts = dict.fromkeys((self.layout, *self.additional_layouts))
+        return tuple(DRAWING_TEMPLATES[layout].path for layout in layouts)
 
 
 DRAWINGS: tuple[DrawingSpec, ...] = (
@@ -642,6 +644,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="frame_cross_screw",
+        part="frame_cross_screw",
+        artifact_stem="frame-cross-screw",
+        script_name="draw_frame_cross_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="tube_frame_cap",
+        part="tube_frame_cap",
+        artifact_stem="tube-frame-cap",
+        script_name="draw_tube_frame_cap.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="gooseneck_set_screw",
         part="gooseneck_set_screw",
         artifact_stem="gooseneck-set-screw",
@@ -742,6 +758,7 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         script_name="draw_frame_assembly.py",
         source_kind="assembly",
         layout=DrawingLayout.LANDSCAPE,
+        additional_layouts=(DrawingLayout.PORTRAIT,),
     ),
     DrawingSpec(
         name="magnifier_assembly",

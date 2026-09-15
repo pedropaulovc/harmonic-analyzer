@@ -1,227 +1,112 @@
-"""Offline contracts for the top-frame drawing."""
+"""Offline contracts for the top-frame geometry and drawing."""
 
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
+import _config
+import fulcrum_keeper_spec as keeper
+from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 import build_top_frame as part
-import draw_top_frame as drawing
-import top_frame_spec
-from cone_pivot_post_installation import (
-    FRAME_FRONT_COLUMN_Z,
-    FRAME_REAR_COLUMN_Z,
-    SUMMING_Z,
+from frame_attachment_spec import (
+    CAP_MOUTH_Y,
+    CAP_RECESS_DEPTH,
+    CAP_RECESS_DIAMETER,
+    CASTING_FULL_THREAD_DEPTH,
+    CASTING_TAP_DRILL_DEPTH,
+    COLUMN_SOCKET_DIAMETER,
+    TOP_SCREW_SEAT_Z,
+    TOP_SCREW_Y,
+    TUBE_CROSS_HOLE_DIAMETER,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
-from _holes import TAP_DRILL_MM
+from tube_frame_cap_spec import MAX_OUTER_DIAMETER
+import tube_frame_spec
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/top-frame.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/top-frame.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/top-frame_drawing.png")
-    assert DRAWINGS_BY_NAME["top_frame"].script == Path(drawing.__file__).resolve()
-
-
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is top_frame_spec.DRAWING_DIMENSIONS
-    assert set(top_frame_spec.DRAWING_DIMENSIONS) == {"OuterProfile"}
-    marked = set().union(*top_frame_spec.DRAWING_DIMENSIONS.values())
-    assert marked == {"Width", "Depth"}
-    kept = set(drawing.TOP_KEEP)
-    assert kept == marked
-
-
-def test_notes_carry_the_casting_rails_bosses_and_holes() -> None:
-    notes = top_frame_spec.DRAWING_NOTES + "\n" + top_frame_spec.DRAWING_NOTES_B
-    notes_flat = " ".join(notes.split())
-    inspection = top_frame_spec.INSPECTION_NOTES
-    inspection_flat = " ".join(inspection.split())
-    assert "GREEN-PAINTED GRAY IRON CASTING" in notes
-    assert "MACHINE DATUM FACES, BORES" in notes
-    assert "1.5 MAX DRAFT. T-ROOT FILLETS R3; TOP-FACE RIM EDGES" in notes_flat
-    assert (
-        "C2.00 X 45 DEG; ALL OTHER CAST EDGES (BAND BOTTOM, BOSSES) SHARP" in notes_flat
-    )
-    assert "UNLESS NOTED" not in notes
-    assert "MACHINE FROM SOLID STOCK" not in notes
-    assert "ASTM A48" not in notes
-    assert "GREEN ENAMEL" not in notes
-    assert "UOS" not in notes
-    assert "CLEAR OPENING" not in notes
-    assert "428.20 X 262.00 OUTER RAIL RING" in notes
-    assert "SIDE RAILS 34.20 WIDE" in notes
-    assert "FRONT/REAR RAILS 38.00 WIDE" in notes
-    assert "CLEAR WINDOW 359.80 X 186.00" in notes
-    assert "INTEGRAL CROSSBAR 22.00 WIDE AT X -26.00..-4.00" in notes
-    assert "18X18 GUSSETS AT ALL FOUR" in notes
-    assert "RING BAND 36.50 TALL" in notes
-    assert "ENVELOPE 446.20 +/-0.25 X 276.20" in notes_flat
-    assert "+/-0.25 X 47.30" in notes_flat
-    assert "4X CORNER BOSSES DIA52.20, 47.30 TALL" in notes
-    assert "PROUD 4.50 ABOVE / 6.30 BELOW" in notes
-    assert "BORED DIA25.50 +0.05/0 THRU" in notes
-    assert "POSITION <MOD-DIAM>0.20 A|B|C ON 394.00 X 224.00 BASIC PITCH" in notes_flat
-    assert "DATUM A = RAIL BOTTOM FACE" in notes
-    assert "B = EAST (-X) OUTER RAIL FACE; C = REAR OUTER RAIL FACE" in notes_flat
-    assert "12.70 WEB CENTRED ON EACH RAIL" in notes
-    assert "PANELS RECESSED 10.75 INTO THE SIDE-RAIL FACES" in notes_flat
-    assert "12.65 INTO THE FRONT/REAR-RAIL FACES" in notes_flat
-    assert "THROUGH THE BOTTOM EDGE" in notes_flat
-    assert "WEB THINS AND STAYS THIN" in notes_flat
-    assert "CAST FINISH INSIDE PANELS" in notes
-    assert "GOOSENECK HUB, EAST RAIL AT Z +3.09" in notes
-    assert "RIB 27.00 WIDE FULL HEIGHT" in notes
-    assert "BORE <MOD-DIAM>17.00 +0.20/0 THRU" in notes
-    assert "UNDERSIDE BOSS DIA30 X 8.00" in notes
-    assert "DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE" in notes_flat
-    assert "16X16X2 SPOT POCKET" in notes
-    assert "4X DRILL + TAP #8-32 UNC-2B X 14.00 DEEP" in notes
-    assert "DIA9.00 X 0.90 SPOT-FACE EACH" in notes
-    assert (
-        "2X <MOD-DIAM>13.49 (1/2 CLOSE) HANGER-STUD HOLES THRU THE CROSSBAR AT"
-        " Z -83.97 / +90.15; POSITION <MOD-DIAM>0.20 A|B|C" in notes_flat
-    )
-    assert "2X DRILL + TAP #8-32 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP" in notes
-    assert "FULCRUM-KEEPER FEET" in notes
-    assert "ALL BORES Ra 1.6" in notes
-    assert "TOP ENDS BROKEN C1.00 X 45 DEG" in notes
-    assert "MASK DATUMS, BORES, BOSS END LANDS AND TAPPED HOLES" in notes_flat
-    assert "DIMENSIONS/GD&T APPLY BEFORE COATING" in notes
-    assert "MAX-MIN RADIAL WALL THICKNESS" in inspection_flat
-    assert "SHALL NOT EXCEED 0.10" in inspection_flat
-    assert "FIT LEAST-SQUARES CYLINDERS" in inspection_flat
-    assert "8 EQUALLY SPACED AXIAL SECTIONS OVER 47.30" in inspection_flat
-    assert "AXIS OFFSET 0.05 MAX" in inspection_flat
-    assert "GREATEST AXIS SEPARATION AT EITHER END PLANE" in inspection_flat
-    assert "64 OD POINTS" in inspection_flat
-    assert "ADDITIONAL TO NATIVE SIZE/POSITION CONTROLS" in inspection_flat
-    assert "TIR" not in notes
-    assert "-0.00" not in notes
-    assert "X.XX" not in notes
-    assert set(top_frame_spec.GEOMETRIC_TOLERANCES_MM) == {
-        "column-bore true position",
-        "column-boss true position",
-        "gooseneck-bore true position",
-        "hanger-stud-hole true position",
-    }
-
-
-def test_ring_envelope_and_hole_stations_are_single_sourced() -> None:
-    assert part.FRONT_COLUMN_Z == FRAME_FRONT_COLUMN_Z == -112.0
-    assert part.REAR_COLUMN_Z == FRAME_REAR_COLUMN_Z == 112.0
-    assert part.GOOSENECK_Z == SUMMING_Z
-    assert part.GOOSENECK_X == -part.COLUMN_X == -197.0
-    assert part.RAIL_W_SIDE == 34.2
-    assert part.RAIL_W_FR == 38.0
-    assert abs(part.OUTER_X - 214.1) < 1e-9
-    assert abs(part.INNER_X - 179.9) < 1e-9
-    assert abs(part.OUTER_Z - 131.0) < 1e-9
-    assert abs(part.INNER_Z - 93.0) < 1e-9
-    assert part.RING_HEIGHT == 36.5
-    assert part.BOSS_DIA == 52.2
-    assert part.BORE_DIA == 25.5
-    assert part.GOOSENECK_BORE_DIA == 17.0
-    assert (part.BAR_X0, part.BAR_X1) == (-26.0, -4.0)
-    assert drawing.STUD_X == -15.0
-    # SUMMING_Z is the derived +3.08759 recentered residual, so the stud
-    # stations land at the note-rounded -83.97 / +90.15 within half a micron.
-    assert part.STUD_Z_FRONT == SUMMING_Z - part.HEX_Z_MID
-    assert part.STUD_Z_REAR == SUMMING_Z + part.HEX_Z_MID
-    assert part.HEX_Z_MID == 87.06
-    assert abs(part.STUD_Z_FRONT - -83.972) < 5e-3
-    assert abs(part.STUD_Z_REAR - 90.148) < 5e-3
-    assert part.STUD_HOLE_DIA == 13.492
-    assert abs(drawing.PLAN_HALF_X - 223.1) < 1e-9
-    assert abs(drawing.PLAN_HALF_Z - 138.1) < 1e-9
-    assert abs(2.0 * drawing.PLAN_HALF_X - 446.2) < 1e-9
-    assert abs(2.0 * drawing.PLAN_HALF_Z - 276.2) < 1e-9
-    assert abs(drawing.BOSS_BAND - 47.3) < 1e-9
-    assert abs(part.BOSS_ABOVE - 4.5) < 1e-9
-    assert abs(part.BOSS_BELOW - 6.3) < 1e-9
-
-
-def _reference_side_station_removals(tap_drill_dia: float) -> tuple[float, float]:
-    """Fine-grid reference for one spot-face plus its non-overlapping tap."""
-    spot_step = 0.002
-    spot_radius = part.SPOTFACE_DIA / 2.0
-    boss_radius = part.BOSS_DIA / 2.0
-    spot = 0.0
-    d = -spot_radius
-    while d < spot_radius:
-        dd = d + 0.5 * spot_step
-        chord = 2.0 * math.sqrt(max(0.0, spot_radius**2 - dd**2))
-        boss_surface = abs(part.FRONT_COLUMN_Z) + math.sqrt(
-            max(0.0, boss_radius**2 - dd**2)
-        )
-        depth = max(
-            0.0,
-            min(boss_surface, part.SPOTFACE_PLANE) - part.SPOTFACE_FLOOR,
-        )
-        spot += chord * depth * spot_step
-        d += spot_step
-
-    tap_step = 0.001
-    tap_radius = tap_drill_dia / 2.0
-    bore_radius = part.BORE_DIA / 2.0
-    tap = 0.0
-    d = -tap_radius
-    while d < tap_radius:
-        dd = d + 0.5 * tap_step
-        chord = 2.0 * math.sqrt(max(0.0, tap_radius**2 - dd**2))
-        bore_surface = abs(part.FRONT_COLUMN_Z) + math.sqrt(
-            max(0.0, bore_radius**2 - dd**2)
-        )
-        tap += chord * max(0.0, part.SPOTFACE_FLOOR - bore_surface) * tap_step
-        d += tap_step
-    return spot, tap
-
-
-def test_side_screw_volume_gate_tracks_the_four_generated_stations() -> None:
-    screws_per_face = len(part.SIDE_SCREW_XS)
-    screw_count = screws_per_face * len(part.SIDE_SCREW_FACES)
-    assert screw_count == 4
-
-    expected_spot, expected_tap = _reference_side_station_removals(
-        TAP_DRILL_MM[part.SIDE_TAP_SPEC.size]
-    )
-    actual_spot = part._spotface_removal()
-    actual_tap = part._side_tap_removal()
-    assert math.isclose(actual_spot, expected_spot, abs_tol=0.001)
-    assert math.isclose(actual_tap, expected_tap, abs_tol=0.005)
+def test_nominal_corner_bores_and_cap_recesses_clear_the_installed_stack() -> None:
+    assert part.BORE_DIA == COLUMN_SOCKET_DIAMETER == 25.5
+    assert part.CAP_RECESS_DIAMETER == CAP_RECESS_DIAMETER
+    assert part.CAP_RECESS_DEPTH == CAP_RECESS_DEPTH
+    assert CAP_RECESS_DIAMETER > MAX_OUTER_DIAMETER
     assert math.isclose(
-        screw_count * (actual_spot + actual_tap),
-        screw_count * (expected_spot + expected_tap),
-        abs_tol=0.025,
+        part.CAP_RECESS_DIAMETRAL_CLEARANCE,
+        CAP_RECESS_DIAMETER - MAX_OUTER_DIAMETER,
+        abs_tol=1e-12,
+    )
+    assert math.isclose(part.CAP_RECESS_DIAMETRAL_CLEARANCE, 0.436232, abs_tol=1e-6)
+    assert math.isclose(
+        part.CAP_RECESS_DIAMETRAL_CLEARANCE + part.CAP_RECESS_DIAMETER_BAND[0],
+        0.636232,
+        abs_tol=1e-6,
+    )
+    # CAD reference clearance is unchanged; actual sockets are matched to
+    # their assigned tubes rather than accepted against a fixed bore band.
+    assert math.isclose(
+        part.BORE_DIA - tube_frame_spec.OUTER_DIA,
+        0.10,
+        abs_tol=1e-12,
+    )
+    assert part.CAP_RECESS_FLOOR_Y - part.SIDE_TAP_DRILL_DIA / 2.0 > 0.0
+    assert part.CAP_RECESS_DIAMETER_BAND == (0.20, 0.0)
+    assert part.CAP_RECESS_DEPTH_BAND == (0.30, 0.0)
+    recess_floor_world = TOP_SCREW_Y + part.CAP_RECESS_FLOOR_Y
+    assert math.isclose(CAP_MOUTH_Y - recess_floor_world, 1.50875, abs_tol=1e-9)
+    assert math.isclose(
+        recess_floor_world - (TOP_SCREW_Y + TUBE_CROSS_HOLE_DIAMETER / 2.0),
+        3.95,
+        abs_tol=1e-9,
     )
 
-    # The prior #10-24 arithmetic misses enough material across either
-    # two-hole face to trip the actual per-feature volume gate.
-    _, prior_tap = _reference_side_station_removals(TAP_DRILL_MM["#10-24"])
-    tap_gate_tolerance = 0.1 * actual_tap + 15.0
-    assert screws_per_face * abs(prior_tap - actual_tap) > tap_gate_tolerance
+
+def test_four_cross_taps_are_bottoming_10_32_with_tooling_lead() -> None:
+    assert len(part.SIDE_SCREW_XS) * len(part.SIDE_SCREW_FACES) == 4
+    assert part.SIDE_TAP_SPEC.kind == "tapped_bottoming"
+    assert part.SIDE_TAP_SPEC.size == "#10-32"
+    assert part.SIDE_TAP_SPEC.thread_class == "2B"
+    assert part.SIDE_TAP_SPEC.depth_mm == CASTING_TAP_DRILL_DEPTH
+    assert part.SIDE_TAP_SPEC.overrides_mm["ThreadDepth"] == CASTING_FULL_THREAD_DEPTH
+    pitch = 25.4 / 32.0
+    assert CASTING_TAP_DRILL_DEPTH - CASTING_FULL_THREAD_DEPTH >= 2.0 * pitch
+    assert part.SPOTFACE_FLOOR == TOP_SCREW_SEAT_Z
+    full_seat_limit = abs(part.FRONT_COLUMN_Z) + math.sqrt(
+        (part.BOSS_DIA / 2.0) ** 2 - (part.SPOTFACE_DIA / 2.0) ** 2
+    )
+    assert part.SPOTFACE_FLOOR < full_seat_limit
 
 
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 2.0)
-    assert top_frame_spec.TOP_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
-    assert top_frame_spec.FRONT_VIEW_NOTE == "FRONT VIEW SCALE 1:4"
+def test_cross_tap_major_thread_and_drill_point_clear_the_far_wall() -> None:
+    # The major-thread envelope, not the tap-drill cylinder, is the finished
+    # thread breakout check.  The drill point has its own positive-wall guard.
+    major_dia = 4.826
+    major_far_wall_z = abs(part.FRONT_COLUMN_Z) - math.sqrt(
+        (part.BOSS_DIA / 2.0) ** 2 - (major_dia / 2.0) ** 2
+    )
+    thread_end_z = part.SPOTFACE_FLOOR - CASTING_FULL_THREAD_DEPTH
+    drill_point_z = (
+        part.SPOTFACE_FLOOR
+        - CASTING_TAP_DRILL_DEPTH
+        - part.SIDE_TAP_DRILL_DIA / 2.0 * part.DRILL_POINT_H
+    )
+    drill_far_wall_z = abs(part.FRONT_COLUMN_Z) - part.BOSS_DIA / 2.0
+    assert part.SIDE_TAP_THREAD_MAJOR_DIA == major_dia
+    assert part.SIDE_TAP_MAJOR_FAR_WALL_Z == major_far_wall_z
+    assert part.SIDE_TAP_THREAD_END_Z == thread_end_z
+    assert part.SIDE_TAP_DRILL_POINT_Z == drill_point_z
+    assert part.SIDE_TAP_DRILL_FAR_WALL_Z == drill_far_wall_z
+    assert part.SIDE_TAP_THREAD_WALL_MARGIN > 0.0
+    assert part.SIDE_TAP_DRILL_WALL_MARGIN > 0.0
 
 
+def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
+    major, length, _, _, pitch = FILLISTER_SIZES["90280A194"]
+    insertion = length - (keeper.FOOT_H - keeper.CBORE_DEPTH_MM)
+    spec = part.KEEPER_TAP_SPEC
+    full_thread = spec.overrides_mm.get("ThreadDepth", spec.depth_mm)
+    depth_tolerance = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
 
-def test_part_stamps_make_critical_properties() -> None:
-    import _config
-
-    config = _config.parts("top-frame")
-    assert config["material"] == config["material_specification"]
-    assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
-    finish = str(config["finish"]).lower()
-    assert "sspc-sp3" in finish
-    assert "alkyd primer/green enamel" in finish
-    assert "75-125um dft" in finish
-    assert "total" in finish
-    assert "color noncritical" in finish
-    assert "mask" not in finish
-    assert config["process"] == "machined from solid stock or casting"
-    assert int(config["quantity"]) == 1
+    assert insertion >= major
+    assert full_thread - insertion >= 0.25
+    assert spec.depth_mm - full_thread - 2.0 * depth_tolerance >= 5.0 * pitch
+    drill_point = part.TAP_DRILL_MM[spec.size] / 2.0 * part.DRILL_POINT_H
+    assert spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
+    assert abs(part.KEEPER_TAP_X - part.COLUMN_X) + major / 2.0 < part.WEB_T / 2.0

@@ -1,15 +1,14 @@
 r"""Create the curated machinist drawing for the tube-frame column.
 
-The SLDPRT remains authoritative.  This recipe supplies only the column's views,
-diameter/length dimensions, and manufacturing notes; every shared sheet/template,
-import, curation, and export behavior lives in ``_drawing_common``.
+The SLDPRT remains authoritative. This recipe supplies the regular open tube's
+orthographic views, diameter/cut-length/cross-hole dimensions, and manufacturing
+notes; shared sheet/template, import, curation, and export behavior lives in
+``_drawing_common``.
 
 The tube axis runs along +Y, so the length view is the ``*Front`` orientation
-(tube vertical) and the annulus end view is ``*Top``.  The portrait sheet uses
-the long axis for the ~994 mm overall column at 1:5; the end view carries an
-explicit 2:1 override so the 25.4/19.3 mm annulus is legible. The standard
-1:10 isometric is pictorial only; the length and annulus views still define
-the part.
+and the chamfered end view is ``*Top``, aligned above it in third-angle
+projection. The portrait sheet uses the long axis for the 1018.765 mm cut
+length at 1:5; the end view carries a 2:1 override. The isometric is pictorial only.
 
 Run with SolidWorks open::
 
@@ -22,30 +21,37 @@ import argparse
 import sys
 from typing import Any
 
-from tube_frame_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_property_linked_callout,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
+    property_link,
     read_required_properties,
+    set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
+    view_name,
 )
-from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA
+from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA, TOP_END_CHAMFER
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -60,28 +66,125 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (~990 mm column)
+SHEET_SCALE = (1.0, 5.0)  # 1:5 whole sheet (1018.765 mm cut tube)
 END_VIEW_SCALE = 2.0
 ISO_VIEW_SCALE = (1, 10)
+# The aligned length/end views occupy the left-centre of the portrait sheet;
+# fitting notes and the pictorial view fill the upper-right field.
+LENGTH_CENTER = (0.110, 0.220)
+END_CENTER = (LENGTH_CENTER[0], 0.360)
+ISO_CENTER = (0.220, 0.280)
 
-# Sheet layout (meters). The length view hugs the far left; the annulus end
-# view sits upper-right; notes fill the clear middle band. The isometric fits
-# in the lower-right field between the notes and title block.
-LENGTH_CENTER = (0.055, 0.220)
-END_CENTER = (0.190, 0.360)
-ISO_CENTER = (0.205, 0.140)
-
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position (meters).  Diameters live on the end view, the length on the tube view.
-END_KEEP = {
-    "OuterDia": (
-        END_CENTER[0] - OUTER_DIA * END_VIEW_SCALE / 1000.0 - 0.024,
-        END_CENTER[1] + 0.010,
-    ),
-}
+# Per-view survivors of the marked-dimension import.
+END_KEEP: dict[str, tuple[float, float]] = {}
 LENGTH_KEEP = {
-    "CapApexY": (LENGTH_CENTER[0] + 0.028, LENGTH_CENTER[1]),
+    "Length": (LENGTH_CENTER[0] - 0.036, LENGTH_CENTER[1]),
+    "LowerHoleY": (LENGTH_CENTER[0] - 0.020, LENGTH_CENTER[1] - 0.075),
+    "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
+    "CrossHoleDia": (LENGTH_CENTER[0] + 0.085, LENGTH_CENTER[1] - 0.115),
+    "TopChamfer": (LENGTH_CENTER[0] + 0.070, LENGTH_CENTER[1] + 0.105),
 }
+CROSS_HOLE_CALLOUT = {
+    "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
+}
+
+
+@_telemetry.traced("drawing.outer_diameter")
+def _add_outer_diameter_reference(
+    adapter: Any,
+    view: Any,
+    *,
+    text_xy: tuple[float, float],
+) -> Any:
+    """Dimension the full-OD circle at the top chamfer's cylindrical shoulder."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate OD reference view {name!r}")
+    # Select the model edge, not a sheet-coordinate hit within the pick aperture
+    # of the smaller top rim. The full OD survives at the chamfer's lower edge.
+    center = (0.0, (COLUMN_LENGTH - TOP_END_CHAMFER) / 1000.0, 0.0)
+    radius = OUTER_DIA / 2000.0
+    matches = []
+    for raw in visible_view_entities(view, 1, label="tube top full-OD shoulder"):
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        values = tuple(float(value) for value in curve.CircleParams)
+        if abs(values[6] - radius) > 1e-7:
+            continue
+        if any(abs(values[index] - center[index]) > 1e-7 for index in range(3)):
+            continue
+        if abs(abs(values[4]) - 1.0) > 1e-7:
+            continue
+        matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"expected one tube top full-OD shoulder edge, found {len(matches)}"
+        )
+    draw.ClearSelection2(True)
+    if not view.SelectEntity(matches[0], False):
+        raise RuntimeError("failed to select tube top full-OD shoulder edge")
+    display = draw.AddDiameterDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to add OD reference dimension")
+    native = _early_bound(display, "IDisplayDimension")
+    measured_mm = float(
+        _early_bound(native.GetDimension2(0), "IDimension").SystemValue
+    ) * 1000.0
+    if abs(measured_mm - OUTER_DIA) > 1e-5:
+        raise RuntimeError(
+            f"tube OD reference measured {measured_mm:g}, expected {OUTER_DIA:g} mm"
+        )
+    display = _sw_type_info.early_bound_or_flag(
+        display,
+        "IDisplayDimension",
+        "GetAnnotation",
+        "SetText",
+        "GetText",
+        "SetSecondArrow",
+        "GetUseDocSecondArrow",
+        "GetSecondArrow",
+        "SetBrokenLeader2",
+        "GetUseDocBrokenLeader",
+        "GetBrokenLeader2",
+    )
+    adapter._attempt(lambda: setattr(display, "Diametric", True))
+    if not bool(adapter._attempt(lambda: display.Diametric)):
+        raise RuntimeError("OD reference dimension is not diametric")
+    adapter._attempt(lambda: setattr(display, "ArrowSide", 1))
+    if int(adapter._attempt(lambda: display.ArrowSide)) != 1:
+        raise RuntimeError("OD reference did not retain its outside arrow")
+    display.SetSecondArrow(False, False)
+    if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
+        raise RuntimeError("OD reference retained its opposite-side arrow")
+    adapter._attempt(lambda: setattr(display, "SolidLeader", False))
+    if display.SetBrokenLeader2(False, 2) != 0:
+        raise RuntimeError("failed to apply broken horizontal OD leader")
+    if bool(display.GetUseDocBrokenLeader()) or int(display.GetBrokenLeader2()) != 2:
+        raise RuntimeError("OD broken leader style did not persist")
+    annotation = display.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError("OD reference dimension has no annotation")
+    display = set_reference_dimension(
+        adapter,
+        annotation,
+        label="outer diameter reference",
+        diameter=True,
+    )
+    od_suffix = (
+        ")\nSOCKETS MHA-035/MHA-077 ARE"
+        "\nMATCH-FIT TO THIS ASSIGNED TUBE"
+        "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
+    )
+    display.SetText(2, od_suffix)
+    if str(display.GetText(2) or "") != od_suffix:
+        raise RuntimeError("OD reference fit text did not persist")
+    draw.EditRebuild3()
+    return annotation
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -102,6 +205,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "End View Note",
             "Isometric View Note",
             "Length View Note",
+            "Top End Callout",
         ),
         required=(
             "Number",
@@ -112,6 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "End View Note",
             "Isometric View Note",
             "Length View Note",
+            "Top End Callout",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -133,65 +238,97 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
-    for view in (end, iso):
-        set_hidden_lines_removed(adapter, view)
-    # The length view carries the bore as greyed hidden lines, so the wall shows.
-    set_hidden_lines_visible(adapter, length)
+    set_hidden_lines_removed(adapter, iso)
 
-    end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="end"
+    curate_view_dimensions(adapter, end, keep=END_KEEP, view_label="end")
+    outer_diameter = _add_outer_diameter_reference(
+        adapter,
+        end,
+        text_xy=(END_CENTER[0] + 0.090, END_CENTER[1] + 0.020),
     )
-    curate_view_dimensions(adapter, length, keep=LENGTH_KEEP, view_label="length")
-    set_dimension_precision(adapter, end_annotations, {"OuterDia": 2})
+    length_annotations = curate_view_dimensions(
+        adapter, length, keep=LENGTH_KEEP, view_label="length"
+    )
+    dimensions = [outer_diameter, *length_annotations]
+    set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
+    for annotation in length_annotations:
+        if dimension_name(adapter, annotation) != "CrossHoleDia":
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError("dimension callout has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        display.SetText(4, "")
+        if str(display.GetText(4) or ""):
+            raise RuntimeError("failed to clear underlined below-dimension callout")
+    set_dimension_precision(
+        adapter,
+        dimensions,
+        {
+            "Length": 1,
+            "LowerHoleY": 2,
+            "UpperHoleY": 2,
+            "CrossHoleDia": 2,
+            "TopChamfer": 2,
+        },
+    )
+    for name in ("Length", "LowerHoleY", "UpperHoleY", "TopChamfer"):
+        references = [
+            annotation
+            for annotation in dimensions
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(references) != 1:
+            raise RuntimeError(
+                f"expected one {name} reference dimension, got {len(references)}"
+            )
+        display = set_reference_dimension(
+            adapter,
+            references[0],
+            label=f"{name} reference",
+        )
+        if name == "TopChamfer":
+            display.SetText(3, "")
+            display.SetText(4, "")
+            if str(display.GetText(3) or "") or str(display.GetText(4) or ""):
+                raise RuntimeError("failed to clear stale chamfer callout lanes")
+            chamfer_suffix = ") X 45 DEG"
+            display.SetText(2, chamfer_suffix)
+            if str(display.GetText(2) or "") != chamfer_suffix:
+                raise RuntimeError("chamfer reference text did not persist")
+    top_chamfer_edge = model_point_in_view(
+        adapter,
+        length,
+        (
+            (OUTER_DIA / 2.0 - TOP_END_CHAMFER / 2.0) / 1000.0,
+            (COLUMN_LENGTH - TOP_END_CHAMFER / 2.0) / 1000.0,
+            0.0,
+        ),
+        label="top OD chamfer midpoint",
+    )
+    add_property_linked_callout(
+        adapter,
+        length,
+        property_name="Top End Callout",
+        edge_xy=top_chamfer_edge,
+        note_xy=(0.150, 0.340),
+    )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    end_top = (
-        END_CENTER[0],
-        END_CENTER[1] + OUTER_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    add_datum_feature(
-        adapter,
-        end,
-        edge_xy=end_top,
-        symbol_xy=(END_CENTER[0], END_CENTER[1] + 0.038),
-        datum="A",
-        label="finished OD derived axis",
-    )
-    flank_x = LENGTH_CENTER[0] + OUTER_DIA / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(flank_x, LENGTH_CENTER[1]),
-        frame_xy=(0.120, 0.270),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["full-length OD cylindricity"],
-        quantity="FULL OD LENGTH",
-        label="full-length OD cylindricity",
-        entity_type="SILHOUETTE",
-    )
-    # Only the BOTTOM end face survives as a perpendicularity target: the top
-    # end is the integral dome cap (no planar top face; the notes own the
-    # cap's finish/blend requirement).
-    half_length_on_sheet = COLUMN_LENGTH / 10000.0
-    add_feature_control_frame(
-        adapter,
-        length,
-        edge_xy=(LENGTH_CENTER[0], LENGTH_CENTER[1] - half_length_on_sheet),
-        frame_xy=(0.100, 0.100),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["bottom end perpendicularity"],
-        datums=("A",),
-        quantity="BOTTOM END FACE",
-        label="bottom end perpendicularity",
-    )
+    # Both end rims receive native centre marks; the length view exposes both
+    # cross-drilled stations through visible hidden geometry.
 
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.115, 0.225, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.135, 0.198
     )
-    add_property_linked_note(adapter, "End View Note", 0.155, 0.318)
-    add_property_linked_note(adapter, "Isometric View Note", 0.170, 0.085)
-    add_property_linked_note(adapter, "Length View Note", 0.020, 0.083)
+    add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
+    add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
+    add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
+    for view in (length, end):
+        set_hidden_lines_visible(adapter, view)
 
     return await finalize_drawing(
         adapter,

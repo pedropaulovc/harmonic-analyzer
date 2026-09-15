@@ -1020,6 +1020,8 @@ def _drawing_registry_value(node: ast.AST) -> object:
         and node.attr in {"LANDSCAPE", "PORTRAIT"}
     ):
         return node.attr.lower()
+    if isinstance(node, ast.Tuple):
+        return tuple(_drawing_registry_value(element) for element in node.elts)
     return ast.literal_eval(node)
 
 

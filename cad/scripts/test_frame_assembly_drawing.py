@@ -1,22 +1,30 @@
-"""Offline contract for the simple frame assembly drawing."""
-
-from pathlib import Path
+"""Observable package contract for the frame assembly drawing."""
 
 import draw_frame_assembly as drawing
-from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_frame_assembly_keeps_registry_outputs_and_precomputed_placement() -> None:
-    spec = DRAWINGS_BY_NAME["frame_assembly"]
-    assert spec.source_kind == "assembly"
-    assert spec.part == "frame"
-    assert drawing.SOURCE == spec.source
-    assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
-        spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
-    )
-    assert drawing.SHEET_SCALE == (1.0, 6.0)
-    assert drawing.FRONT_CENTER == (0.065, 0.155)
-    assert drawing.RIGHT_CENTER == (0.150, 0.155)
-    assert drawing.ISO_CENTER == (0.300, 0.145)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "return await build_simple_three_view_drawing(" in source
+def test_frame_package_bom_identifies_all_29_released_components() -> None:
+    assert drawing.BOM_QUANTITIES == {
+        "harmonic-base": 1,
+        "tube-frame": 4,
+        "tube-frame-cap": 4,
+        "rocker-arm-support": 1,
+        "lag-screw": 4,
+        "top-frame": 1,
+        "nameplate": 1,
+        "fillister-screw": 4,
+        "frame-cross-screw": 8,
+        "gooseneck-set-screw": 1,
+    }
+    assert drawing.BOM_PART_NUMBERS == {
+        "harmonic-base": "MHA-035",
+        "tube-frame": "MHA-083",
+        "tube-frame-cap": "MHA-133",
+        "rocker-arm-support": "MHA-089",
+        "lag-screw": "MHA-039",
+        "top-frame": "MHA-077",
+        "nameplate": "MHA-086",
+        "fillister-screw": "MHA-030",
+        "frame-cross-screw": "MHA-132",
+        "gooseneck-set-screw": "MHA-118",
+    }
