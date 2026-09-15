@@ -296,10 +296,13 @@ class _AssemblyContactScene:
         self,
         components: list[tuple[str, str, float]],
         distances_mm: dict[tuple[str, str], float],
+        *,
+        overlaps_mm3: dict[tuple[str, str], float] | None = None,
     ) -> None:
         self.currentModel = self
         self.swApp = self
         self.distances_mm = distances_mm
+        self.overlaps_mm3 = overlaps_mm3 or {}
         self.components = {}
         for name, source_stem, station_z_mm in components:
             component = _Component(name)
@@ -328,9 +331,11 @@ class _AssemblyContactScene:
         distance_mm = self.distances_mm[(first.Name2, second.Name2)]
         return distance_mm / 1000.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
 
-    @staticmethod
-    def intersection(target: str, tool: str):
-        return None, 0
+    def intersection(self, target: str, tool: str):
+        volume_mm3 = self.overlaps_mm3.get((target, tool))
+        if volume_mm3 is None:
+            return None, 0
+        return (_IntersectionBody(volume_mm3),), 0
 
 
 def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
@@ -359,15 +364,15 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
         _attempt=lambda operation, default=None: operation(),
     )
     channels = [
-        {"amplitude_mm": 1.0},
-        {"amplitude_mm": 2.0},
+        {"index": 0, "amplitude_mm": 1.0},
+        {"index": 1, "amplitude_mm": 2.0},
     ]
     seat = SimpleNamespace(
         lower_maximum_distance_mm=0.001,
         upper_maximum_distance_mm=0.001,
     )
     monkeypatch.setattr(contact, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_config, "active_channels", lambda: channels)
+    monkeypatch.setattr(_config, "channels", lambda: channels)
     monkeypatch.setattr(_config, "active_count", lambda: len(channels))
     monkeypatch.setattr(_config, "machine", lambda *_keys: 10.0)
     monkeypatch.setattr(settled_spring_seats, "channel_seat", lambda _amplitude: seat)
@@ -440,7 +445,7 @@ def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
     )
     monkeypatch.setattr(contact, "_early_bound", scene.bind)
     monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
-    monkeypatch.setattr(_config, "active_channels", lambda: channels)
+    monkeypatch.setattr(_config, "channels", lambda: channels)
     monkeypatch.setattr(_config, "active_count", lambda: len(channels))
     monkeypatch.setattr(_config, "machine", lambda *_keys: 10.0)
     monkeypatch.setattr(
@@ -461,3 +466,138 @@ def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
         ),
     ):
         contact.assert_assembly_spring_contacts(scene, "channel")
+
+
+def _channel_contact_scene(
+    channel_count: int,
+    *,
+    overlaps_mm3: dict[tuple[str, str], float] | None = None,
+) -> _AssemblyContactScene:
+    components = []
+    distances_mm = {}
+    for index in range(channel_count):
+        station_z_mm = index * 10.0
+        spring = f"channel-spring-installed-stretch{index:02d}-1"
+        hook = f"spring-hook-{index + 1}"
+        lever = f"channel-lever-{index + 1}"
+        components.extend(
+            [
+                (
+                    spring,
+                    f"channel-spring-installed-stretch{index:02d}",
+                    station_z_mm,
+                ),
+                (hook, "spring-hook", station_z_mm),
+                (lever, "channel-lever", station_z_mm),
+            ]
+        )
+        distances_mm[(spring, hook)] = 0.004
+        distances_mm[(spring, lever)] = 0.002
+    return _AssemblyContactScene(
+        components,
+        distances_mm,
+        overlaps_mm3=overlaps_mm3,
+    )
+
+
+@pytest.fixture
+def full_channel_configuration(monkeypatch):
+    import _config
+    import settled_spring_seats
+
+    channels = [{"index": index, "amplitude_mm": float(index)} for index in range(4)]
+    seat = SimpleNamespace(
+        lower_maximum_distance_mm=0.005,
+        upper_maximum_distance_mm=0.005,
+    )
+    monkeypatch.setattr(_config, "channels", lambda: channels)
+    monkeypatch.setattr(_config, "active_count", lambda: 3)
+    monkeypatch.setattr(_config, "machine", lambda *_keys: 10.0)
+    monkeypatch.setattr(settled_spring_seats, "channel_seat", lambda _amplitude: seat)
+    return channels
+
+
+def test_explicit_reduced_channel_count_certifies_smaller_assembly(
+    monkeypatch,
+    full_channel_configuration,
+) -> None:
+    scene = _channel_contact_scene(2)
+    monkeypatch.setattr(contact, "_early_bound", scene.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
+
+    contact.assert_assembly_spring_contacts(scene, "channel", channel_count=2)
+
+
+def test_reduced_assembly_without_override_keeps_configured_count_gate(
+    monkeypatch,
+    full_channel_configuration,
+) -> None:
+    scene = _channel_contact_scene(2)
+    monkeypatch.setattr(contact, "_early_bound", scene.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
+
+    with pytest.raises(
+        RuntimeError,
+        match="channel-spring-installed: expected exactly 3 top-level instance",
+    ):
+        contact.assert_assembly_spring_contacts(scene, "channel")
+
+
+def test_explicit_channel_count_can_exceed_active_count_to_full_vector(
+    monkeypatch,
+    full_channel_configuration,
+) -> None:
+    scene = _channel_contact_scene(4)
+    monkeypatch.setattr(contact, "_early_bound", scene.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
+
+    contact.assert_assembly_spring_contacts(scene, "channel", channel_count=4)
+
+
+def test_reduced_channel_override_preserves_native_overlap_rejection(
+    monkeypatch,
+    full_channel_configuration,
+) -> None:
+    scene = _channel_contact_scene(
+        2,
+        overlaps_mm3={
+            (
+                "channel-spring-installed-stretch00-1-body",
+                "spring-hook-1-body",
+            ): _MICROSCOPIC_OVERLAP_MM3
+        },
+    )
+    monkeypatch.setattr(contact, "_early_bound", scene.bind)
+    monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
+
+    with pytest.raises(
+        RuntimeError,
+        match="channel 00 lower native seat: components intersect",
+    ):
+        contact.assert_assembly_spring_contacts(scene, "channel", channel_count=2)
+
+
+@pytest.mark.parametrize("channel_count", [True, False, 2.0, "2"])
+def test_explicit_channel_count_rejects_bool_and_noninteger(
+    full_channel_configuration,
+    channel_count,
+) -> None:
+    with pytest.raises(TypeError, match="must be an integer or None"):
+        contact.assert_assembly_spring_contacts(
+            SimpleNamespace(),
+            "channel",
+            channel_count=channel_count,
+        )
+
+
+@pytest.mark.parametrize("channel_count", [-1, 0, 5])
+def test_explicit_channel_count_rejects_out_of_range_without_clamping(
+    full_channel_configuration,
+    channel_count: int,
+) -> None:
+    with pytest.raises(ValueError, match="must be between 1 and 4"):
+        contact.assert_assembly_spring_contacts(
+            SimpleNamespace(),
+            "channel",
+            channel_count=channel_count,
+        )

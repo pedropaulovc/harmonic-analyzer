@@ -111,6 +111,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import functools
 import math
 import sys
 from typing import Any, Literal
@@ -1622,7 +1623,10 @@ async def build(adapter) -> dict[str, str]:
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,
-        native_contact_check=assert_assembly_spring_contacts,
+        native_contact_check=functools.partial(
+            assert_assembly_spring_contacts,
+            channel_count=CHANNELS,
+        ),
     )
 
 

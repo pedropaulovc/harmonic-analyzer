@@ -83,6 +83,8 @@ from _common import (
 from _assembly import (
     _ALLOWED_FREE_STEMS,
     _export_assembly_images,
+    _invalidate_massprops_proof,
+    _massprops_sidecar,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
@@ -90,6 +92,7 @@ from _assembly import (
     check_no_interference,
     component_names,
     component_transform,
+    reconcile_saved_rebuild_state,
     repair_dangling_mates,
     save_assembly_in_place,
     whats_wrong,
@@ -882,6 +885,15 @@ def _assert_soundness_health(adapter: Any, name: str, rebuilt: Any) -> None:
         raise
 
 
+async def _reopen_assembly_rest_pose(adapter: Any, name: str, sldasm: Path) -> None:
+    """Freshly reopen ``name`` for post-repair rendering without stale COM handles."""
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    configs = check("list configurations", await adapter.list_configurations())
+    if REST in (configs or []) and active_configuration_name(adapter) != REST:
+        check(f"activate {REST}", await adapter.set_active_configuration(REST))
+
+
 def _run_soundness_battery(
     adapter: Any, name: str, report: Report, rebuilt: Any
 ) -> None:
@@ -1097,74 +1109,128 @@ async def _verify_static_one(
             discard_open_documents(adapter)
             adapter.currentModel = None
             return
-        else:
-            # Persist each document whose own MateGroup was repaired. SaveReferenced
-            # remains deliberately off: unrelated child artifacts still belong to
-            # their producing tasks. Temporarily route the adapter to the explicit
-            # document so both Save3 and image export target the child, not the parent.
-            parent = adapter.currentModel
-            rendered: set[str] = set()
-            for repaired_name, model in repaired_documents:
-                activated: dict[str, Any] = {}
-                report.gate(
-                    f"{repaired_name}:auto-repair-activate",
-                    lambda n=repaired_name, m=model: activated.setdefault(
-                        "model", _activate_document(adapter, m, n)
-                    ),
+        # Validate every repaired child while all dirty documents remain open.
+        # This is deliberately separate from saving: no later child gate may fail
+        # after an earlier sibling has already been persisted.
+        for repaired_name, model in repaired_documents:
+            activated: dict[str, Any] = {}
+            report.gate(
+                f"{repaired_name}:auto-repair-activate",
+                lambda n=repaired_name, m=model: activated.setdefault(
+                    "model", _activate_document(adapter, m, n)
+                ),
+            )
+            if len(report.failed) != assembly_failures_before:
+                discard_open_documents(adapter)
+                adapter.currentModel = None
+                return
+            active = activated["model"]
+            if repaired_name != name:
+                rebuilt_child = adapter._attempt(
+                    lambda m=active: m.ForceRebuild3(False), default=None
                 )
-                if len(report.failed) != assembly_failures_before:
-                    discard_open_documents(adapter)
-                    adapter.currentModel = None
-                    return
-                active = activated["model"]
-                if active is not parent:
-                    rebuilt_child = adapter._attempt(
-                        lambda m=active: m.ForceRebuild3(False), default=None
+                child_failures_before = len(report.failed)
+                _run_soundness_battery(adapter, repaired_name, report, rebuilt_child)
+                if len(report.failed) != child_failures_before:
+                    _telemetry.warn(
+                        f"{repaired_name}: repaired child NOT saved because "
+                        "its standalone soundness battery failed"
                     )
-                    child_failures_before = len(report.failed)
-                    _run_soundness_battery(
-                        adapter, repaired_name, report, rebuilt_child
-                    )
-                    if len(report.failed) != child_failures_before:
-                        _telemetry.warn(
-                            f"{repaired_name}: repaired child NOT saved because "
-                            "its standalone soundness battery failed"
-                        )
-                        discard_open_documents(adapter)
-                        adapter.currentModel = None
-                        return
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
+                    return
+
+        # Save every dirty repaired document before any reconciliation. The
+        # reconciliation helper closes the entire SolidWorks session, so calling
+        # it inside this loop would discard every later sibling's unsaved repair.
+        for repaired_name, model in repaired_documents:
+            activated: dict[str, Any] = {}
+            report.gate(
+                f"{repaired_name}:auto-repair-save-activate",
+                lambda n=repaired_name, m=model: activated.setdefault(
+                    "model", _activate_document(adapter, m, n)
+                ),
+            )
+            if len(report.failed) != assembly_failures_before:
+                discard_open_documents(adapter)
+                adapter.currentModel = None
+                return
+            active = activated["model"]
+            if repaired_name in ("channel", "summing"):
                 report.gate(
-                    f"{repaired_name}:auto-repair-save",
-                    lambda n=repaired_name, m=active: save_assembly_in_place(
-                        adapter, n, geometry_changed=True, model=m
+                    f"{repaired_name}:auto-repair-invalidate-proof",
+                    lambda n=repaired_name: _invalidate_massprops_proof(
+                        _massprops_sidecar(n)
                     ),
                 )
                 if len(report.failed) != assembly_failures_before:
                     discard_open_documents(adapter)
                     adapter.currentModel = None
                     return
-                await report.agate(
-                    f"{repaired_name}:auto-repair-renders",
-                    lambda n=repaired_name: _export_assembly_images(
-                        adapter, n, ("front", "top", "isometric")
-                    ),
+            report.gate(
+                f"{repaired_name}:auto-repair-save",
+                lambda n=repaired_name, m=active: save_assembly_in_place(
+                    adapter, n, geometry_changed=True, model=m
+                ),
+            )
+            if len(report.failed) != assembly_failures_before:
+                discard_open_documents(adapter)
+                adapter.currentModel = None
+                return
+
+        # Reconcile only after every repair is safely on disk. Put the requested
+        # top-level target last, and never reactivate a pre-reconcile COM handle
+        # after CloseAllDocuments.
+        reconcile_order = sorted(repaired_documents, key=lambda item: item[0] == name)
+        for repaired_name, _stale_model in reconcile_order:
+            failures_before_reconcile = len(report.failed)
+            await report.agate(
+                f"{repaired_name}:auto-repair-reconcile",
+                lambda n=repaired_name: reconcile_saved_rebuild_state(
+                    adapter, n, OUT_SLDASM / f"{n}.SLDASM"
+                ),
+            )
+            if len(report.failed) != failures_before_reconcile:
+                continue
+            if repaired_name in ("channel", "summing"):
+                report.gate(
+                    f"{repaired_name}:auto-repair-persisted-spring-native-contacts",
+                    lambda n=repaired_name: assert_assembly_spring_contacts(adapter, n),
                 )
-                rendered.add(repaired_name)
-                if len(report.failed) != assembly_failures_before:
-                    discard_open_documents(adapter)
-                    adapter.currentModel = None
-                    return
-                if active is not parent:
-                    _activate_document(adapter, parent, name)
-            # A child repair can change the parent-level visual solution even when
-            # the parent MateGroup itself was untouched, so refresh its renders too.
-            if name not in rendered:
-                await report.agate(
-                    f"{name}:auto-repair-renders",
-                    lambda: _export_assembly_images(
-                        adapter, name, ("front", "top", "isometric")
-                    ),
-                )
+
+        if len(report.failed) != assembly_failures_before:
+            discard_open_documents(adapter)
+            adapter.currentModel = None
+            return
+
+        # Image export changes view/zoom state and can set the document save flag.
+        # Run it only after every persisted repair has reconciled and every spring
+        # assembly has passed native certification. Each reopen deliberately
+        # discards the previous document's view-only dirtiness; repaired geometry
+        # is already persisted and certified.
+        repaired_names = list(dict.fromkeys(n for n, _model in reconcile_order))
+        render_names = [n for n in repaired_names if n != name] + [name]
+        for render_name in render_names:
+            render_failures_before = len(report.failed)
+            await report.agate(
+                f"{render_name}:auto-repair-render-reopen",
+                lambda n=render_name: _reopen_assembly_rest_pose(
+                    adapter, n, OUT_SLDASM / f"{n}.SLDASM"
+                ),
+            )
+            if len(report.failed) != render_failures_before:
+                continue
+            await report.agate(
+                f"{render_name}:auto-repair-renders",
+                lambda n=render_name: _export_assembly_images(
+                    adapter, n, ("front", "top", "isometric")
+                ),
+            )
+
+        if len(report.failed) != assembly_failures_before:
+            discard_open_documents(adapter)
+            adapter.currentModel = None
+            return
 
 
 def _rebuild(adapter: Any) -> None:

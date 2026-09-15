@@ -344,3 +344,137 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
 
     with pytest.raises(ValueError):
         asyncio.run(getattr(_assembly, operation)(None, assembly_name))
+
+
+@pytest.mark.parametrize("persisted_failure", ["channel", "summing"])
+def test_auto_repair_saves_every_document_before_persisted_contact_gate(
+    persisted_failure, monkeypatch, tmp_path
+) -> None:
+    parent = SimpleNamespace(
+        name="harmonic-analyzer",
+        persisted=False,
+        ForceRebuild3=lambda _top_only: True,
+    )
+
+    def repaired_model(name):
+        return SimpleNamespace(
+            name=name,
+            persisted=False,
+            ForceRebuild3=lambda _top_only: True,
+        )
+
+    channel = repaired_model("channel")
+    summing = repaired_model("summing")
+    events = []
+
+    class Adapter(_Adapter):
+        def __init__(self):
+            super().__init__()
+            self.currentModel = parent
+            self.swApp = SimpleNamespace(
+                CloseAllDocuments=lambda _save: events.append(("close", None))
+            )
+
+        async def open_model(self, path):
+            events.append(("open", path))
+            self.currentModel = parent
+            return SimpleNamespace(is_success=True, data=None)
+
+        async def list_configurations(self):
+            return SimpleNamespace(is_success=True, data=["Default"])
+
+    adapter = Adapter()
+    monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
+    (tmp_path / "harmonic-analyzer.SLDASM").write_bytes(b"parent")
+    proofs = {
+        name: tmp_path / f".{name}.massprops.sha" for name in ("channel", "summing")
+    }
+    for proof in proofs.values():
+        proof.write_text("stale-proof\n", encoding="utf-8")
+
+    monkeypatch.setattr(verify, "_assert_fresh", lambda *_args: True)
+    monkeypatch.setattr(verify, "assert_saved_rebuild_clean", lambda *_args: None)
+    monkeypatch.setattr(verify, "active_configuration_name", lambda _adapter: "Default")
+    monkeypatch.setattr(verify, "_expected_free_dof", lambda _name: 0)
+    monkeypatch.setattr(
+        verify, "assert_components_fully_defined", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        verify, "assert_no_over_constrained", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(verify, "_assert_soundness_health", lambda *_args: None)
+    monkeypatch.setattr(verify, "check_no_interference", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(verify, "assert_channel_independence", lambda *_args: None)
+    monkeypatch.setattr(verify, "_dangling_faults", lambda _adapter: ["top:dangle"])
+    monkeypatch.setattr(
+        verify,
+        "_repair_cache_dangles",
+        lambda *_args: {
+            "rebuilt": True,
+            "documents": (("channel", channel), ("summing", summing)),
+        },
+    )
+    monkeypatch.setattr(verify, "_massprops_sidecar", lambda name: proofs[name])
+
+    def save(_adapter, name, geometry_changed, *, model):
+        assert geometry_changed is True
+        assert _adapter.currentModel is model
+        events.append(("save", name))
+        return True
+
+    monkeypatch.setattr(verify, "save_assembly_in_place", save)
+
+    async def reconcile(_adapter, name, path):
+        assert path == tmp_path / f"{name}.SLDASM"
+        assert [event for event in events if event[0] == "save"] == [
+            ("save", "channel"),
+            ("save", "summing"),
+        ]
+        assert all(not proof.exists() for proof in proofs.values())
+        events.append(("reconcile", name))
+        _adapter.currentModel = SimpleNamespace(name=name, persisted=True)
+
+    monkeypatch.setattr(verify, "reconcile_saved_rebuild_state", reconcile)
+
+    def contact(_adapter, name):
+        phase = "persisted" if _adapter.currentModel.persisted else "pre-save"
+        events.append((f"contact-{phase}", name))
+        if phase == "persisted" and name == persisted_failure:
+            raise RuntimeError(f"{name} persisted contact failed")
+
+    monkeypatch.setattr(verify, "assert_assembly_spring_contacts", contact)
+    monkeypatch.setattr(
+        verify,
+        "_export_assembly_images",
+        lambda *_args, **_kwargs: pytest.fail(
+            "renders must not run before all persisted contact gates pass"
+        ),
+    )
+    monkeypatch.setattr(
+        verify,
+        "discard_open_documents",
+        lambda _adapter: events.append(("discard", None)),
+    )
+
+    report = verify.Report()
+    asyncio.run(
+        verify._verify_static_one(
+            adapter, "harmonic-analyzer", report, auto_repair=True
+        )
+    )
+
+    assert ("contact-pre-save", "channel") in events
+    assert ("contact-pre-save", "summing") in events
+    assert [event for event in events if event[0] == "reconcile"] == [
+        ("reconcile", "channel"),
+        ("reconcile", "summing"),
+    ]
+    assert ("contact-persisted", "channel") in events
+    assert ("contact-persisted", "summing") in events
+    failed_label = f"{persisted_failure}:auto-repair-persisted-spring-native-contacts"
+    assert (
+        failed_label,
+        f"{persisted_failure} persisted contact failed",
+    ) in report.failed
+    assert failed_label not in report.passed
+    assert all(not proof.exists() for proof in proofs.values())

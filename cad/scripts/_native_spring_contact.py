@@ -444,29 +444,49 @@ def _match_station_family(
     return matched
 
 
-def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
+def assert_assembly_spring_contacts(
+    adapter: Any,
+    asm_name: str,
+    *,
+    channel_count: int | None = None,
+) -> None:
     """Certify every configured spring seat from persisted top-level instances.
 
+    Normal channel refresh and soundness checks use the configured active rows.
+    A standalone channel build may explicitly select a nonempty prefix of the
+    full configured channel vector, including rows beyond ``active_count``.
     The component walk is independent of builder locals. Channel occurrences are
     grouped by source part, ordered by their shared station Z, and required to
-    form one spring/hook/lever triplet per active configured amplitude. Summing
-    has one counter chain. No component is moved and no rebuild is requested.
+    form one spring/hook/lever triplet per selected amplitude. Summing has one
+    counter chain. No component is moved and no rebuild is requested.
     """
     if asm_name == "channel":
         import _config
         import settled_spring_seats
 
-        active_channels = _config.active_channels()
+        if channel_count is None:
+            selected_channels = _config.active_channels()
+            count = _config.active_count()
+            if len(selected_channels) != count:
+                raise RuntimeError(
+                    f"channel calibration selected {len(selected_channels)} active "
+                    f"row(s), expected {count}"
+                )
+        else:
+            if isinstance(channel_count, bool) or not isinstance(channel_count, int):
+                raise TypeError("channel_count must be an integer or None")
+            all_channels = _config.channels()
+            if not 1 <= channel_count <= len(all_channels):
+                raise ValueError(
+                    f"channel_count must be between 1 and {len(all_channels)}, "
+                    f"got {channel_count}"
+                )
+            selected_channels = all_channels[:channel_count]
+            count = channel_count
         seats = [
             settled_spring_seats.channel_seat(float(channel["amplitude_mm"]))
-            for channel in active_channels
+            for channel in selected_channels
         ]
-        count = len(active_channels)
-        if count != _config.active_count():
-            raise RuntimeError(
-                f"channel calibration selected {count} active row(s), "
-                f"expected {_config.active_count()}"
-            )
         pitch = float(_config.machine("channels", "station_pitch_mm"))
         if not math.isfinite(pitch) or pitch <= 0.0:
             raise RuntimeError(
@@ -488,7 +508,7 @@ def assert_assembly_spring_contacts(adapter: Any, asm_name: str) -> None:
             "channel-lever",
             _ordered_family("channel-lever", found["channel-lever"], count),
         )
-        # active_channels() is config-row/index order. Because the configured
+        # selected_channels is config-row/index order. Because the configured
         # pitch is positive, ascending actual station Z has that same order;
         # therefore each measured seat/bound stays attached to its amplitude.
         for station, (spring, hook, lever, seat) in enumerate(
