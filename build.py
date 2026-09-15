@@ -13,7 +13,9 @@ local dependency scheduler but runs every cache-missing part/assembly/drawing on
 the SolidWorks build farm instead of the local seat (``dodo._farm_build``). It
 needs a clean tree whose HEAD is on ``origin`` (the farm clones from there), the
 remote cache enabled (the farm hands results back through it), and the commit's
-sources published to the pool (``farm.py publish``) before doit starts.
+sources published to the pool (``farm.py publish``) before doit starts. The
+SolidWorks ``verify:*`` gates need a local COM seat, so the default ``build``
+target omits them under the farm executor; run them with ``--executor local``.
 """
 
 from __future__ import annotations
@@ -69,7 +71,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             except FarmPreflightError as problem:
                 print(f"farm: {problem}", file=sys.stderr)
                 return 2
+            print(
+                "farm: SolidWorks verify:* gates are not run on the farm; "
+                "run them with --executor local"
+            )
             doit_args = _with_farm_parallelism(doit_args, run_at)
+    # dodo reads the executor from the environment; an explicit --executor must
+    # win over an inherited HARMONIC_EXECUTOR.
+    os.environ["HARMONIC_EXECUTOR"] = options.executor
     return doit.run(doit_args)
 
 
@@ -125,7 +134,6 @@ def _farm_preflight() -> None:
     identity = _publish(sha)
     os.environ["HARMONIC_FARM_SOURCE_IDENTITY"] = identity
     os.environ["HARMONIC_FARM_COMMIT"] = sha
-    os.environ["HARMONIC_EXECUTOR"] = "farm"
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
 
 

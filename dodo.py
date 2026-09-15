@@ -2797,17 +2797,20 @@ def task_build():
     offline ``check:*`` gates are listed FIRST so workers burn through that ~1 min of
     SolidWorks-free work before piling onto the COM seat, and the parts are in
     per-seat order so two cold builders diverge and split the fleet cache.
+
+    Under the farm executor the ``verify:*`` gates are omitted: they hold a local
+    COM seat on the assembled models, which the farm submitter by design does not
+    have (``_run`` refuses them). ``build.py`` says so once per farm run.
     """
-    return {
-        "actions": None,
-        "task_dep": (
-            [f"check:{s}" for s in _CHECK_NAMES]
-            + [f"part:{s}" for s in _seat_part_order()]
-            + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
-            + [f"drawing:{s}" for s in _drawing_order()]
-            + [f"verify:{s}" for s in _VERIFY_NAMES]
-        ),
-    }
+    deps = (
+        [f"check:{s}" for s in _CHECK_NAMES]
+        + [f"part:{s}" for s in _seat_part_order()]
+        + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
+        + [f"drawing:{s}" for s in _drawing_order()]
+    )
+    if not _farm.enabled():
+        deps += [f"verify:{s}" for s in _VERIFY_NAMES]
+    return {"actions": None, "task_dep": deps}
 
 
 def task_build_bare():

@@ -444,7 +444,39 @@ def test_successful_preflight_stamps_the_environment_before_doit_runs(
     branch = next(a for a in launched if a[:2] == ["git", "branch"])
     assert "--prune" in fetch and fetch[-1] == "origin"
     assert branch[-2:] == ["--list", "origin/*"]
-    assert capsys.readouterr().out == f"farm: sources {'5' * 16} @ {'c' * 12} published\n"
+    assert capsys.readouterr().out == (
+        f"farm: sources {'5' * 16} @ {'c' * 12} published\n"
+        "farm: SolidWorks verify:* gates are not run on the farm; "
+        "run them with --executor local\n"
+    )
+
+
+def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch):
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
+    monkeypatch.setattr(
+        build, "_farm_preflight", lambda: pytest.fail("preflight ran in local mode")
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "local", "part:x"]) == 0
+
+    assert _FakeDoit.seen[0][0] == ["part:x"]
+    assert os.environ["HARMONIC_EXECUTOR"] == "local"
+    assert not _farm.enabled()
+
+
+def test_default_build_target_omits_verify_gates_under_the_farm_executor(monkeypatch):
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    local_deps = _load_dodo().task_build()["task_dep"]
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
+    farm_deps = _load_dodo().task_build()["task_dep"]
+
+    verify = [d for d in local_deps if d.startswith("verify:")]
+    assert verify == ["verify:soundness", "verify:kinematics"]
+    assert farm_deps == [d for d in local_deps if not d.startswith("verify:")]
+    assert any(d.startswith("check:") for d in farm_deps)
+    assert any(d.startswith("drawing:") for d in farm_deps)
 
 
 @pytest.mark.parametrize(
