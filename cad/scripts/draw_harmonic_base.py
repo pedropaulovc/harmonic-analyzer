@@ -27,6 +27,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
+    add_property_linked_note,
     add_surface_finish,
     create_blank_drawing_sheets,
     create_section_view,
@@ -35,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     dimension_name,
     insert_hole_table,
+    import_cosmetic_threads,
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
@@ -84,6 +86,7 @@ from harmonic_base_spec import (
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
     BOTTOM_THICKNESS,
+    DRAWING_NOTES,
     LIP_H,
     LIP_W,
     RIM_TOP,
@@ -128,8 +131,11 @@ if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
 # cross-taps on sheet 2.
 TOP_CENTER = (0.145, 0.185)
 SIDE_CENTER = (0.145, 0.100)
-ISO_SCALE = (1, 10)
-ISO_CENTER = (0.335, 0.190)
+# The isometric owns the whole field right of the sheet-1 dimension envelope
+# (x 0.275-0.410, y 0.070-0.265). At 1:6 the pictorial spans ~0.083 x 0.041,
+# so it is centred in that region instead of floating above a dead strip.
+ISO_SCALE = (1, 6)
+ISO_CENTER = (0.3425, 0.175)
 HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
@@ -144,7 +150,7 @@ GEOMETRY_TOP_KEEP = {
     "TopWid": (0.217, 0.200),
     "PadCornerRadius": (0.070, 0.236),
     "FlangeCornerRadius": (0.040, 0.215),
-    "RimInnerCornerRadius": (0.077, 0.226),
+    "RimInnerCornerRadius": (0.050, 0.232),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
@@ -164,7 +170,7 @@ HOLE_TAG_POSITIONS = {
     "A3": (0.325, 0.176),
     "A4": (0.326, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.239, 0.172),
+    "D1": (0.247, 0.187),
     "E1": (0.257, 0.155),
     "E2": (0.262, 0.226),
     "E3": (0.287, 0.192),
@@ -176,6 +182,8 @@ HOLE_TAG_POSITIONS = {
     "G2": (0.289, 0.206),
     "G3": (0.312, 0.173),
     "G4": (0.312, 0.214),
+    "H3": (0.343, 0.181),
+    "H4": (0.343, 0.214),
 }
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
@@ -252,7 +260,7 @@ def _add_cross_spotface_dimension(adapter: Any, view: Any) -> None:
     drawing.ClearSelection2(True)
     if not view.SelectEntity(matches[0], False):
         raise RuntimeError("failed to select the actual front spotface circle")
-    display = drawing.AddDiameterDimension2(0.193, 0.155, 0.0)
+    display = drawing.AddDiameterDimension2(0.193, 0.135, 0.0)
     drawing.ClearSelection2(True)
     if display is None:
         raise RuntimeError("failed to dimension the actual front spotface")
@@ -757,7 +765,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         if int(tolerance.Type) != 0:  # swTolNONE; the assigned tube governs fit
             raise RuntimeError(f"{name} retains a fixed bore tolerance; rebuild the match-fit source")
-    read_required_properties(
+    source_properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -776,6 +784,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
+    if source_properties["Manufacturing Notes"].replace("\r\n", "\n").strip() != DRAWING_NOTES:
+        raise RuntimeError("source lacks the approved finished-land acceptance; rebuild harmonic-base")
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -875,7 +885,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
-    add_note(adapter, "ISOMETRIC VIEW SCALE 1:10", 0.305, 0.135)
+    add_note(adapter, "ISOMETRIC VIEW SCALE 1:6", 0.3183, 0.145)
     _attached_note(
         adapter,
         top,
@@ -902,7 +912,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, top,
         symbol_xy=(0.040, 0.138),
         control=deck_control,
-        label="deck finish before paint",
+        label="deck seat finish",
         char_height=0.0025,
         entity_type="FACE",
         entity=deck_face,
@@ -914,7 +924,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, side,
         symbol_xy=(0.040, 0.052),
         control=surface_finish_by_key(SURFACE_FINISHES, "underside"),
-        label="underside finish before paint",
+        label="underside seat finish",
         char_height=0.0025,
         entity=_horizontal_base_edge(side, 0.0),
         leader_attach_xy=model_point_in_view(
@@ -960,14 +970,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _section_geometry_controls(adapter, section)
     _add_cross_spotface_dimension(adapter, hole_side)
+    # Sheet-2 left notes column, below the hole table: the socket-matching
+    # note stacks above the linked land note so neither crowds the TOP VIEW
+    # caption. The hole table's SIZE cells are generated by SolidWorks and are
+    # not text-editable, so the note names the table as the reference source.
     add_note(
         adapter,
-        "A1-A4 BORE DIAMETERS: REFERENCE ONLY\n"
+        "A1-A4 BORE DIAMETERS (HOLE TABLE): REFERENCE ONLY\n"
         "MATCH SOCKETS TO ASSIGNED ACTUAL MHA-083 TUBES\n"
         "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK\n"
         "RETAIN CORNER/ORIENTATION MATCH MARKS",
-        0.190,
-        0.255,
+        0.020,
+        0.073,
     )
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
@@ -1023,9 +1037,9 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.285, 0.130),
         label="base column-retention taps",
         process=(
-            "MHA-132 TUBE CROSS-SCREWS\nCONTINUOUS IN-PHASE THREAD\n"
-            "BOTH CASTING WALLS\nON A1-A4 X CENTRES\n"
-            "AXES NORMAL TO SIDE FACES\n2 EACH FRONT/REAR FACE"
+            "MHA-132 TUBE CROSS-SCREWS\n"
+            "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+            "ON A1-A4 X CENTRES\n2 EACH FRONT/REAR FACE"
         ),
     )
     _set_cross_tap_total_quantity(tap_callout)
@@ -1046,21 +1060,55 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_side,
         _cross_tap_edge(hole_side, x_mm=-COLUMN_X),
         BASE_SCREW_Y,
-        (0.205, 0.110),
+        (0.211, 0.096),
         "cross-tap axis height",
         lower_entity=left_base_vertex,
     )
-    tap_height.SetText(1, "AXIS ")
-    tap_height.SetText(4, "FROM BASE\nUNDERSIDE")
-    if (
-        str(tap_height.GetText(1)) != "AXIS "
-        or str(tap_height.GetText(4)) != "FROM BASE\nUNDERSIDE"
-    ):
-        raise RuntimeError("cross-tap axis dimension labels did not persist")
+    tap_height.SetPrecision3(2, -1, -1, -1)
+    if int(tap_height.GetPrimaryPrecision2()) != 2:
+        raise RuntimeError("native cross-axis height precision did not persist")
+    # The hole table measures every coordinate from the virtual corner of the
+    # flange's west and rear faces, so the plan profile carries the seat grade
+    # once, as a "4 SIDES" target read off the same west edge the table's Y
+    # axis is seeded from. The part owns one control per perimeter face; this
+    # single callout states the requirement for all four.
+    flange_finish = add_surface_finish(
+        adapter, hole_top,
+        symbol_xy=(0.178, 0.212),
+        control=surface_finish_by_key(SURFACE_FINISHES, "flange_west"),
+        label="flange perimeter seat finish",
+        char_height=0.0025,
+        edge_entity=table_y_axis,
+        leader_attach_xy=_plan_xy(
+            -BOTTOM_LENGTH / 2.0, BOTTOM_FRONT_Z / 2.0, center=HOLE_TOP_CENTER
+        ),
+    )
+    flange_annotation = _early_bound(flange_finish.GetAnnotation(), "IAnnotation")
+    flange_annotation.BentLeaderLength = 0.035
+    if abs(float(flange_annotation.BentLeaderLength) - 0.035) > 1e-7:
+        raise RuntimeError("flange perimeter finish leader did not clear its roughness text")
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.235, 0.237)
     add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
-    for view in (hole_top, hole_side):
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.046, char_height=0.0035,
+    )
+    section_threads = import_cosmetic_threads(adapter, section)
+    if section_threads[1] == 0:
+        raise RuntimeError("section A-A has no native cosmetic-thread instances")
+    _telemetry.info(f"section A-A native cosmetic threads: seeds/instances={section_threads!r}")
+    for view in (hole_top, hole_side, section):
         set_hidden_lines_visible(adapter, view)
+
+    for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to label drawing sheet {sheet_name}")
+        if (
+            add_note(
+                adapter, f"SHEET {sheet_index} OF {len(SHEET_NAMES)}", 0.350, 0.263
+            )
+            is None
+        ):
+            raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
 
     return await finalize_drawing(
         adapter,
