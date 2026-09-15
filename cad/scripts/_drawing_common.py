@@ -1608,13 +1608,23 @@ def create_blank_drawing_sheets(
 # IView::SetDisplayMode4 requires swSHADED plus its explicit Edges flag for
 # "Shaded With Edges". Faceted=False selects precision geometry; the getter may
 # report either swSHADED or the composite swSHADED_EDGES value after the write.
+#
+# GetFacettedHlrDisplay is NOT read back here. On a fresh view it is transient:
+# it reads False for ~10 ms after the write, flips True ~50 ms later, and only
+# settles False once SolidWorks first computes the view's display geometry —
+# which nothing short of the export does (ForceRebuild3, EditRebuild3,
+# IModelDocExtension.Rebuild, GraphicsRedraw2, UpdateViewDisplayGeometry and the
+# zoom calls all leave it True; the PDF export clears it —
+# `_frame_shading_idempotence_probe --fresh-view-compute`, 2026-09-15). Reading it
+# here was a timing lottery (a slow getter under load read True and failed a
+# correct view); `assert_precise_isometric_views` proves it after export instead.
 _SW_SHADED = 3
 _SW_SHADED_EDGES = 7
 
 
 @_telemetry.traced("drawing.shaded_with_edges", label_param="label")
 def set_high_quality_shaded_with_edges(adapter: Any, view: Any, *, label: str) -> None:
-    """Set and verify a precise Shaded With Edges drawing view."""
+    """Set and verify a Shaded With Edges drawing view (precision proven post-export)."""
     ok = adapter._attempt(
         lambda: view.SetDisplayMode4(False, _SW_SHADED, False, True, True),
         default=False,
@@ -1624,13 +1634,11 @@ def set_high_quality_shaded_with_edges(adapter: Any, view: Any, *, label: str) -
 
     mode = adapter._attempt(lambda: view.GetDisplayMode2(), default=None)
     use_parent = adapter._attempt(lambda: view.GetUseParentDisplayMode(), default=None)
-    faceted = adapter._attempt(lambda: view.GetFacettedHlrDisplay(), default=None)
     edges = adapter._attempt(lambda: view.GetDisplayEdgesInShadedMode(), default=None)
     cosmetic_threads = adapter._attempt(lambda: view.GetCThreadQuality(), default=None)
     readback = {
         "mode": mode,
         "use_parent": use_parent,
-        "faceted": faceted,
         "edges": edges,
         "cosmetic_threads": cosmetic_threads,
     }
@@ -1644,13 +1652,44 @@ def set_high_quality_shaded_with_edges(adapter: Any, view: Any, *, label: str) -
     if (
         mode_value not in {_SW_SHADED, _SW_SHADED_EDGES}
         or bool(use_parent)
-        or bool(faceted)
         or not bool(edges)
         or not bool(cosmetic_threads)
     ):
         raise RuntimeError(
             f"{label}: drawing view is not precise Shaded With Edges {readback!r}"
         )
+
+
+@_telemetry.traced("drawing.assert_precise_isometrics")
+def assert_precise_isometric_views(adapter: Any, sheet_names: Sequence[str]) -> int:
+    """Fail unless every exported standard isometric reads precision geometry.
+
+    Runs AFTER the PDF export, the only step that computes a fresh view's
+    display geometry and settles ``GetFacettedHlrDisplay`` (see the note above
+    ``set_high_quality_shaded_with_edges``), so the flag proves the geometry
+    the PDF was cut from. Returns the number of isometric views checked.
+    """
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    checked = 0
+    for sheet_name in sheet_names:
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(
+                f"failed to activate {sheet_name!r} for precision readback"
+            )
+        for view in iter_views(adapter):
+            orientation = str(
+                adapter._get_attr_or_call(view, "GetOrientationName") or ""
+            )
+            if orientation.strip().lower() != "*isometric":
+                continue
+            faceted = adapter._attempt(view.GetFacettedHlrDisplay, default=None)
+            if faceted is None or bool(faceted):
+                raise RuntimeError(
+                    f"{sheet_name} {view_name(adapter, view)!r}: exported isometric "
+                    f"is not precision geometry (faceted={faceted!r})"
+                )
+            checked += 1
+    return checked
 
 
 @_telemetry.traced("drawing.normalize_edge_break")
@@ -4983,6 +5022,8 @@ async def finalize_drawing(
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
+    # The export just computed every view; the precision flag is truthful now.
+    assert_precise_isometric_views(adapter, sheet_names)
     sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
     render_pdf_png(
         outputs.pdf,

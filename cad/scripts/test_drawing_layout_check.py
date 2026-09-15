@@ -163,7 +163,6 @@ def test_hidden_lines_visible_rejects_a_stale_hlv_transition(monkeypatch):
     (
         ("mode", 2),
         ("use_parent", True),
-        ("faceted", True),
         ("edges", False),
         ("cosmetic_threads", False),
     ),
@@ -174,6 +173,65 @@ def test_high_quality_shaded_with_edges_rejects_bad_readback(defect, value):
     with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
         drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
+def test_high_quality_shaded_with_edges_ignores_transient_facet_flag():
+    # A fresh view reads faceted=True until its first full compute (the export);
+    # the pre-export setter must not fail on it.
+    drawing_common.set_high_quality_shaded_with_edges(
+        _FakeAdapter(None), _display_view(faceted=True), label="Sheet1 Isometric"
+    )
+
+
+def _sheet_views(monkeypatch, views_by_sheet):
+    active = {"sheet": None}
+    ddoc = SimpleNamespace(
+        ActivateSheet=lambda name: active.update(sheet=name) or name in views_by_sheet
+    )
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(
+        drawing_common, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
+    )
+    monkeypatch.setattr(
+        drawing_common, "view_name", lambda _adapter, view: view.GetName2()
+    )
+
+
+def _iso_view(name, faceted, orientation="*Isometric"):
+    return SimpleNamespace(
+        GetName2=lambda: name,
+        GetOrientationName=lambda: orientation,
+        GetFacettedHlrDisplay=lambda: faceted,
+    )
+
+
+def test_post_export_precision_proof_checks_every_isometric(monkeypatch):
+    _sheet_views(
+        monkeypatch,
+        {
+            "Sheet1": [_iso_view("Iso1", False), _iso_view("Front", True, "*Front")],
+            "Sheet2": [_iso_view("Iso2", False)],
+        },
+    )
+
+    checked = drawing_common.assert_precise_isometric_views(
+        _FakeAdapter(None), ("Sheet1", "Sheet2")
+    )
+
+    assert checked == 2
+
+
+@pytest.mark.parametrize("faceted", (True, None))
+def test_post_export_precision_proof_rejects_faceted_isometric(monkeypatch, faceted):
+    _sheet_views(
+        monkeypatch,
+        {"Sheet1": [_iso_view("Iso1", False)], "Sheet2": [_iso_view("Iso2", faceted)]},
+    )
+
+    with pytest.raises(RuntimeError, match="'Iso2': exported isometric is not precision"):
+        drawing_common.assert_precise_isometric_views(
+            _FakeAdapter(None), ("Sheet1", "Sheet2")
         )
 
 
