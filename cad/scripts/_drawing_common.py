@@ -255,6 +255,8 @@ def _select_view_entity(
             selectable = _early_bound(entity, "IEntity")
             selected = bool(selectable.Select4(False, selection_data))
     elif xy is not None:
+        # Coordinate hit-testing needs current geometry, not a pending repaint.
+        _early_bound(view, "IView").UpdateViewDisplayGeometry()
         selected = bool(
             draw.Extension.SelectByID2(
                 "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0

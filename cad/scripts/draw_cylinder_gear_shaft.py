@@ -145,7 +145,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    end = place_view(adapter, str(SOURCE), "*Top", *END_CENTER, scale=(2, 1))
+    end = place_view(
+        adapter, str(SOURCE), "*Top", *END_CENTER, scale=(END_VIEW_SCALE, 1)
+    )
     profile = place_view(adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # Rotate BEFORE dimension import so the Depth dim lands on the displayed

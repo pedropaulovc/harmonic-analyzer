@@ -999,9 +999,9 @@ sections:
         - stated
         - high
       - - Lever length (fulcrum→spring hole c2c)
-        - 177.8 mm (7")
-        - '7.0'
-        - 'M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high) → motion ratio 1.4'
+        - 175.05 mm
+        - '6.89'
+        - 'M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high). SUPERSEDES the 177.8 (7") photo round-number 2026-09-14: the reach is now SET by the vertical spring axis — the hook hole must stand plumb over the summing-lever anchor at |x| 24.85 (knife −15 + `summing_lever_spec.HOLE_X` 39.85), so c2c = |x| 199.9 fulcrum − 24.85 = 175.05 (the neutral lever tilt −0.0022° adds 1.3e−7, far below the ±0.10 hook-arm allocation). 7" left the spring leaning 2.75 mm off plumb → motion ratio 175.05/127 = 1.378 (`channel_lever_spec.py`)'
         - derived
         - med
       - - Bar-pin hole
@@ -1022,7 +1022,7 @@ sections:
         - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); thread from `cad/scripts/build_frame_side_screw.py` and `cad/scripts/build_top_frame.py` KEEPER_TAP_SPEC'
         - measured
         - med
-      - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 177.8, 8 mm overhang; fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
+      - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 175.05, 8 mm overhang (tip r3 centre 180.05, end 183.05; the photo-read step stays at 169, so the tab is 14.05 long with 4.03 between the step and the hole edge); fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
   - prose: |2
 
       Notes: each third-class lever pivots at its end (fulcrum), is driven by its
@@ -1221,9 +1221,9 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 180° bend R 51; tip leg x 95 — plumb above the boss hook — ending y 1378; lug + Ø4 X-pin at y 1373 carries the spring''s top loop'
+        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 90° bend R 51 (the 180° candy-cane is refuted, M6.8); horizontal arm running 50.8 past the bend exit to an end face at machine |x| 95.2 (the part dimension is `gooseneck_geom.ARM_END_X` -101.8: the tube is inserted mirrored at the column line x 197, so machine |x| = 197 - 101.8), carrying the axial #6-32 slotted spring screw whose exposed shank hangs the counter spring''s top eye plumb above the boss hook at |x| 91.2; the arm HEIGHT is the tension adjustment (set by the counter-spring balance, `spring_mount_geom.GOOSENECK_ORIGIN_Y`), not a photo read'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head), the counter spring''s top eye hanging on the shank against the head; arm centreline lowered 1386 -> 1373.3 and shortened to end at machine x 101.75 so the eye stays at (95, 1370.7) (`gooseneck_geom.py`)'
+        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head — head since grown to Ø12 for the 1330K524 double-loop eye), the counter spring''s top eye hanging on the shank against the head. Arm END re-derived 2026-09-14 for the vertical counter axis: the eye rides the exposed shank''s midpoint, so the arm end face moved to machine |x| 95.2 from 101.75 (part ARM_END_X −95.25 → −101.8, a 44.25 → 50.8 straight run past the R51 bend) to hang the eye plumb at |x| 91.2 — the summing lever''s counter anchor (`gooseneck_geom.py`, `spring_mount_geom.COUNTER_ANCHOR_XY`); the arm HEIGHT stays the sliding tension adjustment'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp

@@ -19,7 +19,16 @@ from __future__ import annotations
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)
 ARM_Y = 163.3  # arm/screw axis above the part origin
-ARM_END_X = -95.25  # flat arm-end face; exposed screw runs toward negative X
+BEND_R = 51.0  # 90-degree bend centreline radius (med)
+ARM_END_X = -101.8  # flat arm-end face; exposed screw runs toward negative X
+# The arm END is what makes the counter spring hang plumb in the saved neutral
+# pose: the spring's top eye rides the exposed shank's midpoint, so
+# spring_mount_geom puts that eye at COLUMN_X - ARM_END_X + SCREW_SHANK_LEN/2 =
+# -197 + 101.8 + 4 = -91.2 -- exactly the summing-lever counter anchor's machine
+# X (COUNTER_ANCHOR_XY).  Was -95.25, which hung the eye at -97.75 and leaned
+# the 351 mm spring 6.55 mm off plumb.  Sliding the post sets tension, never
+# this face.
+ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
 SCREW_SHANK_DIA = 3.6  # axial #6-32 spring screw envelope
 SCREW_SHANK_LEN = 8.0  # exposed shank: end face to head underside
 SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye

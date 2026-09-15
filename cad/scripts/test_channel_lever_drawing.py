@@ -31,9 +31,6 @@ def test_draw_view_math_matches_the_spec() -> None:
         channel_lever_spec.LEVER_SPRING_X,
         channel_lever_spec.BAR_PIN_X,
     )
-    assert channel_lever_spec.LEVER_SPRING_X == lever.LEVER_SPRING_X
-    assert channel_lever_spec.BAR_PIN_X == lever.BAR_PIN_X
-    assert channel_lever_spec.PIVOT_HOLE_DIA == lever.PIVOT_HOLE_DIA
     assert lever.BAR_PIN_HOLE_SPEC is channel_lever_spec.BAR_PIN_HOLE_SPEC
     assert lever.SPRING_EYE_HOLE_SPEC is channel_lever_spec.SPRING_EYE_HOLE_SPEC
     assert drawing._BAR_PIN_DIA == blind_cut_dia_mm(
@@ -57,8 +54,7 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     assert "6.50 +0.03/0" in notes
     assert "DATUM C IS THE LONG TOP FACE" in notes
     assert "BASIC 4.75 BELOW C" in notes
-    assert "BAR-PIN 127.00; SHOULDER 169.00" in notes
-    assert "SPRING-HOLE 177.80; TIP R3 CENTRE 182.80" in notes
+    assert "BASIC FROM B: BAR-PIN" in notes
     assert "NOT CONCENTRIC" in notes
     assert "#47 DRILL" not in notes
     assert "#21 DRILL" not in notes

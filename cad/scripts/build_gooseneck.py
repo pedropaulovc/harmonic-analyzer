@@ -32,9 +32,11 @@ revolve about the tube axis. The head slot is omitted (a 0.8 x 0.8 slot
 across the head face adds nothing the notes don't carry).
 
 Layout: part origin at the vertical leg's mid-height; leg y -330..+112.3,
-bend arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -95.25,
-end plug x -95.25..-89.25 (mid-wall O14, overlapping the tube wall), shank
-x -95.25..-103.25 (O3.6), and head x -103.25..-105.25 (O12). The enlarged
+bend arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -101.8
+(a 50.8 run: the arm end is set so the screw's shank midpoint lands on the
+summing lever's counter anchor, see gooseneck_geom.ARM_END_X),
+end plug x -101.8..-95.8 (mid-wall O14, overlapping the tube wall), shank
+x -101.8..-109.8 (O3.6), and head x -109.8..-111.8 (O12). The enlarged
 head retains the stock double-loop eye without a separate washer.
 The tube is HOLLOW -- O16 x 2.0 wall, matching
 the drawing's tube stock -- so every tube profile is an annulus.
@@ -85,12 +87,14 @@ from gooseneck_spec import (
     ISOMETRIC_VIEW_NOTE,
 )
 
-# Geometry nominals the summing assembly reads live in gooseneck_geom (the
-# prose-free module assemblies import); re-imported here so the build and the
-# assembly's hang proof can never drift.
+# The form nominals live in gooseneck_geom -- the prose-free module the summing
+# assembly imports for its hang proof -- so this build, that proof and the
+# drawing's form note (gooseneck_spec note 2) can never drift apart.
 from gooseneck_geom import (  # noqa: E402
     ARM_END_X,
+    ARM_RUN,
     ARM_Y,
+    BEND_R,
     PLUG_T,
     SCREW_HEAD_DIA,
     SCREW_HEAD_T,
@@ -103,7 +107,6 @@ from gooseneck_geom import (  # noqa: E402
 PART_NAME = "gooseneck"
 MATERIAL = "Plain Carbon Steel"
 
-BEND_R = 51.0  # 90-degree bend (med)
 LEG_TOP = round(ARM_Y - BEND_R, 3)  # 112.3: bend start = machine 1322.3
 # (derived: the arm centreline is the spring hang, see gooseneck_geom.ARM_Y;
 # rounded so the equation-manager literal reads 112.3mm, not float noise)
@@ -116,7 +119,6 @@ LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
 # 1.58 mm/px), cross-checked by the post's own Ø16 silhouette (10 px). Was
 # -169 (machine 1041, at the rail top), then -250 (a front-view guess while
 # the lower end was occluded by the coincident east column)
-ARM_RUN = -ARM_END_X - BEND_R  # 44.25: straight run after the bend exit
 
 TUBE_R = TUBE_DIA / 2.0
 TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)
@@ -127,8 +129,8 @@ PLUG_DIA = TUBE_DIA - WALL_T  # 14: mid-wall, so the plug OVERLAPS the wall by
 PLUG_R = PLUG_DIA / 2.0
 SHANK_R = SCREW_SHANK_DIA / 2.0
 HEAD_R = SCREW_HEAD_DIA / 2.0
-HEAD_X = ARM_END_X - SCREW_SHANK_LEN  # -103.25: head underside (shoulder)
-SCREW_TIP_X = HEAD_X - SCREW_HEAD_T  # -105.25: head outer face
+HEAD_X = ARM_END_X - SCREW_SHANK_LEN  # -109.8: head underside (shoulder)
+SCREW_TIP_X = HEAD_X - SCREW_HEAD_T  # -111.8: head outer face
 
 
 async def _volume(adapter) -> float:

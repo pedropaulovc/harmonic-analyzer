@@ -43,8 +43,17 @@ def main() -> int:
         # them directly (codex #359).
         from _interference_contracts import allowed_interference_pairs
 
+        native_contact_check = None
+        if asm_name in ("channel", "summing"):
+            from _native_spring_contact import assert_assembly_spring_contacts
+
+            native_contact_check = assert_assembly_spring_contacts
+
         artefacts = await refresh_assembly(
-            adapter, asm_name, allowed_pairs=allowed_interference_pairs(asm_name)
+            adapter,
+            asm_name,
+            allowed_pairs=allowed_interference_pairs(asm_name),
+            native_contact_check=native_contact_check,
         )
         if asm_name == "harmonic-analyzer":
             # The top assembly's eight-views gallery + parts-only BOM are not part

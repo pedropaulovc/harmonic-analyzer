@@ -5,7 +5,7 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The lever is a long thin third-class lever (~186 mm nose-to-tip, 9.5 mm tall,
+The lever is a long thin third-class lever (~188 mm nose-to-tip, 9.5 mm tall,
 3.0 mm thick).  The sheet runs at 1:1 with a small 1:4 isometric; the 3.0 x 9.5
 section is dimensioned on a right end view.
 
@@ -225,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to front view")
     _add_tip_arc_center_mark(adapter, front)
 
-    # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (177.8) centre distances
+    # Fulcrum -> bar-pin (127) and fulcrum -> spring-eye (175.05) centre distances
     # (bore edge to bore edge; SolidWorks dimensions circle edges centre-to-centre).
     fulcrum_rim = _sheet_xy(-PIVOT_HOLE_DIA / 2.0, 0.0)
     bar_pin_rim = _sheet_xy(BAR_PIN_X - _BAR_PIN_DIA / 2.0, 0.0)
@@ -255,7 +255,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # bar height (9.5) on the front profile at the same station.
     _mid_x = (
         BAR_PIN_X + LEVER_SPRING_X
-    ) / 2.0 - 60.0  # ~92: between the hub and the tab
+    ) / 2.0 - 60.0  # ~91: between the hub and the tab
     add_edge_dimension(
         adapter,
         top,

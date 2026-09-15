@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from typing import Any
 
@@ -2260,9 +2260,15 @@ async def _export_assembly_images(
 
 
 async def save_assembly_and_images(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    asm_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    *,
+    native_contact_check: Callable[[Any, str], None] | None = None,
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    if asm_name in ("channel", "summing") and native_contact_check is None:
+        raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
@@ -2276,6 +2282,10 @@ async def save_assembly_and_images(
     assert_pose_ledger(adapter)
     OUT_SLDASM.mkdir(parents=True, exist_ok=True)
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
+    sidecar = _massprops_sidecar(asm_name)
+    # A full build replaces the assembly bytes. Strictly retire proof for the
+    # previous bytes before replacement; an unlink failure aborts the save.
+    _invalidate_massprops_proof(sidecar)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
@@ -2286,15 +2296,6 @@ async def save_assembly_and_images(
     rebuild_if_needed_before_save(adapter, asm_name)
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
-        # Record the resolved-geometry fingerprint of the just-built assembly so a
-        # later in-place refresh of it (unchanged) is a true no-op and never bumps
-        # the md5 -- otherwise the first refresh after a from-scratch build would
-        # re-save once and cascade up the tree (see save_assembly_in_place /
-        # _massprops_sidecar).
-        digest = await assembly_geometry_digest(adapter, asm_name)
-        sidecar = _massprops_sidecar(asm_name)
-        sidecar.parent.mkdir(parents=True, exist_ok=True)
-        sidecar.write_text(digest + "\n", encoding="utf-8")
         artefacts = {"assembly": str(asm_path)}
         artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     finally:
@@ -2305,6 +2306,15 @@ async def save_assembly_and_images(
     # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
     # the copy source is discarded so the reopen loads clean children from disk.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+    if asm_name in ("channel", "summing"):
+        if native_contact_check is None:
+            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+        native_contact_check(adapter, asm_name)
+    # Fingerprint the actual reconciled persisted model and publish its proof
+    # only after every strict native contact has succeeded.
+    digest = await assembly_geometry_digest(adapter, asm_name)
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(digest + "\n", encoding="utf-8")
     return artefacts
 
 
@@ -2373,6 +2383,11 @@ def _massprops_sidecar(asm_name: str):
     no-op refresh byte-stable, so the build reaches a true fixpoint. Lives under the
     gitignored ``cad/out/sldasm`` next to the recipe sidecar."""
     return OUT_SLDASM / f".{asm_name}.massprops.sha"
+
+
+def _invalidate_massprops_proof(sidecar: Any) -> None:
+    """Strictly revoke persisted-save proof before replacing or certifying it."""
+    sidecar.unlink(missing_ok=True)
 
 
 def saved_rebuild_status(adapter: Any, model: Any = None) -> int:
@@ -2794,6 +2809,8 @@ async def refresh_assembly(
     asm_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
     allowed_pairs: Mapping[frozenset[str], float] | None = None,
+    *,
+    native_contact_check: Callable[[Any, str], None] | None = None,
 ) -> dict[str, str]:
     """Reload an assembly's parts in place -- the cheap incremental rebuild.
 
@@ -2812,18 +2829,18 @@ async def refresh_assembly(
     refresh raise, naming the config + the broken feature/mate. Then the
     rest/export pose is re-activated and, when the refresh actually changed
     the resolved geometry (mass-properties fingerprint moved, or a mate was
-    auto-repaired), the standard gates run: ``assert_components_fully_defined``
+    auto-repaired), the standard broad gates run: ``assert_components_fully_defined``
     (free DOF), ``check_no_interference`` (overlaps), ``assert_model_healthy``
-    (deep mate health). Any gate raises a ``RuntimeError`` naming the culprit
-    and the ``.SLDASM`` is left untouched (the in-place save never runs) -- so
-    an UNHEALABLE dangling mate (AutoMateRepair could not re-bind it) or a
-    geometry change that grows into a neighbour (interference) HALTS the build
-    rather than saving a stale/broken artefact. A fingerprint-identical,
-    repair-free reload SKIPS the gates (they would re-prove the last gated
-    save; ``verify:soundness`` re-proves the artefact independently on every
-    build). The caller escalates to a full from-scratch rebuild via the
-    ``full`` escape (delete the target + ``doit assembly:<stem>``).
+    (deep mate health). Any gate raises a ``RuntimeError`` naming the culprit.
+    Channel and summing assemblies additionally run strict static native spring
+    contact after their final reconciliation on every refresh, even when the
+    0.1-mm-rounded geometry fingerprint is unchanged. A failure leaves the
+    relevant proof marker invalid and never rewrites a no-op ``.SLDASM``. The
+    caller escalates to a full from-scratch rebuild via the ``full`` escape
+    (delete the target + ``doit assembly:<stem>``).
     """
+    if asm_name in ("channel", "summing") and native_contact_check is None:
+        raise ValueError(f"{asm_name} assembly requires native_contact_check")
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
         raise RuntimeError(f"missing assembly {asm_path}; build it from scratch first")
@@ -2886,19 +2903,14 @@ async def refresh_assembly(
     # chokepoint performs one final idempotent rebuild after those reads.
     final_rebuild_before_save(adapter, asm_name)
 
-    # Fingerprint BEFORE the gates (v0.18 perf finding 4): the mass-properties
-    # digest decides BOTH whether to save (an in-place Save3 always rewrites a
-    # fresh md5, which would invalidate the parent even for a no-op reload of
-    # unchanged parts) AND whether the gates must run at all. When the
-    # reloaded parts left the resolved geometry identical to what the last
-    # successful (gated) refresh/build saved -- and nothing was auto-repaired
-    # -- the three gates would re-prove exactly what that run already proved,
-    # and on the top assembly they are the bulk of the refresh wall-clock
-    # (measured 274 s of a 780 s no-op refresh: DOF 115 s + interference 12 s
-    # + deep health 147 s). A successful AutoMateRepair forces the changed
-    # path even on an unchanged fingerprint (a PID-churn-only rebuild): the
-    # re-bound mate state is new and must be re-gated AND re-saved, or every
-    # later refresh re-dangles and re-heals the same mates forever.
+    # Fingerprint before the broad gates (v0.18 perf finding 4): it decides
+    # whether an in-place Save3 is required and whether the expensive DOF,
+    # interference, and deep-health checks need repeating. A successful
+    # AutoMateRepair forces that changed path even on a PID-only rebuild.
+    # Static spring contact is deliberately excluded from this shortcut: its
+    # calibrated distances are nanometre-scale, far below the component-pose
+    # fingerprint's 0.1 mm rounding, so channel/summing run that gate below
+    # after the final save/reconciliation on both changed and unchanged paths.
     digest = await assembly_geometry_digest(adapter, asm_name)
     sidecar = _massprops_sidecar(asm_name)
     try:
@@ -2912,6 +2924,11 @@ async def refresh_assembly(
             f"refresh {asm_name}: saved artifact opened with "
             f"NeedsRebuild2={opened_rebuild_status}; forcing gates + clean re-save"
         )
+    if asm_name in ("channel", "summing"):
+        # Revoke the previous certificate before either the changed-save path or
+        # the byte-stable no-op path attempts strict native certification.
+        # Failure to remove it aborts before any save or reconciliation.
+        _invalidate_massprops_proof(sidecar)
 
     if geometry_changed:
         # Gates -- each already raises a RuntimeError naming the culprit. No
@@ -2929,15 +2946,13 @@ async def refresh_assembly(
         check_no_interference(adapter, allowed_pairs=allowed_pairs)
         assert_model_healthy(adapter, label=asm_name, deep=True, rebuilt=True)
     else:
-        # No-op reload: the per-config rebuild-fault check above already ran
-        # clean, the geometry the gates would inspect is fingerprint-identical
-        # to the last gated save, and verify:soundness independently reopens
-        # the saved artefact and runs the full battery on every build.
-        _telemetry.event("refresh.noop_gates_skipped", asm=asm_name)
+        # The expensive broad gates may reuse the previous proof for identical
+        # resolved geometry. Strict spring contact cannot: the pose fingerprint's
+        # 0.1 mm rounding is much coarser than its calibrated distance bounds.
+        _telemetry.event("refresh.noop_broad_gates_skipped", asm=asm_name)
         log(
-            f"refresh {asm_name}: fingerprint unchanged, no repairs -- gates "
-            "skipped (proven by the last gated save; verify:soundness "
-            "re-proves the artefact independently)"
+            f"refresh {asm_name}: fingerprint unchanged, no repairs -- broad "
+            "DOF/interference/health gates reused"
         )
 
     with _telemetry.span("save", asm=asm_name, changed=geometry_changed):
@@ -2946,16 +2961,22 @@ async def refresh_assembly(
                 adapter
             )  # opens isometric; only when we actually re-save
         saved = save_assembly_in_place(adapter, asm_name, geometry_changed)
-    sidecar.parent.mkdir(parents=True, exist_ok=True)
-    sidecar.write_text(digest + "\n", encoding="utf-8")
 
-    artefacts = {"assembly": str(asm_path)}
-    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     # Same #267 reconcile the full-build path runs: the in-place Save3 followed a
     # final_rebuild_before_save (ForceRebuild3(False)) that dirtied the children in
     # memory, so a fresh open would report needs-rebuild. Only when we actually
-    # re-saved -- a no-op reload left the (already-reconciled) artifact untouched
-    # and byte-stable, and reopening it would needlessly bump the parent's md5.
+    # re-saved -- a no-op reload leaves the reconciled artifact byte-stable.
     if saved:
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
+
+    if asm_name in ("channel", "summing"):
+        if native_contact_check is None:
+            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+        native_contact_check(adapter, asm_name)
+
+    # Publish proof only after every persisted native check has succeeded.
+    sidecar.parent.mkdir(parents=True, exist_ok=True)
+    sidecar.write_text(digest + "\n", encoding="utf-8")
+    artefacts = {"assembly": str(asm_path)}
+    artefacts.update(await _export_assembly_images(adapter, asm_name, views))
     return artefacts
