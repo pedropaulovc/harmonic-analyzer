@@ -40,15 +40,37 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 
 # The deck is black in the source photographs. Machining and black coating of
 # the full underside is the user's reconstruction choice, not photo evidence.
-# These whole faces are cut before painting; there are no locally masked feet.
+# The registry Finish field owns the paint and its masking, so each roughness
+# symbol carries the grade alone; there are no locally masked feet.
+#
+# The flange perimeter carries the same seat grade because it is the drawing's
+# hole-table origin: every mounting coordinate is measured from the virtual
+# sharp corner of two of these faces, so they LOCATE the part (simplicity
+# policy rule 5) and cannot be left as-cast under the title block's
+# CAST/MACHINED surface row. All four sides are required equally -- the corner
+# arcs between them are skimmed with the sides -- and the flange keeps the
+# RAL6000 body colour (only the deck and underside are blacked by the Finish
+# field). The part authors one native symbol per qualified face; the sheet
+# states the requirement once, as this target on the plan profile.
+FLANGE_PERIMETER_TARGET = "4 SIDES"
 SURFACE_FINISHES = (
+    SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
+    SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
     SurfaceFinishControl(
-        "deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT),
-        production_method="BEFORE PAINT",
+        "flange_west", SEAT_UM, PlanarFace((-1, 0, 0), BOTTOM_LENGTH / 2.0),
+        production_method=FLANGE_PERIMETER_TARGET,
     ),
     SurfaceFinishControl(
-        "underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0),
-        production_method="BEFORE PAINT",
+        "flange_east", SEAT_UM, PlanarFace((1, 0, 0), BOTTOM_LENGTH / 2.0),
+        production_method=FLANGE_PERIMETER_TARGET,
+    ),
+    SurfaceFinishControl(
+        "flange_rear", SEAT_UM, PlanarFace((0, 0, 1), BOTTOM_WIDTH / 2.0),
+        production_method=FLANGE_PERIMETER_TARGET,
+    ),
+    SurfaceFinishControl(
+        "flange_front", SEAT_UM, PlanarFace((0, 0, -1), BOTTOM_WIDTH / 2.0),
+        production_method=FLANGE_PERIMETER_TARGET,
     ),
 )
 
@@ -67,7 +89,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Keep this block to short, part-specific facts that are not already legible
 # in a native dimension, hole table, or feature callout.  Finish and masking
 # live in the registry's Finish field.
-DRAWING_NOTES = "STAMP SERIAL IDENTIFIER AT THE INDICATED ID LOCATION."
+# Finished-part acceptance couples the otherwise independent dimensional
+# limits. This does not change nominal CAD geometry or the assigned-tube fit.
+# The requirement only: inspection, coordination and "limits still apply" are
+# what a MIN callout plus the title block already mean.
+DRAWING_NOTES = (
+    "A1-A4: 1.0 MIN CONTINUOUS FINISHED DECK LAND\n"
+    "BETWEEN EACH BORE AND RIM INNER FACE\n"
+    "AFTER MATCHING AND EDGE BREAK."
+)
 
 
 # Base/frame parts carry no datums or feature-control frames under the drawing

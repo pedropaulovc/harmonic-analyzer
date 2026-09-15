@@ -456,6 +456,8 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
     raise AssertionError(
         "base column socket leaves less than 1 mm wall to another base cavity"
     )
+# Nominal model-space sanity only: this does not validate manufactured
+# tolerance combinations. DRAWING_NOTES governs finished-part land acceptance.
 COLUMN_SOCKET_RIM_CLEARANCE = min(
     min(
         TOP_LENGTH / 2.0 - LIP_W - abs(x),
@@ -692,16 +694,36 @@ def _com_get(obj, name: str):
     return value() if callable(value) else value
 
 
+# Only these two qualified planes are blacked by the registry Finish field; the
+# flange perimeter faces carry the same seat grade but keep the body colour.
+BLACK_FINISH_KEYS = ("deck", "underside")
+
+
 async def _paint_machined_faces_black(adapter) -> None:
-    """Black overrides on the two qualified machined planes; green elsewhere."""
+    """Qualify every spec-owned finish face, then black the two painted planes.
+
+    Every control's face is area-checked, so the native part proves the face
+    selection for the four flange perimeter sides as well -- a plane picked at
+    the wrong offset (the top plate's side instead of the flange's) fails here
+    rather than shipping a roughness symbol on the wrong surface.
+    """
     from solidworks_mcp.adapters.com_variant import double_array
 
     faces = _resolve_faces(
         adapter.currentModel, {control.key: control.face for control in SURFACE_FINISHES}
     )
+    # The flange sides are bounded by the four corner arcs and the two 1/16 in
+    # rim breaks, so neither dimension is the raw plate envelope.
+    flange_side_height = BOTTOM_THICKNESS - 2.0 * RIM_CHAMFER
+    flange_end_width = BOTTOM_WIDTH - 2.0 * FLANGE_CORNER_R
+    flange_face_width = BOTTOM_LENGTH - 2.0 * FLANGE_CORNER_R
     expected_areas = {
         "deck": (TOP_LENGTH - 2.0 * LIP_W) * (TOP_WIDTH - 2.0 * LIP_W) * 1e-6,
         "underside": BOTTOM_LENGTH * BOTTOM_WIDTH * 1e-6,
+        "flange_west": flange_end_width * flange_side_height * 1e-6,
+        "flange_east": flange_end_width * flange_side_height * 1e-6,
+        "flange_rear": flange_face_width * flange_side_height * 1e-6,
+        "flange_front": flange_face_width * flange_side_height * 1e-6,
     }
     values = double_array([*PANEL_BLACK, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
     for key, face in faces.items():
@@ -712,6 +734,9 @@ async def _paint_machined_faces_black(adapter) -> None:
                 f"{key} face area {area * 1e6:.0f} mm^2 != "
                 f"{expected * 1e6:.0f} (minus openings/edge breaks)"
             )
+        if key not in BLACK_FINISH_KEYS:
+            _telemetry.info(f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour")
+            continue
         face.MaterialPropertyValues = values
         back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
         if len(back) != 3 or any(
