@@ -71,6 +71,7 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
@@ -505,7 +506,11 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "summing assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        native_contact_check=assert_assembly_spring_contacts,
+    )
 
 
 if __name__ == "__main__":

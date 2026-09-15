@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from typing import Any
 
@@ -2260,9 +2260,15 @@ async def _export_assembly_images(
 
 
 async def save_assembly_and_images(
-    adapter: Any, asm_name: str, views: Iterable[str] = DEFAULT_VIEWS
+    adapter: Any,
+    asm_name: str,
+    views: Iterable[str] = DEFAULT_VIEWS,
+    *,
+    native_contact_check: Callable[[Any, str], None] | None = None,
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    if asm_name in ("channel", "summing") and native_contact_check is None:
+        raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
@@ -2301,9 +2307,9 @@ async def save_assembly_and_images(
     # the copy source is discarded so the reopen loads clean children from disk.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
     if asm_name in ("channel", "summing"):
-        from _native_spring_contact import assert_assembly_spring_contacts
-
-        assert_assembly_spring_contacts(adapter, asm_name)
+        if native_contact_check is None:
+            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+        native_contact_check(adapter, asm_name)
     # Fingerprint the actual reconciled persisted model and publish its proof
     # only after every strict native contact has succeeded.
     digest = await assembly_geometry_digest(adapter, asm_name)
@@ -2803,6 +2809,8 @@ async def refresh_assembly(
     asm_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
     allowed_pairs: Mapping[frozenset[str], float] | None = None,
+    *,
+    native_contact_check: Callable[[Any, str], None] | None = None,
 ) -> dict[str, str]:
     """Reload an assembly's parts in place -- the cheap incremental rebuild.
 
@@ -2831,6 +2839,8 @@ async def refresh_assembly(
     caller escalates to a full from-scratch rebuild via the ``full`` escape
     (delete the target + ``doit assembly:<stem>``).
     """
+    if asm_name in ("channel", "summing") and native_contact_check is None:
+        raise ValueError(f"{asm_name} assembly requires native_contact_check")
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
         raise RuntimeError(f"missing assembly {asm_path}; build it from scratch first")
@@ -2960,9 +2970,9 @@ async def refresh_assembly(
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
 
     if asm_name in ("channel", "summing"):
-        from _native_spring_contact import assert_assembly_spring_contacts
-
-        assert_assembly_spring_contacts(adapter, asm_name)
+        if native_contact_check is None:
+            raise ValueError(f"{asm_name} assembly requires native_contact_check")
+        native_contact_check(adapter, asm_name)
 
     # Publish proof only after every persisted native check has succeeded.
     sidecar.parent.mkdir(parents=True, exist_ok=True)

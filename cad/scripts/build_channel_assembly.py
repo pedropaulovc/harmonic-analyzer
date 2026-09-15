@@ -152,6 +152,7 @@ from _assembly import (
     world_point,
     write_dof_manifest,
 )
+from _native_spring_contact import assert_assembly_spring_contacts
 from _cwm import (
     component_constrained_status,
     component_distance_mate_flip,
@@ -1618,7 +1619,11 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "channel assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        native_contact_check=assert_assembly_spring_contacts,
+    )
 
 
 if __name__ == "__main__":

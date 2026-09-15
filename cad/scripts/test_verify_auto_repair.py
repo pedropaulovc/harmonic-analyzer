@@ -255,7 +255,6 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
     tmp_path, monkeypatch
 ) -> None:
     import _assembly
-    import _native_spring_contact
 
     assembly_path = tmp_path / "channel.SLDASM"
     assembly_path.write_bytes(b"byte-stable assembly")
@@ -318,14 +317,15 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
     def fail_native_contact(_adapter, _name):
         raise RuntimeError("nanometre contact failed")
 
-    monkeypatch.setattr(
-        _native_spring_contact,
-        "assert_assembly_spring_contacts",
-        fail_native_contact,
-    )
-
     with pytest.raises(RuntimeError, match="nanometre contact failed"):
-        asyncio.run(_assembly.refresh_assembly(adapter, "channel", views=[]))
+        asyncio.run(
+            _assembly.refresh_assembly(
+                adapter,
+                "channel",
+                views=[],
+                native_contact_check=fail_native_contact,
+            )
+        )
 
     assert saves == [False]
     assert assembly_path.read_bytes() == b"byte-stable assembly"
