@@ -49,7 +49,9 @@ class _Sheet:
 
 
 class _View:
-    def __init__(self, orientation: str, source: Path, center: tuple[float, float]) -> None:
+    def __init__(
+        self, orientation: str, source: Path, center: tuple[float, float]
+    ) -> None:
         self._orientation = orientation
         self._source = source
         self._center = center
@@ -80,6 +82,14 @@ class _Note:
 
     def GetExtent(self):
         return self._extent
+
+    def GetAnnotation(self):
+        return self
+
+    def SetPosition(self, x: float, y: float, _z: float) -> bool:
+        width = self._extent[3] - self._extent[0]
+        self._extent = (x, y - 0.0005, 0.0, x + width, y + 0.0005, 0.0)
+        return True
 
 
 def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
@@ -153,8 +163,12 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         return draw, sheet
 
     monkeypatch.setattr(purchased, "new_project_drawing", new_project_drawing)
-    monkeypatch.setattr(purchased, "_purchased_title_block", lambda *_args, **_kwargs: [])
-    monkeypatch.setattr(purchased, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        purchased, "_purchased_title_block", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(
+        purchased, "stamp_drawing_summary", lambda *_args, **_kwargs: None
+    )
     monkeypatch.setattr(purchased, "double_array", tuple)
 
     centers = {name: center for name, center, _cell in purchased._VIEW_CELLS}
@@ -168,7 +182,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "place_view", place_view)
     monkeypatch.setattr(purchased, "set_hidden_lines_removed", lambda *_args: None)
-    monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views: (1, 1))
+    monkeypatch.setattr(purchased, "set_hidden_lines_visible", lambda *_args: None)
+    monkeypatch.setattr(purchased, "_fit_views", lambda _draw, _views, _cells: (1, 1))
     monkeypatch.setattr(
         purchased,
         "view_name",
@@ -206,7 +221,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "finalize_drawing", finalize)
 
-    result = asyncio.run(purchased.build_purchased_fastener_drawing(_Adapter(source), spec))
+    result = asyncio.run(
+        purchased.build_purchased_fastener_drawing(_Adapter(source), spec)
+    )
 
     assert result == {"pdf": str(outputs["pdf"])}
     assert ("new", layout) in calls
@@ -218,3 +235,32 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         "Test Fastener — Purchased Part Reference Drawing",
         (1, 1),
     ) in calls
+
+
+def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path):
+    """A fitting 2:1 view must not be rejected by scaling its fixed sheet padding."""
+
+    class PaddedView(_View):
+        @property
+        def Position(self):
+            return self._center
+
+        def GetOutline(self):
+            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+            width = 0.06498 * ratio + 0.0127
+            height = 0.00657 * ratio + 0.0127
+            x, y = self._center
+            return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+        def SetViewPosition(self, position, _update):
+            self._center = tuple(position)
+            return True
+
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    center = (0.111, 0.170)
+    cell = (0.015, 0.155, 0.207, 0.185)
+    view = PaddedView("*Front", tmp_path / "spring.SLDPRT", center)
+    assert purchased._fit_views(_Drawing(), [view], (("*Front", center, cell),)) == (
+        2,
+        1,
+    )

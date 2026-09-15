@@ -1,0 +1,305 @@
+# Fixed native placements; preserve full floating-point round-trip precision.
+# Distance guards bound measurement uncertainty, never placement clearance.
+# channels.yaml must exactly match a preset vector below. Custom stations require
+# new native calibration; builds never interpolate or search for a replacement.
+springs:
+  source: Native mate-solved calibration at 2f471f3f; full saved-assembly acceptance
+    is required by the build gates.
+  confidence: high
+  native_distance_guard_mm: 1.0e-05
+  calibration_resolution_mm: 1.0e-06
+  channel_seats:
+  - amplitude_mm: 0
+    pose:
+      length_mm: 64.98599439690284
+      lower_eye_xy:
+      - 24.625461725020227
+      - 997.4501518498594
+      upper_eye_xy:
+      - 22.259279138699895
+      - 1057.360237597759
+      axis_xy:
+      - -0.039464794776329144
+      - 0.9992209615361669
+      centre_xy:
+      - 23.442370431860063
+      - 1027.405194723809
+      clocking: standard
+    final_distance_mm:
+      lower: 1.4526663775452012e-07
+      upper: 2.529155984154995e-05
+  - amplitude_mm: 4.2105263157894735
+    pose:
+      length_mm: 65.03293398183955
+      lower_eye_xy:
+      - 24.625613234151018
+      - 997.4501578317758
+      upper_eye_xy:
+      - 22.259176038744155
+      - 1057.4072096836103
+      axis_xy:
+      - -0.039438165566880894
+      - 0.9992220129164086
+      centre_xy:
+      - 23.442394636447588
+      - 1027.428683757693
+      clocking: standard
+    final_distance_mm:
+      lower: 1.1455984017072958e-07
+      upper: 4.3345781476915554e-05
+  - amplitude_mm: 4.705882352941177
+    pose:
+      length_mm: 65.03847924175768
+      lower_eye_xy:
+      - 24.62563118626089
+      - 997.4501585402969
+      upper_eye_xy:
+      - 22.259164640771978
+      - 1057.412758810835
+      axis_xy:
+      - -0.039435010308242396
+      - 0.9992221374459178
+      centre_xy:
+      - 23.442397913516434
+      - 1027.4314586755659
+      clocking: standard
+    final_distance_mm:
+      lower: 1.1100230560890604e-07
+      upper: 5.055309194976627e-05
+  - amplitude_mm: 5.333333333333333
+    pose:
+      length_mm: 65.04551017734782
+      lower_eye_xy:
+      - 24.62565396427975
+      - 997.4501594392019
+      upper_eye_xy:
+      - 22.259150426627016
+      - 1057.4197946582851
+      axis_xy:
+      - -0.03943100684896703
+      - 0.9992222954372448
+      centre_xy:
+      - 23.442402195453383
+      - 1027.4349770487436
+      clocking: standard
+    final_distance_mm:
+      lower: 1.0652836945440431e-07
+      upper: 3.432081287939629e-05
+  - amplitude_mm: 6.153846153846154
+    pose:
+      length_mm: 65.05471618287403
+      lower_eye_xy:
+      - 24.625683816240745
+      - 997.4501606171324
+      upper_eye_xy:
+      - 22.259132216820337
+      - 1057.4290071094395
+      axis_xy:
+      - -0.039425760075273
+      - 0.9992225024700391
+      centre_xy:
+      - 23.442408016530543
+      - 1027.4395838632859
+      clocking: standard
+    final_distance_mm:
+      lower: 1.0071537689666179e-07
+      upper: 4.5290924605543376e-05
+  - amplitude_mm: 7.2727272727272725
+    pose:
+      length_mm: 65.0672912083641
+      lower_eye_xy:
+      - 24.625724642979936
+      - 997.4501622278632
+      upper_eye_xy:
+      - 22.259108078841393
+      - 1057.4415909654938
+      axis_xy:
+      - -0.03941858437712693
+      - 0.9992227855717178
+      centre_xy:
+      - 23.442416360910663
+      - 1027.4458765966785
+      clocking: standard
+    final_distance_mm:
+      lower: 9.28358742344672e-08
+      upper: 3.908905690856221e-05
+  - amplitude_mm: 8.88888888888889
+    pose:
+      length_mm: 65.08549870047146
+      lower_eye_xy:
+      - 24.625783859019545
+      - 997.4501645635823
+      upper_eye_xy:
+      - 22.259074635100177
+      - 1057.459811296834
+      axis_xy:
+      - -0.03940817657983291
+      - 0.9992231960971747
+      centre_xy:
+      - 23.442429247059863
+      - 1027.454987930208
+      clocking: standard
+    final_distance_mm:
+      lower: 8.163911868412504e-08
+      upper: 3.0331480461808215e-05
+  - amplitude_mm: 11.428571428571429
+    pose:
+      length_mm: 65.11421391050222
+      lower_eye_xy:
+      - 24.625877497798108
+      - 997.4501682558123
+      upper_eye_xy:
+      - 22.25902553475547
+      - 1057.488546884905
+      axis_xy:
+      - -0.039391718649979965
+      - 0.9992238450426415
+      centre_xy:
+      - 23.44245151627679
+      - 1027.4693575703586
+      clocking: standard
+    final_distance_mm:
+      lower: 6.442468992565172e-08
+      upper: 3.798133133997932e-05
+  - amplitude_mm: 16
+    pose:
+      length_mm: 65.16622317979605
+      lower_eye_xy:
+      - 24.626047860691003
+      - 997.4501749693557
+      upper_eye_xy:
+      - 22.258947842558698
+      - 1057.540593460422
+      axis_xy:
+      - -0.03936177570770697
+      - 0.9992250250134532
+      centre_xy:
+      - 23.44249785162485
+      - 1027.4953842148889
+      clocking: standard
+    final_distance_mm:
+      lower: 3.4874368551152576e-08
+      upper: 3.393913811026823e-05
+  - amplitude_mm: 26.666666666666668
+    pose:
+      length_mm: 65.28918475694783
+      lower_eye_xy:
+      - 24.626454556702775
+      - 997.4501909754792
+      upper_eye_xy:
+      - 22.25882198423076
+      - 1057.6636452769005
+      axis_xy:
+      - -0.03929029491164999
+      - 0.9992278382459907
+      centre_xy:
+      - 23.442638270466766
+      - 1027.5569181261899
+      clocking: standard
+    final_distance_mm:
+      lower: 2.520581296906983e-08
+      upper: 5.0254057419392026e-05
+  - amplitude_mm: 80
+    pose:
+      length_mm: 65.93810303401109
+      lower_eye_xy:
+      - 24.628691072392588
+      - 997.4502784761567
+      upper_eye_xy:
+      - 22.259504958180262
+      - 1058.3130867087941
+      axis_xy:
+      - -0.03889720543627897
+      - 0.9992432173446302
+      centre_xy:
+      - 23.444098015286425
+      - 1027.8816825924755
+      clocking: standard
+    final_distance_mm:
+      lower: 1.359554776948268e-06
+      upper: 4.493113724644654e-06
+  presets:
+    neutral:
+      amplitudes_mm:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      counter:
+        pose:
+          length_mm: 351.4494413474412
+          lower_eye_xy:
+          - -91.35863004397497
+          - 1006.5053952329064
+          upper_eye_xy:
+          - -97.74989921855219
+          - 1348.3955028345717
+          axis_xy:
+          - -0.018690662786660896
+          - 0.9998253143047515
+          centre_xy:
+          - -94.55426463126358
+          - 1177.450449033739
+          clocking: half_turn
+        gooseneck_origin_y_mm: 1188.0266834092736
+        final_distance_mm:
+          lower: 7.438390676770681e-06
+          upper: 5.890844051453245e-10
+    square:
+      amplitudes_mm:
+      - 0
+      - 4.2105263157894735
+      - 0
+      - 4.705882352941177
+      - 0
+      - 5.333333333333333
+      - 0
+      - 6.153846153846154
+      - 0
+      - 7.2727272727272725
+      - 0
+      - 8.88888888888889
+      - 0
+      - 11.428571428571429
+      - 0
+      - 16
+      - 0
+      - 26.666666666666668
+      - 0
+      - 80
+      counter:
+        pose:
+          length_mm: 352.0322903830524
+          lower_eye_xy:
+          - -91.35836665158766
+          - 1006.5054001526553
+          upper_eye_xy:
+          - -97.74989938589168
+          - 1348.9784535311048
+          axis_xy:
+          - -0.018659628449350058
+          - 0.9998258939766125
+          centre_xy:
+          - -94.55413301873968
+          - 1177.74192684188
+          clocking: half_turn
+        gooseneck_origin_y_mm: 1188.6096591496762
+        final_distance_mm:
+          lower: 7.222479867779157e-07
+          upper: 5.553336380077784e-10

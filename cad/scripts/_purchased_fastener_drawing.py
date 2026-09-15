@@ -19,6 +19,7 @@ from _drawing_common import (
     property_link,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     sheet_drawable_region,
     stamp_drawing_summary,
 )
@@ -42,6 +43,12 @@ _VIEW_CELLS = (
     ("*Top", (0.120, 0.225), (0.050, 0.195, 0.190, 0.255)),
     ("*Right", (0.310, 0.125), (0.240, 0.0825, 0.380, 0.1675)),
     ("*Isometric", (0.310, 0.225), (0.240, 0.195, 0.380, 0.255)),
+)
+_SPRING_VIEW_CELLS = (
+    ("*Front", (0.111, 0.170), (0.015, 0.155, 0.207, 0.185)),
+    ("*Top", (0.111, 0.2315), (0.015, 0.200, 0.207, 0.263)),
+    ("*Right", (0.2335, 0.170), (0.207, 0.155, 0.260, 0.185)),
+    ("*Isometric", (0.3415, 0.2125), (0.265, 0.164, 0.418, 0.261)),
 )
 _PROPERTIES = (
     "Number",
@@ -85,29 +92,18 @@ def _rebuild(draw: Any, *, phase: str) -> None:
 
 
 @_telemetry.traced("drawing.purchased_fit_views")
-def _fit_views(draw: Any, views: list[Any]) -> tuple[int, int]:
-    # The initial 1:1 outlines include SOLIDWORKS' native view padding. The
-    # estimate only skips obviously oversized scales; actual regenerated bounds
-    # decide the result, including any padding that does not scale linearly.
+def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
+    # Native outlines include fixed sheet-space padding. Scaling a 1:1 outline
+    # can reject a larger view that actually fits; measure each standard scale.
     _rebuild(draw, phase="initial view extents")
-    extents = []
-    for view, (name, _, _) in zip(views, _VIEW_CELLS, strict=True):
+    for view, (name, _, _) in zip(views, cells, strict=True):
         ratio = tuple(float(value) for value in view.ScaleRatio)
         if len(ratio) != 2 or ratio != (1.0, 1.0):
             raise RuntimeError(
                 f"{name}: initial 1:1 view scale did not persist: {ratio!r}"
             )
-        extents.append(_box(view.GetOutline(), label=name))
-    limit = min(
-        min(
-            (cell[2] - cell[0]) / (box[2] - box[0]),
-            (cell[3] - cell[1]) / (box[3] - box[1]),
-        )
-        for box, (_, _, cell) in zip(extents, _VIEW_CELLS, strict=True)
-    )
+        _box(view.GetOutline(), label=name)
     for scale in _SCALES:
-        if scale[0] / scale[1] > limit:
-            continue
         with _telemetry.span(
             "drawing.purchased_scale_candidate", scale=f"{scale[0]}:{scale[1]}"
         ):
@@ -115,8 +111,17 @@ def _fit_views(draw: Any, views: list[Any]) -> tuple[int, int]:
                 view.UseSheetScale = 0
                 view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
             _rebuild(draw, phase="apply common view scale")
-            for view, (name, center, _) in zip(views, _VIEW_CELLS, strict=True):
-                box = _box(view.GetOutline(), label=name)
+            bounds = [
+                _box(view.GetOutline(), label=name)
+                for view, (name, _, _) in zip(views, cells, strict=True)
+            ]
+            if any(
+                box[2] - box[0] > cell[2] - cell[0]
+                or box[3] - box[1] > cell[3] - cell[1]
+                for box, (_, _, cell) in zip(bounds, cells, strict=True)
+            ):
+                continue
+            for view, (name, center, _), box in zip(views, cells, bounds, strict=True):
                 position = tuple(float(value) for value in view.Position)
                 if len(position) != 2 or not all(map(math.isfinite, position)):
                     raise RuntimeError(
@@ -131,7 +136,7 @@ def _fit_views(draw: Any, views: list[Any]) -> tuple[int, int]:
                     raise RuntimeError(f"{name}: failed to position purchased view")
             _rebuild(draw, phase="center purchased views")
             fits = True
-            for view, (name, center, cell) in zip(views, _VIEW_CELLS, strict=True):
+            for view, (name, center, cell) in zip(views, cells, strict=True):
                 ratio = tuple(float(value) for value in view.ScaleRatio)
                 if (
                     ratio != tuple(float(value) for value in scale)
@@ -150,7 +155,7 @@ def _fit_views(draw: Any, views: list[Any]) -> tuple[int, int]:
             if fits:
                 return scale
     raise RuntimeError(
-        "purchased fastener has no project-standard scale fitting all four view cells"
+        "purchased part has no project-standard scale fitting all four view cells"
     )
 
 
@@ -234,7 +239,7 @@ async def build_purchased_fastener_drawing(
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI."""
     stock = fastener(spec.artifact_stem)
     source = spec.source
-    template = DRAWING_TEMPLATES[spec.layout]
+
     if spec.source_kind != "part" or source.stem != stock.part_name:
         raise ValueError(f"purchased drawing source identity mismatch: {spec!r}")
     if not source.is_file():
@@ -267,9 +272,58 @@ async def build_purchased_fastener_drawing(
                     f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                 )
 
+    return await _build_reference_sheet(
+        adapter,
+        spec,
+        properties=properties,
+        finish=finish,
+        installation_notes=installation_notes,
+    )
+
+
+async def build_purchased_spring_drawing(
+    adapter: Any, spec: DrawingSpec
+) -> dict[str, str]:
+    """Use spring metadata without treating the part as a catalogued fastener."""
+    source = spec.source
+    if spec.source_kind != "part" or not source.is_file():
+        raise FileNotFoundError(f"source purchased spring is missing: {source}")
+    check(f"open {spec.artifact_stem} source", await adapter.open_model(str(source)))
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if Path(model.GetPathName()).resolve() != source.resolve():
+        raise RuntimeError(f"opened purchased spring is not {source}")
+    names = (*_PROPERTIES, "Material Specification", "Finish", "Manufacturing Notes")
+    properties = read_required_properties(model, names, required=names)
+    return await _build_reference_sheet(
+        adapter,
+        spec,
+        properties=properties,
+        finish=properties["Finish"],
+        material_property="Material Specification",
+        reference_notes=properties["Manufacturing Notes"],
+    )
+
+
+async def _build_reference_sheet(
+    adapter: Any,
+    spec: DrawingSpec,
+    *,
+    properties: dict[str, str],
+    finish: str,
+    material_property: str = "Material",
+    installation_notes: str = "",
+    reference_notes: str = "",
+) -> dict[str, str]:
+    source = spec.source
+    template = DRAWING_TEMPLATES[spec.layout]
+    cells = _SPRING_VIEW_CELLS if reference_notes else _VIEW_CELLS
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
-        adapter, draw, material=properties["Material"], finish=finish
+        adapter,
+        draw,
+        material=properties[material_property],
+        finish=finish,
+        material_property=material_property,
     )
     title = f"{properties['Title']} — Purchased Part Reference Drawing"
     with _telemetry.span("drawing.purchased_summary"):
@@ -280,25 +334,28 @@ async def build_purchased_fastener_drawing(
                 0: title,
                 1: "Harmonic Analyzer purchased-part identification; reference only",
                 2: "Harmonic Analyzer Project",
-                3: f"{stock.part_name}; {properties['Supplier']}; {properties['Supplier SKUs']}",
+                3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
                 4: "Front, Top, Right and Isometric; no fabrication dimensions or PMI",
             },
         )
 
     views = []
     with _telemetry.span("drawing.purchased_create_views"):
-        for name, center, _ in _VIEW_CELLS:
+        for name, center, _ in cells:
             view = _early_bound(
                 place_view(adapter, str(source), name, *center, scale=(1, 1)), "IView"
             )
-            set_hidden_lines_removed(adapter, view)
+            if name == "*Isometric":
+                set_hidden_lines_removed(adapter, view)
+            else:
+                set_hidden_lines_visible(adapter, view)
             views.append(view)
         # Later insertions may auto-adjust the sheet scale. Pin all views only
         # after insertion so the measurement pass is genuinely at native 1:1.
         for view in views:
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
-    scale = _fit_views(draw, views)
+    scale = _fit_views(draw, views, cells)
 
     with _telemetry.span("drawing.purchased_property_link"):
         values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
@@ -342,14 +399,21 @@ async def build_purchased_fastener_drawing(
 
     notes = []
     with _telemetry.span("drawing.purchased_annotations"):
-        for name, center, cell in _VIEW_CELLS:
+        for name, center, cell in cells:
             label = f"{name[1:].upper()}  {scale[0]}:{scale[1]}"
+            if reference_notes and name == "*Front":
+                label += "  (SHOWN AT INSTALLED LENGTH)"
             label_y = (
                 cell[3] + 0.007
                 if installation_notes and name in ("*Top", "*Isometric")
                 else cell[1] - 0.006
             )
-            note = _literal_note(adapter, label, center[0] - 0.026, label_y)
+            note = _literal_note(adapter, label, center[0], label_y)
+            bounds = _box(note.GetExtent(), label=label, kind="note")
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            x = 2 * center[0] - (bounds[0] + bounds[2]) / 2
+            if not annotation.SetPosition(x, label_y, 0.0):
+                raise RuntimeError(f"{label}: failed to center view caption")
             notes.append(
                 (
                     note,
@@ -393,6 +457,26 @@ async def build_purchased_fastener_drawing(
             note = _literal_note(adapter, link, 0.018, 0.189)
             notes.append((note, link, installation_notes, (0.015, 0.169, 0.225, 0.190)))
 
+        if reference_notes:
+            # Keep catalog data and set calibration intact in separate columns,
+            # below the aligned views and above the standard purchased footer.
+            lines = reference_notes.splitlines()
+            split = next(
+                (
+                    i
+                    for i, line in enumerate(lines)
+                    if line.startswith(("SET QC:", "SETUP:"))
+                ),
+                len(lines),
+            )
+            for column, text in enumerate(
+                ("\n".join(lines[:split]), "\n".join(lines[split:]))
+            ):
+                if not text:
+                    continue
+                x = 0.018 + column * 0.207
+                note = _literal_note(adapter, text, x, 0.140)
+                notes.append((note, text, text, (x - 0.003, 0.079, x + 0.195, 0.141)))
     with _telemetry.span("drawing.purchased_native_contract"):
         _rebuild(draw, phase="linked notes and final layout")
         for note, linked_text, resolved_text in title_block_notes:
@@ -406,9 +490,7 @@ async def build_purchased_fastener_drawing(
                 )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
-        if len(actual) != 4 or set(orientations) != {
-            name for name, _, _ in _VIEW_CELLS
-        }:
+        if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:
             raise RuntimeError(
                 f"purchased drawing must have exactly four native views: {orientations!r}"
             )
@@ -420,7 +502,7 @@ async def build_purchased_fastener_drawing(
             height=template.height_m,
         )
         border = (region.xmin, region.ymin, region.xmax, region.ymax)
-        for name, _, cell in _VIEW_CELLS:
+        for name, _, cell in cells:
             view = views_by_orientation[name]
             if Path(view.GetReferencedModelName()).resolve() != source.resolve():
                 raise RuntimeError(f"{name}: purchased view references the wrong model")

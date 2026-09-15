@@ -16,11 +16,10 @@ from channel_spring_installed_spec import (
 from spring_mount_geom import channel_force_n
 
 
-DRAWING_DIMENSIONS: dict[str, set[str]] = {}
-
 _QC_LENGTH_1_MM = 60.0
 _QC_LENGTH_2_MM = 80.0
 _QC_PIN_DIA_MM = 2.0
+_MATCHED_SET_SIZE = len(_config.channels())
 _QC_FORCE_1_N = channel_force_n(_QC_LENGTH_1_MM)
 _QC_FORCE_2_N = channel_force_n(_QC_LENGTH_2_MM)
 _MATCH_TOLERANCE_PERCENT = float(
@@ -30,18 +29,18 @@ _MATCH_TOLERANCE_PERCENT = float(
 DRAWING_NOTES = "\n".join(
     (
         "PURCHASED EXTENSION SPRING - REFERENCE DATA",
-        "  SUPPLIER / SKU .... McMASTER-CARR / 9432K31",
         "  END TYPE .......... MACHINE-HOOK ENDS",
         f"  FREE LENGTH ....... {FREE_LENGTH_MM:.2f} MM INSIDE HOOKS",
         f"  CATALOG MAX ....... {MAX_LENGTH_MM:.2f} MM AT {MAXIMUM_LOAD_N:.3f} N",
         f"  NOMINAL RATE ...... {SPRING_RATE_N_PER_MM:.4f} N/MM "
         f"(+/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% CATALOG)",
         f"  INITIAL TENSION ... {INITIAL_TENSION_N:.3f} N "
-        f"(+/-{INITIAL_TENSION_TOLERANCE_N:.6f} N)",
+        f"(+/-{INITIAL_TENSION_TOLERANCE_N:.2f} N CATALOG)",
         f"  ILLUSTRATED LENGTH  {INSTALLED_LENGTH_MM:.2f} MM INSIDE HOOKS",
         "  CAD COILS: REFERENCE GEOMETRY ONLY;",
         "  DO NOT DERIVE FORCE FROM THE COILS.",
-        f"SET QC: USE Ø{_QC_PIN_DIA_MM:.2f} MM PINS; PIN C-C = "
+        f"SET QC: MATCHED SET OF {_MATCHED_SET_SIZE} SPRINGS.",
+        f"  USE Ø{_QC_PIN_DIA_MM:.2f} MM PINS; PIN C-C = "
         f"{_QC_LENGTH_1_MM - _QC_PIN_DIA_MM:.2f}/"
         f"{_QC_LENGTH_2_MM - _QC_PIN_DIA_MM:.2f} MM.",
         f"  THIS REPRESENTS {_QC_LENGTH_1_MM:.2f}/{_QC_LENGTH_2_MM:.2f} MM "
@@ -49,8 +48,9 @@ DRAWING_NOTES = "\n".join(
         f"  NOMINAL F60/F80 = {_QC_FORCE_1_N:.3f}/{_QC_FORCE_2_N:.3f} N.",
         "  RATE = (F80-F60)/20.00 MM.",
         "  READ EACH FORCE 30 S AFTER LOADING.",
-        f"  ALL 20 WITHIN +/-{_MATCH_TOLERANCE_PERCENT:.2f}% OF SET MEAN;",
-        "  USE ONE COMMON SET MEAN.",
+        f"  EACH SPRING RATE WITHIN +/-{_MATCH_TOLERANCE_PERCENT:.2f}%",
+        "  OF THE COMMON SET MEAN RATE.",
+        "  RECORD F60/F80; MATCH RATES, NOT FORCES.",
         f"  CATALOG +/-{100.0 * SPRING_RATE_TOLERANCE_FRACTION:.0f}% "
         "DOES NOT MEET THE SET-MATCH LIMIT.",
         "  RECORD COMMON RATE MEAN AND EACH",
@@ -58,5 +58,3 @@ DRAWING_NOTES = "\n".join(
         "  COUNTERSPRING AND MAGNIFIER CALIBRATION.",
     )
 )
-
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC REFERENCE VIEW SCALE 1:1"

@@ -27,7 +27,7 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  channel-spring-installed x20 (McMaster 9432K31, with native-seated
+  channel-spring-installed x20 (McMaster 9432K31, with fixed measured
   installed-length variants),
   spring-hook x20 (McMaster 9489T111 eyebolts, supplied nuts omitted;
   their shanks thread directly into the summing plate)
@@ -40,10 +40,10 @@ The bar rests its foot-notch roof on the tilted arm's top-edge arc
 leaves the levers essentially level (-0.002 deg at neutral, the ch14 ROM
 re-derive rest pose). Purchased 9432K31 hooks seat in the existing lever
 holes and in 9489T111 lower eyes. The lower anchors thread directly into
-the summing plate, without nuts. ``spring_mount_geom`` supplies catalog
-seeds; native surface contact determines the installed lengths and bearing
-positions. Eye centres are not pin-contact points. The plate lives in summing.SLDASM, so
-its threaded engagement and clearances are also checked at the top level.
+the summing plate, without nuts. ``settled_spring_seats`` loads the fixed
+measured placement table for each supported amplitude; the build performs
+no native fitting or trial motion. Eye centres are not pin-contact points. The
+lower anchors' threaded engagement and clearances are checked at the top level.
 
 Orientation notes: the amplitude bar is rotated 90 deg about its long
 axis (Ry(-90), machine frame) so its end slots and O2 top pin hole run
@@ -52,8 +52,8 @@ lies perpendicular to the lever face. Channel
 stations: z_j = -64.0124 + 7.0565 j, arm/bar/lever mid-planes at z_j + 0.8,
 cam/rod plane z_j - 3.25 (rod tip strap face-flush against the arm).
 
-Operational DOF use semantic contact mates; fixed hardware and the spring
-display bank retain their computed transforms. Radial joints are concentric
+Operational DOF use semantic contact mates; fixed hardware and the static
+spring bank retain their measured transforms. Radial joints are concentric
 or coincident, and parts within a channel slice share an axial reference:
   * rocker/lever concentric on the shaft OD; rod/bar coincident axis-to-
     axis on the named bore axes (the revolute radials);
@@ -64,8 +64,8 @@ or coincident, and parts within a channel slice share an axial reference:
     mid-plane (lever Front plane / bar MidWidth plane), so a channel's
     parts share ONE Z reference;
   * the fulcrum shaft is datum-located by orthogonal plane distances;
-  * springs and lower anchors are grounded at their native-seated / threaded
-    installation transforms; these display solids are not a force solver.
+  * springs and lower anchors are grounded at fixed measured / threaded
+    installation transforms; their actual final contacts are statically gated.
 Each of the rocker/rod/bar joints keeps its operational DOF genuinely
 FREE (rocker swing + rod follow + bar amplitude -- 3 live DOF per
 channel); each freed DOF's drive spec is recorded into the assembly's
@@ -111,7 +111,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
-from dataclasses import replace
+import functools
 import math
 import sys
 from typing import Any, Literal
@@ -119,6 +119,7 @@ from typing import Any, Literal
 import _config
 import _telemetry
 import channel_kinematics
+import settled_spring_seats
 from _common import (
     UNDER_CONSTRAINED,
     _early_bound,
@@ -128,13 +129,11 @@ from _common import (
     log,
     run_build,
 )
-from _native_spring_contact import solve_component_contact
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
-    assert_pose_ledger,
     bore_axis_ref,
     check_no_interference,
     coincident_mate,
@@ -154,6 +153,7 @@ from _assembly import (
     world_point,
     write_dof_manifest,
 )
+from _native_spring_contact import assert_assembly_spring_contacts
 from _cwm import (
     component_constrained_status,
     component_distance_mate_flip,
@@ -497,9 +497,9 @@ async def _locate_to_datum(adapter, name: str) -> None:
     so its principal planes map same-name to the assembly planes (Right->X,
     Top->Y, Front->Z). The live origin (read post-mirror) gives the three
     distances, so it is mirror-agnostic; coord 0 degenerates to a coincident.
-    (The cosmetic bank -- springs, spring-hooks -- is GROUNDED at its computed
-    insert transform instead, and the bushings are patterned; see the bank
-    blocks in build().)
+    (The fixed measured spring bank is GROUNDED at its complete insert
+    transforms instead, and the bushings are patterned; see the bank blocks in
+    build().)
     """
     o = _org(adapter, name)
     pairs = (
@@ -680,160 +680,43 @@ def _assert_spring_mount(
 
 
 async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list[dict]:
-    """Fit supplier end surfaces before building the main channel assembly.
+    """Load fixed measured seats and build one native variant per amplitude.
 
-    Each distinct amplitude uses a three-part native fixture. End corrections
-    change the installed length, not the supplier end geometry or the pull axis.
-    A rebuilt variant is measured again because a native sweep need not preserve
-    its end surface exactly when its overall path changes.
+    Every lookup completes before the first COM build so an unsupported preset
+    fails without placing or rebuilding any spring. Variant indices retain the
+    amplitude preset's first-occurrence order.
     """
+    unique_amplitudes = list(dict.fromkeys(amplitudes))
+    seats_by_amplitude = {
+        amplitude: settled_spring_seats.channel_seat(amplitude)
+        for amplitude in unique_amplitudes
+    }
     by_amplitude: dict[float, dict] = {}
-    for station, amplitude in enumerate(amplitudes):
-        if amplitude in by_amplitude:
-            continue
-        z_mid = z_station(station) + ARM_MID_DZ
-        pose = spring_mounts.channel_pose(amplitude)
-        part = "channel-spring-installed"
+    for amplitude in unique_amplitudes:
+        seat = seats_by_amplitude[amplitude]
+        pose = seat.pose
+        spring_stock.check_length_mm(pose.length_mm)
+        if spring_mounts.channel_force_n(pose.length_mm) > float(
+            _config.parts("channel-spring-installed")["maximum_load_n"]
+        ):
+            raise RuntimeError("settled channel spring exceeds catalog load")
         variant_index = len(by_amplitude)
-        variant = f"channel-spring-installed-stretch{variant_index:02d}"
-        if pose.length_mm != spring_mounts.CHANNEL_NOMINAL_POSE.length_mm:
-            await build_spring(adapter, variant, pose.length_mm, views=[])
-            adapter.swApp.CloseDoc(
-                _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
-            )
-            part = variant
-        state = channel_kinematics.solve_state(amplitude)
-        lever_rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
-        ux, uy = pose.axis_xy
-        for iteration in range(8):
-            owned_titles = []
-            try:
-                check("create spring seating fixture", await adapter.create_assembly())
-                fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-                owned_titles.append(str(fixture.GetTitle()))
-                lever = await place_component(
-                    adapter,
-                    "channel-lever",
-                    [FULCRUM[0], FULCRUM[1], z_mid],
-                    euler_from_rows(lever_rows),
-                    lever_rows,
-                )
-                spring, hook = await place_components_batch(
-                    adapter,
-                    [
-                        {
-                            "part": part,
-                            "position": [*pose.centre_xy, z_mid],
-                            "rotation": [0.0, 0.0, 0.0],
-                            "rows": pose.rotation_rows,
-                            "ground": True,
-                        },
-                        {
-                            "part": "spring-hook",
-                            "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
-                            "rotation": [0.0, 0.0, 0.0],
-                            "rows": IDENTITY,
-                            "ground": True,
-                        },
-                    ],
-                    label="native spring seating fixture",
-                )
-                assembly = _early_bound(fixture, "IAssemblyDoc")
-                for name in (lever, spring, hook):
-                    component = _early_bound(
-                        assembly.GetComponentByName(name), "IComponent2"
-                    )
-                    document = _early_bound(component.GetModelDoc2(), "IModelDoc2")
-                    owned_titles.append(str(document.GetTitle()))
-                radius = spring_stock.WIRE_DIA_MM / 2.0
-                lower = solve_component_contact(
-                    adapter,
-                    spring,
-                    hook,
-                    (-ux, -uy, 0.0),
-                    radius,
-                    label=f"channel {amplitude:g} lower",
-                )
-                upper = solve_component_contact(
-                    adapter,
-                    spring,
-                    lever,
-                    (ux, uy, 0.0),
-                    radius,
-                    label=f"channel {amplitude:g} upper",
-                )
-                seated = (
-                    lower.certificate == "already_seated"
-                    and upper.certificate == "already_seated"
-                )
-                _telemetry.event(
-                    "spring.channel_contact_iteration",
-                    amplitude_mm=amplitude,
-                    iteration=iteration + 1,
-                    inside_length_mm=pose.length_mm,
-                    lower_offset_mm=lower.offset_mm,
-                    upper_offset_mm=upper.offset_mm,
-                    lower_certificate=lower.certificate,
-                    upper_certificate=upper.certificate,
-                )
-                if seated:
-                    check_no_interference(adapter)
-                assert_pose_ledger(adapter)
-            finally:
-                for title in dict.fromkeys(owned_titles):
-                    adapter.swApp.CloseDoc(title)
-            if seated:
-                spring_stock.check_length_mm(pose.length_mm)
-                if spring_mounts.channel_force_n(pose.length_mm) > float(
-                    _config.parts("channel-spring-installed")["maximum_load_n"]
-                ):
-                    raise RuntimeError(
-                        "native-seated channel spring exceeds catalog load"
-                    )
-                by_amplitude[amplitude] = {
-                    "pose": pose,
-                    "variant_index": None
-                    if part == "channel-spring-installed"
-                    else variant_index,
-                }
-                _telemetry.event(
-                    "spring.channel_seated",
-                    amplitude_mm=amplitude,
-                    inside_length_mm=pose.length_mm,
-                    seed_length_mm=spring_mounts.channel_pose(amplitude).length_mm,
-                    iterations=iteration + 1,
-                    lower_contact_offset_mm=lower.offset_mm,
-                    upper_contact_offset_mm=upper.offset_mm,
-                )
-                break
-            lower_eye = tuple(
-                pose.lower_eye_xy[k] - pose.axis_xy[k] * lower.offset_mm
-                for k in range(2)
-            )
-            upper_eye = tuple(
-                pose.upper_eye_xy[k] + pose.axis_xy[k] * upper.offset_mm
-                for k in range(2)
-            )
-            pose = replace(
-                pose,
-                length_mm=spring_stock.check_length_mm(
-                    pose.length_mm + lower.offset_mm + upper.offset_mm
-                ),
-                lower_eye_xy=lower_eye,
-                upper_eye_xy=upper_eye,
-                centre_xy=tuple((a + b) / 2.0 for a, b in zip(lower_eye, upper_eye)),
-            )
-            await build_spring(adapter, variant, pose.length_mm, views=[])
-            adapter.swApp.CloseDoc(
-                _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
-            )
-            part = variant
-        else:
-            raise RuntimeError(
-                f"native channel spring seating did not converge at {amplitude:g} mm: "
-                f"length={pose.length_mm:.12g}, lower={lower.offset_mm:.12g}, "
-                f"upper={upper.offset_mm:.12g} mm"
-            )
+        part = "channel-spring-installed"
+        variant = f"{part}-stretch{variant_index:02d}"
+        await build_spring(adapter, variant, pose.length_mm, views=[])
+        adapter.swApp.CloseDoc(
+            _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+        )
+        by_amplitude[amplitude] = {
+            "pose": pose,
+            "variant_index": variant_index,
+        }
+        _telemetry.event(
+            "spring.channel_fixed_seat",
+            amplitude_mm=amplitude,
+            inside_length_mm=pose.length_mm,
+            variant_index=variant_index,
+        )
     return [by_amplitude[amplitude] for amplitude in amplitudes]
 
 
@@ -841,8 +724,8 @@ async def build(adapter) -> dict[str, str]:
     # The amplitude-bar station per channel IS the Fourier coefficient a_j
     # (channels.yaml amplitude_mm, the square-wave preset). solve_state(a_j)
     # repositions that channel's bar + lever; a_j = 0 is the neutral pose. The
-    # neutral state still anchors the amplitude-independent rocker/rod and the
-    # cosmetic spring/threading seed.
+    # neutral state still anchors the amplitude-independent rocker/rod and uses
+    # the first fixed calibrated spring variant (stretch00).
     amplitudes = _config.amplitudes()
     if any(a < 0.0 for a in amplitudes):
         raise RuntimeError(
@@ -868,29 +751,19 @@ async def build(adapter) -> dict[str, str]:
         % ", ".join(f"{a:.2f}" for a in amplitudes)
     )
 
-    _assert_spring_mount(
-        spring_mounts.CHANNEL_NOMINAL_POSE, 0.0, state="catalog_seed"
-    )
+    _assert_spring_mount(spring_mounts.CHANNEL_NOMINAL_POSE, 0.0, state="catalog_seed")
 
     # Bushing clearance under the bar foot at d = 0 (geometry gate).
     bar_clearance = state["bar_bottom"] - PIVOT[1]
     if bar_clearance < 5.5:
         raise RuntimeError(f"bar passes only {bar_clearance:.2f} above the shaft")
 
-    # Native supplier surfaces, rather than ideal circular-wire offsets, own
-    # installed seating. The existing stretch-part cache carries these variants.
-    native_springs = await _prepare_native_spring_specs(adapter, amplitudes)
-    spring_specs = [
-        {"pose": row["pose"], "variant_index": row["variant_index"]}
-        for row in native_springs
-    ]
-    # Keep component source families explicit for the static build graph.
+    # Fixed measured supplier-surface seats own the installed poses. Build each
+    # calibrated length exactly once, retaining first-occurrence stretch names.
+    spring_specs = await _prepare_native_spring_specs(adapter, amplitudes)
+    # Keep the generated variant family explicit for the static build graph.
     for spec in spring_specs:
-        spec["part"] = "channel-spring-installed"
-        if spec["variant_index"] is not None:
-            spec["part"] = (
-                f"channel-spring-installed-stretch{spec['variant_index']:02d}"
-            )
+        spec["part"] = f"channel-spring-installed-stretch{spec['variant_index']:02d}"
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -1021,23 +894,19 @@ async def build(adapter) -> dict[str, str]:
     # The springs and the two bushing banks are grounded repeated structure, but
     # they are placed EXPLICITLY per channel (springs in the loop, bushings in
     # each inter-channel gap) rather than seeded once and replicated by a
-    # LocalLinearPattern. The pattern's direction sense is read from the shaft's
-    # cosmetic repeated structure. The bushing banks are seed+pattern off the
-    # BankZ reference axis (see the block above the loop); the springs and
-    # spring-hooks are per-channel GROUNDED cosmetic parts (Pedro 2026-07-09,
-    # v018 perf review): no operational DOF, no in-subassembly contact partner,
-    # and a pose fully computed at insert time (the per-channel amplitude tilt
-    # is baked into spring_rows), so the placement transform IS the final pose
-    # and the old 7-mates-per-channel locate battery bought nothing but ~140
-    # late-assembly mate solves. Their specs are COLLECTED per channel and
-    # inserted in ONE AddComponents3 + fixed in ONE FixComponent (Select2 each,
-    # one solve) after the chain loops (place_components_batch). The MOVING
-    # parts stay individual mated instances so each channel articulates
-    # independently (a different harmonic frequency) for the Motion study --
-    # but they are NOT all authored one by one: only the seeds are
-    # (_author_channel); same-amplitude channels are replicated from their
-    # seed's slice by CopyWithMates2 (the dispatch loop), each copy validated
-    # against the seed pose from the model.
+    # LocalLinearPattern. The bushing banks are seed+pattern off the BankZ
+    # reference axis (see the block above the loop); the springs and spring-hooks
+    # are per-channel GROUNDED static parts with complete measured insert poses.
+    # They have no operational DOF, while their actual final lower/upper contacts
+    # are checked against the threaded hook and actual lever instances. The old
+    # 7-mates-per-channel locate battery bought nothing but about 140 late-
+    # assembly mate solves. Their specs are collected per channel and inserted
+    # in one AddComponents3 + one FixComponent after the chain loops
+    # (place_components_batch). The moving parts stay individual mated instances
+    # so each channel articulates independently for the Motion study, but they
+    # are not all authored one by one: only the seeds are. Same-amplitude channels
+    # are replicated from their seed's slice by CopyWithMates2, with each copy
+    # validated against the seed pose from the model.
     grounded_specs: list[dict[str, Any]] = []
     free_dof_keys: list[str] = []  # freed operational DOF recorded in the manifest
 
@@ -1666,11 +1535,13 @@ async def build(adapter) -> dict[str, str]:
     for j in range(CHANNELS):
         z_mid = z_station(j) + ARM_MID_DZ
         # The supplier frame has its origin at mid-length and coil axis +X.
-        # These remain grounded display components; they are not a force solver.
+        # These grounded components use the complete fixed measured seat.
         spec = spring_specs[j]
         pose = spec["pose"]
         _assert_spring_mount(
-            spring_mounts.channel_pose(amplitudes[j]), amplitudes[j], state="catalog_seed"
+            spring_mounts.channel_pose(amplitudes[j]),
+            amplitudes[j],
+            state="catalog_seed",
         )
         _assert_spring_mount(pose, amplitudes[j], state="native_seated")
         grounded_specs.append(
@@ -1692,24 +1563,13 @@ async def build(adapter) -> dict[str, str]:
             }
         )
 
-    # Insert the cosmetic bank (springs + spring-hooks; the bushings were
-    # patterned before the loop) in ONE AddComponents3 + ONE FixComponent
-    # (ground=True). GROUNDED, not semantically mated -- PURELY a
-    # build-performance measure (Pedro 2026-07-09, reversing the #110
-    # treatment for THIS bank only; no kinematic or gate semantics change,
-    # the parts were pinned to global datums and never articulated): both are
-    # cosmetic with no operational DOF and no in-subassembly contact partner
-    # (hooks seat in the summing plate, ANOTHER subassembly; springs' hook/ring
-    # joints have perpendicular axes, no faithful concentric), so the old
-    # locate battery only re-pinned the already-computed insert pose at the
-    # price of ~140 late-assembly mate solves (~4-5 s each, v0.18.0). A fixed
-    # exact-transform part also cannot flip. The per-channel amplitude tilt is
-    # baked into spring_rows, so grounding holds for every preset -- the #113
-    # vertical-only trap does not apply (nothing is re-derived from a mate).
+    # Insert the fixed measured spring bank in one AddComponents3 call. The
+    # persisted native gate re-enumerates every actual top-level occurrence by
+    # source family and station; no ephemeral builder names carry that proof.
     for spec in grounded_specs:
         spec["ground"] = True
     await place_components_batch(
-        adapter, grounded_specs, label="cosmetic bank (springs + hooks, grounded)"
+        adapter, grounded_specs, label="fixed measured spring bank (grounded)"
     )
 
     # Free kinematic model: the per-channel operational DOF (rocker swing +
@@ -1760,7 +1620,14 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "channel assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        native_contact_check=functools.partial(
+            assert_assembly_spring_contacts,
+            channel_count=CHANNELS,
+        ),
+    )
 
 
 if __name__ == "__main__":

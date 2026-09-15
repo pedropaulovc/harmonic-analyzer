@@ -44,7 +44,6 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import sys
-from dataclasses import replace
 
 from _common import (
     apply_custom_properties,
@@ -53,6 +52,7 @@ from _common import (
     log,
     run_build,
 )
+import settled_spring_seats
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     angle_driver,
@@ -67,13 +67,11 @@ from _assembly import (
     lock_mate,
     named_ref,
     place_component,
-    reledger_to_solved,
     reset_dof_manifest,
     save_assembly_and_images,
     write_dof_manifest,
 )
-from _cwm import put_component_pose
-from _native_spring_contact import solve_component_contact
+from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
@@ -181,24 +179,20 @@ import summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# Analytical seeds only: unchanged supplier bodies determine final native seats.
-SPRING_SEED_POS = (*spring_mounts.COUNTER_REFERENCE_POSE.centre_xy, SUMMING_Z)
-GOOSENECK_SEED_POS = (COLUMN_X, spring_mounts.GOOSENECK_ORIGIN_Y, SUMMING_Z)
+# The counter spring and gooseneck use complete calibrated placements loaded by
+# ``counter_seat`` before assembly creation.
 
 
 def _assert_counter_spring_top_hang(
-    pose: spring_mounts.SpringPose | None = None,
-    gooseneck_y: float | None = None,
+    pose: spring_mounts.SpringPose,
+    gooseneck_y: float,
 ) -> None:
-    """Bound retention/envelopes, not native wire contact.
+    """Bound retention and envelopes at the fixed measured placement.
 
-    Defaults check the analytical insertion seeds offline. The assembly passes
-    its actual translated pose and gooseneck height after native seating; only
-    the native body predicate certifies contact. The half-turn clocking keeps
-    the raised end on the open side of the arm.
+    Native body contact is certified separately against actual final component
+    instances. The half-turn clocking keeps the raised end on the open side of
+    the arm.
     """
-    pose = spring_mounts.COUNTER_REFERENCE_POSE if pose is None else pose
-    gooseneck_y = GOOSENECK_SEED_POS[1] if gooseneck_y is None else gooseneck_y
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + gooseneck_geom.ARM_Y
     retention = (gooseneck_geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
@@ -209,11 +203,15 @@ def _assert_counter_spring_top_hang(
         + uy * counter_stock.LOOP_HALF_RISE_MM
         + counter_stock.WIRE_RADIUS_MM
     )
-    axial_gap = min(
-        pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
-        spring_mounts.GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN
-        - pose.upper_eye_xy[0],
-    ) - band
+    axial_gap = (
+        min(
+            pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
+            spring_mounts.GOOSENECK_END_X
+            + gooseneck_geom.SCREW_SHANK_LEN
+            - pose.upper_eye_xy[0],
+        )
+        - band
+    )
     if axial_gap < spring_mounts.MIN_CLEARANCE_MM:
         raise RuntimeError(
             f"double-loop band does not fit exposed shank: {axial_gap:.3f} mm"
@@ -238,7 +236,7 @@ def _assert_counter_spring_top_hang(
     )
 
 
-def _assert_counter_spring_hang() -> None:
+def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
     """Require full direct thread engagement and a tensioned supplier spring."""
     anchor = ANCHOR_9490T1
     tap = summing_lever_spec.COUNTER_HOLE_SPEC
@@ -250,75 +248,20 @@ def _assert_counter_spring_hang() -> None:
         raise RuntimeError("counter anchor thread start is not at the boss face")
     if spring_mounts.COUNTER_SHANK_LENGTH_MM < summing_lever_spec.ANCHOR_H - 1e-6:
         raise RuntimeError("trimmed counter anchor does not engage the full boss")
-    pose = spring_mounts.COUNTER_REFERENCE_POSE
     counter_stock.validate_length_mm(pose.length_mm)
     log(
         f"counter lower anchor: {tap.size} direct through tap, "
         f"{summing_lever_spec.ANCHOR_H:.3f} mm engagement; "
         f"spring inside length {pose.length_mm:.4f} mm, "
-        f"reference force {spring_mounts.counter_force_n(pose.length_mm):.3f} N"
-    )
-
-
-def _seat_counter_native_contacts(adapter, counter: str, boss_hook: str, gooseneck: str) -> None:
-    """Translate rigid supplier geometry to its two independently certified seats."""
-    seed = spring_mounts.COUNTER_REFERENCE_POSE
-    ux, uy = seed.axis_xy
-    lower_direction = (-ux, -uy, 0.0)
-    upper_direction = (0.0, -1.0, 0.0)
-    bracket = spring_mounts.MIN_CLEARANCE_MM / 2.0
-
-    def land(name: str, direction: tuple[float, float, float], offset: float) -> None:
-        target = component_transform(adapter, name)
-        for axis, value in enumerate(direction):
-            target[9 + axis] += value * offset / 1000.0
-        put_component_pose(adapter, name, target)
-        actual = component_transform(adapter, name)
-        if len(actual) != len(target) or max(abs(a - b) for a, b in zip(actual, target)) > 1e-12:
-            raise RuntimeError(f"{name}: native seating transform readback mismatch")
-        reledger_to_solved(adapter, name)
-
-    lower = solve_component_contact(
-        adapter, counter, boss_hook, lower_direction, bracket,
-        label="counter lower native seat",
-    )
-    land(counter, lower_direction, lower.offset_mm)
-    upper = solve_component_contact(
-        adapter, gooseneck, counter, upper_direction, bracket,
-        label="counter upper native seat",
-    )
-    land(gooseneck, upper_direction, upper.offset_mm)
-    # A fresh already_seated certificate witnesses the CURRENT native placement.
-    # A bracketed result instead proposes another move and must not pass this
-    # check. The full assembly gate independently retains zero overlap.
-    for label, moving, fixed, direction in (
-        ("counter lower", counter, boss_hook, lower_direction),
-        ("counter upper", gooseneck, counter, upper_direction),
-    ):
-        contact = solve_component_contact(
-            adapter, moving, fixed, direction, bracket, label=f"{label} native seat verification",
-        )
-        if contact.certificate != "already_seated":
-            raise RuntimeError(f"{label}: current native seat is not certified ({contact!r})")
-    actual_centre = component_origin(adapter, counter)
-    dx, dy = (actual_centre[i] - seed.centre_xy[i] for i in range(2))
-    pose = replace(
-        seed,
-        centre_xy=tuple(actual_centre[:2]),
-        lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
-        upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
-    )
-    _assert_counter_spring_top_hang(pose, component_origin(adapter, gooseneck)[1])
-    log(
-        f"counter native seats: lower {lower.offset_mm:.9g} mm along -axis, "
-        f"gooseneck {upper.offset_mm:.9g} mm along -Y; "
-        f"unchanged supplier inside length {pose.length_mm:.9g} mm"
+        f"calibrated force {spring_mounts.counter_force_n(pose.length_mm):.3f} N"
     )
 
 
 async def build(adapter) -> dict[str, str]:
-    _assert_counter_spring_hang()
-    _assert_counter_spring_top_hang()
+    counter_seat, gooseneck_origin_y = settled_spring_seats.counter_seat()
+    counter_pose = counter_seat.pose
+    _assert_counter_spring_hang(counter_pose)
+    _assert_counter_spring_top_hang(counter_pose, gooseneck_origin_y)
     _assert_knife_hanger_stack()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -505,26 +448,25 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Axis2@{sl}", "AXIS"),
         label="boss-hook keyed",
     )
-    # Preserve the vendor +X coil frame and its required half-turn clocking.
-    counter = await place_component(
+    # Preserve the vendor +X coil frame and required half-turn clocking at the
+    # complete fixed measured pose; no seed placement or corrective move follows.
+    await place_component(
         adapter,
         "counter-spring",
-        list(SPRING_SEED_POS),
-        euler_from_rows(spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows),
-        spring_mounts.COUNTER_REFERENCE_POSE.rotation_rows,
+        [*counter_pose.centre_xy, SUMMING_Z],
+        euler_from_rows(counter_pose.rotation_rows),
+        counter_pose.rotation_rows,
     )
-    # Ry(180): the gooseneck's overhang arm reaches from
-    # the east column toward the machine centre. The post is held in the
-    # top-frame casting's rail-hub bore by its 1/4-20 set screw
-    # (frame.SLDASM) -- there is no separate clamp part.
-    gooseneck = await place_component(
+    # Ry(180): the gooseneck's overhang arm reaches from the east column toward
+    # the machine centre. Its measured origin Y is inserted directly; the post
+    # is held in the top-frame rail-hub bore by its 1/4-20 set screw.
+    await place_component(
         adapter,
         "gooseneck",
-        list(GOOSENECK_SEED_POS),
+        [COLUMN_X, gooseneck_origin_y, SUMMING_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
-    _seat_counter_native_contacts(adapter, counter, bh, gooseneck)
 
     # Certify the AS-BUILT model.  The lever rock remains the sole intended
     # freed DOF; the exact allowed-stem set rejects any free washer, bolt, or
@@ -564,7 +506,11 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "summing assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        native_contact_check=assert_assembly_spring_contacts,
+    )
 
 
 if __name__ == "__main__":
