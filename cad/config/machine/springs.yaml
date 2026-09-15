@@ -1,5 +1,7 @@
 # Fixed native placements; preserve full floating-point round-trip precision.
 # Distance guards bound measurement uncertainty, never placement clearance.
+# channels.yaml must exactly match a preset vector below. Custom stations require
+# new native calibration; builds never interpolate or search for a replacement.
 springs:
   source: Native mate-solved calibration at 2f471f3f; full saved-assembly acceptance
     is required by the build gates.
