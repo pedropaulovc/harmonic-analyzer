@@ -601,3 +601,17 @@ def test_explicit_channel_count_rejects_out_of_range_without_clamping(
             "channel",
             channel_count=channel_count,
         )
+
+
+def test_default_channel_count_cannot_certify_an_empty_assembly(monkeypatch):
+    import _config
+
+    monkeypatch.setattr(_config, "active_count", lambda: 0)
+    monkeypatch.setattr(_config, "active_channels", lambda: [])
+    with pytest.raises(ValueError):
+        contact.assert_assembly_spring_contacts(None, "channel")
+
+
+def test_channel_override_is_not_silently_ignored_for_summing():
+    with pytest.raises(ValueError):
+        contact.assert_assembly_spring_contacts(None, "summing", channel_count=2)

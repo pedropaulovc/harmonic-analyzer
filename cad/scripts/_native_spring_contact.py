@@ -460,6 +460,8 @@ def assert_assembly_spring_contacts(
     form one spring/hook/lever triplet per selected amplitude. Summing has one
     counter chain. No component is moved and no rebuild is requested.
     """
+    if channel_count is not None and asm_name != "channel":
+        raise ValueError("channel_count applies only to the channel assembly")
     if asm_name == "channel":
         import _config
         import settled_spring_seats
@@ -467,6 +469,8 @@ def assert_assembly_spring_contacts(
         if channel_count is None:
             selected_channels = _config.active_channels()
             count = _config.active_count()
+            if count < 1:
+                raise ValueError("channel native contact requires at least one channel")
             if len(selected_channels) != count:
                 raise RuntimeError(
                     f"channel calibration selected {len(selected_channels)} active "

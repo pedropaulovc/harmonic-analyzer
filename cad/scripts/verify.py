@@ -1181,6 +1181,9 @@ async def _verify_static_one(
         # Reconcile only after every repair is safely on disk. Put the requested
         # top-level target last, and never reactivate a pre-reconcile COM handle
         # after CloseAllDocuments.
+        # Finish reconciling all already-saved repairs even if one native check
+        # fails. The verifier leaves producer fingerprints absent; the next
+        # refresh deliberately re-gates and fingerprints the repaired geometry.
         reconcile_order = sorted(repaired_documents, key=lambda item: item[0] == name)
         for repaired_name, _stale_model in reconcile_order:
             failures_before_reconcile = len(report.failed)

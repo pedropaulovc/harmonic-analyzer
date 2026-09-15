@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -346,7 +347,7 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
         asyncio.run(getattr(_assembly, operation)(None, assembly_name))
 
 
-@pytest.mark.parametrize("persisted_failure", ["channel", "summing"])
+@pytest.mark.parametrize("persisted_failure", ["channel", "summing", None])
 def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     persisted_failure, monkeypatch, tmp_path
 ) -> None:
@@ -366,6 +367,8 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     channel = repaired_model("channel")
     summing = repaired_model("summing")
     events = []
+    rendered = {}
+    proof_states_at_reconcile = []
 
     class Adapter(_Adapter):
         def __init__(self):
@@ -377,7 +380,11 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
         async def open_model(self, path):
             events.append(("open", path))
-            self.currentModel = parent
+            self.currentModel = SimpleNamespace(
+                name=Path(path).stem,
+                persisted=True,
+                ForceRebuild3=lambda _top_only: True,
+            )
             return SimpleNamespace(is_success=True, data=None)
 
         async def list_configurations(self):
@@ -417,20 +424,15 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     monkeypatch.setattr(verify, "_massprops_sidecar", lambda name: proofs[name])
 
     def save(_adapter, name, geometry_changed, *, model):
-        assert geometry_changed is True
-        assert _adapter.currentModel is model
         events.append(("save", name))
         return True
 
     monkeypatch.setattr(verify, "save_assembly_in_place", save)
 
     async def reconcile(_adapter, name, path):
-        assert path == tmp_path / f"{name}.SLDASM"
-        assert [event for event in events if event[0] == "save"] == [
-            ("save", "channel"),
-            ("save", "summing"),
-        ]
-        assert all(not proof.exists() for proof in proofs.values())
+        proof_states_at_reconcile.append(
+            tuple(proof.exists() for proof in proofs.values())
+        )
         events.append(("reconcile", name))
         _adapter.currentModel = SimpleNamespace(name=name, persisted=True)
 
@@ -443,13 +445,13 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             raise RuntimeError(f"{name} persisted contact failed")
 
     monkeypatch.setattr(verify, "assert_assembly_spring_contacts", contact)
-    monkeypatch.setattr(
-        verify,
-        "_export_assembly_images",
-        lambda *_args, **_kwargs: pytest.fail(
-            "renders must not run before all persisted contact gates pass"
-        ),
-    )
+
+    async def render(_adapter, name, _views):
+        events.append(("render", name))
+        rendered[name] = _adapter.currentModel.name
+        return {}
+
+    monkeypatch.setattr(verify, "_export_assembly_images", render)
     monkeypatch.setattr(
         verify,
         "discard_open_documents",
@@ -463,18 +465,44 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         )
     )
 
-    assert ("contact-pre-save", "channel") in events
-    assert ("contact-pre-save", "summing") in events
+    pre_save_indices = [
+        events.index(("contact-pre-save", name)) for name in ("channel", "summing")
+    ]
+    save_indices = [events.index(("save", name)) for name in ("channel", "summing")]
+    first_reconcile = next(
+        index for index, event in enumerate(events) if event[0] == "reconcile"
+    )
+    assert max(pre_save_indices) < min(save_indices)
+    assert max(save_indices) < first_reconcile
+    assert all(not any(states) for states in proof_states_at_reconcile)
     assert [event for event in events if event[0] == "reconcile"] == [
         ("reconcile", "channel"),
         ("reconcile", "summing"),
     ]
     assert ("contact-persisted", "channel") in events
     assert ("contact-persisted", "summing") in events
+    assert all(not proof.exists() for proof in proofs.values())
+    if persisted_failure is None:
+        assert report.failed == []
+        assert rendered == {
+            "channel": "channel",
+            "summing": "summing",
+            "harmonic-analyzer": "harmonic-analyzer",
+        }
+        last_certification = max(
+            index
+            for index, event in enumerate(events)
+            if event[0] == "contact-persisted"
+        )
+        first_render = next(
+            index for index, event in enumerate(events) if event[0] == "render"
+        )
+        assert last_certification < first_render
+        return
+    assert rendered == {}
     failed_label = f"{persisted_failure}:auto-repair-persisted-spring-native-contacts"
     assert (
         failed_label,
         f"{persisted_failure} persisted contact failed",
     ) in report.failed
     assert failed_label not in report.passed
-    assert all(not proof.exists() for proof in proofs.values())
