@@ -2265,6 +2265,12 @@ def task_check():
         # A missing assembly-manager pair must not certify an overlapping spring.
         SCRIPTS_DIR / "test_native_spring_contact.py",
         SCRIPTS_DIR / "test_settled_spring_seats.py",
+        # The two anchor parts are dimensioned so both stock springs hang plumb
+        # (channel_lever_spec.LEVER_SPRING_X, gooseneck_geom.ARM_END_X); the
+        # recalibration search that re-measures their seats must converge and
+        # certify only through native evaluations, whatever ClosestDistance says.
+        SCRIPTS_DIR / "test_vertical_spring_anchors.py",
+        SCRIPTS_DIR / "test_seat_search.py",
         # The [out]-param binding rule is ENFORCED, not just documented: no
         # VT_BYREF on the (uniformly early-bound) build path, late-bound probes
         # declare themselves, and _early_bound never falls back to a raw
