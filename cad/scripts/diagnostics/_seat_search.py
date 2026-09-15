@@ -461,11 +461,15 @@ def solve_component_contact(
                 if state == "interfering":
                     lo = candidate
                     if by_secant:
-                        use_secant = False  # d is concave in the offset; the bound alone converges
+                        # The overshoot proved d is concave here, so take the
+                        # guaranteed bound next; a later clear reading (a new
+                        # pair of distances) re-earns the extrapolation.
+                        use_secant = False
                 else:
                     assert distance is not None
                     previous_clear = (hi, hi_distance)
                     hi, hi_distance = candidate, distance
+                    use_secant = True
                     if closing:
                         steer = False  # the distance under-reported the gap
                 iterations += 1

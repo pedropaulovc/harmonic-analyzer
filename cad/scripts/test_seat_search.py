@@ -79,12 +79,35 @@ class _WireOnWire(_FakeContact):
 
 
 @pytest.mark.parametrize("gain", [1.0, 0.7, 0.4])
-def test_true_distance_converges_in_a_few_trials_not_a_bisection(fake, gain) -> None:
+@pytest.mark.parametrize(
+    "contact",
+    [
+        _CONTACT_OFFSET_MM,
+        _CONTACT_OFFSET_MM + 1e-16,
+        _CONTACT_OFFSET_MM - 1e-16,
+        2e-5,
+        5e-7,
+        0.01,
+        0.3,
+    ],
+)
+def test_true_distance_converges_in_a_few_trials_not_a_bisection(
+    fake, gain, contact
+) -> None:
+    """Bisecting this bracket to 1e-6 mm costs ~20 native evaluations (pinned by
+    the zero-distance test); steering must stay far below that wherever the
+    contact sits, including offsets that make a secant probe overshoot."""
     fake.gain = gain
-    linear = _solve()
-    fake.gain = 1.0
+    fake.contact = contact
+    try:
+        linear = _solve()
+    finally:
+        fake.gain = 1.0
+        fake.contact = _CONTACT_OFFSET_MM
 
-    assert linear.iterations <= 4
+    assert linear.iterations <= 10
+    assert linear.interfering_offset_mm < contact <= linear.clear_offset_mm
+    assert linear.clear_offset_mm - linear.interfering_offset_mm <= 1e-6
 
 
 @pytest.mark.parametrize("gain", [1.0, 0.7, 0.4])
