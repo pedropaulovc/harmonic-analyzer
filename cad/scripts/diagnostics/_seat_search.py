@@ -42,6 +42,8 @@ class ContactSolution:
     certificate: Literal["already_seated", "bracketed_native_contact"]
     witness: Literal["native_distance", "native_collision_bracket"]
     final_distance_mm: float
+    seed_distance_mm: float | None = None
+    """Native minimum distance at the UNMOVED pose when it is clear, else None."""
 
 
 def _warn_distance_disagreement(label: str, distance_mm: float) -> None:
@@ -303,6 +305,7 @@ def solve_component_contact(
     max_translation_mm: float,
     *,
     label: str,
+    locate_only: bool = False,
 ) -> ContactSolution:
     """Certify an existing seat or return a proposed clear native contact pose.
 
@@ -354,7 +357,7 @@ def solve_component_contact(
                 label,
             )
             seed_state, seed_distance = pair.evaluate(0.0)
-            if seed_state == "clear":
+            if seed_state == "clear" and not locate_only:
                 assert seed_distance is not None
                 if seed_distance <= NATIVE_CONTACT_DISTANCE_TOLERANCE_MM:
                     span.set_attribute("certificate", "already_seated")
@@ -368,6 +371,7 @@ def solve_component_contact(
                         0,
                         "already_seated",
                         "native_distance",
+                        seed_distance,
                         seed_distance,
                     )
                 if max_translation_mm >= _POSITION_CONVERGENCE_MM:
@@ -389,6 +393,7 @@ def solve_component_contact(
                             0,
                             "already_seated",
                             "native_collision_bracket",
+                            seed_distance,
                             seed_distance,
                         )
             lo, hi = -max_translation_mm, max_translation_mm
@@ -481,6 +486,7 @@ def solve_component_contact(
                 "bracketed_native_contact",
                 "native_collision_bracket",
                 hi_distance,
+                seed_distance if seed_state == "clear" else None,
             )
         finally:
             span.set_attribute("iterations", iterations)

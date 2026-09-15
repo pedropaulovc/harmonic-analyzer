@@ -12,12 +12,20 @@ uses, on the same three-part fixtures the retired in-build search used:
 * counter: ``boss-hook`` + one ``1330K524`` at the preset's balance length +
   ``gooseneck``, per preset (the gooseneck height is the measured output).
 
-Each contact is bisected to a converged collision/clear bracket and then
-re-certified as ``already_seated`` at the landed pose; the channel variant is
-rebuilt at its corrected inside length and re-measured until both ends seat.
-Nothing is fitted, interpolated or offset by a margin. Every seed comes from
-``spring_mount_geom`` (the catalogue-nominal poses), never from the table being
-replaced, so a stale table cannot bias the new one.
+Each contact's native collision/clear boundary is located to 1e-6 mm, and the
+component is then seated ``springs.boolean_stability_mm`` past it, on the clear
+side, where the distance is measured and recorded. The boundary is NOT the
+physical contact: SolidWorks' Boolean fails (status 1058) within ~25 um of the
+tangent hook-on-bore pose and the gate treats that failure as interference, so
+the boundary is where the Boolean starts succeeding -- and that edge scatters
+~2 um between rebuilds of the same spring and ~0.6 um between a fixture and the
+mated assembly (2026-09-15: two calibration runs, then `assembly:channel`
+rejecting a fixture-certified seat by 0.6 um). A seat placed ON the edge is a
+coin flip at the gate; the allowance covers the measured scatter and nothing
+else. The channel variant is rebuilt at its corrected inside length and
+re-measured until both boundaries sit at the allowance within half of it.
+Every seed comes from ``spring_mount_geom`` (the catalogue-nominal poses),
+never from the table being replaced, so a stale table cannot bias the new one.
 
 Run with SolidWorks open (the parts must already be built)::
 
@@ -122,9 +130,28 @@ def _land(
         raise RuntimeError(f"{name}: native seating transform readback mismatch")
 
 
-def _require_seated(label: str, contact: ContactSolution) -> None:
-    if contact.certificate != "already_seated":
-        raise RuntimeError(f"{label}: landed pose is not certified ({contact!r})")
+def _allowance_mm() -> float:
+    allowance = float(_config.machine("springs", "boolean_stability_mm"))
+    if not math.isfinite(allowance) or allowance <= 0.0:
+        raise ValueError("springs.boolean_stability_mm must be finite and positive")
+    return allowance
+
+
+def _correction_mm(contact: ContactSolution, allowance: float) -> float:
+    """How far the moving component must still separate to sit ``allowance``
+    past the native boundary (negative: it is already further out)."""
+    return contact.clear_offset_mm + allowance
+
+
+def _seated(label: str, contact: ContactSolution, allowance: float) -> bool:
+    correction = _correction_mm(contact, allowance)
+    seated = abs(correction) <= allowance / 2.0 and contact.seed_distance_mm is not None
+    _telemetry.info(
+        f"{label}: native boundary at {contact.clear_offset_mm:+.3e} mm, "
+        f"pose distance {contact.seed_distance_mm}, correction {correction:+.3e} mm"
+        f" -> {'seated' if seated else 'refit'}"
+    )
+    return seated
 
 
 # --------------------------------------------------------------- channel
@@ -143,6 +170,7 @@ async def _calibrate_channel(
     lever_rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
     ux, uy = pose.axis_xy
     radius = channel_stock.WIRE_DIA_MM / 2.0
+    allowance = _allowance_mm()
     iterations: list[dict] = []
     report["channel"].append(
         {
@@ -194,6 +222,7 @@ async def _calibrate_channel(
                 (-ux, -uy, 0.0),
                 radius,
                 label=f"channel {amplitude:g} lower",
+                locate_only=True,
             )
             upper = solve_component_contact(
                 adapter,
@@ -202,11 +231,11 @@ async def _calibrate_channel(
                 (ux, uy, 0.0),
                 radius,
                 label=f"channel {amplitude:g} upper",
+                locate_only=True,
             )
-            seated = (
-                lower.certificate == "already_seated"
-                and upper.certificate == "already_seated"
-            )
+            seated = _seated(
+                f"channel {amplitude:g} lower", lower, allowance
+            ) and _seated(f"channel {amplitude:g} upper", upper, allowance)
             iterations.append(
                 {
                     "refit": refit + 1,
@@ -230,20 +259,22 @@ async def _calibrate_channel(
                 "amplitude_mm": amplitude,
                 "pose": _pose_record(pose),
                 "final_distance_mm": {
-                    "lower": lower.final_distance_mm,
-                    "upper": upper.final_distance_mm,
+                    "lower": lower.seed_distance_mm,
+                    "upper": upper.seed_distance_mm,
                 },
             }
+        move_lower = _correction_mm(lower, allowance)
+        move_upper = _correction_mm(upper, allowance)
         lower_eye = tuple(
-            pose.lower_eye_xy[k] - pose.axis_xy[k] * lower.offset_mm for k in range(2)
+            pose.lower_eye_xy[k] - pose.axis_xy[k] * move_lower for k in range(2)
         )
         upper_eye = tuple(
-            pose.upper_eye_xy[k] + pose.axis_xy[k] * upper.offset_mm for k in range(2)
+            pose.upper_eye_xy[k] + pose.axis_xy[k] * move_upper for k in range(2)
         )
         pose = replace(
             pose,
             length_mm=channel_stock.check_length_mm(
-                pose.length_mm + lower.offset_mm + upper.offset_mm
+                pose.length_mm + move_lower + move_upper
             ),
             lower_eye_xy=lower_eye,
             upper_eye_xy=upper_eye,
@@ -323,6 +354,7 @@ async def _calibrate_counter(
             label="counter seat fixture",
         )
         titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck])
+        allowance = _allowance_mm()
         lower = solve_component_contact(
             adapter,
             counter,
@@ -330,8 +362,9 @@ async def _calibrate_counter(
             lower_direction,
             bracket,
             label=f"{preset} counter lower",
+            locate_only=True,
         )
-        _land(adapter, counter, lower_direction, lower.offset_mm)
+        _land(adapter, counter, lower_direction, _correction_mm(lower, allowance))
         upper = solve_component_contact(
             adapter,
             gooseneck,
@@ -339,8 +372,9 @@ async def _calibrate_counter(
             upper_direction,
             bracket,
             label=f"{preset} counter upper",
+            locate_only=True,
         )
-        _land(adapter, gooseneck, upper_direction, upper.offset_mm)
+        _land(adapter, gooseneck, upper_direction, _correction_mm(upper, allowance))
         lower_check = solve_component_contact(
             adapter,
             counter,
@@ -348,8 +382,8 @@ async def _calibrate_counter(
             lower_direction,
             bracket,
             label=f"{preset} counter lower verify",
+            locate_only=True,
         )
-        _require_seated(f"{preset} counter lower", lower_check)
         upper_check = solve_component_contact(
             adapter,
             gooseneck,
@@ -357,8 +391,13 @@ async def _calibrate_counter(
             upper_direction,
             bracket,
             label=f"{preset} counter upper verify",
+            locate_only=True,
         )
-        _require_seated(f"{preset} counter upper", upper_check)
+        for label, contact in (("lower", lower_check), ("upper", upper_check)):
+            if not _seated(f"{preset} counter {label}", contact, allowance):
+                raise RuntimeError(
+                    f"{preset} counter {label}: landed pose is not seated ({contact!r})"
+                )
         check_no_interference(adapter)
         actual_centre = component_origin(adapter, counter)
         actual_gooseneck_y = component_origin(adapter, gooseneck)[1]
@@ -383,16 +422,16 @@ async def _calibrate_counter(
         }
     )
     _telemetry.success(
-        f"{preset} counter: spring moved {lower.offset_mm:.9g} mm along -axis, gooseneck "
-        f"{upper.offset_mm:.9g} mm along -Y; L={pose.length_mm:.9f}, eyes x "
+        f"{preset} counter: spring moved {_correction_mm(lower, allowance):.9g} mm along -axis, gooseneck "
+        f"{_correction_mm(upper, allowance):.9g} mm along -Y; L={pose.length_mm:.9f}, eyes x "
         f"{pose.lower_eye_xy[0]:.6f}/{pose.upper_eye_xy[0]:.6f}, gooseneck y {actual_gooseneck_y:.9f}"
     )
     return {
         "pose": _pose_record(pose),
         "gooseneck_origin_y_mm": actual_gooseneck_y,
         "final_distance_mm": {
-            "lower": lower_check.final_distance_mm,
-            "upper": upper_check.final_distance_mm,
+            "lower": lower_check.seed_distance_mm,
+            "upper": upper_check.seed_distance_mm,
         },
     }
 
