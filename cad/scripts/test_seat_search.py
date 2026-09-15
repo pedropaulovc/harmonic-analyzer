@@ -1,4 +1,5 @@
-"""Offline contract for the native seat SEARCH behind spring recalibration.
+"""Offline contract for the native seat SEARCH behind spring recalibration, and
+for the driver's refusal to write a partial seat table.
 
 The search may use ``ClosestDistance`` only to choose where the next trial
 lands. A distance the modeller over-reports, under-reports, or returns as zero
@@ -8,8 +9,10 @@ the clear endpoint never inside the interfering region.
 
 from __future__ import annotations
 
+
 import pytest
 
+import _config
 from diagnostics import _seat_search as search
 
 _CONTACT_OFFSET_MM = 0.0731234567
@@ -142,3 +145,54 @@ def test_seated_pose_within_guard_is_certified_without_a_move(fake) -> None:
     assert solution.certificate == "already_seated"
     assert solution.witness == "native_distance"
     assert solution.offset_mm == 0.0
+
+
+def test_write_refuses_presets_that_do_not_cover_every_channel_amplitude(
+    tmp_path,
+) -> None:
+    """A partial --write would DELETE the omitted presets' channel-seat rows.
+
+    ``settled_spring_seats.channel_seat`` matches an amplitude exactly, so those
+    stations would fail at build time instead. The driver must refuse before it
+    takes the COM seat -- with no adapter to call, reaching a build is the bug.
+    """
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    table = _config.machine("springs", "presets")
+    partial = min(table, key=lambda name: len(set(table[name]["amplitudes_mm"])))
+    complete = max(table, key=lambda name: len(set(table[name]["amplitudes_mm"])))
+    assert set(table[complete]["amplitudes_mm"]) - set(
+        table[partial]["amplitudes_mm"]
+    ), "fixture needs one preset whose amplitudes are not a subset"
+
+    with pytest.raises(ValueError, match="cover all configured amplitudes"):
+        asyncio.run(
+            driver.calibrate(
+                None,
+                [partial],
+                tmp_path / "report.json",
+                write=True,
+                source="test",
+            )
+        )
+
+
+def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
+    """The complete set must NOT be refused; it is how the table is regenerated."""
+    import asyncio
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    presets = sorted(_config.machine("springs", "presets"))
+    with pytest.raises(AttributeError):  # reached the build: no adapter to drive
+        asyncio.run(
+            driver.calibrate(
+                None,
+                presets,
+                tmp_path / "report.json",
+                write=True,
+                source="test",
+            )
+        )

@@ -475,6 +475,23 @@ async def calibrate(
         raise ValueError(
             f"preset amplitudes must be finite and nonnegative: {amplitudes}"
         )
+    if write:
+        # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
+        # amplitude exactly (no fit, no interpolation), so a write that calibrated
+        # only some presets would delete the rows the omitted ones need. Refuse it
+        # here, before the COM run, rather than leave a table that fails at build.
+        missing = [
+            (name, a)
+            for name in sorted(table)
+            for a in (float(x) for x in table[name]["amplitudes_mm"])
+            if a not in amplitudes
+        ]
+        if missing:
+            raise ValueError(
+                "--write rewrites every channel seat, so the calibrated presets must "
+                f"cover all configured amplitudes; missing {missing}. Calibrate "
+                f"{sorted(table)} together, or drop --write."
+            )
     report: dict = {
         "status": "started",
         "presets": presets,
