@@ -44,14 +44,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopEndBreak": {"TopChamfer"},
 }
 
-TOP_END_CALLOUT = "TOP OD EDGE; MHA-133 CAP\nMUST SEAT FULLY BY HAND"
+TOP_END_CALLOUT = "MHA-133 CAP MUST SEAT FULLY BY HAND"
 
 # Part-specific assembly acceptance that native dimensions cannot express.
 DRAWING_NOTES = "\n".join(
     (
+        "QUANTITY PER FRAME ASSEMBLY MHA-A04.",
         "MATCH-MARK EACH COLUMN,",
         "CORNER AND ORIENTATION.",
-        "FIT BASE MHA-035 AND TOP MHA-077.",
         "SET TOP CROSS-BORE AXIS HEIGHT",
         "PER FRAME ASSEMBLY MHA-A04;",
         "MAINTAIN HEIGHT DURING FIT.",
@@ -62,7 +62,7 @@ DRAWING_NOTES = "\n".join(
         "MATCH-DRILL UPPER STATION AT",
         "SET HEIGHT WITH TOP MHA-077;",
         "LOWER STATION WITH BASE MHA-035.",
-        "THRU BOTH WALLS; RETAIN MATCH MARKS.",
+        "RETAIN MATCH MARKS.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"

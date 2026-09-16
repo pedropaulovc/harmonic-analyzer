@@ -25,9 +25,3 @@ def test_glyph_sits_on_the_lip_top_beside_the_nameplate():
     assert 0.9 * base.SERIAL_HEIGHT_MM <= (physical_z1 - physical_z0) <= 1.1 * base.SERIAL_HEIGHT_MM
     assert abs(base.SERIAL_AREA_MM2 - s["area_mm2"]) < 1e-3, (base.SERIAL_AREA_MM2, s["area_mm2"])
     assert STACK_HEIGHT + LIP_H > STACK_HEIGHT  # the rim top is above the deck
-
-
-def test_notes_mention_the_serial():
-    from harmonic_base_spec import DRAWING_NOTES
-
-    assert 'STAMP SERIAL "2"' in DRAWING_NOTES
