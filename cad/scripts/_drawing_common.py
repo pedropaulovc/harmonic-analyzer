@@ -2145,21 +2145,184 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
     return survivors
 
 
-@_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
-def curate_view_dimensions(
+def _feature_by_dimension_name(
+    dimensions_by_feature: Mapping[str, Iterable[str]],
+) -> dict[str, str]:
+    """Invert a part spec's ``DRAWING_DIMENSIONS`` to ``{dimension: feature}``.
+
+    ``_common.name_dimensions`` names a dimension per OWNING feature, so the
+    inverse is total and unambiguous by construction.  A name claimed by two
+    features is a spec bug, not a runtime condition — it would make the
+    targeted import silently depend on feature order — so it raises here.
+    """
+    owner: dict[str, str] = {}
+    for feature, names in dimensions_by_feature.items():
+        for name in names:
+            previous = owner.setdefault(name, feature)
+            if previous != feature:
+                raise ValueError(
+                    f"dimension {name!r} is claimed by features {previous!r} and "
+                    f"{feature!r}; parametric names are feature-unique"
+                )
+    return owner
+
+
+def _features_owning(
+    dimensions_by_feature: Mapping[str, Iterable[str]],
+    keep: Iterable[str],
+    *,
+    view_label: str,
+) -> tuple[str, ...]:
+    """Name, sorted, the features whose marked dimensions cover ``keep``."""
+    owner = _feature_by_dimension_name(dimensions_by_feature)
+    unknown = sorted(name for name in keep if name not in owner)
+    if unknown:
+        raise RuntimeError(
+            f"{view_label} view keeps dimensions no feature declares: {unknown}; "
+            f"declared={sorted(owner)}"
+        )
+    return tuple(sorted({owner[name] for name in keep}))
+
+
+def _drawing_component_name(adapter: Any, view: Any) -> str:
+    """Name of the model instance a drawing view shows, e.g. ``"tube-frame-2"``.
+
+    ``SelectByID2`` wants it as the middle qualifier of a model item's name, and
+    it is NOT derivable from the part's file name: SolidWorks numbers one
+    instance per view (``tube-frame-1`` in the first view, ``-2`` in the
+    second), so it is read back per view from
+    ``IView::RootDrawingComponent2`` — ``InChildContext=False`` for this view's
+    own root component — rather than guessed.
+    """
+    root = _early_bound(view, "IView").RootDrawingComponent2(False)
+    name = _early_bound(root, "IDrawingComponent").Name if root else None
+    if not isinstance(name, str) or not name:
+        raise RuntimeError(
+            f"drawing view {view_name(adapter, view)!r} has no root drawing "
+            f"component to qualify model feature names with: {name!r}"
+        )
+    return name
+
+
+def _select_model_feature(
+    adapter: Any, feature: str, *, component: str, in_view: str
+) -> str:
+    """Append one model feature of a drawing view to the selection list.
+
+    A feature is addressed from the drawing as
+    ``"<feature>@<drawing component>@<view>"`` — the form
+    ``IModelDocExtension::SelectByID2`` documents for model items seen through a
+    view (``"Sketch1@model-7@Drawing View1"``, from the "Reset Visibility of
+    Sketches in Drawing View" example).  The Type filter must name the real
+    kind: a driving dimension's owner is usually a profile ``"SKETCH"`` but can
+    be a ``"BODYFEATURE"`` (an extrude, a chamfer, a fillet), and an empty Type
+    resolves NEITHER here, so both are tried and the winner is returned.
+    """
+    draw = adapter.currentModel
+    for type_name in ("SKETCH", "BODYFEATURE"):
+        if draw.Extension.SelectByID2(
+            f"{feature}@{component}@{in_view}",
+            type_name,
+            0.0,
+            0.0,
+            0.0,
+            True,  # append: the view itself is already selected
+            0,
+            null_callout(),
+            0,
+        ):
+            return type_name
+    raise RuntimeError(
+        f"failed to select model feature {feature!r} of component {component!r} "
+        f"in view {in_view!r} as a SKETCH or a BODYFEATURE"
+    )
+
+
+@_telemetry.traced("drawing.targeted_model_items")
+def insert_feature_dimensions(
+    adapter: Any, view: Any, features: Sequence[str]
+) -> list[tuple[str, Any]]:
+    """Import only ``features``' marked dimensions into ``view``.
+
+    ``InsertModelAnnotations3`` imports for the current SELECTION, so selecting
+    the view plus the owning features and passing ``swImportModelItemsSource_e``
+    ``swImportModelItemsFromSelectedFeature`` (1) rather than
+    ``swImportModelItemsFromEntireModel`` (0) delivers exactly the recipe's ink
+    — no whole-model marked set to select and ``EditDelete`` afterwards.  The
+    mask still applies: the selected-feature import honours
+    ``swInsertDimensionsMarkedForDrawing``.
+
+    The selection list is the whole contract, and it is asymmetric: the view
+    goes in FIRST (the method "inserts model annotations into this drawing
+    document's currently selected drawing view") and every feature is APPENDED
+    to it.  With the features alone selected the call silently imports nothing —
+    it returns an empty array and no annotation reaches any view — and Option 2
+    (``swImportModelItemsFromSelectedComponent``, which the pre-2008-SP3 help
+    mislabelled "selected feature") imports nothing either way.  All of that is
+    measured on tube-frame by ``diagnostics/probe_targeted_model_items.py``.
+    Every feature rides in ONE selection list and ONE import call.
+
+    Returns ``(parametric name, annotation)`` pairs — the import already reads
+    every name to log what arrived, so handing them back spares the caller a
+    second ``IDimension::Name`` walk over the same annotations.  An annotation
+    that is not a model dimension pairs with ``""``.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(
+        draw, "IDrawingDoc"
+    )  # IDrawingDoc view for drawing-only methods (same dispatch)
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate drawing view {name!r}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"failed to select drawing view {name!r}")
+    component = _drawing_component_name(adapter, view)
+    types = [
+        _select_model_feature(adapter, feature, component=component, in_view=name)
+        for feature in features
+    ]
+    result = adapter._attempt(
+        lambda: ddoc.InsertModelAnnotations3(
+            1,  # swImportModelItemsFromSelectedFeature
+            _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
+            False,
+            True,
+            True,
+            False,
+        )
+    )
+    draw.ClearSelection2(True)
+    if not result or isinstance(result, str):
+        return []
+    named = [
+        (dimension_name(adapter, annotation), annotation)
+        for annotation in (
+            _sw_type_info.early_bound_or_flag(
+                annotation, "IAnnotation", "GetSpecificAnnotation"
+            )
+            for annotation in result
+        )
+    ]
+    _telemetry.info(
+        f"targeted model-item import {name}: "
+        f"features={[f'{f}[{t}]' for f, t in zip(features, types, strict=True)]}, "
+        f"annotations={len(named)}, "
+        f"dimensions={sorted(item for item, _ in named if item)}"
+    )
+    return named
+
+
+def _curate_entire_model_import(
     adapter: Any,
     view: Any,
     *,
     keep: dict[str, tuple[float, float]],
     view_label: str,
 ) -> list[Any]:
-    """Import a view's marked model dimensions and keep exactly ``keep``.
-
-    ``keep`` maps each surviving dimension's parametric name to its sheet
-    position (meters).  Everything else the import produced is deleted; a
-    missing expected dimension fails loud — the print must carry every
-    manufacturing dimension the recipe promises.
-    """
+    """Fallback: import the whole model's marked set, then delete the rest."""
     annotations = delete_unnamed_imports(
         adapter, insert_marked_dimensions(adapter, view)
     )
@@ -2174,6 +2337,70 @@ def curate_view_dimensions(
         raise RuntimeError(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)}"
+        )
+    return curate_dimensions(adapter, curated, reposition=dict(keep))
+
+
+@_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
+def curate_view_dimensions(
+    adapter: Any,
+    view: Any,
+    *,
+    keep: dict[str, tuple[float, float]],
+    view_label: str,
+    dimensions_by_feature: Mapping[str, Iterable[str]] | None = None,
+) -> list[Any]:
+    """Import a view's marked model dimensions and keep exactly ``keep``.
+
+    ``keep`` maps each surviving dimension's parametric name to its sheet
+    position (meters).  A missing expected dimension fails loud — the print
+    must carry every manufacturing dimension the recipe promises.
+
+    ``dimensions_by_feature`` is the source part spec's ``DRAWING_DIMENSIONS``
+    (``{feature: {dimension names}}``).  Given it, only the features that own
+    ``keep`` are selected and imported, so nothing arrives that must be deleted
+    again and an empty ``keep`` costs no COM call at all.  Without it the view
+    falls back to the entire-model import plus deletion sweep: the same ink for
+    many times the round trips, so the fallback WARNS and names the view, which
+    keeps every recipe still on it visible in the build log.
+    """
+    if dimensions_by_feature is None:
+        _telemetry.warn(
+            f"{view_label} view imports the ENTIRE model's marked dimensions and "
+            "deletes the rest; pass dimensions_by_feature=<part>_spec."
+            "DRAWING_DIMENSIONS to import only the features it dimensions"
+        )
+        return _curate_entire_model_import(
+            adapter, view, keep=keep, view_label=view_label
+        )
+    if not keep:
+        return []
+    features = _features_owning(dimensions_by_feature, keep, view_label=view_label)
+    named = insert_feature_dimensions(adapter, view, features)
+    annotations = [annotation for _, annotation in named]
+    extra = tuple(sorted({name for name, _ in named if name and name not in keep}))
+    unnamed = sum(1 for name, _ in named if not name)
+    if extra or unnamed:
+        # A feature that owns a kept dimension can also own ink the recipe does
+        # not place (a cosmetic-thread callout has no parametric name at all).
+        # Deleting it keeps the sheet to the recipe; warning makes the surprise
+        # visible instead of silently paid for on every build.
+        _telemetry.warn(
+            f"{view_label} view's targeted import delivered unrequested "
+            f"annotations from features={list(features)}: dimensions={list(extra)}, "
+            f"unnamed={unnamed}; deleting them"
+        )
+        if unnamed:
+            annotations = delete_unnamed_imports(adapter, annotations)
+    curated = curate_dimensions(
+        adapter, annotations, delete=extra, reposition=dict(keep)
+    )
+    present = {dimension_name(adapter, annotation) for annotation in curated}
+    missing = sorted(set(keep) - present)
+    if missing:
+        raise RuntimeError(
+            f"{view_label} view is missing model dimensions: {missing}; "
+            f"available={sorted(present)} from features={list(features)}"
         )
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 

@@ -89,6 +89,7 @@ from harmonic_base_spec import (
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
     BOTTOM_THICKNESS,
+    DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     LIP_H,
     LIP_W,
@@ -897,10 +898,18 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     top_dimensions = curate_view_dimensions(
-        adapter, top, keep=GEOMETRY_TOP_KEEP, view_label="geometry top"
+        adapter,
+        top,
+        keep=GEOMETRY_TOP_KEEP,
+        view_label="geometry top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_dimensions = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="geometry front"
+        adapter,
+        side,
+        keep=SIDE_KEEP,
+        view_label="geometry front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(
         adapter,
@@ -1050,10 +1059,18 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     curate_view_dimensions(
-        adapter, hole_top, keep=HOLE_TOP_KEEP, view_label="holes top"
+        adapter,
+        hole_top,
+        keep=HOLE_TOP_KEEP,
+        view_label="holes top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     curate_view_dimensions(
-        adapter, section, keep=SECTION_KEEP, view_label="section A-A"
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _section_geometry_controls(adapter, section)
     _add_cross_spotface_dimension(adapter, hole_side)
