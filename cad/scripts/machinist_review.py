@@ -4,7 +4,11 @@ The review the fleet is gated on (``cad/docs/drawing-simplicity-policy.md``):
 each drawing package is rendered or copied into a neutral temp directory and
 handed to ``claude -p --model claude-fable-5-1 --effort medium`` (or
 ``codex exec --model gpt-6-astra`` at low reasoning) with NO repo context under
-the calibrated prompt in ``cad/scripts/prompts/``. Registry part and assembly
+the calibrated prompt in ``cad/scripts/prompts/``. ``--reviewer`` is mandatory
+and MUST name a different model family from the agent that authored or last
+edited the drawing script: a Claude-driven session (Fable, Opus, Sonnet)
+reviews with ``--reviewer codex``, a Codex/GPT-driven session with
+``--reviewer claude``. A same-family verdict is not the gate, even a ``SHIP``. Registry part and assembly
 PDFs are split into full-resolution page images and every page is supplied
 to one reviewer invocation. The schema-validated verdict and its
 provenance are written under ``cad/out/reports/machinist-review/``.
