@@ -135,13 +135,17 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   by every shop, not an added process constraint; do not ask for the tap-drill
   line to be removed.
 - Hidden lines appear only where they tell you something: every internal
-  feature (bore, blind depth, cross-hole, pocket floor) is shown in solid
-  lines in at least one view, section or breakout, and a view carries hidden
-  lines only when a feature there is communicated by them. A view whose
-  hidden lines add nothing but clutter behind the dimensions is a clarity
-  defect, and so is an internal feature that exists ONLY as hidden lines
-  with no section or breakout defining it. Nothing is dimensioned to a
-  hidden line; a section or breakout does that job.
+  feature whose SHAPE you need (a stepped bore, a pocket floor, a cross-hole
+  through a wall, a blind depth no callout states) is shown in solid lines in
+  at least one view, section or breakout, and a view carries hidden lines
+  only when a feature there is communicated by them. A standard hole (drill,
+  ream, tap, counterbore, spotface, with its depth) is fully defined by its
+  hole callout or hole-table row; do not ask for hidden lines or a section
+  to show such a hole's profile. A view whose hidden lines add nothing but
+  clutter behind the dimensions is a clarity defect, and so is a shaped
+  internal feature that exists ONLY as hidden lines with no section or
+  breakout defining it. Nothing is dimensioned to a hidden line; a section
+  or breakout does that job.
 - The package has a standard isometric projection for pictorial clarity. It is
   rendered **Shaded With Edges** in precision/high-quality mode: edges are
   visible, geometry is not coarse or faceted, and cosmetic threads are not
