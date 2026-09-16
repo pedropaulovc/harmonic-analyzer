@@ -33,6 +33,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BossesUpper": {"BossTopExtent"},
     "BossesLower": {"BossBottomExtent"},
     "BoreProfile": {"B0X", "B0Z", "B0Dia"},
+    "SpotFaceRearProfile": {"S1Dia"},
     "BarProfile": {
         "BarAnchorX",
         "BarAnchorZ",

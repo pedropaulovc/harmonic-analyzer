@@ -203,7 +203,7 @@ HUB_TOP_KEEP: dict[str, tuple[float, float]] = {}
 HUB_LEFT_KEEP = {
     "PocketRise": (0.045, HUB_LEFT_CENTER[1]),
 }
-DETAIL_FRONT_KEEP: dict[str, tuple[float, float]] = {}
+DETAIL_FRONT_KEEP = {"S1Dia": (0.200, 0.078)}
 DETAIL_SECTION_KEEP = {
     "CapRecessDia": (
         DETAIL_SECTION_CENTER[0] - 0.040,
@@ -217,6 +217,7 @@ DETAIL_SECTION_KEEP = {
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
     "B0Dia": "4X SOCKET / REF\nMATCH-FIT ASSIGNED TUBE",
+    "S1Dia": "4X SPOTFACE",
     "StudFrontX": "WEB / HANGER X",
     "StudFrontZ": "FRONT HANGER Z",
     "StudRearZ": "REAR HANGER Z",
@@ -296,7 +297,17 @@ def _exact_linear_entities(
             error = sum((p-a-t*v)**2 for p, a, v in zip(point, start, vector))
             matches.append((error, edge))
         if not matches or min(matches, key=lambda item: item[0])[0] > 1e-8:
-            raise RuntimeError(f"{label}: no exact visible line through {point}")
+            nearest = sorted(
+                (
+                    (min(math.dist(point, start), math.dist(point, end)), start, end)
+                    for _, (start, end) in candidates
+                ),
+                key=lambda item: item[0],
+            )[:5]
+            raise RuntimeError(
+                f"{label}: no exact visible line through {point}; "
+                f"{len(candidates)} visible lines, nearest by endpoint={nearest}"
+            )
         selected.append(min(matches, key=lambda item: item[0])[1])
     return selected
 
@@ -432,6 +443,7 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
         label="set-pocket manufacturing section",
     )
     _orient_cut_section(adapter, view, (1.0, 0.0, 0.0))
+    set_hidden_lines_visible(adapter, view)
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
@@ -487,8 +499,11 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
     )
     _checked_dimension(
         adapter, view,
-        p0=(-OUTER_X, (SET_POCKET+SET_POCKET_DEPTH)/2, GOOSENECK_Z),
-        p1=(-OUTER_X+SET_POCKET_DEPTH, (SET_POCKET-SET_POCKET_DEPTH)/2, GOOSENECK_Z),
+        # Nothing exists at the cut plane itself, so both picks sit on the
+        # pocket's far walls: the rib band's far edge on the outer face and the
+        # pocket floor's far wall, SET_POCKET_DEPTH apart along X.
+        p0=(-OUTER_X, 0.0, GOOSENECK_Z+HUB_RIB_W/2),
+        p1=(-OUTER_X+SET_POCKET_DEPTH, 0.0, GOOSENECK_Z+SET_POCKET/2),
         text_xy=(0.062, 0.055), label="set-pocket depth from outer rail face",
         expected_mm=SET_POCKET_DEPTH, orientation="horizontal", exact_linear=True,
         suffix="POCKET DEPTH\nFROM OUTER FACE",
@@ -973,7 +988,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, detail_annotations, detail_callouts)
     set_dimension_precision(
         adapter, detail_annotations,
-        {"C0Dia": 1, "B0Dia": 1},
+        {"C0Dia": 1, "B0Dia": 1, "S1Dia": 1},
     )
     socket_annotations = [
         annotation for annotation in detail_top_dimensions
@@ -987,6 +1002,21 @@ async def build(adapter: Any) -> dict[str, str]:
     socket_dimension = _early_bound(socket_display.GetDimension2(0), "IDimension")
     if int(socket_dimension.GetToleranceType()) != 0:  # swTolNONE
         raise RuntimeError("socket source still carries a fixed fit tolerance; rebuild the part")
+    spotface_annotations = [
+        annotation for annotation in detail_front_dimensions
+        if dimension_name(adapter, annotation) == "S1Dia"
+    ]
+    if len(spotface_annotations) != 1:
+        raise RuntimeError("expected one native spotface profile diameter")
+    spotface_display = _early_bound(
+        spotface_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    spotface_dimension = _early_bound(spotface_display.GetDimension2(0), "IDimension")
+    if not str(spotface_dimension.FullName).startswith("S1Dia@SpotFaceRearProfile@"):
+        raise RuntimeError(f"wrong native spotface feature: {spotface_dimension.FullName}")
+    spotface_value = abs(float(spotface_dimension.SystemValue))*1000.0
+    if abs(spotface_value-SPOTFACE_DIA) > 1e-6:
+        raise RuntimeError(f"native spotface profile diameter measured {spotface_value:g}")
     boss_pick_z = REAR_COLUMN_Z+(CAP_RECESS_DIAMETER+BOSS_DIA)/4
     _checked_dimension(
         adapter, detail_section,
@@ -1032,7 +1062,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front_tap_candidates: list[tuple[float, float, float, Any]] = []
     upper_boss_edge = None
-    spotface_edge = None
     for raw_edge in visible_view_entities(
         detail_front, 1, label="front column cross-tap circles"
     ):
@@ -1064,11 +1093,6 @@ async def build(adapter: Any) -> dict[str, str]:
             + abs(raw_params[4])
             + abs(raw_params[5] - 1.0)
         )
-        if (
-            abs(params[6]-SPOTFACE_DIA/2) < 1e-4
-            and center_error < 1e-4 and normal_error < 1e-6
-        ):
-            spotface_edge = edge
         front_tap_candidates.append(
             (radius_error, center_error, normal_error, edge)
         )
@@ -1084,38 +1108,44 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     if upper_boss_edge is None:
         raise RuntimeError("front view has no exact outer boss rim on the upper boss plane")
-    if spotface_edge is None:
-        raise RuntimeError("front view has no exact column cross-screw spotface rim")
-    _select_view_entity(
-        adapter, detail_front, "EDGE", None,
-        label="column cross-screw spotface diameter", entity=spotface_edge,
-    )
-    spotface_dimension = drawing_model.AddDiameterDimension2(0.200, 0.078, 0.0)
-    if spotface_dimension is None:
-        raise RuntimeError("failed to dimension column cross-screw spotface")
-    spotface_dimension = _early_bound(spotface_dimension, "IDisplayDimension")
-    spotface_value = abs(float(
-        _early_bound(spotface_dimension.GetDimension2(0), "IDimension").SystemValue
-    ))*1000.0
-    if abs(spotface_value-SPOTFACE_DIA) > 1e-6:
-        raise RuntimeError(f"column cross-screw spotface measured {spotface_value:g}")
-    spotface_annotation = _early_bound(spotface_dimension.GetAnnotation(), "IAnnotation")
-    set_dimension_callouts(
-        adapter, [spotface_annotation],
-        {dimension_name(adapter, spotface_annotation): "4X SPOTFACE"},
-    )
-    set_dimension_precision(
-        adapter, [spotface_annotation], {dimension_name(adapter, spotface_annotation): 1},
-    )
-    drawing_model.ClearSelection2(True)
+    section_floor_edges = []
+    for raw_edge in visible_view_entities(
+        detail_section, 1, label="opposed spotface section-plane inventory"
+    ):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None or not _early_bound(curve, "ICurve").IsLine():
+            continue
+        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+        if any(vertex is None for vertex in vertices):
+            continue
+        start, end = [
+            tuple(float(value)*1000.0 for value in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in vertices
+        ]
+        if (
+            max(abs(start[0]-COLUMN_X), abs(end[0]-COLUMN_X)) > 1e-6
+            or abs(start[2]-end[2]) > 1e-6
+            or abs(start[1]-end[1]) < 1e-6
+        ):
+            continue
+        section_floor_edges.append((edge, tuple((a+b)/2 for a, b in zip(start, end))))
+    opposed_floors = []
+    for plane_z in (-TOP_SCREW_SEAT_Z, TOP_SCREW_SEAT_Z):
+        candidates = [item for item in section_floor_edges if abs(item[1][2]-plane_z) < 1e-6]
+        if not candidates:
+            raise RuntimeError(
+                f"section has no native spotface floor edge on Z={plane_z:g}; "
+                f"native vertical edge midpoints={[point for _, point in section_floor_edges]}"
+            )
+        opposed_floors.append(max(candidates, key=lambda item: item[1][1]))
     _checked_dimension(
         adapter, detail_section,
-        p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
-        p1=(COLUMN_X, 0.0, TOP_SCREW_SEAT_Z),
-        text_xy=(0.360, 0.098), label="spotface plane from socket axis",
-        expected_mm=TOP_SCREW_SEAT_Z-REAR_COLUMN_Z,
-        orientation="horizontal", center=True, precision=2,
-        suffix="SPOTFACE FROM\nSOCKET AXIS", entities=(upper_boss_edge, spotface_edge),
+        p0=opposed_floors[0][1], p1=opposed_floors[1][1],
+        text_xy=(0.330, 0.089), label="opposed spotface floor separation",
+        expected_mm=2*TOP_SCREW_SEAT_Z, orientation="horizontal", precision=1,
+        suffix="2 PAIRS SPOTFACES\nCENTRED ON FRAME MIDPLANE",
+        entities=(opposed_floors[0][0], opposed_floors[1][0]),
     )
     add_native_hole_callout(
         adapter,

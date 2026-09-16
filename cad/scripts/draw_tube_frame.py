@@ -26,7 +26,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_callout,
     add_property_linked_note,
     curate_view_dimensions,
     dimension_name,
@@ -51,7 +50,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-from tube_frame_spec import COLUMN_LENGTH, OUTER_DIA, TOP_END_CHAMFER
+from tube_frame_spec import (
+    COLUMN_LENGTH,
+    CROSS_HOLE_DIAMETER,
+    LOWER_CROSS_HOLE_Y,
+    OUTER_DIA,
+    TOP_END_CHAMFER,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["tube_frame"]
@@ -81,8 +86,11 @@ LENGTH_KEEP = {
     "Length": (LENGTH_CENTER[0] - 0.036, LENGTH_CENTER[1]),
     "LowerHoleY": (LENGTH_CENTER[0] - 0.020, LENGTH_CENTER[1] - 0.075),
     "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
-    "CrossHoleDia": (LENGTH_CENTER[0] + 0.085, LENGTH_CENTER[1] - 0.115),
-    "TopChamfer": (LENGTH_CENTER[0] + 0.070, LENGTH_CENTER[1] + 0.105),
+    "CrossHoleDia": (
+        LENGTH_CENTER[0] + 0.085,
+        LENGTH_CENTER[1] - COLUMN_LENGTH / 10000.0 + LOWER_CROSS_HOLE_Y / 5000.0,
+    ),
+    "TopChamfer": (LENGTH_CENTER[0] + 0.040, LENGTH_CENTER[1] + 0.120),
 }
 CROSS_HOLE_CALLOUT = {
     "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
@@ -192,7 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open tube-frame source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    source_properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -263,6 +271,40 @@ async def build(adapter: Any) -> dict[str, str]:
         display.SetText(4, "")
         if str(display.GetText(4) or ""):
             raise RuntimeError("failed to clear underlined below-dimension callout")
+        display = _early_bound(display, "IDisplayDimension")
+        hole_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if "CrossHoleProfile" not in str(hole_dimension.FullName):
+            raise RuntimeError("cross-hole callout lost its source sketch association")
+        measured_mm = float(hole_dimension.SystemValue) * 1000.0
+        if abs(measured_mm - CROSS_HOLE_DIAMETER) > 1e-5:
+            raise RuntimeError(
+                f"cross-hole callout measured {measured_mm:g}, expected {CROSS_HOLE_DIAMETER:g}"
+            )
+        display.DisplayAsLinear = False
+        display.Diametric = True
+        display.ArrowSide = 1
+        display.SetSecondArrow(False, False)
+        display.SolidLeader = False
+        if display.SetBrokenLeader2(False, 2) != 0:
+            raise RuntimeError("failed to apply broken horizontal cross-hole leader")
+        if (
+            bool(display.SolidLeader)
+            or bool(display.GetUseDocBrokenLeader())
+            or int(display.GetBrokenLeader2()) != 2
+            or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())
+        ):
+            raise RuntimeError("cross-hole leader style did not persist")
+        if bool(display.DisplayAsLinear) or not bool(display.Diametric):
+            raise RuntimeError("cross-hole callout did not retain diametric presentation")
+        hole_text = model_point_in_view(
+            adapter,
+            length,
+            (0.0, LOWER_CROSS_HOLE_Y / 1000.0, 0.0),
+            label="lower cross-hole source sketch centre",
+        )
+        if not annotation.SetPosition2(LENGTH_KEEP["CrossHoleDia"][0], hole_text[1], 0.0):
+            raise RuntimeError("failed to align cross-hole callout with its source station")
     set_dimension_precision(
         adapter,
         dimensions,
@@ -271,10 +313,10 @@ async def build(adapter: Any) -> dict[str, str]:
             "LowerHoleY": 2,
             "UpperHoleY": 2,
             "CrossHoleDia": 2,
-            "TopChamfer": 2,
+            "TopChamfer": 1,
         },
     )
-    for name in ("Length", "LowerHoleY", "UpperHoleY", "TopChamfer"):
+    for name in ("Length", "LowerHoleY", "UpperHoleY"):
         references = [
             annotation
             for annotation in dimensions
@@ -289,32 +331,36 @@ async def build(adapter: Any) -> dict[str, str]:
             references[0],
             label=f"{name} reference",
         )
-        if name == "TopChamfer":
-            display.SetText(3, "")
-            display.SetText(4, "")
-            if str(display.GetText(3) or "") or str(display.GetText(4) or ""):
-                raise RuntimeError("failed to clear stale chamfer callout lanes")
-            chamfer_suffix = ") X 45 DEG"
-            display.SetText(2, chamfer_suffix)
-            if str(display.GetText(2) or "") != chamfer_suffix:
-                raise RuntimeError("chamfer reference text did not persist")
-    top_chamfer_edge = model_point_in_view(
-        adapter,
-        length,
-        (
-            (OUTER_DIA / 2.0 - TOP_END_CHAMFER / 2.0) / 1000.0,
-            (COLUMN_LENGTH - TOP_END_CHAMFER / 2.0) / 1000.0,
-            0.0,
-        ),
-        label="top OD chamfer midpoint",
-    )
-    add_property_linked_callout(
-        adapter,
-        length,
-        property_name="Top End Callout",
-        edge_xy=top_chamfer_edge,
-        note_xy=(0.150, 0.340),
-    )
+    chamfers = [
+        annotation
+        for annotation in dimensions
+        if dimension_name(adapter, annotation) == "TopChamfer"
+    ]
+    if len(chamfers) != 1:
+        raise RuntimeError(f"expected one native top chamfer, got {len(chamfers)}")
+    chamfer = _early_bound(chamfers[0].GetSpecificAnnotation(), "IDisplayDimension")
+    native_chamfer = _early_bound(chamfer.GetDimension2(0), "IDimension")
+    if abs(float(native_chamfer.SystemValue) * 1000.0 - TOP_END_CHAMFER) > 1e-5:
+        raise RuntimeError("native top chamfer differs from source size")
+    chamfer.ShowParenthesis = False
+    chamfer.SetText(1, "")
+    # Keep the native value/suffix on one line. Multiline suffix text on this
+    # imported model dimension rendered only its final line in the native PDF.
+    cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
+    chamfer.SetText(3, cap_acceptance)
+    chamfer.SetText(4, "")
+    chamfer_suffix = " X 45 DEG"
+    chamfer.SetText(2, chamfer_suffix)
+    chamfer.ShowDimensionValue = True
+    if (
+        bool(chamfer.ShowParenthesis)
+        or not bool(chamfer.ShowDimensionValue)
+        or str(chamfer.GetText(1) or "")
+        or str(chamfer.GetText(2) or "") != chamfer_suffix
+        or str(chamfer.GetText(3) or "") != cap_acceptance
+        or str(chamfer.GetText(4) or "")
+    ):
+        raise RuntimeError("native chamfer value/cap callout lanes did not persist")
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 

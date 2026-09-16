@@ -17,19 +17,28 @@ MM_PER_IN = 25.4
 
 # --- Two-level base envelope, centred on the part origin. ---
 BOTTOM_LENGTH = 18.0 * MM_PER_IN  # 457.2 (46 cm callout)
-FORMER_BOTTOM_WIDTH = 11.0 * MM_PER_IN  # 279.4 (28 cm callout)
-BOTTOM_FRONT_Z = -FORMER_BOTTOM_WIDTH / 2.0
-BOTTOM_REAR_Z = FORMER_BOTTOM_WIDTH / 2.0
-BOTTOM_WIDTH = BOTTOM_REAR_Z - BOTTOM_FRONT_Z
-BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
 BOTTOM_THICKNESS = 0.5 * MM_PER_IN  # 12.7
 TOP_LENGTH = 17.5 * MM_PER_IN  # 444.5 (0.25 in reveal per side)
-FORMER_TOP_WIDTH = 10.5 * MM_PER_IN  # 266.7
-TOP_FRONT_Z = -FORMER_TOP_WIDTH / 2.0
-TOP_REAR_Z = FORMER_TOP_WIDTH / 2.0
-TOP_WIDTH = TOP_REAR_Z - TOP_FRONT_Z
-TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
 TOP_THICKNESS = 1.5 * MM_PER_IN  # 38.1
+# The pad DEPTH is set by the column stations, not by the ch6 28 cm callout.
+# The sockets sit at x = +/-197 and z = +/-112, so a pad centred on the part
+# origin leaves an EQUAL socket-to-rim deck land on all four sides only at
+# TOP_WIDTH = TOP_LENGTH - 2 * (197 - 112) = 274.5. The former 10.5 in pad
+# (266.7) left 1.6 mm of land in Z against 5.5 in X, and the 2026-09 blind
+# machinist review rejected that asymmetry as a blocker: no tolerance stack
+# behind the hole-table coordinate scheme can hold the 1.0 MIN finished land
+# DRAWING_NOTES demands off a 1.6 mm nominal. build_harmonic_base asserts the
+# land is equal on both axes -- it owns COLUMN_X and the socket stations, so
+# deriving TOP_WIDTH from them here would be circular.
+TOP_WIDTH = 274.5
+# The flange keeps the same 0.25 in reveal per side that it has in X.
+BOTTOM_WIDTH = TOP_WIDTH + (BOTTOM_LENGTH - TOP_LENGTH)  # 287.2
+BOTTOM_FRONT_Z = -BOTTOM_WIDTH / 2.0
+BOTTOM_REAR_Z = BOTTOM_WIDTH / 2.0
+BOTTOM_CENTER_Z = (BOTTOM_FRONT_Z + BOTTOM_REAR_Z) / 2.0
+TOP_FRONT_Z = -TOP_WIDTH / 2.0
+TOP_REAR_Z = TOP_WIDTH / 2.0
+TOP_CENTER_Z = (TOP_FRONT_Z + TOP_REAR_Z) / 2.0
 STACK_HEIGHT = BOTTOM_THICKNESS + TOP_THICKNESS  # 50.8: the deck (pad top)
 LIP_W = 7.0  # raised rim width, in from the pad outline (2026-09 photo re-derive)
 LIP_H = 2.5  # raised rim height above the deck
@@ -51,8 +60,11 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # arcs between them are skimmed with the sides -- and the flange keeps the
 # RAL6000 body colour (only the deck and underside are blacked by the Finish
 # field). The part authors one native symbol per qualified face; the sheet
-# states the requirement once, as this target on the plan profile.
-FLANGE_PERIMETER_TARGET = "4 SIDES"
+# states the requirement once, as this target on the plan profile. The target
+# NAMES the surface, so the one sheet symbol cannot be misread as the pad side
+# face or the rim (2026-09 review clarity item: three nested plan outlines sit
+# within a few millimetres of each other).
+FLANGE_PERIMETER_TARGET = "FLANGE EDGES, 4 SIDES"
 SURFACE_FINISHES = (
     SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
     SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
