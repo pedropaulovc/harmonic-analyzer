@@ -688,6 +688,15 @@ def _assert_spring_mount(
             f"channel anchor cut end sits {recess:.4f} mm above the plate "
             f"underside, expected {spring_hook_spec.PLATE_RECESS_MM:.4f}"
         )
+    # Calibration only unscrews, so the seated pose must hold the whole
+    # back-out budget the registry prints ON TOP of the two-thread floor.
+    budget = spring_hook_spec.ADJUSTMENT_TRAVEL_MM
+    if engagement - budget < spring_hook_spec.MIN_THREAD_ENGAGEMENT_MM - 1e-9:
+        raise RuntimeError(
+            f"channel anchor seats with {engagement:.4f} mm engaged, too little "
+            f"to give up {budget:.4f} mm of preload travel above the "
+            f"{spring_hook_spec.MIN_THREAD_ENGAGEMENT_MM:.4f} mm thread floor"
+        )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
     )
@@ -697,7 +706,9 @@ def _assert_spring_mount(
     log(
         f"stock spring mount: inside length {pose.length_mm:.4f} mm, "
         f"thread engagement {engagement:.3f} mm, "
-        f"cut end {recess:.3f} mm above the plate underside"
+        f"cut end {recess:.3f} mm above the plate underside, "
+        f"back-out budget {budget:.3f} mm "
+        f"({spring_hook_spec.ADJUSTMENT_TURNS} turn)"
     )
 
 

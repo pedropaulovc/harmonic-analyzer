@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _config
 import _stock_trim_drawing as trim_drawing
 import draw_spring_hook as drawing
 import spring_hook_spec as spec
@@ -45,6 +46,37 @@ def test_trim_band_cannot_reach_the_plate_underside_or_lose_the_threads():
     )
     short_thread = spec.THREAD_ENGAGEMENT_MM - band - maximum_axial
     assert short_thread > 2.0 * anchor.thread_pitch_mm
+
+
+def test_backing_out_for_preload_keeps_the_thread_floor():
+    # Calibration unscrews the anchor, so the worst-case (short-limit) part
+    # sets the travel: it may give up engagement only down to the two full
+    # turns min_shank_length_mm holds the cut to.
+    short_engagement = spec.THREAD_ENGAGEMENT_MM - spec.FINISHED_OVERALL_TOLERANCE_MM
+    assert spec.MIN_THREAD_ENGAGEMENT_MM == 2.0 * anchor.thread_pitch_mm
+    assert spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
+        short_engagement - spec.MIN_THREAD_ENGAGEMENT_MM
+    )
+    # Backing the full budget out of the shortest part lands ON the floor; a
+    # nominal part keeps the whole band as extra thread.
+    assert short_engagement - spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
+        spec.MIN_THREAD_ENGAGEMENT_MM
+    )
+    assert spec.THREAD_ENGAGEMENT_MM - spec.ADJUSTMENT_TRAVEL_MM == pytest.approx(
+        spec.MIN_THREAD_ENGAGEMENT_MM + spec.FINISHED_OVERALL_TOLERANCE_MM
+    )
+
+
+def test_printed_back_out_limit_matches_the_computed_budget():
+    # The registry note is what the fitter reads; a band or plate change that
+    # moved the budget must not leave it printing a stale turn count.
+    assert spec.ADJUSTMENT_TURNS >= 1
+    assert spec.ADJUSTMENT_TURNS * anchor.thread_pitch_mm <= spec.ADJUSTMENT_TRAVEL_MM
+    assert (spec.ADJUSTMENT_TURNS + 1) * anchor.thread_pitch_mm > (
+        spec.ADJUSTMENT_TRAVEL_MM
+    )
+    notes = _config.parts("spring-hook")["installation_notes"]
+    assert f"BACK OUT {spec.ADJUSTMENT_TURNS} TURN MAX" in " ".join(notes.split())
 
 
 def test_cut_stays_in_threaded_metal_clear_of_the_neck():

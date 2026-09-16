@@ -16,6 +16,15 @@ The remaining engagement (``THREAD_ENGAGEMENT_MM``) is ~4.4 threads of #6-32
 against a 4.49 N spring, so the band is the title block's general 1-place row
 (as on the counter anchor, ``boss_hook_spec``): even at the long limit the end
 stays 0.8 mm inside the plate, and at the short limit >2 threads remain.
+
+That short limit is what bounds the fitter: unscrewing trades engagement for
+eye lift, so the calibration travel is whatever the SHORTEST in-band anchor
+can give up before it reaches the same two-full-turn floor
+``stock_anchor_geom.min_shank_length_mm`` holds the cut to
+(``ADJUSTMENT_TRAVEL_MM``, 1.143 mm = 1.44 turns; 2.4 turns at nominal
+length).  Whole turns are what a fitter can count, so the registry prints
+``ADJUSTMENT_TURNS`` -- one turn, worth 0.139 N of the 2.71 N installed load,
+which is 5% of preload per turn across the 20 channels.
 """
 
 import _config
@@ -32,6 +41,23 @@ SHANK_LENGTH_MM = round(
 TRIM = trim(ANCHOR_9489T111, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = ANCHOR_9489T111.eye_od_mm / 2 - TRIM.shank_end_y_mm
 FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4
+# Unscrewing for preload trades engagement for eye lift, and the shortest
+# in-band anchor sets the limit: it starts FINISHED_OVERALL_TOLERANCE_MM short
+# of nominal and may not be backed past two full threads (the same floor
+# stock_anchor_geom.min_shank_length_mm holds the cut to).
+MIN_THREAD_ENGAGEMENT_MM = 2.0 * ANCHOR_9489T111.thread_pitch_mm
+ADJUSTMENT_TRAVEL_MM = round(
+    THREAD_ENGAGEMENT_MM - FINISHED_OVERALL_TOLERANCE_MM - MIN_THREAD_ENGAGEMENT_MM,
+    4,
+)
+# A fitter counts turns, not tenths, so the printed instruction floors to them.
+ADJUSTMENT_TURNS = int(ADJUSTMENT_TRAVEL_MM // ANCHOR_9489T111.thread_pitch_mm)
+if ADJUSTMENT_TURNS < 1:
+    raise ValueError(
+        f"no calibration travel: the shortest in-band anchor gives up "
+        f"{ADJUSTMENT_TRAVEL_MM:.4f} mm before two full threads, under the "
+        f"{ANCHOR_9489T111.thread_pitch_mm:.5f} mm a fitter can count"
+    )
 CHAMFER_WIDTH_MM = ANCHOR_9489T111.end_chamfer_mm
 # At the short chamfer limit the cut end's flat (major radius - chamfer) must
 # still pass the #6-32 tap drill it enters, which allows 0.0556 mm below the
