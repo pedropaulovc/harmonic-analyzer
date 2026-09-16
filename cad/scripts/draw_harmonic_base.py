@@ -40,6 +40,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -122,6 +123,15 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 4.0)
 VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS")
+
+# Section A-A is projected from a vertical cutting line, which lays machine +Y
+# across the sheet: it reads as the upright section turned 90 degrees
+# clockwise. That qualifier rides in the NATIVE view label beside the scale, so
+# the sheet carries exactly one "SECTION A-A" and it is the one under the view.
+# The custom-scale compartment PREFIXES the scale SolidWorks formats itself
+# (label renders "<this text> 1 : 4"), so spelling the ratio here too printed
+# it twice -- state the rotation and let the native value follow.
+SECTION_LABEL_SCALE_TEXT = "ROTATED 90 DEG CW  SCALE"
 
 if abs((BOTTOM_REAR_Z - BOTTOM_FRONT_Z) - BOTTOM_WIDTH) > 1e-12:
     raise AssertionError("base drawing extents disagree with the overall depth")
@@ -313,6 +323,10 @@ def _check_cross_tap_callout(display: Any) -> None:
             raise RuntimeError(
                 f"base tap callout {name}: {actual_mm} != {expected[name]} mm"
             )
+        if name == "hw-tapdrldepth" and int(length.Precision) != 0:
+            raise RuntimeError(
+                f"base tap-drill depth prints {length.Precision} decimals, not a whole-mm MIN"
+            )
         found.add(name)
     required = set(expected) | set(expected_strings)
     if found != required:
@@ -321,8 +335,12 @@ def _check_cross_tap_callout(display: Any) -> None:
         )
 
 
-def _set_cross_tap_total_quantity(display: Any) -> None:
-    """Aggregate both two-hole features without resolving their size/depth tokens."""
+def _set_cross_tap_callout_text(display: Any) -> None:
+    """Aggregate both two-hole features and call the drill depth a minimum.
+
+    Neither edit resolves a native size/depth token: the writable callout part
+    keeps them, so the Hole Wizard variables stay associative.
+    """
     definitions = {
         definition_part: str(display.GetText(definition_part) or "")
         for definition_part in (5, 6, 7, 8)
@@ -339,17 +357,46 @@ def _set_cross_tap_total_quantity(display: Any) -> None:
     ):
         raise RuntimeError(f"expected one native two-instance drill definition: {definitions!r}")
     quantity = len(COLUMN_SOCKET_XZ)
-    updated = definition.replace("<NUM_INST>", str(quantity), 1)
+    # The tap drill only has to reach deep enough for the bottoming tap to cut
+    # full thread, so its depth is a MINIMUM, not the two-place band "48.00"
+    # asked the shop to hold (2026-09 review).
+    updated = definition.replace("<NUM_INST>", str(quantity), 1).replace(
+        "<hw-tapdrldepth>", "<hw-tapdrldepth> MIN", 1
+    )
     display.SetText(3, updated)
+    resolved = str(display.GetText(3) or "")
     if (
         str(display.GetText(7)) != updated
-        or not str(display.GetText(3)).lstrip().startswith(f"{quantity}X ")
+        or not resolved.lstrip().startswith(f"{quantity}X ")
+        or " MIN" not in resolved
         or any(
             str(display.GetText(part) or "") != definitions[part]
             for part in (5, 6, 8)
         )
     ):
         raise RuntimeError("aggregate cross-tap quantity or untouched native definitions did not persist")
+
+
+@_telemetry.traced("drawing.base_drill_depth_precision")
+def _set_drill_depth_precision(display: Any) -> None:
+    """Print the MIN tap-drill depth as a whole millimetre, natively.
+
+    ``IDisplayDimension::SetPrecision3`` is per CALLOUT, so flattening it would
+    also cost the tap-drill DIAMETER its two decimal places. Every Hole Wizard
+    length token carries its own ``ICalloutLengthVariable::Precision``, so only
+    the depth's drops here and the value itself stays the native variable.
+    """
+    found = False
+    for raw in display.GetHoleCalloutVariables() or ():
+        if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-tapdrldepth":
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        length.Precision = 0
+        if int(length.Precision) != 0:
+            raise RuntimeError("base tap-drill depth precision did not persist")
+        found = True
+    if not found:
+        raise RuntimeError("base tap callout has no native tap-drill depth variable")
 
 
 @_telemetry.traced("drawing.base_rim_width")
@@ -381,7 +428,10 @@ def _add_rim_width(adapter: Any, view: Any) -> Any:
         edge = max(items, key=lambda item: item[0])[1]
         if not view.SelectEntity(edge, index > 0):
             raise RuntimeError(f"failed to select base rim wall {index}")
-    display = drawing.AddHorizontalDimension2(0.240, 0.140, 0.0)
+    # Below the 287.2 depth dimension's lower extension line (sheet y 0.149),
+    # not against it: three caption lines ride under this value (2026-09 review
+    # clarity item).
+    display = drawing.AddHorizontalDimension2(0.243, 0.125, 0.0)
     drawing.ClearSelection2(True)
     if display is None:
         raise RuntimeError("failed to create base rim-width dimension")
@@ -780,6 +830,24 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to set end-only section cutting line")
     if extension.GetUserPreferenceInteger(542, 0) != 1:
         raise RuntimeError("section cutting-line style did not persist")
+    # swDetailingSectionViewLabels_{PerStandard,Scale,CustomScale} = 242/247/84
+    # and swDetailingViewLabelsScale_SCALEcustom = 3, read off this install's
+    # swconst.tlb (R2026x). The custom scale compartment is the only writable
+    # text in a native section label, and it is where the rotation qualifier
+    # belongs: a second free-note label beside the view is what the 2026-09
+    # review read as Section A-A labelled twice.
+    if not extension.SetUserPreferenceToggle(242, 0, False):
+        raise RuntimeError("failed to release the standard section-label defaults")
+    if not extension.SetUserPreferenceInteger(247, 0, 3):
+        raise RuntimeError("failed to select custom section-label scale text")
+    if not extension.SetUserPreferenceString(84, 0, SECTION_LABEL_SCALE_TEXT):
+        raise RuntimeError("failed to write the section-label scale text")
+    if (
+        extension.GetUserPreferenceToggle(242, 0)
+        or int(extension.GetUserPreferenceInteger(247, 0)) != 3
+        or str(extension.GetUserPreferenceString(84, 0)) != SECTION_LABEL_SCALE_TEXT
+    ):
+        raise RuntimeError("native section-label scale text did not persist")
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):
@@ -1020,7 +1088,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "ON A1-A4 X CENTRES\n2 EACH FRONT/REAR FACE"
         ),
     )
-    _set_cross_tap_total_quantity(tap_callout)
+    _set_cross_tap_callout_text(tap_callout)
+    _set_drill_depth_precision(tap_callout)
     _check_cross_tap_callout(tap_callout)
     base_edge = _horizontal_base_edge(hole_side, 0.0)
     endpoints = (base_edge.GetStartVertex(), base_edge.GetEndVertex())
@@ -1033,18 +1102,36 @@ async def build(adapter: Any) -> dict[str, str]:
     base_point = tuple(float(value) for value in left_base_vertex.GetPoint())
     if base_point[0] >= 0.0 or abs(base_point[1]) > 1e-7:
         raise RuntimeError("cross-axis datum is not the left base-underside vertex")
+    # 38.10 is also the deck above the flange (40.6 - 2.5), so the axis height
+    # has to SHOW which two features it spans (2026-09 review blocker): the
+    # upper witness line lands on the hole CENTRELINE -- the native arc-centre
+    # endpoint, now drawn by this view's auto center marks -- the lower one on
+    # the flange underside, and the caption names that Ra 3.2 seating face.
+    # The text block is parked BELOW the extension lines it would otherwise be
+    # struck through by: at 1:4 the two witness lines are 9.5 mm apart on
+    # paper, so a four-line block centred on the dimension line put the value
+    # on the line and each caption line on an extension line. Outside the band
+    # SolidWorks keeps the arrows inside and jogs a leader down to the text.
+    if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
+    axis_caption = "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE"
     tap_height = _add_base_height(
         adapter,
         hole_side,
         _cross_tap_edge(hole_side, x_mm=-COLUMN_X),
         BASE_SCREW_Y,
-        (0.211, 0.096),
-        "cross-tap axis height",
+        (0.196, 0.0745),
+        "cross-screw axis height above the flange underside",
         lower_entity=left_base_vertex,
     )
+    set_arc_endpoints_to_center(adapter, tap_height, label="cross-screw axis height")
+    tap_height.SetText(4, axis_caption)
     tap_height.SetPrecision3(2, -1, -1, -1)
-    if int(tap_height.GetPrimaryPrecision2()) != 2:
-        raise RuntimeError("native cross-axis height precision did not persist")
+    if (
+        int(tap_height.GetPrimaryPrecision2()) != 2
+        or str(tap_height.GetText(4)) != axis_caption
+    ):
+        raise RuntimeError("native cross-axis height precision or datum caption did not persist")
     # The hole table measures every coordinate from the virtual corner of the
     # flange's west and rear faces, so the plan profile carries the seat grade
     # once, read off the same west edge the table's Y axis is seeded from. The
@@ -1070,11 +1157,16 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
     # Three nested outlines (flange, pad side, rim inner) sit within 1.6 mm of
     # each other at the table origin, so the corner is named instead of left to
-    # be inferred from A1-A4 symmetry. Section A-A is projected from a vertical
-    # cutting line, which lays machine +Y across the sheet: it reads as the
-    # upright section turned 90 degrees clockwise, and says so.
-    add_note(adapter, "ORIGIN: FLANGE OUTER\nSHARP CORNER (X0 Y0)", 0.207, 0.1525)
-    add_note(adapter, "SECTION A-A\nROTATED\n90 DEG CW", 0.342, 0.2025)
+    # be inferred from A1-A4 symmetry. The note reads from the open field left
+    # of the plan view: against the corner itself it ran into the E1/F3 hole
+    # tags and the table's own X0/Y0 axis labels (2026-09 review clarity item).
+    # That field is only 60 mm wide -- the hole table ends at x 0.163 and the
+    # X0/Y0 arrows start at x 0.207 -- so the note is reflowed to three short
+    # lines and sits BESIDE the arrows it explains, clear of the table border
+    # and of the spotface callout below it.
+    add_note(
+        adapter, "ORIGIN: FLANGE\nOUTER SHARP\nCORNER (X0 Y0)", 0.165, 0.186,
+    )
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.046, char_height=0.0035,
     )
