@@ -7,7 +7,7 @@ export behavior lives in ``_drawing_common``.
 
 The base is a stepped gray-iron frame with a raised rim, four column sockets,
 and blind tapped hardware seats. The plate is 457 mm long, so the whole sheet
-runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:10.
+runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:6.
 
 Run with SolidWorks open::
 
@@ -56,6 +56,7 @@ from _surface_finish import surface_finish_by_key
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
+    BASE_SPOTFACE_DEPTH,
     BASE_SPOTFACE_PLANE_Z,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
@@ -70,7 +71,6 @@ from build_harmonic_base import (
     LOCK_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
-    PAD_ROOT_R,
     RIM_CHAMFER,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
@@ -268,7 +268,10 @@ def _add_cross_spotface_dimension(adapter: Any, view: Any) -> None:
     actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
     if abs(actual_mm - SCREW_SPOTFACE_DIAMETER) > 1e-5:
         raise RuntimeError(f"front spotface measured {actual_mm}, expected {SCREW_SPOTFACE_DIAMETER} mm")
-    caption = "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR\nCLEAN UP"
+    caption = (
+        "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR\n"
+        f"{BASE_SPOTFACE_DEPTH:.2f} DEEP"
+    )
     display.SetText(4, caption)
     display.SetPrecision3(1, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != 1 or str(display.GetText(4)) != caption:
@@ -541,19 +544,11 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 
 def _section_geometry_controls(adapter: Any, view: Any) -> None:
     levels: dict[float, list[tuple[float, Any]]] = {STACK_HEIGHT: [], RIM_TOP: []}
-    roots = []
     chamfers: dict[str, list[tuple[float, Any]]] = {"UPPER RIM": [], "UNDERSIDE": []}
-    for raw in visible_view_entities(view, 1, label="base section rim and root"):
+    for raw in visible_view_entities(view, 1, label="base section rim and chamfers"):
         edge = _early_bound(raw, "IEdge")
         curve = _early_bound(edge.GetCurve(), "ICurve")
-        if curve.IsCircle():
-            values = tuple(float(value) for value in curve.CircleParams)
-            if (
-                abs(values[6] - PAD_ROOT_R / 1000.0) < 1e-7
-                and abs(values[1] - (BOTTOM_THICKNESS + PAD_ROOT_R) / 1000.0) < 1e-7
-            ):
-                roots.append((values[2], edge))
-        elif curve.IsLine():
+        if curve.IsLine():
             x0, y0, z0, x1, y1, z1 = tuple(edge.GetCurveParams2())[:6]
             # Section A-A is a YZ cut: these native diagonal edges expose
             # both equal legs of the actual 45-degree chamfer.
@@ -572,8 +567,8 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
             for height, candidates in levels.items():
                 if span > 1e-6 and abs(y0 - height / 1000.0) < 1e-7:
                     candidates.append((span, edge))
-    if any(not candidates for candidates in levels.values()) or not roots:
-        raise RuntimeError("base section lacks exact deck/rim edges or pad-root arc")
+    if any(not candidates for candidates in levels.values()):
+        raise RuntimeError("base section lacks exact deck/rim edges")
     if any(not candidates for candidates in chamfers.values()):
         raise RuntimeError("base section lacks the actual equal-leg upper/underside chamfer edges")
     drawing = adapter.currentModel
@@ -599,31 +594,10 @@ def _section_geometry_controls(adapter: Any, view: Any) -> None:
     step.SetPrecision3(1, -1, -1, -1)
     if int(step.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base rim-step precision did not persist")
-    selection_data = _early_bound(
-        drawing.SelectionManager, "ISelectionMgr"
-    ).CreateSelectData()
-    selection_data.View = view
-    if not _early_bound(min(roots, key=lambda item: item[0])[1], "IEntity").Select4(
-        False, selection_data
-    ):
-        raise RuntimeError("failed to select the actual pad-to-flange root arc")
-    root = drawing.AddRadialDimension2(0.355, 0.192, 0.0)
-    drawing.ClearSelection2(True)
-    if root is None:
-        raise RuntimeError("failed to dimension the actual pad-to-flange root")
-    root = _early_bound(root, "IDisplayDimension")
-    actual = (
-        float(_early_bound(root.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    )
-    if abs(actual - PAD_ROOT_R) > 1e-5:
-        raise RuntimeError(
-            f"base root radius measured {actual}, expected {PAD_ROOT_R} mm"
-        )
-    root.SetText(4, "ROOT")
-    root.SetPrecision3(1, -1, -1, -1)
-    if int(root.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError("base root-radius precision did not persist")
-    root.ArcExtensionLineOrOppositeSide = False
+    # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
+    # junction is not measurable with hobby-shop kit, so the model keeps its
+    # fillet and the deck cutter's own corner radius defines it (2026-09
+    # review over-specification item).
     for label, candidates in chamfers.items():
         edge = (
             min(candidates, key=lambda item: item[0])[1]
@@ -854,7 +828,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     rim_width = _add_rim_width(adapter, top)
-    rim_width.SetText(4, "FROM PAD OUTER EDGE\nTO RIM INNER FACE")
+    rim_width.SetText(4, "FROM PAD OUTER EDGE\nTO RIM INNER FACE\n4 SIDES")
     rim_width.SetPrecision3(1, -1, -1, -1)
     if int(rim_width.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base rim-width precision did not persist")
@@ -874,9 +848,12 @@ async def build(adapter: Any) -> dict[str, str]:
     overall_height.SetPrecision3(1, -1, -1, -1)
     if int(overall_height.GetPrimaryPrecision2()) != 1:
         raise RuntimeError("base overall reference precision did not persist")
+    # All three height dimensions stack on the LEFT of the front view, shortest
+    # nearest the outline: 12.7 at x 0.073, this 40.6 at 0.0625, the overall
+    # reference at 0.052. Its text clears the 53.3 text above the view.
     flange_to_rim = _add_base_height(
         adapter, side, _horizontal_base_edge(side, RIM_TOP),
-        RIM_TOP - BOTTOM_THICKNESS, (0.245, 0.100), "visible flange-to-rim height",
+        RIM_TOP - BOTTOM_THICKNESS, (0.0625, 0.112), "visible flange-to-rim height",
         lower_entity=_horizontal_base_edge(side, BOTTOM_THICKNESS),
     )
     flange_to_rim.SetPrecision3(1, -1, -1, -1)
@@ -1039,6 +1016,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process=(
             "MHA-132 TUBE CROSS-SCREWS\n"
             "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+            "DEPTHS FROM SPOTFACE FLOOR\n"
             "ON A1-A4 X CENTRES\n2 EACH FRONT/REAR FACE"
         ),
     )
@@ -1069,18 +1047,19 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("native cross-axis height precision did not persist")
     # The hole table measures every coordinate from the virtual corner of the
     # flange's west and rear faces, so the plan profile carries the seat grade
-    # once, as a "4 SIDES" target read off the same west edge the table's Y
-    # axis is seeded from. The part owns one control per perimeter face; this
-    # single callout states the requirement for all four.
+    # once, read off the same west edge the table's Y axis is seeded from. The
+    # symbol's own target names the surface ("FLANGE EDGES, 4 SIDES"), which
+    # the three nested plan outlines made necessary; the part owns one control
+    # per perimeter face and this single callout states all four.
     flange_finish = add_surface_finish(
         adapter, hole_top,
-        symbol_xy=(0.178, 0.212),
+        symbol_xy=(0.170, 0.205),
         control=surface_finish_by_key(SURFACE_FINISHES, "flange_west"),
         label="flange perimeter seat finish",
         char_height=0.0025,
         edge_entity=table_y_axis,
         leader_attach_xy=_plan_xy(
-            -BOTTOM_LENGTH / 2.0, BOTTOM_FRONT_Z / 2.0, center=HOLE_TOP_CENTER
+            -BOTTOM_LENGTH / 2.0, 0.0, center=HOLE_TOP_CENTER
         ),
     )
     flange_annotation = _early_bound(flange_finish.GetAnnotation(), "IAnnotation")
@@ -1089,6 +1068,13 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("flange perimeter finish leader did not clear its roughness text")
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.235, 0.237)
     add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
+    # Three nested outlines (flange, pad side, rim inner) sit within 1.6 mm of
+    # each other at the table origin, so the corner is named instead of left to
+    # be inferred from A1-A4 symmetry. Section A-A is projected from a vertical
+    # cutting line, which lays machine +Y across the sheet: it reads as the
+    # upright section turned 90 degrees clockwise, and says so.
+    add_note(adapter, "ORIGIN: FLANGE OUTER\nSHARP CORNER (X0 Y0)", 0.207, 0.1525)
+    add_note(adapter, "SECTION A-A\nROTATED\n90 DEG CW", 0.342, 0.2025)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.020, 0.046, char_height=0.0035,
     )

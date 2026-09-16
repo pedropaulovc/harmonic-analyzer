@@ -143,8 +143,12 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
 # Plate nominal geometry (BOTTOM_*/TOP_*) lives in harmonic_base_spec -- the
 # COM-free contract the drawing shares. DIMENSIONS.md ch6: 46 cm / 28 cm callouts
-# = 18.1 x 11.0 in (annotated); legacy 18.0 x 11.0 kept, top plate 0.25 in reveal
-# per side, thicknesses from the legacy HarmonicBase.cs (photo-verify M2 note).
+# = 18.1 x 11.0 in (annotated); the length keeps the legacy 18.0 in and the
+# thicknesses come from the legacy HarmonicBase.cs (photo-verify M2 note). The
+# DEPTH deliberately no longer follows the 28 cm callout: harmonic_base_spec
+# widens the pad to 274.5 (slab 287.2, same 0.25 in reveal per side) so the
+# socket-to-rim deck land is equal on both axes -- asserted below, because
+# only this module knows the column stations.
 IN = 25.4
 
 # Four column sockets and their interrupted front/back retaining taps. The
@@ -212,8 +216,11 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 # The machined plate gets 45-degree edge breaks on every external edge: the
 # vertical plan corners at 1/8 in legs, the exposed top rims and the
 # underside rim at 1/16 in (single-pass mill/file breaks). The one internal
-# wall junction -- the pad side walls meeting the flange top face -- carries
-# the R0.50 root fillet note 1 already caps (a cutter-corner radius). Every
+# wall junction -- the pad side walls meeting the flange top face -- carries a
+# 0.5 root fillet, which is NOT a print requirement: a 0.5 mm internal root
+# cannot be measured with hobby-shop kit (it needs an optical comparator or a
+# radius gauge under magnification), so the sheet carries no radius callout
+# and the deck cutter's own corner defines it (2026-09 review). Every
 # mechanism hole sits >= 26 from every plate edge; the closest seats to a rim
 # are the nameplate taps (NAMEPLATE_SCREW_XZ), Ø2.26 at 12.5 in from the pad
 # side and 5.5 inside the raised rim's inner wall -- still far clear of the
@@ -227,7 +234,7 @@ HOLE_XZ = SUPPORT_HOLD_DOWN_XZ
 FLANGE_CORNER_R = 0.875 * IN  # 22.225
 PAD_CORNER_R = FLANGE_CORNER_R - (BOTTOM_LENGTH - TOP_LENGTH) / 2.0  # 15.875
 RIM_CHAMFER = 0.0625 * IN  # 1.5875 legs, top rims + underside rim
-PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
+PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 
 # Raised rim + black deck (2026-09 photo re-derive). Every plate that shows
 # the base top -- ch11 p.21 (crank close-up), ch13 p.25 (cylinder-gear front),
@@ -237,8 +244,9 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet (note 1: R0.50 MAX)
 # frames stays at the pad top (STACK_HEIGHT), so nothing mounted on the base
 # moves. The deck face is painted PANEL_BLACK at the FACE level (part and
 # body stay casting green); the lip's inner edge clears the closest deck
-# occupants -- tube-frame columns (|z| 124.7) and the nameplate (x 214.25) --
-# by >= 1.0.
+# occupants by >= 1.0 -- the tube-frame column sockets (wall at |z| 124.75,
+# now 5.5 clear after the pad widening) and the nameplate's plate corner
+# (x 214.25, 1.0 clear, the binding case).
 # LIP_W / LIP_H live in harmonic_base_spec (the drawing's side view needs the
 # rim top for its silhouette pick).
 RIM_INNER_R = PAD_CORNER_R - LIP_W  # 8.875: the deck pocket's plan corners
@@ -458,14 +466,24 @@ if COLUMN_SOCKET_NEAREST_OCCUPANT_WALL < 1.0:
     )
 # Nominal model-space sanity only: this does not validate manufactured
 # tolerance combinations. DRAWING_NOTES governs finished-part land acceptance.
-COLUMN_SOCKET_RIM_CLEARANCE = min(
-    min(
-        TOP_LENGTH / 2.0 - LIP_W - abs(x),
-        TOP_WIDTH / 2.0 - LIP_W - abs(z),
-    )
-    - COLUMN_SOCKET_DIAMETER / 2.0
-    for x, z in COLUMN_SOCKET_XZ
+# TOP_WIDTH is sized so this land is EQUAL on both axes: the 2026-09 blind
+# machinist review rejected the former 10.5 in pad, whose 1.6 mm land in Z
+# could not survive the coordinate stack behind the 1.0 MIN finished-land
+# note while every table dimension stayed in tolerance.
+COLUMN_SOCKET_LAND_X = min(
+    TOP_LENGTH / 2.0 - LIP_W - abs(x) - COLUMN_SOCKET_DIAMETER / 2.0
+    for x, _z in COLUMN_SOCKET_XZ
 )
+COLUMN_SOCKET_LAND_Z = min(
+    TOP_WIDTH / 2.0 - LIP_W - abs(z) - COLUMN_SOCKET_DIAMETER / 2.0
+    for _x, z in COLUMN_SOCKET_XZ
+)
+COLUMN_SOCKET_RIM_CLEARANCE = min(COLUMN_SOCKET_LAND_X, COLUMN_SOCKET_LAND_Z)
+if abs(COLUMN_SOCKET_LAND_X - COLUMN_SOCKET_LAND_Z) > 1e-9:
+    raise AssertionError(
+        "base deck land is not equal on both axes: "
+        f"x={COLUMN_SOCKET_LAND_X}, z={COLUMN_SOCKET_LAND_Z}"
+    )
 if COLUMN_SOCKET_RIM_CLEARANCE < 1.0:
     raise AssertionError("base column socket crowds the raised rim")
 
@@ -1338,7 +1356,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(
         adapter, "base length (annotated 46 cm / 18 in)", "x", BOTTOM_LENGTH
     )
-    await bbox_extent_check(adapter, "base depth (28 cm plate)", "z", BOTTOM_WIDTH)
+    await bbox_extent_check(adapter, "base depth (widened pad slab)", "z", BOTTOM_WIDTH)
 
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
