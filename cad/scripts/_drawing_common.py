@@ -376,6 +376,11 @@ def _validate_surface_finish_control_face(
     )
 
 
+# TEMPORARY experiment flag: audit datum placement readbacks without
+# rejecting them, so one live run reveals the real SolidWorks contract.
+_PLACEMENT_AUDIT_ONLY = True
+
+
 class LeaderPlacement(NamedTuple):
     """How a placed annotation's readback relates to the point it was given.
 
@@ -535,17 +540,39 @@ def add_datum_feature(
         placement = LeaderPlacement(offset, 0.0)
     else:
         placement = leader_placement(actual_xy, symbol_xy, edge_xy)
-    _telemetry.debug(
-        f"datum {datum} placement ({label}): lateral={placement.lateral:.6g} m, "
-        f"pull_in={placement.pull_in:.6g} m"
+    # TEMPORARY placement audit: dump what SolidWorks reports about the leader
+    # so the guard can assert the reported geometry instead of a model derived
+    # from the picked anchor. Remove once the contract is pinned.
+    try:
+        leader_audit = _sw_type_info.early_bound_or_flag(
+            tag_annotation,
+            "IAnnotation",
+            "GetLeaderCount",
+            "GetLeaderStyle",
+            "GetLeaderPointsAtIndex",
+        )
+        audit_count = int(leader_audit.GetLeaderCount())
+        audit_style = int(leader_audit.GetLeaderStyle())
+        audit_points = [
+            list(leader_audit.GetLeaderPointsAtIndex(i) or []) for i in range(audit_count)
+        ]
+    except Exception as exc:  # noqa: BLE001 - diagnostic only
+        audit_count, audit_style, audit_points = -1, -1, [repr(exc)]
+    _telemetry.info(
+        f"[audit] datum {datum} ({label}) requested={symbol_xy} anchor={edge_xy} "
+        f"reported={actual_xy} forced_shoulder={forced_shoulder}->{bool(tag.ForcedShoulder)} "
+        f"shoulder={bool(tag.Shoulder)} leaders={audit_count} style={audit_style} "
+        f"points={audit_points} lateral={placement.lateral:.6g} pull_in={placement.pull_in:.6g}"
     )
-    if placement.lateral > position_tolerance_m:
+    if _PLACEMENT_AUDIT_ONLY:
+        pass  # TEMPORARY: collect every datum's readback in one run, reject nothing.
+    elif placement.lateral > position_tolerance_m:
         raise RuntimeError(
             f"datum {datum} left its leader ({label}): {actual_xy}; "
             f"requested={symbol_xy}, lateral={placement.lateral:.6g} m, "
             f"limit={position_tolerance_m:.6g} m"
         )
-    if not -position_tolerance_m <= placement.pull_in <= leader_shoulder_limit_m:
+    elif not -position_tolerance_m <= placement.pull_in <= leader_shoulder_limit_m:
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): {actual_xy}; "
             f"requested={symbol_xy}, pull_in={placement.pull_in:.6g} m, "
