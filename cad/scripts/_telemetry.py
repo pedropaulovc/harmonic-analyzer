@@ -128,6 +128,63 @@ def _resolve_service_name() -> str:
 
 _service_name = _resolve_service_name()
 
+# ``service.name`` says WHICH STAGE ran; on a build farm the next question is
+# WHICH MACHINE ran it. Azure Monitor derives its ``cloud_RoleInstance`` column
+# from ``service.instance.id``, and without that attribute every span from every
+# worker lands in one anonymous bucket -- a two-worker farm becomes unattributable
+# ("which worker built this drawing?" needs a join through the build's control
+# plane). Resolution order: an explicit ``OTEL_SERVICE_INSTANCE_ID``, then the farm
+# worker identity (``<computername>@<instance-id>``, which distinguishes two
+# workers that share a hostname pattern), then this host's name, which is right for
+# a developer workstation. ``OTEL_RESOURCE_ATTRIBUTES`` wins over all of it: the
+# SDK merges that env itself, so declaring the attribute there must not be
+# overwritten by an explicit value here.
+_INSTANCE_ID_ENV = "OTEL_SERVICE_INSTANCE_ID"
+_WORKER_ID_ENV = "HARMONIC_WORKER_ID"
+
+
+def _declares_instance_id(spec: str) -> bool:
+    """Does ``OTEL_RESOURCE_ATTRIBUTES`` set ``service.instance.id`` itself?
+
+    Follows the ``OTELResourceDetector`` grammar -- comma-separated entries split
+    at their first ``=`` -- and compares the key exactly. A substring test would
+    read a neighbouring ``service.instance.identifier=legacy`` as this attribute
+    and drop the instance id entirely. The SDK exposes no public parser.
+    """
+
+    for entry in spec.split(","):
+        key, separator, _ = entry.partition("=")
+        if separator and key.strip() == "service.instance.id":
+            return True
+    return False
+
+
+def _resolve_instance_id() -> str | None:
+    if _declares_instance_id(os.environ.get("OTEL_RESOURCE_ATTRIBUTES", "")):
+        return None
+    for name in (_INSTANCE_ID_ENV, _WORKER_ID_ENV):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    with contextlib.suppress(Exception):
+        host = socket.gethostname().strip()
+        if host:
+            return host
+    return None
+
+
+def _resource_attributes(service: str) -> dict[str, str]:
+    attributes = {
+        "service.name": service,
+        "service.namespace": _SERVICE_NAMESPACE,
+        "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
+    }
+    instance = _resolve_instance_id()
+    if instance:
+        attributes["service.instance.id"] = instance
+    return attributes
+
+
 # Project default: ship OTLP to a local **.NET Aspire dashboard** through the
 # local collector with zero env. So `doit ...` / a build script lights up the
 # dashboard's traces+logs the moment it is running -- no OTEL_* exports needed.
@@ -859,13 +916,7 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         ]
         os.environ[f"OTEL_EXPORTER_OTLP_{signal.upper()}_PROTOCOL"] = protocol
 
-    resource = Resource.create(
-        {
-            "service.name": _service_name,
-            "service.namespace": _SERVICE_NAMESPACE,
-            "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
-        }
-    )
+    resource = Resource.create(_resource_attributes(_service_name))
 
     # ---- traces -------------------------------------------------------- #
     # Built ONCE and kept, because the build-infra provider (a second resource in this
@@ -972,13 +1023,7 @@ def _provider_for_service(service: str):
             # primary provider's), and letting it shut them down at exit would re-close
             # every exporter -- one "Exporter already shutdown" per extra resource.
             shutdown_on_exit=False,
-            resource=Resource.create(
-                {
-                    "service.name": service,
-                    "service.namespace": _SERVICE_NAMESPACE,
-                    "service.version": os.environ.get("HARMONIC_VERSION", "dev"),
-                }
-            ),
+            resource=Resource.create(_resource_attributes(service)),
         )
         for processor in _span_processors:
             provider.add_span_processor(processor)
