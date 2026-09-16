@@ -95,6 +95,7 @@ LENGTH_KEEP = {
 CROSS_HOLE_CALLOUT = {
     "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
 }
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
 
 @_telemetry.traced("drawing.outer_diameter")
@@ -259,6 +260,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     dimensions = [outer_diameter, *length_annotations]
     set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
+    hole_text = model_point_in_view(
+        adapter,
+        length,
+        (0.0, LOWER_CROSS_HOLE_Y / 1000.0, 0.0),
+        label="lower cross-hole source sketch centre",
+    )
     for annotation in length_annotations:
         if dimension_name(adapter, annotation) != "CrossHoleDia":
             continue
@@ -297,14 +304,27 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("cross-hole leader style did not persist")
         if bool(display.DisplayAsLinear) or not bool(display.Diametric):
             raise RuntimeError("cross-hole callout did not retain diametric presentation")
-        hole_text = model_point_in_view(
-            adapter,
-            length,
-            (0.0, LOWER_CROSS_HOLE_Y / 1000.0, 0.0),
-            label="lower cross-hole source sketch centre",
+        # A diametric callout hangs on its own leader, so SOLIDWORKS also drew
+        # the dimension LEADER-LINE pair from the hole straight past the text
+        # (a 93 mm diagonal run measured through IAnnotation::GetDisplayData)
+        # on top of the broken leader's horizontal shoulder. Hiding the leader
+        # lines leaves exactly the shoulder run and its arrow at the hole;
+        # ``OffsetText`` is not available on radial/diametric dimensions, and
+        # ``ArcExtensionLineOrOppositeSide`` is already False here.
+        display.LeaderVisibility = _LEADER_LINE_NONE
+        if int(display.LeaderVisibility) != _LEADER_LINE_NONE:
+            raise RuntimeError("cross-hole callout kept its dimension leader line")
+        # ``curate_view_dimensions`` already placed the text at the station
+        # ``LENGTH_KEEP`` derives arithmetically; prove that station is the
+        # projected source-sketch centre instead of moving the text again.
+        placed = tuple(
+            float(value) for value in (_early_bound(annotation, "IAnnotation").GetPosition() or ())
         )
-        if not annotation.SetPosition2(LENGTH_KEEP["CrossHoleDia"][0], hole_text[1], 0.0):
-            raise RuntimeError("failed to align cross-hole callout with its source station")
+        if abs(placed[1] - hole_text[1]) > 1e-6:
+            raise RuntimeError(
+                "cross-hole callout is not aligned with its source station: "
+                f"{placed[1] * 1000.0:g} vs {hole_text[1] * 1000.0:g} mm"
+            )
     set_dimension_precision(
         adapter,
         dimensions,
