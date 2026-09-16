@@ -256,7 +256,13 @@ subprocess holds the seat.
 **Serializes but does NOT isolate:** SolidWorks keys open documents by *filename* and
 carries session-global state, so the lock is a safety belt — not a green light for
 genuinely-independent concurrent builds on one machine. Still: never hand-launch two
-SolidWorks build scripts at once.
+SolidWorks build scripts at once. Corollary — **the lock holder owns the session**:
+whoever acquires the seat is right to, and must, `CloseAllDocuments` and start from
+an empty session (`_common.run_build` does exactly that and fails if any document
+survives). Work left open across a lock release was never protected: save or discard
+before releasing, and never expect a document to be there when you get the seat back.
+A read-only probe that opens a drawing also loads its parts read-only by the same
+filename a sibling's part build wants — the fresh start is what makes that harmless.
 
 Tradeoff (documented, accepted): under a cold `-n N` full build, workers that grab a
 COM task block on the seat, so the `check:*` gates can be starved toward the end of
