@@ -123,7 +123,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RibProfile": {"RibWidth"},
     "SetPocketProfile": {"PocketRun", "PocketRise"},
     "GooseneckTap": {"SetTapZ"},
-    "GooseneckProfile": {"GnX", "GnZ"},
+    "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
     "StudHoles": {"StudFrontX", "StudFrontZ", "StudRearX", "StudRearZ"},
     "KeeperTaps": {
         "KeeperFrontX",
@@ -133,6 +133,109 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "CapRecessProfile": {"CapRecessDia"},
     "CapRecesses": {"CapRecessDepth"},
+}
+
+
+# --- Decimal places, authored ON THE PART -------------------------------------
+#
+# Policy rule 2: the places a dimension prints are part of the tolerance it
+# claims, and the model owns both.  ``build_top_frame`` applies this table
+# natively (``_drawing_marks.apply_drawing_precision``) right after the drawing
+# marks, so ``draw_top_frame`` imports each dimension verbatim and only reads
+# ``GetPrimaryPrecision2()`` back off the sheet.
+#
+# One place is this casting's routine band.  The hanger and keeper stations are
+# drilled and tapped clearance features: .X (+/-0.8) is the band they need, and
+# a second place claimed a tolerance nothing on the part requires.  Two places
+# appear only where a fit lives there -- the cap recess diameter and depth carry
+# the bilateral bands above, and the gooseneck bore prints the clearance a
+# purchased post is set into.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
+    "WebRing": {"RingHeight": 1},
+    "BossUpProfile": {"C0Dia": 1},
+    "BoreProfile": {"B0Dia": 1},
+    "SpotFaceRearProfile": {"S1Dia": 1},
+    "BarProfile": {"GussetRunE": 1},
+    "HubBossProfile": {"HubDia": 1},
+    "RibProfile": {"RibWidth": 1},
+    "SetPocketProfile": {"PocketRise": 1},
+    "GooseneckProfile": {"GnDia": 2},
+    "StudHoles": {"StudFrontX": 1, "StudFrontZ": 1, "StudRearZ": 1},
+    "KeeperTaps": {"KeeperFrontX": 1, "KeeperFrontZ": 1, "KeeperRearZ": 1},
+    "CapRecessProfile": {"CapRecessDia": 2},
+    "CapRecesses": {"CapRecessDepth": 2},
+}
+
+# The drawing reads this flat view back off the sheet: a dimension name is
+# unique across the features that expose one, and a marked dimension nobody
+# authored places for would otherwise print SolidWorks' template default.
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: decimals
+    for dimensions in DRAWING_PRECISION.values()
+    for name, decimals in dimensions.items()
+}
+if len(DRAWING_PRECISION_BY_NAME) != sum(
+    len(dimensions) for dimensions in DRAWING_PRECISION.values()
+):
+    raise AssertionError("two features share a drawing-precision dimension name")
+for _feature, _dimensions in DRAWING_PRECISION.items():
+    _unmarked = sorted(set(_dimensions) - DRAWING_DIMENSIONS.get(_feature, set()))
+    if _unmarked:
+        raise AssertionError(
+            f"{_feature}: precision authored for unmarked dimensions {_unmarked}"
+        )
+
+
+# --- Decimal places for the dimensions the SHEET derives ----------------------
+#
+# Rule 2's one exception.  Some numbers on this print are distances between two
+# model faces that no single model dimension expresses: a web thickness that is
+# the difference of two profile offsets, a flange thickness between two extrude
+# extents, a boss stack that sums three, a chamfer leg, a spotface-floor
+# separation, a ramp angle.  Their VALUE is still the model's -- every one is
+# measured in the view and the build fails if the geometry moved -- but there is
+# no model dimension to carry the places, so the places live here, in the part's
+# own contract, instead of as a literal in the drawing script.  Keyed by the
+# recipe's own dimension label.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
+    # section E-E -- cast stock under the title block's general band.
+    "overall casting width": 1,
+    "overall casting depth": 1,
+    "side flange width": 1,
+    "left window clear width": 1,
+    "right window clear width": 1,
+    "central web width": 1,
+    "rail web thickness": 1,
+    "front rear flange width": 1,
+    "top flange thickness": 1,
+    "top rim chamfer": 1,
+    "T rail root radius": 1,
+    "side rail web thickness": 1,
+    # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
+    # column plan is drilled from, and MHA-035 states them to 0.01, so they
+    # are the one pair of sheet-derived numbers that earns a second place.
+    "socket horizontal pitch": 2,
+    "socket vertical pitch": 2,
+    # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed spotface
+    # floors and the tap axis below the boss top.
+    "socket boss overall height": 1,
+    "boss top above rail top": 1,
+    "top bore mouth chamfer": 1,
+    "opposed spotface floor separation": 1,
+    "cross screw axis from boss top": 1,
+    # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
+    # cropped set-pocket section D-D.
+    "hub from left front socket": 1,
+    "set screw axis from rail top": 1,
+    "hub boss underside drop": 1,
+    "hub gusset feather span": 1,
+    "hub gusset ramp angle": 1,
+    "set-pocket depth from outer rail face": 1,
+    # Sheet 5, UNDERSIDE.
+    "crossbar junction land": 1,
+    "underside gusset thickness": 1,
 }
 
 

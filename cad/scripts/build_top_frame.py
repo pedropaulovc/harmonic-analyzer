@@ -91,6 +91,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -115,6 +116,7 @@ from top_frame_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
+    DRAWING_PRECISION,
     FRONT_COLUMN_Z,
     GOOSENECK_BORE_DIA,
     GOOSENECK_X,
@@ -1395,6 +1397,10 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # The decimal places travel WITH the dimension: the drawing imports each
+    # marked dimension and only reads its precision back, so the part is the
+    # single place a place count is authored (drawing-simplicity rule 2).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     _qualify_machined_faces(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
