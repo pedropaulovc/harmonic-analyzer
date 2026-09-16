@@ -53,7 +53,14 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    (`SetPrecision3`, `set_dimension_precision`) or types a spec constant
    into note text (`f"{DEPTH:.1f} DEEP"`) is hiding a part without its
    tolerance: the nominal the shop reads must be the model's value, at the
-   model's precision, with the model's band. Migrated packages are gated by
+   model's precision, with the model's band. A value the sheet prints but no
+   feature dimension carries is not an exemption -- model it, even if that
+   takes a hidden reference sketch whose one driving dimension IS the value.
+   The single exception is a pure REFERENCE dimension: a read-only restatement
+   of values the model already owns, carrying no band and having no model
+   dimension to import. Its places are still specification, so a migrated
+   sheet reads them from a `*_spec` constant (`DRAWING_REFERENCE_PRECISION`),
+   never from a literal. Migrated packages are gated by
    `test_drawing_specification_purity.py`; the remaining fleet is #766.
    A matched-fit callout identifies the mating part by name and its drawing
    or part number when assigned, and states the required clearance,

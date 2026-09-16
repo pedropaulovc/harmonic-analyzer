@@ -27,6 +27,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -35,7 +36,6 @@ from _drawing_common import (
     property_link,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimension,
@@ -53,6 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from tube_frame_spec import (
     COLUMN_LENGTH,
     CROSS_HOLE_DIAMETER,
+    DRAWING_PRECISION_BY_NAME,
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
     TOP_END_CHAMFER,
@@ -82,9 +83,15 @@ ISO_CENTER = (0.220, 0.280)
 
 # Per-view survivors of the marked-dimension import.
 END_KEEP: dict[str, tuple[float, float]] = {}
+# The three station values park left of the tube, each on its own dimension
+# line, so the lines have to stand far enough apart that no value's text sits
+# in a neighbour's corridor. At 0.036/0.020 the (12.70) text was 23 mm wide
+# across lines 21 mm apart, so BOTH the cut length's and the upper station's
+# lines printed through it (native layout audit: two text-on-line findings and
+# the leader crossing between them).
 LENGTH_KEEP = {
-    "Length": (LENGTH_CENTER[0] - 0.036, LENGTH_CENTER[1]),
-    "LowerHoleY": (LENGTH_CENTER[0] - 0.020, LENGTH_CENTER[1] - 0.075),
+    "Length": (LENGTH_CENTER[0] - 0.050, LENGTH_CENTER[1]),
+    "LowerHoleY": (LENGTH_CENTER[0] - 0.025, LENGTH_CENTER[1] - 0.075),
     "UpperHoleY": (LENGTH_CENTER[0] - 0.015, LENGTH_CENTER[1] + 0.075),
     "CrossHoleDia": (
         LENGTH_CENTER[0] + 0.085,
@@ -325,17 +332,11 @@ async def build(adapter: Any) -> dict[str, str]:
                 "cross-hole callout is not aligned with its source station: "
                 f"{placed[1] * 1000.0:g} vs {hole_text[1] * 1000.0:g} mm"
             )
-    set_dimension_precision(
-        adapter,
-        dimensions,
-        {
-            "Length": 1,
-            "LowerHoleY": 2,
-            "UpperHoleY": 2,
-            "CrossHoleDia": 2,
-            "TopChamfer": 1,
-        },
-    )
+    # The part authored these places (tube_frame_spec.DRAWING_PRECISION); this
+    # sheet only proves they survived the import. A silent fallback to the
+    # drawing document's two places would print the 1018.8 cut length as
+    # 1018.77 and ask for a band the match-cut note explicitly refuses.
+    assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
     for name in ("Length", "LowerHoleY", "UpperHoleY"):
         references = [
             annotation

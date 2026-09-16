@@ -38,13 +38,16 @@ from _common import (
     CASTING_GREEN,
     PANEL_BLACK,
     SketchDims,
+    _early_bound,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
     check,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -56,12 +59,15 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from _holes import (
     DRILL_POINT_H,
@@ -72,19 +78,22 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
-from _gtol_spec import CylinderFace
 from _part_pmi import _resolve_faces, author_part_pmi
-from _surface_finish import SEAT_UM, SurfaceFinishControl
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
     BOTTOM_WIDTH,
+    COLUMN_SOCKET_XZ,
+    COLUMN_X,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     LIP_H,
     LIP_W,
     DRAWING_NOTES,
+    PART_SURFACE_FINISHES,
+    SOCKET_BORE_FINISHES,
+    SPOTFACE_DEPTH_BAND_MM,
     STACK_HEIGHT,
-    SURFACE_FINISHES,
     TOP_LENGTH,
     TOP_THICKNESS,
     TOP_WIDTH,
@@ -92,7 +101,6 @@ from harmonic_base_spec import (
 import nameplate_spec
 from cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
-    FRAME_REAR_COLUMN_Z,
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
     POST_X_SHIFT,
@@ -140,6 +148,38 @@ from _visibility import blank_reference_geometry
 
 import _telemetry
 
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set.
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None:
+    """Prove a renamed dimension is the one the recipe meant.
+
+    ``name_dimensions`` renames by CREATION ORDER, so any feature that emits
+    more than one display dimension can hand the name to the wrong value in
+    silence -- an offset-start boss extrude emits its depth AND its start
+    offset, and the two differ by twenty times here. Cheap to check, and the
+    failure it catches would otherwise surface as a wrong number on a sheet.
+    """
+    raw = adapter.currentModel.Parameter(full_name)
+    if raw is None:
+        raise RuntimeError(f"no dimension named {full_name}")
+    actual_mm = float(_early_bound(raw, "IDimension").SystemValue) * 1000.0
+    if abs(actual_mm - expected_mm) > 1e-6:
+        raise RuntimeError(
+            f"{full_name} measures {actual_mm:g} mm, expected {expected_mm:g} mm"
+        )
+
+
 PART_NAME = "harmonic-base"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 
@@ -153,50 +193,12 @@ MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
 # only this module knows the column stations.
 IN = 25.4
 
-# Four column sockets and their interrupted front/back retaining taps. The
-# physical stations are shared with the tube and assembly; only the X pitch is
-# local to the frame casting family.
-# Bore diameters are nominal CAD geometry only. Match-fit production sockets
-# to their assigned actual MHA-083 tubes, not to a fixed diameter band.
-COLUMN_X = 197.0
-COLUMN_SOCKET_XZ = tuple(
-    (sx * COLUMN_X, z)
-    for sx in (-1.0, 1.0)
-    for z in (FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z)
-)
-
-
-def socket_bore_finish_key(x_mm: float, z_mm: float) -> str:
-    """Stable surface-finish key for the column socket at one station.
-
-    Keys name the STATION, not the hole-table tag: SOLIDWORKS assigns A1-A4 by
-    table order, so a tag-shaped key would silently point at another bore if
-    the table ever reorders. The sheet keeps the tag language in its target.
-    """
-    return (
-        f"socket_{'west' if x_mm < 0.0 else 'east'}"
-        f"_{'front' if z_mm < 0.0 else 'rear'}"
-    )
-
-
-# Simplicity-policy rule 5: the four sockets LOCATE the frame on the base --
-# each column tube is matched to its own bore for a close hand-slip fit, and
-# the deck's Ra 3.2 stops at the deck plane -- so every bore is a seat that
-# MUST be cut on a casting the title block otherwise leaves as CAST/MACHINED.
-# The controls live here rather than in harmonic_base_spec because only this
-# module knows COLUMN_X and the tube's Z stations, while the bore size and
-# depth come from frame_attachment_spec, which imports harmonic_base_spec.
-SOCKET_BORE_TARGET = "A1-A4 BORES"
-SOCKET_BORE_FINISHES = tuple(
-    SurfaceFinishControl(
-        socket_bore_finish_key(x, z),
-        SEAT_UM,
-        CylinderFace(COLUMN_SOCKET_DIAMETER, contains_x_mm=x, contains_z_mm=z),
-        production_method=SOCKET_BORE_TARGET,
-    )
-    for x, z in COLUMN_SOCKET_XZ
-)
-PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
+# The four column sockets, their stations and their bore surface finishes now
+# live in harmonic_base_spec: the sheet may only source a surface-finish
+# control from a part SPEC, and the bore size reaches that spec through the
+# leaf module frame_column_stations. Bore diameters remain nominal CAD
+# geometry -- match-fit production sockets to their assigned actual MHA-083
+# tubes, not to a fixed diameter band.
 BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
 BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
 BASE_CROSS_TAP_SPEC = HoleSpec(
@@ -303,7 +305,6 @@ SERIAL_MIRROR_Y = (
 )
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
 SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
-RIM_OVERLAP = 1.0  # the ring starts this far below the pad top so it merges
 
 # Cone swing hardware, blind from the TOP face. MACHINE-handed part coords.
 # The platform recipe owns the shared lock/stop contact calculation; the base
@@ -1152,9 +1153,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Raised rim FIRST (2026-09 photo re-derive, see LIP_W): one ring feature
     # -- outer rectangle on the pad's plan outline, inner rectangle LIP_W in --
-    # boss-extruded from RIM_OVERLAP below the pad top to LIP_H above it, so
-    # it merges into the pad and its outer faces continue the pad sides. Net
-    # material: the ring over LIP_H. Top-plane sketch: (x, y) -> (X, -Z).
+    # boss-extruded from the pad's top face, so it merges into the pad and its
+    # outer faces continue the pad sides. The extrude starts ON that face (it
+    # used to start 1.0 below it) because its depth dimension IS the rim step
+    # the drawing prints: policy rule 2 puts the printed nominal in the model,
+    # and a depth carrying a merge allowance is not the value the shop holds.
+    # Same solid either way -- the allowance lay inside existing material.
+    # Net material: the ring over LIP_H. Top-plane sketch: (x, y) -> (X, -Z).
     half_x, half_z = TOP_LENGTH / 2.0, TOP_WIDTH / 2.0
     outer_pts = [
         (-half_x, -half_z),
@@ -1176,8 +1181,10 @@ async def build(adapter) -> dict[str, str]:
     await ensure_fully_defined(adapter, "rim sketch")
     check("exit_sketch rim", await adapter.exit_sketch())
     name_last_feature(adapter, "RimProfile")
-    extrude_at_offset(adapter, RIM_OVERLAP + LIP_H, total - RIM_OVERLAP)
+    extrude_at_offset(adapter, LIP_H, total)
     name_last_feature(adapter, "Rim")
+    name_dimensions(adapter, "Rim", ["RimHeight"])
+    _verify_named_dimension(adapter, "RimHeight@Rim", LIP_H)
     a_ring = TOP_LENGTH * TOP_WIDTH - (TOP_LENGTH - 2.0 * LIP_W) * (
         TOP_WIDTH - 2.0 * LIP_W
     )
@@ -1394,6 +1401,86 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
+    # Two REFERENCE sketches. The rim width and the flange-to-rim height are
+    # manufacturing values the sheet prints, so policy rule 2 says the model
+    # owns them -- but neither is any feature's dimension: the rim ring's
+    # width is the gap between two loops of one profile, and the 40.6 spans
+    # three features. Each therefore gets a hidden one-line sketch whose
+    # single driving dimension IS the value, marked for drawing like any
+    # other. Construction, not hidden: a BLANKED sketch's dimensions never reach
+    # InsertModelAnnotations3 (first build failed with "geometry top view is
+    # missing model dimensions: ['RimWidth']"), while construction geometry
+    # imports normally and is never drawn in a view.
+    check("create_sketch rim-width reference", await adapter.create_sketch("Top"))
+    # Direct-to-DB for the geometry: this line lies ON the sketch X axis and
+    # runs horizontally, so creation-time inference would snap in exactly the
+    # relations the explicit ones below add and leave the sketch OVER-defined.
+    set_sketch_direct_db(adapter, True)
+    rim_ref = check(
+        "rim width reference line",
+        await adapter.add_line(TOP_LENGTH / 2.0, 0.0, TOP_LENGTH / 2.0 - LIP_W, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, rim_ref)
+    check(
+        "rim width reference horizontal",
+        await adapter.add_sketch_constraint(rim_ref, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{rim_ref}.start",
+        f"{rim_ref}.end",
+        "horizontal_distance",
+        LIP_W,
+        "rim width reference",
+    )
+    await anchor_point_to_origin(
+        adapter, f"{rim_ref}.start", TOP_LENGTH / 2.0, 0.0, "rim width reference"
+    )
+    await ensure_fully_defined(adapter, "rim width reference sketch")
+    check("exit_sketch rim-width reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "RimWidthReference")
+    name_dimensions(adapter, "RimWidthReference", ["RimWidth"])
+    _verify_named_dimension(adapter, "RimWidth@RimWidthReference", LIP_W)
+
+    # On the left silhouette (x = -BOTTOM_LENGTH/2), where the front view's
+    # flange-to-rim dimension has always drawn its witness lines.
+    check("create_sketch height reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    height_ref = check(
+        "flange-to-rim reference line",
+        await adapter.add_line(
+            -BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, -BOTTOM_LENGTH / 2.0, deck_top
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, height_ref)
+    check(
+        "flange-to-rim reference vertical",
+        await adapter.add_sketch_constraint(height_ref, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{height_ref}.start",
+        f"{height_ref}.end",
+        "vertical_distance",
+        deck_top - BOTTOM_THICKNESS,
+        "flange-to-rim reference",
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{height_ref}.start",
+        -BOTTOM_LENGTH / 2.0,
+        BOTTOM_THICKNESS,
+        "flange-to-rim reference",
+    )
+    await ensure_fully_defined(adapter, "flange-to-rim reference sketch")
+    check("exit_sketch height reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeightReference")
+    name_dimensions(adapter, "HeightReference", ["FlangeToRim"])
+    _verify_named_dimension(
+        adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
+    )
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
@@ -1409,6 +1496,14 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Decimal places are the tolerance statement, so they are authored HERE
+    # and the drawing only reads them back (policy rule 2). Same for the one
+    # dimension whose band is not the title block's: a spotface may run deep,
+    # never shallow, or the screw head rocks on an unfaced ring.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    set_dimension_bilateral_tolerance(
+        adapter, "BaseSpotFaceRear", "SpotFaceDepth", *SPOTFACE_DEPTH_BAND_MM
+    )
     author_part_pmi(adapter, surface_finishes=PART_SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

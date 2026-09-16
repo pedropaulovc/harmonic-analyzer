@@ -2389,6 +2389,49 @@ def set_dimension_precision(
     adapter.currentModel.EditRebuild3()
 
 
+@_telemetry.traced("drawing.imported_precision")
+def assert_imported_precision(
+    adapter: Any, annotations: Iterable[Any], precision: dict[str, int]
+) -> None:
+    """Prove imported model dimensions kept their PART-authored decimal places.
+
+    Policy rule 2 makes the model own display precision, so a migrated sheet
+    may not rewrite it -- but it must still fail loud when an import loses the
+    override, because a dimension that silently falls back to the drawing
+    document's two-place default prints a tighter band than anyone specified.
+    The read-only mirror of :func:`set_dimension_precision`: same name-keyed
+    scan, ``GetPrimaryPrecision2`` only, and an unmatched name is an error.
+    """
+    remaining = dict(precision)
+    scanned = 0
+    for annotation in annotations:
+        scanned += 1
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        digits = remaining.pop(name, None)
+        if digits is None:
+            continue
+        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
+        if display is None:
+            raise RuntimeError(f"dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "GetPrimaryPrecision2"
+        )
+        applied = adapter._attempt(lambda d=display: d.GetPrimaryPrecision2())
+        if applied != digits:
+            raise RuntimeError(
+                f"imported dimension {name!r} prints {applied} decimal places, but "
+                f"its part authored {digits}; rebuild the source part"
+            )
+    _span_scan_attrs(scanned=scanned, changed=0)
+    if remaining:
+        raise RuntimeError(
+            f"part-authored precision never reached the sheet: {sorted(remaining)}"
+        )
+
+
 @_telemetry.traced("drawing.reference_dimensions")
 def set_reference_dimensions(
     adapter: Any, annotations: Iterable[Any], names: Iterable[str]
