@@ -32,6 +32,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_edge_dimension,
+    add_surface_finish,
     dimension_name,
     set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
@@ -55,12 +56,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_pmi import _resolve_faces
+from _surface_finish import surface_finish_by_key
 from build_top_frame import (
     BAR_X0,
     BAR_X1,
     BORE_DIA,
     BORE_CHAMFER,
     CAP_RECESS_DIAMETER,
+    CAP_RECESS_FLOOR_Y,
     BOSS_ABOVE,
     BOSS_BELOW,
     FLANGE,
@@ -72,6 +76,8 @@ from build_top_frame import (
     RAIL_W_SIDE,
     INNER_X,
     INNER_Z,
+    LAND_X0,
+    LAND_X1,
     RING_HEIGHT,
     WEB_T,
     WEB_IN_X,
@@ -104,6 +110,7 @@ from build_top_frame import (
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
 )
+from top_frame_spec import SURFACE_FINISHES
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -130,8 +137,11 @@ SHEET_NAMES = (
     "UNDERSIDE",
 )
 SHEET_SCALE = (1.0, 3.0)
+# The station plan is drawn half size, so its centre-mark axes and label
+# lanes derive from its own scale and never from the title block's.
+DETAIL_TOP_SCALE = (1, 2)
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
-DETAIL_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
+DETAIL_VIEW_SCALE = DETAIL_TOP_SCALE[0] / DETAIL_TOP_SCALE[1]
 
 # Plan extents including the proud corner bosses (the straight rails alone
 # stop at x +/-214.1 / z +/-131.0): x +/-223.1 -> 446.2 and z +/-138.1 ->
@@ -155,16 +165,30 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 GEOMETRY_ISO_CENTER = (0.072, 0.052)
 ISO_SCALE = (1, 5)
 
-# Sheet 2: the hole/station plan.
-DETAIL_TOP_CENTER = (0.175, 0.190)
+# Sheet 2: the hole/station plan, centred on the sheet it now fills at
+# 1:2.  The 25.5 sockets and their 52.2 bosses are the features a machinist
+# sets up from, and at 1:3 they were 8.5 mm of paper.
+DETAIL_TOP_CENTER = (0.215, 0.160)
+DETAIL_TOP_SCALE_NOTE_XY = (0.105, 0.0845)
+# The socket Ra symbol reads off the near-side rim of the rear east socket,
+# in the sheet's own empty lower-left corner, so its leader crosses neither
+# the 224.00 pitch lane nor the 4X socket qualifier above the view.
+SOCKET_FINISH_SYMBOL_XY = (0.050, 0.090)
+FINISH_LEADER_TAIL = 0.035
 
-# Sheet 3: the cross-tap elevation with section A-A standing to its right,
-# the direction the section arrows look.
-DETAIL_FRONT_CENTER = (0.110, 0.200)
-DETAIL_SECTION_CENTER = (0.300, 0.200)
-DETAIL_SECTION_CAPTION_XY = (0.300, 0.178)
-BOSS_ABOVE_RAIL_LINE_XY = (0.342, 0.200)
-BOSS_ABOVE_RAIL_TEXT_XY = (0.366, 0.225)
+# Sheet 3: the cross-tap elevation across the sheet's upper band with
+# section A-A below it, both half size.  A-A carries the cap recess, the
+# cap seat and the 47.3 boss stack, so it gets the sheet's whole lower
+# half instead of a quarter of its right edge.
+DETAIL_FRONT_SCALE = (1, 2)
+DETAIL_FRONT_CENTER = (0.145, 0.228)
+DETAIL_FRONT_SCALE_NOTE_XY = (0.100, 0.205)
+DETAIL_SECTION_SCALE = (1, 2)
+DETAIL_SECTION_CENTER = (0.290, 0.135)
+DETAIL_SECTION_CAPTION_XY = (0.240, 0.088)
+CAP_SEAT_FINISH_SYMBOL_XY = (0.196, 0.114)
+BOSS_ABOVE_RAIL_LINE_XY = (0.3665, 0.1423)
+BOSS_ABOVE_RAIL_TEXT_XY = (0.390, 0.103)
 
 # Sheet 4: hub location, true-axis side view, cropped set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -175,13 +199,29 @@ HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
 POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
+HUB_BORE_FINISH_SYMBOL_XY = (0.030, 0.160)
+# One ramp, three numbers: the 60.0 feather span, the 8.0 drop below the
+# rail underside and the 20 DEG ramp all park in the band under the hub
+# side view, so nobody has to hold one of them on another sheet.
+HUB_GUSSET_SPAN_TEXT_XY = (0.1465, 0.0760)
+HUB_BOSS_DROP_TEXT_XY = (0.120, 0.0848)
+HUB_BOSS_DROP_OFFSET_XY = (0.085, 0.0640)
+HUB_GUSSET_ANGLE_TEXT_XY = (0.190, 0.0645)
+HUB_LEFT_NOTE_XY = (0.093, 0.0455)
 
-# Sheet 5: the underside locator and its enlarged native detail.
+# Sheet 5: the underside locator and its enlarged native detail.  The
+# locator sits at the title block's own scale; the detail is the print's
+# only 2:1 view because the 7.0 gusset and its 8.0 feather drop are the
+# smallest features on the casting.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
-HUB_BOTTOM_SCALE = (1, 5)
-HUB_DETAIL_CENTER = (0.300, 0.160)
-HUB_DETAIL_SCALE = (1, 1)
-HUB_DETAIL_CAPTION_XY = (0.258, 0.113)
+HUB_BOTTOM_SCALE = (1, 3)
+HUB_BOTTOM_NOTE_XY = (0.060, 0.120)
+HUB_DETAIL_CENTER = (0.300, 0.174)
+HUB_DETAIL_SCALE = (2, 1)
+HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
+HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
+HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
+HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
 
 # Sheet 1, Section E-E: the side rails and the full-height central web, cut
 # clear of every hole station (keeper taps at z -70.9 / 77.1, hangers at
@@ -198,7 +238,7 @@ SIDE_WEB_TEXT_XY = (0.335, 0.1215)
 # and every label sits under its own view - centred where the dimension
 # lanes below the view leave room, offset within that band where they do not.
 GEOMETRY_ISO_NOTE_XY = (0.042, 0.018)
-DETAIL_TOP_NOTE_XY = (0.127, 0.1235)
+DETAIL_TOP_NOTE_XY = (0.070, 0.060)
 POCKET_RISE_LINE_XY = (0.070, 0.0785)
 POCKET_RISE_TEXT_XY = (0.0422, 0.0785)
 
@@ -223,25 +263,28 @@ GEOMETRY_CALLOUTS = {
     "GussetRunE": "4X 45 DEG GUSSET",
 }
 
-# Imported station dimensions share the drawn model-origin axes.
+# Imported station dimensions share the drawn model-origin axes.  The Z
+# stations stand in the margins left and right of the plan, the X stations
+# above it, and the boss/socket diameters leave the socket they qualify in
+# opposite directions so neither leader crosses the other's text.
 DETAIL_TOP_KEEP = {
-    "StudRearZ": (0.065, DETAIL_TOP_CENTER[1] - 0.015),
-    "KeeperRearZ": (0.300, DETAIL_TOP_CENTER[1] - 0.028),
-    "C0Dia": (0.045, 0.254),
-    "B0Dia": (0.070, 0.244),
-    "StudFrontX": (0.170, 0.245),
-    "StudFrontZ": (0.055, DETAIL_TOP_CENTER[1] + 0.015),
-    "KeeperFrontX": (0.285, 0.240),
-    "KeeperFrontZ": (0.290, DETAIL_TOP_CENTER[1] + 0.012),
+    "StudRearZ": (0.045, 0.120),
+    "KeeperRearZ": (0.365, 0.120),
+    "C0Dia": (0.150, 0.247),
+    "B0Dia": (0.050, 0.252),
+    "StudFrontX": (0.207, 0.240),
+    "StudFrontZ": (0.045, 0.200),
+    "KeeperFrontX": (0.300, 0.247),
+    "KeeperFrontZ": (0.365, 0.180),
 }
 HUB_TOP_KEEP: dict[str, tuple[float, float]] = {}
 HUB_LEFT_KEEP = {
     "PocketRise": POCKET_RISE_LINE_XY,
 }
-DETAIL_FRONT_KEEP = {"S1Dia": (0.060, 0.235)}
+DETAIL_FRONT_KEEP = {"S1Dia": (0.045, 0.256)}
 DETAIL_SECTION_KEEP = {
-    "CapRecessDia": (0.235, 0.160),
-    "CapRecessDepth": (0.376, 0.180),
+    "CapRecessDia": (0.140, 0.170),
+    "CapRecessDepth": (0.372, 0.128),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
@@ -669,6 +712,35 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
 
 
 
+def _finish_leader_tail(symbol: Any, *, label: str) -> None:
+    """Give one surface-finish symbol the horizontal tail its text needs.
+
+    The roughness value hangs to the right of the symbol, so a short bent
+    leader draws its own tail straight through "Ra 3.2".
+    """
+    annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
+    annotation.BentLeaderLength = FINISH_LEADER_TAIL
+    if abs(float(annotation.BentLeaderLength)-FINISH_LEADER_TAIL) > 1e-7:
+        raise RuntimeError(f"{label} finish leader did not clear its roughness text")
+
+
+def _machined_faces(view: Any) -> dict[str, Any]:
+    """Resolve every part-owned surface-finish face through ``view``'s model.
+
+    A plan view shows four identical sockets and four identical cap seats,
+    so a coordinate pick cannot say which face a symbol qualifies.  The
+    part-owned face specs can: each resolves to exactly one model face, and
+    ``add_surface_finish`` then re-checks the selected face against the same
+    control before it writes the symbol.
+    """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    return _resolve_faces(
+        document, {control.key: control.face for control in SURFACE_FINISHES}
+    )
+
+
 def _position_view_caption(
     adapter: Any, view: Any, target: tuple[float, float]
 ) -> None:
@@ -732,7 +804,7 @@ def _gusset_ramp_angle(adapter: Any, view: Any) -> None:
     if abs(float(dimension.SystemValue)-expected) > 1e-7:
         raise RuntimeError(f"gusset ramp angle measured {dimension.SystemValue} radians, expected {expected}")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if not annotation.SetPosition2(0.175, 0.0605, 0.0):
+    if not annotation.SetPosition2(*HUB_GUSSET_ANGLE_TEXT_XY, 0.0):
         raise RuntimeError("failed to position native gusset ramp angle")
     set_dimension_precision(adapter, [annotation], {dimension_name(adapter, annotation): 1})
     set_dimension_callouts(adapter, [annotation], {dimension_name(adapter, annotation): "2X GUSSET\nTO RAIL UNDERSIDE"})
@@ -861,20 +933,20 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for left_x, right_x, text_x, label in (
         (-INNER_X, BAR_X0, 0.105, "left window clear width"),
-        (BAR_X1, INNER_X, 0.180, "right window clear width"),
+        (BAR_X1, INNER_X, 0.205, "right window clear width"),
     ):
         _checked_dimension(
             adapter, geometry_top,
             p0=(left_x, HALF_H - EDGE_CHAMFER, 0.0),
             p1=(right_x, HALF_H - EDGE_CHAMFER, 0.0),
-            text_xy=(text_x, 0.125), label=label,
+            text_xy=(text_x, 0.118), label=label,
             expected_mm=right_x-left_x, orientation="horizontal", exact_linear=True,
         )
     _checked_dimension(
         adapter, geometry_top,
         p0=(BAR_X0, HALF_H-EDGE_CHAMFER, 0.0),
         p1=(BAR_X1, HALF_H-EDGE_CHAMFER, 0.0),
-        text_xy=(GEOMETRY_TOP_CENTER[0], 0.112), label="central web width",
+        text_xy=(GEOMETRY_TOP_CENTER[0], 0.1055), label="central web width",
         expected_mm=BAR_X1-BAR_X0, orientation="horizontal", exact_linear=True,
         suffix="CENTRAL WEB",
     )
@@ -958,8 +1030,8 @@ async def build(adapter: Any) -> dict[str, str]:
          (0.389, 0.2245)),
         ((rail_cut_x, HALF_H, abs(FRONT_COLUMN_Z)),
          (rail_cut_x, -HALF_H, abs(FRONT_COLUMN_Z)),
-         RING_HEIGHT, (0.390, 0.207), "vertical", "rail total height", "RAIL HEIGHT",
-         None),
+         RING_HEIGHT, (0.390, 0.1945), "vertical", "rail total height", "RAIL HEIGHT",
+         (0.368, 0.1905)),
     ):
         _checked_dimension(
             adapter, rail_section, p0=p0, p1=p1, text_xy=xy,
@@ -990,7 +1062,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, rail_section, "EDGE", None, label="T rail root radius",
         entity=root_arcs[0],
     )
-    root_display = drawing_model.AddRadialDimension2(0.290, 0.235, 0.0)
+    root_display = drawing_model.AddRadialDimension2(0.305, 0.1955, 0.0)
     if root_display is None:
         raise RuntimeError("failed to dimension T rail root radius")
     root_display = _early_bound(root_display, "IDisplayDimension")
@@ -1058,7 +1130,7 @@ async def build(adapter: Any) -> dict[str, str]:
         str(SOURCE),
         "*Top",
         *DETAIL_TOP_CENTER,
-        scale=SHEET_SCALE,
+        scale=DETAIL_TOP_SCALE,
     )
     set_hidden_lines_removed(adapter, detail_top)
     detail_top_dimensions = curate_view_dimensions(
@@ -1107,20 +1179,51 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if add_note(adapter, label, *xy) is None:
             raise RuntimeError("failed to label frame-centre coordinate axes")
+    if add_note(
+        adapter,
+        f"STATION PLAN SCALE {DETAIL_TOP_SCALE[0]:g}:{DETAIL_TOP_SCALE[1]:g}",
+        *DETAIL_TOP_SCALE_NOTE_XY,
+    ) is None:
+        raise RuntimeError("failed to label the station plan scale")
+    # The title block names no finish grade ("CAST/MACHINED"), so every
+    # surface that must be cut says so on the face: the tube sockets and
+    # their cap seats locate the columns, the hub bore locates the
+    # gooseneck.  Each symbol carries the part's own control and attaches
+    # to the one model face that control names.
+    machined_faces = _machined_faces(detail_top)
+    socket_finish = add_surface_finish(
+        adapter,
+        detail_top,
+        symbol_xy=SOCKET_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "socket_east_rear"),
+        label="tube socket bore finish",
+        entity_type="FACE",
+        entity=machined_faces["socket_east_rear"],
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            detail_top,
+            (-COLUMN_X/1000.0, 0.0, (REAR_COLUMN_Z+BORE_DIA/2)/1000.0),
+            label="socket bore finish leader",
+        ),
+        char_height=0.0025,
+    )
+    _finish_leader_tail(socket_finish, label="tube socket bore")
     _checked_dimension(
         adapter, detail_top,
         p0=(-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
         p1=(COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
-        text_xy=(DETAIL_TOP_CENTER[0], 0.132), label="socket horizontal pitch",
+        text_xy=(0.190, 0.078), label="socket horizontal pitch",
         expected_mm=2*COLUMN_X, orientation="horizontal", center=True, precision=2,
+        suffix="MATCHES MHA-035",
     )
     _checked_dimension(
         adapter, detail_top,
         p0=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
-        text_xy=(0.088, 0.2155), label="socket vertical pitch",
+        text_xy=(0.083, 0.160), label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True, precision=2,
+        suffix="MATCHES MHA-035",
     )
     stud_edge = model_point_in_view(
         adapter,
@@ -1136,7 +1239,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=stud_edge,
-        callout_xy=(0.190, 0.258),
+        callout_xy=(0.230, 0.258),
         label="2X hanger-stud clearance holes",
         process="HANGER DRILL",
     )
@@ -1155,7 +1258,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=keeper_edge,
-        callout_xy=(0.345, 0.225),
+        callout_xy=(0.368, 0.247),
         label="2X fulcrum-keeper blind taps",
         process="KEEPER TAP",
     )
@@ -1174,7 +1277,7 @@ async def build(adapter: Any) -> dict[str, str]:
         str(SOURCE),
         "*Front",
         *DETAIL_FRONT_CENTER,
-        scale=SHEET_SCALE,
+        scale=DETAIL_FRONT_SCALE,
     )
     cut_x = model_point_in_view(
         adapter,
@@ -1189,7 +1292,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_end=(cut_x, DETAIL_FRONT_CENTER[1] + 0.030),
         view_xy=DETAIL_SECTION_CENTER,
         section_label="A",
-        scale=(1, 4),
+        scale=DETAIL_SECTION_SCALE,
         label="top-frame corner section",
     )
     for view in (detail_front, detail_section):
@@ -1239,10 +1342,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_section,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, boss_pick_z),
         p1=(COLUMN_X, -HALF_H-BOSS_BELOW, boss_pick_z),
-        text_xy=(0.352, 0.200), label="socket boss overall height",
+        text_xy=(0.377, 0.135), label="socket boss overall height",
         expected_mm=RING_HEIGHT+BOSS_ABOVE+BOSS_BELOW,
         orientation="vertical", exact_linear=True, suffix="4X BOSS\nOVERALL HEIGHT",
-        offset_text=(0.376, 0.140),
+        offset_text=(0.390, 0.165),
     )
     # The 47.3 boss stack and the 36.5 rail band never said where the extra
     # 10.8 sits.  One native rail-top-to-boss-top dimension splits it: 4.5
@@ -1267,7 +1370,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_section,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z+CAP_RECESS_DIAMETER/2+BORE_CHAMFER),
         p1=(COLUMN_X, HALF_H+BOSS_ABOVE-BORE_CHAMFER, REAR_COLUMN_Z+CAP_RECESS_DIAMETER/2),
-        text_xy=(0.300, 0.230), label="top bore mouth chamfer",
+        text_xy=(0.330, 0.170), label="top bore mouth chamfer",
         expected_mm=BORE_CHAMFER, orientation="horizontal",
         entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
         suffix="X 45 DEG\nCAP / GOOSENECK TOP",
@@ -1354,7 +1457,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _checked_dimension(
         adapter, detail_section,
         p0=opposed_floors[0][1], p1=opposed_floors[1][1],
-        text_xy=(0.300, 0.140), label="opposed spotface floor separation",
+        text_xy=(0.290, 0.108), label="opposed spotface floor separation",
         expected_mm=2*TOP_SCREW_SEAT_Z, orientation="horizontal", precision=1,
         suffix="2 PAIRS SPOTFACES\nCENTRED ON FRAME MIDPLANE",
         entities=(opposed_floors[0][0], opposed_floors[1][0]),
@@ -1363,19 +1466,48 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_front,
         edge=front_tap_edge,
-        callout_xy=(0.075, 0.170),
+        callout_xy=(0.250, 0.195),
         label="front/rear column-retention bottoming taps",
-        process="DEPTHS FROM SPOTFACE\nBOTTOMING TAP",
+        process="DEPTHS FROM SPOTFACE\nBOTTOMING TAP\n2X PER END, 4X TOTAL",
     )
     _checked_dimension(
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
         p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, 0.0, TOP_SCREW_SEAT_Z),
-        text_xy=(0.192, 0.200), label="cross screw axis from boss top",
+        text_xy=(0.2605, 0.229), label="cross screw axis from boss top",
         expected_mm=HALF_H+BOSS_ABOVE, orientation="vertical", center=True, precision=2,
-        suffix="TAP AXIS BELOW BOSS TOP\n2X SHOWN, 2X OPPOSITE END",
-        entities=(upper_boss_edge, front_tap_edge), offset_text=(0.228, 0.200),
+        # Two taps per column end, opposed across the boss, at both ends of
+        # the casting: the count a machinist sets up from is the total.
+        suffix="TAP AXIS BELOW BOSS TOP",
+        entities=(upper_boss_edge, front_tap_edge), offset_text=(0.300, 0.229),
     )
+    cap_seat_finish = add_surface_finish(
+        adapter,
+        detail_section,
+        symbol_xy=CAP_SEAT_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "cap_seat_west_front"),
+        label="cap seat floor finish",
+        entity_type="FACE",
+        entity=machined_faces["cap_seat_west_front"],
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            detail_section,
+            (
+                COLUMN_X/1000.0,
+                CAP_RECESS_FLOOR_Y/1000.0,
+                (FRONT_COLUMN_Z+(BORE_DIA+CAP_RECESS_DIAMETER)/4)/1000.0,
+            ),
+            label="cap seat finish leader",
+        ),
+        char_height=0.0025,
+    )
+    _finish_leader_tail(cap_seat_finish, label="cap seat floor")
+    if add_note(
+        adapter,
+        f"FRONT VIEW SCALE {DETAIL_FRONT_SCALE[0]:g}:{DETAIL_FRONT_SCALE[1]:g}",
+        *DETAIL_FRONT_SCALE_NOTE_XY,
+    ) is None:
+        raise RuntimeError("failed to label the cross-tap front view scale")
     cap_fit_note = add_note(
         adapter,
         "CAP RECESSES FOR MHA-133 / 9275K141",
@@ -1511,8 +1643,25 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(GOOSENECK_X, HALF_H, GOOSENECK_Z),
         text_xy=(0.040, 0.225), label="hub from left front socket",
         expected_mm=GOOSENECK_Z-FRONT_COLUMN_Z, orientation="vertical",
-        center=True, precision=2, entities=(left_socket_edge, gooseneck_edge),
+        center=True, precision=1, entities=(left_socket_edge, gooseneck_edge),
     )
+    hub_bore_finish = add_surface_finish(
+        adapter,
+        hub_top,
+        symbol_xy=HUB_BORE_FINISH_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "hub_bore"),
+        label="gooseneck hub bore finish",
+        entity_type="FACE",
+        entity=machined_faces["hub_bore"],
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            hub_top,
+            (GOOSENECK_X/1000.0, 0.0, (GOOSENECK_Z+GOOSENECK_BORE_DIA/2)/1000.0),
+            label="hub bore finish leader",
+        ),
+        char_height=0.0025,
+    )
+    _finish_leader_tail(hub_bore_finish, label="gooseneck hub bore")
     set_hidden_lines_visible(adapter, detail_left)
     tap_candidates: list[tuple[float, float, float, Any]] = []
     tap_x = -(OUTER_X - SET_POCKET_DEPTH)
@@ -1595,15 +1744,29 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_left,
         p0=(-WEB_OUT_X, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP),
         p1=(GOOSENECK_X, -HALF_H-HUB_BOSS_DROP, GOOSENECK_Z),
-        text_xy=(0.238, 0.073), label="hub boss underside drop",
+        text_xy=HUB_BOSS_DROP_TEXT_XY, label="hub boss underside drop",
         expected_mm=HUB_BOSS_DROP, orientation="vertical",
-        suffix="BELOW RAIL\nUNDERSIDE", offset_text=(0.255, 0.080),
+        suffix="BELOW RAIL\nUNDERSIDE", offset_text=HUB_BOSS_DROP_OFFSET_XY,
+    )
+    # The 8.0 drop and the 20 DEG ramp only close against the span the
+    # feathers actually run: 60.0, outer corner to outer corner.  The ramp
+    # rises over the outer 22.0 of each side and the inner 16.0 stays a
+    # full-depth flat buried inside the 30.0 boss, which is why the drop
+    # does not appear within the ramp's own run.
+    _checked_dimension(
+        adapter, detail_left,
+        p0=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z-HUB_GUSSET_HALF_OUT),
+        p1=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT),
+        text_xy=HUB_GUSSET_SPAN_TEXT_XY, label="hub gusset feather span",
+        expected_mm=2*HUB_GUSSET_HALF_OUT, orientation="horizontal",
+        entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
+        suffix="GUSSET SPAN",
     )
     _gusset_ramp_angle(adapter, detail_left)
     set_hidden_lines_visible(adapter, detail_left)
     left_note = add_note(
         adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2",
-        0.139, 0.0755,
+        *HUB_LEFT_NOTE_XY,
     )
     if (
         detail_top_note is None
@@ -1629,33 +1792,38 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     bottom_dimensions = curate_view_dimensions(
         adapter, geometry_bottom,
-        keep={"HubDia": (0.380, 0.200)},
+        keep={"HubDia": HUB_BOSS_DIA_TEXT_XY},
         view_label="enlarged underside geometry",
     )
     set_dimension_callouts(adapter, bottom_dimensions, {"HubDia": "CYLINDRICAL BOSS"})
     set_dimension_precision(adapter, bottom_dimensions, {"HubDia": 1})
-    if add_note(adapter, "UNDERSIDE LOCATOR SCALE 1:5", 0.073, 0.165) is None:
+    # The locator is drawn at the title block's own scale, so it names
+    # itself and says nothing a reader can already read off the title block.
+    if add_note(adapter, "UNDERSIDE LOCATOR", *HUB_BOTTOM_NOTE_XY) is None:
         raise RuntimeError("failed to label underside locator")
+    _checked_dimension(
+        adapter, hub_bottom_parent,
+        p0=(LAND_X0, -HALF_H, -(INNER_Z+WEB_IN_Z)/2),
+        p1=(LAND_X1, -HALF_H, -(INNER_Z+WEB_IN_Z)/2),
+        text_xy=(0.105, 0.145), label="crossbar junction land",
+        expected_mm=LAND_X1-LAND_X0, orientation="horizontal",
+        exact_linear=True,
+        suffix="FULL-THICKNESS LAND\n2X CENTRED ON CENTRAL WEB",
+    )
     gusset_z = GOOSENECK_Z + (HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2
     gusset_y = -HALF_H-HUB_BOSS_DROP/2
     _checked_dimension(
         adapter, geometry_bottom,
         p0=(GOOSENECK_X-HUB_GUSSET_T/2, gusset_y, gusset_z),
         p1=(GOOSENECK_X+HUB_GUSSET_T/2, gusset_y, gusset_z),
-        text_xy=(0.300, 0.092), label="underside gusset thickness",
+        text_xy=HUB_GUSSET_T_TEXT_XY, label="underside gusset thickness",
         expected_mm=HUB_GUSSET_T, orientation="horizontal", exact_linear=True,
         suffix="2X GUSSET\nCENTRED ON BORE",
-        offset_text=(0.360, 0.092),
+        offset_text=HUB_GUSSET_T_OFFSET_XY,
     )
-    _checked_dimension(
-        adapter, geometry_bottom,
-        p0=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z-HUB_GUSSET_HALF_OUT),
-        p1=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT),
-        text_xy=(0.345, 0.160), label="underside gusset overall span",
-        expected_mm=2*HUB_GUSSET_HALF_OUT, orientation="vertical",
-        entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
-        suffix="UNDERSIDE\nGUSSET SPAN", offset_text=(0.375, 0.160),
-    )
+    # The 60.0 feather span is dimensioned once, on the hub side view that
+    # also carries the drop and the ramp angle; repeating it here would be
+    # the same length stated twice on two sheets.
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
