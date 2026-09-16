@@ -20,6 +20,22 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.fixture(autouse=True)
+def local_executor(monkeypatch):
+    """Pin every recipe test to the LOCAL executor.
+
+    These tests drive ``dodo``'s cached-action internals directly and stub the local
+    path (``_exec_com``, ``_com_seat``, ``_cache``). ``HARMONIC_EXECUTOR`` is process
+    environment, so a farm-mode parent (``build.py --executor farm`` runs the
+    ``check:recipe`` pytest as a subprocess) leaked ``farm`` in here and sent the
+    stubbed leaves to the REAL farm: the fake ``"k" * 64`` cache key came back as
+    ``invalid_request: cache key must be a lowercase 64-hex digest`` and three tests
+    failed only because of how the suite was invoked. The suite's verdict must not
+    depend on the caller's executor.
+    """
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+
+
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
     assert spec is not None and spec.loader is not None, (
