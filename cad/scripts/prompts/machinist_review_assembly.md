@@ -100,8 +100,12 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   usable drawing region, not bunched against an edge beside a large dead field,
   but correctness comes first. Projected orthographic views preserve ASME
   alignment; they are not staggered for aesthetics. Resolve crowding by moving
-  the aligned group, changing orientation or scale, or moving nonprojected
-  views and annotations.
+  the aligned group, changing orientation or scale, moving nonprojected
+  views and annotations — or by adding a sheet. A package may have as many
+  sheets as it needs; a sheet is too crowded when the balloons, callouts, steps
+  or notes of one view overlap or crowd those of another. Report that as a
+  clarity defect and say which view, exploded view, BOM or step list should
+  move to its own sheet; never ask for smaller views or squeezed text instead.
 - Judge whether each sheet fits better in landscape or portrait. Compare them
   by useful scale of the assembled and exploded views, the space for the BOM
   and steps, and the resulting empty or crowded areas. Report a clarity defect
