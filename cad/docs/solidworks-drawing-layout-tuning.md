@@ -265,8 +265,10 @@ string-replacement script. Run `uv run --frozen ruff check` and never
 
 ## Synchronous builds and session hygiene
 
-- The COM seat is shared. Before ANY COM call, ask every agent that might hold
-  it and wait for an affirmative reply.
+- The COM seat is shared but SELF-SERIALIZING: `_com_seat` (a machine-global
+  file lock) queues every doit COM task and the attach-only audit runner. Do
+  NOT ask sibling agents whether the seat is free -- submit the build
+  synchronously and let it queue; `com.seat.wait` in the log is normal.
 - Attach, never launch: `HARMONIC_SW_AUTOSTART=0` plus a held
   `HARMONIC_COM_SEAT`. `cad/scripts/diagnostics/_owned_native_session.py` is the
   attach-only runner.
