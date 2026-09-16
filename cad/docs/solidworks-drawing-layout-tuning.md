@@ -269,6 +269,16 @@ string-replacement script. Run `uv run --frozen ruff check` and never
   file lock) queues every doit COM task and the attach-only audit runner. Do
   NOT ask sibling agents whether the seat is free -- submit the build
   synchronously and let it queue; `com.seat.wait` in the log is normal.
+- **The lock serializes, it does not isolate.** Every process drives the SAME
+  SolidWorks session, whose open-document table is keyed by FILENAME. A
+  read-only probe that opens `top-frame.SLDDRW` also loads `top-frame.SLDPRT`
+  read-only, and that part can stay resident after the drawing is closed; a
+  sibling's `part:top_frame` build in another worktree then binds to the
+  resident read-only copy and fails on the first `Select2` (measured
+  2026-09-16: two deterministic Hole Wizard "face Select failed" runs). Diff
+  `ISldWorks::GetDocuments` before/after a probe and `CloseDoc` every document
+  the probe pulled in, or do not probe a drawing whose part a sibling may be
+  building.
 - Attach, never launch: `HARMONIC_SW_AUTOSTART=0` plus a held
   `HARMONIC_COM_SEAT`. `cad/scripts/diagnostics/_owned_native_session.py` is the
   attach-only runner.
