@@ -137,17 +137,18 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
         diameter_m = 2.0 * geometry.parameters[6]
         if abs(diameter_m - spec.diameter_mm / 1000.0) > tolerance_m:
             return False
-        if spec.contains_x_mm is None and spec.contains_y_mm is None:
+        stations = (spec.contains_x_mm, spec.contains_y_mm, spec.contains_z_mm)
+        if all(station is None for station in stations):
             return True
         if len(geometry.box) != 6:
             return False
-        if spec.contains_x_mm is not None:
-            x = spec.contains_x_mm / 1000.0
-            if not geometry.box[0] - tolerance_m <= x <= geometry.box[3] + tolerance_m:
-                return False
-        if spec.contains_y_mm is not None:
-            y = spec.contains_y_mm / 1000.0
-            if not geometry.box[1] - tolerance_m <= y <= geometry.box[4] + tolerance_m:
+        for axis, station in enumerate(stations):
+            if station is None:
+                continue
+            value = station / 1000.0
+            low = geometry.box[axis] - tolerance_m
+            high = geometry.box[axis + 3] + tolerance_m
+            if not low <= value <= high:
                 return False
         return True
     if isinstance(spec, ConeFace):
