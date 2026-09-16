@@ -114,15 +114,19 @@ class FakeComponent:
 
 
 class FakeView:
-    """An ``IView`` double: a name and the root component that qualifies items."""
+    """An ``IView`` double: a name, its root component, and its base view."""
 
-    def __init__(self, name: str, component: str) -> None:
+    def __init__(self, name: str, component: str, base: FakeView | None = None) -> None:
         self._name = name
         self._component = FakeComponent(component)
+        self._base = base
         self.child_context = []
 
     def GetName2(self) -> str:
         return self._name
+
+    def GetBaseView(self) -> FakeView | None:
+        return self._base
 
     def RootDrawingComponent2(self, in_child_context: bool):
         self.child_context.append(in_child_context)
@@ -239,6 +243,36 @@ def test_a_feature_of_neither_kind_fails_loudly() -> None:
     adapter, drawing, view = _seat()
     with pytest.raises(RuntimeError, match="as a SKETCH or a BODYFEATURE"):
         drawing_common.insert_feature_dimensions(adapter, view, ("Missing",))
+
+
+def test_a_derived_view_is_qualified_by_its_base_view() -> None:
+    """A section answers to none of its own model-item paths; its base does.
+
+    Measured on the built top-frame drawing:
+    ``"CapRecessProfile@top-frame-7@Section View A-A"`` refuses as a SKETCH and
+    as a BODYFEATURE (and for every instance suffix 1..20), the same feature
+    resolves through the section's base view, and the import still lands in the
+    section because ``InsertModelAnnotations3`` follows the SELECTED view.
+    """
+    adapter, drawing, base = _seat(view="Drawing View7", component="top-frame-7")
+    section = FakeView("Section View A-A", "top-frame-7", base=base)
+    drawing.kinds["Section View A-A"] = "DRAWINGVIEW"
+    named = drawing_common.insert_feature_dimensions(
+        adapter, section, ("AnnulusProfile",)
+    )
+    assert [name for name, _ in named] == ["OuterDia"]
+    assert [
+        (name, type_name)
+        for _, name, type_name, _ in (
+            call for call in drawing.calls if call[0] == "select"
+        )
+    ] == [
+        ("Section View A-A", "DRAWINGVIEW"),
+        ("AnnulusProfile@top-frame-7@Section View A-A", "SKETCH"),
+        ("AnnulusProfile@top-frame-7@Section View A-A", "BODYFEATURE"),
+        ("AnnulusProfile@top-frame-7@Drawing View7", "SKETCH"),
+    ]
+    assert ("activate", "Section View A-A") in drawing.calls
 
 
 def test_the_component_qualifier_is_read_back_per_view() -> None:

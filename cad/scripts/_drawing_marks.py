@@ -51,18 +51,29 @@ def _feature_tree(feature: Any) -> Any:
 def _named_dimension(
     adapter: Any, feature_name: str, dimension_name: str
 ) -> tuple[Any, Any]:
-    """Resolve exactly one named display/source dimension on ``feature_name``."""
+    """Resolve exactly one named display/source dimension on ``feature_name``.
+
+    Walks the same subfeature tree as ``mark_dimensions_for_drawing``: a Hole
+    Wizard placement dimension belongs to a ``ProfileFeature`` subfeature, so a
+    search that stopped at the top level could not author the decimal places or
+    the tolerance of a dimension the mark path happily marks -- the recipe names
+    the wizard feature, and the dimension is one level down.  Every candidate is
+    matched against the name of the feature that actually owns it, and a name
+    that resolves twice inside the tree is still rejected rather than guessed.
+    """
     feature = _feature_by_name(adapter, feature_name)
     matches: list[tuple[Any, Any]] = []
-    display = _read_member(feature, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not display:
-            break
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        name = str(_read_member(dimension, "Name"))
-        if _dim_owner_feature(dimension) == feature_name and name == dimension_name:
-            matches.append((display, dimension))
-        display = feature.GetNextDisplayDimension(display)
+    for current in _feature_tree(feature):
+        current_name = str(_read_member(current, "Name"))
+        display = _read_member(current, "GetFirstDisplayDimension")
+        for _ in range(1000):
+            if not display:
+                break
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            name = str(_read_member(dimension, "Name"))
+            if _dim_owner_feature(dimension) == current_name and name == dimension_name:
+                matches.append((display, dimension))
+            display = current.GetNextDisplayDimension(display)
     if len(matches) != 1:
         raise RuntimeError(
             f"{dimension_name}@{feature_name}: expected exactly one dimension, "

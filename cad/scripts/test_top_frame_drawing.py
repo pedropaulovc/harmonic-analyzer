@@ -8,6 +8,7 @@ import _config
 import fulcrum_keeper_spec as keeper
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 import build_top_frame as part
+import draw_top_frame as drawing
 from frame_attachment_spec import (
     CAP_MOUTH_Y,
     CAP_RECESS_DEPTH,
@@ -20,6 +21,7 @@ from frame_attachment_spec import (
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from tube_frame_cap_spec import MAX_OUTER_DIAMETER
+import top_frame_spec as spec
 import tube_frame_spec
 
 
@@ -110,3 +112,18 @@ def test_keeper_tap_holds_stock_screw_above_a_plug_tap_lead() -> None:
     drill_point = part.TAP_DRILL_MM[spec.size] / 2.0 * part.DRILL_POINT_H
     assert spec.depth_mm + depth_tolerance + drill_point < part.RING_HEIGHT
     assert abs(part.KEEPER_TAP_X - part.COLUMN_X) + major / 2.0 < part.WEB_T / 2.0
+def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
+    # Rule 2: the part owns the decimal places, so a kept model dimension
+    # nobody authored places for prints SolidWorks' template default and the
+    # sheet has nowhere left to say otherwise.
+    kept = set().union(
+        drawing.GEOMETRY_TOP_KEEP,
+        drawing.GEOMETRY_FRONT_KEEP,
+        drawing.DETAIL_TOP_KEEP,
+        drawing.DETAIL_FRONT_KEEP,
+        drawing.DETAIL_SECTION_KEEP,
+        drawing.HUB_TOP_KEEP,
+        drawing.HUB_LEFT_KEEP,
+    )
+    assert kept, "the top-frame sheets import no model dimensions"
+    assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)

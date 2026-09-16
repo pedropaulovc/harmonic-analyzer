@@ -1783,17 +1783,32 @@ def assert_precise_isometric_views(adapter: Any, sheet_names: Sequence[str]) -> 
     return checked
 
 
-@_telemetry.traced("drawing.normalize_edge_break")
-def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
-    ok = adapter._attempt(
-        lambda: view.SetDisplayMode4(False, 2, False, False, True), default=False
-    )
-    if not ok:
-        raise RuntimeError("failed to set hidden-lines-removed drawing view")
-
-
 _SW_HLV = 1  # swDisplayMode_e.swHIDDEN_GREYED
 _SW_HLR = 2  # swDisplayMode_e.swHIDDEN
+
+
+def set_hidden_lines_removed(adapter: Any, view: Any) -> None:
+    """Remove the hidden edges from ``view`` -- the print's default.
+
+    The mirror of ``set_hidden_lines_visible``, and idempotent for the same
+    two reasons: ``SetDisplayMode4`` returns False for a same-mode set (a
+    no-op, not a failure), so the RESULT is what gets asserted, and passing
+    through the other mode makes the call a real regen -- an annotation
+    attached after placement can leave a view's edge set unregenerated.
+    """
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayMode4(False, _SW_HLV, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLV:
+        raise RuntimeError(
+            f"failed to transition drawing view through HLV (mode reads {mode})"
+        )
+    bound.SetDisplayMode4(False, _SW_HLR, False, False, True)
+    mode = int(bound.GetDisplayMode2())
+    if mode != _SW_HLR:
+        raise RuntimeError(
+            f"failed to set hidden-lines-removed drawing view (mode reads {mode})"
+        )
 
 
 def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
@@ -2204,8 +2219,42 @@ def _drawing_component_name(adapter: Any, view: Any) -> str:
     return name
 
 
+def _model_item_paths(adapter: Any, view: Any) -> tuple[tuple[str, str], ...]:
+    """The ``@component@view`` qualifiers a model item of ``view`` answers to.
+
+    A projected view answers to its own name.  A DERIVED view does not.  On
+    top_frame's Section View A-A, every combination of
+    ``"CapRecessProfile@top-frame-7@Section View A-A"`` with SKETCH,
+    BODYFEATURE, "" and SOLIDBODY refuses -- for instance suffixes 1..20
+    (``RootDrawingComponent2(True)`` reads 'top-frame-16', which refuses too)
+    and for the sheet-qualified view name -- while the section itself selects
+    fine as a DRAWINGVIEW and the same two features resolve through its BASE
+    view, whose component name it happens to share.
+
+    Naming a feature through the base view does NOT import into the base view:
+    ``InsertModelAnnotations3`` follows the SELECTED drawing view, so with the
+    section selected the section is what gains the dimensions (measured: A-A's
+    census gained a second CapRecessDepth and CapRecessDia, the base view
+    gained none).  The base-view chain is therefore walked as a fallback, each
+    name paired with the component name THAT view reports (SolidWorks numbers
+    one instance per view), and the first qualifier that resolves wins.
+    """
+    paths = [(_drawing_component_name(adapter, view), view_name(adapter, view))]
+    seen = {paths[0][1]}
+    base = _early_bound(view, "IView").GetBaseView()
+    while base is not None:
+        base = _early_bound(base, "IView")
+        name = view_name(adapter, base)
+        if name in seen:
+            break
+        seen.add(name)
+        paths.append((_drawing_component_name(adapter, base), name))
+        base = base.GetBaseView()
+    return tuple(paths)
+
+
 def _select_model_feature(
-    adapter: Any, feature: str, *, component: str, in_view: str
+    adapter: Any, feature: str, *, paths: Sequence[tuple[str, str]]
 ) -> str:
     """Append one model feature of a drawing view to the selection list.
 
@@ -2217,24 +2266,29 @@ def _select_model_feature(
     kind: a driving dimension's owner is usually a profile ``"SKETCH"`` but can
     be a ``"BODYFEATURE"`` (an extrude, a chamfer, a fillet), and an empty Type
     resolves NEITHER here, so both are tried and the winner is returned.
+
+    ``paths`` are :func:`_model_item_paths`' qualifiers, the view's own first
+    and then its base views' -- a derived view answers to none of its own.
     """
     draw = adapter.currentModel
-    for type_name in ("SKETCH", "BODYFEATURE"):
-        if draw.Extension.SelectByID2(
-            f"{feature}@{component}@{in_view}",
-            type_name,
-            0.0,
-            0.0,
-            0.0,
-            True,  # append: the view itself is already selected
-            0,
-            null_callout(),
-            0,
-        ):
-            return type_name
+    for component, in_view in paths:
+        for type_name in ("SKETCH", "BODYFEATURE"):
+            if draw.Extension.SelectByID2(
+                f"{feature}@{component}@{in_view}",
+                type_name,
+                0.0,
+                0.0,
+                0.0,
+                True,  # append: the view itself is already selected
+                0,
+                null_callout(),
+                0,
+            ):
+                return f"{type_name} via {in_view}"
     raise RuntimeError(
-        f"failed to select model feature {feature!r} of component {component!r} "
-        f"in view {in_view!r} as a SKETCH or a BODYFEATURE"
+        f"failed to select model feature {feature!r} as a SKETCH or a "
+        "BODYFEATURE through any of "
+        f"{[f'{feature}@{component}@{in_view}' for component, in_view in paths]}"
     )
 
 
@@ -2279,9 +2333,9 @@ def insert_feature_dimensions(
         name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"failed to select drawing view {name!r}")
-    component = _drawing_component_name(adapter, view)
+    paths = _model_item_paths(adapter, view)
     types = [
-        _select_model_feature(adapter, feature, component=component, in_view=name)
+        _select_model_feature(adapter, feature, paths=paths)
         for feature in features
     ]
     result = adapter._attempt(
