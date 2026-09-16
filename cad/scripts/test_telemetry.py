@@ -401,6 +401,24 @@ def test_instance_id_prefers_explicit_env_then_worker_identity(monkeypatch):
     assert _telemetry._resolve_instance_id() == socket.gethostname()
 
 
+def test_instance_id_yields_only_to_an_exact_resource_attribute_key(monkeypatch):
+    """``OTEL_RESOURCE_ATTRIBUTES`` entries are matched by exact key, not by
+    substring: a neighbouring ``service.instance.identifier`` neither declares the
+    instance id nor may suppress it, or every span loses its worker attribution."""
+    monkeypatch.delenv("OTEL_SERVICE_INSTANCE_ID", raising=False)
+    monkeypatch.setenv("HARMONIC_WORKER_ID", "swmaker000004@4")
+
+    monkeypatch.setenv(
+        "OTEL_RESOURCE_ATTRIBUTES", "service.instance.identifier=legacy,host.name=a"
+    )
+    assert _telemetry._resolve_instance_id() == "swmaker000004@4"
+
+    monkeypatch.setenv(
+        "OTEL_RESOURCE_ATTRIBUTES", "host.name=a, service.instance.id=from-env"
+    )
+    assert _telemetry._resolve_instance_id() is None
+
+
 def test_process_startup_is_billed_to_the_parent_trace(capture, monkeypatch):
     """The spawn + interpreter + import region between a parent launching a process
     and that process's first span is DARK -- ~2-5 s per COM task. ``inject_env``

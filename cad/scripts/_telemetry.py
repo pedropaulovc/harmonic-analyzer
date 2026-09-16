@@ -143,8 +143,24 @@ _INSTANCE_ID_ENV = "OTEL_SERVICE_INSTANCE_ID"
 _WORKER_ID_ENV = "HARMONIC_WORKER_ID"
 
 
+def _declares_instance_id(spec: str) -> bool:
+    """Does ``OTEL_RESOURCE_ATTRIBUTES`` set ``service.instance.id`` itself?
+
+    Follows the ``OTELResourceDetector`` grammar -- comma-separated entries split
+    at their first ``=`` -- and compares the key exactly. A substring test would
+    read a neighbouring ``service.instance.identifier=legacy`` as this attribute
+    and drop the instance id entirely. The SDK exposes no public parser.
+    """
+
+    for entry in spec.split(","):
+        key, separator, _ = entry.partition("=")
+        if separator and key.strip() == "service.instance.id":
+            return True
+    return False
+
+
 def _resolve_instance_id() -> str | None:
-    if "service.instance.id" in os.environ.get("OTEL_RESOURCE_ATTRIBUTES", ""):
+    if _declares_instance_id(os.environ.get("OTEL_RESOURCE_ATTRIBUTES", "")):
         return None
     for name in (_INSTANCE_ID_ENV, _WORKER_ID_ENV):
         value = os.environ.get(name, "").strip()
