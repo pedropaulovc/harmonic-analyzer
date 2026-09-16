@@ -278,9 +278,15 @@ def _add_cross_spotface_dimension(adapter: Any, view: Any) -> None:
     actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
     if abs(actual_mm - SCREW_SPOTFACE_DIAMETER) > 1e-5:
         raise RuntimeError(f"front spotface measured {actual_mm}, expected {SCREW_SPOTFACE_DIAMETER} mm")
+    # One place, not two: the spotface only lands a screw head on the seat
+    # plane, so the general .X band (+-0.8) governs it and "4.25" asked the
+    # shop to hold +-0.51 for nothing (2026-09 review over-specification).
+    # 4.25 is exactly representable, so round-half-EVEN prints 4.2 -- the
+    # shallower side, which leaves material rather than removing it, and the
+    # modelled 4.25 plane sits well inside the one-place band it now carries.
     caption = (
         "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR\n"
-        f"{BASE_SPOTFACE_DEPTH:.2f} DEEP"
+        f"{BASE_SPOTFACE_DEPTH:.1f} DEEP"
     )
     display.SetText(4, caption)
     display.SetPrecision3(1, -1, -1, -1)
@@ -1126,9 +1132,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_arc_endpoints_to_center(adapter, tap_height, label="cross-screw axis height")
     tap_height.SetText(4, axis_caption)
-    tap_height.SetPrecision3(2, -1, -1, -1)
+    # One place (38.1), so the general .X band (+-0.8) governs: the tube cross
+    # holes are MATCH-DRILLED from the assembled base, so this axis only has to
+    # land mid-socket -- +-0.51 was work nobody needed (2026-09 review
+    # over-specification).
+    tap_height.SetPrecision3(1, -1, -1, -1)
     if (
-        int(tap_height.GetPrimaryPrecision2()) != 2
+        int(tap_height.GetPrimaryPrecision2()) != 1
         or str(tap_height.GetText(4)) != axis_caption
     ):
         raise RuntimeError("native cross-axis height precision or datum caption did not persist")
