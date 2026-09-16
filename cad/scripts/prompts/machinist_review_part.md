@@ -145,7 +145,10 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   clutter behind the dimensions is a clarity defect, and so is a shaped
   internal feature that exists ONLY as hidden lines with no section or
   breakout defining it. Nothing is dimensioned to a hidden line; a section
-  or breakout does that job.
+  or breakout does that job. A section view never carries hidden lines: it
+  shows either the material beyond the cut in solid lines or only the cut
+  faces. Hatched slices floating among dashed ghosts of removed material are
+  a clarity defect.
 - The package has a standard isometric projection for pictorial clarity. It is
   rendered **Shaded With Edges** in precision/high-quality mode: edges are
   visible, geometry is not coarse or faceted, and cosmetic threads are not

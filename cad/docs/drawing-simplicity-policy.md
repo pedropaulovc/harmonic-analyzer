@@ -135,7 +135,15 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      hidden-line view per part, sometimes none when sections and callouts
      cover everything, occasionally two for orthogonal cross-hole
      families — it is a criterion, not a count. Assembly views
-     are hidden-lines-removed. Never dimension to a hidden line — cut a
+     are hidden-lines-removed. **Section views are always
+     hidden-lines-removed**: the cut exists to show the interior in solid
+     lines, so dashed edges in a section only say the cut was placed wrong.
+     A section either shows the geometry beyond the cutting plane (the
+     default) or is cut-surface-only (`IDrSection::SetDisplayOnlySurfaceCut`)
+     — never cut-surface-only WITH hidden lines, which prints hatched slices
+     floating among dashed ghosts of the material that was removed. A
+     dimension that needs an edge behind the cut takes the full section, not
+     hidden lines. Never dimension to a hidden line — cut a
      section or breakout instead. (This supersedes the earlier
      "hidden lines ON in every orthographic view" rule: on the castings it
      buried every dimension in dashed haystacks and drove the crowding
