@@ -269,23 +269,23 @@ string-replacement script. Run `uv run --frozen ruff check` and never
   file lock) queues every doit COM task and the attach-only audit runner. Do
   NOT ask sibling agents whether the seat is free -- submit the build
   synchronously and let it queue; `com.seat.wait` in the log is normal.
-- **The lock serializes, it does not isolate.** Every process drives the SAME
-  SolidWorks session, whose open-document table is keyed by FILENAME. A
-  read-only probe that opens `top-frame.SLDDRW` also loads `top-frame.SLDPRT`
-  read-only, and that part can stay resident after the drawing is closed; a
-  sibling's `part:top_frame` build in another worktree then binds to the
-  resident read-only copy and fails on the first `Select2` (measured
-  2026-09-16: two deterministic Hole Wizard "face Select failed" runs). Diff
-  `ISldWorks::GetDocuments` before/after a probe and `CloseDoc` every document
-  the probe pulled in, or do not probe a drawing whose part a sibling may be
-  building.
+- **The lock serializes, it does not isolate — so the lock holder OWNS the
+  session.** Every process drives the same SolidWorks, whose open-document
+  table is keyed by FILENAME: a read-only probe that opens `top-frame.SLDDRW`
+  also loads `top-frame.SLDPRT` read-only, and a later `part:top_frame` build
+  binds to that resident copy and fails on its first `Select2` (measured
+  2026-09-16, twice). The contract: whoever acquires the seat is right to,
+  and must, `ISldWorks::CloseAllDocuments(True)` and start from an empty
+  session; any document a previous holder left open unsaved was never
+  protected, and it is not the taker's problem. Nobody holds work across a
+  lock release — save or discard before releasing.
 - Attach, never launch: `HARMONIC_SW_AUTOSTART=0` plus a held
   `HARMONIC_COM_SEAT`. `cad/scripts/diagnostics/_owned_native_session.py` is the
   attach-only runner.
-- Open read-only + silent (`swOpenDocOptions_Silent | ..._ReadOnly`) and close
-  by explicit path with `ISldWorks::CloseDoc(path)`. **Never
-  `CloseAllDocuments`** — it destroys whatever a sibling agent has open. Prove
-  you left nothing behind: `ISldWorks::GetDocumentCount()` and `ActiveDoc`.
+- Open read-only + silent (`swOpenDocOptions_Silent | ..._ReadOnly`). On
+  taking the seat, `CloseAllDocuments(True)` first; on release, close what you
+  opened by path with `ISldWorks::CloseDoc(path)` and prove the session is
+  empty: `ISldWorks::GetDocumentCount()` and `ActiveDoc`.
 - Keep each attach short and one-shot. A held session blocks every sibling's
   build; ten seconds of audit does not.
 - Never launch a `doit` build to inspect a drawing. Audit the open document.
