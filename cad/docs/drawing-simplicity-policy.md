@@ -180,12 +180,19 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders the
-verdict a blind senior machinist gives each drawing package under the calibrated
-prompt in `cad/scripts/prompts/`. Part and assembly packages render every native
-PDF page at 300 dpi and submit all sheet images to one review, using the rubric
-for that package kind. A downscaled contact-sheet preview is not a substitute
-for reviewing every page. A package passes when
+`uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
+`--all`) renders the verdict a blind senior machinist gives each drawing package
+under the calibrated prompt in `cad/scripts/prompts/`. **The reviewer MUST be a
+different model family from whoever authored or last edited the drawing
+script.** An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
+`--reviewer codex`; an agent running on a Codex/GPT model reviews with
+`--reviewer claude`. A same-family review shares the author's blind spots and
+does not count as the gate, even when it returns `SHIP`; if the cross-family
+reviewer is over quota, the package waits for it rather than falling back.
+Part and assembly packages render every native PDF page at 300 dpi and submit
+all sheet images to one review, using the rubric for that package kind. A
+downscaled contact-sheet preview is not a substitute for reviewing every page.
+A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
 finding. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
