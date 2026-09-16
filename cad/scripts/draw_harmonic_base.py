@@ -17,6 +17,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -44,7 +45,6 @@ from _drawing_common import (
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
@@ -72,6 +72,7 @@ from build_harmonic_base import (
     LOCK_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
+    PART_SURFACE_FINISHES,
     RIM_CHAMFER,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
@@ -80,6 +81,7 @@ from build_harmonic_base import (
     PIVOT_SCREW_XZ,
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
+    socket_bore_finish_key,
 )
 from harmonic_base_spec import (
     BOTTOM_FRONT_Z,
@@ -92,7 +94,6 @@ from harmonic_base_spec import (
     LIP_W,
     RIM_TOP,
     STACK_HEIGHT,
-    SURFACE_FINISHES,
     TOP_LENGTH,
 )
 from frame_attachment_spec import (
@@ -150,6 +151,29 @@ HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
 HOLE_TABLE_ANCHOR = (0.018, 0.260)
+
+# Section A-A cuts the socket pair at x = +COLUMN_X and lays machine -Z up the
+# sheet, so the lower-Z (front) socket of that pair is the UPPER one on paper.
+# Its inner bore wall is the leader target, picked midway between the
+# cross-screw axis and the deck: that puts the arrowhead 6.35 mm (1.6 mm on
+# paper) clear of BOTH the window the cross tap opens through the wall and the
+# deck outline, so the symbol reads as the bore's and cannot be mistaken for
+# the tapped cross hole whose cosmetic thread crowds the same wall.
+SECTION_SOCKET_XZ = min(
+    (station for station in COLUMN_SOCKET_XZ if station[0] > 0.0),
+    key=lambda station: station[1],
+)
+SOCKET_LEADER_POINT_MM = (
+    COLUMN_X,
+    (BASE_SCREW_Y + STACK_HEIGHT) / 2.0,
+    SECTION_SOCKET_XZ[1] + COLUMN_SOCKET_DIAMETER / 2.0,
+)
+# The symbol sits in the open field on the DECK side of the section, between
+# the upper-rim and underside chamfer callouts, so its leader reaches the bore
+# by crossing the deck outline alone and its text clears both. The shoulder is
+# short so the elbow stays out of the cut geometry it points into.
+SOCKET_FINISH_SYMBOL_XY = (0.387, 0.1435)
+SOCKET_FINISH_SHOULDER = 0.004
 
 # Per-view survivors of the native marked-dimension import. Sheet 1 owns the
 # exterior envelope and edge geometry. Sheet 2 owns socket and hole definition.
@@ -861,6 +885,14 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    # Rule 7: hidden lines only where they inform. Nothing on this sheet is
+    # communicated by a dashed edge -- the envelope, the corner radii, the
+    # heights and the stamped ID all read off the outline, and every internal
+    # feature is defined by sheet 2's hole table, its callouts and section A-A
+    # -- so both orthographic views stay hidden-lines-REMOVED and their
+    # dimensions sit on clean geometry. The dashed B1-H4 tap haystack the front
+    # elevation used to carry was the 2026-09 review's clarity finding: the
+    # hole table already states every size and depth it drew.
     for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -944,7 +976,7 @@ async def build(adapter: Any) -> dict[str, str]:
         f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
         (0.125, 0.130),
     )
-    deck_control = surface_finish_by_key(SURFACE_FINISHES, "deck")
+    deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
     deck_face = _resolve_faces(
         _early_bound(top.ReferencedDocument, "IModelDoc2"),
         {"deck": deck_control.face},
@@ -974,7 +1006,7 @@ async def build(adapter: Any) -> dict[str, str]:
     underside_finish = add_surface_finish(
         adapter, side,
         symbol_xy=(0.040, 0.052),
-        control=surface_finish_by_key(SURFACE_FINISHES, "underside"),
+        control=surface_finish_by_key(PART_SURFACE_FINISHES, "underside"),
         label="underside seat finish",
         char_height=0.0025,
         entity=_horizontal_base_edge(side, 0.0),
@@ -988,8 +1020,6 @@ async def build(adapter: Any) -> dict[str, str]:
         annotation.BentLeaderLength = 0.035
         if abs(float(annotation.BentLeaderLength) - 0.035) > 1e-7:
             raise RuntimeError(f"{label} finish leader did not clear its roughness text")
-    for view in (top, side):
-        set_hidden_lines_visible(adapter, view)
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate harmonic-base holes sheet")
@@ -1010,6 +1040,12 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         label="base column-socket section",
     )
+    # Rule 7 again: the hole table plus the cross-tap and spotface callouts
+    # define every hole on this sheet, and section A-A shows the socket, its
+    # depth and the cross tap through it in SOLID lines, so no view here needs
+    # dashed edges -- plan, front cross-tap elevation and section are all
+    # hidden-lines-removed. Every pick below therefore runs against the same
+    # visible-entity set the sheet exports.
     for view in (hole_top, hole_side, section):
         set_hidden_lines_removed(adapter, view)
 
@@ -1151,7 +1187,7 @@ async def build(adapter: Any) -> dict[str, str]:
     flange_finish = add_surface_finish(
         adapter, hole_top,
         symbol_xy=(0.170, 0.205),
-        control=surface_finish_by_key(SURFACE_FINISHES, "flange_west"),
+        control=surface_finish_by_key(PART_SURFACE_FINISHES, "flange_west"),
         label="flange perimeter seat finish",
         char_height=0.0025,
         edge_entity=table_y_axis,
@@ -1163,6 +1199,58 @@ async def build(adapter: Any) -> dict[str, str]:
     flange_annotation.BentLeaderLength = 0.035
     if abs(float(flange_annotation.BentLeaderLength) - 0.035) > 1e-7:
         raise RuntimeError("flange perimeter finish leader did not clear its roughness text")
+    # The four sockets locate the frame columns, so their bores carry the seat
+    # grade (rule 5) -- the deck symbol stops at the deck plane and the hole
+    # table's bore diameters are reference-only match-fit sizes. Section A-A is
+    # the one view that draws a controlled bore wall in SOLID lines, so the
+    # single sheet symbol lives here and its target names all four tags; the
+    # part owns one native control per bore, and add_surface_finish validates
+    # this leader against the very face the control qualifies.
+    socket_control = surface_finish_by_key(
+        PART_SURFACE_FINISHES, socket_bore_finish_key(*SECTION_SOCKET_XZ)
+    )
+    socket_face = _resolve_faces(
+        _early_bound(hole_top.ReferencedDocument, "IModelDoc2"),
+        {"socket": socket_control.face},
+    )["socket"]
+    socket_point = tuple(
+        float(value)
+        for value in (
+            socket_face.GetClosestPointOn(
+                *(station / 1000.0 for station in SOCKET_LEADER_POINT_MM)
+            )
+            or ()
+        )
+    )
+    if len(socket_point) != 5:
+        raise RuntimeError(
+            f"socket bore face returned no closest point: {socket_point!r}"
+        )
+    bore_radius = math.hypot(
+        socket_point[0] - COLUMN_X / 1000.0,
+        socket_point[2] - SECTION_SOCKET_XZ[1] / 1000.0,
+    )
+    if abs(bore_radius - COLUMN_SOCKET_DIAMETER / 2000.0) > 1e-7:
+        raise RuntimeError(
+            f"native socket leader point is not on the bore wall: {socket_point!r}"
+        )
+    socket_finish = add_surface_finish(
+        adapter, section,
+        symbol_xy=SOCKET_FINISH_SYMBOL_XY,
+        control=socket_control,
+        label="column socket bore finish",
+        char_height=0.0025,
+        entity_type="FACE",
+        entity=socket_face,
+        leader_attach_xy=model_point_in_view(
+            adapter, section, socket_point[:3],
+            label="qualified socket bore finish anchor",
+        ),
+    )
+    socket_annotation = _early_bound(socket_finish.GetAnnotation(), "IAnnotation")
+    socket_annotation.BentLeaderLength = SOCKET_FINISH_SHOULDER
+    if abs(float(socket_annotation.BentLeaderLength) - SOCKET_FINISH_SHOULDER) > 1e-7:
+        raise RuntimeError("socket bore finish leader shoulder did not persist")
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.235, 0.237)
     add_note(adapter, "FRONT CROSS-TAP VIEW SCALE 1:4", 0.245, 0.075)
     # Three nested outlines (flange, pad side, rim inner) sit within 1.6 mm of
@@ -1184,8 +1272,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if section_threads[1] == 0:
         raise RuntimeError("section A-A has no native cosmetic-thread instances")
     _telemetry.info(f"section A-A native cosmetic threads: seeds/instances={section_threads!r}")
-    for view in (hole_top, hole_side, section):
-        set_hidden_lines_visible(adapter, view)
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):

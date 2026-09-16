@@ -127,11 +127,19 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
 @dataclass(frozen=True)
 class CylinderFace:
     """The unique cylindrical face of ``diameter_mm`` (optionally disambiguated
-    by a point its axis span must contain, in part coordinates, mm)."""
+    by a point its axis span must contain, in part coordinates, mm).
+
+    The three station coordinates are independent and AND together, which is
+    what it takes to name ONE bore of a symmetric family: the harmonic base's
+    four column sockets share their diameter, depth and height and differ only
+    in X and Z, so a diameter (or a diameter and an X) matches two or four
+    faces and resolves none of them.
+    """
 
     diameter_mm: float
     contains_x_mm: float | None = None
     contains_y_mm: float | None = None
+    contains_z_mm: float | None = None
     tolerance_mm: float = 0.05
 
     def __post_init__(self) -> None:
