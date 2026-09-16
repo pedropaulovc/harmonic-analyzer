@@ -26,9 +26,11 @@ native contact or full-model clearance evidence. The full build, saved contact
 readback, and fresh oblique visual inspection remain required.
 
 The revised tip envelope is X=140..180 and Z=-95..-55 mm. The deck's flat
-interior is X=-215.25..215.25 and Z=-126.35..126.35 mm, so the whole circular
-envelope lies inside the raised rim. This bound complements the nameplate
-clearance test; it does not replace the native interference gate.
+interior is X=-215.25..215.25 and Z=-130.25..130.25 mm (pad 444.5 × 274.5 less
+the 7.0 rim; the pad was widened from 266.7 on 2026-09-15 for equal socket land),
+so the whole circular envelope lies inside the raised rim. This bound
+complements the nameplate clearance test; it does not replace the native
+interference gate.
 
 The full `uv run python -m doit -n 4` at
 `f82021edfff36155b765b50e99c4e2d3e1610bea` exited zero on September 7.
