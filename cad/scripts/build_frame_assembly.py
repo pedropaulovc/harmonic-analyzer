@@ -8,8 +8,9 @@ the near wall. The visible frame pose and evidence-locked top station remain
 unchanged.
 
 Layout (from the ch. 6 dimension photo and the ch. 30 eight views; assembly
-axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28 cm
-depth):
+axes follow the harmonic-base part: X = 46 cm length, Y = up, Z = 28.7 cm
+flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
+"28 cm" callout; see ``harmonic_base_spec.TOP_WIDTH``):
 
 * harmonic-base fixed at the origin, deck at Y=50.8, with four 25.4-deep
   sockets.
