@@ -110,8 +110,21 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      (draft/faceted quality off) and high-quality cosmetic threads. The
      isometric supplements the manufacturing views; it never replaces an
      orthographic, section, or detail view needed to define a feature.
-   - Hidden lines ON in every orthographic view (both books); never dimension
-     to a hidden line — cut a section or breakout instead.
+   - Hidden lines only where they inform (ASME Y14.3: omit them when not
+     required for clarity). Every internal feature — bore, blind depth,
+     cross-hole, pocket floor — is defined by SOLID lines in at least one
+     view, section, or breakout. A view shows hidden lines only when some
+     feature is communicated by them there (a cross-hole through a turned
+     part; a blind depth no section covers); every other orthographic view
+     is hidden-lines-removed so its dimensions and leaders sit on clean
+     geometry. That usually means one hidden-line view per part, sometimes
+     none when sections cover everything, occasionally two for orthogonal
+     cross-hole families — it is a criterion, not a count. Assembly views
+     are hidden-lines-removed. Never dimension to a hidden line — cut a
+     section or breakout instead. (This supersedes the earlier
+     "hidden lines ON in every orthographic view" rule: on the castings it
+     buried every dimension in dashed haystacks and drove the crowding
+     that rule 8 now resolves with extra sheets.)
    - One origin per view; the overall length is real and conspicuous.
    - Turned parts: oriented as they sit in the lathe, diameters on the side
      view (not leader-piled on the end view), lengths from one faced end.

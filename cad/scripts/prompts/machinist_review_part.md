@@ -134,8 +134,14 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   in the CAD system's standard two-line form. That is the table's format, read
   by every shop, not an added process constraint; do not ask for the tap-drill
   line to be removed.
-- Hidden lines are present in the orthographic views. Nothing is
-  dimensioned to a hidden line; a section or breakout does that job.
+- Hidden lines appear only where they tell you something: every internal
+  feature (bore, blind depth, cross-hole, pocket floor) is shown in solid
+  lines in at least one view, section or breakout, and a view carries hidden
+  lines only when a feature there is communicated by them. A view whose
+  hidden lines add nothing but clutter behind the dimensions is a clarity
+  defect, and so is an internal feature that exists ONLY as hidden lines
+  with no section or breakout defining it. Nothing is dimensioned to a
+  hidden line; a section or breakout does that job.
 - The package has a standard isometric projection for pictorial clarity. It is
   rendered **Shaded With Edges** in precision/high-quality mode: edges are
   visible, geometry is not coarse or faceted, and cosmetic threads are not
@@ -249,10 +255,12 @@ say the fix):
   the inner border, projected orthographic views that break ASME alignment, a
   view group bunched against an edge or visibly unbalanced, crossed leaders,
   text on lines, a dimension that reads like an overall but is not,
-  dimensioning to hidden lines, missing hidden lines, a view choice that hides
-  the feature, a missing or noncompliant Shaded With Edges isometric, a turned
-  part dimensioned from both ends, or an otherwise identifiable matched-fit
-  mate missing its name or assigned drawing/part number.
+  dimensioning to hidden lines, an internal feature defined only by hidden
+  lines, hidden lines cluttering a view where they inform nothing, a view
+  choice that hides the feature, a missing or noncompliant Shaded With Edges
+  isometric, a turned part dimensioned from both ends, or an otherwise
+  identifiable matched-fit mate missing its name or assigned drawing/part
+  number.
 
 - minor: taste and polish that would not change how you make the part.
 An empty list is a valid answer for any category. Never pad a category.
