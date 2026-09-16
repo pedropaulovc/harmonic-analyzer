@@ -166,7 +166,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.105, 0.228),
         datum="A",
         label="cam-pin cylindrical-shank datum axis",
-        position_tolerance_m=0.0065,
+        position_tolerance_m=1e-4,
     )
     add_surface_finish(
         adapter,

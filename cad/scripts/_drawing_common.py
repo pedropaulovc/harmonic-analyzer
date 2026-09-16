@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, NamedTuple, Sequence
 
 
 import _config
@@ -376,6 +376,48 @@ def _validate_surface_finish_control_face(
     )
 
 
+class LeaderPlacement(NamedTuple):
+    """How a placed annotation's readback relates to the point it was given.
+
+    ``lateral`` is the distance from the ray the author drew (attachment point
+    towards requested point) -- the quantity that says whether the leader still
+    points where it was aimed.  ``pull_in`` is how much nearer the attachment
+    the readback sits *along* that ray: positive towards the attachment,
+    negative past the requested point.
+    """
+
+    lateral: float
+    pull_in: float
+
+
+def leader_placement(
+    actual: tuple[float, float],
+    requested: tuple[float, float],
+    anchor: tuple[float, float],
+) -> LeaderPlacement:
+    """Decompose an annotation readback about the leader the author drew.
+
+    ``IAnnotation::SetPosition2`` places the symbol, but ``GetPosition`` reports
+    a shouldered datum tag's leader knee rather than that symbol point, so the
+    two differ by a shoulder length *along the leader* even though the move
+    persisted exactly. Measured on ``drawing:pinion_cam`` datum D (2026-09-16,
+    identical on two workers): requested and reported points share a bearing of
+    -166.033 deg about the boss axis to six decimals while the reported radius
+    is 4.795 mm shorter. Comparing the raw points instead makes that shoulder
+    look like a failed placement, which is why such sites accumulated
+    hand-tuned millimetre slack that drifts with the geometry.
+    """
+
+    span_x, span_y = requested[0] - anchor[0], requested[1] - anchor[1]
+    span = math.hypot(span_x, span_y)
+    offset_x, offset_y = actual[0] - anchor[0], actual[1] - anchor[1]
+    if span == 0.0:
+        return LeaderPlacement(math.hypot(offset_x, offset_y), 0.0)
+    unit_x, unit_y = span_x / span, span_y / span
+    along = offset_x * unit_x + offset_y * unit_y
+    return LeaderPlacement(abs(offset_x * unit_y - offset_y * unit_x), span - along)
+
+
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -391,12 +433,21 @@ def add_datum_feature(
     annotation: Any | None = None,
     shoulder: bool = False,
     position_tolerance_m: float = 1.5e-5,
+    leader_shoulder_limit_m: float = 0.02,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    ``position_tolerance_m`` bounds how far the placed tag may sit *off* the
+    leader the caller aimed (attachment point towards ``symbol_xy``);
+    ``leader_shoulder_limit_m`` bounds how far back *along* that leader
+    ``GetPosition`` may report it, which is a shoulder length, not a failed
+    move. An ignored ``SetPosition2`` leaves the tag near its attachment and so
+    exceeds the shoulder allowance; a tag placed off-aim fails the lateral
+    bound. See ``leader_placement``.
     """
     draw = adapter.currentModel
     if annotation is None:
@@ -474,20 +525,31 @@ def add_datum_feature(
         if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
             raise RuntimeError(f"failed to position datum {datum} ({label})")
     actual_position = tag_annotation.GetPosition()
-    position_error = (
-        math.inf
-        if not actual_position
-        else math.hypot(
-            float(actual_position[0]) - symbol_xy[0],
-            float(actual_position[1]) - symbol_xy[1],
-        )
+    if not actual_position:
+        raise RuntimeError(f"datum {datum} reports no position ({label})")
+    actual_xy = (float(actual_position[0]), float(actual_position[1]))
+    if edge_xy is None:
+        # No attachment point to aim from (an entity-anchored tag), so the raw
+        # points are all there is to compare.
+        offset = math.hypot(actual_xy[0] - symbol_xy[0], actual_xy[1] - symbol_xy[1])
+        placement = LeaderPlacement(offset, 0.0)
+    else:
+        placement = leader_placement(actual_xy, symbol_xy, edge_xy)
+    _telemetry.debug(
+        f"datum {datum} placement ({label}): lateral={placement.lateral:.6g} m, "
+        f"pull_in={placement.pull_in:.6g} m"
     )
-    if position_error > position_tolerance_m:
+    if placement.lateral > position_tolerance_m:
         raise RuntimeError(
-            f"datum {datum} position did not persist ({label}): "
-            f"{tuple(actual_position[:2]) if actual_position else None}; "
-            f"requested={symbol_xy}, error={position_error:.6g} m, "
+            f"datum {datum} left its leader ({label}): {actual_xy}; "
+            f"requested={symbol_xy}, lateral={placement.lateral:.6g} m, "
             f"limit={position_tolerance_m:.6g} m"
+        )
+    if not -position_tolerance_m <= placement.pull_in <= leader_shoulder_limit_m:
+        raise RuntimeError(
+            f"datum {datum} position did not persist ({label}): {actual_xy}; "
+            f"requested={symbol_xy}, pull_in={placement.pull_in:.6g} m, "
+            f"allowed=[{-position_tolerance_m:.6g}, {leader_shoulder_limit_m:.6g}] m"
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")
@@ -1871,9 +1933,7 @@ def render_pdf_png(
         x = column * cell_size[0] + (cell_size[0] - preview_size[0]) // 2
         y = row * cell_size[1] + (cell_size[1] - preview_size[1]) // 2
         contact.paste(cell.convert("RGB"), (x, y))
-    contact.save(
-        png, dpi=(contact_template.dpi, contact_template.dpi)
-    )
+    contact.save(png, dpi=(contact_template.dpi, contact_template.dpi))
 
 
 def sanitize_pdf_metadata(pdf: Path, *, title: str, expected_pages: int = 1) -> None:
@@ -3403,12 +3463,20 @@ def rendered_balloon_circle(note: Any, *, label: str) -> tuple[float, float, flo
         if any(abs(arc[4 + axis] - arc[7 + axis]) > 1e-9 for axis in range(3)):
             continue
         radius = math.hypot(arc[4] - arc[10], arc[5] - arc[11])
-        if (not math.isfinite(radius) or radius <= 0.0
-                or abs(arc[13]) > 1e-9 or abs(arc[14]) > 1e-9
-                or abs(abs(arc[15]) - 1.0) > 1e-9):
-            raise RuntimeError(f"{label}: invalid rendered sheet-circle geometry: {arc!r}")
+        if (
+            not math.isfinite(radius)
+            or radius <= 0.0
+            or abs(arc[13]) > 1e-9
+            or abs(arc[14]) > 1e-9
+            or abs(abs(arc[15]) - 1.0) > 1e-9
+        ):
+            raise RuntimeError(
+                f"{label}: invalid rendered sheet-circle geometry: {arc!r}"
+            )
         if circle is not None:
-            raise RuntimeError(f"{label}: multiple rendered full-circle balloon primitives")
+            raise RuntimeError(
+                f"{label}: multiple rendered full-circle balloon primitives"
+            )
         circle = (arc[10], arc[11], radius)
     if circle is None:
         raise RuntimeError(f"{label}: no rendered full-circle balloon primitive")
@@ -4009,22 +4077,42 @@ def position_bom_balloon(
     adapter.currentModel.GraphicsRedraw2()
     current_note = annotation.GetSpecificAnnotation()
     if current_note is None:
-        raise RuntimeError(f"{label}: item {item_number} note vanished after positioning")
+        raise RuntimeError(
+            f"{label}: item {item_number} note vanished after positioning"
+        )
     actual_anchor = tuple(float(value) for value in annotation.GetPosition())
     actual_xy = rendered_balloon_circle(current_note, label=label)[:2]
-    pixel_bounds = tuple(max(position_tolerance_m, value) for value in drawing_viewport_pixel_size(adapter))
-    residual = tuple(actual - expected for actual, expected in zip(actual_xy, position_xy))
-    state = {"requested_anchor": target_anchor, "actual_anchor": actual_anchor,
-             "target_circle": position_xy, "actual_circle": actual_xy,
-             "residual_xy": residual, "pixel_bounds_m": pixel_bounds}
+    pixel_bounds = tuple(
+        max(position_tolerance_m, value)
+        for value in drawing_viewport_pixel_size(adapter)
+    )
+    residual = tuple(
+        actual - expected for actual, expected in zip(actual_xy, position_xy)
+    )
+    state = {
+        "requested_anchor": target_anchor,
+        "actual_anchor": actual_anchor,
+        "target_circle": position_xy,
+        "actual_circle": actual_xy,
+        "residual_xy": residual,
+        "pixel_bounds_m": pixel_bounds,
+    }
     _telemetry.info(f"{label}: item {item_number} pixel-bounded placement {state!r}")
-    if len(actual_anchor) < 2 or not all(math.isfinite(value) for value in actual_anchor[:2]) or any(
-        abs(actual_anchor[index] - target_anchor[index]) > position_tolerance_m
-        for index in range(2)
+    if (
+        len(actual_anchor) < 2
+        or not all(math.isfinite(value) for value in actual_anchor[:2])
+        or any(
+            abs(actual_anchor[index] - target_anchor[index]) > position_tolerance_m
+            for index in range(2)
+        )
     ):
-        raise RuntimeError(f"{label}: item {item_number} native anchor did not persist: {state!r}")
+        raise RuntimeError(
+            f"{label}: item {item_number} native anchor did not persist: {state!r}"
+        )
     if any(abs(residual[index]) > pixel_bounds[index] for index in range(2)):
-        raise RuntimeError(f"{label}: item {item_number} rendered circle exceeds viewport resolution: {state!r}")
+        raise RuntimeError(
+            f"{label}: item {item_number} rendered circle exceeds viewport resolution: {state!r}"
+        )
 
 
 def stamp_drawing_summary(
@@ -4885,7 +4973,9 @@ async def finalize_drawing(
         # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
         # the 1:1 the template pinned (each view still carries its own explicit
         # scale), so re-pin it once here before asserting the contract.
-        if not sheet.SetScale(float(sheet_scale[0]), float(sheet_scale[1]), False, False):
+        if not sheet.SetScale(
+            float(sheet_scale[0]), float(sheet_scale[1]), False, False
+        ):
             raise RuntimeError(
                 f"failed to set final drawing sheet {sheet_name!r} scale"
             )

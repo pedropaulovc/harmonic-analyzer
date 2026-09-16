@@ -266,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="block-width median plane",
         entity_type="DIMENSION",
-        position_tolerance_m=0.001,
+        position_tolerance_m=1e-4,
     )
     add_datum_feature(
         adapter,
@@ -298,7 +298,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth median plane",
         entity_type="DIMENSION",
         shoulder=True,
-        position_tolerance_m=0.001,
+        position_tolerance_m=1e-4,
     )
     passage_entity = _circle_entity(
         adapter,
