@@ -175,11 +175,17 @@ class ConeFace:
 @dataclass(frozen=True)
 class PlanarFace:
     """The unique planar face whose outward normal ≈ ``normal`` and whose plane
-    sits at ``offset_mm`` along that normal (part coordinates, mm)."""
+    sits at ``offset_mm`` along that normal (part coordinates, mm).
+
+    ``contains_x_mm`` and ``contains_z_mm`` AND together like the cylinder
+    stations above: the top frame's four cap-recess floors are COPLANAR (one Y
+    offset, one annulus area each), so naming one takes both plan stations.
+    """
 
     normal: tuple[float, float, float]
     offset_mm: float
     contains_z_mm: float | None = None
+    contains_x_mm: float | None = None
     tolerance_mm: float = 0.05
 
     def __post_init__(self) -> None:

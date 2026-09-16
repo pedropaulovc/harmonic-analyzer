@@ -106,15 +106,25 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _part_pmi import _resolve_faces, author_part_pmi
 from top_frame_spec import (
+    BORE_DIA,
+    BOSS_ABOVE,
+    CAP_RECESS_FLOOR_Y,
+    COLUMN_X,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_NOTES_B,
+    FRONT_COLUMN_Z,
+    GOOSENECK_BORE_DIA,
+    GOOSENECK_X,
+    HALF_H,
+    REAR_COLUMN_Z,
+    RING_HEIGHT,
+    SURFACE_FINISHES,
 )
 from cone_pivot_post_installation import (
     FRAME_COLUMN_Z_CENTER,
-    FRAME_FRONT_COLUMN_Z,
-    FRAME_REAR_COLUMN_Z,
     SUMMING_Z,
 )
 from frame_attachment_spec import (
@@ -122,34 +132,33 @@ from frame_attachment_spec import (
     CAP_RECESS_DIAMETER,
     CASTING_FULL_THREAD_DEPTH,
     CASTING_TAP_DRILL_DEPTH,
-    COLUMN_SOCKET_DIAMETER,
     SCREW_SPOTFACE_DIAMETER,
     TOP_SCREW_SEAT_Z,
 )
 from _fit_limits import deviations
 from tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 
+import _telemetry
+
 PART_NAME = "top-frame"
 MATERIAL = "Gray Cast Iron"  # green-painted casting like the base
 
 # --- Plan geometry (machine == part-local x/z; part y = machine y - 1017.95) --
-COLUMN_X = 197.0  # column stations (frame.SLDASM)
-FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
-REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
+#
+# COLUMN_X, FRONT/REAR_COLUMN_Z, RING_HEIGHT, HALF_H, BOSS_ABOVE, BORE_DIA,
+# CAP_RECESS_FLOOR_Y, GOOSENECK_X and GOOSENECK_BORE_DIA are imported from
+# top_frame_spec: the machined-surface face specs are keyed off those stations,
+# and the spec is the COM-free contract the drawing's finish symbols are
+# provenance-checked against.
 FRAME_CENTER_Z = FRAME_COLUMN_Z_CENTER  # 0.0
 
 RAIL_W_SIDE = 34.2  # side rails, along Z (GT corner rescale 221.5 -> 214.1)
 RAIL_W_FR = 38.0  # front/rear rails, along X (GT z-corner rescale 137.4 -> 131)
-RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
-HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
 
 BOSS_DIA = 52.2  # silhouette extremes +/-223.1 in p002/p006
-BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
 BOSS_BELOW = 6.3  # boss hang below the underside (p006 read 5.7-7)
-BORE_DIA = COLUMN_SOCKET_DIAMETER
 CAP_RECESS_DIAMETER_BAND = (0.20, 0.0)
 CAP_RECESS_DEPTH_BAND = (0.30, 0.0)
-CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH
 CAP_RECESS_DIAMETRAL_CLEARANCE = CAP_RECESS_DIAMETER - CAP_MAX_OUTER_DIAMETER
 if CAP_RECESS_DIAMETRAL_CLEARANCE <= 0.0:
     raise AssertionError("purchased cap does not clear the top-frame recess")
@@ -169,9 +178,7 @@ STUD_HOLE_SPEC = HoleSpec("clearance", "1/2", fit="close")  # O13.492
 STUD_HOLE_DIA = CLEARANCE_MM[("1/2", "close")]
 
 # --- Gooseneck hub (old gooseneck-clamp function, merged) -------------------
-GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
 GOOSENECK_Z = SUMMING_Z
-GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 HUB_RIB_W = 27.0  # full-height rib band across the east rail
 HUB_BOSS_DIA = 30.0  # underside boss around the bore exit
 HUB_BOSS_DROP = 8.0  # boss bottom local -26.25
@@ -185,7 +192,7 @@ SET_TAP_SPEC = HoleSpec("tapped", "1/4-20", end="through_next")
 
 # --- Cross screws (frame -> tube-frame columns -> far casting wall) ----------
 SPOTFACE_DIA = SCREW_SPOTFACE_DIAMETER
-SPOTFACE_PLANE = abs(FRAME_FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
+SPOTFACE_PLANE = abs(FRONT_COLUMN_Z) + BOSS_DIA / 2.0 + 0.4
 SPOTFACE_FLOOR = TOP_SCREW_SEAT_Z
 SIDE_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
@@ -528,6 +535,41 @@ def _bore_chamfer_removal() -> float:
         return math.pi * BORE_CHAMFER**2 * (bore_dia / 2.0 + BORE_CHAMFER / 3.0)
 
     return 4.0 * ring(CAP_RECESS_DIAMETER) + ring(GOOSENECK_BORE_DIA)
+
+
+def _qualify_machined_faces(adapter) -> None:
+    """Area-check every face the surface-finish spec owns.
+
+    ``_resolve_faces`` already proves each spec names exactly ONE face; the
+    area proves it named the RIGHT one, so a station typo ships a build failure
+    instead of a roughness symbol on the wrong surface (build_harmonic_base's
+    _paint_machined_faces_black precedent). Expectations are the full analytic
+    wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
+    windows that break into the bores (~1% each) and the C1 bore-top breaks.
+    """
+    faces = _resolve_faces(
+        adapter.currentModel,
+        {control.key: control.face for control in SURFACE_FINISHES},
+    )
+    socket_wall = math.pi * BORE_DIA * (CAP_RECESS_FLOOR_Y + HALF_H + BOSS_BELOW)
+    cap_seat = math.pi / 4.0 * (CAP_RECESS_DIAMETER**2 - BORE_DIA**2)
+    hub_wall = (
+        math.pi * GOOSENECK_BORE_DIA * (HUB_BOSS_DROP + 2.0 * HALF_H - BORE_CHAMFER)
+    )
+    for key, face in faces.items():
+        if key.startswith("cap_seat"):
+            expected = cap_seat
+        elif key == "hub_bore":
+            expected = hub_wall
+        else:
+            expected = socket_wall
+        area = float(face.GetArea()) * 1e6
+        if abs(area - expected) > 0.05 * expected:
+            raise RuntimeError(
+                f"{key} face area {area:.0f} mm^2 != {expected:.0f} "
+                "(minus tap windows and edge breaks)"
+            )
+        _telemetry.info(f"{key} face qualified ({area:.0f} mm^2)")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1353,6 +1395,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    _qualify_machined_faces(adapter)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

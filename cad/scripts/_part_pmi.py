@@ -178,12 +178,19 @@ def _face_matches(geometry: _FaceGeometry, spec: FaceSpec) -> bool:
         )
         if abs(offset - spec.offset_mm / 1000.0) > tolerance_m:
             return False
-        if spec.contains_z_mm is None:
+        if spec.contains_x_mm is None and spec.contains_z_mm is None:
             return True
         if len(geometry.box) != 6:
             return False
-        z = spec.contains_z_mm / 1000.0
-        return geometry.box[2] - tolerance_m <= z <= geometry.box[5] + tolerance_m
+        for axis, station in ((0, spec.contains_x_mm), (2, spec.contains_z_mm)):
+            if station is None:
+                continue
+            value = station / 1000.0
+            low = geometry.box[axis] - tolerance_m
+            high = geometry.box[axis + 3] + tolerance_m
+            if not low <= value <= high:
+                return False
+        return True
     if isinstance(spec, SphereFace):
         if geometry.identity != _SURFACE_SPHERE:
             return False
