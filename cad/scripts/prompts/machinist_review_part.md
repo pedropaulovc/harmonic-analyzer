@@ -184,7 +184,12 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   correctness comes first. Projected orthographic views preserve ASME
   alignment: front, top and side views are not staggered for aesthetics.
   Resolve crowding by moving the aligned group, changing sheet orientation or
-  scale, or moving nonprojected views and annotations.
+  scale, moving nonprojected views and annotations — or by adding a sheet.
+  A package may have as many sheets as it needs; a sheet is too crowded when
+  the callouts, dimensions or notes of one view or section overlap or crowd
+  those of another. Report that as a clarity defect and say which section,
+  detail or table should move to its own sheet; never ask for smaller views,
+  abbreviated qualifiers, or text squeezed between lines instead.
 - Judge whether the views, dimensions and notes fit better on a landscape or
   portrait ASME sheet. Report a clarity defect when the chosen orientation
   forces materially smaller views, awkward crowding, or large unusable space

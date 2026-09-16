@@ -140,8 +140,16 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    Projected orthographic views preserve ASME alignment; front, top, and side
    views are never staggered merely to improve composition. Correctness comes
    before visual balance. Resolve crowding by moving the aligned view group,
-   choosing a better sheet orientation or scale, or repositioning nonprojected
-   views and annotations.
+   choosing a better sheet orientation or scale, repositioning nonprojected
+   views and annotations — or, once those are exhausted, by **adding a
+   sheet**. A drawing package is not limited to one sheet, and extra sheets
+   are cheap; cramming is not. The diagnostic symptom of a sheet that is too
+   crowded is callouts, dimensions, or notes belonging to one view or section
+   overlapping, or being squeezed against, those of another. When that
+   happens, move whole sections, detail views, or the hole table with its
+   notes to a new sheet of the same package rather than shrinking scale,
+   abbreviating qualifiers, or threading text between lines. Each sheet
+   should then read cleanly on its own, with its views still at a useful scale.
    Choose landscape or portrait according to the view arrangement, useful
    drawing scale, and space needed by dimensions and notes. A sparse sheet
    with undersized views has the wrong orientation when rotating the layout
