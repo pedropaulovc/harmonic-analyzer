@@ -334,6 +334,7 @@ from _spring import build_spring  # noqa: E402
 import channel_lever_spec  # noqa: E402
 import channel_spring_stock_geom as spring_stock  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
+import spring_hook_spec  # noqa: E402
 import summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
 
@@ -663,10 +664,39 @@ def _assert_spring_mount(
     bottom = top - summing_lever_spec.PLATE_T
     anchor_y = spring_mounts.CHANNEL_ANCHOR_XY[1]
     thread_top = anchor_y + anchor.thread_start_y_mm
-    thread_bottom = anchor_y + anchor.shank_end_y_mm
+    # The Ø3.175 neck cannot enter the tap, so the neck shoulders on the plate's
+    # top face: that is the anchor's down-stop and where the thread starts.
+    if abs(thread_top - top) > 1e-6:
+        raise RuntimeError(
+            f"channel anchor neck stands {thread_top - top:.3f} mm off the plate top"
+        )
+    # The production anchor is CUT to length, so its thread ends at the trimmed
+    # end, not at the vendor's 19.05 mm shank end.
+    thread_bottom = anchor_y + spring_hook_spec.TRIM.shank_end_y_mm
     engagement = min(top, thread_top) - max(bottom, thread_bottom)
-    if engagement < summing_lever_spec.PLATE_T - 1e-6:
-        raise RuntimeError(f"channel anchor only engages {engagement:.3f} mm of plate")
+    if abs(engagement - spring_hook_spec.THREAD_ENGAGEMENT_MM) > 1e-6:
+        raise RuntimeError(
+            f"channel anchor engages {engagement:.4f} mm of plate, expected "
+            f"{spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
+        )
+    # The trim stops the cut end INSIDE the plate: anything below it hangs in
+    # the channel bank's working space, and the recess is the adjustment room
+    # left for unscrewing the anchor.
+    recess = thread_bottom - bottom
+    if abs(recess - spring_hook_spec.PLATE_RECESS_MM) > 1e-6:
+        raise RuntimeError(
+            f"channel anchor cut end sits {recess:.4f} mm above the plate "
+            f"underside, expected {spring_hook_spec.PLATE_RECESS_MM:.4f}"
+        )
+    # Calibration only unscrews, so the seated pose must hold the whole
+    # back-out budget the registry prints ON TOP of the two-thread floor.
+    budget = spring_hook_spec.ADJUSTMENT_TRAVEL_MM
+    if engagement - budget < spring_hook_spec.MIN_THREAD_ENGAGEMENT_MM - 1e-9:
+        raise RuntimeError(
+            f"channel anchor seats with {engagement:.4f} mm engaged, too little "
+            f"to give up {budget:.4f} mm of preload travel above the "
+            f"{spring_hook_spec.MIN_THREAD_ENGAGEMENT_MM:.4f} mm thread floor"
+        )
     spring_bottom = (
         pose.lower_eye_xy[1] - uy * spring_stock.COIL_MEAN_RADIUS_MM - wire_r
     )
@@ -675,7 +705,10 @@ def _assert_spring_mount(
     spring_stock.check_length_mm(pose.length_mm)
     log(
         f"stock spring mount: inside length {pose.length_mm:.4f} mm, "
-        f"thread engagement {engagement:.3f} mm, tail {bottom - thread_bottom:.3f} mm"
+        f"thread engagement {engagement:.3f} mm, "
+        f"cut end {recess:.3f} mm above the plate underside, "
+        f"back-out budget {budget:.3f} mm "
+        f"({spring_hook_spec.ADJUSTMENT_TURNS} turn)"
     )
 
 

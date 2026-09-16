@@ -483,7 +483,9 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   guide friction. Verify assembly fit and measured force curves before closing
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
-  Lower anchors are **9489T111 #6-32**, supplied nuts omitted, and
+  Lower anchors are **9489T111 #6-32**, supplied nuts omitted and shank trimmed
+  to 6.668 mm, which stops the cut end 1.588 mm (1/16 in) above the coefficient
+  plate's underside and leaves 3.493 mm of thread engaged, and
   **9490T1 #10-24**, shank trimmed to 19.05 mm. Both thread directly into the
   summing lever; there are no nuts at the plate or boss. Existing upper lever
   holes are retained, with no upper pins. The gooseneck head is Ø12 mm to retain

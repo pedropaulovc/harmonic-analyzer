@@ -66,10 +66,16 @@ against Weyl's 255.02).  The nut closes exactly: hex ring 43.83141 - corner
 cones 0.315560 - bore chamfers 0.110450 = 43.405397 against the vendor's
 43.405400 (5e-8 relative).
 
-``nut='omitted'`` is the production configuration: the anchor threads straight
-into the summing lever, so the shipped nut is never installed.  It runs the
-bolt half of the same code path and gates against the vendor's bolt BODY
-(365.7780 mm^3, 13 faces).  ``truth`` is accepted for
+``nut='omitted'`` plus a shorter ``shank_length_mm`` is the production
+configuration: the anchor threads straight into the summing lever, so the
+shipped nut is never installed and the free end is cut back to a stop INSIDE
+the plate it threads into (``spring_hook_spec``).  Both gates above still run
+on the COMPLETE stock solid -- the bolt BODY (365.7780 mm^3, 13 faces) -- and
+the trim is applied afterwards, by
+:func:`diag_mcmaster_lib.trim_factory_shank`, so the vendor's ``Shank Lg.``
+(and the bend radius it drives) keeps its stock value.
+The cut plane lies past the captive nut's seat, so a trim with the nut built
+is rejected.  ``truth`` is accepted for
 :func:`diag_mcmaster_lib.run_replica` (which gates the finished part) and is
 deliberately not read while building.
 
@@ -107,6 +113,7 @@ from stock_anchor_geom import (  # noqa: E402
     nut_hex_profile_mm,
     thread_cutter_profile_mm,
     thread_groove_volume_per_mm_mm3,
+    trim,
 )
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     bodies,
@@ -114,6 +121,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     no_sketch_inference,
     offset_plane,
     replica_main,
+    trim_factory_shank,
 )
 
 A = ANCHOR_9489T111
@@ -390,22 +398,42 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
 # --------------------------------------------------------------------------
 # builder
 # --------------------------------------------------------------------------
-async def build_9489T111(adapter, truth=None, *, nut: str = "included"):
+async def build_9489T111(
+    adapter,
+    truth=None,
+    *,
+    nut: str = "included",
+    shank_length_mm: float | None = None,
+):
     """Build 9489T111 into the current (empty) part.  Never opens or saves.
 
     ``nut='included'`` reproduces the vendor part (bolt + captive hex nut);
     ``nut='omitted'`` builds the bolt alone, which is how the anchor installs
     (threaded straight into the summing lever).
+
+    ``shank_length_mm=None`` keeps the full factory shank (19.05 mm).  A
+    shorter length physically trims the complete stock solid and restores its
+    end deburr; it never re-seeds or rotates the factory thread, and the
+    vendor's own ``Shank Lg.`` -- which drives the bend radius -- keeps its
+    stock value.  The cut lands past the captive nut's seat, so trimming
+    requires ``nut='omitted'``.
     """
     if nut not in NUT_CHOICES:
         raise ValueError(f"nut must be one of {NUT_CHOICES}, got {nut!r}")
+    requested_cut = trim(A, shank_length_mm)
+    if requested_cut.removed_length_mm and nut != "omitted":
+        raise ValueError(
+            "9489T111 cannot be trimmed with the captive nut built: its seat "
+            f"at y={A.nut.seat_y_mm} is past the cut at "
+            f"y={requested_cut.shank_end_y_mm}"
+        )
     _telemetry.info(
         f"9489T111: {A.thread_size} shank {A.shank_length_mm} mm "
         f"(OD {A.thread_major_dia_mm} x thread {A.thread_length_mm} from "
         f"y={A.shank_end_y_mm}), wire {A.wire_dia_mm} on eye R"
         f"{A.eye_mean_radius_mm}, helix {A.thread_helix_height_mm:.5f} mm x "
         f"{A.thread_helix_revolutions:g} revs at pitch {A.thread_pitch_mm}, "
-        f"nut {nut}"
+        f"nut {nut}, finished shank {requested_cut.shank_length_mm} mm"
     )
 
     with no_sketch_inference(adapter):
@@ -537,6 +565,15 @@ async def build_9489T111(adapter, truth=None, *, nut: str = "included"):
             f"lever, so only the bolt body ships ({bolt_truth.volume_mm3:.4f} "
             "mm^3, 13 faces)"
         )
+
+    # Production modification, applied only once the stock solid is proven.
+    # trim_factory_shank gates it: one solid body whose extreme -Y point IS the
+    # cut plane. The face count is deliberately NOT re-asserted -- the cut
+    # replaces the end disc and chamfer cone but also removes whatever the
+    # vendor helix leaves at its free end, so the stock 13-face topology is not
+    # a contract of the trimmed part (9490T1's trim asserts nothing either).
+    if requested_cut.removed_length_mm:
+        await trim_factory_shank(adapter, A, requested_cut)
 
     # The replica is authored in the vendor's own frame: no COM remap.
     adapter._mcm_com_map = None

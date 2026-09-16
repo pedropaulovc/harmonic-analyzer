@@ -2,8 +2,8 @@ r"""McMaster-Carr 9489T111 / 9490T1 -- stock routing eyebolts, pure geometry.
 
 The two lower spring anchors: 9489T111 (#6-32, eye + hex nut, channel-spring
 end) and 9490T1 (#10-24, open-eye, counter-spring end).  Both thread directly
-into the summing lever, so the nut is production-omitted on the first and the
-second is production-trimmed -- see :func:`trim`.
+into the summing lever, so both are production-trimmed to the seat they
+engage -- see :func:`trim` -- and the first also drops its supplied nut.
 
 Every number below is either a dimension the vendor's own SolidWorks tree
 carries (harvest ``cad/out/reports/mcmaster-<sku>-dump.json``, written by
@@ -57,9 +57,10 @@ Shared by both (the repo's McMaster thread family):
 
 Length parameters
 -----------------
-``shank_length_mm`` (9490T1 only) is the FINISHED shank length measured from
+``shank_length_mm`` is the FINISHED shank length measured from
 :attr:`StockAnchor.advertised_shank_start_y_mm` -- the plane where the bend
-becomes straight and the thread starts -- to the cut end:
+becomes straight (on 9490T1 the thread starts there too; on 9489T111 a
+3.175 mm neck follows) -- to the cut end:
 
     ``shank_end_y = advertised_shank_start_y - shank_length``   (:data:`SHANK_LENGTH_LAW`)
 
@@ -69,9 +70,18 @@ surviving thread surfaces do not move.  :func:`trim` describes only that
 physical removal; finished mass properties come from the resulting native
 solid, not a re-seeded thread or an exact per-length mass claim.
 
-9489T111's shank is NOT parametric here: its ``Shank Lg.`` drives the bend
-radius through the vendor's own equation, so shortening it is a different
-part, not a trim.  Its production variation is the nut (built or not).
+Both anchors are trimmed in production, each to the seat it threads into
+(9490T1 to the summation-anchor boss height, 9489T111 to its neck plus the
+engaged depth of the coefficient plate), so neither protrudes past the summing
+lever.
+The cut is POST-PURCHASE: the vendor's ``Shank Lg.`` -- which on 9489T111
+also drives the bend radius through ``D1@Sketch8`` -- keeps its stock value,
+the stock solid is built from it, and only the free end is removed.  ORDERING
+a shorter 9489T111 would be a different part (its bend would change);
+CUTTING one is not.  :attr:`StockAnchor.min_shank_length_mm` keeps the cut
+end in threaded metal, clear of that neck.  9489T111's other production
+variation is the nut (built or not), and a trim requires it omitted: the
+captive nut seats past any cut this project makes.
 
 Cross-checks (analytic, no COM)
 -------------------------------
@@ -363,16 +373,21 @@ class StockAnchor:
         return self.eye_od_mm / 2.0 - self.shank_end_y_mm
 
     @property
-    def min_shank_length_mm(self) -> float:
-        """Shortest shank this geometry still expresses: the 45 deg deburr
-        chamfer plus one full thread turn clear of the bend."""
-        return self.end_chamfer_mm + 2.0 * self.thread_pitch_mm
+    def unthreaded_shank_length_mm(self) -> float:
+        """Shank above the thread start: 9489T111's straight neck, 0 on 9490T1."""
+        return self.advertised_shank_start_y_mm - self.thread_start_y_mm
 
     @property
-    def trimmable(self) -> bool:
-        """9489T111's shank length drives its bend radius (vendor equation),
-        so only 9490T1 can be cut to length as the same part."""
-        return self.neck_dia_mm is None
+    def min_shank_length_mm(self) -> float:
+        """Shortest shank this geometry still expresses: the unthreaded neck,
+        plus the 45 deg deburr chamfer and two full thread turns below it.
+        A shorter cut would land in the neck (or the bend), where the deburr
+        revolve has no shank to cut."""
+        return (
+            self.unthreaded_shank_length_mm
+            + self.end_chamfer_mm
+            + 2.0 * self.thread_pitch_mm
+        )
 
 
 # --------------------------------------------------------------------------
@@ -606,17 +621,12 @@ def thread_groove_volume_per_mm_mm3(
 
 
 # --------------------------------------------------------------------------
-# trimming (9490T1)
+# trimming (both anchors, post-purchase)
 # --------------------------------------------------------------------------
 def validate_shank_length_mm(a: StockAnchor, shank_length_mm: float | None) -> float:
     """Resolve and range-check a finished shank length in mm."""
     if shank_length_mm is None:
         return a.shank_length_mm
-    if not a.trimmable:
-        raise ValueError(
-            f"{a.sku} is not trimmable: its Shank Lg. drives the bend radius "
-            f"(vendor equation), so a shorter shank is a different part"
-        )
     length = float(shank_length_mm)
     if length > a.shank_length_mm:
         raise ValueError(
@@ -626,7 +636,8 @@ def validate_shank_length_mm(a: StockAnchor, shank_length_mm: float | None) -> f
     if length < a.min_shank_length_mm:
         raise ValueError(
             f"{a.sku} shank_length_mm {length} is below the geometric floor "
-            f"{a.min_shank_length_mm:.6f} (deburr chamfer + one full turn)"
+            f"{a.min_shank_length_mm:.6f} (unthreaded neck + deburr chamfer + "
+            f"two full turns)"
         )
     return length
 

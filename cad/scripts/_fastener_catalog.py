@@ -132,7 +132,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "spring-hook": _stock(
         "spring-hook",
-        "Black-Oxide Steel #6-32 Routing Eyebolt (Supplied Nut Omitted)",
+        "Black-Oxide Steel #6-32 Routing Eyebolt (Trimmed Shank, Supplied Nut Omitted)",
         "9489T111",
     ),
     "boss-hook": _stock(
