@@ -380,7 +380,7 @@ class StockAnchor:
     @property
     def min_shank_length_mm(self) -> float:
         """Shortest shank this geometry still expresses: the unthreaded neck,
-        plus the 45 deg deburr chamfer and one full thread turn below it.
+        plus the 45 deg deburr chamfer and two full thread turns below it.
         A shorter cut would land in the neck (or the bend), where the deburr
         revolve has no shank to cut."""
         return (
@@ -637,7 +637,7 @@ def validate_shank_length_mm(a: StockAnchor, shank_length_mm: float | None) -> f
         raise ValueError(
             f"{a.sku} shank_length_mm {length} is below the geometric floor "
             f"{a.min_shank_length_mm:.6f} (unthreaded neck + deburr chamfer + "
-            f"one full turn)"
+            f"two full turns)"
         )
     return length
 

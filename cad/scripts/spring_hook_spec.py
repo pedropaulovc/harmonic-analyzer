@@ -15,7 +15,7 @@ never projects, and the recess is free adjustment room under any pose.
 The remaining engagement (``THREAD_ENGAGEMENT_MM``) is ~4.4 threads of #6-32
 against a 4.49 N spring, so the band is the title block's general 1-place row
 (as on the counter anchor, ``boss_hook_spec``): even at the long limit the end
-stays 0.8 mm inside the plate, and at the short limit >3 threads remain.
+stays 0.8 mm inside the plate, and at the short limit >2 threads remain.
 """
 
 import _config
