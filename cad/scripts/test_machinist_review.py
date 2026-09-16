@@ -575,7 +575,11 @@ def test_pdfium_operations_share_one_module_lock(tmp_path: Path, monkeypatch) ->
     monkeypatch.setitem(
         sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
     )
-    barrier = threading.Barrier(2, timeout=5)
+    # The barrier is a rendezvous, not a stopwatch: both threads must be inside
+    # the lock's reach at once. The deadline only stops a real deadlock from
+    # hanging the suite, so it is generous -- a 5 s budget failed this gate when
+    # the machine was busy with a parallel `doit -n 4` and a review subprocess.
+    barrier = threading.Barrier(2, timeout=120)
     source = tmp_path / "assembly.pdf"
     package = mr.ReviewPackage("assembly", "assembly", (source,))
     workdir = tmp_path / "images"
