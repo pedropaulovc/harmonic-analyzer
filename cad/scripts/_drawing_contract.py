@@ -31,6 +31,17 @@ _TOLERANCE_SETTERS = frozenset(
     }
 )
 
+# Drawing scripts whose part builds own display precision (policy rule 2):
+# ``<part>_spec.DRAWING_PRECISION`` is applied natively on the .SLDPRT and the
+# drawing only reads it back.  A render-time ``SetPrecision3`` /
+# ``set_dimension_precision`` in one of these is a part missing its tolerance.
+# The remaining fleet migrates under #766; until then the rule is scoped here.
+PRECISION_MIGRATED_DRAWINGS = frozenset(
+    {"draw_harmonic_base.py", "draw_top_frame.py", "draw_tube_frame.py"}
+)
+_PRECISION_SETTERS = frozenset({"set_dimension_precision"})
+_DIRECT_PRECISION_METHODS = frozenset({"SetPrecision3"})
+
 _UNSIGNED_VALUE_FRAGMENT = r"(?:\d+(?:\.\d*)?|\.\d+|\x00)"
 _SIGNED_VALUE_FRAGMENT = rf"(?:[-+]\s*{_UNSIGNED_VALUE_FRAGMENT})"
 _VALUE_FRAGMENT = r"(?:[-+]?(?:\d+(?:\.\d*)?|\.\d+)|\x00)"
@@ -570,6 +581,25 @@ def _is_tolerance_expression(node: ast.expr, names: frozenset[str]) -> bool:
     return False
 
 
+def _leaves_primary_precision(node: ast.Call) -> bool:
+    """``SetPrecision3(-1, ...)``: the primary places are left alone.
+
+    The first positional argument is ``swDimensionPrecisionSettings_e`` for the
+    primary value; ``-1`` (do-not-change) is how the model-side tolerance helper
+    sets only the tolerance places.  Anything else, or a non-literal, rewrites
+    the nominal's precision on the sheet.
+    """
+    if not node.args:
+        return False
+    first = node.args[0]
+    return (
+        isinstance(first, ast.UnaryOp)
+        and isinstance(first.op, ast.USub)
+        and isinstance(first.operand, ast.Constant)
+        and first.operand.value == 1
+    )
+
+
 def drawing_specification_violations(
     source: str, *, filename: str = "<string>"
 ) -> tuple[DrawingSpecificationViolation, ...]:
@@ -743,6 +773,22 @@ def drawing_specification_violations(
                             )
 
             name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name in _PRECISION_SETTERS:
+                add(
+                    node,
+                    "drawing-owned-precision",
+                    f"{name}(...) rewrites display precision at render time",
+                )
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in _DIRECT_PRECISION_METHODS
+                and not _leaves_primary_precision(node)
+            ):
+                add(
+                    node,
+                    "drawing-owned-precision",
+                    f"direct COM {node.func.attr}(...) rewrites primary precision",
+                )
             if name in _TOLERANCE_SETTERS:
                 add(
                     node,
@@ -787,13 +833,19 @@ def drawing_specification_violations(
 def drawing_fleet_specification_violations(
     paths: Iterable[Path],
 ) -> tuple[DrawingSpecificationViolation, ...]:
-    """Scan drawing scripts in deterministic path/line order."""
+    """Scan drawing scripts in deterministic path/line order.
+
+    ``drawing-owned-precision`` applies only to ``PRECISION_MIGRATED_DRAWINGS``
+    until #766 moves the rest of the fleet's precision into its part builds.
+    """
     violations = (
         violation
         for path in sorted(paths)
         for violation in drawing_specification_violations(
             path.read_text(encoding="utf-8"), filename=str(path)
         )
+        if violation.rule != "drawing-owned-precision"
+        or path.name in PRECISION_MIGRATED_DRAWINGS
     )
     return tuple(sorted(violations))
 

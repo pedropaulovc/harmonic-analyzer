@@ -349,3 +349,28 @@ def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
     assert not violations, "drawing-owned manufacturing specifications:\n" + "\n".join(
         str(item) for item in violations
     )
+
+
+def test_detector_flags_render_time_precision_but_not_tolerance_places() -> None:
+    source = """
+from _drawing_common import set_dimension_precision
+
+set_dimension_precision(adapter, dims, {"HubDia": 1})
+display.SetPrecision3(1, -1, -1, -1)
+display.SetPrecision3(-1, -1, 3, -1)
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (4, "drawing-owned-precision"),
+        (5, "drawing-owned-precision"),
+    ]
+
+
+def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:
+    legacy = tmp_path / "draw_legacy.py"
+    migrated = tmp_path / "draw_harmonic_base.py"
+    body = "display.SetPrecision3(1, -1, -1, -1)\n"
+    legacy.write_text(body, encoding="utf-8")
+    migrated.write_text(body, encoding="utf-8")
+    violations = drawing_fleet_specification_violations([legacy, migrated])
+    assert [Path(item.filename).name for item in violations] == ["draw_harmonic_base.py"]

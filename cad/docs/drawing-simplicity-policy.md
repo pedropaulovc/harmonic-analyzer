@@ -40,11 +40,21 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    saying "material not critical". For a coated ferrous part, the Finish field
    also carries any masking and bare-surface corrosion protection; those
    instructions do not belong in Manufacturing Notes.
-2. **Decimal places carry the tolerance.** A dimension with no explicit band
-   is governed by its decimal places. A tighter band goes ON that dimension
-   as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
-   never in a note and never as a frame. Three decimals mean "hold it"; two
-   mean "routine". Do not print three decimals on a routine feature.
+2. **Decimal places carry the tolerance, and the MODEL owns both.** A
+   dimension with no explicit band is governed by its decimal places. A
+   tighter band goes ON that dimension as a native model tolerance
+   (`_drawing_marks.set_dimension_*_tolerance`), never in a note and never
+   as a frame. Three decimals mean "hold it"; two mean "routine". Do not
+   print three decimals on a routine feature. The decimal places are
+   likewise a property of the model dimension: the part build authors them
+   (`<part>_spec.DRAWING_PRECISION`, applied natively on the `.SLDPRT`) and
+   the drawing imports the dimension verbatim, reading the precision back to
+   prove it. A drawing script that rewrites precision at render time
+   (`SetPrecision3`, `set_dimension_precision`) or types a spec constant
+   into note text (`f"{DEPTH:.1f} DEEP"`) is hiding a part without its
+   tolerance: the nominal the shop reads must be the model's value, at the
+   model's precision, with the model's band. Migrated packages are gated by
+   `test_drawing_specification_purity.py`; the remaining fleet is #766.
    A matched-fit callout identifies the mating part by name and its drawing
    or part number when assigned, and states the required clearance,
    interference, or unambiguous functional acceptance. Specify diametral or

@@ -109,6 +109,48 @@ def _set_tolerance_precision(
     return digits
 
 
+@_telemetry.traced("dim.display_precision", label_param="dimension_name")
+def set_dimension_display_precision(
+    adapter: Any, feature_name: str, dimension_name: str, decimals: int
+) -> None:
+    """Author the decimal places of one model dimension ON THE PART.
+
+    Decimal places carry the tolerance (drawing-simplicity policy rule 2), so
+    they are a property of the model dimension, not of the sheet: the part
+    build applies ``<part>_spec.DRAWING_PRECISION`` here, the .SLDPRT stores
+    the per-dimension override, and the drawing that imports the dimension
+    reads the same places back instead of rewriting them at render time.
+    Only the primary places move; dual and tolerance places are left alone
+    (``_set_tolerance_precision`` owns the tolerance places).
+    """
+    if decimals < 0 or decimals > 8:
+        raise ValueError(f"display precision must be 0..8 decimals, got {decimals!r}")
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(decimals, do_not_change, do_not_change, do_not_change)
+    applied = int(display.GetPrimaryPrecision2())
+    if applied != decimals:
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: display precision did not persist: "
+            f"requested {decimals} decimals, dimension reports {applied}"
+        )
+    _telemetry.success(
+        f"precision {dimension_name}@{feature_name}: {decimals} decimals"
+    )
+
+
+def apply_drawing_precision(
+    adapter: Any, precision: dict[str, dict[str, int]]
+) -> None:
+    """Apply a spec's ``DRAWING_PRECISION`` -- ``{feature: {dimension: decimals}}``."""
+    for feature_name, dimensions in precision.items():
+        for dimension_name, decimals in dimensions.items():
+            set_dimension_display_precision(
+                adapter, feature_name, dimension_name, decimals
+            )
+
+
 def set_dimension_symmetric_tolerance(
     adapter: Any,
     feature_name: str,
