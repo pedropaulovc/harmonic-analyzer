@@ -53,6 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from tube_frame_spec import (
     COLUMN_LENGTH,
     CROSS_HOLE_DIAMETER,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
@@ -256,14 +257,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, iso)
 
-    curate_view_dimensions(adapter, end, keep=END_KEEP, view_label="end")
+    curate_view_dimensions(
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     outer_diameter = _add_outer_diameter_reference(
         adapter,
         end,
         text_xy=(END_CENTER[0] + 0.090, END_CENTER[1] + 0.020),
     )
     length_annotations = curate_view_dimensions(
-        adapter, length, keep=LENGTH_KEEP, view_label="length"
+        adapter,
+        length,
+        keep=LENGTH_KEEP,
+        view_label="length",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     dimensions = [outer_diameter, *length_annotations]
     set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
