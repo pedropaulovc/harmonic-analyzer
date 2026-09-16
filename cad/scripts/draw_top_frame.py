@@ -4,9 +4,12 @@ The SLDPRT remains authoritative.  This recipe supplies only native model
 dimensions, associative hole callouts, and the views of the casting; shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``. GEOMETRY defines the frame windows and T-rail section;
-HOLES-SOCKETS defines the socket pattern, hanger/keeper holes, cap seats, and
-cross-screw axes. HUB-SET-SCREW contains the hub location, true-axis side view,
-enlarged native underside, and a cropped section through the set-screw pocket.
+HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
+cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
+holds the hub location, true-axis side view and the cropped set-pocket
+section; UNDERSIDE holds the underside locator and its enlarged native
+detail.  A group gets its own sheet rather than a crowded corner of one:
+qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
 
 Run with SolidWorks open::
@@ -40,6 +43,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
+    offset_dimension_text,
     _select_view_entity,
     new_project_drawing,
     read_required_properties,
@@ -70,6 +74,7 @@ from build_top_frame import (
     INNER_Z,
     RING_HEIGHT,
     WEB_T,
+    WEB_IN_X,
     WEB_OUT_X,
     WEB_IN_Z,
     WEB_OUT_Z,
@@ -91,7 +96,6 @@ from build_top_frame import (
     KEEPER_TAP_Z_FRONT,
     OUTER_X,
     SET_POCKET_DEPTH,
-    SET_POCKET,
     SPOTFACE_DIA,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
@@ -118,7 +122,13 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_NAMES = ("GEOMETRY", "HOLES-SOCKETS", "HUB-SET-SCREW")
+SHEET_NAMES = (
+    "GEOMETRY",
+    "HOLES-SOCKETS",
+    "CROSS-TAPS",
+    "HUB-SET-SCREW",
+    "UNDERSIDE",
+)
 SHEET_SCALE = (1.0, 3.0)
 GEOMETRY_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
 DETAIL_VIEW_SCALE = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -140,46 +150,71 @@ DETAIL_PLAN_HALF_D = PLAN_HALF_Z * DETAIL_VIEW_SCALE / 1000.0
 
 # Sheet 1: overall envelope and non-hole geometry.  Top/front remain
 # horizontally projected; the isometric supplements those orthographic views.
-GEOMETRY_TOP_CENTER = (0.145, 0.175)
+GEOMETRY_TOP_CENTER = (0.145, 0.1685)
 GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 GEOMETRY_ISO_CENTER = (0.072, 0.052)
 ISO_SCALE = (1, 5)
 
-# Sheet 2: the aligned hole pattern/front group and corner section.
+# Sheet 2: the hole/station plan.
 DETAIL_TOP_CENTER = (0.175, 0.190)
-DETAIL_FRONT_CENTER = (0.175, 0.095)
-DETAIL_SECTION_CENTER = (0.330, 0.130)
 
-# Sheet 3: hub location, true-axis side view, and enlarged native underside.
+# Sheet 3: the cross-tap elevation with section A-A standing to its right,
+# the direction the section arrows look.
+DETAIL_FRONT_CENTER = (0.110, 0.200)
+DETAIL_SECTION_CENTER = (0.300, 0.200)
+DETAIL_SECTION_CAPTION_XY = (0.300, 0.178)
+BOSS_ABOVE_RAIL_LINE_XY = (0.342, 0.200)
+BOSS_ABOVE_RAIL_TEXT_XY = (0.366, 0.225)
+
+# Sheet 4: hub location, true-axis side view, cropped set-pocket section.
 HUB_TOP_CENTER = (0.145, 0.200)
 HUB_LEFT_CENTER = (0.145, 0.095)
 HUB_LEFT_SCALE = (1, 2)
-HUB_BOTTOM_CENTER = (0.330, 0.220)
-HUB_BOTTOM_SCALE = (1, 5)
-HUB_DETAIL_CENTER = (0.325, 0.140)
-HUB_DETAIL_SCALE = (1, 1)
-HUB_SECTION_CENTER = (0.105, 0.050)
+HUB_SECTION_CENTER = (0.330, 0.210)
 HUB_SECTION_SCALE = (1, 1)
+HUB_SECTION_CAPTION_XY = (0.330, 0.178)
+POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
+POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
 
-GEOMETRY_TOP_NOTE_XY = (0.015, 0.245)
-GEOMETRY_FRONT_NOTE_XY = (0.025, 0.120)
+# Sheet 5: the underside locator and its enlarged native detail.
+HUB_BOTTOM_CENTER = (0.110, 0.200)
+HUB_BOTTOM_SCALE = (1, 5)
+HUB_DETAIL_CENTER = (0.300, 0.160)
+HUB_DETAIL_SCALE = (1, 1)
+HUB_DETAIL_CAPTION_XY = (0.258, 0.113)
+
+# Sheet 1, Section E-E: the side rails and the full-height central web, cut
+# clear of every hole station (keeper taps at z -70.9 / 77.1, hangers at
+# -84.0 / 90.1, corner bosses at z +/-112), so the section carries rail and
+# web stock only.
+SIDE_SECTION_Z = -56.0
+SIDE_SECTION_CENTER = (0.345, 0.106)
+SIDE_SECTION_SCALE = (1, 4)
+SIDE_SECTION_CAPTION_XY = (0.345, 0.0915)
+SIDE_SECTION_NOTE_XY = (0.290, 0.133)
+SIDE_WEB_TEXT_XY = (0.335, 0.1215)
+
+# Only views drawn at a scale the title block does not state carry a label,
+# and every label sits under its own view - centred where the dimension
+# lanes below the view leave room, offset within that band where they do not.
 GEOMETRY_ISO_NOTE_XY = (0.042, 0.018)
-DETAIL_TOP_NOTE_XY = (0.030, 0.120)
-DETAIL_FRONT_NOTE_XY = (0.040, 0.065)
+DETAIL_TOP_NOTE_XY = (0.127, 0.1235)
+POCKET_RISE_LINE_XY = (0.070, 0.0785)
+POCKET_RISE_TEXT_XY = (0.0422, 0.0785)
 
 # The first sheet contains only the frame/window and T-rail definition.
 GEOMETRY_TOP_KEEP = {
     "Width": (
         GEOMETRY_TOP_CENTER[0],
-        0.250,
+        0.2435,
     ),
     "Depth": (0.046, GEOMETRY_TOP_CENTER[1]),
     "WinWidth": (
         GEOMETRY_TOP_CENTER[0],
-        0.237,
+        0.2305,
     ),
     "WinDepth": (0.059, GEOMETRY_TOP_CENTER[1] - 0.012),
-    "GussetRunE": (GEOMETRY_TOP_CENTER[0], 0.227),
+    "GussetRunE": (GEOMETRY_TOP_CENTER[0], 0.2205),
 }
 GEOMETRY_FRONT_KEEP: dict[str, tuple[float, float]] = {}
 GEOMETRY_CALLOUTS = {
@@ -190,7 +225,7 @@ GEOMETRY_CALLOUTS = {
 
 # Imported station dimensions share the drawn model-origin axes.
 DETAIL_TOP_KEEP = {
-    "StudRearZ": (0.065, DETAIL_TOP_CENTER[1] - 0.030),
+    "StudRearZ": (0.065, DETAIL_TOP_CENTER[1] - 0.015),
     "KeeperRearZ": (0.300, DETAIL_TOP_CENTER[1] - 0.028),
     "C0Dia": (0.045, 0.254),
     "B0Dia": (0.070, 0.244),
@@ -201,23 +236,16 @@ DETAIL_TOP_KEEP = {
 }
 HUB_TOP_KEEP: dict[str, tuple[float, float]] = {}
 HUB_LEFT_KEEP = {
-    "PocketRise": (0.045, HUB_LEFT_CENTER[1]),
+    "PocketRise": POCKET_RISE_LINE_XY,
 }
-DETAIL_FRONT_KEEP = {"S1Dia": (0.200, 0.078)}
+DETAIL_FRONT_KEEP = {"S1Dia": (0.060, 0.235)}
 DETAIL_SECTION_KEEP = {
-    "CapRecessDia": (
-        DETAIL_SECTION_CENTER[0] - 0.040,
-        DETAIL_SECTION_CENTER[1] + 0.020,
-    ),
-    "CapRecessDepth": (
-        0.374,
-        0.167,
-    ),
+    "CapRecessDia": (0.235, 0.160),
+    "CapRecessDepth": (0.376, 0.180),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
     "B0Dia": "4X SOCKET / REF\nMATCH-FIT ASSIGNED TUBE",
-    "S1Dia": "4X SPOTFACE",
     "StudFrontX": "WEB / HANGER X",
     "StudFrontZ": "FRONT HANGER Z",
     "StudRearZ": "REAR HANGER Z",
@@ -225,9 +253,10 @@ DETAIL_CALLOUTS = {
     "KeeperFrontZ": "FRONT KEEPER Z",
     "KeeperRearZ": "REAR KEEPER Z",
 }
+FRONT_CALLOUTS = {"S1Dia": "4X SPOTFACE"}
 SECTION_CALLOUTS = {
     "CapRecessDia": "4X CAP RECESS",
-    "CapRecessDepth": "4X CAP SEAT",
+    "CapRecessDepth": "4X\nCAP SEAT",
 }
 
 
@@ -312,6 +341,54 @@ def _exact_linear_entities(
     return selected
 
 
+def _cut_face_edge(
+    view: Any,
+    *,
+    fixed: dict[int, float],
+    near: tuple[int, float, float] | None = None,
+    label: str,
+) -> tuple[Any, tuple[float, float, float]]:
+    """The longest visible cut-face line pinned to ``fixed`` model mm axes.
+
+    ``SetDisplayOnlySurfaceCut`` leaves a section showing its cut faces only,
+    so every visible line carries the cut plane's own coordinate.  Pinning
+    that axis plus one face level -- a rail top, a boss top, a pocket floor --
+    names the face itself instead of a hand-written station a geometry change
+    would silently invalidate.  ``near`` is ``(axis, value, window)`` and
+    picks between parallel faces (the front boss rather than the rear); the
+    longest line wins so a chamfer tangent can never stand in for the face.
+    Returns the edge and its midpoint in model mm, ready for ``entities=``.
+    """
+    candidates = []
+    for raw_edge in visible_view_entities(view, 1, label=label):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None or not _early_bound(curve, "ICurve").IsLine():
+            continue
+        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+        if any(vertex is None for vertex in vertices):
+            continue
+        start, end = [
+            tuple(float(value)*1000.0 for value in _early_bound(vertex, "IVertex").GetPoint())
+            for vertex in vertices
+        ]
+        if any(
+            max(abs(start[axis]-value), abs(end[axis]-value)) > 1e-6
+            for axis, value in fixed.items()
+        ):
+            continue
+        midpoint = tuple((a+b)/2.0 for a, b in zip(start, end))
+        if near is not None and abs(midpoint[near[0]]-near[1]) > near[2]:
+            continue
+        candidates.append((math.dist(start, end), edge, midpoint))
+    if not candidates:
+        raise RuntimeError(
+            f"{label}: no visible cut-face line at {fixed} (near={near})"
+        )
+    _span, edge, midpoint = max(candidates, key=lambda item: item[0])
+    return edge, midpoint
+
+
 def _checked_dimension(
     adapter: Any,
     view: Any,
@@ -331,6 +408,7 @@ def _checked_dimension(
     exact_linear: bool = False,
     exact_vertices: bool = False,
     entities: tuple[Any, Any] | None = None,
+    offset_text: tuple[float, float] | None = None,
 ) -> Any:
     selected = list(entities) if entities is not None else None
     if exact_vertices:
@@ -385,6 +463,16 @@ def _checked_dimension(
         set_dimension_callouts(adapter, [annotation], {dimension_name(adapter, annotation): suffix})
     if reference:
         set_reference_dimension(adapter, annotation, label=label)
+    if offset_text is not None:
+        # A short run (4.5 mm at 1:4 is 1.1 mm of paper) cannot hold its own
+        # text between the arrows, and text parked past them leaves
+        # SolidWorks drawing the dimension line straight through the value.
+        # OffsetText buys a leader, so ``offset_text`` parks the text beside
+        # the dimension line at ``text_xy`` -- never above or below it, which
+        # would only move the same line into the qualifier.
+        offset_dimension_text(
+            adapter, [annotation], {dimension_name(adapter, annotation): offset_text}
+        )
     return native
 
 
@@ -435,7 +523,11 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
             adapter, parent_view, (x/1000.0, 0.0, GOOSENECK_Z/1000.0),
             label="set-pocket section cutting line",
         )
-        for x in (-INNER_X+5.0, -OUTER_X-5.0)
+        # A cutting line that stops inside the view makes a partial
+        # section: SolidWorks then prints the line, its arrows and both D
+        # labels in its dangling colour (olive) and hatches no cut face.
+        # The crop below, not the line, is what keeps the view to the hub.
+        for x in (PLAN_HALF_X+6.0, -PLAN_HALF_X-6.0)
     ]
     view = create_section_view(
         adapter, parent_view, line_start=line[0], line_end=line[1],
@@ -497,16 +589,25 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
             ((-OUTER_X-2.0, 0.0, GOOSENECK_Z), (-INNER_X+2.0, 0.0, GOOSENECK_Z)),
         ),
     )
+    # The cut plane runs through the pocket centre, so the outer rail face and
+    # the pocket floor both appear in it as lines the pocket walls interrupt --
+    # picked as faces, since their Y extents depend on the cast rim breaks.
+    pocket_face_edge, pocket_face_point = _cut_face_edge(
+        view, fixed={0: -OUTER_X, 2: GOOSENECK_Z},
+        label="set-pocket outer rail face",
+    )
+    pocket_floor_edge, pocket_floor_point = _cut_face_edge(
+        view, fixed={0: -OUTER_X+SET_POCKET_DEPTH, 2: GOOSENECK_Z},
+        label="set-pocket floor",
+    )
     _checked_dimension(
         adapter, view,
-        # Nothing exists at the cut plane itself, so both picks sit on the
-        # pocket's far walls: the rib band's far edge on the outer face and the
-        # pocket floor's far wall, SET_POCKET_DEPTH apart along X.
-        p0=(-OUTER_X, 0.0, GOOSENECK_Z+HUB_RIB_W/2),
-        p1=(-OUTER_X+SET_POCKET_DEPTH, 0.0, GOOSENECK_Z+SET_POCKET/2),
-        text_xy=(0.062, 0.055), label="set-pocket depth from outer rail face",
-        expected_mm=SET_POCKET_DEPTH, orientation="horizontal", exact_linear=True,
+        p0=pocket_face_point, p1=pocket_floor_point,
+        text_xy=POCKET_DEPTH_TEXT_XY, label="set-pocket depth from outer rail face",
+        expected_mm=SET_POCKET_DEPTH, orientation="horizontal",
+        entities=(pocket_face_edge, pocket_floor_edge),
         suffix="POCKET DEPTH\nFROM OUTER FACE",
+        offset_text=POCKET_DEPTH_OFFSET_XY,
     )
     return view
 
@@ -631,7 +732,7 @@ def _gusset_ramp_angle(adapter: Any, view: Any) -> None:
     if abs(float(dimension.SystemValue)-expected) > 1e-7:
         raise RuntimeError(f"gusset ramp angle measured {dimension.SystemValue} radians, expected {expected}")
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if not annotation.SetPosition2(0.175, 0.070, 0.0):
+    if not annotation.SetPosition2(0.175, 0.0605, 0.0):
         raise RuntimeError("failed to position native gusset ramp angle")
     set_dimension_precision(adapter, [annotation], {dimension_name(adapter, annotation): 1})
     set_dimension_callouts(adapter, [annotation], {dimension_name(adapter, annotation): "2X GUSSET\nTO RAIL UNDERSIDE"})
@@ -709,8 +810,8 @@ async def build(adapter: Any) -> dict[str, str]:
         *GEOMETRY_ISO_CENTER,
         scale=ISO_SCALE,
     )
-    for view in (geometry_top, geometry_front):
-        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_visible(adapter, geometry_top)
+    set_hidden_lines_removed(adapter, geometry_front)
     set_hidden_lines_removed(adapter, geometry_iso)
     geometry_top_dimensions = curate_view_dimensions(
         adapter,
@@ -738,7 +839,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, geometry_top,
         p0=(-PLAN_HALF_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(PLAN_HALF_X, HALF_H+BOSS_ABOVE, FRONT_COLUMN_Z),
-        text_xy=(GEOMETRY_TOP_CENTER[0], 0.263), label="overall casting width",
+        text_xy=(GEOMETRY_TOP_CENTER[0], 0.2565), label="overall casting width",
         expected_mm=2*PLAN_HALF_X, orientation="horizontal", maximum=True,
         reference=True, suffix="OVERALL",
     )
@@ -835,24 +936,35 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(height_edges[0][0], height_edges[1][0]),
         reference=True, suffix="RAIL HEIGHT",
     )
+    # The 12.7 web width and the R3.0 web root attach to edges this section
+    # only carries as hidden lines, so B-B keeps them (ASME Y14.3: hidden
+    # lines where the features in that view are communicated by them).
     set_hidden_lines_visible(adapter, rail_section)
-    for p0, p1, expected, xy, orientation, label, qualifier in (
+    # Each text parks clear of every witness line: the two widths sit beside
+    # their extension lines and the 36.5 rail height between its arrows (12.2
+    # mm of paper holds two lines of text).  The 8.0 flange run is 2.7 mm of
+    # paper, so it needs a leader -- and its own dimension line stands 18 mm
+    # left of the 36.5 line so neither one crosses the other's text.
+    for p0, p1, expected, xy, orientation, label, qualifier, offset in (
         ((rail_cut_x, 0.0, WEB_IN_Z), (rail_cut_x, 0.0, WEB_OUT_Z),
-         WEB_T, (0.355, 0.180), "horizontal", "rail web thickness", "WEB WIDTH"),
+         WEB_T, (0.380, 0.178), "horizontal", "rail web thickness", "WEB WIDTH", None),
         ((rail_cut_x, (FLANGE_BOT_Y+HALF_H-EDGE_CHAMFER)/2, INNER_Z),
          (rail_cut_x, (FLANGE_BOT_Y+HALF_H-EDGE_CHAMFER)/2, OUTER_Z),
-         RAIL_W_FR, (0.355, 0.230), "horizontal", "front rear flange width", "FLANGE WIDTH"),
+         RAIL_W_FR, (0.328, 0.230), "horizontal", "front rear flange width",
+         "FLANGE WIDTH", None),
         ((rail_cut_x, HALF_H, (INNER_Z+WEB_IN_Z)/2),
          (rail_cut_x, FLANGE_BOT_Y, (INNER_Z+WEB_IN_Z)/2),
-         FLANGE, (0.371, 0.215), "vertical", "top flange thickness", "FLANGE THICKNESS"),
+         FLANGE, (0.372, 0.2117), "vertical", "top flange thickness", "TOP FLANGE",
+         (0.389, 0.2245)),
         ((rail_cut_x, HALF_H, abs(FRONT_COLUMN_Z)),
          (rail_cut_x, -HALF_H, abs(FRONT_COLUMN_Z)),
-         RING_HEIGHT, (0.390, 0.195), "vertical", "rail total height", "RAIL HEIGHT"),
+         RING_HEIGHT, (0.390, 0.207), "vertical", "rail total height", "RAIL HEIGHT",
+         None),
     ):
         _checked_dimension(
             adapter, rail_section, p0=p0, p1=p1, text_xy=xy,
             label=label, expected_mm=expected, orientation=orientation, exact_linear=True,
-            suffix=qualifier,
+            suffix=qualifier, offset_text=offset,
         )
     _checked_dimension(
         adapter, rail_section,
@@ -894,22 +1006,49 @@ async def build(adapter: Any) -> dict[str, str]:
         0.270, 0.145,
     ) is None:
         raise RuntimeError("failed to identify the cut rails and centred webs")
-    geometry_top_note = add_note(
-        adapter, "PLAN VIEW SCALE 1:3", *GEOMETRY_TOP_NOTE_XY
+    # B-B cuts the front/rear rails only, so the 34.2 side rails and the
+    # 22.0 central web had no web thickness, root radius or rim chamfer
+    # anywhere on the print, yet the keeper taps and the hanger holes are cut
+    # into exactly that stock.  E-E is a second native section of the model.
+    side_cut = [
+        model_point_in_view(
+            adapter, geometry_top, (x/1000.0, 0.0, SIDE_SECTION_Z/1000.0),
+            label="side rail section station",
+        )
+        for x in (PLAN_HALF_X+6.0, -PLAN_HALF_X-6.0)
+    ]
+    side_section = create_section_view(
+        adapter, geometry_top,
+        line_start=side_cut[0], line_end=side_cut[1],
+        view_xy=SIDE_SECTION_CENTER, section_label="E", scale=SIDE_SECTION_SCALE,
+        label="side rail manufacturing section",
     )
-    geometry_front_note = add_note(
-        adapter, "FRONT VIEW SCALE 1:3", *GEOMETRY_FRONT_NOTE_XY
+    _orient_cut_section(adapter, side_section, (1.0, 0.0, 0.0))
+    # E-E dimensions its side rail web off the same kind of hidden edge.
+    set_hidden_lines_visible(adapter, side_section)
+    _checked_dimension(
+        adapter, side_section,
+        p0=(-WEB_OUT_X, 0.0, SIDE_SECTION_Z),
+        p1=(-WEB_IN_X, 0.0, SIDE_SECTION_Z),
+        text_xy=SIDE_WEB_TEXT_XY, label="side rail web thickness",
+        expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
+        suffix="2X SIDE RAIL WEB",
     )
+    _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
+    if add_note(
+        adapter, "E-E: SIDE RAILS AND FULL-HEIGHT CENTRAL WEB",
+        *SIDE_SECTION_NOTE_XY,
+    ) is None:
+        raise RuntimeError("failed to identify the cut side rails and central web")
+    # The plan and front views are projected at the title block's own scale,
+    # so a label restating it would be the one thing on the sheet saying
+    # nothing; the isometric is drawn at 1:5 and says so, under itself.
     geometry_iso_note = add_note(
         adapter,
         f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}",
         *GEOMETRY_ISO_NOTE_XY,
     )
-    if (
-        geometry_top_note is None
-        or geometry_front_note is None
-        or geometry_iso_note is None
-    ):
+    if geometry_iso_note is None:
         raise RuntimeError("failed to label top-frame geometry sheet")
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
@@ -921,6 +1060,115 @@ async def build(adapter: Any) -> dict[str, str]:
         *DETAIL_TOP_CENTER,
         scale=SHEET_SCALE,
     )
+    set_hidden_lines_removed(adapter, detail_top)
+    detail_top_dimensions = curate_view_dimensions(
+        adapter,
+        detail_top,
+        keep=DETAIL_TOP_KEEP,
+        view_label="holes/sockets top",
+    )
+    detail_top_callouts = {name: "" for name in DETAIL_TOP_KEEP}
+    detail_top_callouts.update(DETAIL_CALLOUTS)
+    set_dimension_callouts(adapter, detail_top_dimensions, detail_top_callouts)
+    set_dimension_precision(
+        adapter, detail_top_dimensions,
+        {
+            "C0Dia": 1,
+            "B0Dia": 1,
+            # Hanger and keeper stations are drilled and tapped clearance
+            # features: .X (+/-0.8) is the band they need, and the second
+            # place claimed a tolerance nothing on the part requires.
+            "StudFrontX": 1,
+            "StudFrontZ": 1,
+            "StudRearZ": 1,
+            "KeeperFrontX": 1,
+            "KeeperFrontZ": 1,
+            "KeeperRearZ": 1,
+        },
+    )
+    socket_annotations = [
+        annotation for annotation in detail_top_dimensions
+        if dimension_name(adapter, annotation) == "B0Dia"
+    ]
+    if len(socket_annotations) != 1:
+        raise RuntimeError("expected one native socket nominal for reference display")
+    socket_display = set_reference_dimension(
+        adapter, socket_annotations[0], label="matched socket nominal", diameter=True,
+    )
+    socket_dimension = _early_bound(socket_display.GetDimension2(0), "IDimension")
+    if int(socket_dimension.GetToleranceType()) != 0:  # swTolNONE
+        raise RuntimeError("socket source still carries a fixed fit tolerance; rebuild the part")
+    if not auto_center_marks(adapter, detail_top, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to top-frame hole pattern")
+    _add_view_centerlines(adapter, detail_top, FRAME_ORIGIN_AXES)
+    for label, xy in (
+        ("X", (DETAIL_TOP_CENTER[0]+DETAIL_PLAN_HALF_W+0.005, DETAIL_TOP_CENTER[1]+0.002)),
+        ("Z", (DETAIL_TOP_CENTER[0]+0.003, DETAIL_TOP_CENTER[1]-DETAIL_PLAN_HALF_D-0.006)),
+    ):
+        if add_note(adapter, label, *xy) is None:
+            raise RuntimeError("failed to label frame-centre coordinate axes")
+    _checked_dimension(
+        adapter, detail_top,
+        p0=(-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
+        p1=(COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
+        text_xy=(DETAIL_TOP_CENTER[0], 0.132), label="socket horizontal pitch",
+        expected_mm=2*COLUMN_X, orientation="horizontal", center=True, precision=2,
+    )
+    _checked_dimension(
+        adapter, detail_top,
+        p0=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
+        p1=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
+        text_xy=(0.088, 0.2155), label="socket vertical pitch",
+        expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
+        center=True, precision=2,
+    )
+    stud_edge = model_point_in_view(
+        adapter,
+        detail_top,
+        (
+            ((BAR_X0 + BAR_X1) / 2.0) / 1000.0,
+            HALF_H / 1000.0,
+            (STUD_Z_FRONT + STUD_HOLE_DIA / 2.0) / 1000.0,
+        ),
+        label="top-frame hanger-stud hole edge",
+    )
+    add_native_hole_callout(
+        adapter,
+        detail_top,
+        edge_xy=stud_edge,
+        callout_xy=(0.190, 0.258),
+        label="2X hanger-stud clearance holes",
+        process="HANGER DRILL",
+    )
+    keeper_edge = model_point_in_view(
+        adapter,
+        detail_top,
+        (
+            KEEPER_TAP_X / 1000.0,
+            HALF_H / 1000.0,
+            (KEEPER_TAP_Z_FRONT + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0)
+            / 1000.0,
+        ),
+        label="top-frame fulcrum-keeper tap edge",
+    )
+    add_native_hole_callout(
+        adapter,
+        detail_top,
+        edge_xy=keeper_edge,
+        callout_xy=(0.345, 0.225),
+        label="2X fulcrum-keeper blind taps",
+        process="KEEPER TAP",
+    )
+    detail_top_note = add_note(
+        adapter,
+        "HOLE LOCATIONS FROM FRAME CENTRE (X,Z)",
+        *DETAIL_TOP_NOTE_XY,
+    )
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.040, 0.045, char_height=0.0035,
+    )
+    if not ddoc.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("failed to activate top-frame cross-tap sheet")
     detail_front = place_view(
         adapter,
         str(SOURCE),
@@ -944,20 +1192,13 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(1, 4),
         label="top-frame corner section",
     )
-    for view in (detail_top, detail_front):
+    for view in (detail_front, detail_section):
         set_hidden_lines_visible(adapter, view)
-    set_hidden_lines_visible(adapter, detail_section)
     _add_view_centerlines(
         adapter, detail_section,
         (((COLUMN_X, 0.0, -PLAN_HALF_Z), (COLUMN_X, 0.0, PLAN_HALF_Z)),),
     )
-
-    detail_top_dimensions = curate_view_dimensions(
-        adapter,
-        detail_top,
-        keep=DETAIL_TOP_KEEP,
-        view_label="holes/sockets top",
-    )
+    _position_view_caption(adapter, detail_section, DETAIL_SECTION_CAPTION_XY)
     detail_front_dimensions = curate_view_dimensions(
         adapter,
         detail_front,
@@ -970,38 +1211,14 @@ async def build(adapter: Any) -> dict[str, str]:
         keep=DETAIL_SECTION_KEEP,
         view_label="holes/sockets section A-A",
     )
-    detail_annotations = [
-        *detail_top_dimensions,
-        *detail_front_dimensions,
-        *detail_section_dimensions,
-    ]
-    detail_callouts = {
-        name: ""
-        for name in (
-            *DETAIL_TOP_KEEP,
-            *DETAIL_FRONT_KEEP,
-            *DETAIL_SECTION_KEEP,
-        )
+    section_annotations = [*detail_front_dimensions, *detail_section_dimensions]
+    section_callouts = {
+        name: "" for name in (*DETAIL_FRONT_KEEP, *DETAIL_SECTION_KEEP)
     }
-    detail_callouts.update(DETAIL_CALLOUTS)
-    detail_callouts.update(SECTION_CALLOUTS)
-    set_dimension_callouts(adapter, detail_annotations, detail_callouts)
-    set_dimension_precision(
-        adapter, detail_annotations,
-        {"C0Dia": 1, "B0Dia": 1, "S1Dia": 1},
-    )
-    socket_annotations = [
-        annotation for annotation in detail_top_dimensions
-        if dimension_name(adapter, annotation) == "B0Dia"
-    ]
-    if len(socket_annotations) != 1:
-        raise RuntimeError("expected one native socket nominal for reference display")
-    socket_display = set_reference_dimension(
-        adapter, socket_annotations[0], label="matched socket nominal", diameter=True,
-    )
-    socket_dimension = _early_bound(socket_display.GetDimension2(0), "IDimension")
-    if int(socket_dimension.GetToleranceType()) != 0:  # swTolNONE
-        raise RuntimeError("socket source still carries a fixed fit tolerance; rebuild the part")
+    section_callouts.update(FRONT_CALLOUTS)
+    section_callouts.update(SECTION_CALLOUTS)
+    set_dimension_callouts(adapter, section_annotations, section_callouts)
+    set_dimension_precision(adapter, section_annotations, {"S1Dia": 1})
     spotface_annotations = [
         annotation for annotation in detail_front_dimensions
         if dimension_name(adapter, annotation) == "S1Dia"
@@ -1022,44 +1239,39 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_section,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, boss_pick_z),
         p1=(COLUMN_X, -HALF_H-BOSS_BELOW, boss_pick_z),
-        text_xy=(0.372, 0.117), label="socket boss overall height",
+        text_xy=(0.352, 0.200), label="socket boss overall height",
         expected_mm=RING_HEIGHT+BOSS_ABOVE+BOSS_BELOW,
         orientation="vertical", exact_linear=True, suffix="4X BOSS\nOVERALL HEIGHT",
+        offset_text=(0.376, 0.140),
+    )
+    # The 47.3 boss stack and the 36.5 rail band never said where the extra
+    # 10.8 sits.  One native rail-top-to-boss-top dimension splits it: 4.5
+    # above, and the 6.3 below then follows from the overall height.
+    boss_top_edge_section, boss_top_point = _cut_face_edge(
+        detail_section, fixed={0: COLUMN_X, 1: HALF_H+BOSS_ABOVE},
+        near=(2, REAR_COLUMN_Z, BOSS_DIA), label="section boss top face",
+    )
+    rail_top_edge_section, rail_top_point = _cut_face_edge(
+        detail_section, fixed={0: COLUMN_X, 1: HALF_H},
+        near=(2, 0.0, BOSS_DIA), label="section rail top face",
+    )
+    _checked_dimension(
+        adapter, detail_section,
+        p0=boss_top_point, p1=rail_top_point,
+        text_xy=BOSS_ABOVE_RAIL_LINE_XY, label="boss top above rail top",
+        expected_mm=BOSS_ABOVE, orientation="vertical",
+        entities=(boss_top_edge_section, rail_top_edge_section),
+        suffix="4X BOSS TOP\nABOVE RAIL TOP", offset_text=BOSS_ABOVE_RAIL_TEXT_XY,
     )
     _checked_dimension(
         adapter, detail_section,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z+CAP_RECESS_DIAMETER/2+BORE_CHAMFER),
         p1=(COLUMN_X, HALF_H+BOSS_ABOVE-BORE_CHAMFER, REAR_COLUMN_Z+CAP_RECESS_DIAMETER/2),
-        text_xy=(0.340, 0.190), label="top bore mouth chamfer",
+        text_xy=(0.300, 0.230), label="top bore mouth chamfer",
         expected_mm=BORE_CHAMFER, orientation="horizontal",
         entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
         suffix="X 45 DEG\nCAP / GOOSENECK TOP",
     )
-    if not auto_center_marks(adapter, detail_top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to top-frame hole pattern")
-    _add_view_centerlines(adapter, detail_top, FRAME_ORIGIN_AXES)
-    for label, xy in (
-        ("X", (DETAIL_TOP_CENTER[0]+DETAIL_PLAN_HALF_W+0.005, DETAIL_TOP_CENTER[1]+0.002)),
-        ("Z", (DETAIL_TOP_CENTER[0]+0.003, DETAIL_TOP_CENTER[1]-DETAIL_PLAN_HALF_D-0.006)),
-    ):
-        if add_note(adapter, label, *xy) is None:
-            raise RuntimeError("failed to label frame-centre coordinate axes")
-    _checked_dimension(
-        adapter, detail_top,
-        p0=(-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
-        p1=(COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
-        text_xy=(DETAIL_TOP_CENTER[0], 0.132), label="socket horizontal pitch",
-        expected_mm=2*COLUMN_X, orientation="horizontal", center=True, precision=2,
-    )
-    _checked_dimension(
-        adapter, detail_top,
-        p0=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
-        p1=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
-        text_xy=(0.080, DETAIL_TOP_CENTER[1]), label="socket vertical pitch",
-        expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
-        center=True, precision=2,
-    )
-
     front_tap_candidates: list[tuple[float, float, float, Any]] = []
     upper_boss_edge = None
     for raw_edge in visible_view_entities(
@@ -1142,7 +1354,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _checked_dimension(
         adapter, detail_section,
         p0=opposed_floors[0][1], p1=opposed_floors[1][1],
-        text_xy=(0.330, 0.089), label="opposed spotface floor separation",
+        text_xy=(0.300, 0.140), label="opposed spotface floor separation",
         expected_mm=2*TOP_SCREW_SEAT_Z, orientation="horizontal", precision=1,
         suffix="2 PAIRS SPOTFACES\nCENTRED ON FRAME MIDPLANE",
         entities=(opposed_floors[0][0], opposed_floors[1][0]),
@@ -1151,10 +1363,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_front,
         edge=front_tap_edge,
-        callout_xy=(
-            DETAIL_FRONT_CENTER[0] + DETAIL_PLAN_HALF_W + 0.012,
-            DETAIL_FRONT_CENTER[1] + 0.020,
-        ),
+        callout_xy=(0.075, 0.170),
         label="front/rear column-retention bottoming taps",
         process="DEPTHS FROM SPOTFACE\nBOTTOMING TAP",
     )
@@ -1162,57 +1371,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_front,
         p0=(COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z),
         p1=(COLUMN_X+SIDE_TAP_DRILL_DIA/2, 0.0, TOP_SCREW_SEAT_Z),
-        text_xy=(0.270, 0.082), label="cross screw axis from boss top",
+        text_xy=(0.192, 0.200), label="cross screw axis from boss top",
         expected_mm=HALF_H+BOSS_ABOVE, orientation="vertical", center=True, precision=2,
-        suffix="4X: 2 FRONT + 2 REAR\nALONG Z AT SOCKET X CENTRES",
-        entities=(upper_boss_edge, front_tap_edge),
-    )
-    stud_edge = model_point_in_view(
-        adapter,
-        detail_top,
-        (
-            ((BAR_X0 + BAR_X1) / 2.0) / 1000.0,
-            HALF_H / 1000.0,
-            (STUD_Z_FRONT + STUD_HOLE_DIA / 2.0) / 1000.0,
-        ),
-        label="top-frame hanger-stud hole edge",
-    )
-    add_native_hole_callout(
-        adapter,
-        detail_top,
-        edge_xy=stud_edge,
-        callout_xy=(0.190, 0.258),
-        label="2X hanger-stud clearance holes",
-        process="HANGER DRILL",
-    )
-    keeper_edge = model_point_in_view(
-        adapter,
-        detail_top,
-        (
-            KEEPER_TAP_X / 1000.0,
-            HALF_H / 1000.0,
-            (KEEPER_TAP_Z_FRONT + TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0)
-            / 1000.0,
-        ),
-        label="top-frame fulcrum-keeper tap edge",
-    )
-    add_native_hole_callout(
-        adapter,
-        detail_top,
-        edge_xy=keeper_edge,
-        callout_xy=(0.345, 0.225),
-        label="2X fulcrum-keeper blind taps",
-        process="KEEPER TAP",
-    )
-    detail_top_note = add_note(
-        adapter,
-        "HOLE LOCATIONS FROM FRAME CENTRE (X,Z) / SCALE 1:3",
-        *DETAIL_TOP_NOTE_XY,
-    )
-    detail_front_note = add_note(
-        adapter,
-        "FRONT CROSS-TAP VIEW SCALE 1:3",
-        *DETAIL_FRONT_NOTE_XY,
+        suffix="TAP AXIS BELOW BOSS TOP\n2X SHOWN, 2X OPPOSITE END",
+        entities=(upper_boss_edge, front_tap_edge), offset_text=(0.228, 0.200),
     )
     cap_fit_note = add_note(
         adapter,
@@ -1222,10 +1384,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if add_note(adapter, "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-132", 0.040, 0.025) is None:
         raise RuntimeError("failed to identify section cross-screw relation")
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.040, 0.045, char_height=0.0035,
-    )
-    if not ddoc.ActivateSheet(SHEET_NAMES[2]):
+    if not ddoc.ActivateSheet(SHEET_NAMES[3]):
         raise RuntimeError("failed to activate top-frame hub sheet")
     hub_top = place_view(
         adapter, str(SOURCE), "*Top", *HUB_TOP_CENTER, scale=SHEET_SCALE,
@@ -1233,8 +1392,8 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_left = place_view(
         adapter, str(SOURCE), "*Left", *HUB_LEFT_CENTER, scale=HUB_LEFT_SCALE,
     )
-    for view in (hub_top, detail_left):
-        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, hub_top)
+    set_hidden_lines_visible(adapter, detail_left)
     hub_top_dimensions = curate_view_dimensions(
         adapter, hub_top, keep=HUB_TOP_KEEP, view_label="hub location",
     )
@@ -1252,13 +1411,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(
         adapter, hub_left_dimensions, {name: 1 for name in HUB_LEFT_KEEP},
     )
+    offset_dimension_text(
+        adapter, hub_left_dimensions, {"PocketRise": POCKET_RISE_TEXT_XY},
+    )
     _checked_dimension(
         adapter, detail_left,
         p0=(-OUTER_X, 0.0, GOOSENECK_Z-HUB_RIB_W/2),
         p1=(-OUTER_X, 0.0, GOOSENECK_Z+HUB_RIB_W/2),
-        text_xy=(HUB_LEFT_CENTER[0], 0.141), label="full-height hub rail pad",
+        text_xy=(HUB_LEFT_CENTER[0], 0.130), label="full-height hub rail pad",
         expected_mm=HUB_RIB_W, orientation="horizontal", exact_linear=True,
         suffix="FULL-HEIGHT PAD\nCENTRED ON BORE",
+        offset_text=(0.257, 0.140),
     )
     _add_view_centerlines(
         adapter, hub_top,
@@ -1267,46 +1430,8 @@ async def build(adapter: Any) -> dict[str, str]:
             ((-PLAN_HALF_X, 0.0, FRONT_COLUMN_Z), (PLAN_HALF_X, 0.0, FRONT_COLUMN_Z)),
         ),
     )
-    if add_note(adapter, "HUB LOCATION SCALE 1:3", 0.030, 0.260) is None:
+    if add_note(adapter, "HUB LOCATION SCALE 1:3", 0.107, 0.1435) is None:
         raise RuntimeError("failed to label hub location view")
-    hub_bottom_parent = place_view(
-        adapter, str(SOURCE), "*Bottom", *HUB_BOTTOM_CENTER, scale=HUB_BOTTOM_SCALE,
-    )
-    set_hidden_lines_visible(adapter, hub_bottom_parent)
-    geometry_bottom = _hub_underside_detail(adapter, hub_bottom_parent)
-    set_hidden_lines_visible(adapter, geometry_bottom)
-    curate_view_dimensions(
-        adapter, hub_bottom_parent, keep={},
-        view_label="underside locator",
-    )
-    bottom_dimensions = curate_view_dimensions(
-        adapter, geometry_bottom,
-        keep={"HubDia": (0.265, 0.150)},
-        view_label="enlarged underside geometry",
-    )
-    set_dimension_callouts(adapter, bottom_dimensions, {"HubDia": "CYLINDRICAL BOSS"})
-    set_dimension_precision(adapter, bottom_dimensions, {"HubDia": 1})
-    if add_note(adapter, "UNDERSIDE LOCATOR SCALE 1:5", 0.270, 0.255) is None:
-        raise RuntimeError("failed to label underside locator")
-    gusset_z = GOOSENECK_Z + (HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2
-    gusset_y = -HALF_H-HUB_BOSS_DROP/2
-    _checked_dimension(
-        adapter, geometry_bottom,
-        p0=(GOOSENECK_X-HUB_GUSSET_T/2, gusset_y, gusset_z),
-        p1=(GOOSENECK_X+HUB_GUSSET_T/2, gusset_y, gusset_z),
-        text_xy=(0.390, 0.185), label="underside gusset thickness",
-        expected_mm=HUB_GUSSET_T, orientation="horizontal", exact_linear=True,
-        suffix="2X GUSSET\nCENTRED ON BORE",
-    )
-    _checked_dimension(
-        adapter, geometry_bottom,
-        p0=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z-HUB_GUSSET_HALF_OUT),
-        p1=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT),
-        text_xy=(0.390, 0.140), label="underside gusset overall span",
-        expected_mm=2*HUB_GUSSET_HALF_OUT, orientation="vertical",
-        entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
-        suffix="UNDERSIDE\nGUSSET SPAN",
-    )
     bore_candidates: list[tuple[float, float, Any]] = []
     left_socket_edge = None
     for raw_edge in visible_view_entities(
@@ -1461,35 +1586,77 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_left,
         p0=(-OUTER_X, HALF_H, GOOSENECK_Z),
         p1=(tap_x, 0.0, GOOSENECK_Z+tap_radius),
-        text_xy=(0.230, 0.108), label="set screw axis from rail top",
+        text_xy=(0.230, 0.1125), label="set screw axis from rail top",
         expected_mm=HALF_H, orientation="vertical", center=True, precision=2,
         suffix="FROM RAIL TOP\nON BORE CENTRE",
-        entities=(rail_top_edge, set_tap_edge),
+        entities=(rail_top_edge, set_tap_edge), offset_text=(0.252, 0.1125),
     )
     _checked_dimension(
         adapter, detail_left,
         p0=(-WEB_OUT_X, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP),
         p1=(GOOSENECK_X, -HALF_H-HUB_BOSS_DROP, GOOSENECK_Z),
-        text_xy=(0.225, 0.083), label="hub boss underside drop",
+        text_xy=(0.238, 0.073), label="hub boss underside drop",
         expected_mm=HUB_BOSS_DROP, orientation="vertical",
-        suffix="BELOW RAIL\nUNDERSIDE",
+        suffix="BELOW RAIL\nUNDERSIDE", offset_text=(0.255, 0.080),
     )
     _gusset_ramp_angle(adapter, detail_left)
     set_hidden_lines_visible(adapter, detail_left)
     left_note = add_note(
         adapter, "HUB SIDE / REMOVED VIEW SCALE 1:2",
-        0.080, 0.078,
+        0.139, 0.0755,
     )
     if (
         detail_top_note is None
-        or detail_front_note is None
         or cap_fit_note is None
         or left_note is None
     ):
         raise RuntimeError("failed to label top-frame holes/sockets sheet")
     hub_section = _hub_pocket_section(adapter, hub_top)
-    _position_view_caption(adapter, hub_section, (0.170, 0.050))
-    _position_view_caption(adapter, geometry_bottom, (HUB_DETAIL_CENTER[0], 0.086))
+    _position_view_caption(adapter, hub_section, HUB_SECTION_CAPTION_XY)
+    if not ddoc.ActivateSheet(SHEET_NAMES[4]):
+        raise RuntimeError("failed to activate top-frame underside sheet")
+    hub_bottom_parent = place_view(
+        adapter, str(SOURCE), "*Bottom", *HUB_BOTTOM_CENTER, scale=HUB_BOTTOM_SCALE,
+    )
+    set_hidden_lines_removed(adapter, hub_bottom_parent)
+    geometry_bottom = _hub_underside_detail(adapter, hub_bottom_parent)
+    # SolidWorks refuses hidden-lines-removed on this native detail view, so
+    # the enlarged underside keeps its parent's hidden lines.
+    set_hidden_lines_visible(adapter, geometry_bottom)
+    curate_view_dimensions(
+        adapter, hub_bottom_parent, keep={},
+        view_label="underside locator",
+    )
+    bottom_dimensions = curate_view_dimensions(
+        adapter, geometry_bottom,
+        keep={"HubDia": (0.380, 0.200)},
+        view_label="enlarged underside geometry",
+    )
+    set_dimension_callouts(adapter, bottom_dimensions, {"HubDia": "CYLINDRICAL BOSS"})
+    set_dimension_precision(adapter, bottom_dimensions, {"HubDia": 1})
+    if add_note(adapter, "UNDERSIDE LOCATOR SCALE 1:5", 0.073, 0.165) is None:
+        raise RuntimeError("failed to label underside locator")
+    gusset_z = GOOSENECK_Z + (HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2
+    gusset_y = -HALF_H-HUB_BOSS_DROP/2
+    _checked_dimension(
+        adapter, geometry_bottom,
+        p0=(GOOSENECK_X-HUB_GUSSET_T/2, gusset_y, gusset_z),
+        p1=(GOOSENECK_X+HUB_GUSSET_T/2, gusset_y, gusset_z),
+        text_xy=(0.300, 0.092), label="underside gusset thickness",
+        expected_mm=HUB_GUSSET_T, orientation="horizontal", exact_linear=True,
+        suffix="2X GUSSET\nCENTRED ON BORE",
+        offset_text=(0.360, 0.092),
+    )
+    _checked_dimension(
+        adapter, geometry_bottom,
+        p0=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z-HUB_GUSSET_HALF_OUT),
+        p1=(GOOSENECK_X-HUB_GUSSET_T/2, -HALF_H, GOOSENECK_Z+HUB_GUSSET_HALF_OUT),
+        text_xy=(0.345, 0.160), label="underside gusset overall span",
+        expected_mm=2*HUB_GUSSET_HALF_OUT, orientation="vertical",
+        entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
+        suffix="UNDERSIDE\nGUSSET SPAN", offset_text=(0.375, 0.160),
+    )
+    _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to label drawing sheet {sheet_name}")
@@ -1504,11 +1671,12 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-        # Separate hub location/side and underside imports add automatic Hole
-        # Wizard notes. This three-sheet composition has six across all sheets;
-        # the associative feature callouts replace them, and the total stays gated.
+        # Every sheet that imports a tapped feature gets its own automatic Hole
+        # Wizard note; five sheets with two of them drawn hidden-lines-removed
+        # produce seven.  The associative feature callouts replace them all, and
+        # the count stays gated so a lost callout fails the build.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=6,
+        expected_redundant_notes=7,
     )
 
 
