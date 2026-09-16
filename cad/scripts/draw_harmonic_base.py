@@ -33,6 +33,7 @@ from _drawing_common import (
     create_blank_drawing_sheets,
     create_section_view,
     create_view_theoretical_datum,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     dimension_name,
@@ -41,9 +42,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_center,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_reference_dimension,
     stamp_drawing_summary,
@@ -57,12 +56,8 @@ from _surface_finish import surface_finish_by_key
 from build_harmonic_base import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
-    BASE_SPOTFACE_DEPTH,
-    BASE_SPOTFACE_PLANE_Z,
     BLOCK_SCREW_HOLE_DIA,
     BLOCK_SCREW_XZ,
-    COLUMN_X,
-    COLUMN_SOCKET_XZ,
     COLUMN_SOCKET_DIAMETER,
     FOOT_SCREW_HOLE_DIA,
     FOOT_SCREW_XZ,
@@ -72,8 +67,6 @@ from build_harmonic_base import (
     LOCK_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_HOLE_DIA,
     NAMEPLATE_SCREW_XZ,
-    PART_SURFACE_FINISHES,
-    RIM_CHAMFER,
     SERIAL_HEIGHT_MM,
     SERIAL_TEXT,
     SERIAL_XZ,
@@ -81,26 +74,23 @@ from build_harmonic_base import (
     PIVOT_SCREW_XZ,
     STOP_SCREW_HOLE_DIA,
     STOP_SCREW_XZ,
-    socket_bore_finish_key,
 )
 from harmonic_base_spec import (
     BOTTOM_FRONT_Z,
     BOTTOM_LENGTH,
     BOTTOM_REAR_Z,
     BOTTOM_WIDTH,
-    BOTTOM_THICKNESS,
+    COLUMN_SOCKET_XZ,
+    COLUMN_X,
     DRAWING_NOTES,
-    LIP_H,
-    LIP_W,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
+    PART_SURFACE_FINISHES,
     RIM_TOP,
     STACK_HEIGHT,
-    TOP_LENGTH,
+    socket_bore_finish_key,
 )
-from frame_attachment_spec import (
-    BASE_SCREW_SEAT_Z,
-    BASE_SCREW_Y,
-    SCREW_SPOTFACE_DIAMETER,
-)
+from frame_attachment_spec import BASE_SCREW_SEAT_Z, BASE_SCREW_Y
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -177,6 +167,12 @@ SOCKET_FINISH_SHOULDER = 0.004
 
 # Per-view survivors of the native marked-dimension import. Sheet 1 owns the
 # exterior envelope and edge geometry. Sheet 2 owns socket and hole definition.
+# Every manufacturing value on both sheets is imported here: the part marks
+# and precises them (harmonic_base_spec.DRAWING_DIMENSIONS / DRAWING_PRECISION)
+# and these tables only say WHICH view shows each one and WHERE its text sits
+# -- the placement-only division policy rule 2 draws. The four keeps partition
+# DRAWING_PRECISION_BY_NAME exactly, which assert_imported_precision proves at
+# the end of the build.
 GEOMETRY_TOP_KEEP = {
     "BottomLen": (TOP_CENTER[0], 0.244),
     "TopLen": (TOP_CENTER[0], 0.230),
@@ -185,17 +181,67 @@ GEOMETRY_TOP_KEEP = {
     "PadCornerRadius": (0.070, 0.236),
     "FlangeCornerRadius": (0.040, 0.215),
     "RimInnerCornerRadius": (0.050, 0.232),
+    # Below the 287.2 depth dimension's lower extension line (sheet y 0.149),
+    # not against it: three caption lines ride under this value (2026-09
+    # review clarity item).
+    "RimWidth": (0.243, 0.125),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
+    "FlangeToRim": (0.0625, 0.112),
 }
 HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
-SECTION_KEEP: dict[str, tuple[float, float]] = {}
+# Section A-A lays machine +Y across the sheet, so the three height values
+# read left-to-right beside the view and the spotface depth -- a machine-Z
+# value, which the rotation lays UP the sheet -- sits off the rear end it cuts.
+# Both edge breaks land on the view's top-left corner, so their text stacks in
+# the strip between the view (right edge 387.3 mm) and the sheet's right inner
+# border (419.1 mm). The native layout audit measured what that strip costs:
+# the underside break's text parked 67 mm below its own feature ran its
+# dimension line straight through the socket-bore Ra symbol, and both chamfer
+# captions ran off the sheet edge -- 433.6 mm on a 431.8 mm sheet. Both texts
+# now sit beside the corner they dimension, captions inside the border.
+SECTION_KEEP = {
+    "RimHeight": (0.393, 0.215),
+    "TopRimChamfer": (0.400, 0.189),
+    "BottomEdgeChamfer": (0.385, 0.1633),
+    # Right of the section, not left: a display dimension anchors where
+    # its leader meets the text box border, so a position LEFT of the
+    # spotface ran the block back across the front cross-tap view (seen
+    # on the 200 dpi sheet-2 render).  This lands it in the same
+    # 382-418 mm callout column the three dimensions above use, ABOVE its own
+    # dimension line: the leader drops from the arrow to the block's bottom-left
+    # corner, so a block straddling the dimension line gets its widest caption
+    # row struck by that drop (measured at y 0.103: the line crossed '4X
+    # SPOTFACE' over 3.5 mm).
+    "SpotFaceDepth": (0.3845, 0.113),
+}
+HOLE_SIDE_KEEP = {
+    "SpotFaceDia": (0.193, 0.135),
+    # 4 mm above the old station: three caption lines hang below this value and
+    # the lowest reached the title-block band at y 66 mm (audit keep-out).
+    "Spot0Y": (0.196, 0.0785),
+}
 GEOMETRY_CALLOUTS = {
     "TopLen": "PAD CENTERED ON FLANGE",
     "PadCornerRadius": "PAD",
     "FlangeCornerRadius": "FLANGE",
     "RimInnerCornerRadius": "RIM INNER",
+    "RimWidth": "FROM PAD OUTER EDGE\nTO RIM INNER FACE\n4 SIDES",
+}
+# One chamfer feature breaks both plates' top rims, so its caption names the
+# feature -- in the PLURAL -- rather than whichever of its edges the import
+# attached to. Plural, not spelled out: this column is 32 mm wide, and a
+# caption row wider than that leaves the sheet (see SECTION_KEEP).
+SECTION_CALLOUTS = {
+    "RimHeight": "RIM ABOVE\nDECK",
+    "TopRimChamfer": "X 45 DEG\nTOP RIMS",
+    "BottomEdgeChamfer": "X 45 DEG\nUNDERSIDE",
+    "SpotFaceDepth": "4X SPOTFACE\nDEPTH",
+}
+HOLE_SIDE_CALLOUTS = {
+    "SpotFaceDia": "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR",
+    "Spot0Y": "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE",
 }
 
 # Native table tags keep their source association while short leaders separate
@@ -268,54 +314,6 @@ def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
             f"expected one base cross-tap entry edge, found {len(matches)}"
         )
     return matches[0]
-
-
-def _add_cross_spotface_dimension(adapter: Any, view: Any) -> None:
-    """Dimension the actual front spotface entry, not its section projection."""
-    center = (-COLUMN_X / 1000.0, BASE_SCREW_Y / 1000.0, BASE_SPOTFACE_PLANE_Z / 1000.0)
-    matches = []
-    for raw in visible_view_entities(view, 1, label="base front spotface entry"):
-        edge = _early_bound(raw, "IEdge")
-        curve = _early_bound(edge.GetCurve(), "ICurve")
-        if not curve.IsCircle():
-            continue
-        values = tuple(float(value) for value in curve.CircleParams)
-        if (
-            abs(values[6] - SCREW_SPOTFACE_DIAMETER / 2000.0) < 1e-7
-            and all(abs(values[index] - center[index]) < 1e-7 for index in range(3))
-            and abs(abs(values[5]) - 1.0) < 1e-7
-        ):
-            matches.append(edge)
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one actual front spotface entry, found {len(matches)}")
-    drawing = adapter.currentModel
-    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate front spotface view")
-    drawing.ClearSelection2(True)
-    if not view.SelectEntity(matches[0], False):
-        raise RuntimeError("failed to select the actual front spotface circle")
-    display = drawing.AddDiameterDimension2(0.193, 0.135, 0.0)
-    drawing.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError("failed to dimension the actual front spotface")
-    display = _early_bound(display, "IDisplayDimension")
-    actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    if abs(actual_mm - SCREW_SPOTFACE_DIAMETER) > 1e-5:
-        raise RuntimeError(f"front spotface measured {actual_mm}, expected {SCREW_SPOTFACE_DIAMETER} mm")
-    # One place, not two: the spotface only lands a screw head on the seat
-    # plane, so the general .X band (+-0.8) governs it and "4.25" asked the
-    # shop to hold +-0.51 for nothing (2026-09 review over-specification).
-    # 4.25 is exactly representable, so round-half-EVEN prints 4.2 -- the
-    # shallower side, which leaves material rather than removing it, and the
-    # modelled 4.25 plane sits well inside the one-place band it now carries.
-    caption = (
-        "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR\n"
-        f"{BASE_SPOTFACE_DEPTH:.1f} DEEP"
-    )
-    display.SetText(4, caption)
-    display.SetPrecision3(1, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != 1 or str(display.GetText(4)) != caption:
-        raise RuntimeError("front spotface precision or caption did not persist")
 
 
 @_telemetry.traced("drawing.base_cross_tap_readback")
@@ -427,50 +425,6 @@ def _set_drill_depth_precision(display: Any) -> None:
         found = True
     if not found:
         raise RuntimeError("base tap callout has no native tap-drill depth variable")
-
-
-@_telemetry.traced("drawing.base_rim_width")
-def _add_rim_width(adapter: Any, view: Any) -> Any:
-    """Measure the two unchamfered rim-wall stations through exact model edges."""
-    stations = (TOP_LENGTH / 2000.0, (TOP_LENGTH / 2.0 - LIP_W) / 1000.0)
-    candidates: list[list[tuple[float, Any]]] = [[], []]
-    for raw in visible_view_entities(view, 1, label="base rim wall edges"):
-        edge = _early_bound(raw, "IEdge")
-        curve = _early_bound(edge.GetCurve(), "ICurve")
-        if not curve.IsLine():
-            continue
-        values = tuple(float(value) for value in edge.GetCurveParams2())
-        x0, y0, z0, x1, y1, z1 = values[:6]
-        if abs(x0 - x1) > 1e-7 or abs(y0 - y1) > 1e-7 or z0 * z1 > 0:
-            continue
-        if not STACK_HEIGHT / 1000.0 - 1e-7 <= y0 <= RIM_TOP / 1000.0 + 1e-7:
-            continue
-        for index, station in enumerate(stations):
-            if abs(x0 - station) <= 1e-7:
-                candidates[index].append((y0, edge))
-    if any(not items for items in candidates):
-        raise RuntimeError("base rim width lacks exact outer/inner wall edges")
-    drawing = adapter.currentModel
-    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate base rim view")
-    drawing.ClearSelection2(True)
-    for index, items in enumerate(candidates):
-        edge = max(items, key=lambda item: item[0])[1]
-        if not view.SelectEntity(edge, index > 0):
-            raise RuntimeError(f"failed to select base rim wall {index}")
-    # Below the 287.2 depth dimension's lower extension line (sheet y 0.149),
-    # not against it: three caption lines ride under this value (2026-09 review
-    # clarity item).
-    display = drawing.AddHorizontalDimension2(0.243, 0.125, 0.0)
-    drawing.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError("failed to create base rim-width dimension")
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    actual_mm = float(dimension.SystemValue) * 1000.0
-    if abs(actual_mm - LIP_W) > 1e-5:
-        raise RuntimeError(f"base rim width measured {actual_mm}, expected {LIP_W} mm")
-    return display
 
 
 def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
@@ -620,89 +574,6 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
         raise RuntimeError(f"native hole-table tags not found: {sorted(remaining)}")
     if found != set(table_locations):
         raise RuntimeError(f"native table/view tag bijection failed: missing={set(table_locations) - found}")
-
-
-def _section_geometry_controls(adapter: Any, view: Any) -> None:
-    levels: dict[float, list[tuple[float, Any]]] = {STACK_HEIGHT: [], RIM_TOP: []}
-    chamfers: dict[str, list[tuple[float, Any]]] = {"UPPER RIM": [], "UNDERSIDE": []}
-    for raw in visible_view_entities(view, 1, label="base section rim and chamfers"):
-        edge = _early_bound(raw, "IEdge")
-        curve = _early_bound(edge.GetCurve(), "ICurve")
-        if curve.IsLine():
-            x0, y0, z0, x1, y1, z1 = tuple(edge.GetCurveParams2())[:6]
-            # Section A-A is a YZ cut: these native diagonal edges expose
-            # both equal legs of the actual 45-degree chamfer.
-            if (
-                abs(x1 - x0) < 1e-7
-                and abs(abs(y1 - y0) - RIM_CHAMFER / 1000.0) < 1e-7
-                and abs(abs(z1 - z0) - RIM_CHAMFER / 1000.0) < 1e-7
-            ):
-                if abs(max(y0, y1) - RIM_TOP / 1000.0) < 1e-7:
-                    chamfers["UPPER RIM"].append(((z0 + z1) / 2.0, edge))
-                elif abs(min(y0, y1)) < 1e-7:
-                    chamfers["UNDERSIDE"].append(((z0 + z1) / 2.0, edge))
-            if abs(y1 - y0) > 1e-7:
-                continue
-            span = ((x1 - x0) ** 2 + (z1 - z0) ** 2) ** 0.5
-            for height, candidates in levels.items():
-                if span > 1e-6 and abs(y0 - height / 1000.0) < 1e-7:
-                    candidates.append((span, edge))
-    if any(not candidates for candidates in levels.values()):
-        raise RuntimeError("base section lacks exact deck/rim edges")
-    if any(not candidates for candidates in chamfers.values()):
-        raise RuntimeError("base section lacks the actual equal-leg upper/underside chamfer edges")
-    drawing = adapter.currentModel
-    if not _early_bound(drawing, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate base section controls")
-    drawing.ClearSelection2(True)
-    for index, candidates in enumerate(levels.values()):
-        if not view.SelectEntity(
-            max(candidates, key=lambda item: item[0])[1], index > 0
-        ):
-            raise RuntimeError("failed to select exact base rim-step edges")
-    step = drawing.AddHorizontalDimension2(0.393, 0.215, 0.0)
-    drawing.ClearSelection2(True)
-    if step is None:
-        raise RuntimeError("failed to create base rim-step dimension")
-    step = _early_bound(step, "IDisplayDimension")
-    actual = (
-        float(_early_bound(step.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    )
-    if abs(actual - LIP_H) > 1e-5:
-        raise RuntimeError(f"base rim step measured {actual}, expected {LIP_H} mm")
-    step.SetText(4, "RIM ABOVE\nDECK")
-    step.SetPrecision3(1, -1, -1, -1)
-    if int(step.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError("base rim-step precision did not persist")
-    # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
-    # junction is not measurable with hobby-shop kit, so the model keeps its
-    # fillet and the deck cutter's own corner radius defines it (2026-09
-    # review over-specification item).
-    for label, candidates in chamfers.items():
-        edge = (
-            min(candidates, key=lambda item: item[0])[1]
-            if label == "UPPER RIM"
-            else max(candidates, key=lambda item: item[0])[1]
-        )
-        vertices = (edge.GetStartVertex(), edge.GetEndVertex())
-        drawing.ClearSelection2(True)
-        for index, vertex in enumerate(vertices):
-            if vertex is None or not view.SelectEntity(vertex, index > 0):
-                raise RuntimeError(f"failed to select actual {label} chamfer endpoints")
-        text_xy = (0.400, 0.184) if label == "UPPER RIM" else (0.395, 0.103)
-        display = drawing.AddHorizontalDimension2(*text_xy, 0.0)
-        drawing.ClearSelection2(True)
-        if display is None:
-            raise RuntimeError(f"failed to dimension the section {label} chamfer")
-        display = _early_bound(display, "IDisplayDimension")
-        actual_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-        if abs(actual_mm - RIM_CHAMFER) > 1e-5:
-            raise RuntimeError(f"section {label} chamfer measured {actual_mm}, expected {RIM_CHAMFER} mm")
-        caption = f"X 45 DEG\n{label}"
-        display.SetText(4, caption)
-        display.SetPrecision3(1, -1, -1, -1)
-        if int(display.GetPrimaryPrecision2()) != 1 or str(display.GetText(4)) != caption:
-            raise RuntimeError(f"section {label} chamfer precision or caption did not persist")
 
 
 ALL_HOLES = (
@@ -915,35 +786,23 @@ async def build(adapter: Any) -> dict[str, str]:
         display.ArcExtensionLineOrOppositeSide = False
         if display.ArcExtensionLineOrOppositeSide:
             raise RuntimeError(f"{name} leader did not stay on its native corner arc")
-    set_dimension_precision(
-        adapter,
-        [*top_dimensions, *side_dimensions],
-        {
-            name: 1
-            for name in (
-                "BottomLen",
-                "BottomWid",
-                "TopLen",
-                "TopWid",
-                "PadCornerRadius",
-                "FlangeCornerRadius",
-                "RimInnerCornerRadius",
-                "BottomThickness",
-            )
-        },
-    )
-
-    rim_width = _add_rim_width(adapter, top)
-    rim_width.SetText(4, "FROM PAD OUTER EDGE\nTO RIM INNER FACE\n4 SIDES")
-    rim_width.SetPrecision3(1, -1, -1, -1)
-    if int(rim_width.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError("base rim-width precision did not persist")
+    # All three height dimensions stack on the LEFT of the front view,
+    # shortest nearest the outline: the part-owned 12.7 at x 0.073 and 40.6 at
+    # 0.0625 (SIDE_KEEP), this derived overall at 0.0425. At 0.052 the two
+    # outer dimensions sat inside each other's ink -- this text was struck by
+    # the 40.6's lower witness line and its own dimension line ran through the
+    # 40.6's text (native layout audit); 10 mm of extra offset clears both,
+    # and the text still sits below the 53.3 witness lines it belongs to.
+    # The overall is the ONLY dimension this sheet
+    # creates: it is the read-only sum of three model-owned heights, so there
+    # is no model dimension to import and no tolerance to carry -- which is
+    # why its places are the one precision the part hands over as a constant.
     overall_height = _add_base_height(
         adapter,
         side,
         _horizontal_base_edge(side, RIM_TOP),
         RIM_TOP,
-        (0.052, 0.099),
+        (0.0425, 0.099),
         "overall rim height",
     )
     set_reference_dimension(
@@ -951,20 +810,9 @@ async def build(adapter: Any) -> dict[str, str]:
         overall_height.GetAnnotation(),
         label="derived overall rim height",
     )
-    overall_height.SetPrecision3(1, -1, -1, -1)
-    if int(overall_height.GetPrimaryPrecision2()) != 1:
+    overall_height.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(overall_height.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("base overall reference precision did not persist")
-    # All three height dimensions stack on the LEFT of the front view, shortest
-    # nearest the outline: 12.7 at x 0.073, this 40.6 at 0.0625, the overall
-    # reference at 0.052. Its text clears the 53.3 text above the view.
-    flange_to_rim = _add_base_height(
-        adapter, side, _horizontal_base_edge(side, RIM_TOP),
-        RIM_TOP - BOTTOM_THICKNESS, (0.0625, 0.112), "visible flange-to-rim height",
-        lower_entity=_horizontal_base_edge(side, BOTTOM_THICKNESS),
-    )
-    flange_to_rim.SetPrecision3(1, -1, -1, -1)
-    if int(flange_to_rim.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError("base flange-to-rim height precision did not persist")
 
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
@@ -1052,11 +900,18 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(
         adapter, hole_top, keep=HOLE_TOP_KEEP, view_label="holes top"
     )
-    curate_view_dimensions(
+    section_dimensions = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="section A-A"
     )
-    _section_geometry_controls(adapter, section)
-    _add_cross_spotface_dimension(adapter, hole_side)
+    hole_side_dimensions = curate_view_dimensions(
+        adapter, hole_side, keep=HOLE_SIDE_KEEP, view_label="holes front"
+    )
+    set_dimension_callouts(adapter, section_dimensions, SECTION_CALLOUTS)
+    set_dimension_callouts(adapter, hole_side_dimensions, HOLE_SIDE_CALLOUTS)
+    # No root-radius callout: a 0.5 mm internal root at the pad-to-flange
+    # junction is not measurable with hobby-shop kit, so the model keeps its
+    # fillet and the deck cutter's own corner radius defines it (2026-09
+    # review over-specification item).
     # Sheet-2 left notes column, below the hole table: the socket-matching
     # note stacks above the linked land note so neither crowds the TOP VIEW
     # caption. The hole table's SIZE cells are generated by SolidWorks and are
@@ -1133,51 +988,19 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_cross_tap_callout_text(tap_callout)
     _set_drill_depth_precision(tap_callout)
     _check_cross_tap_callout(tap_callout)
-    base_edge = _horizontal_base_edge(hole_side, 0.0)
-    endpoints = (base_edge.GetStartVertex(), base_edge.GetEndVertex())
-    if any(vertex is None for vertex in endpoints):
-        raise RuntimeError("cross-axis underside edge lacks native endpoint vertices")
-    left_base_vertex = min(
-        (_early_bound(vertex, "IVertex") for vertex in endpoints),
-        key=lambda vertex: float(vertex.GetPoint()[0]),
-    )
-    base_point = tuple(float(value) for value in left_base_vertex.GetPoint())
-    if base_point[0] >= 0.0 or abs(base_point[1]) > 1e-7:
-        raise RuntimeError("cross-axis datum is not the left base-underside vertex")
     # 38.10 is also the deck above the flange (40.6 - 2.5), so the axis height
-    # has to SHOW which two features it spans (2026-09 review blocker): the
-    # upper witness line lands on the hole CENTRELINE -- the native arc-centre
-    # endpoint, now drawn by this view's auto center marks -- the lower one on
-    # the flange underside, and the caption names that Ra 3.2 seating face.
-    # The text block is parked BELOW the extension lines it would otherwise be
+    # has to SHOW which two features it spans (2026-09 review blocker). The
+    # imported Spot0Y does that natively and for free: it is the spotface
+    # sketch's own dimension, from the sketch origin -- which lies ON the
+    # flange underside -- to the hole CENTRE, whose center mark this view
+    # draws. Its caption (HOLE_SIDE_CALLOUTS) names that Ra 3.2 seating face,
+    # and its text is parked BELOW the extension lines it would otherwise be
     # struck through by: at 1:4 the two witness lines are 9.5 mm apart on
     # paper, so a four-line block centred on the dimension line put the value
     # on the line and each caption line on an extension line. Outside the band
     # SolidWorks keeps the arrows inside and jogs a leader down to the text.
     if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
-    axis_caption = "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE"
-    tap_height = _add_base_height(
-        adapter,
-        hole_side,
-        _cross_tap_edge(hole_side, x_mm=-COLUMN_X),
-        BASE_SCREW_Y,
-        (0.196, 0.0745),
-        "cross-screw axis height above the flange underside",
-        lower_entity=left_base_vertex,
-    )
-    set_arc_endpoints_to_center(adapter, tap_height, label="cross-screw axis height")
-    tap_height.SetText(4, axis_caption)
-    # One place (38.1), so the general .X band (+-0.8) governs: the tube cross
-    # holes are MATCH-DRILLED from the assembled base, so this axis only has to
-    # land mid-socket -- +-0.51 was work nobody needed (2026-09 review
-    # over-specification).
-    tap_height.SetPrecision3(1, -1, -1, -1)
-    if (
-        int(tap_height.GetPrimaryPrecision2()) != 1
-        or str(tap_height.GetText(4)) != axis_caption
-    ):
-        raise RuntimeError("native cross-axis height precision or datum caption did not persist")
     # The hole table measures every coordinate from the virtual corner of the
     # flange's west and rear faces, so the plan profile carries the seat grade
     # once, read off the same west edge the table's Y axis is seeded from. The
@@ -1265,8 +1088,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(
         adapter, "ORIGIN: FLANGE\nOUTER SHARP\nCORNER (X0 Y0)", 0.165, 0.186,
     )
+    # 6 mm lower than the bore note above it: the audit holds two blocks in
+    # one column a full block height apart, and 8.8 mm was under it.
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.020, 0.046, char_height=0.0035,
+        adapter, "Manufacturing Notes", 0.020, 0.040, char_height=0.0035,
     )
     section_threads = import_cosmetic_threads(adapter, section)
     if section_threads[1] == 0:
@@ -1283,6 +1108,22 @@ async def build(adapter: Any) -> dict[str, str]:
             is None
         ):
             raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
+
+    # Policy rule 2's proof obligation, now that no sheet code writes places:
+    # every imported dimension must still print what its PART authored. A
+    # silent fallback to the drawing document's two places would ask the shop
+    # for a band nobody specified, and nothing else on the sheet would look
+    # wrong. The four keeps partition this map, so a missing name fails too.
+    assert_imported_precision(
+        adapter,
+        [
+            *top_dimensions,
+            *side_dimensions,
+            *section_dimensions,
+            *hole_side_dimensions,
+        ],
+        DRAWING_PRECISION_BY_NAME,
+    )
 
     return await finalize_drawing(
         adapter,

@@ -354,11 +354,12 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
     from _gtol_spec import CylinderFace
     from _part_pmi import _face_matches
 
+    spec = harmonic_base_spec
     geometries = {
-        station: _socket_bore_geometry(*station) for station in part.COLUMN_SOCKET_XZ
+        station: _socket_bore_geometry(*station) for station in spec.COLUMN_SOCKET_XZ
     }
-    assert len(part.SOCKET_BORE_FINISHES) == len(part.COLUMN_SOCKET_XZ)
-    for control in part.SOCKET_BORE_FINISHES:
+    assert len(spec.SOCKET_BORE_FINISHES) == len(spec.COLUMN_SOCKET_XZ)
+    for control in spec.SOCKET_BORE_FINISHES:
         matched = [
             station
             for station, geometry in geometries.items()
@@ -366,11 +367,11 @@ def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
         ]
         assert matched == [
             station
-            for station in part.COLUMN_SOCKET_XZ
-            if part.socket_bore_finish_key(*station) == control.key
+            for station in spec.COLUMN_SOCKET_XZ
+            if spec.socket_bore_finish_key(*station) == control.key
         ]
-        assert control.roughness_um == part.SEAT_UM
-        assert control.production_method == part.SOCKET_BORE_TARGET
+        assert control.roughness_um == spec.SEAT_UM
+        assert control.production_method == spec.SOCKET_BORE_TARGET
     x_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER, contains_x_mm=part.COLUMN_X)
     size_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER)
     assert sum(_face_matches(g, x_only) for g in geometries.values()) == 2

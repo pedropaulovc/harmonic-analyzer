@@ -35,6 +35,12 @@ _TOLERANCE_SETTERS = frozenset(
 # ``<part>_spec.DRAWING_PRECISION`` is applied natively on the .SLDPRT and the
 # drawing only reads it back.  A render-time ``SetPrecision3`` /
 # ``set_dimension_precision`` in one of these is a part missing its tolerance.
+#
+# One exception, and only one: a pure REFERENCE dimension is a read-only sum
+# of model-owned values, carries no tolerance, and has no model dimension to
+# import, so its places are not a tolerance statement.  Those places are still
+# specification, so a sheet may pass them through ``SetPrecision3`` ONLY from
+# a ``*_spec`` constant (``DRAWING_REFERENCE_PRECISION``) -- never a literal.
 # The remaining fleet migrates under #766; until then the rule is scoped here.
 PRECISION_MIGRATED_DRAWINGS = frozenset(
     {"draw_harmonic_base.py", "draw_top_frame.py", "draw_tube_frame.py"}
@@ -783,11 +789,20 @@ def drawing_specification_violations(
                 isinstance(node.func, ast.Attribute)
                 and node.func.attr in _DIRECT_PRECISION_METHODS
                 and not _leaves_primary_precision(node)
+                and not (
+                    node.args
+                    and _part_spec_sourced(
+                        node.args[0],
+                        direct=part_spec_direct,
+                        modules=part_spec_modules,
+                        assignments=assignments,
+                    )
+                )
             ):
                 add(
                     node,
                     "drawing-owned-precision",
-                    f"direct COM {node.func.attr}(...) rewrites primary precision",
+                    f"direct COM {node.func.attr}(...) writes a literal precision",
                 )
             if name in _TOLERANCE_SETTERS:
                 add(

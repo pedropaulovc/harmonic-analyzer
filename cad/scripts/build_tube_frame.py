@@ -64,6 +64,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -73,6 +74,7 @@ from tube_frame_spec import (
     CROSS_HOLE_DIAMETER,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     END_VIEW_NOTE,
     INNER_DIA,
     ISOMETRIC_VIEW_NOTE,
@@ -254,6 +256,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Decimal places are the tolerance statement, so the part authors them and
+    # the drawing only reads them back (policy rule 2).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,

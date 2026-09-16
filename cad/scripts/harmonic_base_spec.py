@@ -10,8 +10,10 @@ silently drift.
 
 from __future__ import annotations
 
-from _gtol_spec import PlanarFace
+from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
+from frame_column_stations import COLUMN_SOCKET_DIAMETER, COLUMN_X
 
 MM_PER_IN = 25.4
 
@@ -86,8 +88,54 @@ SURFACE_FINISHES = (
     ),
 )
 
-# Mark only dimensions imported by the drawing. Hole-table dimensions and the
-# exact-edge rim, root, height and underside-chamfer controls remain native.
+# --- Column sockets: the frame interface this casting owns -----------------
+# Simplicity-policy rule 5: the four sockets LOCATE the frame on the base --
+# each column tube is matched to its own bore for a close hand-slip fit, and
+# the deck's Ra 3.2 stops at the deck plane -- so every bore is a seat that
+# MUST be cut on a casting the title block otherwise leaves as CAST/MACHINED.
+# These controls belong to the part SPEC rather than to the build recipe: a
+# sheet may only take a surface-finish control from a ``*_spec`` module, so a
+# symbol sourced from the build script had no part-owned provenance. The
+# stations come from the leaf module frame_column_stations, not from
+# frame_attachment_spec, which derives its heights from STACK_HEIGHT.
+COLUMN_SOCKET_XZ = tuple(
+    (sx * COLUMN_X, z)
+    for sx in (-1.0, 1.0)
+    for z in (FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z)
+)
+
+
+def socket_bore_finish_key(x_mm: float, z_mm: float) -> str:
+    """Stable surface-finish key for the column socket at one station.
+
+    Keys name the STATION, not the hole-table tag: SOLIDWORKS assigns A1-A4 by
+    table order, so a tag-shaped key would silently point at another bore if
+    the table ever reorders. The sheet keeps the tag language in its target.
+    """
+    return (
+        f"socket_{'west' if x_mm < 0.0 else 'east'}"
+        f"_{'front' if z_mm < 0.0 else 'rear'}"
+    )
+
+
+SOCKET_BORE_TARGET = "A1-A4 BORES"
+SOCKET_BORE_FINISHES = tuple(
+    SurfaceFinishControl(
+        socket_bore_finish_key(x, z),
+        SEAT_UM,
+        CylinderFace(COLUMN_SOCKET_DIAMETER, contains_x_mm=x, contains_z_mm=z),
+        production_method=SOCKET_BORE_TARGET,
+    )
+    for x, z in COLUMN_SOCKET_XZ
+)
+PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
+
+# Mark every dimension the drawing imports. Policy rule 2: a printed nominal
+# whose decimal places state a tolerance is a MODEL dimension, so the rim
+# step, the rim width, the flange-to-rim height, both 45-degree edge breaks,
+# the cross-screw axis height and the spotface size and depth are authored on
+# the part and imported -- not drawn on the sheet from picked geometry. Only
+# the hole table and the parenthesised overall height stay sheet-side.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
     "TopProfile": {"TopLen", "TopWid"},
@@ -95,8 +143,66 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PadCorners": {"PadCornerRadius"},
     "FlangeCorners": {"FlangeCornerRadius"},
     "RimInnerCorners": {"RimInnerCornerRadius"},
-    "BaseSpotFaceRearProfile": {"SpotFaceDia"},
+    "Rim": {"RimHeight"},
+    "RimWidthReference": {"RimWidth"},
+    "HeightReference": {"FlangeToRim"},
+    "TopRimBreaks": {"TopRimChamfer"},
+    "BottomEdgeBreak": {"BottomEdgeChamfer"},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
+    "BaseSpotFaceRear": {"SpotFaceDepth"},
 }
+
+# Decimal places ARE the tolerance statement (policy rule 2), so the MODEL
+# owns them: build_harmonic_base applies this map to the .SLDPRT and
+# draw_harmonic_base only reads it back. Everything on this casting is held to
+# the title block's general .X band, so every imported dimension prints ONE
+# place; the drawing document's two-place default would silently ask the shop
+# for .XX on a sand casting. The one exception is the spotface depth: it
+# carries its OWN bilateral band (SPOTFACE_DEPTH_BAND_MM), so its places state
+# no band and must print the modelled plane exactly -- 4.25, two places.
+# Rounded to 4.3 the printed nominal would put the model's own plane outside
+# the band the sheet prints; rounded to 4.2 it would misstate the model.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BottomProfile": {"BottomLen": 1, "BottomWid": 1},
+    "TopProfile": {"TopLen": 1, "TopWid": 1},
+    "BottomPlate": {"BottomThickness": 1},
+    "PadCorners": {"PadCornerRadius": 1},
+    "FlangeCorners": {"FlangeCornerRadius": 1},
+    "RimInnerCorners": {"RimInnerCornerRadius": 1},
+    "Rim": {"RimHeight": 1},
+    "RimWidthReference": {"RimWidth": 1},
+    "HeightReference": {"FlangeToRim": 1},
+    "TopRimBreaks": {"TopRimChamfer": 1},
+    "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},
+    "BaseSpotFaceRear": {"SpotFaceDepth": 2},
+}
+
+# The overall 53.3 is a pure REFERENCE dimension: the read-only sum of the
+# three model-owned heights below it, parenthesised, carrying no tolerance of
+# its own and having no model dimension to import. Its places are therefore
+# not a tolerance statement -- but they are still specification, so the PART
+# owns the digit and the sheet passes it through instead of writing a literal.
+DRAWING_REFERENCE_PRECISION = 1
+
+# A spotface only has to clean the cast face under a screw head: deeper is
+# harmless, shallower leaves an unfaced ring the head would rock on, so the
+# general .X band is wrong in one direction here. The model carries the band.
+SPOTFACE_DEPTH_BAND_MM = (0.0, 0.5)  # (lower, upper) deviation
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 # Keep this block to short, part-specific facts that are not already legible
 # in a native dimension, hole table, or feature callout.  Finish and masking
