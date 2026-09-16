@@ -317,3 +317,85 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
+
+
+def _socket_bore_geometry(x_mm: float, z_mm: float):
+    """The bore wall's COM geometry signature, as measured on the built part.
+
+    Faces read back one Ø25.50 cylinder per station whose bounding box spans
+    the bore's own radius in X and Z and the socket depth in Y, so the specs
+    can be resolved offline without a SolidWorks session.
+    """
+    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+
+    radius = part.COLUMN_SOCKET_DIAMETER / 2000.0
+    return _FaceGeometry(
+        face=None,
+        identity=_SURFACE_CYLINDER,
+        parameters=(x_mm / 1000.0, 0.0, z_mm / 1000.0, 0.0, 1.0, 0.0, radius),
+        outward_normal=None,
+        box=(
+            x_mm / 1000.0 - radius,
+            (part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH) / 1000.0,
+            z_mm / 1000.0 - radius,
+            x_mm / 1000.0 + radius,
+            part.STACK_HEIGHT / 1000.0,
+            z_mm / 1000.0 + radius,
+        ),
+    )
+
+
+def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
+    """The four sockets differ only in X and Z, so a bore control that names
+    less than both would qualify two faces (or all four) and abort the part
+    build after ten minutes of cutting -- or, worse, print the seat grade
+    against the wrong bore. Require a 1:1 station/control match, and hold the
+    ambiguity the Z station exists to resolve."""
+    from _gtol_spec import CylinderFace
+    from _part_pmi import _face_matches
+
+    geometries = {
+        station: _socket_bore_geometry(*station) for station in part.COLUMN_SOCKET_XZ
+    }
+    assert len(part.SOCKET_BORE_FINISHES) == len(part.COLUMN_SOCKET_XZ)
+    for control in part.SOCKET_BORE_FINISHES:
+        matched = [
+            station
+            for station, geometry in geometries.items()
+            if _face_matches(geometry, control.face)
+        ]
+        assert matched == [
+            station
+            for station in part.COLUMN_SOCKET_XZ
+            if part.socket_bore_finish_key(*station) == control.key
+        ]
+        assert control.roughness_um == part.SEAT_UM
+        assert control.production_method == part.SOCKET_BORE_TARGET
+    x_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER, contains_x_mm=part.COLUMN_X)
+    size_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER)
+    assert sum(_face_matches(g, x_only) for g in geometries.values()) == 2
+    assert sum(_face_matches(g, size_only) for g in geometries.values()) == 4
+
+
+def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
+    """The sheet's one socket symbol leads to the INNER wall of the socket that
+    section A-A puts in the upper half of the sheet, at a height that keeps the
+    arrowhead inside the bore and clear of both the window the cross tap opens
+    through that wall and the deck outline -- the first placement sat 1 mm (on
+    paper) from the cross tap's cosmetic thread and read as the tap's."""
+    import draw_harmonic_base as sheet
+
+    x_mm, y_mm, z_mm = sheet.SOCKET_LEADER_POINT_MM
+    station_x, station_z = sheet.SECTION_SOCKET_XZ
+    assert (station_x, station_z) in part.COLUMN_SOCKET_XZ
+    assert station_x == part.COLUMN_X
+    assert station_z == min(z for x, z in part.COLUMN_SOCKET_XZ if x > 0.0)
+    assert x_mm == part.COLUMN_X
+    assert math.isclose(
+        abs(z_mm - station_z), part.COLUMN_SOCKET_DIAMETER / 2.0, abs_tol=1e-9
+    )
+    assert abs(z_mm) < abs(station_z)
+    tap_clearance = abs(y_mm - part.BASE_SCREW_Y) - part.BASE_CROSS_TAP_DRILL_DIA / 2.0
+    deck_clearance = part.STACK_HEIGHT - y_mm
+    assert min(tap_clearance, deck_clearance) > 4.0
+    assert y_mm > part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH

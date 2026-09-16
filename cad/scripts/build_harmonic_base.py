@@ -72,7 +72,9 @@ from _holes import (
     blind_hole_volume_mm3,
     wizard_holes,
 )
+from _gtol_spec import CylinderFace
 from _part_pmi import _resolve_faces, author_part_pmi
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 from harmonic_base_spec import (
     BOTTOM_LENGTH,
     BOTTOM_THICKNESS,
@@ -162,6 +164,39 @@ COLUMN_SOCKET_XZ = tuple(
     for sx in (-1.0, 1.0)
     for z in (FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z)
 )
+
+
+def socket_bore_finish_key(x_mm: float, z_mm: float) -> str:
+    """Stable surface-finish key for the column socket at one station.
+
+    Keys name the STATION, not the hole-table tag: SOLIDWORKS assigns A1-A4 by
+    table order, so a tag-shaped key would silently point at another bore if
+    the table ever reorders. The sheet keeps the tag language in its target.
+    """
+    return (
+        f"socket_{'west' if x_mm < 0.0 else 'east'}"
+        f"_{'front' if z_mm < 0.0 else 'rear'}"
+    )
+
+
+# Simplicity-policy rule 5: the four sockets LOCATE the frame on the base --
+# each column tube is matched to its own bore for a close hand-slip fit, and
+# the deck's Ra 3.2 stops at the deck plane -- so every bore is a seat that
+# MUST be cut on a casting the title block otherwise leaves as CAST/MACHINED.
+# The controls live here rather than in harmonic_base_spec because only this
+# module knows COLUMN_X and the tube's Z stations, while the bore size and
+# depth come from frame_attachment_spec, which imports harmonic_base_spec.
+SOCKET_BORE_TARGET = "A1-A4 BORES"
+SOCKET_BORE_FINISHES = tuple(
+    SurfaceFinishControl(
+        socket_bore_finish_key(x, z),
+        SEAT_UM,
+        CylinderFace(COLUMN_SOCKET_DIAMETER, contains_x_mm=x, contains_z_mm=z),
+        production_method=SOCKET_BORE_TARGET,
+    )
+    for x, z in COLUMN_SOCKET_XZ
+)
+PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
 BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
 BASE_CROSS_TAP_SPEC = HoleSpec(
@@ -728,7 +763,8 @@ async def _paint_machined_faces_black(adapter) -> None:
     from solidworks_mcp.adapters.com_variant import double_array
 
     faces = _resolve_faces(
-        adapter.currentModel, {control.key: control.face for control in SURFACE_FINISHES}
+        adapter.currentModel,
+        {control.key: control.face for control in PART_SURFACE_FINISHES},
     )
     # The flange sides are bounded by the four corner arcs and the two 1/16 in
     # rim breaks, so neither dimension is the raw plate envelope.
@@ -743,6 +779,17 @@ async def _paint_machined_faces_black(adapter) -> None:
         "flange_rear": flange_face_width * flange_side_height * 1e-6,
         "flange_front": flange_face_width * flange_side_height * 1e-6,
     }
+    # Each socket bore wall loses two small windows where the cross tap passes
+    # through it (~1.3% of the cylinder), well inside the 5% band below.
+    expected_areas.update(
+        {
+            control.key: math.pi
+            * COLUMN_SOCKET_DIAMETER
+            * COLUMN_SOCKET_DEPTH
+            * 1e-6
+            for control in SOCKET_BORE_FINISHES
+        }
+    )
     values = double_array([*PANEL_BLACK, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
     for key, face in faces.items():
         area = float(face.GetArea())
@@ -1362,7 +1409,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    author_part_pmi(adapter, surface_finishes=PART_SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
