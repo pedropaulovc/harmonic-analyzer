@@ -151,7 +151,7 @@ leave it True (122 s PDF export is the only thing that clears it).
 
 ## Scratch files to delete before merge
 
-Repo-root `_frame_*_probe.py`, `_hole_callout_association_regression.py`,
+Repo-root `HANDOFF-drawing-base-astra.md`, `_frame_*_probe.py`, `_hole_callout_association_regression.py`,
 `_top_failed608_recovery_probe.py`, `_top_pocket_apply.py`, and
 `cad/scripts/diagnostics/{_base_finish_visual_probe,_base_socket_land_visual,_top_pocket_section_probe,probe_tube_dimension_geometry,diag_*_temp,repro_balloon_rendered_geometry}.py`
 — all untracked, none committed.
