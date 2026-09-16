@@ -16,6 +16,7 @@ import builtins
 import json
 import logging
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -357,6 +358,47 @@ def test_build_infra_spans_carry_their_own_resource(capture):
     # Provider ≠ context: the infra span still parents under the task span.
     assert seat_trace == task.context.trace_id
     assert wait.parent.span_id == task.context.span_id
+
+
+def test_every_resource_identifies_the_machine(capture):
+    """Azure Monitor derives ``cloud_RoleInstance`` from ``service.instance.id``, so
+    a resource without it makes a multi-worker build farm unattributable -- every
+    worker's spans land in one anonymous bucket. Both resources a process can emit
+    under (its stage and ``build-infra``) must carry it."""
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear"):
+        with _telemetry.span(
+            "com.seat.wait part:cone_gear", service=_telemetry.BUILD_INFRA_SERVICE
+        ):
+            pass
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    for name in ("task part:cone_gear", "com.seat.wait part:cone_gear"):
+        instance = finished[name].resource.attributes.get("service.instance.id")
+        assert instance, f"{name} has no service.instance.id"
+
+
+def test_instance_id_prefers_explicit_env_then_worker_identity(monkeypatch):
+    """Resolution order, most specific first: an operator's
+    ``OTEL_SERVICE_INSTANCE_ID``, then the farm worker identity (two workers can
+    share a hostname pattern but never an instance id), then the hostname, which is
+    what a developer workstation wants. ``OTEL_RESOURCE_ATTRIBUTES`` is merged by the
+    SDK itself, so an instance id declared there must not be overridden here."""
+    monkeypatch.delenv("OTEL_SERVICE_INSTANCE_ID", raising=False)
+    monkeypatch.delenv("OTEL_RESOURCE_ATTRIBUTES", raising=False)
+    monkeypatch.setenv("HARMONIC_WORKER_ID", "swmaker000005@5")
+    assert _telemetry._resolve_instance_id() == "swmaker000005@5"
+
+    monkeypatch.setenv("OTEL_SERVICE_INSTANCE_ID", "operator-choice")
+    assert _telemetry._resolve_instance_id() == "operator-choice"
+
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "service.instance.id=from-env")
+    assert _telemetry._resolve_instance_id() is None
+
+    monkeypatch.delenv("OTEL_RESOURCE_ATTRIBUTES")
+    monkeypatch.delenv("OTEL_SERVICE_INSTANCE_ID")
+    monkeypatch.delenv("HARMONIC_WORKER_ID")
+    assert _telemetry._resolve_instance_id() == socket.gethostname()
 
 
 def test_process_startup_is_billed_to_the_parent_trace(capture, monkeypatch):
