@@ -743,6 +743,9 @@ def project_part_pmi(
 
     for datum in datums:
         placement = placements[datum.key]
+        # No position_tolerance_m here: that field bounds an FCF's frame-corner
+        # drift; a datum tag's readback is its leader junction (see
+        # add_datum_feature) and keeps the helper's measured default.
         tag = add_datum_feature(
             adapter,
             placement.view,
@@ -753,7 +756,6 @@ def project_part_pmi(
             label=f"{label} {datum.key}",
             entity_type=placement.attachment_type,
             entity=placement.entity,
-            position_tolerance_m=placement.position_tolerance_m,
         )
         projected[datum.key] = _name(
             tag.GetAnnotation(), datum.annotation_name, datum.key

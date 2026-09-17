@@ -270,7 +270,6 @@ async def build(adapter: Any) -> dict[str, str]:
                     END_CENTER[1] + _DATUM_B_OFFSET[1],
                 ),
                 attachment_xy=stud_circle_at_datum_b,
-                position_tolerance_m=0.00003,
             ),
             # +0.052 in y put the frame's 8 mm half-box 8.3 mm over the top
             # margin. Held to +0.045 and pushed out to +0.058 in x, which keeps
