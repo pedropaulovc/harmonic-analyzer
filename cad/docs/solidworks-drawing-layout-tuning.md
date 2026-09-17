@@ -43,10 +43,17 @@ measured.
 Standalone, on a built drawing, without touching a recipe:
 
 ```bash
-HARMONIC_SW_AUTOSTART=0 HARMONIC_COM_SEAT=audit:layout \
-  uv run cad/scripts/diagnostics/drawing_layout_audit.py \
+uv run cad/scripts/diagnostics/drawing_layout_audit.py \
   cad/out/slddrw/<part>.SLDDRW [--json dump.json] [--sheet N] [--quiet]
 ```
+
+It holds the machine-global COM seat lock (`dodo._com_seat`) for the whole
+open-audit-close, so it queues behind a running `doit` build instead of landing
+inside it. Never bypass that with a bare attach: an attach-only `OpenDoc6`
+changes the seat's active document and a sibling part build mid-sketch dies in a
+plain selection call (three `part:top_frame` builds were lost that way on
+2026-09-16 to an unlocked probe). Any read-only COM probe you write gets the
+same `with dodo._com_seat("<label>"):` wrapper.
 
 Exit 1 means findings. The dump lists, per sheet: size, inner border from
 `ISheet::GetZoneMargin`, the title-block keep-out, every view's outline / scale /

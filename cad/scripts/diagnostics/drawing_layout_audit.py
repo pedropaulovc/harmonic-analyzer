@@ -71,10 +71,17 @@ HOW TO RUN IT
 Attach-only against the running seat; it never launches SolidWorks, never
 saves, and closes only the document it opened, by path::
 
-    HARMONIC_SW_AUTOSTART=0 HARMONIC_COM_SEAT=audit:layout \
-        uv run cad/scripts/diagnostics/drawing_layout_audit.py \
+    uv run cad/scripts/diagnostics/drawing_layout_audit.py \
         C:/src/harmonic-analyzer/cad/out/slddrw/tube-frame.SLDDRW \
         [--json out.json] [--sheet 1]
+
+It takes the machine-global COM seat lock itself (``dodo._com_seat``, the same
+lock every ``doit`` COM task holds) for the whole open-audit-close, so it QUEUES
+behind a running build instead of landing inside it. That is not hygiene: an
+attach-only ``OpenDoc6`` changes the seat's active document, and a sibling part
+build mid-sketch then fails in a plain selection call (``hole wizard hanger stud
+holes: face Select failed`` -- three ``part:top_frame`` builds lost this way on
+2026-09-16 to an unlocked probe opening a drawing every minute or two).
 
 Exit status is 1 when any finding is reported, 0 when the layout is clean.
 
@@ -102,8 +109,10 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import _telemetry  # noqa: E402
+import dodo  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
 from _layout_geometry import (  # noqa: E402
@@ -919,17 +928,16 @@ def main(argv: list[str] | None = None) -> int:
     path = arguments.drawing.resolve()
     if not path.is_file():
         raise SystemExit(f"no such drawing: {path}")
-    if os.environ.get("HARMONIC_SW_AUTOSTART") != "0":
-        raise SystemExit(
-            "refusing to run without HARMONIC_SW_AUTOSTART=0: this audit must "
-            "attach to the running seat, never launch or recover one"
-        )
-    if not os.environ.get("HARMONIC_COM_SEAT"):
-        raise SystemExit(
-            "refusing to run without HARMONIC_COM_SEAT: the seat is shared with "
-            "whoever is building, and must be claimed before opening a document"
-        )
+    # Attach to the running seat, never launch or recover one.
+    os.environ["HARMONIC_SW_AUTOSTART"] = "0"
+    # Hold the seat for the whole open-audit-close: ``_com_seat`` queues behind any
+    # running doit COM task (and makes them queue behind us), and sets
+    # HARMONIC_COM_SEAT so the adapter's seat guard sees a claimed seat.
+    with dodo._com_seat(f"audit:layout {path.stem}"):
+        return _audit_under_seat(arguments, path)
 
+
+def _audit_under_seat(arguments: argparse.Namespace, path: Path) -> int:
     app, document = _attach(None, path)
     try:
         sheets = collect_document(None, document)
