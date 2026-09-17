@@ -70,11 +70,7 @@ def test_native_gdt_and_finish_present() -> None:
     assert 'bar_height = add_edge_dimension(' in source
     assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
     assert source.count("add_datum_feature(") == 3
-    assert (
-        'label="fulcrum bore axis",\n        position_tolerance_m=0.0001'
-        in source
-    )
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert 'label="fulcrum bore axis",' in source
     assert source.count("_force_dimension_black(") == 3
     assert source.count("annotation.Color = 0") == 1
     assert "annotation.LayerOverride" in source

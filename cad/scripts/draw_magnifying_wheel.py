@@ -187,7 +187,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] + 0.016),
         datum="A",
         label="axle bore axis",
-        position_tolerance_m=1e-4,
     )
     add_feature_control_frame(
         adapter,

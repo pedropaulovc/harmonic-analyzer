@@ -1,15 +1,15 @@
 """Behavioral datum-placement regressions; all COM boundaries are test doubles.
 
-The original requested-position failures below are copied from the published
-candidate-2d-datum-retry-full.log. Native cases exercise the separately approved
-two-recipe helper; requested cases also cover initial leader-mode transitions.
+Requested-position cases pin the measured ``IAnnotation::GetPosition`` contract
+(see ``add_datum_feature``): a correct placement reads up to ~17 mm from its
+request, an ignored move stays at the default drop by the attachment. Native
+cases exercise the separately approved two-recipe helper; requested cases also
+cover initial leader-mode transitions.
 """
 
 from __future__ import annotations
 
-import hashlib
 import math
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -187,36 +187,32 @@ def native(harness, **changes):
 
 
 @pytest.mark.parametrize(
-    "label,requested,actual,limit",
+    "label,requested,actual,persists",
     (
-        ("lift rod axis", (0.055, 0.22899999999999998),
-         (0.05499999999999966, 0.22897646401719635, 0.0), 0.00002),
-        ("rack pinion bore axis", (0.22, 0.20099999999999998),
-         (0.21999999999999942, 0.20083662770023045, 0.0015), 0.0001),
+        # drawing:pinion_cam datum C (2026-09-16): OD-attached tag, prints at
+        # the request, reads 17.3 mm from it.
+        ("cam OD datum axis", (0.155, 0.105),
+         (0.1422600487567706, 0.11665705540246048, 0.0135), True),
+        # An ignored move: the tag stays at its default drop, ~15 mm off the
+        # attachment at (0.105, 0.135) and 45 mm from the request.
+        ("cam OD datum axis", (0.155, 0.105), (0.115, 0.125, 0.0135), False),
     ),
 )
-def test_original_requested_failures_still_reject(
-    harness, label, requested, actual, limit,
+def test_requested_position_bounds_readback_distance(
+    harness, label, requested, actual, persists,
 ):
-    receipt = Path(__file__).parents[1] / (
-        "docs/pipeline/evidence/vm2-datum-placement/raw/"
-        "candidate-2d-datum-retry-full.log"
-    )
-    raw = receipt.read_bytes()
-    assert hashlib.sha256(raw).hexdigest() == (
-        "a7ec86f9a83f2ff9bc7717f940e19c238a494f0352e0c613ddab89853184061f"
-    )
-    text = raw.decode("utf-8")
-    assert f"({label}): {actual[:2]}; requested={requested}" in text
     harness.annotation.requested_readback = actual
-    with pytest.raises(RuntimeError, match="position did not persist"):
-        common.add_datum_feature(
-            harness.adapter, harness.view, edge_xy=(0.1, 0.1),
-            symbol_xy=requested, datum="A", label=label,
-            position_tolerance_m=limit,
-        )
+    kwargs = dict(
+        edge_xy=(0.105, 0.13527), symbol_xy=requested, datum="C", label=label,
+    )
+    if persists:
+        tag = common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        assert tag is harness.tag
+    else:
+        with pytest.raises(RuntimeError, match="position did not persist"):
+            common.add_datum_feature(harness.adapter, harness.view, **kwargs)
+        assert harness.rebuild_calls == 0
     assert harness.annotation.set_calls == [(*requested, 0.0)]
-    assert harness.rebuild_calls == 0
 
 
 def test_requested_default_still_positions_once(harness):

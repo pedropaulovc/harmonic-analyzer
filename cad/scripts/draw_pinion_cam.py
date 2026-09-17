@@ -259,7 +259,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=bore_symbol,
         datum="B",
         label="cam final bore axis",
-        position_tolerance_m=1e-4,
     )
     add_datum_feature(
         adapter,
@@ -268,7 +267,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.155, 0.105),
         datum="C",
         label="cam OD datum axis",
-        position_tolerance_m=1e-4,
     )
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
@@ -280,7 +278,6 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.192, 0.170),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=1e-4,
     )
     add_feature_control_frame(
         adapter,

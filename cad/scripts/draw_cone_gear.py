@@ -133,7 +133,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="cone gear bore axis",
         shoulder=True,
-        position_tolerance_m=0.0001,
     )
     add_feature_control_frame(
         adapter,

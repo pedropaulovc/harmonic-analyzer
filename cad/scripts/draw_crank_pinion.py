@@ -131,15 +131,17 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
     tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
 
+    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0)
     add_datum_feature(
         adapter,
         front,
-        entity=bore_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + 0.033),
+        edge_xy=bore_top,
+        # Upper-left of the bore: the mirror spot upper-right sits on the
+        # end-face FCF's "2X AXIAL END FACES" text.
+        symbol_xy=(FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + 0.033),
         datum="A",
         label="crank pinion bore axis",
         shoulder=True,
-        position_tolerance_m=0.080,
     )
     add_feature_control_frame(
         adapter,

@@ -15,7 +15,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, NamedTuple, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
 
 import _config
@@ -377,53 +377,6 @@ def _validate_surface_finish_control_face(
     )
 
 
-# TEMPORARY experiment flag: audit datum placement readbacks without
-# rejecting them, so one live run reveals the real SolidWorks contract.
-_PLACEMENT_AUDIT_ONLY = True
-
-
-class LeaderPlacement(NamedTuple):
-    """How a placed annotation's readback relates to the point it was given.
-
-    ``lateral`` is the distance from the ray the author drew (attachment point
-    towards requested point) -- the quantity that says whether the leader still
-    points where it was aimed.  ``pull_in`` is how much nearer the attachment
-    the readback sits *along* that ray: positive towards the attachment,
-    negative past the requested point.
-    """
-
-    lateral: float
-    pull_in: float
-
-
-def leader_placement(
-    actual: tuple[float, float],
-    requested: tuple[float, float],
-    anchor: tuple[float, float],
-) -> LeaderPlacement:
-    """Decompose an annotation readback about the leader the author drew.
-
-    ``IAnnotation::SetPosition2`` places the symbol, but ``GetPosition`` reports
-    a shouldered datum tag's leader knee rather than that symbol point, so the
-    two differ by a shoulder length *along the leader* even though the move
-    persisted exactly. Measured on ``drawing:pinion_cam`` datum D (2026-09-16,
-    identical on two workers): requested and reported points share a bearing of
-    -166.033 deg about the boss axis to six decimals while the reported radius
-    is 4.795 mm shorter. Comparing the raw points instead makes that shoulder
-    look like a failed placement, which is why such sites accumulated
-    hand-tuned millimetre slack that drifts with the geometry.
-    """
-
-    span_x, span_y = requested[0] - anchor[0], requested[1] - anchor[1]
-    span = math.hypot(span_x, span_y)
-    offset_x, offset_y = actual[0] - anchor[0], actual[1] - anchor[1]
-    if span == 0.0:
-        return LeaderPlacement(math.hypot(offset_x, offset_y), 0.0)
-    unit_x, unit_y = span_x / span, span_y / span
-    along = offset_x * unit_x + offset_y * unit_y
-    return LeaderPlacement(abs(offset_x * unit_y - offset_y * unit_x), span - along)
-
-
 @_telemetry.traced("drawing.datum_feature", label_param="label")
 def add_datum_feature(
     adapter: Any,
@@ -438,8 +391,7 @@ def add_datum_feature(
     entity: Any | None = None,
     annotation: Any | None = None,
     shoulder: bool = False,
-    position_tolerance_m: float = 1.5e-5,
-    leader_shoulder_limit_m: float = 0.02,
+    position_tolerance_m: float = 0.02,
     callout_below: str = "",
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
@@ -447,13 +399,20 @@ def add_datum_feature(
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
 
-    ``position_tolerance_m`` bounds how far the placed tag may sit *off* the
-    leader the caller aimed (attachment point towards ``symbol_xy``);
-    ``leader_shoulder_limit_m`` bounds how far back *along* that leader
-    ``GetPosition`` may report it, which is a shoulder length, not a failed
-    move. An ignored ``SetPosition2`` leaves the tag near its attachment and so
-    exceeds the shoulder allowance; a tag placed off-aim fails the lateral
-    bound. See ``leader_placement``.
+    ``position_tolerance_m`` bounds how far ``IAnnotation::GetPosition`` may
+    read from ``symbol_xy`` after the move. That readback is the point where
+    the leader meets the symbol, not the symbol centre, and an edge attachment
+    re-solves along its edge once the tag moves, so a correctly placed tag
+    reads up to its half-extent plus that re-solve away from the request:
+    measured 4.8 mm on ``drawing:pinion_cam`` datum D and 17.3 mm on its
+    OD-attached datum C (2026-09-16, identical on two seats; both print at the
+    request). An ignored ``SetPosition2`` leaves the tag at its default drop,
+    12-20 mm off the attachment and 40 mm+ from any request it was aimed at,
+    which the 20 mm default rejects. The readback is not a ray from the picked
+    point (datum C's bearing swung 4.7 deg), so decomposing it about that ray
+    rejects good placements; and in the authoring session
+    ``IDatumTag::GetLineAtIndex`` stays frozen at the insertion geometry through
+    a rebuild, so it cannot serve as a readback here.
     """
     draw = adapter.currentModel
     if annotation is None:
@@ -534,50 +493,21 @@ def add_datum_feature(
     if not actual_position:
         raise RuntimeError(f"datum {datum} reports no position ({label})")
     actual_xy = (float(actual_position[0]), float(actual_position[1]))
-    if edge_xy is None:
-        # No attachment point to aim from (an entity-anchored tag), so the raw
-        # points are all there is to compare.
-        offset = math.hypot(actual_xy[0] - symbol_xy[0], actual_xy[1] - symbol_xy[1])
-        placement = LeaderPlacement(offset, 0.0)
-    else:
-        placement = leader_placement(actual_xy, symbol_xy, edge_xy)
-    # TEMPORARY placement audit: dump what SolidWorks reports about the leader
-    # so the guard can assert the reported geometry instead of a model derived
-    # from the picked anchor. Remove once the contract is pinned.
-    try:
-        leader_audit = _sw_type_info.early_bound_or_flag(
-            tag_annotation,
-            "IAnnotation",
-            "GetLeaderCount",
-            "GetLeaderStyle",
-            "GetLeaderPointsAtIndex",
-        )
-        audit_count = int(leader_audit.GetLeaderCount())
-        audit_style = int(leader_audit.GetLeaderStyle())
-        audit_points = [
-            list(leader_audit.GetLeaderPointsAtIndex(i) or []) for i in range(audit_count)
-        ]
-    except Exception as exc:  # noqa: BLE001 - diagnostic only
-        audit_count, audit_style, audit_points = -1, -1, [repr(exc)]
-    _telemetry.info(
-        f"[audit] datum {datum} ({label}) requested={symbol_xy} anchor={edge_xy} "
-        f"reported={actual_xy} forced_shoulder={forced_shoulder}->{bool(tag.ForcedShoulder)} "
-        f"shoulder={bool(tag.Shoulder)} leaders={audit_count} style={audit_style} "
-        f"points={audit_points} lateral={placement.lateral:.6g} pull_in={placement.pull_in:.6g}"
+    offset = math.hypot(actual_xy[0] - symbol_xy[0], actual_xy[1] - symbol_xy[1])
+    _telemetry.event(
+        "datum.placement",
+        datum=datum,
+        requested_x=symbol_xy[0],
+        requested_y=symbol_xy[1],
+        reported_x=actual_xy[0],
+        reported_y=actual_xy[1],
+        offset_m=offset,
     )
-    if _PLACEMENT_AUDIT_ONLY:
-        pass  # TEMPORARY: collect every datum's readback in one run, reject nothing.
-    elif placement.lateral > position_tolerance_m:
-        raise RuntimeError(
-            f"datum {datum} left its leader ({label}): {actual_xy}; "
-            f"requested={symbol_xy}, lateral={placement.lateral:.6g} m, "
-            f"limit={position_tolerance_m:.6g} m"
-        )
-    elif not -position_tolerance_m <= placement.pull_in <= leader_shoulder_limit_m:
+    if offset > position_tolerance_m:
         raise RuntimeError(
             f"datum {datum} position did not persist ({label}): {actual_xy}; "
-            f"requested={symbol_xy}, pull_in={placement.pull_in:.6g} m, "
-            f"allowed=[{-position_tolerance_m:.6g}, {leader_shoulder_limit_m:.6g}] m"
+            f"requested={symbol_xy}, offset={offset:.6g} m, "
+            f"limit={position_tolerance_m:.6g} m"
         )
     if str(tag.GetLabel()) != datum:
         raise RuntimeError(f"datum feature label did not persist ({label})")

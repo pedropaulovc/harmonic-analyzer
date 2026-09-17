@@ -75,6 +75,7 @@ display mode, and every annotation's text box, `GetPosition`, and line segments.
 | Inner border keep-out | `ISheet::GetZoneMargin(swZoneMargin_e)` — **takes the side as an argument** (top 0, bottom 1, right 2, left 3) | `types/ISheet/GetZoneMargin.md`, `enums/swZoneMargin_e.md` |
 | Every sheet, without activating any | `IDrawingDoc::GetSheetNames` + `IDrawingDoc::Sheet(name)` -> `ISheet`, then `ISheet::GetViews` | `types/IDrawingDoc/GetSheetNames.md`, `types/ISheet/GetViews.md` |
 | Dimensions on an INACTIVE sheet | `IView::GetFirstDisplayDimension6` | `types/IView/GetFirstDisplayDimension6.md` ("obsoletes ...5 by supporting inactive sheets") |
+| Where a datum tag REALLY went after `SetPosition2` | `IAnnotation::GetPosition` — the leader/symbol junction, not the symbol centre: reads 0–5 mm from the request on a straight attachment, 17 mm on an OD-attached tag whose attachment re-solved along the edge (bearing swung 4.7°). `IAnnotation::GetLeaderCount` is 0 for every datum tag, and in the authoring session `IDatumTag::GetLineCount/GetLineAtIndex` stay frozen at the INSERTION geometry through a rebuild — useless as a readback. | `drawing:pinion_cam` datums A–D, 2026-09-16, two seats; `_drawing_common.add_datum_feature` |
 
 All of it is **sheet space, metres**, origin at the sheet's lower-left — for
 view-owned annotations too (measured: a dimension inside a view 102 mm from the
@@ -266,6 +267,20 @@ regardless of the viewing transform". In a DRAWING, "use model space view to
 determine the selection vector" — project through `IView::ModelToViewTransform`
 (get-only, `types/IView/ModelToViewTransform.md`), which is what
 `_drawing_common.model_point_in_view` wraps.
+
+**h. A datum tag that will not leave its attachment.**
+Don't: attach a datum tag to a bore by selecting the edge OBJECT
+(`add_datum_feature(entity=visible_circle_edge(...), shoulder=True)`) and then
+loosen the placement guard until the build passes. `SetPosition2` returns True
+and the tag stays at its default drop on the far side of the bore — crank_pinion
+datum A read 60.3 mm from its request and printed on top of the Ø dimension
+leader; the 80 mm `position_tolerance_m` that let it through was added in the
+same commit as the `entity=` pick (73a3ceb1).
+Do: pick the edge by SHEET POINT (`edge_xy=bore_top`, as cone_gear and the
+transgear recipes do); the same tag then reads 8.0 mm from its request and
+prints there. Keep the guard at its 20 mm default and tighten it only where the
+leader itself is shorter than 20 mm (a snap-back would pass otherwise:
+channel_lever, platen_guide, rocker_arm, cone_tip_block E).
 
 ## The sheet-split rule
 
