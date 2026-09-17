@@ -727,8 +727,7 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
         leaf_timeout_s=None,
     )
     assert request.traceparent is None or request.traceparent.startswith("00-")
-    assert options["id"] == _farm.workflow_id("part:pen_rod", "k" * 64, IDENTITY)
-    assert options["id"] == "leaf:part:pen_rod:" + "k" * 64
+    assert options["id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
     assert options["task_queue"] == "solidworks-control"
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
@@ -744,8 +743,11 @@ def test_a_run_can_raise_the_per_leaf_budget(temporal_boundary, monkeypatch):
 
     _farm.run_leaf("part:pen_rod", "k" * 64)
 
-    [(_, request, _options)] = calls["start"]
+    [(_, request, options)] = calls["start"]
     assert request.leaf_timeout_s == 5400
+    # A raised budget cannot attach to a running 15 min execution: Temporal
+    # cannot widen an existing run's timeout, so the budget is part of the id.
+    assert options["id"].endswith(":5400s")
 
 
 def test_an_unreadable_budget_stops_the_run_instead_of_dispatching(

@@ -36,6 +36,9 @@ NAMESPACE = "solidworks"
 CONFIG_ENV = "SOLIDWORKS_POOL_CONFIG"
 DEFAULT_CONFIG_PATH = Path.home() / ".solidworks-pool" / "config.json"
 EXECUTION_TIMEOUT = timedelta(hours=8)
+LEAF_TIMEOUT_DEFAULT_S = 15 * 60
+LEAF_TIMEOUT_MIN_S = 60
+LEAF_TIMEOUT_MAX_S = 3 * 3600
 
 
 @dataclass(frozen=True)
@@ -47,7 +50,7 @@ class LeafRequest:
     cache_key: str | None  # 64-hex expected buildcache key; None only for check:*
     traceparent: str | None
     submitter: str  # f"{user}@{host}", UI summary only
-    leaf_timeout_s: int | None  # per-attempt budget; None takes the default
+    leaf_timeout_s: int | None = None  # per-attempt budget; None takes the default
 
 
 @dataclass(frozen=True)
@@ -62,8 +65,23 @@ class LeafResult:
     failure_message: str | None  # <=1000 chars, CR/LF stripped
 
 
-def workflow_id(task: str, cache_key: str | None, source_identity: str) -> str:
-    return f"leaf:{task}:{cache_key or source_identity[:16]}"
+def clamp_leaf_timeout_s(requested: int | None) -> int:
+    """The budget the farm will actually grant, mirroring its own clamp.
+
+    The control plane clamps whatever it is given; the submitter computes the
+    same value so the workflow id it dedupes on matches the budget the leaf
+    will really run under.
+    """
+
+    if requested is None:
+        return LEAF_TIMEOUT_DEFAULT_S
+    return max(LEAF_TIMEOUT_MIN_S, min(LEAF_TIMEOUT_MAX_S, requested))
+
+
+def workflow_id(
+    task: str, cache_key: str | None, source_identity: str, timeout_s: int
+) -> str:
+    return f"leaf:{task}:{cache_key or source_identity[:16]}:{timeout_s}s"
 
 
 def enabled() -> bool:
@@ -177,8 +195,10 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             submitter=submitter(),
             leaf_timeout_s=leaf_timeout_s(),
         )
-        wf_id = workflow_id(task, cache_key, request.source_identity_sha256)
+        budget = clamp_leaf_timeout_s(request.leaf_timeout_s)
+        wf_id = workflow_id(task, cache_key, request.source_identity_sha256, budget)
         sp.set_attribute("workflow_id", wf_id)
+        sp.set_attribute("leaf_timeout_s", budget)
         result = asyncio.run(_dispatch(request, wf_id))
         sp.set_attribute("worker", result.worker_id)
         sp.set_attribute("attempt", result.attempt)
