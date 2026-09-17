@@ -1221,7 +1221,10 @@ def _place_package(adapter: Any) -> None:
         adapter, instruction_iso, False, label="assembly instruction isometric"
     )
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
-    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.115), label="assembly checks")
+    # 34 lines at ~4.7 mm pitch run the sequence block down to ~0.104; the
+    # checks block starts under it with a line of clearance (0.115 overprinted
+    # step 10 with the checks heading, seen on the 2026-09-17 render).
+    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.095), label="assembly checks")
     _add_note_block(
         adapter,
         "FINISHED ASSEMBLY 1:7",
