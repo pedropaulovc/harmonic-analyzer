@@ -155,7 +155,18 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      "hidden lines ON in every orthographic view" rule: on the castings it
      buried every dimension in dashed haystacks and drove the crowding
      that rule 8 now resolves with extra sheets.)
-   - One origin per view; the overall length is real and conspicuous.
+   - One origin per view, and it is a FEATURE: every location dimension
+     starts on something the shop can indicate or pick up -- a finished
+     face or edge, the axis of a real bore or boss -- never a construction
+     centreline, a symmetry axis or the model origin with nothing there.
+     "LOCATIONS FROM FRAME CENTRE" is mid-air with a note on it; a centre
+     the machinist must first derive from a symmetric pattern is that
+     derivation's own stack-up. Baseline (or ordinate) from that one datum,
+     never chained feature to feature. (A Hole Wizard placement sketch
+     cannot carry a datum point -- every point in it is a hole -- so a
+     hole's model dims stay origin-based; the print dimensions it from the
+     datum feature with a driven dimension picked on both features.) The
+     overall length is real and conspicuous.
    - Turned parts: oriented as they sit in the lathe, diameters on the side
      view (not leader-piled on the end view), lengths from one faced end.
    - Slots dimensioned to the radius centres; chamfers preferred to radii on

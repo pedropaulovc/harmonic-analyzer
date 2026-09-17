@@ -211,6 +211,34 @@ edges, or call `SetPartialSection(False)`
 give the line's actual extent to compare against `IView::GetOutline`.
 (`ISectionViewData` is the MODEL-side section-view feature — `FirstPlane`,
 `GraphicsOnlySection` — not the drawing section; do not reach for it here.)
+When a short line is what you WANT — an ASME removed section through one rail
+of a symmetric frame, not that rail and its unannotated twin — ask for it:
+`_drawing_common.create_section_view(..., partial=True)` passes
+`swCreateSectionView_Partial` (0x10) to `CreateSectionViewAt5`, SolidWorks
+sections just the span, the cut closes, and `GetPartialSection()` reads True by
+design (top-frame B-B/E-E; the recipe's `_assert_section_display(removed=True)`
+pins it). Centre the line's span on the profile you dimension: a partial section
+is centred on the cut span, so `view_xy` places that profile, not the old
+full-cut centre.
+
+**f2. Face labels on a pictorial read as leaders crossing the view.**
+Don't: insert the label as a sheet note. A note whose leader ENDS on a view
+is, to the audit, a sheet-owned leader crossing that view (12 findings for six
+labels), and it does not move with the view.
+Do: insert it while the view is active — `add_leader_note(..., view=view)`
+activates the view first and proves `IAnnotation::OwnerType ==
+swAnnotationOwner_DrawingView` (0) — so the view owns it, lists it under
+`GetAnnotations`, and the audit exempts the one view a leader is allowed to land
+on. `place_pictorial_sheet` does this for every octant face label.
+
+**f3. Face names: the print's or the machine's?** Pictorial face labels are
+the PRINT's (FRONT = the face `*Front` shows, +Z; RIGHT = +X) — the ASME
+orientation-key reading every fleet caption follows. The MACHINE's front is
+model −Z (`dimensions.yaml` "Z = depth (− front)"), and model-owned dimension
+names carry that word (`StudFrontZ` → "FRONT HANGER Z"). A blind reviewer reads
+the two as conflicting locations; resolve it with one key note on the priming
+sheet saying which is which (top-frame `ORIENTATION_KEY_TEXT`), never by
+flipping the model names.
 
 **g. Picking one of four identical bores.**
 Don't: `SelectByID2("CylinderFace", "FACE", 0, 0, 0, ...)` and hope. A generated
