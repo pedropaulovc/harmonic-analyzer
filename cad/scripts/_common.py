@@ -2114,6 +2114,55 @@ def _visible_document_paths(adapter: Any) -> list[str]:
     return paths
 
 
+def _resident_output_documents(adapter: Any) -> list[str]:
+    """Paths of EVERY resident document (visible or hidden) under ``cad/out``.
+
+    A hidden resident -- the part behind a closed drawing, the children of a
+    reopened assembly -- still holds a Windows share lock on its file, so this
+    is the set that would fail a later ``cad/out`` write (a cache restore over
+    the file, a from-scratch rebuild deleting it). Toolbox residents live
+    outside ``cad/out`` and are excluded by construction."""
+    out_root = (CAD_ROOT / "out").resolve()
+    paths: list[str] = []
+    doc = adapter.swApp.GetFirstDocument()
+    while doc is not None:
+        doc = _early_bound(doc, "IModelDoc2")
+        path = str(doc.GetPathName() or "")
+        if path and Path(path).resolve().is_relative_to(out_root):
+            paths.append(path)
+        doc = doc.GetNext()
+    return paths
+
+
+def discard_open_documents(adapter: Any) -> None:
+    """Close every open document WITHOUT a "Save Modified Documents" prompt.
+
+    The transient-drive paths author real mates (and verify's pen sweep installs
+    equations), so the reopened assembly (and its referenced children) are
+    DIRTY. ``CloseAllDocuments(True)`` still pops the save modal for a dirty
+    referenced child in 3DX R2026x -- headless, that hangs the run forever.
+    This mirrors ``cut_release._discard_open_documents``: close the active doc
+    by TITLE first (``CloseDoc`` discards a dirty doc without saving, and
+    closing the assembly title drops its hidden components too), then
+    ``CloseAllDocuments(True)`` as a backstop with nothing dirty left to prompt
+    about. Bounded so a misbehaving session can't spin; an empty title is
+    refused (``CloseDoc("")`` silently no-ops on assemblies and would leave the
+    document resident)."""
+    for _ in range(500):
+        doc = adapter._attempt(lambda: _read_member(adapter.swApp, "IActiveDoc2"),
+                               default=None)
+        if doc is None:
+            break
+        title = str(_read_member(doc, "GetTitle") or "")
+        if not title:
+            raise RuntimeError(
+                "active document has an empty title -- refusing CloseDoc(''), which "
+                "silently no-ops on assemblies and would leave the document resident"
+            )
+        adapter._attempt(lambda t=title: adapter.swApp.CloseDoc(t), default=None)
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+
+
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
@@ -2194,18 +2243,22 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                 # inspecting an artefact in the UI — leaves documents open, and
                 # saving over (or deleting) an open path fails. Verified, not
                 # best-effort: a document that refuses to close would surface later
-                # as an opaque save/permission error mid-build. Only VISIBLE
-                # documents count: SolidWorks keeps Toolbox library parts (e.g.
-                # `binding head screw_ai.sldprt` behind a Hole Wizard insert) as
-                # hidden residents that CloseAllDocuments/QuitDoc never release.
-                adapter.swApp.CloseAllDocuments(True)
-                holding = _visible_document_paths(adapter)
+                # as an opaque save/permission error mid-build. Discard by title
+                # first (a crashed build leaves DIRTY documents, and a bare
+                # ``CloseAllDocuments(True)`` pops the save modal for a dirty
+                # referenced child -- headless, forever). Only cad/out residents
+                # count, hidden ones included: a hidden referenced part still
+                # share-locks its file, while Toolbox library parts (e.g. `binding
+                # head screw_ai.sldprt` behind a Hole Wizard insert) live outside
+                # cad/out and are residents CloseAllDocuments never releases.
+                discard_open_documents(adapter)
+                holding = _resident_output_documents(adapter)
                 if holding:
                     raise RuntimeError(
-                        f"{len(holding)} document(s) still open after "
-                        f"CloseAllDocuments: {holding}"
+                        f"{len(holding)} cad/out document(s) still open after "
+                        f"discard_open_documents: {holding}"
                     )
-                _telemetry.success("CloseAllDocuments (clean session)")
+                _telemetry.success("all documents closed (clean session)")
                 _pin_default_part_template(adapter)
             # Group the build's own operations (inserts, the mate chokepoint, the
             # per-config gates) under ONE ``<kind>.build`` phase span, a sibling of
@@ -2223,8 +2276,35 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # Teardown is its own span so a disconnect failure is attributable
             # and never a silent gap before process exit. The watchdog stop is
             # outermost so telemetry teardown cannot leave it armed.
+            #
+            # Leave the seat holding NO cad/out document. SolidWorks keeps every
+            # document the build touched resident after the COM session ends --
+            # a part after its own build, the (hidden) referenced models behind
+            # a closed drawing, the reopened assembly and its children -- and each
+            # holds a share lock on its file. The next task's cache restore runs
+            # BEFORE any COM session (outside the seat, so before the connect-time
+            # CloseAllDocuments above) and its extract then fails with
+            # PermissionError, falling through to a local rebuild whose exact
+            # ``.execution`` token no peer can reproduce: on a farm worker that
+            # silently forks every dependent's cache key off the submitter's
+            # (observed 2026-09-17: worker 4 rebuilt measuring_stick behind the
+            # open top-assembly drawing and `cache_missing`-failed the leaf).
+            # Warn-only: a document that refuses to close is a hazard for the
+            # NEXT task, not a failure of this one, and connect re-checks loud.
             try:
                 async with _telemetry.aspan("sw.disconnect"):
+                    try:
+                        discard_open_documents(adapter)
+                        holding = _resident_output_documents(adapter)
+                        if holding:
+                            _telemetry.warn(
+                                f"{len(holding)} cad/out document(s) still resident "
+                                f"after teardown close: {holding}"
+                            )
+                        else:
+                            _telemetry.success("all documents closed (seat left clean)")
+                    except Exception as exc:  # noqa: BLE001
+                        _telemetry.warn(f"teardown close failed: {exc}")
                     try:
                         await adapter.disconnect()
                         _telemetry.success("disconnected")

@@ -1836,13 +1836,22 @@ _SW_SHADED_EDGES = 7
 
 @_telemetry.traced("drawing.shaded_with_edges", label_param="label")
 def set_high_quality_shaded_with_edges(adapter: Any, view: Any, *, label: str) -> None:
-    """Set and verify a Shaded With Edges drawing view (precision proven post-export)."""
-    ok = adapter._attempt(
-        lambda: view.SetDisplayMode4(False, _SW_SHADED, False, True, True),
-        default=False,
+    """Set and verify a Shaded With Edges drawing view (precision proven post-export).
+
+    ``SetDisplayMode4`` returns False when the view ALREADY reads the requested
+    mode (frame_assembly sets its exploded isometric before the BOM/balloon
+    pass, then ``finalize_drawing`` re-applies it: readback mode 3, edges True,
+    use_parent False, no COM error -- 2026-09-17), so the setter's bool is not
+    the proof. Only a COM exception is fatal here; the readback below is the
+    contract either way.
+    """
+    _ok, error = adapter._attempt_with_error(
+        lambda: view.SetDisplayMode4(False, _SW_SHADED, False, True, True)
     )
-    if not ok:
-        raise RuntimeError(f"{label}: failed to set Shaded With Edges display")
+    if error is not None:
+        raise RuntimeError(
+            f"{label}: SetDisplayMode4 raised {error!r}"
+        ) from error
 
     mode = adapter._attempt(lambda: view.GetDisplayMode2(), default=None)
     use_parent = adapter._attempt(lambda: view.GetUseParentDisplayMode(), default=None)

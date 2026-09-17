@@ -312,8 +312,9 @@ def test_run_build_cleans_up_when_session_setup_fails(
     )
     monkeypatch.setattr(_common._watchdog, "start", Mock())
     monkeypatch.setattr(_common._watchdog, "stop", Mock())
+    monkeypatch.setattr(_common, "discard_open_documents", Mock())
     monkeypatch.setattr(
-        _common, "_visible_document_paths", lambda _adapter: ["stuck.SLDDRW"]
+        _common, "_resident_output_documents", lambda _adapter: ["stuck.SLDDRW"]
     )
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])

@@ -167,6 +167,40 @@ def test_restore_miss_logs_event_at_debug(tmp_path, fake, monkeypatch):
     assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
 
 
+def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_through(
+    tmp_path, fake, monkeypatch
+):
+    """The one restore failure that must not become "building locally": a cached
+    build exists but SolidWorks still holds the output (Windows share lock), and
+    a local rebuild would mint a token the fleet cannot reproduce."""
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    fake.blobs[key] = b"payload"
+
+    def refuse(_blob):
+        raise PermissionError(13, "Permission denied", "cad/out/sldprt/x.SLDPRT")
+
+    monkeypatch.setattr(cache, "_unpack", refuse)
+
+    with pytest.raises(cache.RestoreLocked, match="share-locked") as info:
+        cache.restore(key, [], "part:x")
+
+    assert info.value.key == key
+    assert [e["event"] for e in _events(tmp_path)] == ["restore_locked"]
+
+
+def test_restore_other_unpack_errors_still_fall_through(tmp_path, fake, monkeypatch):
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    fake.blobs[key] = b"payload"
+    monkeypatch.setattr(
+        cache, "_unpack", lambda _blob: (_ for _ in ()).throw(OSError("disk full"))
+    )
+
+    assert cache.restore(key, [], "part:x") is False
+    assert [e["event"] for e in _events(tmp_path)] == ["restore_error"]
+
+
 def test_miss_retains_previous_and_current_inputs(tmp_path, fake):
     """Once a rebuild publishes the new key, its sidecar advances; the miss event
     must therefore preserve both sides of the drift for later diagnosis."""

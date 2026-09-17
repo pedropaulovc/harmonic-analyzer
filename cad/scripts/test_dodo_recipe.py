@@ -887,6 +887,114 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     assert stores[0][1] == [output]
 
 
+def _locked(dodo, key, label):
+    return dodo._cache.RestoreLocked(
+        label, key, PermissionError(13, "Permission denied", "platen-guide.SLDDRW")
+    )
+
+
+def test_cached_drawing_locked_restore_releases_seat_then_restores(
+    tmp_path, monkeypatch
+):
+    """A HIT refused by a share lock must NOT fall through to a local build (that
+    forks the artefact identity off the fleet's): release the seat's resident
+    documents under the seat, then the re-probe restores the cached build."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    events = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    outcomes = iter(("locked", True))
+
+    def restore(key, outputs, label):
+        outcome = next(outcomes)
+        events.append(("restore", outcome))
+        if outcome == "locked":
+            raise _locked(dodo, key, label)
+        return outcome
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo,
+        "_exec_com",
+        lambda cmd, label, **_kwargs: events.append(("exec", Path(cmd[1]).name)),
+    )
+    monkeypatch.setattr(
+        dodo._cache,
+        "store",
+        lambda *_args: events.append(("store", None)) or "stored",
+    )
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert events == [
+        ("restore", "locked"),
+        ("exec", "release_seat_documents.py"),
+        ("restore", True),
+    ]
+
+
+def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    builds = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+
+    def restore(key, outputs, label):
+        raise _locked(dodo, key, label)
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo, "_exec_com", lambda cmd, label, **_kwargs: builds.append(Path(cmd[1]).name)
+    )
+
+    with pytest.raises(RuntimeError, match="still share-locked"):
+        dodo._cached_drawing_action("platen_guide")
+
+    # The release ran; the drawing itself was never built over the locked file.
+    assert builds == ["release_seat_documents.py"]
+
+
+def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypatch):
+    """The farm submitter holds no seat to release: a locked restore is fatal
+    before any leaf is dispatched."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+
+    def restore(key, outputs, label):
+        raise _locked(dodo, key, label)
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("leaf dispatched")),
+    )
+
+    with pytest.raises(dodo._cache.RestoreLocked, match="share-locked"):
+        dodo._cached_drawing_action("platen_guide")
+
+
 def test_cache_status_covers_drawings():
     dodo = _load_dodo()
     rows = dict(dodo._cache_rows())

@@ -513,10 +513,36 @@ def probe(key: str) -> bool | None:
         return None
 
 
+class RestoreLocked(RuntimeError):
+    """A cached build for ``key`` EXISTS but could not be written over the seat's
+    outputs: a share lock (Windows ``PermissionError``) -- SolidWorks still holds
+    the document from an earlier session (a crashed/killed build, or a human with
+    the artefact open in the UI).
+
+    Deliberately NOT swallowed like other restore errors: "building locally" here
+    would succeed (SolidWorks can save over its own resident document) and mint a
+    fresh ``.execution`` token no other seat can reproduce -- forking every
+    dependent's cache key off the fleet's (2026-09-17, farm worker 4:
+    ``measuring_stick`` behind the open top-assembly drawing). The caller must
+    release the seat's documents and retry, or fail loud."""
+
+    def __init__(self, label: str, key: str, cause: OSError) -> None:
+        self.label = label
+        self.key = key
+        self.cause = cause
+        super().__init__(
+            f"{label}: cached build {key[:12]} exists but its outputs are "
+            f"share-locked on this seat ({cause.filename!s}) -- SolidWorks still "
+            "holds the document; close it (release the seat) and retry"
+        )
+
+
 def restore(key: str, outputs: list[Path], label: str) -> bool:
     """Try to download+unpack a cached build for ``key``. Return True on a HIT (the
     outputs are now on disk and the COM build can be skipped), False on a miss or
-    any error (caller falls through to the real build). Never raises.
+    any error (caller falls through to the real build). Raises
+    :class:`RestoreLocked` -- the ONE non-swallowed failure -- when the HIT's
+    extraction is refused by a share lock on an output (see the class).
 
     On a HIT, if this seat last PUBLISHED a different key for ``label`` (its sidecar
     differs), WARN: the seat is serving a key it never stored -- the
@@ -536,7 +562,14 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             _event("cache.miss", label, key)
             _record("restore_miss", label, key)
             return False
-        _unpack(blob)
+        try:
+            _unpack(blob)
+        except PermissionError as exc:
+            locked = RestoreLocked(label, key, exc)
+            _warn(str(locked))
+            _event("cache.restore_locked", label, key, path=str(exc.filename))
+            _record("restore_locked", label, key)
+            raise locked from exc
         _log(f"HIT   {label} ({key[:12]}) -> skipped COM build")
         _event("cache.hit", label, key)
         prev = last_stored_key(label)
@@ -549,6 +582,8 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         else:
             _record("restore_hit", label, key)
         return True
+    except RestoreLocked:
+        raise
     except Exception as exc:  # noqa: BLE001 -- cache must never break a build
         _warn(f"restore error for {label}: {exc!r} -- building locally")
         _event("cache.restore_error", label, key)

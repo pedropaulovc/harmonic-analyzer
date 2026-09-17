@@ -78,6 +78,13 @@ class _FakeAdapter:
             return default
 
     @staticmethod
+    def _attempt_with_error(callback):
+        try:
+            return callback(), None
+        except Exception as exc:
+            return None, exc
+
+    @staticmethod
     def _get_attr_or_call(obj, name):
         member = getattr(obj, name, None)
         return member() if callable(member) else member
@@ -114,11 +121,37 @@ def test_high_quality_shaded_with_edges_uses_documented_com_shape():
     assert calls == [(False, 3, False, True, True)]
 
 
-def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
+def test_high_quality_shaded_with_edges_accepts_a_no_op_setter_on_a_correct_view():
+    # SetDisplayMode4 returns False when the view already reads Shaded With
+    # Edges (frame_assembly sets its exploded isometric before the BOM pass and
+    # finalize re-applies it); the readback, not the setter's bool, is the proof.
     view = _display_view()
     view.SetDisplayMode4 = lambda *_args: False
 
-    with pytest.raises(RuntimeError, match="failed to set Shaded With Edges"):
+    drawing_common.set_high_quality_shaded_with_edges(
+        _FakeAdapter(None), view, label="Sheet1 Isometric"
+    )
+
+
+def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
+    view = _display_view(mode=2)
+    view.SetDisplayMode4 = lambda *_args: False
+
+    with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
+        drawing_common.set_high_quality_shaded_with_edges(
+            _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
+def test_high_quality_shaded_with_edges_surfaces_a_com_exception():
+    view = _display_view()
+
+    def boom(*_args):
+        raise OSError("COM call rejected")
+
+    view.SetDisplayMode4 = boom
+
+    with pytest.raises(RuntimeError, match="SetDisplayMode4 raised"):
         drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
         )
