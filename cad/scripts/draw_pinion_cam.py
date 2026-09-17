@@ -270,12 +270,16 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
-    # rather than the tap/axis region (machinist round 1).
+    # rather than the tap/axis region (machinist round 1). The symbol sits on
+    # the SAME horizontal ray, 35 mm out: the earlier down-left request
+    # (0.192, 0.170) gave the tag a 77 mm angled leader that SolidWorks
+    # re-solved 41-51 mm off (seat-dependent) and drove across the BOSS OD
+    # AXIS frame's leader (farm workers 4 and 6, 2026-09-17, sheet inspected).
     add_datum_feature(
         adapter,
         bottom,
         edge_xy=bottom_boss_left,
-        symbol_xy=(0.192, 0.170),
+        symbol_xy=(0.232, bottom_boss_center[1]),
         datum="D",
         label="cam boss OD axis",
     )
