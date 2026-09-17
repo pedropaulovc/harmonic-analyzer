@@ -430,3 +430,6 @@ async def build(adapter) -> dict[str, str]:
 
 if __name__ == "__main__":
     sys.exit(run_build(build))
+
+# Chaos-test marker 2026-09-17T22:45Z: re-keys this part so the farm must rebuild it,
+# to land a mid-COM SOLIDWORKS kill on a real leaf. Geometry is untouched.
