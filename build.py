@@ -58,11 +58,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         choices=_EXECUTORS,
         default=os.environ.get("HARMONIC_EXECUTOR", "local"),
     )
+    # A cold leaf (source sync plus a cold SOLIDWORKS start) measured 61.5 min on
+    # the farm, well past the control plane's 15 min default, so a run that knows
+    # it is cold raises the per-attempt budget for the leaves it dispatches.
+    parser.add_argument("--leaf-timeout", type=int, metavar="MINUTES")
     options, doit_args = parser.parse_known_args(argv)
     if options.verbosity is not None:
         os.environ["HARMONIC_VERBOSITY"] = options.verbosity
     doit = DoitMain()
     doit_args = list(doit_args)
+    if options.leaf_timeout is not None:
+        os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
     if options.executor == "farm":
         run_at = _run_insertion_point(doit_args, doit.get_cmds())
         if run_at is not None:
@@ -92,7 +98,9 @@ def _git(*args: str) -> str:
             f"git {' '.join(args)} failed (exit {exc.returncode}){_tail(exc.stderr)}"
         ) from None
     except OSError as exc:
-        raise FarmPreflightError(f"git {' '.join(args)} could not start: {exc}") from None
+        raise FarmPreflightError(
+            f"git {' '.join(args)} could not start: {exc}"
+        ) from None
 
 
 def _tail(text: str | None, lines: int = 20) -> str:
@@ -157,11 +165,11 @@ def _publish(sha: str) -> str:
     ]
     try:
         # stderr is inherited so publish progress streams to the console.
-        publish = subprocess.run(
-            argv, cwd=REPO_ROOT, stdout=subprocess.PIPE, text=True
-        )
+        publish = subprocess.run(argv, cwd=REPO_ROOT, stdout=subprocess.PIPE, text=True)
     except OSError as exc:
-        raise FarmPreflightError(f"publish could not start ({argv[0]}): {exc}") from None
+        raise FarmPreflightError(
+            f"publish could not start ({argv[0]}): {exc}"
+        ) from None
     lines = [line for line in publish.stdout.splitlines() if line.strip()]
     if publish.returncode != 0 or not lines:
         raise FarmPreflightError(
