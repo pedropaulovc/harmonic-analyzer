@@ -124,13 +124,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPocketProfile": {"PocketRun", "PocketRise"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
-    "StudHoles": {"StudFrontX", "StudFrontZ", "StudRearX", "StudRearZ"},
-    "KeeperTaps": {
-        "KeeperFrontX",
-        "KeeperFrontZ",
-        "KeeperRearX",
-        "KeeperRearZ",
-    },
+    # The hanger-stud and keeper-tap placement dims (StudFrontX ...,
+    # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
+    # measures from the origin -- mid-air on the print -- so sheet 3
+    # dimensions those stations from the socket bore axes with sheet-derived
+    # dimensions (DRAWING_REFERENCE_PRECISION below, policy rule 7).
     "CapRecessProfile": {"CapRecessDia"},
     "CapRecesses": {"CapRecessDepth"},
 }
@@ -161,8 +159,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RibProfile": {"RibWidth": 1},
     "SetPocketProfile": {"PocketRise": 1},
     "GooseneckProfile": {"GnDia": 2},
-    "StudHoles": {"StudFrontX": 1, "StudFrontZ": 1, "StudRearZ": 1},
-    "KeeperTaps": {"KeeperFrontX": 1, "KeeperFrontZ": 1, "KeeperRearZ": 1},
     "CapRecessProfile": {"CapRecessDia": 2},
     "CapRecesses": {"CapRecessDepth": 2},
 }
@@ -218,6 +214,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # are the one pair of sheet-derived numbers that earns a second place.
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
+    # The hole stations, baseline from the socket bore axes (X from the left
+    # pair, Z from the upper pair): drilled positions under the general band.
+    "hanger x from left sockets": 1,
+    "front hanger z from upper sockets": 1,
+    "rear hanger z from upper sockets": 1,
+    "keeper x from left sockets": 1,
+    "front keeper z from upper sockets": 1,
+    "rear keeper z from upper sockets": 1,
     # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed spotface
     # floors and the tap axis below the boss top.
     "socket boss overall height": 1,
@@ -225,6 +229,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "top bore mouth chamfer": 1,
     "opposed spotface floor separation": 1,
     "cross screw axis from boss top": 1,
+    "spotface floor from socket axis": 1,
     # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
     # cropped set-pocket section D-D.
     "hub from left front socket": 1,

@@ -108,6 +108,7 @@ from _holes import (
     wizard_holes,
 )
 from _part_pmi import _resolve_faces, author_part_pmi
+from _named_views import name_octant_views
 from top_frame_spec import (
     BORE_DIA,
     BOSS_ABOVE,
@@ -1411,6 +1412,10 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes B": DRAWING_NOTES_B,
         },
     )
+    # The print opens on two octant pictorials (front-top-left, front-bottom-
+    # right) to prime the reader before the orthographic sheets; all eight are
+    # named here so any print of this part can place any of them by name.
+    name_octant_views(adapter, label=PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

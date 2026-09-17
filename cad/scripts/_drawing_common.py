@@ -53,6 +53,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     iter_views,
     new_drawing,
+    place_view,
     remove_notes_matching as remove_notes_matching,
     save_drawing,
     set_units_mm,
@@ -583,7 +584,7 @@ def add_datum_feature(
     if callout_below and not tag.SetText(4, callout_below):
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_datum_feature")
     return tag
 
 
@@ -738,7 +739,7 @@ def add_feature_control_frame(
         0, leader_attach_xy[0], leader_attach_xy[1], 0.0
     ):
         raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_feature_control_frame")
     if (
         int(annotation.GetAttachedEntityCount3()) not in expected_entities
         or not bool(gtol.IsAttached())
@@ -1018,7 +1019,7 @@ def add_surface_finish(
         if not annotation.SetTextFormat(0, False, text_format):
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_surface_finish")
     return symbol
 
 
@@ -1056,7 +1057,7 @@ def add_view_centerline(
     if centerline is None:
         raise RuntimeError(f"failed to insert view centerline ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_view_centerline")
     return centerline
 
 
@@ -1070,9 +1071,10 @@ def create_section_view(
     view_xy: tuple[float, float],
     section_label: str,
     scale: tuple[int, int] = (1, 1),
+    partial: bool = False,
     label: str,
 ) -> Any:
-    """Create a full, unaligned section from one straight cutting-plane line.
+    """Create an unaligned section from one straight cutting-plane line.
 
     The public coordinates are drawing-sheet meters; convert them through the
     parent sketch's transform before CreateLine, which takes view-local sketch
@@ -1081,6 +1083,17 @@ def create_section_view(
     ``ISketchManager.CreateLine`` leaves the new segment selected, the precondition for
     ``CreateSectionViewAt5``.  The section is deliberately unaligned so a part
     recipe can place and scale it independently of the parent view.
+
+    ``partial=True`` is the ASME removed section: the cutting line spans ONLY
+    the feature of interest (one rail of a frame, not the whole plan), and
+    with ``swCreateSectionView_Partial`` SolidWorks sections just that span
+    instead of the full plane -- so a cut through a symmetric frame shows one
+    T profile to dimension, not that profile and its unannotated twin 80 mm
+    away. Without the flag a short line is the "olive, unhatched" failure the
+    layout-tuning notes describe (the cut does not close); with it the line
+    is allowed to stop inside the part. Pair it with
+    ``IDrSection::SetDisplayOnlySurfaceCut`` (the recipes' cut-only mode) so
+    nothing beyond the plane prints either.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -1105,12 +1118,14 @@ def create_section_view(
     if segment is None:
         raise RuntimeError(f"failed to create section line ({label})")
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
+    # (| swCreateSectionView_Partial for a removed section).
+    options = 0x1 | 0x8 | (0x10 if partial else 0)
     section = ddoc.CreateSectionViewAt5(
         float(view_xy[0]),
         float(view_xy[1]),
         0.0,
         section_label,
-        0x1 | 0x8,
+        options,
         None,
         0.0,
     )
@@ -1134,7 +1149,7 @@ def create_section_view(
     if int(dr_section.SetLabel2(section_label)) < 0:
         raise RuntimeError(f"failed to persist section label ({label})")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="create_section_view")
     return section
 
 
@@ -1240,7 +1255,7 @@ def add_property_linked_callout(
         )
     if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
         raise RuntimeError(f"failed to position linked callout {property_name!r}")
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_property_linked_callout")
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
         or int(annotation.GetLeaderCount()) != 1
@@ -1296,7 +1311,7 @@ def add_attached_note(
         raise RuntimeError(f"failed to create attached-note leader ({label}): {status}")
     if not annotation.SetPosition2(note_xy[0], note_xy[1], 0.0):
         raise RuntimeError(f"failed to position attached note ({label})")
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_attached_note")
     if (
         int(annotation.GetAttachedEntityCount3()) != 1
         or int(annotation.GetLeaderCount()) != 1
@@ -1374,8 +1389,42 @@ def add_native_hole_callout(
             )
         _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_native_hole_callout")
     return display
+
+
+@_telemetry.traced("drawing.hole_callout_precision", label_param="label")
+def set_hole_callout_precision(
+    display: Any, precision: Mapping[str, int], *, label: str
+) -> None:
+    """Set the decimals of named Hole Wizard length variables, natively.
+
+    ``precision`` maps a callout variable name (``"hw-tapdrldepth"``,
+    ``"hw-threaddepth"``) to its number of decimals. Per VARIABLE, because
+    ``IDisplayDimension::SetPrecision3`` is per callout ("does not support
+    setting the Primary ... values for hole callouts") and flattening the
+    whole callout would cost the tap-drill DIAMETER its two places; every
+    length token carries its own ``ICalloutLengthVariable::Precision``, so
+    only the named ones change and each value stays the native variable.
+    A blind depth printed ``16.00`` asks the shop for the .XX band; ``16.0``
+    puts it under the general .X tolerance it actually needs.
+    """
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+
+    remaining = dict(precision)
+    for raw in display.GetHoleCalloutVariables() or ():
+        name = str(dynamic_dispatch(raw._oleobj_).VariableName)
+        decimals = remaining.pop(name, None)
+        if decimals is None:
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        length.Precision = int(decimals)
+        if int(length.Precision) != int(decimals):
+            raise RuntimeError(f"{label}: {name} precision did not persist")
+    if remaining:
+        raise RuntimeError(
+            f"{label}: hole callout has no native variables {sorted(remaining)}"
+        )
 
 
 # The general-tolerance custom properties every part carries
@@ -1615,8 +1664,148 @@ def new_project_drawing(
     # was last saved.
     draw.ViewZoomtofit2()
     draw.ForceRebuild3(False)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="new_project_drawing")
     return draw, sheet
+
+
+_LEADER_STRAIGHT = 1  # swLeaderStyle_e.swSTRAIGHT
+
+
+_OWNER_DRAWING_VIEW = 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
+
+
+@_telemetry.traced("drawing.leader_note", label_param="label")
+def add_leader_note(
+    adapter: Any,
+    text: str,
+    *,
+    text_xy: tuple[float, float],
+    attach_xy: tuple[float, float],
+    label: str,
+    view: Any = None,
+    height: float | None = None,
+) -> Any:
+    """A free note with one straight leader whose tip sits at ``attach_xy``.
+
+    Both points are sheet metres. The leader is a POINTER, not an attachment:
+    it names what it touches (a face on a pictorial, a region of a view) and
+    is not associated to any entity, which is what a face label wants -- a
+    hidden-lines or scale change moves nothing. The tip is read back from
+    ``GetLeaderPointsAtIndex`` so a leader SolidWorks quietly re-routed fails
+    the build instead of pointing at the wrong face.
+
+    With ``view`` the note is inserted while that view is active, so
+    SolidWorks makes the VIEW its owner (``IAnnotation::OwnerType`` reads
+    ``swAnnotationOwner_DrawingView``, proved here): it is listed by the
+    view's ``GetAnnotations`` and moves with it, and the layout audit exempts
+    a leader from the one view it is owned by -- a sheet-owned label whose
+    leader ends ON a view reads as crossing it (12 findings on the priming
+    sheet before this).
+    """
+    draw = adapter.currentModel
+    if view is not None:
+        ddoc = _early_bound(draw, "IDrawingDoc")
+        name = view_name(adapter, view)
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"{label}: failed to activate view {name!r} for the note")
+    note = add_note(adapter, text, *text_xy, height=height)
+    if note is None:
+        raise RuntimeError(f"{label}: failed to insert the note {text!r}")
+    annotation = _sw_type_info.early_bound_or_flag(
+        note.GetAnnotation(),
+        "IAnnotation",
+        "SetLeader3",
+        "SetLeaderAttachmentPointAtIndex",
+        "GetLeaderPointsAtIndex",
+        "SetPosition2",
+        "OwnerType",
+    )
+    if view is not None and int(annotation.OwnerType) != _OWNER_DRAWING_VIEW:
+        raise RuntimeError(
+            f"{label}: note is not owned by its view (OwnerType {int(annotation.OwnerType)})"
+        )
+    status = int(
+        annotation.SetLeader3(_LEADER_STRAIGHT, _LEADER_SIDE_SMART, True, False, False, False)
+    )
+    if status != 0:
+        raise RuntimeError(f"{label}: SetLeader3 refused a straight leader (status {status})")
+    if not annotation.SetLeaderAttachmentPointAtIndex(0, attach_xy[0], attach_xy[1], 0.0):
+        raise RuntimeError(f"{label}: failed to place the leader tip at {attach_xy}")
+    if not annotation.SetPosition2(text_xy[0], text_xy[1], 0.0):
+        raise RuntimeError(f"{label}: failed to position the note at {text_xy}")
+    rebuild_drawing(adapter, label="add_leader_note")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError(f"{label}: the note's leader is unreadable ({len(points)} values)")
+    tip = (float(points[-3]), float(points[-2]))
+    if math.dist(tip, attach_xy) > 0.001:
+        raise RuntimeError(f"{label}: leader tip landed at {tip}, requested {attach_xy}")
+    draw.ClearSelection2(True)
+    return note
+
+
+@dataclass(frozen=True)
+class FaceLabel:
+    """One face name on a pictorial: ``text`` at ``text_xy`` pointing at ``point_mm``."""
+
+    text: str
+    point_mm: tuple[float, float, float]
+    text_xy: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class PictorialView:
+    """One octant view of the priming sheet.
+
+    ``octant`` is the viewer octant ``(sx, sy, sz)`` from ``_named_views``;
+    the part build must have named it. ``center_xy`` is the view centre on the
+    sheet in metres; ``labels`` are the face names the view carries.
+    """
+
+    octant: tuple[int, int, int]
+    center_xy: tuple[float, float]
+    labels: tuple[FaceLabel, ...]
+
+
+@_telemetry.traced("drawing.pictorial_sheet", label_param="label")
+def place_pictorial_sheet(
+    adapter: Any,
+    model_path: str,
+    views: Sequence[PictorialView],
+    *,
+    scale: tuple[float, float],
+    label: str,
+) -> list[Any]:
+    """Place octant pictorials with leadered face names on the ACTIVE sheet.
+
+    The priming sheet a print opens on: two isometrics from opposite octants
+    (front-top-left and front-bottom-right show all six faces between them),
+    each face named where the reader sees it, so the orthographic sheets that
+    follow need no orientation key. Views are placed by the octant's model
+    view name (``_named_views.octant_view_name``); the finalizer styles them
+    Shaded With Edges and the post-export precision check covers them, the
+    same as ``*Isometric``. Returns the ``IView`` objects in order.
+    """
+    from _named_views import octant_view_name  # noqa: PLC0415 -- part-side module
+
+    placed = []
+    for pictorial in views:
+        view = place_view(
+            adapter, model_path, octant_view_name(*pictorial.octant),
+            *pictorial.center_xy, scale=scale,
+        )
+        set_hidden_lines_removed(adapter, view)
+        for face in pictorial.labels:
+            attach_xy = model_point_in_view(
+                adapter, view, tuple(value / 1000.0 for value in face.point_mm),
+                label=f"{label} {face.text} face",
+            )
+            add_leader_note(
+                adapter, face.text, text_xy=face.text_xy, attach_xy=attach_xy,
+                view=view, label=f"{label} {face.text} label",
+            )
+        placed.append(view)
+    return placed
 
 
 @_telemetry.traced("drawing.create_sheets", label_param="label")
@@ -1771,7 +1960,7 @@ def assert_precise_isometric_views(adapter: Any, sheet_names: Sequence[str]) -> 
             orientation = str(
                 adapter._get_attr_or_call(view, "GetOrientationName") or ""
             )
-            if orientation.strip().lower() != "*isometric":
+            if not is_pictorial_orientation(orientation):
                 continue
             faceted = adapter._attempt(view.GetFacettedHlrDisplay, default=None)
             if faceted is None or bool(faceted):
@@ -2080,7 +2269,7 @@ def add_hole_group_tags(
             )
         if not annotation.SetPosition2(*note_position, 0.0):
             raise RuntimeError(f"failed to position hole group tag {tag!r}")
-        draw.EditRebuild3()
+        rebuild_drawing(adapter, label="add_hole_group_tags")
         if (
             int(annotation.GetAttachedEntityCount3()) != 1
             or int(annotation.GetLeaderCount()) != 1
@@ -2156,7 +2345,7 @@ def delete_unnamed_imports(adapter: Any, annotations: list[Any]) -> list[Any]:
             raise RuntimeError("failed to select an automatic model annotation")
         draw.EditDelete()
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="delete_unnamed_imports")
     return survivors
 
 
@@ -2498,7 +2687,9 @@ def set_dimension_callouts(
         adapter._attempt(lambda d=display, s=text: d.SetText(text_part, s))
     if remaining:
         raise RuntimeError(f"dimension callouts not applied: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
+    # ``SetText`` takes effect immediately (``GetText`` reads it back without
+    # a rebuild); the text EXTENT it changes is only read by the finalizer's
+    # layout pass, which rebuilds first. 30 rebuilds on top-frame, ~14 s.
 
 
 def set_dimension_text(
@@ -2534,7 +2725,7 @@ def set_dimension_text(
             raise RuntimeError(f"dimension text did not persist for {name!r}")
     if remaining:
         raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="set_dimension_text")
 
 
 @_telemetry.traced("drawing.reference_dimension", label_param="label")
@@ -2564,7 +2755,7 @@ def set_reference_dimension(
         raise RuntimeError(
             f"failed to parenthesize {label}: prefix={prefix!r}, suffix={suffix!r}"
         )
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="set_reference_dimension")
     return display
 
 
@@ -2667,7 +2858,7 @@ def set_dimension_precision(
     _span_scan_attrs(scanned=scanned, changed=changed)
     if remaining:
         raise RuntimeError(f"dimension precision not applied: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="set_dimension_precision")
 
 
 @_telemetry.traced("drawing.imported_precision")
@@ -2768,7 +2959,7 @@ def set_reference_dimensions(
     missing = wanted - marked
     if missing:
         raise RuntimeError(f"reference dimensions not applied: {sorted(missing)}")
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="set_reference_dimensions")
 
 
 def offset_dimension_text(
@@ -2797,7 +2988,7 @@ def offset_dimension_text(
             raise RuntimeError(f"failed to offset dimension text {name!r}")
     if remaining:
         raise RuntimeError(f"dimension text not offset: {sorted(remaining)}")
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="offset_dimension_text")
 
 
 def add_edge_dimension(
@@ -2858,6 +3049,18 @@ def add_edge_dimension(
             )
             selected = selectable.Select2(index > 0, selection_data)
             location = "by entity"
+        elif selected_type == "SKETCHSEGMENT":
+            # An owned view centreline (``ISketchSegment``, no ``IEntity``
+            # face): a bore axis the print dimensions FROM, so a location
+            # starts on the feature the shop indicates, not mid-air.
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            selection_data = manager.CreateSelectData()
+            selection_data.View = view
+            selectable = _sw_type_info.early_bound_or_flag(
+                requested_entity, "ISketchSegment", "Select4"
+            )
+            selected = selectable.Select4(index > 0, selection_data)
+            location = "by centreline"
         else:
             manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
             selection_data = manager.CreateSelectData()
@@ -2886,7 +3089,12 @@ def add_edge_dimension(
     else:
         raise ValueError(f"unknown dimension orientation {orientation!r}")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    # No rebuild here: ``Add*Dimension2`` returns an evaluated display
+    # dimension (its value, text and position read back at once -- every
+    # ``_checked_dimension`` proves the value straight after this call), and
+    # at ~0.45 s per ``EditRebuild3`` the per-dimension rebuild was 26 of
+    # top-frame's 104 rebuilds. The finalizer rebuilds once before the
+    # layout readbacks that do need settled text extents.
     if dimension is None:
         raise RuntimeError(f"failed to add the {label} {orientation} dimension")
     return dimension
@@ -2949,12 +3157,16 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     deriving outline geometry and returns SIX. Do not reason about "a sweep" as
     one number.
 
-    Nothing is memoised, deliberately. An audit of every call site found no
-    drawing that sweeps the same view twice — each gear print picks a circle off
-    ``front`` and at most a silhouette off ``right`` — so a per-view cache would
-    have a 0% hit rate. A cross-call cache would also have to invalidate on any
-    visibility change (``set_hidden_lines_removed``, the drive-train isolation
-    walk), and a stale entity list picks the wrong edge SILENTLY.
+    Nothing is memoised here, deliberately: a hidden cross-call cache would
+    have to invalidate on any visibility change (``set_hidden_lines_removed``,
+    the drive-train isolation walk), and a stale entity list picks the wrong
+    edge SILENTLY. A recipe that picks MANY entities off one view -- top_frame
+    swept its plan view four times in a row and Section A-A five times, 124 s
+    of a 270 s build once the per-edge ``GetCurve``/``IsLine``/vertex reads
+    were counted -- scans once with :func:`scan_view_edges` and picks off the
+    :class:`ViewEdges` it returns, re-scanning EXPLICITLY after it changes the
+    view's display. The staleness hazard then lives in one visible line of the
+    recipe instead of in a cache nobody can see.
     """
     drawing_view = _early_bound(view, "IView")
     entities: list[Any] = []
@@ -2969,6 +3181,215 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     span.set_attribute("entities", len(entities))
     span.set_attribute("entity_kind", entity_kind)
     return entities
+
+
+@_telemetry.traced("drawing.rebuild", label_param="label")
+def rebuild_drawing(adapter: Any, *, label: str) -> None:
+    """The one ``EditRebuild3`` chokepoint for drawing recipes.
+
+    Every annotation helper used to call ``EditRebuild3`` inline -- 31 sites
+    in this module, a dozen more in top_frame's recipe -- and each one
+    regenerates every view on every sheet. Untraced, that cost was ~50 s of
+    a 270 s top_frame build with nothing in the trace to attribute it to.
+    Routing them here makes each rebuild a ``drawing.rebuild`` span named for
+    the helper that asked, so "which helper's rebuilds are worth removing?"
+    is read off ``traces.jsonl`` instead of guessed.
+    """
+    adapter.currentModel.EditRebuild3()
+
+
+@dataclass(frozen=True)
+class ViewEdge:
+    """One visible model edge of a drawing view with its geometry read ONCE.
+
+    ``line`` is ``(start_mm, end_mm)`` for a straight edge; ``circle`` is
+    ``(cx, cy, cz, nx, ny, nz, r)`` with the centre and radius in mm and the
+    axis a unit vector, straight from ``ICurve::CircleParams``. Both are
+    ``None`` for any other curve (an ellipse, a spline). ``vertices`` are the
+    ``IVertex`` objects of a straight edge, in ``(start, end)`` order, for
+    picks that dimension vertex-to-vertex.
+    """
+
+    edge: Any
+    line: tuple[tuple[float, float, float], tuple[float, float, float]] | None
+    circle: tuple[float, float, float, float, float, float, float] | None
+    vertices: tuple[Any, Any] | None
+
+    @property
+    def midpoint_mm(self) -> tuple[float, float, float]:
+        if self.line is None:
+            raise ValueError("midpoint of a non-linear edge")
+        start, end = self.line
+        return tuple((a + b) / 2.0 for a, b in zip(start, end))
+
+    @property
+    def length_mm(self) -> float:
+        if self.line is None:
+            raise ValueError("length of a non-linear edge")
+        return math.dist(*self.line)
+
+
+@dataclass(frozen=True)
+class ViewEdges:
+    """Every visible edge of one view, classified, from ONE COM sweep.
+
+    Holds the ``IEdge`` handles plus the geometry a picker reasons about, so
+    picking N dimensions off one view costs one sweep and N pure-Python
+    filters instead of N sweeps each re-reading every edge's curve and
+    vertices over COM (5+ round trips per edge, 60-100 edges per view).
+
+    **Valid only for the display state it was scanned in.** Changing the
+    view's display mode, cropping it, or reversing a section's cut direction
+    changes what ``GetVisibleEntities2`` returns; the recipe that made such a
+    change calls :func:`scan_view_edges` again -- there is no implicit
+    invalidation, by design (see ``visible_view_entities``).
+    """
+
+    label: str
+    edges: tuple[ViewEdge, ...]
+
+    @property
+    def lines(self) -> tuple[ViewEdge, ...]:
+        return tuple(item for item in self.edges if item.line is not None)
+
+    @property
+    def circles(self) -> tuple[ViewEdge, ...]:
+        return tuple(item for item in self.edges if item.circle is not None)
+
+    def exact_line_through(
+        self, point_mm: tuple[float, float, float], *, label: str
+    ) -> ViewEdge:
+        """The straight visible edge whose segment passes through ``point_mm``.
+
+        Exact (1e-8 mm^2 squared distance, within the segment's own span), so a
+        point that is not ON a visible edge fails loud naming the five nearest
+        segment ends -- a coordinate typo or a hidden edge can never resolve to
+        the neighbour that happens to be closest.
+        """
+        matches = []
+        for item in self.lines:
+            start, end = item.line
+            vector = tuple(b - a for a, b in zip(start, end))
+            length_sq = sum(value * value for value in vector)
+            if length_sq == 0.0:
+                continue
+            t = sum((p - a) * v for p, a, v in zip(point_mm, start, vector)) / length_sq
+            if not -1e-6 <= t <= 1.0 + 1e-6:
+                continue
+            error = sum((p - a - t * v) ** 2 for p, a, v in zip(point_mm, start, vector))
+            matches.append((error, item))
+        if not matches or min(matches, key=lambda pair: pair[0])[0] > 1e-8:
+            nearest = sorted(
+                (
+                    (min(math.dist(point_mm, start), math.dist(point_mm, end)), start, end)
+                    for start, end in (item.line for item in self.lines)
+                ),
+                key=lambda row: row[0],
+            )[:5]
+            raise RuntimeError(
+                f"{label}: no exact visible line through {point_mm} in the "
+                f"{self.label!r} scan; {len(self.lines)} visible lines, "
+                f"nearest by endpoint={nearest}"
+            )
+        return min(matches, key=lambda pair: pair[0])[1]
+
+    def exact_vertex_at(self, point_mm: tuple[float, float, float], *, label: str) -> Any:
+        """The ``IVertex`` of a visible straight edge sitting exactly at ``point_mm``."""
+        best = None
+        for item in self.lines:
+            for point, vertex in zip(item.line, item.vertices):
+                error = sum((a - b) ** 2 for a, b in zip(point_mm, point))
+                if best is None or error < best[0]:
+                    best = (error, vertex)
+        if best is None or best[0] > 1e-8:
+            raise RuntimeError(
+                f"{label}: no exact visible vertex at {point_mm} in the "
+                f"{self.label!r} scan"
+            )
+        return best[1]
+
+    def circle_at(
+        self,
+        center_mm: tuple[float, float, float],
+        radius_mm: float,
+        *,
+        axis: tuple[float, float, float] | None = None,
+        label: str,
+        center_tol_mm: float = 0.02,
+        radius_tol_mm: float = 0.01,
+    ) -> ViewEdge:
+        """The visible circular edge nearest ``center_mm``/``radius_mm``.
+
+        ``axis`` (a unit vector, either sign) pins the circle's plane so the
+        two rims of one bore -- same centre in the view, opposite normals --
+        cannot be confused. Fails loud past the tolerances with the nearest
+        candidate's numbers, so a moved feature is a build error, never a
+        dimension quietly hung on the wrong rim.
+        """
+        best = None
+        for item in self.circles:
+            cx, cy, cz, nx, ny, nz, r = item.circle
+            center_error = sum(abs(a - b) for a, b in zip((cx, cy, cz), center_mm))
+            radius_error = abs(r - radius_mm)
+            axis_error = 0.0
+            if axis is not None:
+                dot = nx * axis[0] + ny * axis[1] + nz * axis[2]
+                axis_error = 1.0 - abs(dot)
+            score = center_error + radius_error + axis_error
+            if best is None or score < best[0]:
+                best = (score, center_error, radius_error, axis_error, item)
+        if best is None:
+            raise RuntimeError(f"{label}: the {self.label!r} scan has no circular edge")
+        _score, center_error, radius_error, axis_error, item = best
+        if center_error > center_tol_mm or radius_error > radius_tol_mm or axis_error > 1e-6:
+            raise RuntimeError(
+                f"{label}: no visible circle at {center_mm} r={radius_mm:g} mm in "
+                f"the {self.label!r} scan; nearest centre error {center_error:.4g} mm, "
+                f"radius error {radius_error:.4g} mm, axis error {axis_error:.2g}"
+            )
+        return item
+
+
+@_telemetry.traced("drawing.view_edge_scan", label_param="label")
+def scan_view_edges(view: Any, *, label: str) -> ViewEdges:
+    """Sweep ``view``'s visible edges once and read each one's geometry once.
+
+    The sweep is :func:`visible_view_entities` (kind 1, edges); the
+    classification -- ``GetCurve``, ``IsLine``/``IsCircle``, the two vertices
+    and their points, ``CircleParams`` -- is the part every picker used to
+    repeat per dimension. Its size rides the span (``edges``/``lines``/
+    ``circles``) so a slow scan reads as "this view is big", not "this seat
+    is slow".
+    """
+    items: list[ViewEdge] = []
+    for raw_edge in visible_view_entities(view, 1, label=label):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        line = circle = vertices = None
+        if curve.IsLine():
+            raw_vertices = (edge.GetStartVertex(), edge.GetEndVertex())
+            if all(vertex is not None for vertex in raw_vertices):
+                bound = tuple(_early_bound(vertex, "IVertex") for vertex in raw_vertices)
+                start, end = (
+                    tuple(float(value) * 1000.0 for value in vertex.GetPoint())
+                    for vertex in bound
+                )
+                line, vertices = (start, end), bound
+        elif curve.IsCircle():
+            raw = tuple(float(value) for value in curve.CircleParams)
+            circle = (
+                raw[0] * 1000.0, raw[1] * 1000.0, raw[2] * 1000.0,
+                raw[3], raw[4], raw[5], raw[6] * 1000.0,
+            )
+        items.append(ViewEdge(edge=edge, line=line, circle=circle, vertices=vertices))
+    span = _telemetry.trace.get_current_span()
+    span.set_attribute("edges", len(items))
+    span.set_attribute("lines", sum(1 for item in items if item.line is not None))
+    span.set_attribute("circles", sum(1 for item in items if item.circle is not None))
+    return ViewEdges(label=label, edges=tuple(items))
 
 
 _ARC_END_CENTER = 1  # swArcEndCondition_e.swArcEndConditionCenter
@@ -3049,7 +3470,7 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
         raise RuntimeError(f"failed to make {label} dimension BASIC")
     if int(model_dimension.GetToleranceType()) != TOL_BASIC:
         raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="set_basic_dimension")
     return dimension
 
 
@@ -3127,7 +3548,7 @@ def create_view_theoretical_datum(
         raise RuntimeError(f"failed to create {label} theoretical datum point")
     point = _early_bound(point, "ISketchPoint")
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="create_view_theoretical_datum")
     return point
 
 
@@ -3252,7 +3673,7 @@ def insert_hole_table(
         if not origin.Reattach():
             raise RuntimeError(f"failed to reattach {label} hole-table datum")
         draw.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="_select_entity")
     table = _sw_type_info.early_bound(table, "ITableAnnotation")
     # Indexed COM properties such as Text2 are omitted by the late-bound
     # dispatch returned from IHoleTableAnnotation.  Wrap the same dispatch in
@@ -3271,7 +3692,7 @@ def insert_hole_table(
                 raise RuntimeError(
                     f"native hole-table header did not persist: {applied_heading!r}"
                 )
-        adapter.currentModel.EditRebuild3()
+        rebuild_drawing(adapter, label="_select_entity")
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
     contents = tuple(
@@ -3506,7 +3927,7 @@ def insert_bom_table(
             f"grouping={actual_grouping}, one_item={actual_one_item}"
         )
     draw.ForceRebuild3(False)
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="insert_bom_table")
     table = _sw_type_info.early_bound(bom, "ITableAnnotation")
     if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
         raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
@@ -3587,7 +4008,7 @@ def insert_bom_table(
                 f"{label} BOM descriptions not applied (no matching row): "
                 f"{sorted(remaining)}"
             )
-        adapter.currentModel.EditRebuild3()
+        rebuild_drawing(adapter, label="insert_bom_table")
     _telemetry.success(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )
@@ -3999,7 +4420,7 @@ def _create_auto_balloons(
     options.ItemOrder = 1
     notes = ddoc.AutoBalloon5(options)
     draw.ClearSelection2(True)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="_create_auto_balloons")
     if not notes or isinstance(notes, str):
         if allow_empty:
             return []
@@ -4034,14 +4455,13 @@ def add_auto_balloons(
     per component (``IgnoreMultiple``). Fails loud unless at least ``expected``
     balloons landed. Returns the balloon notes.
     """
-    draw = adapter.currentModel
     balloons = _create_auto_balloons(adapter, view, label=label)
     if len(balloons) < expected:
         raise RuntimeError(
             f"{label}: {len(balloons)} balloons landed, expected >= {expected}"
         )
     _spread_balloons(adapter, view, balloons)
-    draw.EditRebuild3()
+    rebuild_drawing(adapter, label="add_auto_balloons")
     _telemetry.success(f"{label}: {len(balloons)} BOM balloons inserted")
     return balloons
 
@@ -4118,7 +4538,7 @@ def isolate_drawing_view_components(
             f"{label}: component families not found: {missing}; "
             f"enumerated={sorted(enumerated)}"
         )
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="isolate_drawing_view_components")
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
@@ -4290,7 +4710,7 @@ def add_component_bom_balloons(
     if margin <= 0.0:
         raise ValueError(f"{label}: balloon ring margin must be positive")
     _spread_balloons(adapter, view, balloons, margin=margin)
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="add_component_bom_balloons")
     _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
     return balloons
 
@@ -4340,7 +4760,7 @@ def add_auto_balloons_across_views(
             f"{label}: balloon item coverage mismatch; missing={missing}, "
             f"unexpected={unexpected}, seen={sorted(item_numbers)}"
         )
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="add_auto_balloons_across_views")
     _telemetry.success(
         f"{label}: {len(all_balloons)} balloons cover all {expected} BOM items"
     )
@@ -4424,7 +4844,7 @@ def position_bom_balloon(
     if not annotation.SetPosition(target_anchor[0], target_anchor[1], 0.0):
         raise RuntimeError(f"{label}: failed to position item {item_number}")
     note.LockPosition = True
-    adapter.currentModel.EditRebuild3()
+    rebuild_drawing(adapter, label="position_bom_balloon")
     adapter.currentModel.GraphicsRedraw2()
     current_note = annotation.GetSpecificAnnotation()
     if current_note is None:
@@ -4484,8 +4904,20 @@ def stamp_drawing_summary(
 # space, so its box is not a faithful collision footprint -- give such views
 # ``NONE`` collision scope. ``GetOrientationName`` returns the predefined view
 # name (e.g. "*Isometric"); ortho views return "*Front"/"*Right"/... and
-# projected / section / detail views return "".
+# projected / section / detail views return "". The part-named octant views
+# (``_named_views``, "ISO FRONT-TOP-LEFT") are isometrics of the other seven
+# octants and are treated exactly like ``*Isometric`` wherever a pictorial is
+# special-cased: this predicate, the finalizer's Shaded With Edges pass and
+# the post-export precision assertion.
 _PICTORIAL_ORIENTATIONS = frozenset({"*isometric", "*dimetric", "*trimetric"})
+_OCTANT_ORIENTATION_PREFIX = "iso "
+
+
+def is_pictorial_orientation(orientation: str) -> bool:
+    """True for ``*Isometric``/``*Dimetric``/``*Trimetric`` and the octant ``ISO …`` views."""
+    name = orientation.strip().lower()
+    return name in _PICTORIAL_ORIENTATIONS or name.startswith(_OCTANT_ORIENTATION_PREFIX)
+
 
 # A note centered inside its owning view is treated as a hole tag / balloon
 # (detail on the view) only when it is also SMALL: native hole-table tags span
@@ -4498,7 +4930,7 @@ _TAG_MAX_SPAN_M = 0.015
 def _view_scope(adapter: Any, view: Any) -> CollisionScope:
     """``NONE`` for a pictorial view (empty diagonal box), ``ALL`` for an ortho view."""
     orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
-    if orientation.strip().lower() in _PICTORIAL_ORIENTATIONS:
+    if is_pictorial_orientation(orientation):
         return CollisionScope.NONE
     return CollisionScope.ALL
 
@@ -5381,7 +5813,7 @@ async def finalize_drawing(
             orientation = str(
                 adapter._get_attr_or_call(view, "GetOrientationName") or ""
             )
-            if orientation.strip().lower() != "*isometric":
+            if not is_pictorial_orientation(orientation):
                 continue
             set_high_quality_shaded_with_edges(
                 adapter,
@@ -5423,7 +5855,9 @@ async def finalize_drawing(
     # Isometric view is present, the finalizer owns its high-quality Shaded With
     # Edges mode; every other view keeps the appearance authored by its recipe.
     removed_notes = 0
-    for sheet_name in sheet_names:
+    # No substrings, no sweep: activating five sheets to match nothing is
+    # exactly the cycling a recipe that deletes its own notes is avoiding.
+    for sheet_name in sheet_names if redundant_note_substrings else ():
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(
                 f"failed to activate drawing sheet {sheet_name!r} for note cleanup"
@@ -5446,15 +5880,22 @@ async def finalize_drawing(
     # outline while the reopened SLDDRW (which regenerates on load) showed the
     # dashed edges. Flush every view's display geometry HERE, after all the
     # rebuilds above and right before export — the same call at view-placement
-    # time is invalidated again by the later annotation/table imports.
+    # time is invalidated again by the later annotation/table imports. The
+    # views come off each ``ISheet`` by name -- ``ISheet::GetViews`` returns
+    # the drawing views alone (unlike ``IDrawingDoc::GetViews``, whose per-sheet
+    # rows lead with the sheet's own view) -- so no sheet is activated for this.
     for sheet_name in sheet_names:
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(f"failed to activate {sheet_name!r} before export")
-        for view in iter_views(adapter):
-            _early_bound(view, "IView").UpdateViewDisplayGeometry()
+        sheet = _early_bound(ddoc.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            _early_bound(raw_view, "IView").UpdateViewDisplayGeometry()
 
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
+    # The ONE settling rebuild for the whole print: per-dimension and
+    # per-callout helpers no longer rebuild (their readbacks never needed it),
+    # so every text extent and view outline is brought current here, before
+    # the SLDDRW/PDF that the blind review and the layout audit read.
+    rebuild_drawing(adapter, label="finalize_drawing")
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot

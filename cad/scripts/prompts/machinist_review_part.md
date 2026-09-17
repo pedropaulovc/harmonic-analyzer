@@ -156,10 +156,19 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   wireframe/HLR pictorial, or visibly draft-quality isometric is a clarity
   defect. The isometric does not replace manufacturing views needed to define
   the part.
-- Dimensions come from one origin per view, the overall length is real and
-  conspicuous, turned parts show diameters on the side view with lengths from
-  one faced end, slots go to the radius centres, shoulder fillets on turned
-  parts have a size, chamfers are given.
+- Every location dimension starts on something the shop can touch, indicate
+  or pick up: a finished face or edge, the axis of a real bore or boss, a
+  datum feature symbol on a reachable surface. A dimension whose origin is a
+  construction centreline, a symmetry axis or the CAD origin with no feature
+  there -- mid-air -- cannot be measured and is a blocker, whatever a note
+  says ("LOCATIONS FROM FRAME CENTRE" names the defect, it does not cure
+  it). A centre the machinist would first have to derive from a symmetric
+  pattern is that derivation's own stack-up, not a datum. Within one view
+  the locations come from ONE such datum, baseline or ordinate, never
+  chained feature to feature, so tolerances do not accumulate. The overall
+  length is real and conspicuous; turned parts show diameters on the side
+  view with lengths from one faced end; slots go to the radius centres;
+  shoulder fillets on turned parts have a size; chamfers are given.
 - Reference dimensions in parentheses are welcome. A redundant correct
   dimension never hurt anyone; a missing one does.
 - When a ferrous part is coated, its Finish field identifies the allowed

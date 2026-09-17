@@ -44,6 +44,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hole_callout_precision,
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
@@ -404,28 +405,6 @@ def _set_cross_tap_callout_text(display: Any) -> None:
         )
     ):
         raise RuntimeError("aggregate cross-tap quantity or untouched native definitions did not persist")
-
-
-@_telemetry.traced("drawing.base_drill_depth_precision")
-def _set_drill_depth_precision(display: Any) -> None:
-    """Print the MIN tap-drill depth as a whole millimetre, natively.
-
-    ``IDisplayDimension::SetPrecision3`` is per CALLOUT, so flattening it would
-    also cost the tap-drill DIAMETER its two decimal places. Every Hole Wizard
-    length token carries its own ``ICalloutLengthVariable::Precision``, so only
-    the depth's drops here and the value itself stays the native variable.
-    """
-    found = False
-    for raw in display.GetHoleCalloutVariables() or ():
-        if str(dynamic_dispatch(raw._oleobj_).VariableName) != "hw-tapdrldepth":
-            continue
-        length = _early_bound(raw, "ICalloutLengthVariable")
-        length.Precision = 0
-        if int(length.Precision) != 0:
-            raise RuntimeError("base tap-drill depth precision did not persist")
-        found = True
-    if not found:
-        raise RuntimeError("base tap callout has no native tap-drill depth variable")
 
 
 def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
@@ -1007,7 +986,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     _set_cross_tap_callout_text(tap_callout)
-    _set_drill_depth_precision(tap_callout)
+    # The MIN tap-drill depth prints as a whole millimetre; the diameter keeps
+    # its two places (per-variable, see set_hole_callout_precision).
+    set_hole_callout_precision(
+        tap_callout, {"hw-tapdrldepth": 0}, label="base cross-tap drill depth"
+    )
     _check_cross_tap_callout(tap_callout)
     # 38.10 is also the deck above the flange (40.6 - 2.5), so the axis height
     # has to SHOW which two features it spans (2026-09 review blocker). The
