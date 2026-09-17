@@ -366,6 +366,29 @@ display.SetPrecision3(-1, -1, 3, -1)
     ]
 
 
+def test_precision_exception_is_the_spec_reference_precision_only() -> None:
+    """Only DRAWING_REFERENCE_PRECISION (direct, aliased, module attribute, or an
+    item of it) may reach SetPrecision3; any other *_spec value is spec data,
+    not a places statement, and still writes a drawing-owned precision."""
+    source = """
+import top_frame_spec
+from harmonic_base_spec import DRAWING_REFERENCE_PRECISION as REF
+from tube_frame_spec import DRAWING_REFERENCE_PRECISION, SHANK_DIA
+
+display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+display.SetPrecision3(DRAWING_REFERENCE_PRECISION["Height"], -1, -1, -1)
+display.SetPrecision3(REF, -1, -1, -1)
+display.SetPrecision3(top_frame_spec.DRAWING_REFERENCE_PRECISION["Web"], -1, -1, -1)
+display.SetPrecision3(SHANK_DIA, -1, -1, -1)
+display.SetPrecision3(top_frame_spec.WEB_WIDTH, -1, -1, -1)
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (10, "drawing-owned-precision"),
+        (11, "drawing-owned-precision"),
+    ]
+
+
 def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:
     legacy = tmp_path / "draw_legacy.py"
     migrated = tmp_path / "draw_harmonic_base.py"

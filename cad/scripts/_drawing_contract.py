@@ -188,6 +188,46 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(direct), frozenset(modules)
 
 
+REFERENCE_PRECISION_NAME = "DRAWING_REFERENCE_PRECISION"
+
+
+def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
+    """Local bindings of a ``*_spec`` module's ``DRAWING_REFERENCE_PRECISION``."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        leaf = (node.module or "").rsplit(".", 1)[-1]
+        if not leaf.endswith("_spec") or leaf.startswith("_"):
+            continue
+        names.update(
+            alias.asname or alias.name
+            for alias in node.names
+            if alias.name == REFERENCE_PRECISION_NAME
+        )
+    return frozenset(names)
+
+
+def _reference_precision_sourced(
+    expression: ast.expr, *, names: frozenset[str], modules: frozenset[str]
+) -> bool:
+    """Whether ``expression`` IS the spec's ``DRAWING_REFERENCE_PRECISION`` (or an
+    item of it) -- the one value a sheet may pass to ``SetPrecision3``. Any other
+    ``*_spec`` value (a diameter, a count) is spec data, not a places statement,
+    and must not launder a render-time precision (CodeRabbit, #754)."""
+    if isinstance(expression, ast.Subscript):
+        expression = expression.value
+    if isinstance(expression, ast.Name):
+        return expression.id in names
+    if isinstance(expression, ast.Attribute):
+        return (
+            expression.attr == REFERENCE_PRECISION_NAME
+            and isinstance(expression.value, ast.Name)
+            and expression.value.id in modules
+        )
+    return False
+
+
 def _bound_names(target: ast.expr) -> frozenset[str]:
     if isinstance(target, ast.Name):
         return frozenset({target.id})
@@ -624,6 +664,7 @@ def drawing_specification_violations(
     assignments = _simple_assignments(tree)
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
+    reference_precision_names = _reference_precision_names(tree)
     finish_lookup_direct, finish_lookup_modules = _imported_functions(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
@@ -791,18 +832,18 @@ def drawing_specification_violations(
                 and not _leaves_primary_precision(node)
                 and not (
                     node.args
-                    and _part_spec_sourced(
+                    and _reference_precision_sourced(
                         node.args[0],
-                        direct=part_spec_direct,
+                        names=reference_precision_names,
                         modules=part_spec_modules,
-                        assignments=assignments,
                     )
                 )
             ):
                 add(
                     node,
                     "drawing-owned-precision",
-                    f"direct COM {node.func.attr}(...) writes a literal precision",
+                    f"direct COM {node.func.attr}(...) writes a precision that is "
+                    f"not the spec's {REFERENCE_PRECISION_NAME}",
                 )
             if name in _TOLERANCE_SETTERS:
                 add(

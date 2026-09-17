@@ -338,6 +338,10 @@ async def build(adapter: Any) -> dict[str, str]:
         placed = tuple(
             float(value) for value in (_early_bound(annotation, "IAnnotation").GetPosition() or ())
         )
+        if len(placed) < 2:
+            raise RuntimeError(
+                f"cross-hole callout has no position read-back: {placed!r}"
+            )
         if abs(placed[1] - hole_text[1]) > 1e-6:
             raise RuntimeError(
                 "cross-hole callout is not aligned with its source station: "

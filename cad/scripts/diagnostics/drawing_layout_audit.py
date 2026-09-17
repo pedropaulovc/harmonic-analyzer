@@ -113,6 +113,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import _telemetry  # noqa: E402
 import dodo  # noqa: E402
+from _drawing_common import is_pictorial_orientation  # noqa: E402
 from _drawing_layout_check import DrawableRegion  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES  # noqa: E402
 from _layout_geometry import (  # noqa: E402
@@ -581,6 +582,7 @@ def _annotation_geometry(
 def _view_geometry(adapter: Any, view: Any, name: str) -> ViewGeometry:
     outline = _floats(_get(adapter, view, "GetOutline"))
     scale = _floats(_get(adapter, view, "ScaleRatio"))
+    orientation = str(_get(adapter, view, "GetOrientationName", "") or "")
     return ViewGeometry(
         name=name,
         outline=Box(*outline[:4]) if len(outline) >= 4 else None,
@@ -591,6 +593,7 @@ def _view_geometry(adapter: Any, view: Any, name: str) -> ViewGeometry:
         ),
         faceted_hlr=bool(_get(adapter, view, "GetFacettedHlrDisplay", False)),
         view_type=int(_get(adapter, view, "Type", -1) or -1),
+        pictorial=is_pictorial_orientation(orientation),
     )
 
 

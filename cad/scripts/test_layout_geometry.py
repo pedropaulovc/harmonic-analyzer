@@ -91,7 +91,10 @@ def test_segment_grazing_a_text_box_face_is_not_ink_through_the_text():
     """
     box = Box(0.100, 0.100, 0.110, 0.104)
     along_top = Segment(0.090, 0.104, 0.120, 0.104)
-    assert segment_box_overlap_length(along_top, box) == pytest.approx(0.010)
+    assert segment_box_overlap_length(along_top, box) == pytest.approx(0.0)
+    # A run one text-height INSIDE the edge is real ink through the text.
+    inside = Segment(0.090, 0.102, 0.120, 0.102)
+    assert segment_box_overlap_length(inside, box) == pytest.approx(0.010)
     # ... but a perpendicular line that only touches the face has no chord.
     touching = Segment(0.105, 0.090, 0.105, 0.100)
     assert segment_box_overlap_length(touching, box) == pytest.approx(0.0)
@@ -342,3 +345,22 @@ def test_leader_crossing_a_foreign_view_is_reported_through_the_shared_audit():
     )
     findings = audit_sheet(_sheet([crossing], views=views))
     assert any(finding.kind == "leader-crosses-view" for finding in findings)
+
+
+def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
+    """The shared contract gives pictorial outlines ``CollisionScope.NONE`` (an
+    isometric's box is mostly empty diagonal space); the annotation-level audit
+    must honour it instead of defaulting every view to ``ALL``."""
+    views = (
+        ViewGeometry("Isometric", Box(0.050, 0.050, 0.150, 0.150), pictorial=True),
+        ViewGeometry("Top", Box(0.200, 0.050, 0.300, 0.150)),
+    )
+    crossing = AnnotationGeometry(
+        label="RA1",
+        kind="gdt",
+        owner="Top",
+        text_boxes=(Box(0.320, 0.100, 0.340, 0.104),),
+        segments=(Segment(0.320, 0.102, 0.060, 0.102, "leader"),),
+    )
+    findings = audit_sheet(_sheet([crossing], views=views))
+    assert not any(finding.kind == "leader-crosses-view" for finding in findings)

@@ -41,6 +41,7 @@ from statistics import median
 
 from _drawing_layout_check import (
     DEFAULT_CROSSING_INSET_M,
+    CollisionScope,
     DrawableRegion,
     LayoutElement,
     LeaderSegment,
@@ -221,11 +222,28 @@ def clip_segment_to_box(segment: Segment, box: Box) -> tuple[float, float] | Non
 
 
 def segment_box_overlap_length(segment: Segment, box: Box) -> float:
-    """How much of ``segment``, in metres, runs inside ``box``."""
+    """How much of ``segment``, in metres, runs THROUGH ``box``.
+
+    A run lying exactly on a box edge has zero depth -- a witness line ending
+    along the text's edge, a leader tangent to a note -- and reads 0.0, the same
+    as a perpendicular touch, so ``find_text_on_line`` cannot report it as ink
+    through the text (CodeRabbit, #754).
+    """
     span = clip_segment_to_box(segment, box)
     if span is None:
         return 0.0
+    if _collinear_with_box_edge(segment, box):
+        return 0.0
     return (span[1] - span[0]) * segment.length
+
+
+def _collinear_with_box_edge(segment: Segment, box: Box) -> bool:
+    """Axis-parallel ``segment`` lying on one of ``box``'s four edge lines."""
+    if abs(segment.y1 - segment.y0) < 1e-12:
+        return any(abs(segment.y0 - edge) < 1e-9 for edge in (box.ymin, box.ymax))
+    if abs(segment.x1 - segment.x0) < 1e-12:
+        return any(abs(segment.x0 - edge) < 1e-9 for edge in (box.xmin, box.xmax))
+    return False
 
 
 def union_boxes(boxes: list[Box]) -> Box | None:
@@ -357,6 +375,10 @@ class ViewGeometry:
     uses_parent_display: bool = False
     faceted_hlr: bool = False
     view_type: int = -1
+    # An isometric/dimetric/trimetric or octant view: its axis-aligned outline is
+    # mostly empty diagonal space, so the shared audit gives it
+    # ``CollisionScope.NONE`` and a leader clipping that box is not a crossing.
+    pictorial: bool = False
 
 
 @dataclass(frozen=True)
@@ -657,6 +679,7 @@ def find_leader_crossings(
             view.outline.ymin,
             view.outline.xmax,
             view.outline.ymax,
+            scope=CollisionScope.NONE if view.pictorial else CollisionScope.ALL,
         )
         for view in sheet.views
         if view.outline is not None

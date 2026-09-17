@@ -1547,21 +1547,31 @@ def _reprobe_under_seat(
     rather than rebuild (the fleet cache-split win; fable/codex review). Its OWN
     phase span, never inside the task span: it is another network round-trip, and
     on a hit a full download -- which would otherwise make the "work" span pure
-    transfer. ``probed`` is the outside-seat disposition: ``locked`` first frees
-    the seat's documents, and a probe still locked afterwards is fatal.
+    transfer. ``probed`` is the outside-seat disposition. Whichever probe first
+    reads ``locked`` -- the outside one, or this one after a peer published
+    while we queued -- gets ONE release of the seat's documents and one more
+    probe; a probe still locked after the release is fatal.
     Returns True on a hit (the caller skips the build)."""
+    released = False
     if probed == "locked":
         _release_seat_documents(label)
-    with _telemetry.span(
-        f"cache.reprobe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
-    ) as reprobe:
-        outcome = _probe_cache(key, outputs, label, reprobe, hit="hit-after-wait")
-    if outcome == "locked":
-        raise RuntimeError(
-            f"{label}: cached outputs still share-locked after releasing the "
-            "seat's documents -- close them in SolidWorks and rerun"
-        )
-    return outcome == "hit-after-wait"
+        released = True
+    while True:
+        with _telemetry.span(
+            f"cache.reprobe {label}",
+            label=label,
+            service=_telemetry.BUILD_INFRA_SERVICE,
+        ) as reprobe:
+            outcome = _probe_cache(key, outputs, label, reprobe, hit="hit-after-wait")
+        if outcome != "locked":
+            return outcome == "hit-after-wait"
+        if released:
+            raise RuntimeError(
+                f"{label}: cached outputs still share-locked after releasing the "
+                "seat's documents -- close them in SolidWorks and rerun"
+            )
+        _release_seat_documents(label)
+        released = True
 
 
 def _cached_drawing_action(stem: str) -> None:

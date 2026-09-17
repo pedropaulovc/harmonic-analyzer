@@ -940,6 +940,50 @@ def test_cached_drawing_locked_restore_releases_seat_then_restores(
     ]
 
 
+def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
+    tmp_path, monkeypatch
+):
+    """Outside probe: miss. A peer publishes while we queue; the under-seat
+    probe is the first to hit the lock -- it still gets the release + one
+    re-probe instead of failing (CodeRabbit, #754)."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    events = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    outcomes = iter((False, "locked", True))
+
+    def restore(key, outputs, label):
+        outcome = next(outcomes)
+        events.append(("restore", outcome))
+        if outcome == "locked":
+            raise _locked(dodo, key, label)
+        return outcome
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo,
+        "_exec_com",
+        lambda cmd, label, **_kwargs: events.append(("exec", Path(cmd[1]).name)),
+    )
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "stored")
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert events == [
+        ("restore", False),
+        ("restore", "locked"),
+        ("exec", "release_seat_documents.py"),
+        ("restore", True),
+    ]
+
+
 def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypatch):
     dodo = _load_dodo()
     output = tmp_path / "platen-guide.SLDDRW"
