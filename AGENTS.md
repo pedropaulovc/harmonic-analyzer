@@ -221,7 +221,7 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
   and start SolidWorks) needs more — the slowest measured leaf was
   `part:fulcrum_keeper` at 61.5 min — so pass
   `--leaf-timeout <minutes>` (or set `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm
-  clamps the request to 60 s–4 h. Leaving it at the default on a cold run costs
+  clamps the request to 60 s–3 h. Leaving it at the default on a cold run costs
   one retry and then a `platform`-style failure per slow leaf.
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
