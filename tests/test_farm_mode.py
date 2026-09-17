@@ -717,21 +717,62 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     [(workflow, request, options)] = calls["start"]
     assert workflow == "BuildLeaf"
     assert request == _farm.LeafRequest(
-        farm_protocol_version=2,
+        farm_protocol_version=3,
         source_identity_sha256=IDENTITY,
         commit=SHA,
         task="part:pen_rod",
         cache_key="k" * 64,
         traceparent=request.traceparent,
         submitter=_farm.submitter(),
+        leaf_timeout_s=None,
     )
     assert request.traceparent is None or request.traceparent.startswith("00-")
-    assert options["id"] == _farm.workflow_id("part:pen_rod", "k" * 64, IDENTITY)
-    assert options["id"] == "leaf:part:pen_rod:" + "k" * 64
+    assert options["id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
     assert options["task_queue"] == "solidworks-control"
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
     assert options["result_type"] is _farm.LeafResult
+
+
+def test_a_run_can_raise_the_per_leaf_budget(temporal_boundary, monkeypatch):
+    # A cold closure run needs more than the control plane's default budget; a
+    # warm run must not pay for it, so the budget travels with the leaf.
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "5400")
+
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    [(_, request, options)] = calls["start"]
+    assert request.leaf_timeout_s == 5400
+    # A raised budget cannot attach to a running 15 min execution: Temporal
+    # cannot widen an existing run's timeout, so the budget is part of the id.
+    assert options["id"].endswith(":5400s")
+
+
+def test_an_unreadable_budget_stops_the_run_instead_of_dispatching(
+    temporal_boundary, monkeypatch
+):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "90m")
+
+    with pytest.raises(RuntimeError) as failure:
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    assert "HARMONIC_FARM_LEAF_TIMEOUT_S" in str(failure.value)
+    assert calls["start"] == []
+
+
+def test_the_build_wrapper_turns_minutes_into_the_leaf_budget(monkeypatch):
+    monkeypatch.delenv("HARMONIC_FARM_LEAF_TIMEOUT_S", raising=False)
+    _preflight_fakes(monkeypatch)
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "--leaf-timeout", "90", "part:x"]) == 0
+    assert os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] == "5400"
+    assert _farm.leaf_timeout_s() == 5400
 
 
 def test_only_a_cancelled_workflow_becomes_a_cancelled_result(temporal_boundary):
