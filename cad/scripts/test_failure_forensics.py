@@ -32,10 +32,16 @@ from __future__ import annotations
 
 import contextlib
 import json
-import time
+import ctypes
+import io
+import logging
+import re
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from unittest import mock
 
 import pytest
 from opentelemetry._logs import get_logger_provider
@@ -592,7 +598,21 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
     0.4 mm: exactly the 91247A720 logo profile's nearest non-coincident
     competitor, i.e. the crossover this capture exists to make visible.
     """
-    monkeypatch.setattr(_common, "_client_pixels", lambda adapter: (2000, 1200))
+    monkeypatch.setattr(
+        _common,
+        "_frame_geometry",
+        lambda adapter: {
+            "frame_hwnd": 0x1234,
+            "frame_left": 0,
+            "frame_top": 0,
+            "frame_width_px": 2000,
+            "frame_height_px": 1200,
+            "frame_area_px": 2_400_000,
+            "frame_client_width_px": 2000,
+            "frame_client_height_px": 1200,
+            "frame_state": "normal",
+        },
+    )
     geometry = _common.display_geometry(_unmerged_profile(tmp_path))
 
     assert geometry["px_per_mm"] == 20.0
@@ -601,9 +621,43 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
     assert geometry["snap_tolerance_px"] == 8
     # The raw inputs behind it are kept: neither is interpretable alone.
     assert geometry["view_scale2"] == 3.5
-    assert geometry["frame_client_px"] == "2000x1200"
     assert geometry["visible_width_mm"] == 100.0
     assert geometry["px_per_mm_from_box"] == 20.0
+
+
+def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
+    """The MEASURED root cause: the failing seat's window was 1024x640 against
+    1278x750 and 1296x816 on the two seats that passed -- 0.620 of the area,
+    monotonic with the outcome, and recorded nowhere. A "1024x640" label would
+    not answer "smaller than the seat that passed?"; integers and an area do.
+    """
+    rects = {
+        "GetWindowRect": (12, 34, 12 + 1024, 34 + 640),
+        "GetClientRect": (0, 0, 1008, 600),
+    }
+
+    class _User32:
+        def __getattr__(self, name):
+            if name in rects:
+                def fill(hwnd, pointer, _name=name):
+                    rect = ctypes.cast(pointer, ctypes.POINTER(_common._Rect))[0]
+                    rect.left, rect.top, rect.right, rect.bottom = rects[_name]
+                    return 1
+
+                return fill
+            return lambda *args: 0  # IsIconic / IsZoomed: a normal window
+
+    with mock.patch.object(_common.ctypes, "windll", mock.Mock(user32=_User32())):
+        geometry = _common._frame_geometry(_unmerged_profile(tmp_path))
+
+    assert geometry["frame_width_px"] == 1024
+    assert geometry["frame_height_px"] == 640
+    assert geometry["frame_area_px"] == 1024 * 640
+    assert (geometry["frame_left"], geometry["frame_top"]) == (12, 34)
+    assert geometry["frame_client_width_px"] == 1008
+    assert geometry["frame_state"] == "normal"
+    # The comparison the investigation had to do by hand, now arithmetic:
+    assert round(geometry["frame_area_px"] / (1296 * 816), 3) == 0.620
 
 
 def test_display_geometry_flags_a_session_without_a_display(tmp_path, monkeypatch):
@@ -915,6 +969,148 @@ def test_a_declared_spec_cannot_be_mutated_in_place():
     accumulate into the fleet's declaration."""
     with pytest.raises(TypeError):
         _INFERENCE_SPEC.toggles["swSketchInference"] = True
+
+
+def test_an_open_sketch_is_reported_at_exit_not_at_the_extrude(capture_telemetry):
+    """The gap that cost the 2026-09-17 investigation: exit_sketch returned OK
+    and the extrude failed 1.9 s later with nothing recorded in between. A
+    sketch the seat ACCEPTED with no closed contour must say so at closure."""
+    spans, logs = capture_telemetry
+    places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
+    adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager())
+
+    verdict = _common.record_sketch_closure(
+        adapter,
+        "logo",
+        _Sketch(contours=0, points=places + places),
+        expected_points=9,
+    )
+
+    assert verdict["closure"] == "open"
+    assert verdict["contour_count"] == 0
+    assert verdict["unmerged_points"] == 9
+    warnings = [
+        str(r.log_record.body)
+        for r in logs.get_finished_logs()
+        if r.log_record.severity_text == "WARN"
+    ]
+    assert any("no usable contour" in body for body in warnings)
+
+
+def test_a_closed_sketch_records_its_verdict_without_warning(capture_telemetry):
+    """The control, and the reason this runs on the success path too: a good
+    sketch logs the counts a later failure has to be compared against, and does
+    not cry wolf on every build."""
+    spans, logs = capture_telemetry
+    places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
+    adapter = _Adapter(sw=_Seat(), sketch_manager=_SketchManager())
+
+    verdict = _common.record_sketch_closure(
+        adapter, "logo", _Sketch(contours=2, points=places), expected_points=9
+    )
+
+    assert verdict["closure"] == "closed"
+    assert verdict["unmerged_points"] == 0
+    assert not [
+        r for r in logs.get_finished_logs() if r.log_record.severity_text == "WARN"
+    ]
+
+
+def test_a_closure_verdict_that_cannot_be_read_never_raises(capture_telemetry):
+    """A sketch that would have built must not fail on the way to being
+    described: the verdict degrades to "unknown" and the caller decides."""
+    spans, logs = capture_telemetry
+
+    class _Hostile:
+        def __getattr__(self, name):
+            raise OSError("RPC_E_DISCONNECTED")
+
+    verdict = _common.record_sketch_closure(
+        _Adapter(sw=_Seat()), "logo", _Hostile()
+    )
+
+    assert verdict["closure"] == "unknown"
+
+
+def test_authored_profile_geometry_is_logged_for_every_profile(capture_telemetry):
+    """Per-entity logs were inconsistent -- shank/hex/cutter logged every line,
+    logo logged nothing -- so one uniform line states the AUTHOR's intent:
+    endpoints emitted, distinct places, coincidences the seat must merge."""
+    spans, logs = capture_telemetry
+    places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
+
+    intent = _common.log_profile_geometry("logo", places + places)
+
+    assert intent == {
+        "profile": "logo",
+        "authored_points": 18,
+        "distinct_places": 9,
+        "expected_merges": 9,
+    }
+    assert any(
+        "9 coincidences to merge" in str(r.log_record.body)
+        for r in logs.get_finished_logs()
+    )
+
+
+def test_warn_and_error_lines_carry_an_absolute_utc_stamp():
+    """The leaf log's stamps are elapsed seconds, and the only absolute stamp in
+    it on 2026-09-17 was LOCAL (21:58:42) against blob metadata in UTC
+    (04:59:59Z) -- the same event reading as two runs seven hours apart."""
+    when = datetime(2026, 9, 18, 4, 59, 59, tzinfo=timezone.utc)
+    record = logging.LogRecord(
+        "harmonic", logging.WARNING, __file__, 1, "seat drifted", None, None
+    )
+    record.created = when.timestamp()
+
+    line = _telemetry._FriendlyFormatter().format(record)
+
+    assert line.endswith("@2026-09-18T04:59:59.000Z")
+    info = logging.LogRecord(
+        "harmonic", logging.INFO, __file__, 1, "create_sketch logo", None, None
+    )
+    # INFO stays compact: a 600-line build log must remain readable.
+    assert "@" not in _telemetry._FriendlyFormatter().format(info)
+
+
+def test_the_log_states_what_t_zero_was_in_utc(capture_telemetry, monkeypatch):
+    """Elapsed-seconds stamps are only correlatable if something says what t=0
+    was; nothing did, so the reader depended on whichever library happened to
+    print a timestamp.
+
+    The banner must survive the terse mode a farm leaf runs in: at warning-only
+    console verbosity an INFO record is dropped, which is precisely when the log
+    is hardest to place in time.
+    """
+    spans, logs = capture_telemetry
+    terse = logging.StreamHandler(stream=io.StringIO())
+    terse.setLevel(logging.WARNING)
+    monkeypatch.setattr(_telemetry, "_anchor_printed", False)
+
+    _telemetry._log_utc_anchor(_telemetry.get_logger(), terse)
+
+    banner = terse.stream.getvalue()
+    assert "log anchor" in banner
+    assert re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z", banner)
+    # ... and the structured sinks get it as a real record too.
+    anchors = [
+        str(r.log_record.body)
+        for r in logs.get_finished_logs()
+        if "log anchor" in str(r.log_record.body)
+    ]
+    assert anchors and anchors[-1].endswith("carries its own @UTC")
+
+
+def test_the_anchor_banner_is_printed_once_per_process(monkeypatch):
+    """A reconfigure (dodo relabels the service mid-process) must not restate
+    the anchor: a header repeated at random depths reads like a new run."""
+    stream = logging.StreamHandler(stream=io.StringIO())
+    monkeypatch.setattr(_telemetry, "_anchor_printed", False)
+
+    for _ in range(3):
+        _telemetry._log_utc_anchor(_telemetry.get_logger(), stream)
+
+    assert stream.stream.getvalue().count("log anchor") == 1
 
 
 if __name__ == "__main__":

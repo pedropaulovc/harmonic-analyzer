@@ -57,7 +57,7 @@ import re
 import shutil
 import sys
 import time
-from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -2749,13 +2749,19 @@ MODAL_HAZARD_TOGGLE_NAMES = (
     "swOpenLastUsedDocumentAtStart",
 )
 
-# Per-DOCUMENT toggles, read through ``IModelDocExtension`` and reported in
-# their own bucket. ``swSketchAddConstToRectEntity`` is the reason this bucket
-# exists: RootCause read system=False while the active document read True on the
-# same worker, so mixing it into the system snapshot logs a value that governs
-# nothing (and pinning it system-wide manufactures permanent false drift, which
-# is why SeatSettings dropped it from the baseline).
-DOCUMENT_SCOPE_TOGGLE_NAMES = ("swSketchAddConstToRectEntity",)
+# Per-DOCUMENT toggles, read through ``IModelDocExtension`` and reported in their
+# own bucket. These are not "preferences SolidWorks ignores on write": SolidWorks'
+# own option-to-API mapping (docs/swconst/ToolsSketchEntitiesRectangle.md:11,14)
+# documents both members on ``IModelDocExtension::Get/SetUserPreferenceToggle``
+# and NOT on ``ISldWorks``, so reading them through the system accessor is a
+# category error -- which is exactly why one worker read system=False while its
+# active document read True in the same pass. They are also HALF A RADIO PAIR
+# each (From Midpoint / From Corner), so a snapshot naming only one describes
+# half a control.
+DOCUMENT_SCOPE_TOGGLE_NAMES = (
+    "swSketchAddConstToRectEntity",  # Rectangle Type > Add construction lines > From Midpoint
+    "swSketchAddConstLineDiagonalType",  # ... > From Corner (id 585, verified in swconst)
+)
 
 # The SolidWorks default-template preferences (``swUserPreferenceStringValue_e``
 # member names): the part template sets the document's INITIAL VIEW SCALE, which
@@ -2898,8 +2904,27 @@ _SM_CXSCREEN, _SM_CYSCREEN, _SM_CMONITORS = 0, 1, 80
 _SNAP_TOLERANCE_PX = 8
 
 
-def _client_pixels(adapter: Any) -> tuple[int | None, int | None]:
-    """Client-area pixel size of the SolidWorks main frame."""
+def _frame_geometry(adapter: Any) -> dict[str, Any]:
+    """The SolidWorks main window's pixel rect -- the term the 2026-09-17
+    investigation had to reconstruct by hand and could not.
+
+    RootCause's verdict refuted preference drift by measurement (45 shared
+    sketch/snap/inference preference names, ZERO differences across workers
+    4/5/6) and landed on this instead: the failing seat's main window was
+    1024x640 against 1278x750 and 1296x816 on the two that passed -- 0.620 of
+    the area, monotonic with the outcome. Nothing recorded it. The live
+    dashboard frames are capped and unversioned and the published PNGs are a
+    forced 1600x1000 (they measure the EXPORT, not the window), so the rect at
+    04:59:56Z is permanently unrecoverable.
+
+    Recorded as INTEGERS, not a "1024x640" label: width/height/left/top plus the
+    derived area are what a later comparison across seats needs, and the
+    maximised/minimised state says whether an operator had hand-arranged the
+    window (which is how w5 got its size -- launched over RDP, then ``tscon``'d
+    to the console). SeatSettings records the same fields on every periodic seat
+    check, including clean seats; this is the failure-time half of the pair, and
+    the field names match theirs so both halves join on one query.
+    """
     sw = adapter.swApp
     frame = adapter._attempt(lambda: _read_member(sw, "Frame"), default=None)
     hwnd = (
@@ -2908,11 +2933,32 @@ def _client_pixels(adapter: Any) -> tuple[int | None, int | None]:
         else None
     )
     if not hwnd:
-        return None, None
-    rect = _Rect()
-    if not ctypes.windll.user32.GetClientRect(hwnd, ctypes.byref(rect)):
-        return None, None
-    return rect.right - rect.left, rect.bottom - rect.top
+        return {"frame_hwnd": None}
+    user32 = ctypes.windll.user32
+    geometry: dict[str, Any] = {"frame_hwnd": hwnd}
+    window = _Rect()
+    if user32.GetWindowRect(hwnd, ctypes.byref(window)):
+        width = window.right - window.left
+        height = window.bottom - window.top
+        geometry.update(
+            frame_left=window.left,
+            frame_top=window.top,
+            frame_width_px=width,
+            frame_height_px=height,
+            frame_area_px=width * height,
+        )
+    client = _Rect()
+    if user32.GetClientRect(hwnd, ctypes.byref(client)):
+        geometry["frame_client_width_px"] = client.right - client.left
+        geometry["frame_client_height_px"] = client.bottom - client.top
+    geometry["frame_state"] = (
+        "minimised"
+        if user32.IsIconic(hwnd)
+        else "maximised"
+        if user32.IsZoomed(hwnd)
+        else "normal"
+    )
+    return geometry
 
 
 def _projected_px_per_mm(adapter: Any, view: Any) -> dict[str, Any]:
@@ -2973,18 +3019,18 @@ def display_geometry(adapter: Any) -> dict[str, Any]:
     that did not could not be compared.
 
     Recorded: ``Scale2`` and the visible model box (the raw inputs, each
-    uninterpretable without the other), the frame client pixels, the measured
-    px/mm with the per-axis values behind it, the resulting snap floor in
-    millimetres, and the interactive session's screen metrics.
+    uninterpretable without the other), the main window's numeric rect, area and
+    state (:func:`_frame_geometry` -- the measured root cause of the 2026-09-17
+    failure), the measured px/mm with the per-axis values behind it, the
+    resulting snap floor in millimetres, and the interactive session's screen
+    metrics.
     """
-    geometry: dict[str, Any] = {}
-    width_px, height_px = _client_pixels(adapter)
-    if width_px is not None:
-        geometry["frame_client_px"] = f"{width_px}x{height_px}"
-    geometry["screen_px"] = (
-        f"{ctypes.windll.user32.GetSystemMetrics(_SM_CXSCREEN)}"
-        f"x{ctypes.windll.user32.GetSystemMetrics(_SM_CYSCREEN)}"
-    )
+    geometry: dict[str, Any] = dict(_frame_geometry(adapter))
+    screen_w = int(ctypes.windll.user32.GetSystemMetrics(_SM_CXSCREEN))
+    screen_h = int(ctypes.windll.user32.GetSystemMetrics(_SM_CYSCREEN))
+    geometry["screen_width_px"] = screen_w
+    geometry["screen_height_px"] = screen_h
+    geometry["screen_px"] = f"{screen_w}x{screen_h}"
     geometry["monitors"] = int(ctypes.windll.user32.GetSystemMetrics(_SM_CMONITORS))
     # 0x0 with no monitors is a session whose RDP client disconnected: screen
     # capture stops and the seat's view geometry stops meaning anything.
@@ -3008,9 +3054,10 @@ def display_geometry(adapter: Any) -> dict[str, Any]:
         geometry["visible_box_mm"] = [round(value * 1000.0, 3) for value in numbers]
         geometry["visible_width_mm"] = round(abs(numbers[3] - numbers[0]) * 1000.0, 3)
         geometry["visible_height_mm"] = round(abs(numbers[4] - numbers[1]) * 1000.0, 3)
-        if width_px and geometry["visible_width_mm"]:
+        client_width = geometry.get("frame_client_width_px")
+        if client_width and geometry["visible_width_mm"]:
             geometry["px_per_mm_from_box"] = round(
-                width_px / geometry["visible_width_mm"], 3
+                client_width / geometry["visible_width_mm"], 3
             )
     geometry.update(_projected_px_per_mm(adapter, view))
     return geometry
@@ -3038,7 +3085,9 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
         f"authoring {label}: px/mm={display.get('px_per_mm', 'unknown')} "
         f"snap_floor={display.get('snap_floor_mm', 'unknown')}mm "
         f"view_scale2={display.get('view_scale2', 'unknown')} "
-        f"frame={display.get('frame_client_px', 'unknown')} "
+        f"frame={display.get('frame_width_px', '?')}x"
+        f"{display.get('frame_height_px', '?')}"
+        f"({display.get('frame_state', 'unknown')}) "
         f"AddToDB={context['sketch_manager'].get('AddToDB', 'unknown')}"
     )
     with contextlib.suppress(Exception):
@@ -3483,6 +3532,138 @@ def capture_com_failure(
             },
         )
     raise exc_type(message)
+
+
+def log_profile_geometry(
+    label: str, points: Sequence[Sequence[float]]
+) -> dict[str, Any]:
+    """Log what a profile was AUTHORED to be, computed in Python, before COM.
+
+    Per-entity authoring logs are not uniform today: ``shank``, ``hex`` and
+    ``cutter`` log every ``add_line`` with coordinates, while ``washer``,
+    ``trim``, ``helix seed``, ``runout``, ``dash0/1/2`` and ``logo`` log nothing
+    -- and the profile that failed on 2026-09-17 was in the silent group, so the
+    recovered log could not say whether it closed into two loops, nine open
+    segments, or none. One line per profile makes a SUCCESS comparable with a
+    failure, which is the whole point of recording it.
+
+    This is the AUTHOR's intent: how many endpoints were emitted, how many
+    distinct places they occupy, and therefore how many coincidences the author
+    is asking the seat to merge. Compare it against the seat's own verdict from
+    :func:`record_sketch_closure` -- intent from Python, outcome from COM.
+    """
+    places = [
+        tuple(round(float(value) / _COINCIDENT_TOL_M) * _COINCIDENT_TOL_M for value in point)
+        for point in points
+    ]
+    distinct = len(set(places))
+    intent: dict[str, Any] = {
+        "profile": label,
+        "authored_points": len(places),
+        "distinct_places": distinct,
+        "expected_merges": len(places) - distinct,
+    }
+    _telemetry.success(
+        f"profile {label}: {len(places)} authored points over {distinct} places "
+        f"({intent['expected_merges']} coincidences to merge)",
+        **intent,
+    )
+    return intent
+
+
+def record_sketch_closure(
+    adapter: Any,
+    label: str,
+    sketch: Any | None = None,
+    *,
+    expected_points: int | None = None,
+    expect_contours: int | None = None,
+) -> dict[str, Any]:
+    """Read a just-closed sketch's CLOSURE VERDICT once, log it, and return it.
+
+    On 2026-09-17 ``exit_sketch logo`` returned OK, ``Sketch11`` was created and
+    renamed, and ``FeatureExtrusion3`` found no usable contour 1.9 s later.
+    Between those two events nothing was recorded, so a four-hour investigation
+    replaced what one line of log would have said: the seat accepted a sketch
+    with no closed loop.
+
+    Read ONCE, consumed twice: the returned dict is the same shape the failure
+    capture records, so a caller's fail-safe guard decides whether to raise from
+    THIS verdict rather than issuing its own second read of an API whose return
+    shape is disputed (``ISketch.CheckFeatureUse``). Callers should pass the
+    verdict's ``contour_count``/``unmerged_points`` to
+    :func:`capture_com_failure` as context instead of re-reading the sketch.
+
+    Never raises: a verdict that cannot be read logs ``unknown`` and returns what
+    it has, because a sketch that would have built must not fail on the way to
+    being described. Deciding to FAIL on a bad verdict is the caller's job.
+    """
+    verdict = adapter._attempt(
+        lambda: _sketch_state(adapter, sketch, expected_points), default=None
+    )
+    if not verdict:
+        _telemetry.warn(f"sketch {label}: closure verdict unavailable", sketch=label)
+        return {"sketch": label, "closure": "unknown"}
+    contours = verdict.get("contour_count")
+    unmerged = verdict.get("unmerged_points")
+    # Tri-state on purpose: "open" is a MEASUREMENT (the seat reported zero
+    # contours) and "unknown" is the absence of one. Collapsing them would put a
+    # verdict in the log that nothing measured -- the exact move that made
+    # 2026-09-17 unfalsifiable.
+    readable = isinstance(contours, int)
+    closed = readable and contours > 0
+    verdict = {
+        **verdict,
+        "sketch_label": label,
+        "closure": ("closed" if closed else "open") if readable else "unknown",
+    }
+    summary = (
+        f"sketch {label}: {contours} contour(s), "
+        f"{verdict.get('segment_count')} segment(s), "
+        f"{verdict.get('point_count')} point(s), {verdict.get('constrained')}"
+    )
+    short = {
+        key: value
+        for key, value in verdict.items()
+        if key
+        in {
+            "sketch_label",
+            "closure",
+            "contour_count",
+            "region_count",
+            "segment_count",
+            "point_count",
+            "distinct_point_positions",
+            "coincident_point_pairs",
+            "unmerged_points",
+            "constrained",
+            "point_census_error",
+        }
+    }
+    wanted = 1 if expect_contours is None else expect_contours
+    if not readable:
+        _telemetry.warn(
+            f"sketch {label}: closure verdict unreadable -- a later feature "
+            f"failure on this profile cannot be told from a seat-state failure",
+            **short,
+        )
+    elif contours < wanted:
+        # The earliest detectable symptom of the 2026-09-17 mechanism: the seat
+        # accepted the sketch, so only this count says the loops did not close.
+        _telemetry.warn(
+            f"{summary} -- expected at least {wanted} closed contour(s); "
+            f"a feature consuming this profile will get no usable contour",
+            **short,
+        )
+    elif unmerged:
+        _telemetry.warn(
+            f"{summary} -- {unmerged} endpoint(s) did not merge", **short
+        )
+    else:
+        _telemetry.success(summary, **short)
+    with contextlib.suppress(Exception):
+        _telemetry.event("sketch.closure", **_attributes_of(short))
+    return verdict
 
 
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
