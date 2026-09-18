@@ -474,7 +474,11 @@ fail a build):
   `store`/`restore_hit`/`restore_miss`/`restore_hit_drift`/…), so post-hoc debugging
   reads a file. On a HIT under a key this seat never published — the
   store-skip-on-hit drift that bit v0.9.0 — `restore` emits a `WARN` and a
-  `restore_hit_drift` event.
+  `restore_hit_drift` event. A process that *structurally cannot* publish (a
+  `--executor farm` submitter, which dispatches every leaf and never reaches
+  `store`; a `ro` seat) hits foreign keys as its normal path, so there the same
+  event is recorded with `drift_expected: true` + a `drift_reason` and logged at
+  debug — the `WARN` keeps meaning "a publishing seat drifted".
 
 ## Fine-grained config deps
 
@@ -800,8 +804,10 @@ scripts that `from _common import log, check` are instrumented unchanged.
   event** + a `cache` attribute on the phase span that made the decision (`hit`/`miss`
   on `cache.probe`, `hit-after-wait`/`miss` on `task`), so a miss and the build it
   triggered are backtraceable from the signals, not just the console. A routine
-  miss is `debug`; drift and soft errors remain `warn` (`!!`). Every outcome is still
-  appended to `cache.jsonl`. (`_artifact_cache.py`.)
+  miss is `debug`; soft errors and *actionable* drift stay `warn` (`!!`) — drift a
+  non-publishing process (farm submitter, `ro` seat) cannot avoid is `debug` with
+  `drift_expected` on its event. Every outcome is still appended to `cache.jsonl`.
+  (`_artifact_cache.py`.)
 - **Cross-process trace continuity.** `dodo._exec` (the span-less core `_run` and
   the cached part/assembly actions both call) injects W3C trace context
   (`TRACEPARENT`) into each subprocess env via `_telemetry.inject_env`; the build
