@@ -32,7 +32,11 @@ failed`` leaf on ``swmaker000005@5``:
 Re-deriving what the audit catches, so the claim is backed by the commit and
 not by a report -- the widened audit flags NINE pre-guard sites at
 ``4c5a4322`` (the commit before the migration), and the number is
-re-derivable by anyone after any rebase::
+re-derivable by anyone after any rebase.  The worktree stays at ``4c5a4322``
+on purpose: that is the only tree where the unguarded sites still exist, so
+replaying against a guard commit would derive nothing.  What a rebase moves
+is which guard commit the count was last checked against -- currently
+``ceaff371``, where those same nine are migrated and this file is green::
 
     git worktree add /tmp/pre 4c5a4322
     cp cad/scripts/test_sketch_preference_baseline.py /tmp/pre/cad/scripts/
@@ -293,6 +297,12 @@ HAND_ROLLED_ADD_TO_DB = {
 TEST_FAKE_ADD_TO_DB_ANCHORS = {
     "test_failure_forensics.py": "__init__",
     "test_rocker_arm_support_drawing.py": "__init__",
+    # The guard's own contract file (``ceaff371``).  Enrolled because it is
+    # the test module most easily mistaken for a real site: its double records
+    # ``AddToDB`` at creation and exposes a ``CreatePoint``, so anyone grepping
+    # for either would expect this audit to have something to say about it.
+    # It does, and the answer is stated rather than implied by a prefix rule.
+    "test_sketch_geometry_guards.py": "__init__",
 }
 
 _MODULE_SCOPE = "<module>"
@@ -556,7 +566,16 @@ def test_a_silently_declined_suppression_is_caught_by_read_back() -> None:
     inference = diag.SKETCH_DRAWING_STATE["swSketchInference"][0]
     adapter = _adapter_at(True, refuse=frozenset({(inference, False)}))
 
-    with pytest.raises(RuntimeError, match="refused to set swSketchInference"):
+    # Anchored on the DIRECTION of the declined write, not merely on
+    # "refused": ``apply_sketch_preferences`` raises one message for both the
+    # suppression write and the baseline write, with the values the other way
+    # round, so a bare substring is satisfied by whichever refusal reaches it
+    # and cannot tell the two paths apart.
+    with pytest.raises(
+        RuntimeError,
+        match="refused to set swSketchInference .* to False: it still reads "
+        "back True",
+    ):
         with diag.no_sketch_inference(adapter):
             raise AssertionError("the block must never run under a refused write")
 
@@ -582,7 +601,13 @@ def test_a_silently_declined_baseline_write_is_not_reported_as_a_repair(
     inference = diag.SEAT_SKETCH_BASELINE["swSketchInference"][0]
     adapter = _adapter_at(False, refuse=frozenset({(inference, True)}))
 
-    with pytest.raises(RuntimeError, match="refused to set swSketchInference"):
+    # The mirror image of the suppression refusal above, anchored so neither
+    # test can be satisfied by the other path's message.
+    with pytest.raises(
+        RuntimeError,
+        match="refused to set swSketchInference .* to True: it still reads "
+        "back False",
+    ):
         diag.assert_seat_sketch_baseline(adapter, "91247A720")
 
     assert adapter.swApp.toggles[inference] is False
@@ -1072,6 +1097,23 @@ def test_the_test_module_exclusion_still_covers_only_fake_managers() -> None:
             f"{sorted(writers)}): the test-module exclusion is covering "
             "something else now, so re-justify it"
         )
+    # EQUALITY, not just liveness: "test_*.py is excluded" is a rule no test
+    # can falsify, and ``ceaff371`` demonstrated the cost -- it added
+    # ``test_sketch_geometry_guards.py``, whose double records ``AddToDB`` and
+    # exposes a ``CreatePoint``, and the prefix rule absorbed it in silence.
+    # A test module that grows a preference write must now be ENROLLED, so
+    # the exclusion enumerates what it covers instead of asserting a prefix.
+    writing_test_modules = sorted(
+        path.relative_to(SCRIPTS_DIR).as_posix()
+        for path in SCRIPTS_DIR.rglob("test_*.py")
+        if _add_to_db_writers(path)
+    )
+    assert writing_test_modules == sorted(TEST_FAKE_ADD_TO_DB_ANCHORS), (
+        f"test modules writing AddToDB {writing_test_modules} do not match "
+        f"the enrolled exclusions {sorted(TEST_FAKE_ADD_TO_DB_ANCHORS)} -- "
+        "enrol the new one with the function its FAKE writes from, or delete "
+        "the entry whose fake is gone"
+    )
 
 
 def test_the_audit_exemptions_still_exist_and_are_still_raw_com_probes() -> None:
