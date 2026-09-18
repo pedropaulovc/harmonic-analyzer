@@ -332,15 +332,26 @@ def no_sketch_inference(adapter):
             apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
 
 
-def assert_profile_closed(adapter, label: str, *, loops: int) -> dict:
+def assert_profile_closed(
+    adapter, label: str, *, loops: int, feature: str
+) -> dict:
     """Decide, from ONE closure read, whether the profile really closed.
 
-    Call immediately after ``exit_sketch``.  The read itself belongs to
-    ``_common.record_sketch_closure``, which resolves the last profile
-    feature's sketch, logs one uniform line, emits a ``sketch.closure`` span
-    event and returns the verdict -- so the seat is interrogated ONCE and both
-    the forensics record and this decision come from the same numbers.  This
-    function only decides the raise.
+    Call immediately after ``exit_sketch``, and pass the ``feature`` name the
+    sketch was just given by ``name_last_feature``.  The read itself belongs to
+    ``_common.record_sketch_closure``, which logs one uniform line, emits a
+    ``sketch.closure`` span event and returns the verdict -- so the seat is
+    interrogated ONCE and both the forensics record and this decision come from
+    the same numbers.  This function only decides the raise.
+
+    ``feature`` is REQUIRED rather than defaulted because of how that read
+    resolves a sketch when it is not told which one: caller dispatch, then a
+    named feature, then the LAST ``ProfileFeature``, then
+    ``GetActiveSketch2``.  After ``exit_sketch`` there is no active sketch, so
+    the last-profile-feature branch answers -- correct for a recipe that
+    authored one sketch, silently WRONG for a recipe that authored two before
+    checking.  A verdict on the wrong sketch is worse than no verdict, and the
+    caller always knows the name it just assigned.
 
     The decision turns on the verdict's TRI-STATE ``closure``:
 
@@ -368,7 +379,9 @@ def assert_profile_closed(adapter, label: str, *, loops: int) -> dict:
     Returns the verdict dict, so the caller can pass its counts into
     :func:`capture_com_failure` as context instead of re-reading the sketch.
     """
-    verdict = record_sketch_closure(adapter, label, expect_contours=loops)
+    verdict = record_sketch_closure(
+        adapter, label, feature, expect_contours=loops
+    )
     if verdict.get("closure") == "open":
         raise RuntimeError(
             f"{label}: profile did not close -- the seat reports "

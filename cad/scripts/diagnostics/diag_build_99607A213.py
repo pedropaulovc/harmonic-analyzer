@@ -198,7 +198,9 @@ async def build_99607A213(adapter, truth=None):
     # The revolve axis is construction geometry in this same sketch, which is
     # exactly why the contour COUNT is not allowed to fail a build here -- see
     # assert_profile_closed.  Zero contours still does.
-    assert_profile_closed(adapter, "flare lens", loops=1)
+    assert_profile_closed(
+        adapter, "flare lens", loops=1, feature="FlareProfile"
+    )
     check("flare cut", await adapter.create_revolve(
         RevolveParameters(angle=360.0, is_cut=True)))
     name_last_feature(adapter, "FlareCut")

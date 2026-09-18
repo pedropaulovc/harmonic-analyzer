@@ -418,9 +418,21 @@ def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
     shared with the forensics record -- so this decision is pure and testable
     without any COM at all.
     """
-    monkeypatch.setattr(diag, "record_sketch_closure",
-                        lambda _a, _l, **_kw: verdict)
-    return diag.assert_profile_closed(object(), "ring", loops=loops)
+    seen: list[tuple] = []
+
+    def _record(_adapter, _label, sketch=None, **kwargs):
+        seen.append((sketch, kwargs.get("expect_contours")))
+        return verdict
+
+    monkeypatch.setattr(diag, "record_sketch_closure", _record)
+    result = diag.assert_profile_closed(
+        object(), "ring", loops=loops, feature="LogoProfile"
+    )
+    # The sketch is named, never left to "last ProfileFeature wins": a recipe
+    # that authors two sketches before checking would otherwise verdict the
+    # wrong one, and a verdict on the wrong sketch is worse than no verdict.
+    assert seen == [("LogoProfile", loops)]
+    return result
 
 
 def test_a_measured_open_profile_fails_the_build(monkeypatch) -> None:

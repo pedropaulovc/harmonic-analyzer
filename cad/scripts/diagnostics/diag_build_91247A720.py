@@ -424,7 +424,9 @@ async def build_91247A720(adapter, truth=None):
     name_last_feature(adapter, "LogoProfile")
     # ONE closure read, shared with the forensics record: no second COM call,
     # and the extrude's failure context below comes from these same numbers.
-    closure = assert_profile_closed(adapter, "logo ring", loops=2)
+    closure = assert_profile_closed(
+        adapter, "logo ring", loops=2, feature="LogoProfile"
+    )
     model.ClearSelection2(True)
     # FeatureExtrusion3 also returns None when NOTHING is selected, so an
     # unchecked Select2 leaves a failed selection and a bad profile
