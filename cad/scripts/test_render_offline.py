@@ -239,7 +239,7 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     )
     done = subprocess.run(
         ["uv", "run", "--no-project", "--with", "pillow", str(driver)],
-        capture_output=True, text=True, cwd=REPO_ROOT,
+        capture_output=True, text=True, cwd=REPO_ROOT, timeout=180,
     )
     assert done.returncode == 0, done.stdout + done.stderr
     assert "CURRENT" in done.stdout
