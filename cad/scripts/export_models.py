@@ -402,15 +402,23 @@ def _exporter_digest() -> str:
     format / scene / colour logic invalidates every recorded output even when no CAD
     recipe changed (codex review). Best-effort: if the closure can't be resolved, fall
     back to this module alone; if even that can't be read, '' (a stable, round-tripping
-    value) -- never blocking an export."""
+    value) -- never blocking an export.
+
+    Hash GIT-CANONICAL bytes (``dodo._canonical_file_bytes``), never raw ones: this
+    sentinel is compared ACROSS checkouts -- an export that ran on a farm worker is
+    read back on the submitter -- and a worker's LF checkout hashes identical code
+    differently from a CRLF one, which invalidated every farm-produced ledger and
+    silently forced a full re-export (and failed the gallery's freshness check).
+    """
     self_path = Path(__file__).resolve()
     try:
         from _buildgraph import module_deps_of
+        canon = _import_dodo()._canonical_file_bytes
         files = sorted({self_path, *(Path(p).resolve()
                                      for p in module_deps_of(self_path))})
         h = hashlib.md5()
         for f in files:
-            h.update(f.read_bytes())
+            h.update(canon(str(f)))
         return h.hexdigest()
     except Exception:
         try:
