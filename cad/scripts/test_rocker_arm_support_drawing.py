@@ -194,16 +194,71 @@ def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
     }
 
 
-@pytest.mark.parametrize("scale", [0.5, 1.0])
-def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
-    """A centre cut must stay centred on a translated, scaled parent view.
+class _FakeSketchManager:
+    """Records the ``CreateLine`` call and can snap the segment like inference.
 
-    Native CreateLine interprets sheet coordinates a second time: the old
-    helper cut x=42.5 mm off centre at 1:2 and left an unsectioned taper.
+    ``add_to_db`` is the mode the seat is already in when the helper runs: a
+    seat left in direct-to-DB mode by an earlier leaf must get THAT value back,
+    which a fake hard-wired to ``False`` cannot tell apart from a restore that
+    always writes ``False``. ``snap_at`` picks which endpoint inference moves,
+    and ``raises`` makes ``CreateLine`` fail so the restore can be proved on
+    the exception path -- a leaked ``AddToDB = True`` poisons every later
+    sketch on the shared seat, which is the whole reason for the guard.
     """
+
+    def __init__(
+        self,
+        snap: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        *,
+        add_to_db: bool = False,
+        snap_at: str = "end",
+        raises: Exception | None = None,
+    ) -> None:
+        self.AddToDB = add_to_db
+        self.add_to_db_when_created: bool | None = None
+        self.calls: list[tuple[float, ...]] = []
+        self._snap = snap
+        self._snap_at = snap_at
+        self._raises = raises
+
+    def CreateLine(self, *args: float) -> SimpleNamespace:
+        self.add_to_db_when_created = self.AddToDB
+        self.calls.append(args)
+        if self._raises is not None:
+            raise self._raises
+        shifted = tuple(
+            value + shift
+            for value, shift in zip(
+                args[0:3] if self._snap_at == "start" else args[3:6], self._snap
+            )
+        )
+        start = shifted if self._snap_at == "start" else tuple(args[0:3])
+        end = tuple(args[3:6]) if self._snap_at == "start" else shifted
+        return SimpleNamespace(
+            GetStartPoint2=lambda: SimpleNamespace(X=start[0], Y=start[1], Z=start[2]),
+            GetEndPoint2=lambda: SimpleNamespace(X=end[0], Y=end[1], Z=end[2]),
+            Select4=lambda append, data: True,
+        )
+
+
+def _member(obj, name):
+    """Stand in for the adapter's method-or-property COM read."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
+def _section_doubles(
+    monkeypatch,
+    scale: float,
+    snap: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    *,
+    add_to_db: bool = False,
+    snap_at: str = "end",
+    raises: Exception | None = None,
+) -> SimpleNamespace:
     origin = drawing.FRONT_CENTER
     transform = object()
-    points = []
+    points: list[tuple[float, ...]] = []
 
     def make_point(values):
         points.append(tuple(values))
@@ -228,12 +283,21 @@ def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
     section = Mock()
     section.GetSection.return_value = section_definition
     section.SetViewPosition.return_value = True
+    sketch_manager = _FakeSketchManager(
+        snap, add_to_db=add_to_db, snap_at=snap_at, raises=raises
+    )
     model = Mock()
     model.ActivateView.return_value = True
+    model.SketchManager = sketch_manager
+    model.SelectionManager = SimpleNamespace(
+        CreateSelectData=lambda: SimpleNamespace(View=None),
+        GetSelectedObjectCount2=lambda mark: 1,
+    )
     model.CreateSectionViewAt5.return_value = section
     adapter = SimpleNamespace(
         currentModel=model,
         swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
+        _get_attr_or_call=lambda obj, name: _member(obj, name),
     )
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
@@ -241,22 +305,112 @@ def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    start = (origin[0], origin[1] - 0.050)
-    end = (origin[0], origin[1] + 0.050)
+    return SimpleNamespace(
+        adapter=adapter,
+        parent=parent,
+        model=model,
+        section=section,
+        section_definition=section_definition,
+        sketch_manager=sketch_manager,
+        points=points,
+        start=(origin[0], origin[1] - 0.050),
+        end=(origin[0], origin[1] + 0.050),
+    )
+
+
+@pytest.mark.parametrize("scale", [0.5, 1.0])
+@pytest.mark.parametrize("seat_add_to_db", [False, True])
+def test_section_cut_uses_parent_sketch_coordinates(
+    monkeypatch, scale, seat_add_to_db
+) -> None:
+    """A centre cut must stay centred on a translated, scaled parent view.
+
+    Native CreateLine interprets sheet coordinates a second time: the old
+    helper cut x=42.5 mm off centre at 1:2 and left an unsectioned taper.
+
+    ``seat_add_to_db`` is the mode the seat arrives in. Restoring the value we
+    found is not the same as writing ``False``, and only the ``True`` case can
+    tell them apart -- a seat an earlier leaf left in direct-to-DB mode must
+    not be silently reset by a drawing recipe.
+    """
+    doubles = _section_doubles(monkeypatch, scale, add_to_db=seat_add_to_db)
     result = _drawing_common.create_section_view(
-        adapter,
-        parent,
-        line_start=start,
-        line_end=end,
+        doubles.adapter,
+        doubles.parent,
+        line_start=doubles.start,
+        line_end=doubles.end,
         view_xy=drawing.RIGHT_CENTER,
         section_label="A",
         scale=(1, 2),
         label="centre cut regression",
     )
-    assert result is section
-    assert points == [(*start, 0.0), (*end, 0.0)]
-    assert model.SketchManager.CreateLine.call_args.args == pytest.approx(
+    assert result is doubles.section
+    assert doubles.points == [(*doubles.start, 0.0), (*doubles.end, 0.0)]
+    assert doubles.sketch_manager.calls[0] == pytest.approx(
         (0.0, -0.050 / scale, 0.0, 0.0, 0.050 / scale, 0.0)
     )
-    section_definition.SetAutoHatch.assert_called_once_with(True)
-    section_definition.SetLabel2.assert_called_once_with("A")
+    # The cutting line is authored direct-to-DB, out of sketch inference's
+    # reach, and the seat's own mode is left as it was found.
+    assert doubles.sketch_manager.add_to_db_when_created is True
+    assert doubles.sketch_manager.AddToDB is seat_add_to_db
+    doubles.section_definition.SetAutoHatch.assert_called_once_with(True)
+    doubles.section_definition.SetLabel2.assert_called_once_with("A")
+
+
+@pytest.mark.parametrize("seat_add_to_db", [False, True])
+def test_section_cut_restores_the_seat_when_the_line_fails(
+    monkeypatch, seat_add_to_db
+) -> None:
+    """A CreateLine that raises must still hand the seat back as it was found.
+
+    This is the failure the guard exists for: ``AddToDB`` is a session-global
+    sketch mode, so a helper that sets it and dies leaves every later sketch on
+    that seat -- in this leaf and the next one -- authoring direct to the
+    database with no inference at all. The restore therefore belongs in a
+    ``finally``; dropping it back to the success path passes every other test
+    in this file.
+    """
+    boom = RuntimeError("CreateLine exploded")
+    doubles = _section_doubles(monkeypatch, 1.0, add_to_db=seat_add_to_db, raises=boom)
+    with pytest.raises(RuntimeError, match="CreateLine exploded"):
+        _drawing_common.create_section_view(
+            doubles.adapter,
+            doubles.parent,
+            line_start=doubles.start,
+            line_end=doubles.end,
+            view_xy=drawing.RIGHT_CENTER,
+            section_label="A",
+            scale=(1, 2),
+            label="exception regression",
+        )
+    assert doubles.sketch_manager.add_to_db_when_created is True
+    assert doubles.sketch_manager.AddToDB is seat_add_to_db
+    doubles.model.CreateSectionViewAt5.assert_not_called()
+
+
+@pytest.mark.parametrize("moved", ["start", "end"])
+def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch, moved) -> None:
+    """A snapped endpoint tilts the cut plane; no section may be created.
+
+    top_frame's D-D was cut 4.29 degrees oblique this way (0.674 mm off
+    station at the rail face), and the tilt only surfaced much later, as a
+    missing cut-face line in a different recipe's dimension pick. Inference
+    snaps whichever end lands near a witness entity, so both endpoints are
+    read back -- checking only the end point is a tilt of the same magnitude
+    about the other pivot.
+    """
+    doubles = _section_doubles(
+        monkeypatch, 1.0, snap=(0.0, 0.000674, 0.0), snap_at=moved
+    )
+    with pytest.raises(RuntimeError, match=rf"{moved} point sits 0\.674 mm"):
+        _drawing_common.create_section_view(
+            doubles.adapter,
+            doubles.parent,
+            line_start=doubles.start,
+            line_end=doubles.end,
+            view_xy=drawing.RIGHT_CENTER,
+            section_label="A",
+            scale=(1, 2),
+            label="snap regression",
+        )
+    doubles.model.CreateSectionViewAt5.assert_not_called()
