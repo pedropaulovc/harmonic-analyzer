@@ -1,4 +1,4 @@
-r"""Offline invariants for the profiles that are closed by AUTHORED relations.
+r"""Offline invariants for the profiles whose closure the sketch DB welds.
 
 These tests pin the two profiles that were rewritten after the 2026-09-17
 ``logo ring extrude failed`` leaf on ``swmaker000005@5``: the 91247A720 logo
@@ -7,18 +7,28 @@ real production geometry functions -- not a reimplementation of them -- so a
 coordinate edit that opens a profile fails here, in seconds, instead of on a
 farm worker twenty minutes into a release build.
 
-What they do NOT claim: they do not prove the profile extrudes.  The coincident
-endpoints were ALREADY bit-exact before the rewrite (measured: gap 0.000e+00
-across all 15 pairs), and per the SolidWorks learning
-``sketch-inference-endpoint-merging.md`` identical coordinates are NOT a merge
--- "coincidence is an inference-time behavior, not a geometry-time one".  So
-exactness was necessary, already true, and never sufficient.  What these tests
-pin is the property that makes the authored ``merge`` relations resolvable at
-all: **each shared vertex must be written as the same expression in both
-segments**, so the two doubles are identical and the pairing is unambiguous.
-Closure itself is guaranteed by the relations; the seat's outcome is recorded
-once after ``exit_sketch`` (``_common.record_sketch_closure``) as evidence, not
-as the guarantee.
+What they pin is one property: **each shared vertex must be written as the
+same expression in both segments**, so the two doubles are bit-identical.
+That is what closes the profile.  An exact-coordinate endpoint written
+straight to the sketch database (``AddToDB``) is coalesced there at creation
+-- the behaviour ``_common.add_line_chain`` has always relied on, since it
+authors no closure relation at all and its loops close -- so a vertex spelled
+two different ways is two vertices, and the loop stays open.
+
+The 2026-09-18 correction to that account is worth keeping in view.  These
+profiles used to ASK for a ``merge`` relation per pair as well, on the
+strength of the learning ``sketch-inference-endpoint-merging.md``
+("coincidence is an inference-time behavior, not a geometry-time one").  That
+is true of the inference path and false of the direct-to-DB path, and the
+relation was not merely redundant: ``swConstraintType_MERGEPOINTS`` merges two
+DISTINCT points, so on an already-welded pair ``AddRelation`` returns ``None``
+and the recipe dies.  ``test_diag_mcmaster_lib`` holds that regression; what
+lives here is the bit-identity the weld depends on.
+
+What they do NOT claim: they do not prove the profile extrudes.  Exactness is
+necessary and not sufficient, so the seat's outcome is still measured once
+after ``exit_sketch`` (``_common.record_sketch_closure``), and
+``assert_profile_closed`` fails the build on a pair the seat left unwelded.
 """
 
 from __future__ import annotations

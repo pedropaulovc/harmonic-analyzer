@@ -344,8 +344,9 @@ def no_sketch_inference(adapter):
     bug -- but it is cheap and the failure it prevents is silent.
 
     Correctness does not depend on this contextmanager: every recipe asserts
-    the seat baseline at its start, and profiles are closed by explicit
-    relations rather than by inference.  It is scoping -- it makes a recipe
+    the seat baseline at its start, and profiles are closed by the sketch
+    database welding bit-identical endpoint coordinates, which has no
+    inference term at all.  It is scoping -- it makes a recipe
     self-describing at the point it draws, and it narrows the window in which
     a crash can leak the suppressed state at all.
 
