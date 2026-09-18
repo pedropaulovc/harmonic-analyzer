@@ -319,11 +319,28 @@ def no_sketch_inference(adapter):
     relations rather than by inference.  It is scoping -- it makes a recipe
     self-describing at the point it draws, and it narrows the window in which
     a crash can leak the suppressed state at all.
+
+    The counter is raised only AFTER the suppression write succeeds.  Raising
+    it first would pin it forever if ``apply_sketch_preferences`` threw --
+    ``SetUserPreferenceToggle`` is a COM call on a seat that may be dying --
+    because the ``finally`` that lowers it would never have been entered.
+    Every later block on that adapter would then see a nonzero depth and
+    quietly become a no-op: suppression never applied, baseline never
+    restored, for the life of the process.  That is the silent-disable this
+    contextmanager exists to prevent, so it must not be reachable through its
+    own error path.
+
+    A half-applied suppression is itself a poisoned seat, so a failed ENTRY
+    puts the declared baseline back before the exception propagates.
     """
     depth = getattr(adapter, "_sketch_drawing_depth", 0)
-    adapter._sketch_drawing_depth = depth + 1
     if depth == 0:
-        apply_sketch_preferences(adapter, SKETCH_DRAWING_STATE)
+        try:
+            apply_sketch_preferences(adapter, SKETCH_DRAWING_STATE)
+        except Exception:
+            apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
+            raise
+    adapter._sketch_drawing_depth = depth + 1
     try:
         yield
     finally:

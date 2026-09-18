@@ -239,6 +239,45 @@ def test_an_exception_in_a_nested_block_does_not_pin_the_depth_counter() -> None
     assert adapter.swApp.writes, "a later block stopped applying preferences"
 
 
+def test_a_failed_entry_does_not_pin_the_depth_counter() -> None:
+    """The silent-disable must not be reachable through the guard's own error.
+
+    ``SetUserPreferenceToggle`` is a COM call on a seat that may be dying.  If
+    the counter went up before that write succeeded, a throw would leave it at
+    1 with no ``finally`` ever entered, and every later block on this adapter
+    would see a nonzero depth and become a no-op -- no suppression, no
+    restore, for the life of the process.  A half-applied suppression is also a
+    poisoned seat, so the declared baseline goes back before the throw
+    propagates.
+    """
+    adapter = _adapter_at(True)
+    failing = adapter.swApp
+    calls: list[int] = []
+
+    def _set(toggle: int, value: bool) -> None:
+        calls.append(toggle)
+        if value is False:
+            raise OSError("the seat dropped the connection")
+        failing.toggles[toggle] = bool(value)
+
+    adapter.swApp.SetUserPreferenceToggle = _set
+
+    with pytest.raises(OSError):
+        with diag.no_sketch_inference(adapter):
+            raise AssertionError("the block must never run")
+
+    assert getattr(adapter, "_sketch_drawing_depth", 0) == 0
+    assert adapter.swApp.toggles == _state(True), "the baseline was not restored"
+
+    # Drop the instance attribute so the real method is found on the class
+    # again: the SAME adapter must still work, which is the whole point.
+    del adapter.swApp.SetUserPreferenceToggle
+    adapter.swApp.writes.clear()
+    with diag.no_sketch_inference(adapter):
+        assert adapter.swApp.toggles == _state(False)
+    assert adapter.swApp.writes, "a later block stopped applying preferences"
+
+
 def _is_guard_call(expr: ast.expr) -> bool:
     """Is ``expr`` a call to one of the guard contextmanagers?
 
@@ -321,7 +360,13 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
     * an intervening ``sk.AddToDB = False`` puts the manager back through the
       inference engine, and an earlier enable does not undo that;
     * ``sk1.AddToDB = True`` guarantees nothing about primitives drawn through
-      ``sk2``.
+      ``sk2``;
+    * a reassignment of the guarded receiver INSIDE the block ends the
+      guarantee from that point on, so the span is refused outright rather
+      than split at the statement that broke it;
+    * the span covers the ``try`` BODY only.  ``except``/``else``/``finally``
+      run after or instead of the guarded work -- and the restore itself lives
+      in ``finally`` -- so a primitive there is not covered by the enable.
 
     A guard the audit only believes it saw is worse than no guard, because it
     is the thing that makes this whole PR's regression gate meaningless.
@@ -342,8 +387,27 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
             if not restored:
                 continue
             suite, index = positions.get(node, ([], 0))
-            if restored & _receivers_enabled_before(suite, index):
-                spans.append((node.lineno, node.end_lineno))
+            guarded = restored & _receivers_enabled_before(suite, index)
+            # Any reassignment of a guarded receiver INSIDE the block ends the
+            # guarantee: `sk.AddToDB = False` there puts the manager back
+            # through the inference engine for everything after it.  Rather
+            # than track a per-statement timeline, the whole span is refused,
+            # which reports the block for a human to look at.
+            if any(
+                (found := _add_to_db_assignment(stmt)) is not None
+                and found[0] in guarded
+                for stmt in ast.walk(node)
+                if isinstance(stmt, ast.stmt) and stmt not in node.finalbody
+            ):
+                continue
+            if guarded:
+                # The BODY only.  An `except`/`else`/`finally` clause runs
+                # after or instead of the guarded work -- and the restore
+                # itself lives in `finally` -- so a primitive there is not
+                # covered by the enable.
+                spans.append(
+                    (node.body[0].lineno, node.body[-1].end_lineno)
+                )
     return spans
 
 
@@ -491,6 +555,52 @@ def test_an_enable_on_a_different_receiver_is_not_a_guard(tmp_path: Path) -> Non
     )
 
     assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+
+
+def test_a_disable_inside_the_block_ends_the_guard(tmp_path: Path) -> None:
+    """Everything after ``sk.AddToDB = False`` is back on the inference engine.
+
+    The enable before the ``try`` does not survive its own block being turned
+    off, so a primitive after that assignment is exactly as view-dependent as
+    an unguarded one.
+    """
+    offender = tmp_path / "diag_build_disabled_inside.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    sk.AddToDB = True\n"
+        "    try:\n"
+        "        sk.AddToDB = False\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = True\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+
+
+def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> None:
+    """The restore runs there, so the enable no longer holds.
+
+    A cleanup path that draws is still drawing: this is the shape a "just
+    put back a placeholder circle on failure" handler takes.
+    """
+    offender = tmp_path / "diag_build_finally_draws.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = prev\n"
+        "        sk.CreateCircleByRadius(0.0, 0.0, 0.0, 1.0)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(9, "CreateCircleByRadius")]
 
 
 def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
