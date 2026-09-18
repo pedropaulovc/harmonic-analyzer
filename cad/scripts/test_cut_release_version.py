@@ -235,3 +235,26 @@ def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
     with pytest.raises(RuntimeError, match="not tracked"):
         cut_release.require_tracked("cad/docs/not-a-page.md", "closure")
     cut_release.require_tracked("cad/docs/device-operation.md", "closure")
+
+
+def test_release_notes_report_the_native_pack_and_go_count() -> None:
+    """The native Pack-and-Go count and the neutral export inventory are two
+    different numbers. They shared the ``documents`` key, so
+    ``stage_release_neutral``'s inventory silently overwrote the COM-derived
+    count and the notes advertised the wrong one (CodeRabbit, PR #770)."""
+    facts = {
+        "native_documents": 137,
+        "documents": 99,
+        "sw_revision": "35",
+        "parts": 99,
+        "assemblies": 8,
+        "config_meshes": 22,
+        "pngs": 107,
+        "comparisons": {"pairs": 3, "mean_score": None},
+        "size_mb": 42.0,
+    }
+
+    notes = cut_release.release_notes("v42", facts)
+
+    assert "native Pack-and-Go (137 referenced documents" in notes
+    assert "99 referenced documents" not in notes

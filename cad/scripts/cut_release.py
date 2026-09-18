@@ -659,6 +659,7 @@ def write_provenance(
         },
         "model": {
             "documents": facts.get("documents"),
+            "native_documents": facts.get("native_documents"),
             "parts": facts.get("parts"),
             "assemblies": facts.get("assemblies"),
             "config_meshes": facts.get("config_meshes"),
@@ -884,9 +885,14 @@ def bundle(
     stage.mkdir(parents=True)
 
     # 1. Copy the prepared native tree (stage/solidworks + stage/slddrw) so the
-    #    native files ride in the one bundle.
+    #    native files ride in the one bundle. Two counts, two keys:
+    #    ``native_documents`` is the Pack-and-Go referenced set (COM-derived,
+    #    from the sidecar); ``documents`` is the neutral export inventory
+    #    ``stage_release_neutral`` reports below. They are NOT the same number,
+    #    and one shared key let the neutral count overwrite the native one and
+    #    mislabel it in the release notes (CodeRabbit, PR #770).
     facts: dict[str, Any] = {
-        "documents": package["documents"],
+        "native_documents": package["documents"],
         "sw_revision": revision,
     }
     native_drawings = stage_native(stage, package)
@@ -996,7 +1002,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"part). This release attaches a single **CAD bundle** "
         f"`harmonic-analyzer-{version}.zip` so the model can be opened without "
         f"rebuilding -- with or without SolidWorks:\n\n"
-        f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
+        f"- `solidworks/` -- native Pack-and-Go ({facts['native_documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
         f"- `step/` -- AP214 STEP for {facts['parts']} parts; `stl/` fine binary "
         f"STL (mm) for all {facts['parts']} parts "

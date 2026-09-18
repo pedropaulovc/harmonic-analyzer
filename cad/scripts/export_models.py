@@ -1321,6 +1321,16 @@ def refresh_comparison_gallery() -> None:
             _stamp_gallery_outputs_current(manifest)
             _telemetry.info("comparison gallery already current")
             _telemetry.event("comparisons.current", pairs=pair_count)
+        # ``outputs_complete`` was measured BEFORE composite/gallery ran, and
+        # ``_run_tool`` only proves exit 0. A tool that exits clean without
+        # writing its outputs would stamp the input digest anyway, so the next
+        # build -- and the release staging that trusts this certificate --
+        # would treat a hollow gallery as current (CodeRabbit, PR #770).
+        if not _gallery_outputs_complete(manifest):
+            raise RuntimeError(
+                "comparison gallery tools exited 0 without producing every "
+                "required render, composite and score output"
+            )
         _write_gallery_stamp(input_digest)
         sp.set_attribute("rendered_pairs", len(rendered))
         sp.set_attribute("full_composite", full_composite)
