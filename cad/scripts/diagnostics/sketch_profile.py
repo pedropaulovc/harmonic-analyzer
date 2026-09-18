@@ -13,25 +13,34 @@ seat and returns ``None`` on the next.  Observed 2026-09-17 on
 ``diag_build_91247A720.py``, on a part that had published successfully twice
 the same day from other seats.
 
-Bit-exact input coordinates are NOT a substitute for a relation.  Two
-independent facts make "the endpoints are equal, so they will merge" unsafe:
+Bit-exact input coordinates are not enough by themselves either: SolidWorks
+re-fits a three-point arc, so the endpoint it REALISES can differ from the
+endpoint that was passed in (the replica profiles' arc endpoints are only
+concyclic to ~1e-17 mm because the arc centres are 6-decimal literals).
 
-* whether an exactly-coincident pair merges at all is what the inference
-  setting decides; and
-* SolidWorks re-fits a three-point arc, so the endpoint it REALISES can differ
-  from the endpoint that was passed in (the replica profiles' arc endpoints are
-  only concyclic to ~1e-17 mm because the arc centres are 6-decimal literals).
+So closure here is always AUTHORED, by writing exact coordinates straight to
+the sketch database under ``ISketchManager.AddToDB = True``.  A DB write is
+not drawing: the inference engine never sees it, and two segment ends written
+at bit-identical coordinates are coalesced into ONE sketch point at creation.
+That is the mechanism ``_common.add_line_chain`` has always relied on -- it
+authors zero closure relations and its loops close on every seat.  Arcs are
+authored centre-based (:func:`minor_arc`) so the only quantity SolidWorks may
+re-fit is an endpoint, and the endpoint each segment passes is the same double
+its neighbour passes.
 
-So closure here is always AUTHORED: every vertex that must coincide gets an
-explicit ``merge`` relation (``swConstraintType_MERGEPOINTS``) through
-``ISketchRelationManager.AddRelation``.  The profile then extrudes identically
-on a seat with inference disabled and on one with it enabled.
+No ``swConstraintType_MERGEPOINTS`` relation is authored, deliberately: that
+relation merges two DISTINCT points, and applied to a pair the DB has already
+coalesced, ``ISketchRelationManager.AddRelation`` returns ``None`` without
+raising -- indistinguishable from a refusal, which is how it surfaced as
+"SolidWorks rejected 'merge' relation" on three workers (2026-09-18,
+``part:pen_set_screw`` / ``part:knife_hanger_stud``).
 
 Nothing in this module touches COM, so it is importable -- and testable --
-without a SolidWorks seat.  :func:`endpoint_merges` is the offline invariant:
-it pairs endpoints on EXACT float equality and raises when a vertex is not
-shared by exactly two segment ends, which is the latent defect a profile that
-leans on inference to bridge a 1-ULP gap would carry on every seat.
+without a SolidWorks seat.  :func:`endpoint_merges` is the offline invariant
+that makes the weld provable: it pairs endpoints on EXACT float equality and
+raises when a vertex is not shared by exactly two segment ends, which is the
+latent defect a profile that leans on inference to bridge a 1-ULP gap would
+carry on every seat.  A vertex it accepts is a vertex the DB welds.
 """
 
 from __future__ import annotations
@@ -75,7 +84,8 @@ class Arc:
 
     A centre-based arc is preferred over a three-point arc: the centre and the
     radius are exactly what was authored, so the only quantity SolidWorks may
-    re-fit is the endpoint, and the ``merge`` relation pins that.
+    re-fit is the endpoint -- and the endpoint is the double the neighbouring
+    segment passes too, which is what lets the sketch DB weld the pair.
     """
 
     center: Vertex
@@ -146,8 +156,10 @@ def arc_radii_mm(arc: Arc) -> tuple[float, float]:
     These are NOT required to be exactly equal: replica arc centres are
     rounded decimal literals, so the two radii routinely differ by an ULP.
     ``CreateArc`` takes the centre and the start radius and projects the end
-    point onto that circle, which is precisely why the end point needs an
-    authored ``merge`` rather than a coincidence of arithmetic.
+    point onto that circle, so the realised end point is SolidWorks' to
+    choose -- which is why closure is proved by reading the sketch back
+    (:func:`endpoint_merges` over what the DB welded) instead of by trusting
+    the arithmetic that went in.
     """
     return (
         math.hypot(arc.start[0] - arc.center[0], arc.start[1] - arc.center[1]),

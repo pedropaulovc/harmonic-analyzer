@@ -66,10 +66,12 @@ from diagnostics.sketch_profile import (
 def test_logo_ring_vertices_are_bit_identical_across_segments() -> None:
     """Every shared vertex is the SAME double in both segments that meet there.
 
-    This is the property the authored merges rely on: ``endpoint_merges``
-    groups endpoints on ``==``, so a vertex written as ``ct[0] + r * nx`` in one
-    segment and ``ct[0] + r * 0.866...`` in its neighbour would be two
-    different vertices even though both "are" the same point.
+    This is the property the sketch-DB weld rests on: the database coalesces
+    two segment ends only when they arrive at bit-identical coordinates, and
+    ``endpoint_merges`` groups endpoints on ``==``, so a vertex written as
+    ``ct[0] + r * nx`` in one segment and ``ct[0] + r * 0.866...`` in its
+    neighbour would be two different vertices -- two unwelded points, an open
+    contour -- even though both "are" the same point.
     """
     segments = logo_ring_profile()
     merges = endpoint_merges(segments)
