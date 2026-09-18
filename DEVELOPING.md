@@ -5,14 +5,23 @@ Practical, machine-local development notes that don't belong in `AGENTS.md`
 
 ## Remote build-artifact cache
 
-The COM/SolidWorks tasks (`part:<stem>`, `assembly:<stem>`, `drawing:<stem>`) are
-the slow part of the pipeline — a part is ~20 s and a full assembly ~500 s. Their
-outputs are a pure
+Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,
+`drawing:<stem>`, the gates (`verify_soundness:<stem>`, `verify:kinematics`,
+`preflight`), the neutral `export` and the release Pack-and-Go
+(`package:release`). They are the slow part of the pipeline — a part is ~20 s and
+a full assembly ~500 s. Their outputs are a pure
 function of their hashed inputs, so a shared cache lets one machine **download a
 prebuilt `.SLDPRT`/`.SLDASM`/`.SLDDRW`/`.STL`/`.PDF`** for an unchanged input set
 instead of
 driving SolidWorks. A seat-less machine can pull; a builder pulls **and**
 publishes. Implementation: `cad/scripts/_artifact_cache.py`.
+
+A gate produces no CAD artefact, so **its stamp is its cached output**
+(`cad/out/reports/verify-*.ok`, `preflight.ok`): identical inputs imply an
+identical verdict, so restoring the stamp is restoring the proof. This is also
+the mechanism behind `--executor farm`: a cache-missing COM task dispatches one
+farm leaf and then restores what the worker published, which is how a machine
+with no SolidWorks seat runs a whole release.
 
 ### TL;DR — it just works
 
@@ -76,7 +85,8 @@ without reconstructing build history from terminal scrollback (none can fail a
 build):
 
 - **`doit cache_status`** — the one-command answer to *"why did this miss?"*. For
-  every part/assembly/drawing it prints `HIT`/`MISS` (a backend presence probe — a
+  every cacheable COM task (part, assembly, drawing, gate, `export`,
+  `package:release`) it prints `HIT`/`MISS` (a backend presence probe — a
   HEAD,
   not a download) + the 12-char key, and for a miss the full `(digest, relpath)`
   list that produced the key. Compare two seats' output and the moved digest is the

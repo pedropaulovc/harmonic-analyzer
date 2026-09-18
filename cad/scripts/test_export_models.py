@@ -376,7 +376,14 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "restore_export_prefs", lambda *_args: None)
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
-    monkeypatch.setattr(export_models, "refresh_comparison_gallery", lambda: True)
+
+    def _no_gallery() -> None:
+        raise AssertionError(
+            "export must not touch the comparison gallery -- it is the "
+            "SolidWorks-free `gallery` task, so export can run on a farm worker"
+        )
+
+    monkeypatch.setattr(export_models, "refresh_comparison_gallery", _no_gallery)
     repaired_pngs: list[str] = []
 
     async def _repair_png(_adapter, stem: str) -> None:
@@ -454,7 +461,7 @@ def test_current_gallery_skips_redundant_composite_and_index(
     old_mtime = time.time() - 100
     os.utime(comparisons / "scores.json", (old_mtime, old_mtime))
     os.utime(comparisons / "index.html", (old_mtime, old_mtime))
-    assert export_models.refresh_comparison_gallery()
+    export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == ["render_offline.py"]
     assert calls[0][-1] == "--stale-only"
     assert messages == ["comparison gallery already current"]
@@ -470,7 +477,7 @@ def test_current_gallery_skips_redundant_composite_and_index(
         return []
 
     monkeypatch.setattr(export_models, "_run_tool", _run_composite_refresh)
-    assert export_models.refresh_comparison_gallery()
+    export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == [
         "render_offline.py", "gallery.py",
     ]
@@ -478,22 +485,21 @@ def test_current_gallery_skips_redundant_composite_and_index(
     export_models.GALLERY_STAMP.unlink()
     calls.clear()
     monkeypatch.setattr(export_models, "_run_tool", _run)
-    assert export_models.refresh_comparison_gallery()
+    export_models.refresh_comparison_gallery()
     assert [Path(cmd[2]).name for cmd in calls] == [
         "render_offline.py", "composite.py", "gallery.py",
     ]
     assert calls[0] == ["uv", "run", str(render_tool)]
 
 
-def test_gallery_missing_blender_fails_export_loudly(tmp_path: Path, monkeypatch) -> None:
+def _stub_gallery_tree(tmp_path: Path, monkeypatch, manifest: dict[str, object]) -> None:
+    """Point every gallery path at a tmp tree holding just the manifest + tools."""
     comparisons = tmp_path / "comparisons"
     tools = comparisons / "tools"
     tools.mkdir(parents=True)
-    manifest = {"pairs": []}
     (comparisons / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     for name in ("render_offline.py", "blender_worker.py", "composite.py", "gallery.py"):
         (tools / name).write_text(name, encoding="utf-8")
-
     monkeypatch.setattr(export_models, "REPO", tmp_path)
     monkeypatch.setattr(export_models, "COMPARISONS_DIR", comparisons)
     monkeypatch.setattr(export_models, "RENDER_OFFLINE", tools / "render_offline.py")
@@ -503,6 +509,10 @@ def test_gallery_missing_blender_fails_export_loudly(tmp_path: Path, monkeypatch
     monkeypatch.setattr(export_models, "GALLERY_STAMP", tmp_path / "gallery.json")
     monkeypatch.setattr(export_models, "_prune_stale_gallery", lambda: None)
 
+
+def test_gallery_missing_blender_fails_loudly(tmp_path: Path, monkeypatch) -> None:
+    _stub_gallery_tree(tmp_path, monkeypatch, {"pairs": []})
+
     def _missing_blender(_cmd: list[str], _tag: str) -> list[str]:
         raise RuntimeError("cmp exited non-zero: BLENDER_UNAVAILABLE: no Blender found")
 
@@ -510,6 +520,49 @@ def test_gallery_missing_blender_fails_export_loudly(tmp_path: Path, monkeypatch
 
     with pytest.raises(RuntimeError, match="comparison gallery requires Blender"):
         export_models.refresh_comparison_gallery()
+
+
+def test_gallery_render_fault_is_fatal(tmp_path: Path, monkeypatch) -> None:
+    """The gallery task owns the whole release showcase, so a renderer/scoring
+    fault must fail it: a warn-and-succeed would ship a stale gallery, and the
+    stamp must NOT claim the outputs match the current inputs."""
+    _stub_gallery_tree(tmp_path, monkeypatch, {"pairs": []})
+    warnings: list[str] = []
+    monkeypatch.setattr(export_models._telemetry, "warn", warnings.append)
+
+    def _render_fault(_cmd: list[str], _tag: str) -> list[str]:
+        raise RuntimeError("cmp exited non-zero: blender crashed on pair sample")
+
+    monkeypatch.setattr(export_models, "_run_tool", _render_fault)
+
+    with pytest.raises(RuntimeError, match="blender crashed on pair sample"):
+        export_models.refresh_comparison_gallery()
+    assert warnings == []
+    assert not (tmp_path / "gallery.json").exists()
+
+
+def test_comparisons_flag_refreshes_only_the_gallery(monkeypatch) -> None:
+    """``--comparisons`` is the SolidWorks-free ``gallery`` doit task: it runs the
+    refresh, never attaches to COM, and refuses the export selection flags."""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        export_models, "refresh_comparison_gallery", lambda: calls.append("gallery"),
+    )
+
+    def _no_com(_build) -> int:
+        raise AssertionError("--comparisons must never attach to SolidWorks")
+
+    monkeypatch.setattr(export_models, "run_build", _no_com)
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--comparisons"])
+
+    assert export_models.main() == 0
+    assert calls == ["gallery"]
+
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--comparisons", "--force"])
+    with pytest.raises(SystemExit) as rejected:
+        export_models.main()
+    assert rejected.value.code == 2
+    assert calls == ["gallery"]
 
 
 def test_gallery_digest_includes_blender_worker(tmp_path: Path, monkeypatch) -> None:

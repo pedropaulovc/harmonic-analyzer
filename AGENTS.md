@@ -197,25 +197,30 @@ uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
 ```
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this
-`.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/
-`verify:*`/`export`/`release`) additionally need SolidWorks open on this machine.
+`.venv` with nothing else installed; the COM tasks (`part:`/`assembly:`/`drawing:`/
+`verify_soundness:`/`verify:`/`preflight`/`export`/`package:release`) need a
+SolidWorks seat — either open on this machine (`--executor local`) or on the build
+farm (`--executor farm`, which is how a seatless machine runs them).
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
-| group | needs SolidWorks | takes the COM seat lock |
-|-------|:---:|:---:|
-| `part:<stem>`, `assembly:<stem>` | yes | yes |
-| `verify:soundness`, `verify:kinematics` | yes | yes |
-| `export`, `release`, `preflight` | yes | yes |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:budget` | **no** | no (parallel) |
-| `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) |
-| `cache_status` | **no** | no (diagnostic) |
-| `build` (default), `build_bare` | meta | — |
+| group | needs SolidWorks | takes the COM seat lock | farm-dispatchable |
+|-------|:---:|:---:|:---:|
+| `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
+| `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
+| `preflight`, `export`, `package:release` | yes | yes | yes |
+| `verify:soundness` | no (aggregator) | no | — (its leaves are) |
+| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
+| `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
+| `cache_status` | **no** | no (diagnostic) | no |
+| `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
-  (`verify.py` has no `--suite all` anymore — `build` replaced it.) Under
-  `--executor farm` (`./build`) it omits `verify:*`, which need a local COM seat;
-  run those with `--executor local`.
+  (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
+  SAME closure under both executors: every COM task, gates included, is a
+  cache-keyed leaf, so `--executor farm` (`./build`) runs the whole thing without a
+  local seat.
 - Under `--executor farm` each leaf gets 15 min on the worker by default. A cold
   run (nothing in the remote cache, workers that must sync the source package
   and start SolidWorks) needs more — the slowest measured leaf was
@@ -226,6 +231,8 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
+  Its COM half is the separate `package:release` leaf (Pack-and-Go), so `release`
+  itself only stages, diffs, tags and publishes — no seat, farm or local.
 - The tracked `cad/config/release.yaml` value is the Revision on every
   `.SLDPRT`, `.SLDASM`, and linked drawing title block. `cut_release.py`
   advances it after a successful publish and leaves a tracked merge bump;
@@ -244,17 +251,29 @@ lock lives under `%PROGRAMDATA%/harmonic-analyzer/com-seat.lock` (override with
 worktrees and concurrent `doit` invocations** on the seat.
 
 The task graph now carries only **real** dependency edges (an assembly's `file_dep`
-on its parts, `verify`/`export` on the built `.SLDASM`, `release` on
-`export`+`verify:*`+`preflight`+`check:*`), so the DAG reads true and a COM failure
+on its parts, `verify`/`export`/`package:release` on the built `.SLDASM` identities,
+`release` on `export`+`gallery`+`package:release`+`verify:*`+`preflight`+`check:*`),
+so the DAG reads true and a COM failure
 no longer skips *unrelated* downstream COM tasks. (History: this replaced the old
 `task_dep` **spine** — `_COM_TAIL`/`_spine_dep`/`_assert_spine_complete`, a
 topological linearization of every COM task — which made the DAG lie and coupled
-ordering to serialization. See `memory/com-seat-lock.md`.)
+ordering to serialization. See `memory/com-seat-lock.md`.) The one COM-to-COM
+`task_dep` left is the `verify:soundness` aggregator over its own
+`verify_soundness:<stem>` leaves: it drives no SolidWorks itself, and that edge is
+what puts the leaves inside the graph the farm packages.
 
-**Invariant:** any new COM-touching task MUST run its SolidWorks subprocess inside
-`_com_seat(...)` — for a part/assembly action wrap the `_exec` call; for a
-`_run`/`_run_stamped` gate pass `com=True`. A COM task that skips it would race the
-STA seat. This is enforced loud at runtime: a doit-launched build that reaches
+**Invariant:** there is exactly ONE way to run SolidWorks from a task —
+`_cached_com_action(label, cmd, file_deps, outputs, log_stem, stamp=None)`. It
+probes the remote cache, dispatches a farm leaf when the executor is `farm`, and
+otherwise takes `_com_seat(...)`, re-probes under the lock, runs `_exec_com` and
+stores the result. `_run`/`_run_stamped` have NO `com` parameter (and no seat
+access), so a new COM task cannot race the STA seat or silently skip the cache:
+route it through `_cached_com_action` (a part/assembly/drawing keeps its
+`_cached_part_action`/`_cached_assembly_action`/`_cached_drawing_action` wrapper).
+A cache-keyed COM task must therefore declare its inputs as machine-stable
+`file_dep`s and its outputs under `cad/out/`; a gate whose only output is a
+verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.
+This is enforced loud at runtime: a doit-launched build that reaches
 `sw.connect` without `HARMONIC_COM_SEAT` set raises in `_common.run_build` (the
 successor to the removed `_assert_spine_complete` tripwire). The cache RESTORE/STORE
 (Azure transfers) run **outside** the lock, so cache hits stay parallel; only the COM
@@ -526,6 +545,16 @@ checkable.)
 `config`}. `math`/`config` need no SolidWorks (wrapped as `check:*`); the other two
 open the model (wrapped as `verify:*`). Old names static/isolation/motion/truth,
 the `all` aggregate, and the separate `subsystems` suite are gone.
+
+Both COM suites are **cache-keyed farm leaves**, not local-only gates. `soundness`
+is split one leaf per assembly (`verify_soundness:<stem>`, stamping
+`cad/out/reports/verify-soundness-<dashed>.ok`), so a change to one assembly
+re-proves only that model and a gate a peer or worker already proved RESTORES
+instead of reopening anything; the public `verify:soundness` task is a
+SolidWorks-free aggregator over those child stamps (it keeps the CLI and the
+release edge). `verify:kinematics` is one leaf. A gate's stamp IS its cached
+artefact — identical inputs imply an identical verdict — which is what lets a
+machine with no seat run the full gate set through `--executor farm`.
 
 `soundness` opens EVERY built (sub)assembly standalone and runs the shared health
 battery on each: **one shared re-solve** (`verify.rebuild`) after open, then DOF /
@@ -848,7 +877,7 @@ parallelizes its per-mesh Hausdorff classification across a process pool
 (`--jobs`, default auto). `cut_release` benefits with no change. `--jobs 1`
 forces serial (debugging / a fallback if the spawn-mode pool misbehaves).
 
-## Comparison gallery — produced on export, shipped in the release bundle
+## Comparison gallery — its own task, shipped in the release bundle
 
 The reference-photo comparison gallery (this model overlaid on Michelson's ch30
 photos) is **derived**: its CAD renders, composites, RMS scores, `index.html` and
@@ -864,26 +893,30 @@ Because nothing tracked is rewritten, the refresh can never dirty the worktree
 the release tag pins (an earlier version kept `ref/` tracked and could publish a
 dirty tree — Codex P2).
 
-**Produced by the `export` stage, shipped by `release`.** The gallery is refreshed
-inside the export task, not the release: `export_models.refresh_comparison_gallery`
-runs **once the STLs are written** (the tail of `export_models.main`, so the
-offline renderer reads settled geometry), `--stale-only` so only pairs whose
-geometry changed re-render. It first **prunes** any render/composite/score/ref
-whose pair id left the manifest (targeted, so it does *not* force a full
-re-render) — so a removed/renamed pair leaves nothing stale and the pair count
-stays honest. `cut_release.py:stage_comparisons` then simply **copies** that
-gallery — plus `ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited
-— under the bundle's `cad/comparisons/`. Each release therefore publishes a fresh,
+**Its own `gallery` task, which `release` depends on.** `gallery` runs
+`export_models.py --comparisons` — `refresh_comparison_gallery()` and nothing else:
+no COM, no adapter, no seat. It is ordered after `export` by a `file_dep` on
+`cad/out/reports/release-neutral.json`, so the offline renderer reads settled
+geometry, and renders `--stale-only` so only pairs whose geometry changed
+re-render. It first **prunes** any render/composite/score/ref whose pair id left
+the manifest (targeted, so it does *not* force a full re-render) — so a
+removed/renamed pair leaves nothing stale and the pair count stays honest.
+`cut_release.py:stage_comparisons` then simply **copies** that gallery — plus
+`ATTRIBUTION.md`, so the redistributed CC BY imagery stays credited — under the
+bundle's `cad/comparisons/`. Each release therefore publishes a fresh,
 self-contained snapshot (`open cad/comparisons/index.html`).
 
-Both steps are **best-effort** on the Blender front: the renderer lives on a
-separate GPU seat, so an `export` run on the SolidWorks seat logs a `warn`
-(`export.comparisons` span, `refreshed=false`) and skips; `stage_comparisons` then
-finds no gallery and ships the bundle without it (`release.comparisons`,
-`staged=false`) — or, if an *old* gallery lingers, ships it with a loud
-`STALE vs geometry` warning rather than silently publishing stale renders. Refresh
-it standalone anytime — unchanged — with
-`uv run cad/comparisons/tools/render_offline.py` (Blender), then `gallery.py`.
+**It fails LOUD, and that is why it left the export stage.** The refresh needs
+Blender (`$HARMONIC_BLENDER` or a discovered install) and no farm worker has it,
+so while it lived at the tail of `export_models.main` it had to be best-effort —
+which meant a seat without Blender warned, skipped, and let `release` ship a
+stale (or missing) showcase. Now the Blender-bound work is a separate task that
+runs on the submitter and exits non-zero on any render/composite/scoring fault
+(`export.comparisons` span; no digest stamp is written, so the next run still
+sees the gallery as stale), while `export` became a farm-dispatchable COM leaf
+that never touches `cad/comparisons/`. Refresh the gallery standalone anytime with
+`uv run python cad/scripts/export_models.py --comparisons`, or drive the tools
+directly (`uv run cad/comparisons/tools/render_offline.py`, then `gallery.py`).
 
 ## Considered but NOT done (with reasons)
 

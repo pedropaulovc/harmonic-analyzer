@@ -1584,14 +1584,27 @@ def test_com_tasks_carry_no_inter_com_task_dep():
     """DAG accuracy: with the spine gone, part/assembly/verify/preflight tasks must
     carry NO ``task_dep`` on another COM task -- ordering comes from their real
     file_dep on built artefacts, serialization from the seat lock. (export/release
-    DO carry real gate edges -- asserted separately below.)"""
+    DO carry real gate edges -- asserted separately below.)
+
+    The one legitimate COM-to-COM edge is ``verify:soundness`` over its own
+    per-assembly leaves: it is a pure aggregator that runs no SolidWorks itself,
+    and the edge is what puts the leaves in the packaged farm graph."""
     dodo = _load_dodo()
     for t in dodo.task_part():
         assert not t.get("task_dep"), f"part:{t['name']} has a stray task_dep"
     for t in dodo.task_assembly():
         assert not t.get("task_dep"), f"assembly:{t['name']} has a stray task_dep"
+    for t in dodo.task_verify_soundness():
+        assert not t.get("task_dep"), (
+            f"verify_soundness:{t['name']} has a stray task_dep"
+        )
+    aggregated = {
+        "soundness": [f"verify_soundness:{stem}" for stem in dodo.ASSEMBLY_ORDER]
+    }
     for t in dodo.task_verify():
-        assert not t.get("task_dep"), f"verify:{t['name']} has a stray task_dep"
+        assert t.get("task_dep", []) == aggregated.get(t["name"], []), (
+            f"verify:{t['name']} carries an unexpected task_dep"
+        )
     assert not dodo.task_preflight().get("task_dep"), "preflight has a stray task_dep"
 
 

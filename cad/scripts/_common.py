@@ -2141,7 +2141,7 @@ def discard_open_documents(adapter: Any) -> None:
     equations), so the reopened assembly (and its referenced children) are
     DIRTY. ``CloseAllDocuments(True)`` still pops the save modal for a dirty
     referenced child in 3DX R2026x -- headless, that hangs the run forever.
-    This mirrors ``cut_release._discard_open_documents``: close the active doc
+    This mirrors ``package_native._discard_open_documents``: close the active doc
     by TITLE first (``CloseDoc`` discards a dirty doc without saving, and
     closing the assembly title drops its hidden components too), then
     ``CloseAllDocuments(True)`` as a backstop with nothing dirty left to prompt
