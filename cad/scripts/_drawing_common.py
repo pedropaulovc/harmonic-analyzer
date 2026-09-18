@@ -5692,11 +5692,23 @@ def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> floa
 
     ``CharHeightInPts`` is only authoritative when the format says its height
     is specified in points; otherwise the authored value is ``CharHeight``, a
-    height in METRES, and ``CharHeightInPts`` is stale (this is the same
-    ``IsHeightSpecifiedInPts`` rule the fit applier honours when it writes).
-    Reading the wrong one would compare 16 pt against a leftover.
+    height in METRES, and ``CharHeightInPts`` is stale. Reading the wrong one
+    would compare 16 pt against a leftover and refuse every sheet on a
+    millimetre-authored template.
+
+    ``IsHeightSpecifiedInPts`` is a METHOD, not a property: dispid 11,
+    invkind 1, retval ``VT_BOOL``, present in neither ``_prop_map_get_`` nor
+    ``_prop_map_put_`` of the generated wrapper -- SolidWorks documents it as
+    "IsHeightSpecifiedInPts Method" and calls it with parentheses in its own
+    sample. Reading it as an attribute off the early-bound wrapper yields a
+    BOUND METHOD, which is truthy forever, so the points branch would be taken
+    unconditionally and the check above would silently invert into the bug it
+    exists to prevent. ``_get_attr_or_call`` is the repo's method-or-property
+    idiom and is already used for ``GetEditSheet`` in this module.
     """
-    in_points = adapter._attempt(lambda: text_format.IsHeightSpecifiedInPts)
+    in_points = adapter._attempt(
+        lambda: adapter._get_attr_or_call(text_format, "IsHeightSpecifiedInPts")
+    )
     if in_points is None:
         raise RuntimeError(
             f"sheet {sheet_name!r} PART note will not say whether its height is "
@@ -5892,9 +5904,17 @@ def fit_title_block_part_name(
         )
         if fit.adjust:
             text_format.LineLength = fit.line_length_mm / 1000.0
-            # CharHeightInPts is ignored unless the format is in points.
-            text_format.IsHeightSpecifiedInPts = True
+            # The unit the height is read in is NOT ours to choose:
+            # IsHeightSpecifiedInPts is a read-only METHOD (dispid 11, no
+            # entry in the wrapper's _prop_map_put_), so assigning to it
+            # raises AttributeError rather than switching the format to
+            # points. Both HEIGHT properties are settable, though, so the
+            # applier writes the same physical size through both and lets the
+            # format keep whichever unit it already declares authoritative.
+            # That is stronger than depending on an undocumented
+            # flip-on-write: the rendered height is right either way.
             text_format.CharHeightInPts = int(fit.point_size)
+            text_format.CharHeight = fit.point_size * MM_PER_POINT / 1000.0
             if not annotation.SetTextFormat(0, False, text_format):
                 raise RuntimeError(
                     f"sheet {sheet_name!r} PART note rejected the fitted text "
@@ -5910,7 +5930,14 @@ def fit_title_block_part_name(
             # Likewise the line length is compared at 0.05 mm: ten times
             # tighter than the 0.5 mm the fit keeps in hand, so no difference
             # this check tolerates can move a wrap decision.
-            applied_pts = round(float(applied.CharHeightInPts or 0.0))
+            #
+            # The size is read back through the property the format DECLARES
+            # authoritative, not through CharHeightInPts, which is a leftover
+            # on a millimetre-authored note and would then verify the write
+            # against a value the renderer never consults.
+            applied_pts = round(
+                _note_point_size(adapter, applied, sheet_name=sheet_name)
+            )
             applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
             if (
                 applied_pts != fit.point_size

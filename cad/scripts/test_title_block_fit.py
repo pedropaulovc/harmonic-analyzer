@@ -168,6 +168,31 @@ def _one_line_extent(point_size: int, *, width_mm: float = 60.0):
     )
 
 
+# Exactly the names in the generated ITextFormat wrapper's ``_prop_map_put_``
+# (typelib 34.0). Anything else is a method or a read-only member, and
+# assigning to it raises AttributeError on a live seat.
+_SETTABLE_TEXT_FORMAT_PROPERTIES = frozenset(
+    {
+        "BackWards",
+        "Bold",
+        "CharHeight",
+        "CharHeightInPts",
+        "CharSpacingFactor",
+        "Escapement",
+        "Italic",
+        "LineLength",
+        "LineSpacing",
+        "ObliqueAngle",
+        "Strikeout",
+        "TypeFaceName",
+        "Underline",
+        "UpsideDown",
+        "Vertical",
+        "WidthFactor",
+    }
+)
+
+
 class _FakeTextFormat:
     """The template's authored PART format, as ``ITextFormat`` reports it.
 
@@ -176,6 +201,18 @@ class _FakeTextFormat:
     Century Gothic at 18 pt, with ``TypeFaceName`` unchanged either way.
     ``height_in_points`` chooses which of the two height properties the
     template authored, since ``CharHeightInPts`` is stale when it did not.
+
+    This fake deliberately reproduces two things about the GENERATED wrapper
+    that a plain attribute bag does not, because the applier runs against that
+    wrapper and both of them hid a real defect:
+
+    * ``IsHeightSpecifiedInPts`` is a METHOD (dispid 11, retval ``VT_BOOL``),
+      absent from ``_prop_map_get_``. Read as an attribute it yields a bound
+      method -- truthy forever -- so a fake exposing it as a ``bool`` lets a
+      reader that never calls it pass every test and invert on the seat.
+    * assignment is restricted to the wrapper's ``_prop_map_put_`` names;
+      ``DispatchBaseClass.__setattr__`` raises ``AttributeError`` for anything
+      else, so writing the read-only flag is an error, not a no-op.
     """
 
     def __init__(
@@ -187,13 +224,23 @@ class _FakeTextFormat:
         point_size: float = LANDSCAPE.nominal_point_size,
         height_in_points: bool = True,
     ):
+        self.__dict__["_height_in_points"] = height_in_points
         self.TypeFaceName = typeface
         self.Bold = bold
         self.Italic = italic
         self.LineLength = 0.0
-        self.IsHeightSpecifiedInPts = height_in_points
         self.CharHeightInPts = point_size if height_in_points else 0
         self.CharHeight = point_size * MM_PER_POINT / 1000.0
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name not in _SETTABLE_TEXT_FORMAT_PROPERTIES:
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
+        self.__dict__[name] = value
+
+    def IsHeightSpecifiedInPts(self) -> bool:
+        return self.__dict__["_height_in_points"]
 
 
 class _FakeAnnotation:
@@ -381,7 +428,13 @@ def test_an_untouched_sheets_ink_is_never_written(seat):
 
 
 def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
-    """The fitted sheets still get the format the plan asked for."""
+    """The fitted sheets still get the format the plan asked for.
+
+    The size is asserted through BOTH height properties, in their own units,
+    because the applier cannot choose which one the note prints from:
+    ``IsHeightSpecifiedInPts`` is read-only, so the format keeps whichever
+    unit it was authored in and the write has to be correct in either.
+    """
     name = "harmonic-analyzer assembly"
     ddoc, annotation = seat(name)
 
@@ -396,11 +449,42 @@ def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
     assert fit.adjust is True
     assert annotation.writes == 1
     assert annotation.text_format.CharHeightInPts == fit.point_size
-    assert annotation.text_format.IsHeightSpecifiedInPts is True
+    assert annotation.text_format.CharHeight * 1000.0 == pytest.approx(
+        fit.point_size * MM_PER_POINT
+    )
     assert annotation.text_format.LineLength * 1000.0 == pytest.approx(
         fit.line_length_mm
     )
     assert ddoc.GetEditSheet is True
+
+
+def test_a_millimetre_authored_sheet_is_fitted_in_its_own_unit(seat):
+    """A note that prints from ``CharHeight`` must still come out at the fit.
+
+    ``IsHeightSpecifiedInPts`` is a read-only METHOD, so the applier cannot
+    switch a millimetre-authored note to points: it can only write the same
+    physical height through both properties and let the note keep its unit.
+    If the applier wrote the points property alone, this sheet would render
+    at its ORIGINAL height while the readback -- which reads whichever
+    property the format declares authoritative -- reported the fit, i.e. a
+    wrapped title block verified as correct.
+    """
+    name = "harmonic-analyzer assembly"
+    ddoc, annotation = seat(name, height_in_points=False)
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is True
+    assert annotation.text_format.IsHeightSpecifiedInPts() is False
+    assert annotation.text_format.CharHeight * 1000.0 == pytest.approx(
+        fit.point_size * MM_PER_POINT
+    )
 
 
 def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
