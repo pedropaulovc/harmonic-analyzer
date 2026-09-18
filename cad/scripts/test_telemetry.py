@@ -230,6 +230,52 @@ def test_nested_spans_share_one_trace(capture):
     assert len(traces) == 1  # no gaps: every span hangs off the one root trace
 
 
+def test_attribute_names_the_log_farm_selects_on_are_pinned_here(capture):
+    """CONSUMER: solidworks-pool ``farm.py logs`` (``_logs_labels_block``), which
+    reads a RUNNING leaf's lines out of the workspace these spans feed:
+
+        | extend depth = toint(todynamic(Attributes)['harmonic.depth'])
+        | extend label = tostring(todynamic(Attributes).label)
+        | where depth == 0 and isnotempty(label)
+
+    Rename either key here, or stop emitting 0 at a process's top level, and
+    that query matches nothing: every farm leaf becomes unattributable, its
+    lines arrive with no leaf name, and the command can only fall back to
+    guessing from the worker. No test in the pool repo can red on a rename in
+    this file -- it builds the attribute names by hand, because it has no
+    other choice -- so the pin belongs here, on the producing side.
+
+    ``harmonic.depth`` is per-PROCESS, not per-trace: a leaf's trace holds
+    depth-0 spans from the doit parent (``task <label>``) AND from the build
+    subprocess it spawned (``proc.startup``, ``sw.connect``, ``<kind>.build``).
+    The pool resolves the leaf only because it also requires exactly one
+    DISTINCT label among those depth-0 spans, and the subprocess ones carry
+    none. Two rules, then: do not rename or flatten these keys, and never put
+    ``label`` on a span opened at the top level of a build subprocess. The
+    depth half of the second rule is pinned by
+    ``test_build_session_continues_injected_parent_without_duplicate``.
+
+    The depth-1 assertion is load-bearing, not decoration: ``label`` is reused
+    at depth >= 1 for DIMENSION names (``blank_od``), and the measured ratio in
+    one build window was 1443 depth-1 labels against 309 depth-0 leaf labels.
+    ``depth == 0`` is what stops the pool from filing a leaf's output under a
+    sketch dimension, so a change that flattens depth is as damaging as a
+    rename.
+    """
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear", label="part:cone_gear"):
+        with _telemetry.span("sketch.circle", label="blank_od"):
+            pass
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    root = finished["task part:cone_gear"]
+    child = finished["sketch.circle"]
+    assert root.attributes["harmonic.depth"] == 0
+    assert root.attributes["label"] == "part:cone_gear"
+    assert child.attributes["harmonic.depth"] == 1
+    assert child.attributes["label"] == "blank_od"
+
+
 def test_traced_decorator_wraps_sync_and_async(capture):
     spans, _ = capture
 
@@ -305,6 +351,14 @@ def test_build_session_continues_injected_parent_without_duplicate(
     op = [s for s in spans.get_finished_spans() if s.name == "op"][-1]
     assert op.context.trace_id == task.context.trace_id
     assert op.parent.trace_id == task.context.trace_id
+    # `harmonic.depth` is per-PROCESS, not per-trace: a span opened at the top
+    # level of a continued session reads 0 even though the trace already has a
+    # depth-0 span (the doit task) in the parent process. That is what the pool
+    # query relies on -- it selects depth == 0 AND a non-empty `label`, and
+    # resolves a leaf only when the trace holds exactly ONE distinct label. So
+    # a subprocess top-level span must never carry `label`; this assertion is
+    # here so the depth half of that rule cannot change unnoticed.
+    assert op.attributes["harmonic.depth"] == 0
 
 
 def test_cross_process_trace_propagation(tmp_path):
