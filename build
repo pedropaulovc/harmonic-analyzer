@@ -1,4 +1,5 @@
 #!/bin/sh
-# Farm entry point: doit schedules locally; every cache-missing part/assembly/
-# drawing builds on the SolidWorks farm (see build.py --executor farm).
+# Farm entry point: doit schedules locally; every cache-missing SolidWorks task
+# -- parts, assemblies, drawings, verify:*, preflight, export and the release
+# Pack-and-Go -- builds on the farm (see build.py --executor farm).
 cd "$(dirname "$0")" && exec uv run python build.py --executor farm "$@"
