@@ -1081,7 +1081,7 @@ def _failure_artefacts(since: float) -> list[Path]:
 
 
 def _artefact_record(path: Path) -> str | None:
-    """One manifest entry (``relpath:size:digest12``), or ``None`` when the
+    """One manifest entry (``relpath:size:digest16``), or ``None`` when the
     artefact is gone or unreadable.
 
     Digesting a saved SLDPRT takes seconds, so the file can vanish between the
@@ -1095,11 +1095,14 @@ def _artefact_record(path: Path) -> str | None:
             f":{_artefact_digest(path)[:16]}"
         )
     except OSError as exc:
-        _telemetry.warn(
-            f"[forensics] artefact {path} became unreadable while the manifest "
-            f"was being written: {exc}",
-            artefact=str(path),
-        )
+        # A log sink is I/O too: see _fail_task on why no emission here may
+        # escape.
+        with contextlib.suppress(Exception):
+            _telemetry.warn(
+                f"[forensics] artefact {path} became unreadable while the "
+                f"manifest was being written: {exc}",
+                artefact=str(path),
+            )
         return None
 
 
@@ -1131,43 +1134,56 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
     an "unknown GB" line on every pytest failure. ``started`` bounds the manifest
     to the artefacts THIS attempt wrote (see :func:`_failure_artefacts`).
 
-    The manifest can NEVER replace the failure it documents. Enumerating and
-    digesting the tree is I/O on a path where the workspace is already in
-    trouble, so an ``OSError`` there degrades to a WARNING and the
-    ``RuntimeError`` carrying the exit code still goes out: the alternative is a
-    leaf log whose last word is a FileNotFoundError under ``failures/``, which
-    reads as "the forensics broke" and hides which build step failed and with
-    what code -- the one fact this whole path exists to deliver (coderabbit).
+    The manifest can NEVER replace the failure it documents, by either route.
+    Enumerating and digesting the tree is I/O on a path where the workspace is
+    already in trouble, so an ``OSError`` there degrades to a WARNING; and
+    EMITTING is I/O as well -- ``logging`` does not guard a handler, so an
+    ``emit`` that raises (OTel's ``LoggingHandler.emit`` is one unguarded line,
+    and a full or locked sink is exactly the condition a dying worker is in)
+    propagates straight out of ``_telemetry.error`` unless suppressed. Either
+    way the ``RuntimeError`` carrying the exit code still goes out: the
+    alternative is a leaf log whose last word is a FileNotFoundError under
+    ``failures/`` or the log handler's own traceback, which reads as "the
+    forensics broke" and hides which build step failed and with what code --
+    the one fact this whole path exists to deliver (coderabbit, CrLoop772).
+
+    Only the EMISSIONS are suppressed, never the manifest arithmetic around
+    them: a ``NameError`` or a bad f-string here must stay loud, or this path
+    becomes undebuggable. Same split as ``_common.capture_com_failure``, which
+    wraps its final ERROR record and nothing else.
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
-        _telemetry.error(
-            f"[forensics] {label} failed (exit {rc}) with the seat at "
-            f"{commit_gb:.1f} GB of its {_sw_max_commit_gb():.1f} GB budget",
-            label=label,
-            exit_code=rc,
-            seat_commit_gb=round(commit_gb, 2),
-            seat_commit_budget_gb=_sw_max_commit_gb(),
-        )
+        with contextlib.suppress(Exception):
+            _telemetry.error(
+                f"[forensics] {label} failed (exit {rc}) with the seat at "
+                f"{commit_gb:.1f} GB of its {_sw_max_commit_gb():.1f} GB budget",
+                label=label,
+                exit_code=rc,
+                seat_commit_gb=round(commit_gb, 2),
+                seat_commit_budget_gb=_sw_max_commit_gb(),
+            )
     try:
         artefacts = _failure_artefacts(started)
     except OSError as exc:
         artefacts = []
-        _telemetry.warn(
-            f"[forensics] {label}: cannot enumerate {FAILURES}: {exc}",
-            label=label,
-            exit_code=rc,
-        )
+        with contextlib.suppress(Exception):
+            _telemetry.warn(
+                f"[forensics] {label}: cannot enumerate {FAILURES}: {exc}",
+                label=label,
+                exit_code=rc,
+            )
     records = [record for record in (_artefact_record(p) for p in artefacts) if record]
     if records:
-        _telemetry.error(
-            f"[forensics] {label}: {len(records)} artefact(s) under "
-            f"{FAILURES} -- upload prefix 'failures/' beside the leaf log",
-            label=label,
-            exit_code=rc,
-            failure_dir=str(FAILURES),
-            artefacts=" ".join(records),
-        )
+        with contextlib.suppress(Exception):
+            _telemetry.error(
+                f"[forensics] {label}: {len(records)} artefact(s) under "
+                f"{FAILURES} -- upload prefix 'failures/' beside the leaf log",
+                label=label,
+                exit_code=rc,
+                failure_dir=str(FAILURES),
+                artefacts=" ".join(records),
+            )
     raise RuntimeError(f"{label} failed (exit {rc})")
 
 

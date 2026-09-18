@@ -1291,5 +1291,39 @@ def test_an_unwalkable_failure_tree_costs_a_warning_not_the_exit_code(
     )
 
 
+def test_an_exploding_log_sink_does_not_replace_the_task_failure(dodo_failures):
+    """The OTHER way a diagnostic can eat the failure: the emission itself.
+
+    ``logging`` guards nothing on the handler path -- ``Logger.handle`` ->
+    ``callHandlers`` -> ``Handler.emit`` has no ``try``, and only the stdlib's
+    own ``emit`` bodies self-guard via ``handleError``. OTel's
+    ``LoggingHandler.emit`` is a single unguarded call, and a full, locked or
+    shut-down sink is exactly the state a dying worker's process is in, so an
+    unsuppressed ``_telemetry.error`` here would hand the reader the log
+    handler's traceback instead of the exit code (CrLoop772).
+    """
+    dodo = dodo_failures
+    capture = dodo.FAILURES / "logo-ring-extrude" / "capture.json"
+    capture.parent.mkdir(parents=True)
+    capture.write_bytes(b"{}")
+
+    class _FullDisk(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            raise RuntimeError("log sink is full")
+
+    sink = _FullDisk()
+    logger = _telemetry.get_logger()
+    logger.addHandler(sink)
+    try:
+        # The match is what discriminates: the sink raises RuntimeError too, so
+        # only the message proves the TASK's failure is the one that escaped.
+        with pytest.raises(
+            RuntimeError, match=r"^logo ring extrude failed \(exit 86\)$"
+        ):
+            dodo._fail_task("logo ring extrude", 86, started=0.0)
+    finally:
+        logger.removeHandler(sink)
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
