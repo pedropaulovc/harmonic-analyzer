@@ -23,9 +23,11 @@ import _drawing_common as drawing_common
 from _common import part_properties
 from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
 from _title_block_text import (
-    CAP_HEIGHT_EM,
     DESCENDER_EM,
+    LINE_SPACING_EM,
     MM_PER_POINT,
+    ONE_LINE_EXTENT_EM,
+    ONE_LINE_EXTENT_TOLERANCE,
     TITLE_BLOCK_TYPEFACE,
     PartNameDoesNotFit,
     fit_is_contained,
@@ -155,15 +157,30 @@ def test_an_unfittable_name_fails_the_build():
 # only on a seat.
 
 
-def _one_line_extent(point_size: int, *, width_mm: float = 60.0):
-    """``INote::GetExtent`` (metres) for one line drawn in ``LANDSCAPE``."""
+# Measured on the farm, and the reason this fake renders instead of returning
+# a canned box: SolidWorks' system-units height (``ITextFormat.CharHeight``,
+# metres) is the CHARACTER height, not the em. Four names at 12, 15 and 16 pt
+# across three workers came back with extents 1.3806-1.3813x the single-line
+# bound after the applier wrote the em size into it; 1/1.38095 = 0.7241.
+SW_CHARACTER_HEIGHT_EM = 0.7241
+
+
+def _one_line_extent(point_size: float, *, width_mm: float = 60.0):
+    """``INote::GetExtent`` (metres) for one line drawn in ``LANDSCAPE``.
+
+    The box is ``ONE_LINE_EXTENT_EM`` tall, which is what the farm measured
+    for a correctly-sized note, and it is anchored on the descender because
+    that is the edge the cell-rule check reads; SolidWorks' padding sits
+    above it.
+    """
     size_mm = point_size * MM_PER_POINT
+    bottom_mm = LANDSCAPE.baseline_mm - DESCENDER_EM * size_mm
     return (
         LANDSCAPE.text_left_mm / 1000.0,
-        (LANDSCAPE.baseline_mm - DESCENDER_EM * size_mm) / 1000.0,
+        bottom_mm / 1000.0,
         0.0,
         (LANDSCAPE.text_left_mm + width_mm) / 1000.0,
-        (LANDSCAPE.baseline_mm + CAP_HEIGHT_EM * size_mm) / 1000.0,
+        (bottom_mm + ONE_LINE_EXTENT_EM * size_mm) / 1000.0,
         0.0,
     )
 
@@ -202,9 +219,9 @@ class _FakeTextFormat:
     ``height_in_points`` chooses which of the two height properties the
     template authored, since ``CharHeightInPts`` is stale when it did not.
 
-    This fake deliberately reproduces two things about the GENERATED wrapper
-    that a plain attribute bag does not, because the applier runs against that
-    wrapper and both of them hid a real defect:
+    This fake deliberately reproduces three things about the GENERATED
+    wrapper and about SolidWorks itself that a plain attribute bag does not,
+    because the applier runs against those and all three hid a real defect:
 
     * ``IsHeightSpecifiedInPts`` is a METHOD (dispid 11, retval ``VT_BOOL``),
       absent from ``_prop_map_get_``. Read as an attribute it yields a bound
@@ -213,6 +230,13 @@ class _FakeTextFormat:
     * assignment is restricted to the wrapper's ``_prop_map_put_`` names;
       ``DispatchBaseClass.__setattr__`` raises ``AttributeError`` for anything
       else, so writing the read-only flag is an error, not a no-op.
+    * the two height properties are NOT interchangeable and writing one
+      decides which unit the note renders in. ``CharHeight`` is a CHARACTER
+      height in metres, so a note switched to it renders an em of
+      ``CharHeight / SW_CHARACTER_HEIGHT_EM``. An applier that wrote "the
+      same height through both" therefore wrote two different heights and
+      the taller one won -- which is what ``rendered_point_size`` exists to
+      make visible offline.
     """
 
     def __init__(
@@ -229,18 +253,36 @@ class _FakeTextFormat:
         self.Bold = bold
         self.Italic = italic
         self.LineLength = 0.0
-        self.CharHeightInPts = point_size if height_in_points else 0
-        self.CharHeight = point_size * MM_PER_POINT / 1000.0
+        # Authored state, not a write: the template is self-consistent, so
+        # both properties describe the same rendered size. These go straight
+        # into __dict__ so that the authority rule below only ever sees what
+        # the APPLIER does.
+        self.__dict__["CharHeightInPts"] = point_size if height_in_points else 0
+        self.__dict__["CharHeight"] = (
+            point_size * MM_PER_POINT * SW_CHARACTER_HEIGHT_EM / 1000.0
+        )
 
     def __setattr__(self, name: str, value: object) -> None:
         if name not in _SETTABLE_TEXT_FORMAT_PROPERTIES:
             raise AttributeError(
                 f"'{type(self).__name__}' object has no attribute '{name}'"
             )
+        if name in ("CharHeight", "CharHeightInPts"):
+            # Last height write wins the unit, which is how the farm's
+            # points-authored notes ended up rendering from CharHeight.
+            self.__dict__["_height_in_points"] = name == "CharHeightInPts"
         self.__dict__[name] = value
 
     def IsHeightSpecifiedInPts(self) -> bool:
         return self.__dict__["_height_in_points"]
+
+    @property
+    def rendered_point_size(self) -> float:
+        """The em the note actually prints at, in points."""
+        if self.__dict__["_height_in_points"]:
+            return float(self.__dict__["CharHeightInPts"])
+        char_height_pts = self.__dict__["CharHeight"] * 1000.0 / MM_PER_POINT
+        return char_height_pts / SW_CHARACTER_HEIGHT_EM
 
 
 class _FakeAnnotation:
@@ -260,10 +302,24 @@ class _FakeAnnotation:
 
 
 class _FakeNote:
-    def __init__(self, text: str, annotation: _FakeAnnotation, extent):
+    """A note whose extent is RENDERED from its format, not canned.
+
+    An extent fixed at construction cannot catch a write that changes the
+    rendered size, which is exactly the class of defect that reached the
+    farm. Wrapping is not modelled -- the note always draws one line -- so a
+    test that wants a wrapped extent assigns a tuple over ``GetExtent``, the
+    way ``_get_attr_or_call`` accepts either.
+    """
+
+    def __init__(self, text: str, annotation: _FakeAnnotation, *, width_mm=60.0):
         self.text = text
         self.annotation = annotation
-        self.GetExtent = extent
+        self.width_mm = width_mm
+
+    def GetExtent(self):
+        return _one_line_extent(
+            self.annotation.text_format.rendered_point_size, width_mm=self.width_mm
+        )
 
     def GetText(self):
         return self.text
@@ -337,9 +393,7 @@ def seat(monkeypatch):
 
     def build(name: str, **format_kwargs):
         annotation = _FakeAnnotation(_FakeTextFormat(**format_kwargs))
-        point_size = fit_part_name(name, LANDSCAPE).point_size
-        note = _FakeNote(name, annotation, _one_line_extent(point_size))
-        return _FakeDrawingDoc(note), annotation
+        return _FakeDrawingDoc(_FakeNote(name, annotation)), annotation
 
     return build
 
@@ -395,28 +449,37 @@ def test_a_reauthored_template_fails_every_sheet(seat, name, adjust, authored, m
     assert ddoc.GetEditSheet() is True
 
 
-def test_a_template_authoring_its_height_in_millimetres_is_read_correctly(seat):
-    """``CharHeightInPts`` is stale unless the format says it is authoritative.
+@pytest.mark.parametrize(
+    "name,adjust",
+    [("channel-spring-installed", False), ("harmonic-analyzer assembly", True)],
+    ids=["untouched-sheet", "fitted-sheet"],
+)
+def test_a_millimetre_authored_note_is_refused_not_converted(seat, name, adjust):
+    """A note that prints from ``CharHeight`` is refused, on either class.
 
-    A note authored in millimetres reports its size through ``CharHeight``
-    (metres) while ``CharHeightInPts`` holds a leftover, so a size check that
-    always read the points property would refuse the whole fleet. This is the
-    case that discriminates: the same 16 pt note, authored the other way.
+    ``CharHeight`` is a CHARACTER height in metres, so it is not the em the
+    width model is keyed to; the farm measured the difference at a factor of
+    1.381. The applier used to convert with the em factor and write both
+    properties, which inflated every fitted note by that factor. There is no
+    measured font constant to convert with, so the rule now names the gap
+    instead of guessing across it -- on the untouched sheets too, because
+    ``adjust=False`` is a verdict of the same width model.
     """
-    name = "channel-spring-installed"
+    assert fit_part_name(name, LANDSCAPE).adjust is adjust
     ddoc, annotation = seat(name, height_in_points=False)
     assert annotation.text_format.CharHeightInPts == 0
 
-    fit = drawing_common.fit_title_block_part_name(
-        _FakeAdapter(),
-        ddoc,
-        layout=DrawingLayout.LANDSCAPE,
-        sheet_name="Sheet1",
-        expected_name=name,
-    )
+    with pytest.raises(RuntimeError, match="authors its height in system units"):
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )
 
-    assert fit.adjust is False
     assert annotation.writes == 0
+    assert ddoc.GetEditSheet() is True
 
 
 def test_an_untouched_sheets_ink_is_never_written(seat):
@@ -440,12 +503,45 @@ def test_an_untouched_sheets_ink_is_never_written(seat):
 
 
 def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
-    """The fitted sheets still get the format the plan asked for.
+    """The fitted sheets get the plan's size through ONE height property.
 
-    The size is asserted through BOTH height properties, in their own units,
-    because the applier cannot choose which one the note prints from:
-    ``IsHeightSpecifiedInPts`` is read-only, so the format keeps whichever
-    unit it was authored in and the write has to be correct in either.
+    The note must come out of the fit still declaring points, and with its
+    system-units height untouched: two properties nominally describing the
+    same height in different units is what shipped a 1.381x inflation, and
+    the one the applier does not own is the one whose unit it got wrong.
+    """
+    name = "harmonic-analyzer assembly"
+    ddoc, annotation = seat(name)
+    authored_char_height = annotation.text_format.CharHeight
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is True
+    assert annotation.writes == 1
+    assert annotation.text_format.CharHeightInPts == fit.point_size
+    assert annotation.text_format.IsHeightSpecifiedInPts() is True
+    assert annotation.text_format.CharHeight == authored_char_height
+    assert annotation.text_format.LineLength * 1000.0 == pytest.approx(
+        fit.line_length_mm
+    )
+    assert ddoc.GetEditSheet() is True
+
+
+def test_a_fitted_note_renders_no_taller_than_one_line(seat):
+    """The RATIO, which is what the farm actually measured going wrong.
+
+    Pinning "this name fits" passes again the day a unit factor comes back
+    on a shorter name. What failed on the farm was a constant multiplicative
+    inflation -- extent 1.3806-1.3813x the single-line bound across four
+    names, three sizes and three workers -- so the assertion is on
+    extent/bound, at the size the note reports back rather than the one that
+    was requested.
     """
     name = "harmonic-analyzer assembly"
     ddoc, annotation = seat(name)
@@ -459,63 +555,67 @@ def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
     )
 
     assert fit.adjust is True
-    assert annotation.writes == 1
-    assert annotation.text_format.CharHeightInPts == fit.point_size
-    assert annotation.text_format.CharHeight * 1000.0 == pytest.approx(
-        fit.point_size * MM_PER_POINT
-    )
-    assert annotation.text_format.LineLength * 1000.0 == pytest.approx(
-        fit.line_length_mm
-    )
-    assert ddoc.GetEditSheet() is True
+    applied_pts = annotation.text_format.rendered_point_size
+    assert applied_pts == pytest.approx(fit.point_size)
+    _x0, y0, _z0, _x1, y1, _z1 = ddoc.note.GetExtent()
+    height_mm = abs(y1 - y0) * 1000.0
+    one_line_mm = ONE_LINE_EXTENT_EM * applied_pts * MM_PER_POINT
+    assert height_mm / one_line_mm <= 1.0 + ONE_LINE_EXTENT_TOLERANCE
 
 
-def test_a_millimetre_authored_sheet_is_fitted_in_its_own_unit(seat):
-    """A note that prints from ``CharHeight`` must still come out at the fit.
+def test_writing_the_system_units_height_inflates_the_note(seat):
+    """The fake can SEE the defect the applier used to ship.
 
-    ``IsHeightSpecifiedInPts`` is a read-only METHOD, so the applier cannot
-    switch a millimetre-authored note to points: it can only write the same
-    physical height through both properties and let the note keep its unit.
-    If the applier wrote the points property alone, this sheet would render
-    at its ORIGINAL height while the readback -- which reads whichever
-    property the format declares authoritative -- reported the fit, i.e. a
-    wrapped title block verified as correct.
+    Without this, the ratio assertion above is unfalsifiable: a fake whose
+    extent ignores the format would pass it whatever the applier wrote. This
+    reproduces the removed write -- ``CharHeight = em_mm / 1000`` after the
+    points write -- and pins the inflation at the farm's measured 1.381, so
+    reinstating that line in ``fit_title_block_part_name`` makes the sheet
+    fail here instead of on a worker.
     """
     name = "harmonic-analyzer assembly"
-    ddoc, annotation = seat(name, height_in_points=False)
+    ddoc, annotation = seat(name)
+    fit = fit_part_name(name, LANDSCAPE)
+    text_format = annotation.text_format
 
-    fit = drawing_common.fit_title_block_part_name(
-        _FakeAdapter(),
-        ddoc,
-        layout=DrawingLayout.LANDSCAPE,
-        sheet_name="Sheet1",
-        expected_name=name,
-    )
+    text_format.CharHeightInPts = int(fit.point_size)
+    text_format.CharHeight = fit.point_size * MM_PER_POINT / 1000.0
 
-    assert fit.adjust is True
-    assert annotation.text_format.IsHeightSpecifiedInPts() is False
-    assert annotation.text_format.CharHeight * 1000.0 == pytest.approx(
-        fit.point_size * MM_PER_POINT
+    assert text_format.IsHeightSpecifiedInPts() is False
+    assert text_format.rendered_point_size == pytest.approx(
+        fit.point_size / SW_CHARACTER_HEIGHT_EM
     )
+    _x0, y0, _z0, _x1, y1, _z1 = ddoc.note.GetExtent()
+    height_mm = abs(y1 - y0) * 1000.0
+    one_line_mm = ONE_LINE_EXTENT_EM * fit.point_size * MM_PER_POINT
+    assert height_mm / one_line_mm == pytest.approx(1.381, abs=0.001)
 
 
 def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
-    """If ``LineLength`` is ignored, the two-line extent must fail the build."""
+    """If ``LineLength`` is ignored, the two-line extent must fail the build.
+
+    The refusal has to say what was MEASURED, not what it infers. An earlier
+    version reported "renders on more than one line" for every over-tall
+    extent, and that wording sent three agents after font ladders when the
+    real cause was a unit factor on notes that never wrapped. A wrap here
+    adds one em to a 1.8 em line, so the ratio it must report is 1.556, and
+    the size it must report is the one read BACK off the note.
+    """
     name = "harmonic-analyzer assembly"
     ddoc, _annotation = seat(name)
     point_size = fit_part_name(name, LANDSCAPE).point_size
-    x0, y0, z0, x1, _y1, z1 = _one_line_extent(point_size)
+    x0, y0, z0, x1, y1, z1 = _one_line_extent(point_size)
     # A second line drops one em BELOW the first, through the cell's rule.
     ddoc.note.GetExtent = (
         x0,
-        y0 - point_size * MM_PER_POINT / 1000.0,
+        y0 - LINE_SPACING_EM * point_size * MM_PER_POINT / 1000.0,
         z0,
         x1,
-        _y1,
+        y1,
         z1,
     )
 
-    with pytest.raises(RuntimeError, match="more than one line"):
+    with pytest.raises(RuntimeError) as raised:
         drawing_common.fit_title_block_part_name(
             _FakeAdapter(),
             ddoc,
@@ -523,3 +623,7 @@ def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
             sheet_name="Sheet1",
             expected_name=name,
         )
+
+    message = str(raised.value)
+    assert "renders 1.556x taller than one line" in message
+    assert f"at the {point_size:g} pt the note reports back" in message

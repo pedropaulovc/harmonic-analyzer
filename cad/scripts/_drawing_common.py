@@ -40,6 +40,8 @@ from _drawing_layout_check import (
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _title_block_text import (
     MM_PER_POINT,
+    ONE_LINE_EXTENT_EM,
+    ONE_LINE_EXTENT_TOLERANCE,
     TITLE_BLOCK_BOLD,
     TITLE_BLOCK_ITALIC,
     TITLE_BLOCK_TYPEFACE,
@@ -5690,21 +5692,33 @@ def _iter_template_notes(adapter: Any, ddoc: Any):
 def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> float:
     """The size ``text_format`` actually prints at, in points.
 
-    ``CharHeightInPts`` is only authoritative when the format says its height
-    is specified in points; otherwise the authored value is ``CharHeight``, a
-    height in METRES, and ``CharHeightInPts`` is stale. Reading the wrong one
-    would compare 16 pt against a leftover and refuse every sheet on a
-    millimetre-authored template.
+    Only one of the two height properties is authoritative, and the format
+    says which. ``CharHeightInPts`` is a stale leftover unless
+    ``IsHeightSpecifiedInPts`` is true, so reading it unconditionally would
+    compare 16 pt against a value the renderer never consults.
 
     ``IsHeightSpecifiedInPts`` is a METHOD, not a property: dispid 11,
     invkind 1, retval ``VT_BOOL``, present in neither ``_prop_map_get_`` nor
     ``_prop_map_put_`` of the generated wrapper -- SolidWorks documents it as
     "IsHeightSpecifiedInPts Method" and calls it with parentheses in its own
     sample. Reading it as an attribute off the early-bound wrapper yields a
-    BOUND METHOD, which is truthy forever, so the points branch would be taken
-    unconditionally and the check above would silently invert into the bug it
-    exists to prevent. ``_get_attr_or_call`` is the repo's method-or-property
-    idiom and is already used for ``GetEditSheet`` in this module.
+    BOUND METHOD, which is truthy forever, so the points branch would be
+    taken unconditionally. ``_get_attr_or_call`` is the repo's
+    method-or-property idiom and is already used for ``GetEditSheet`` here.
+
+    A system-units note is REFUSED rather than converted. ``CharHeight`` is
+    not the em size in metres: writing the em into it made the note render
+    1.381x taller than one line, measured across four names at 12, 15 and
+    16 pt on three workers (spread 1.3806-1.3813). The interpretation that
+    fits -- 1/1.381 = 0.7241 against Century Gothic's 0.718 cap height -- is
+    that the system-units height is the CHARACTER height, but that is an
+    inference from one campaign, not a measured font constant, and this
+    module's width model is keyed to the em. Converting with it would be
+    guessing in exactly the place that just cost a build, so the rule names
+    the gap instead. The fleet's templates author in points (the 96-sheet
+    size guard passes at 16 pt, which it could not if this branch were
+    live), so this refusal is unreachable today and exists to stay
+    unreachable loudly.
     """
     in_points = adapter._attempt(
         lambda: adapter._get_attr_or_call(text_format, "IsHeightSpecifiedInPts")
@@ -5714,17 +5728,22 @@ def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> floa
             f"sheet {sheet_name!r} PART note will not say whether its height is "
             "in points, so the size the width model assumes cannot be checked"
         )
-    attribute = "CharHeightInPts" if in_points else "CharHeight"
-    raw = adapter._attempt(lambda: getattr(text_format, attribute))
+    if not in_points:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note authors its height in system units "
+            "(IsHeightSpecifiedInPts is false), and ITextFormat.CharHeight is a "
+            "CHARACTER height, not the em the title-block width model is keyed "
+            "to -- the two differ by a measured factor of about 1.381. Re-author "
+            "the template's PART note in points, or measure the ratio and teach "
+            "_title_block_text about it"
+        )
+    raw = adapter._attempt(lambda: text_format.CharHeightInPts)
     if raw is None:
         raise RuntimeError(
-            f"sheet {sheet_name!r} PART note reports no {attribute} to check "
+            f"sheet {sheet_name!r} PART note reports no CharHeightInPts to check "
             "against the size the width model is computed at"
         )
-    if in_points:
-        return float(raw)
-    # ITextFormat.CharHeight is in metres.
-    return float(raw) * 1000.0 / MM_PER_POINT
+    return float(raw)
 
 
 def _assert_width_model_applies(
@@ -5894,6 +5913,11 @@ def fit_title_block_part_name(
             f"sheet {sheet_name!r} stayed in edit-sheet mode after EditTemplate; "
             "the title block's note is not editable"
         )
+    # The size the note came back reporting, which is what the extent check
+    # below must be read against: comparing a measured extent to the size we
+    # ASKED for hides exactly the failure where the write lands differently
+    # from the request.
+    applied_pts = float(fit.point_size)
     try:
         note, annotation, text_format = _part_name_note(
             adapter,
@@ -5904,17 +5928,21 @@ def fit_title_block_part_name(
         )
         if fit.adjust:
             text_format.LineLength = fit.line_length_mm / 1000.0
-            # The unit the height is read in is NOT ours to choose:
-            # IsHeightSpecifiedInPts is a read-only METHOD (dispid 11, no
-            # entry in the wrapper's _prop_map_put_), so assigning to it
-            # raises AttributeError rather than switching the format to
-            # points. Both HEIGHT properties are settable, though, so the
-            # applier writes the same physical size through both and lets the
-            # format keep whichever unit it already declares authoritative.
-            # That is stronger than depending on an undocumented
-            # flip-on-write: the rendered height is right either way.
+            # ONE authoritative property, in the unit this module thinks in.
+            #
+            # CharHeight is NOT the same number in metres: SolidWorks' system
+            # -units height is the CHARACTER height, so writing the em size
+            # into it renders every glyph 1/0.724 too big. Measured on the
+            # farm, not reasoned about -- four names at 12, 15 and 16 pt on
+            # three workers all came back with an extent exactly 1.381x the
+            # single-line bound, including two that needed no size change at
+            # all and so could only have been inflated by the write itself.
+            # Writing "the same height through both properties" was therefore
+            # writing two DIFFERENT heights, and the wider one won.
+            #
+            # So the applier writes the points property only, and the
+            # readback below refuses any sheet whose note did not take it.
             text_format.CharHeightInPts = int(fit.point_size)
-            text_format.CharHeight = fit.point_size * MM_PER_POINT / 1000.0
             if not annotation.SetTextFormat(0, False, text_format):
                 raise RuntimeError(
                     f"sheet {sheet_name!r} PART note rejected the fitted text "
@@ -5931,21 +5959,19 @@ def fit_title_block_part_name(
             # tighter than the 0.5 mm the fit keeps in hand, so no difference
             # this check tolerates can move a wrap decision.
             #
-            # The size is read back through the property the format DECLARES
-            # authoritative, not through CharHeightInPts, which is a leftover
-            # on a millimetre-authored note and would then verify the write
-            # against a value the renderer never consults.
-            applied_pts = round(
-                _note_point_size(adapter, applied, sheet_name=sheet_name)
-            )
+            # The size goes through _note_point_size rather than a bare
+            # CharHeightInPts read, so a note that came back declaring
+            # system units is refused here instead of being verified against
+            # a points value the renderer would no longer consult.
+            applied_pts = _note_point_size(adapter, applied, sheet_name=sheet_name)
             applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
             if (
-                applied_pts != fit.point_size
+                round(applied_pts) != fit.point_size
                 or abs(applied_line_mm - fit.line_length_mm) > 0.05
             ):
                 raise RuntimeError(
                     f"sheet {sheet_name!r} PART note did not keep the fitted "
-                    f"format: {applied_pts} pt / {applied_line_mm:.3f} mm line "
+                    f"format: {applied_pts:g} pt / {applied_line_mm:.3f} mm line "
                     f"length, expected {fit.point_size} pt / "
                     f"{fit.line_length_mm:.3f} mm"
                 )
@@ -5976,15 +6002,30 @@ def fit_title_block_part_name(
         )
     x0, y0, _z0, x1, y1, _z1 = (float(value) * 1000.0 for value in extent)
     bottom, top = min(y0, y1), max(y0, y1)
-    em_mm = fit.point_size * MM_PER_POINT
-    # Line spacing is exactly 1 em (measured), so a wrapped note's extent spans
-    # at least 2 em while one line -- glyph box 1.025 em, plus whatever padding
-    # SolidWorks adds -- cannot reach 1.8 em.
-    if top - bottom > 1.8 * em_mm:
+    # The extent is read against the size the note came back reporting, not
+    # the size we asked for: the two diverge in exactly the failure this
+    # check exists to catch.
+    em_mm = applied_pts * MM_PER_POINT
+    # One line measures ONE_LINE_EXTENT_EM tall, with a tolerance that is an
+    # order of magnitude below either defect this separates (a second line,
+    # or the whole note scaled by a unit factor).
+    one_line_mm = ONE_LINE_EXTENT_EM * em_mm
+    height_mm = top - bottom
+    if height_mm > one_line_mm * (1.0 + ONE_LINE_EXTENT_TOLERANCE):
+        # Say WHAT WAS MEASURED. An earlier version of this check reported
+        # "still renders on more than one line", which is an inference, and
+        # a wrong one: the farm produced byte-identical 14.03 mm extents for
+        # a 30-character and a 34-character name at the same size, which no
+        # wrap can do. The ratio is the diagnostic -- a small integer-ish
+        # ratio (2.0, 3.0) is a wrap, while a constant non-integer one
+        # (1.38 was a height written in the wrong unit) is the whole note
+        # scaled, and it is identical for names that do and do not wrap.
         raise RuntimeError(
-            f"sheet {sheet_name!r} PART name {expected_name!r} still renders on "
-            f"more than one line: note extent is {top - bottom:.2f} mm tall at "
-            f"{fit.point_size} pt (one line is at most {1.8 * em_mm:.2f} mm)"
+            f"sheet {sheet_name!r} PART name {expected_name!r} renders "
+            f"{height_mm / one_line_mm:.3f}x taller than one line: note extent "
+            f"is {height_mm:.2f} mm at the {applied_pts:g} pt the note reports "
+            f"back (requested {fit.point_size} pt), where one line at that size "
+            f"is {one_line_mm:.2f} mm"
         )
     if bottom < field.cell_bottom_mm - 0.5:
         raise RuntimeError(
@@ -6003,8 +6044,9 @@ def fit_title_block_part_name(
         )
     _telemetry.success(
         f"{sheet_name}: fitted PART name {expected_name!r} to one line at "
-        f"{fit.point_size} pt ({fit.width_mm:.2f} mm in a "
-        f"{fit.line_length_mm:.2f} mm field)"
+        f"{applied_pts:g} pt ({fit.width_mm:.2f} mm in a "
+        f"{fit.line_length_mm:.2f} mm field); note extent "
+        f"{height_mm:.2f} mm = {height_mm / one_line_mm:.3f} of one line"
     )
     return fit
 

@@ -80,14 +80,20 @@ picks the largest integer point size (16 pt down to a 9 pt floor) at which the
 name fits the cell's real usable width, and
 `_drawing_common.fit_title_block_part_name` applies it to that sheet's own
 template note through `EditTemplate` → `ITextFormat.LineLength` /
-`CharHeightInPts` + `CharHeight` → `EditSheet`, then re-reads
-`INote::GetExtent` to prove the result is one line inside the cell. Both
-height properties are written because the applier cannot pick the unit:
-`IsHeightSpecifiedInPts` is a read-only **method**, so the note keeps
-whichever unit it was authored in and the same physical size has to be
-correct in both. The DRWDOT binary is never written; the edit lives in the
-SLDDRW. A name that already fits the note's authored box keeps its ink: the
-note is read, but no format is written.
+`CharHeightInPts` → `EditSheet`, then re-reads `INote::GetExtent` to prove
+the result is one line inside the cell. **Only the points property is
+written.** `ITextFormat` also carries `CharHeight`, in system units, and it
+is *not* the same number in metres: it is the CHARACTER height, so writing
+the em size into it renders the note 1.381× too big — measured on the farm
+across four names at 12/15/16 pt on three workers, including two sheets
+whose size did not change and so could only have been inflated by the write.
+A note that declares its height in system units (`IsHeightSpecifiedInPts`,
+a read-only **method**, returns false) is therefore refused with that
+message rather than converted, on every sheet: the em-to-character ratio is
+an inference from one campaign, not a measured font constant. The fleet's
+templates author in points. The DRWDOT binary is never written; the edit
+lives in the SLDDRW. A name that already fits the note's authored box keeps
+its ink: the note is read, but no format is written.
 
 The width model is the template font's own glyph advances, taken from the
 Century Gothic CID subset embedded in the released PDFs. **If the title block

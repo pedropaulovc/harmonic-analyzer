@@ -83,6 +83,22 @@ DESCENDER_EM = 0.307
 # Measured: two-line sheets place consecutive baselines exactly one em apart.
 LINE_SPACING_EM = 1.0
 
+# What IAnnotation::GetExtent reports for a note that occupies ONE line, in
+# ems of the size the note reports back. Measured on the farm: a 16 pt note
+# whose height was written correctly extents 10.16 mm = 1.800 em. The glyph
+# box itself is only 1.025 em (CAP_HEIGHT_EM + DESCENDER_EM); the rest is
+# padding SolidWorks adds around the line, and it scales with the size, not
+# with the string. A second line adds LINE_SPACING_EM on top.
+ONE_LINE_EXTENT_EM = 1.8
+
+# How far above ONE_LINE_EXTENT_EM a measured extent may sit before the sheet
+# is refused. The two real defects this discriminates are far away from it: a
+# second line adds LINE_SPACING_EM (+56% of one line) and a height written
+# through the system-units property inflated the whole note by 38%. The
+# tolerance therefore only has to absorb rounding through the metre round trip
+# and whatever the renderer's padding does at the last digit.
+ONE_LINE_EXTENT_TOLERANCE = 0.05
+
 # Glyph advances in 1/1000 em, from the ``/W`` array of the Century Gothic CID
 # subset embedded in the v36 release PDFs. ASCII only: the CID-to-character
 # decode is proved by 104 title blocks' worth of text decoding to correct
