@@ -379,6 +379,9 @@ def test_a_cached_gate_never_dispatches_a_leaf(farm_gate, monkeypatch):
 
     assert len(calls["restore"]) == 1
     assert calls["store"] == []
+    # The restored stamp IS the gate's verdict -- a hit that leaves no stamp
+    # would make doit re-run the gate on the next build.
+    assert stamp.read_text(encoding="utf-8") == "verify_soundness:pen\n"
 
 
 # --- build.py: farm preflight and argv handling ------------------------------
