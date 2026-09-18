@@ -416,37 +416,43 @@ def assert_profile_closed(
     to fail a build while it is unmeasured whether a revolve centreline in the
     same sketch registers as a contour (99607A213 draws exactly that).
 
-    The REAL gates are offline and have already run by the time this is
-    called: :func:`endpoint_merges` refuses any vertex not shared by exactly
-    two segment ends, and :func:`minor_arc` refuses an endpoint that has
-    arrived at its arc's centre -- which is the realised shape of an inference
-    snap, since an outer arc's nearest wrong target is its own centre.  This
-    read-back is the seat's OUTCOME set against that authored intent, not the
-    guarantee.
+    The offline gates have already run by the time this is called:
+    :func:`endpoint_merges` refuses any vertex not shared by exactly two
+    segment ends, and :func:`minor_arc` refuses an endpoint that has arrived
+    at its arc's centre -- which is the realised shape of an inference snap,
+    since an outer arc's nearest wrong target is its own centre.  Those bound
+    the authored INTENT.  This read-back is what bounds the seat's OUTCOME,
+    and it is a gate in its own right, because nothing between the two is
+    asserted any more: :func:`draw_closed_profile` authors exact-coordinate
+    endpoints into the sketch database and the database welds them at
+    creation, so there is no per-pair return value to check.
 
     Returns the verdict dict, so the caller can pass its counts into
     :func:`capture_com_failure` as context instead of re-reading the sketch.
 
-    The raise reports ``coincident_point_pairs``, the direct fingerprint of
-    this failure: a closed N-segment chain whose endpoints MERGED keeps N
-    points at N distinct places, while the same chain unmerged keeps 2N points
-    sitting in N coincident pairs.  ``_point_census`` fills it in whenever the
-    seat returned point coordinates it could read -- it is gated on ``places``
+    ``coincident_point_pairs`` is what turns that weld from an assumption
+    into a measurement, and it is the direct fingerprint of the failure: a
+    closed N-segment chain whose endpoints welded keeps N points at N
+    distinct places, while the same chain unwelded keeps 2N points sitting in
+    N coincident pairs.  ``_point_census`` fills it in whenever the seat
+    returned point coordinates it could read -- it is gated on ``places``
     being non-empty, so an unreadable census degrades it to absent, which is
-    honest: the number was not measured.  That is the opposite of
-    ``unmerged_points``, which ``_sketch_state`` derives only when it is given
-    ``expected_points`` and which this path therefore could NEVER populate --
-    a permanently absent number in the one message that has to be readable off
-    a dead leaf's log.  ``expected_points`` is not plumbed through to supply
-    it, because it would be wrong here: it is
-    compared against the sketch's TOTAL point count, and 99607A213 draws a
-    revolve centreline in this same sketch, so the authored vertex count would
+    honest: the number was not measured, and an absent number must not raise
+    for the same reason ``"unknown"`` closure does not.  That is the opposite
+    of ``unmerged_points``, which ``_sketch_state`` derives only when it is
+    given ``expected_points`` and which this path therefore could NEVER
+    populate -- a permanently absent number in the one message that has to be
+    readable off a dead leaf's log.  ``expected_points`` is not plumbed
+    through to supply it, because it would be wrong here: it is compared
+    against the sketch's TOTAL point count, and 99607A213 draws a revolve
+    centreline in this same sketch, so the authored vertex count would
     understate the total by that centreline's two points and report a healthy
-    profile as having two unmerged endpoints.
+    profile as having two unwelded endpoints.
     """
     verdict = record_sketch_closure(
         adapter, label, feature, expect_contours=loops
     )
+    unwelded = verdict.get("coincident_point_pairs")
     if verdict.get("closure") == "open":
         raise RuntimeError(
             f"{label}: profile did not close -- the seat reports "
@@ -454,10 +460,19 @@ def assert_profile_closed(
             f"{verdict.get('segment_count')} segments "
             f"({verdict.get('point_count')} sketch points over "
             f"{verdict.get('distinct_point_positions')} distinct places, "
-            f"coincident_point_pairs={verdict.get('coincident_point_pairs')})."
-            "  Every merge relation was applied and the coordinates closed "
-            "offline, so this is a geometry defect in the profile, not a seat "
-            "setting."
+            f"coincident_point_pairs={unwelded})."
+            "  The coordinates closed offline, so this is a geometry defect "
+            "in the profile, not a seat setting."
+        )
+    if unwelded:
+        raise RuntimeError(
+            f"{label}: {unwelded} endpoint pair(s) did not weld -- the seat "
+            f"kept {verdict.get('point_count')} sketch points over "
+            f"{verdict.get('distinct_point_positions')} distinct places. "
+            "Exact-coordinate endpoints authored straight into the sketch "
+            "database are coalesced there at creation; two points left "
+            "sitting at one place mean that did not happen, so the loop is "
+            "held together by coordinates alone and any edit will open it."
         )
     return verdict
 
@@ -486,24 +501,36 @@ async def draw_closed_profile(
     Writing direct to the database has no pixel term at all, which is why this
     path produces identical geometry at any view scale.
 
-    Closure is then AUTHORED: :func:`endpoint_merges` pairs the endpoints on
-    exact float equality and each pair gets a ``merge`` relation
-    (``swConstraintType_MERGEPOINTS``), individually checked.  ``merge`` welds
-    two endpoints into one point, which is what inference itself would have
-    done; ``coincident`` would leave two distinct points held together by the
-    solver, i.e. exactly the tolerant state whose reliability we are trying to
-    stop depending on.
+    Closure then comes from the database, not from a relation.  The segments
+    are authored so that adjacent ends carry BIT-IDENTICAL coordinates, and
+    an exact-coordinate endpoint written straight to the sketch DB is
+    coalesced there at creation: the loop closes with no relation at all.
+    That is not an assumption, it is the behaviour ``_common.add_line_chain``
+    has always relied on -- it authors ZERO closure relations and its loops
+    close, on every worker, for every rectilinear part in the fleet.
 
-    That ordering -- draw direct-to-DB, restore ``AddToDB``, then relate -- is
-    the one ``_common.add_line_chain`` + ``define_rectilinear_chain`` already
-    use, and relations are added through the adapter's
-    ``ISketchRelationManager.AddRelation`` path (``IModelDoc2``'s legacy
-    ``SketchAddConstraints`` silently no-ops on SW 2026/3DEXPERIENCE).
+    So this function does NOT ask for a ``merge`` relation, and asking would
+    be worse than redundant.  ``swConstraintType_MERGEPOINTS`` merges two
+    DISTINCT points (``probe_point_anchoring`` case 7a proves it live, on two
+    points 5 mm apart); applied to a pair the database has already welded
+    into one point it has nothing to merge, and
+    ``ISketchRelationManager.AddRelation`` answers ``None`` without raising.
+    The adapter cannot tell that apart from a refusal, so it reports
+    "SolidWorks rejected 'merge' relation" -- which is exactly what failed
+    both profiles on 2026-09-18, on three different workers, always on the
+    FIRST pair, because every pair is in that state.
+
+    :func:`endpoint_merges` is still what pairs the endpoints, on exact float
+    equality, and it still refuses any vertex not shared by exactly two
+    segment ends.  It now states the coincidences the database is REQUIRED to
+    weld rather than a list of relations to issue, and
+    :func:`assert_profile_closed` measures that it did: an unwelded pair
+    survives the sketch as two points at one place and raises there.
 
     ``loops`` is the number of closed loops the profile must form -- 2 for a
     ring (outer boundary plus the hole), 1 for a plain region.  It is ASSERTED
     offline, against the coordinates, before any COM call: that assertion plus
-    the checked merge relations ARE the closure guarantee, and together with
+    the measured weld ARE the closure guarantee, and together with
     :func:`minor_arc`'s refusal of a zero-radius arc they are what catches a
     corner that an inference snap would have collapsed.
 
@@ -552,19 +579,13 @@ async def draw_closed_profile(
                 ids.append(check(f"{label}: add_{kind} {index}", result))
         finally:
             sketch_mgr.AddToDB = prev_add_to_db
-        for (first, first_end), (second, second_end) in merges:
-            check(
-                f"{label}: merge {ids[first]}.{first_end} <-> "
-                f"{ids[second]}.{second_end}",
-                await adapter.add_sketch_constraint(
-                    f"{ids[first]}.{first_end}",
-                    f"{ids[second]}.{second_end}",
-                    "merge",
-                ),
-            )
+    # No relation loop: see the docstring.  The endpoints are already ONE
+    # point each by the time the AddToDB block exits, so there is nothing
+    # left to relate and MERGEPOINTS would be refused for precisely that
+    # reason.  assert_profile_closed measures the weld instead.
     _telemetry.info(
-        f"{label}: {len(segments)} segments, {len(merges)} explicit merges, "
-        f"{loops} loops authored"
+        f"{label}: {len(segments)} segments, {len(merges)} endpoint "
+        f"coincidence(s) for the sketch DB to weld, {loops} loops authored"
     )
     return ids
 

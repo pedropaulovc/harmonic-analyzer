@@ -407,16 +407,18 @@ async def build_91247A720(adapter, truth=None):
     #
     # Closure is now AUTHORED and has no pixel term at all: segments go
     # straight to the sketch database (AddToDB), arcs are centre-based rather
-    # than re-fitted from three points, and every shared vertex gets an
-    # explicit merge relation.  Direct-to-DB is the fix precisely BECAUSE it
-    # removes the pixel term -- the measured seat variable was window size, so
-    # no preference baseline could have prevented this.  The ring extrudes
-    # identically at any window size, at any view scale, on any seat.
+    # than re-fitted from three points, and adjacent ends carry bit-identical
+    # coordinates, which the sketch DB welds into one point at creation.
+    # Direct-to-DB is the fix precisely BECAUSE it removes the pixel term --
+    # the measured seat variable was window size, so no preference baseline
+    # could have prevented this.  The ring extrudes identically at any window
+    # size, at any view scale, on any seat.
     #
-    # The two gates that catch a degenerate corner are OFFLINE, in
-    # sketch_profile: endpoint_merges refuses any vertex not shared by exactly
-    # two ends, and minor_arc refuses an endpoint that has arrived at the
-    # centre.  The closure read after exit_sketch is forensics, not a gate.
+    # Two gates catch a degenerate corner OFFLINE, in sketch_profile:
+    # endpoint_merges refuses any vertex not shared by exactly two ends, and
+    # minor_arc refuses an endpoint that has arrived at the centre.  The
+    # closure read after exit_sketch is the third, and it is a gate too: it
+    # is what measures that the DB actually welded the pairs.
     logo_segs = logo_ring_profile()
     check("create_sketch logo", await adapter.create_sketch("HeadTopPlane"))
     await draw_closed_profile(adapter, logo_segs, label="logo ring", loops=2)

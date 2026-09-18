@@ -180,10 +180,13 @@ async def build_99607A213(adapter, truth=None):
     # NO-OPS on SW 2026/3DEXPERIENCE (see the note on
     # ``_add_sketch_constraint_impl`` in the MCP sketch adapter).  So the
     # nearest-endpoint search, the selection dance and the constraint call
-    # were all dead code, and this profile has been closing on nothing but
-    # coincident coordinates and a tolerant revolve.  ``draw_closed_profile``
-    # relates the endpoints through ``ISketchRelationManager.AddRelation``,
-    # which does not no-op, and CHECKS each relation.
+    # were all dead code, and the profile closed on coincident coordinates
+    # alone.  That last part turned out to be the mechanism, not the gap:
+    # exact-coordinate endpoints written straight to the sketch DB are welded
+    # there at creation, which is why this closed deterministically on every
+    # worker.  ``draw_closed_profile`` therefore authors the coordinates and
+    # ``assert_profile_closed`` MEASURES the weld, instead of asking for a
+    # relation that a welded pair can only refuse.
     check("create_sketch flare", await adapter.create_sketch("Front"))
     with no_sketch_inference(adapter):
         # Revolve axis: raw construction geometry, drawn under the same
