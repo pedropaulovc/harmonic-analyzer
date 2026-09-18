@@ -118,6 +118,36 @@ def test_a_surface_type_change_is_geometry() -> None:
     assert "surface type" in problems[0]
 
 
+def test_a_census_with_no_persistent_reference_is_not_a_match() -> None:
+    """Two failed reads must not compare equal.
+
+    A probe that reports "same references" because neither side read one is
+    worse than no probe: it produces the evidence without the check. The
+    capture refuses an empty ``GetPersistReference3`` for the same reason, so
+    this can only arrive from a hand-written or truncated census file.
+    """
+    before = _census(_face(12.5, (0, 0, 0, 5, 5, 0), ""))
+    after = _census(_face(12.5, (0, 0, 0, 5, 5, 0), ""))
+
+    problems = diff_census(before, after)
+
+    assert len(problems) == 1
+    assert problems[0].startswith("identity:")
+    assert "nothing was compared" in problems[0]
+
+
+def test_a_truncated_box_is_reported_rather_than_zipped_away() -> None:
+    """A short box would otherwise pair up silently and read as unmoved."""
+    before = _census(_face(12.5, (0, 0, 0, 5, 5, 0), "aaaa"))
+    after = _census(_face(12.5, (0, 0), "aaaa"))
+
+    problems = diff_census(before, after)
+
+    assert len(problems) == 1
+    assert problems[0].startswith("geometry:")
+    assert "not 6 each" in problems[0]
+
+
 def test_noise_below_the_tolerance_is_not_a_difference() -> None:
     """Rebuilt geometry is not bit-identical, and must not have to be.
 

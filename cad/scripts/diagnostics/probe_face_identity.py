@@ -132,13 +132,15 @@ def diff_census(
                     f"{face_b['area_mm2']} (delta {area_delta:.6f} mm^2)"
                 )
                 continue
-            box_delta = max(
-                (
-                    abs(float(x) - float(y))
-                    for x, y in zip(face_a["box_mm"], face_b["box_mm"])
-                ),
-                default=0.0,
-            )
+            box_a = [float(v) for v in face_a["box_mm"]]
+            box_b = [float(v) for v in face_b["box_mm"]]
+            if len(box_a) != len(box_b) or len(box_a) != 6:
+                problems.append(
+                    f"geometry: {where} box has {len(box_a)} and {len(box_b)} "
+                    "corners, not 6 each -- one of these censuses is incomplete"
+                )
+                continue
+            box_delta = max(abs(x - y) for x, y in zip(box_a, box_b))
             if box_delta > box_tol_mm:
                 problems.append(f"geometry: {where} box moved by {box_delta:.9f} mm")
                 continue
@@ -148,13 +150,33 @@ def diff_census(
                     f"{face_a.get('surface')} -> {face_b.get('surface')}"
                 )
                 continue
-            if face_a.get("persist") != face_b.get("persist"):
+            if not face_a.get("persist") or not face_b.get("persist"):
+                problems.append(
+                    f"identity: {where} has no persistent reference in one of "
+                    "the censuses -- nothing was compared for this face"
+                )
+            elif face_a["persist"] != face_b["persist"]:
                 problems.append(
                     f"identity: {where} is the same face geometrically but its "
                     f"persistent reference changed "
-                    f"({face_a.get('persist')} -> {face_b.get('persist')})"
+                    f"({face_a['persist']} -> {face_b['persist']})"
                 )
     return problems
+
+
+def _box_mm(owner, member: str, what: str) -> list[float]:
+    """A six-corner box in millimetres, or a refusal.
+
+    An empty read must never reach the census: two censuses that both failed
+    to read a box would compare equal and the probe would report a match it
+    never made.
+    """
+    from _common import _read_member
+
+    box = [round(float(v) * 1000.0, 9) for v in (_read_member(owner, member) or ())]
+    if len(box) != 6:
+        raise RuntimeError(f"{member} returned {len(box)} corners for {what}, not 6")
+    return box
 
 
 async def capture_census(adapter, part_path: Path) -> dict:
@@ -166,30 +188,36 @@ async def capture_census(adapter, part_path: Path) -> dict:
     extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
     part = _early_bound(model, "IPartDoc")
     bodies = []
-    for raw_body in part.GetBodies2(0, False) or ():
+    for body_index, raw_body in enumerate(part.GetBodies2(0, False) or ()):
         body = _early_bound(raw_body, "IBody2")
         faces = []
-        for raw_face in body.GetFaces() or ():
+        for face_index, raw_face in enumerate(body.GetFaces() or ()):
+            what = f"body {body_index} face {face_index} of {part_path.name}"
             face = _early_bound(raw_face, "IFace2")
             surface = _read_member(face, "GetSurface")
             # GetPersistReference3 is the handle a saved downstream reference
             # actually stores.  Opaque bytes, and its LENGTH is informative
-            # too, so it is hashed whole rather than truncated.
+            # too, so it is hashed whole rather than truncated.  A missing one
+            # is refused rather than hashed: sha256(b"") on both sides would
+            # read as "same reference" and turn this probe into decoration.
             reference = extension.GetPersistReference3(raw_face)
+            if not reference:
+                raise RuntimeError(f"GetPersistReference3 returned nothing for {what}")
             faces.append(
                 {
                     "area_mm2": round(float(_read_member(face, "GetArea")) * 1e6, 6),
-                    "box_mm": [
-                        round(float(v) * 1000.0, 9)
-                        for v in (_read_member(face, "GetBox") or ())
-                    ],
+                    "box_mm": _box_mm(face, "GetBox", what),
                     "surface": (
                         int(_read_member(surface, "Identity") or -1) if surface else -1
                     ),
-                    "persist": hashlib.sha256(
-                        bytes(bytearray(reference or ()))
-                    ).hexdigest()[:16],
+                    "persist": hashlib.sha256(bytes(bytearray(reference))).hexdigest()[
+                        :16
+                    ],
                 }
+            )
+        if not faces:
+            raise RuntimeError(
+                f"body {body_index} of {part_path.name} reported 0 faces"
             )
         bodies.append(
             {
@@ -197,13 +225,12 @@ async def capture_census(adapter, part_path: Path) -> dict:
                 # The BOX, not the volume: IBody2 volume needs a density
                 # argument, and the vendor gate in gate_and_save already owns
                 # volume.  The box is only used to pair bodies up.
-                "box_mm": [
-                    round(float(v) * 1000.0, 9)
-                    for v in (_read_member(body, "GetBodyBox") or ())
-                ],
+                "box_mm": _box_mm(body, "GetBodyBox", f"body {body_index}"),
                 "faces": faces,
             }
         )
+    if not bodies:
+        raise RuntimeError(f"{part_path.name} reported no solid bodies")
     return {"part": part_path.name, "bodies": bodies}
 
 
