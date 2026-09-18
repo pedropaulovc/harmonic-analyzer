@@ -40,6 +40,7 @@ from _drawing_layout_check import (
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _title_block_text import (
     MM_PER_POINT,
+    EXTENT_BOTTOM_RESERVE_EM,
     ONE_LINE_EXTENT_EM,
     ONE_LINE_EXTENT_TOLERANCE,
     TITLE_BLOCK_BOLD,
@@ -5990,7 +5991,16 @@ def fit_title_block_part_name(
     The applied fit is then VERIFIED off the note's own geometry rather than
     assumed, because a silently-ignored ``LineLength`` would otherwise ship a
     wrapped title block: ``INote::GetExtent`` must report a single line's
-    height and must not cross the cell's lower rule.
+    height, and the note's INK must stay above the cell's lower rule. Not the
+    extent's bottom edge -- that box is top-anchored and carries about a line
+    of empty reserve underneath (``EXTENT_BOTTOM_RESERVE_EM``), so its lower
+    edge crosses the rule on every sheet legible enough to read.
+
+    Every sheet that has a PART note MEASURES its extent and logs it, fitted
+    or not; only a fitted sheet is REFUSED by it. The measurement is what
+    keeps the one-line model re-measurable, and the 78 sheets nobody edits
+    are its control population -- but an untouched sheet's ink is what v36
+    shipped, so instrumentation there has no standing to fail a build.
     """
     field = DRAWING_TEMPLATES[layout].part_name_field
     fit = fit_part_name(expected_name, field)
@@ -6078,21 +6088,23 @@ def fit_title_block_part_name(
             f"sheet {sheet_name!r} is stuck in edit-sheet-format mode after the "
             "PART name fit"
         )
-    if not fit.adjust:
-        # Nothing was written, so there is no applied fit to verify: the name
-        # is narrower than the width the note is PROVEN to render unwrapped
-        # at, and its ink is exactly what v36 shipped.
-        _telemetry.info(
-            f"{sheet_name}: PART name {expected_name!r} is {fit.width_mm:.2f} mm "
-            f"at the template's own {fit.point_size} pt, inside the note's "
-            f"proven {fit.line_length_mm:.2f} mm box; left untouched"
-        )
-        return fit
-
-    # SetTextFormat's effect reaches the note's geometry only after a redraw.
-    adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2())
+    if fit.adjust:
+        # SetTextFormat's effect reaches the note's geometry only after a
+        # redraw. Nothing was written on the untouched path, so that sheet's
+        # geometry is already current and pays for no redraw.
+        adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2())
     extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
     if not extent:
+        if not fit.adjust:
+            # Nothing was written, so there is nothing to verify: measuring an
+            # untouched sheet is instrumentation, and instrumentation may not
+            # invent a way to fail a sheet whose ink is exactly what v36
+            # shipped.
+            _telemetry.info(
+                f"{sheet_name}: PART note reports no extent; nothing was "
+                "written to it, so there is no applied fit to measure"
+            )
+            return fit
         raise RuntimeError(
             f"sheet {sheet_name!r} PART note reports no extent to verify the fit"
         )
@@ -6100,49 +6112,87 @@ def fit_title_block_part_name(
     bottom, top = min(y0, y1), max(y0, y1)
     # The extent is read against the size the note came back reporting, not
     # the size we asked for: the two diverge in exactly the failure this
-    # check exists to catch.
+    # check exists to catch. On an untouched sheet nothing was written, so the
+    # size is the template's own -- which _assert_width_model_applies has
+    # already checked against the model's nominal.
     em_mm = applied_pts * MM_PER_POINT
     one_line_mm = ONE_LINE_EXTENT_EM * em_mm
     height_mm = top - bottom
     extent_em = height_mm / em_mm
+    # Where the INK is, as opposed to where the box is. The extent is
+    # top-anchored and carries about one line pitch of empty reserve below
+    # the descender (EXTENT_BOTTOM_RESERVE_EM, measured), so the box bottom
+    # sits 4.79 mm below the text at 16 pt. The cell's lower rule is ruled
+    # geometry; comparing the box bottom against it compares padding against
+    # ink and refuses correct drawings.
+    ink_bottom_mm = bottom + EXTENT_BOTTOM_RESERVE_EM * em_mm
     # Record the measurement on EVERY sheet that reaches here, not only the
-    # ones refused below. ONE_LINE_EXTENT_EM is an envelope over a measured
-    # distribution, and that sample is 15 sheets because a REFUSAL used to be
-    # the only thing that printed the number -- which, for those 15, cost
-    # nothing: the old bound refused everything above 1.89 em and the
-    # shortest reading is 1.9123, so no sheet reached this check and passed
-    # quietly. The sample is complete, not selected. What it is not is
-    # RE-MEASURABLE: with the bound corrected, every sheet passes and the
-    # next build would print nothing. This line is what keeps the
-    # distribution observable once the guard is quiet, in the log and as a
-    # span event, so the constant is re-measured instead of re-argued.
+    # ones refused below, and not only the ones that were FITTED.
+    # ONE_LINE_EXTENT_EM is an envelope over a measured distribution, and
+    # that sample was 18 sheets because a REFUSAL used to be the only thing
+    # that printed the number, on the only path that measured at all. For
+    # those 18 the selection cost nothing -- the old bound refused everything
+    # above 1.89 em and the shortest reading is 1.9120, so no sheet reached
+    # the height check and passed quietly -- but the sample was also not
+    # RE-MEASURABLE, and it could not answer the one question the number
+    # raises: is this value normal? The 77 sheets that need no fit are the
+    # control population, they print the same note through the same
+    # template, and they were the 77 the old logging could not see. They
+    # report here now.
     #
     # The LAYOUT is part of the record because it is the discriminating
     # variable: the extent is a function of the size and the template, not
     # of the name (harmonic-analyzer assembly and fillister_screw are
     # different names of different lengths on different parts and both
     # measured 10.96 mm at 16 pt), so what this enumerates is one factor per
-    # template, not one per sheet.
+    # template, not one per sheet. The raw box edges go out beside the
+    # derived ink bottom so a reader can re-derive the reserve from a log
+    # instead of trusting this constant.
     _telemetry.info(
         f"{sheet_name}: PART note extent {height_mm:.2f} mm at "
         f"{applied_pts:g} pt = {extent_em:.4f} em "
         f"({height_mm / one_line_mm:.3f} of the {ONE_LINE_EXTENT_EM:g} em "
-        f"one-line model, {layout.value} template)"
+        f"one-line model, {layout.value} template); box "
+        f"{bottom:.2f}..{top:.2f} mm, ink bottom {ink_bottom_mm:.2f} mm, "
+        f"cell rule {field.cell_bottom_mm:.2f} mm"
+        + ("" if fit.adjust else "; note left untouched")
     )
     _telemetry.event(
         "title_block.extent",
         sheet=sheet_name,
         layout=layout.value,
         part_name=expected_name,
+        fitted=bool(fit.adjust),
         applied_pts=applied_pts,
         requested_pts=float(fit.point_size),
         extent_mm=height_mm,
         extent_em=extent_em,
+        extent_bottom_mm=bottom,
+        extent_top_mm=top,
+        ink_bottom_mm=ink_bottom_mm,
+        cell_bottom_mm=field.cell_bottom_mm,
         one_line_em=ONE_LINE_EXTENT_EM,
         tolerance=ONE_LINE_EXTENT_TOLERANCE,
+        bottom_reserve_em=EXTENT_BOTTOM_RESERVE_EM,
     )
+    if not fit.adjust:
+        # Nothing was written, so there is no applied fit to enforce: the name
+        # is narrower than the width the note is PROVEN to render unwrapped
+        # at, and its ink is exactly what v36 shipped. The extent above is
+        # instrumentation, and instrumentation does not get to fail a sheet it
+        # has no complaint about -- a refusal here would be a brand-new way
+        # for a green build to break, on 77 sheets whose geometry nobody
+        # touched. If one of them ever does measure strangely, the line above
+        # says so and the reader decides.
+        _telemetry.info(
+            f"{sheet_name}: PART name {expected_name!r} is {fit.width_mm:.2f} mm "
+            f"at the template's own {fit.point_size} pt, inside the note's "
+            f"proven {fit.line_length_mm:.2f} mm box; left untouched"
+        )
+        return fit
+
     # One line measures ONE_LINE_EXTENT_EM tall. The tolerance is NOT
-    # comfortable and must not be treated as slack: it splits an 11.8% gap,
+    # comfortable and must not be treated as slack: it splits an 11.7% gap,
     # because a unit-inflated extent scales with the same unknown per-sheet
     # factor the legitimate one does (the arithmetic is in _title_block_text,
     # next to the constant).
@@ -6152,13 +6202,13 @@ def fit_title_block_part_name(
         # a wrong one: the farm produced byte-identical 14.03 mm extents for
         # a 30-character and a 34-character name at the same size, which no
         # wrap can do. The ratio is the diagnostic -- but NOT as an integer
-        # count of lines, because the extent already carries a line of
-        # leading: a wrap adds one LINE_SPACING_EM, which reads as 1.49x on
-        # the tallest measured sheet and 1.54x on the one that actually
-        # wrapped (cone_tip_adjuster), never 2x. A ratio near 1.205 with no
-        # wrap in sight is the whole note scaled by a height written in the
-        # wrong unit, and that one is identical for names that do and do not
-        # wrap.
+        # count of lines, because the extent already carries a line of empty
+        # reserve below the ink: a wrap spends that reserve and adds one
+        # LINE_SPACING_EM under it, which reads as 1.49x on the tallest
+        # measured sheet and 1.54x on the one that actually wrapped
+        # (cone_tip_adjuster), never 2x. A ratio near 1.205 with no wrap in
+        # sight is the whole note scaled by a height written in the wrong
+        # unit, and that one is identical for names that do and do not wrap.
         raise RuntimeError(
             f"sheet {sheet_name!r} PART name {expected_name!r} renders "
             f"{height_mm / one_line_mm:.3f}x taller than one line: note extent "
@@ -6166,11 +6216,28 @@ def fit_title_block_part_name(
             f"back (requested {fit.point_size} pt), where one line at that size "
             f"is {one_line_mm:.2f} mm"
         )
-    if bottom < field.cell_bottom_mm - 0.5:
+    # What must clear the cell's lower rule is the TEXT, so that is what this
+    # compares. Using the extent's own bottom edge refuses correct drawings:
+    # the box is top-anchored and its lower edge is empty reserve, so it
+    # descends with the point size while the ink does not move much, and the
+    # rule "box bottom >= 35.88 mm" is satisfiable on the landscape template
+    # only below about 9.2 pt -- an illegible title block. It refused all 18
+    # fitted sheets of the 4c5a4322 build by 0.53 mm at 11 pt through 4.11 mm
+    # at 16 pt, including two sheets fitted AT the template's authored 16 pt,
+    # whose ink therefore sits exactly where the 77 unfitted sheets print it.
+    #
+    # A real hang is still caught, and with room to spare: a second line puts
+    # the ink one LINE_SPACING_EM lower, 5.6 mm at 16 pt, which is eleven
+    # times the 0.5 mm this keeps in hand. The slack is for the reserve
+    # constant's own error (the two measured top families differ by 0.012 em,
+    # 0.07 mm), not for a line of text.
+    if ink_bottom_mm < field.cell_bottom_mm - 0.5:
         raise RuntimeError(
             f"sheet {sheet_name!r} PART name {expected_name!r} hangs below its "
-            f"cell: note extent bottom {bottom:.2f} mm < rule at "
-            f"{field.cell_bottom_mm:.2f} mm (this is what collides with DWG. NO.)"
+            f"cell: lowest ink {ink_bottom_mm:.2f} mm < rule at "
+            f"{field.cell_bottom_mm:.2f} mm (extent box bottom {bottom:.2f} mm "
+            f"plus {EXTENT_BOTTOM_RESERVE_EM:g} em of reserve at "
+            f"{applied_pts:g} pt; this is what collides with DWG. NO.)"
         )
     # Only the note's POSITION and HEIGHT are measured geometry; SolidWorks
     # ESTIMATES a note's extent WIDTH (see cad/docs/solidworks-drawing-layout-

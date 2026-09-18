@@ -81,68 +81,108 @@ CAP_HEIGHT_EM = 0.718
 DESCENDER_EM = 0.307
 
 # Measured: two-line sheets place consecutive baselines exactly one em apart.
+# Re-derived from the release PDFs' text matrices (the recipe is under
+# EXTENT_BOTTOM_RESERVE_EM): 38.3648, 32.7204 and 27.0759 mm, differences of
+# 5.6444 mm = 16 pt to four decimals.
 LINE_SPACING_EM = 1.0
 
 # What INote::GetExtent reports for a note that occupies ONE line, in ems of
 # the size the note reports back.
 #
-# The extent is NOT the glyph box. SolidWorks anchors a note's extent on the
-# descender and reserves a full line pitch of leading above the line it
-# draws, so one line measures the glyph box (1.025 em = CAP_HEIGHT_EM +
-# DESCENDER_EM) plus about one LINE_SPACING_EM -- close to 2 em -- and a
-# second line adds another LINE_SPACING_EM on top of that.
+# The extent is NOT the glyph box, and it is NOT centred on it. SolidWorks
+# reports a box that is anchored at its TOP -- the note's own anchor, which
+# does not move when the size changes -- with the line's ink just under that
+# top edge and about a full line pitch of empty reserve BELOW the descender,
+# room for the next line the note does not have. So one line measures the
+# glyph box (1.025 em = CAP_HEIGHT_EM + DESCENDER_EM) plus roughly one
+# LINE_SPACING_EM, close to 2 em, and a second line consumes the reserve and
+# adds another pitch under it. Measured split, at 16 pt, where the applied
+# size equals the template's authored size and the ink is therefore exactly
+# where the v36 renders measured it (baseline 38.3648 mm):
 #
-# MEASURED, on the 15 landscape sheets whose fitted notes reported an extent
-# in the farm build of integration head c99e0026 -- every sheet the fit step
-# touched, all 15 refused by the 1.8 bound this value replaces -- after
-# 6d3704a6 removed the system-units height write
-# (em = extent_mm / (pt * MM_PER_POINT)):
+#   0.068 em  above the cap height   (box top 42.80 mm, cap top 42.42 mm)
+#   1.025 em  the ink itself         (cap top down to descender 36.63 mm)
+#   0.849 em  reserve below the ink  (descender down to box bottom 31.84 mm)
 #
-#   10.91 mm @ 15 pt  2.0617 em  slotted_screw, frame_side_screw
-#   10.52 mm @ 15 pt  1.9880 em  foot_screw, gooseneck_set_screw,
-#                                clamp_screw, swing_stop_screw,
-#                                bracket_screw, cone_lock_knob
-#    8.33 mm @ 12 pt  1.9677 em  hex_bolt, hanger_screw
-#   10.96 mm @ 16 pt  1.9417 em  fillister_screw, lag_screw,
-#                                harmonic_analyzer_assembly
-#    7.45 mm @ 11 pt  1.9198 em  cone_pivot_screw
-#    8.77 mm @ 13 pt  1.9123 em  cone_tip_adjuster
+# An earlier version of this comment put the reserve ABOVE the ink. That was
+# an inference, and it was wrong; see EXTENT_BOTTOM_RESERVE_EM, which is the
+# measurement, and which the cell-rule check needs because the box bottom
+# and the ink bottom are 4.79 mm apart at 16 pt.
 #
-# This constant is the MAXIMUM of that distribution, not its mean: the check
-# is one-sided, so the bound has to clear the tallest legitimate sheet.
+# MEASURED, on the 18 landscape sheets whose fitted notes reported an extent
+# in the farm build of 4c5a4322 -- every sheet the fit step touched, and the
+# em is the log's own figure, computed from the full-precision extent rather
+# than the 2-decimal millimetres beside it:
+#
+#   2.0626 em  10.91 mm @ 15 pt  clamp_screw, frame_side_screw,
+#                                gooseneck_set_screw, slotted_screw,
+#                                swing_stop_screw
+#   2.0411 em  11.52 mm @ 16 pt  lag_screw
+#   2.0053 em   8.49 mm @ 12 pt  hex_bolt
+#   1.9885 em  10.52 mm @ 15 pt  bracket_screw, cone_lock_knob,
+#                                cone_tip_pinch_screw, foot_screw,
+#                                thumb_screw
+#   1.9678 em   8.33 mm @ 12 pt  hanger_screw
+#   1.9419 em  10.96 mm @ 16 pt  fillister_screw, harmonic_analyzer_assembly
+#   1.9207 em   7.45 mm @ 11 pt  cone_pivot_screw, pen_set_screw
+#   1.9120 em   8.77 mm @ 13 pt  cone_tip_adjuster
+#
+# This constant is a MODEL of one line, good to about +-0.001 em, and NOT
+# the sample maximum: five sheets measure 2.0626 em, which is 0.0006 em
+# ABOVE it. They pass because what the check enforces is the PRODUCT
+# ONE_LINE_EXTENT_EM * (1 + ONE_LINE_EXTENT_TOLERANCE) = 2.1651 em, which
+# clears the tallest measured line by 5.0%. Chasing the observed maximum
+# with every build's readings is how 1.8 got here in the first place, so the
+# rule is: the constant tracks the model, the tolerance owns the margin, and
+# a reading above the constant is only news if it is above the product.
 #
 # The extent is NOT a function of the name. 'harmonic-analyzer assembly' and
 # 'Brass Fillister Head Slotted Screw' are different strings of different
-# lengths on different parts, and both measured 10.96 mm at 16 pt; while two
-# sheets carrying the SAME name ('Steel Narrow Fillister Head Slotted Screw'
-# on slotted_screw and swing_stop_screw) measured 10.91 and 10.52 mm at the
-# same 15 pt. What varies is the SHEET; what the extent depends on is the
-# size and the template. That is also why shrinking the font can never
+# lengths on different parts, and both measured 10.96 mm at 16 pt; while
+# seven sheets carrying the SAME name ('Steel Narrow Fillister Head Slotted
+# Screw') split three ways at the same 15 pt -- 10.52 mm on bracket_screw,
+# cone_tip_pinch_screw and foot_screw, 10.91 mm on clamp_screw,
+# frame_side_screw, slotted_screw and swing_stop_screw. What varies is the
+# SHEET; what the extent depends on is the size and the template. That is
+# also why shrinking the font can never
 # rescue a refused sheet: the ratio this bound is compared against is
 # scale-invariant, so the fit step's step-down loop moves the width and
 # leaves the height ratio exactly where it was.
 #
-# Six discrete values over 15 sheets, each shared to the last digit by every
-# sheet that reports it and spanning 7.8% -- a quantised distribution, not a
-# continuous spread. The quantising variable is not identified: the repo
-# ships exactly two sheet formats (cad/templates/harmonic-analyzer-
-# {landscape,portrait}.DRWDOT) and all 15 sheets use the landscape one, so it
-# is not a template revision; and GetExtent is proven to report unscaled
-# sheet millimetres (_purchased_fastener_drawing checks its own notes'
-# extents against absolute cell geometry on these very sheets), so it is not
-# sheet scale.
+# Eight discrete values over 18 sheets, each shared to the last digit by
+# every sheet that reports it and spanning 7.9% -- a quantised distribution,
+# not a continuous spread. The quantising variable is not identified, and two
+# candidates are eliminated: the repo ships exactly two sheet formats
+# (cad/templates/harmonic-analyzer-{landscape,portrait}.DRWDOT) and all 18
+# sheets use the landscape one, so it is not a template revision; and
+# GetExtent is proven to report unscaled sheet millimetres
+# (_purchased_fastener_drawing checks its own notes' extents against
+# absolute cell geometry on these very sheets), so it is not sheet scale.
+#
+# What the same build DID pin down is the box's top edge, and it splits the
+# 18 sheets into two families: extent top = bottom + height is invariant at
+# 42.80 mm on 11 sheets and at 43.28..43.29 mm on 7, across every size from
+# 11 to 16 pt. So the note is top-anchored and the box grows downward as the
+# size rises, and the two families differ by a flat 0.49 mm of sheet space
+# (not a fixed number of ems), which is also the whole of their extent-em
+# difference. Whatever moves it, it moves the BOX, and the reserve below the
+# ink is derived from the family that leaves the ink lowest.
 #
 # The sample is COMPLETE for the sheets that reached the check, not a
 # survivors' sample. The bound it replaces refused anything above
-# 1.8 x 1.05 = 1.89 em, and the smallest value here is 1.9123 em, so no
-# sheet could have reached this check and passed: every one of the 15 was
+# 1.8 x 1.05 = 1.89 em, and the smallest value here is 1.9120 em, so no
+# sheet could have reached the height check and passed: every one was
 # refused and printed its measurement. There is no taller sheet hiding
 # behind a silent pass.
 #
-# What the new logging buys is the NEXT build, not this sample: every sheet
-# that reaches the check now reports its extent with its layout (see
-# _drawing_common.fit_title_block_part_name), pass or refusal, so the
-# distribution is re-measured instead of re-argued.
+# What the logging buys is the NEXT build, not this sample: EVERY sheet now
+# reports its extent, its ratio and its ink bottom with its layout (see
+# _drawing_common.fit_title_block_part_name), fitted or not, pass or
+# refusal. The first version of that logging fired only on the fitted path,
+# which meant the only 18 sheets that could report were the 18 that failed
+# -- an instrument that cannot answer "is this value normal?", which is the
+# only question it exists to answer. The 77 untouched sheets are the control
+# population and they now report too.
 #
 # The portrait template is not in the sample, and no portrait sheet reaches
 # this check: of the 96 fleet names 18 need fitting and all 18 are
@@ -186,14 +226,14 @@ ONE_LINE_EXTENT_EM = 2.062
 #                                              em de-inflated)
 #
 # So the corridor to place the refusal in runs from the tallest legitimate
-# sheet (2.0617) to the extrapolated floor of the defect band (2.3049),
-# 11.8% wide. At this tolerance the refusal starts at 2.1651 em: 5.0% above
-# the tallest legitimate sheet, 6.1% below the floor.
+# sheet (2.0626) to the extrapolated floor of the defect band (2.3049),
+# 11.7% wide. At this tolerance the refusal starts at 2.1651 em: 5.0% above
+# the tallest legitimate sheet, 6.5% below the floor.
 #
 # The bounds on editing it, since all three were once stated wrongly here:
 #
 # * 0.1178 is where a defective sheet gets through (2.3049/2.062 - 1). Not
-#   0.058: that is sqrt(2.3049/2.0617) - 1, the geometric midpoint of the
+#   0.057: that is sqrt(2.3049/2.0626) - 1, the geometric midpoint of the
 #   corridor -- where the split stops being even, which is not the same
 #   thing as where the guard stops working. 0.205 is where the lowest
 #   OBSERVED defect (2.4850) gets through.
@@ -206,12 +246,94 @@ ONE_LINE_EXTENT_EM = 2.062
 #   not half a point.
 #
 # Note that the tests defend the PRODUCT, ONE_LINE_EXTENT_EM * (1 + this),
-# which has to land in (2.0617, 2.3049]. They do not pin either factor: all
-# six readings pass at a constant of 2.0 as well (2.0617/2.0 = 1.031 < 1.05).
-# Simplifying the constant and staying green is therefore possible -- and
-# the reason not to is that the constant is a MEASUREMENT with a provenance
+# which has to land in (2.0626, 2.3049]. They do not pin either factor: all
+# eight readings pass at a constant of 2.0 as well (2.0626/2.0 = 1.031 <
+# 1.05). Simplifying the constant and staying green is therefore possible --
+# and the reason not to is that the constant is a MODEL with a provenance
 # and the tolerance is a decision about how much of the corridor to spend.
 ONE_LINE_EXTENT_TOLERANCE = 0.05
+
+# How much of the extent box sits BELOW the ink, in ems of the size the note
+# reports back. The cell-rule check needs this because GetExtent's bottom
+# edge is not where the text is: it is one line pitch of empty reserve
+# lower, so comparing the box bottom against the cell's lower rule compares
+# padding against ruled geometry.
+#
+# MEASURED, at the one size where the ink's position is known independently.
+# fillister_screw and harmonic_analyzer_assembly fit at 16 pt, which is the
+# template's own authored size: the applier widens their LineLength and
+# writes the same 16 pt back, so their ink is in exactly the place the v36
+# renders measured (baseline 38.3648 mm) and in exactly the place the 77
+# untouched sheets print it. Their extent bottom came back at 31.84 mm, so
+#
+#   reserve = (38.3648 - 31.84) / (16 * MM_PER_POINT) - DESCENDER_EM
+#           = 1.1560 - 0.307 = 0.8490 em
+#
+# The second top family (lag_screw, extent bottom 31.77 mm at 16 pt) gives
+# 0.8614 em by the same arithmetic. This constant takes the SMALLER of the
+# two, which is the conservative direction: it predicts the ink lower than
+# it is, so the check refuses sooner rather than later.
+#
+# Corroborated independently of both: the total padding the box carries is
+# then 1.025 em of ink inside a 1.9419 em box, i.e. 0.917 em of empty space,
+# which is one LINE_SPACING_EM to within 8% -- and LINE_SPACING_EM was
+# measured from two-line baselines on the v36 renders, with no reference to
+# any extent. The reserve is one line's worth of room for the line that is
+# not there. cone_tip_adjuster's wrapped extent agrees: 17.54 mm for two
+# lines at 13 pt requested implies a rendered size 1.296x the request, which
+# lands inside the 1.2053..1.3261 system-units inflation measured on other
+# sheets in that same build.
+#
+# Where 38.3648 mm comes from, since this whole check now rests on it: the
+# release PDFs themselves, and it is RE-DERIVABLE in a dozen lines of
+# Python with no seat and no SolidWorks. Each sheet in cad/out/pdf is a
+# native vector PDF; inflate its content stream, tokenise the text objects,
+# and the PART value is the 16 pt run whose text matrix starts at
+# x = 312.442 mm. Its Tm f component IS the baseline. Re-derived here over
+# all 96: 53 sheets carry that run and every one of them reports
+# 38.3648 mm, identical to four decimals -- the template authors it, so it
+# does not vary by sheet or by name.
+#
+# The same extraction re-derives LINE_SPACING_EM and finds the defect this
+# module exists for: 18 of the 96 print a SECOND 16 pt run at 32.7204 mm
+# (exactly one em lower, which is the 1.0 above) and three of those print a
+# third at 27.0759 mm. Eighteen wrapped sheets in the renders, eighteen
+# sheets the fit step touches -- the two populations are the same one.
+#
+# NOT derived from the sheets it exonerates. The 18 refusals were at 11..16
+# pt and the arithmetic above uses only the two 16 pt sheets, whose applied
+# size equals the authored size -- the single case where the ink's position
+# is a v36 measurement rather than an inference from this box.
+#
+# PROPORTIONAL TO THE EM, which is a model and not a second measurement:
+# there is no sheet at a second size where the ink is independently known,
+# because 16 pt IS the template's authored size and every other fitted size
+# is one the applier chose. What backs it:
+#
+# * The box as a whole scales with the em. Regressing the 18 measured
+#   heights on em within a top family gives extent = 2.023*em - 0.36 mm
+#   (family A, residual sigma 0.16 mm), and the fixed term's standard error
+#   is 0.53 mm -- so any size-independent component of the box is zero to
+#   within about half a millimetre. A reserve fixed at its 16 pt value
+#   instead would be 1.5 mm out at 11 pt, three times that bound.
+# * Cap height and descender are font metrics, proportional by definition,
+#   and this reserve is one LINE_SPACING_EM of the same kind of space.
+# * Below 16 pt the proportional reserve is the SMALLER of the two
+#   candidate models in millimetres (3.29 mm at 11 pt against a fixed
+#   4.79 mm), so it is also the conservative one -- and the fit step never
+#   goes ABOVE 16 pt, since it only ever steps DOWN from the authored size.
+#   The proportional model is therefore the lower bound at every size the
+#   applier can produce, and exact at the size it was measured at.
+# * It cannot change a verdict on the measured population either way: at
+#   11..15 pt the tightest margin against the enforced threshold is 1.39 mm,
+#   which no 0.53 mm uncertainty crosses, and at 16 pt the two models are
+#   the same number.
+#
+# So: measured at 16 pt, assumed proportional, unverified below it. If a
+# future build ever wants that verified, the discriminating sheet is one
+# whose ink position is known independently at a second size -- which today
+# means a template authored at something other than 16 pt.
+EXTENT_BOTTOM_RESERVE_EM = 0.848
 
 # Glyph advances in 1/1000 em, from the ``/W`` array of the Century Gothic CID
 # subset embedded in the v36 release PDFs. ASCII only: the CID-to-character

@@ -102,6 +102,32 @@ templates author in points. The DRWDOT binary is never written; the edit
 lives in the SLDDRW. A name that already fits the note's authored box keeps
 its ink: the note is read, but no format is written.
 
+What `GetExtent` reports is not the glyph box: it is top-anchored, with the
+ink just under the top edge and about a full line pitch of empty reserve
+BELOW the descender — room for the line the note does not have. So one line
+measures 1.91–2.06 em rather than the 1.025 em of ink, and the box's lower
+edge sits 4.79 mm below the text at 16 pt. Both checks read that correctly:
+the height is compared against a one-line model of 2.062 em (+5%), and the
+cell's lower rule is compared against the note's INK,
+`extent bottom + EXTENT_BOTTOM_RESERVE_EM × em`. Comparing the box's own
+bottom edge instead refuses every legible title block — the 4c5a4322 build
+refused all 18 fitted sheets that way, by 0.53 mm at 11 pt to 4.11 mm at
+16 pt, and that rule is satisfiable on this template only below about
+9.2 pt. The reserve (0.848 em) is measured on the two sheets whose fitted
+size equals the template's authored 16 pt, where the ink's position is known
+independently from the release PDFs' own text matrices; the provenance, the
+re-derivation recipe and the proportionality argument are beside the constant
+in `_title_block_text`.
+
+Every sheet with a PART note now measures its extent and logs it — fitted or
+not, pass or refusal, as a `title_block.extent` span event carrying the box
+edges, the ink bottom and the rule. Only a FITTED sheet can be refused by it:
+an untouched note is what v36 shipped, and a measurement added afterwards has
+no standing to fail it. The first version of that logging fired only on the
+fitted path, so the only sheets that could report were the ones that failed,
+which cannot answer "is this reading normal?" — the 77 untouched sheets are
+the control population.
+
 The width model is the template font's own glyph advances, taken from the
 Century Gothic CID subset embedded in the released PDFs. **If the title block
 moves, the cell is resized, or its font changes, re-measure**: the field
