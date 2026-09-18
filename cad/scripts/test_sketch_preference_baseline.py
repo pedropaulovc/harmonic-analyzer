@@ -854,7 +854,7 @@ def test_the_snap_family_is_recorded_and_never_written(monkeypatch) -> None:
     assert "CenterPoints=True" in logged[0] and "Nearest=True" in logged[0]
 
 
-def test_a_snap_member_this_build_does_not_expose_reads_as_unknown(
+def test_a_snap_member_this_build_cannot_read_is_recorded_as_unknown(
     monkeypatch,
 ) -> None:
     """A refused read must be None, not a crash and not a silent False.
