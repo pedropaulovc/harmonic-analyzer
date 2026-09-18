@@ -34,16 +34,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
+    capture_com_failure,
     check,
     name_last_feature,
     volume_check,
 )
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
+    draw_closed_profile,
     insert_helix,
     offset_plane,
     replica_main,
     thread_sweep_cut,
+)
+from diagnostics.sketch_profile import (  # noqa: E402
+    Line,
+    Segment,
+    minor_arc,
 )
 
 TS_MAJOR_R = 2.8448 / 2.0
@@ -53,6 +60,39 @@ TS_SH_R = 5.953125 / 2.0
 TS_SH_H = 3.175
 TS_HEAD_R = 7.540625 / 2.0
 TS_HEAD_H = 3.175
+
+# --- flare lens (Cut-Revolve1) -----------------------------------------------
+# The vendor's equations: D1 = ShoulderLen * 0.2 = 0.635 sets the axial span,
+# D2 = D1 * 0.75 = 0.47625 raises the arc centre above the shoulder OD.  The
+# lens is a chord along the shoulder OD closed by an arc that dips toward the
+# axis, revolved as a cut.
+TS_FLARE_D2 = 0.47625
+TS_FLARE_Z0 = 0.635
+TS_FLARE_Z1 = 3.175
+TS_FLARE_CENTRE = (TS_SH_R + TS_FLARE_D2, (TS_FLARE_Z0 + TS_FLARE_Z1) / 2.0)
+
+
+def flare_profile() -> tuple[Segment, ...]:
+    """The flare lens: the shoulder-OD chord, closed by the dipping arc.
+
+    The two segments share both endpoints, which are written as the SAME
+    expressions in both, so they are bit-identical doubles and pair exactly.
+
+    The arc is authored by CENTRE, not through a rounded mid-point.  The old
+    three-point form passed ``(2.096452, 1.905)`` as its mid-point -- the
+    true minimum-radius point is ``2.0964519054308415``, so the arc SolidWorks
+    fitted was 9.5e-8 mm off the intended circle and its realised endpoints
+    were re-solved rather than taken verbatim.  Centre + endpoints puts the
+    radius exactly where the vendor equation puts it.
+
+    Pure: no COM, no adapter.
+    """
+    lower = (TS_SH_R, TS_FLARE_Z0)
+    upper = (TS_SH_R, TS_FLARE_Z1)
+    return (
+        Line(lower, upper),
+        minor_arc(TS_FLARE_CENTRE, lower, upper),
+    )
 
 
 async def build_99607A213(adapter, truth=None):
@@ -78,9 +118,9 @@ async def build_99607A213(adapter, truth=None):
     # --- shank with tip chamfer ---------------------------------------------
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
-        raise RuntimeError("99607 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
+            raise RuntimeError("99607 shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
@@ -127,48 +167,31 @@ async def build_99607A213(adapter, truth=None):
                        v_shank + v_sh + v_head, 0.005 * v_head)
 
     # --- flare: revolve-cut the chord+arc lens off the shoulder -------------
-    # Arc centre sits over the chord midpoint (axial 1.905), raised
-    # D2 = 0.47625 above the shoulder radius; endpoints on the shoulder OD
-    # at axial 0.635 and 3.175.  The lens dips to radius 2.096452.
+    # Geometry and its derivation: :func:`flare_profile` (module level, so the
+    # offline closure test asserts against the real thing).
+    #
+    # Inference must stay OFF here for a reason this file recorded the hard
+    # way: the lens endpoints lie exactly ON the shoulder-OD silhouette, and
+    # pixel-snapping MOVED the lower one (0.635 became 0.5, observed as a
+    # 1.5 mm^2 torus-area drift).  What this block used to do about the
+    # resulting open profile was merge the endpoints through
+    # ``IModelDoc2.SketchAddConstraints("sgMERGEPOINTS")`` -- which SILENTLY
+    # NO-OPS on SW 2026/3DEXPERIENCE (see the note on
+    # ``_add_sketch_constraint_impl`` in the MCP sketch adapter).  So the
+    # nearest-endpoint search, the selection dance and the constraint call
+    # were all dead code, and this profile has been closing on nothing but
+    # coincident coordinates and a tolerant revolve.  ``draw_closed_profile``
+    # relates the endpoints through ``ISketchRelationManager.AddRelation``,
+    # which does not no-op, and CHECKS each relation.
     check("create_sketch flare", await adapter.create_sketch("Front"))
-    sk2 = adapter.currentSketchManager
-    if sk2.CreateCenterLine(0.0, 0.0, 0.0, 0.0, 1.0 / 1000.0, 0.0) is None:
-        raise RuntimeError("flare centerline failed")
-    # Inference must stay OFF -- the lens endpoints lie exactly ON the
-    # shoulder-OD silhouette and pixel-snapping MOVED the lower one (0.635
-    # became 0.5, observed as a 1.5 mm^2 torus-area drift).  But without
-    # inference the line<->arc endpoints never merge and the revolve cut
-    # fails on the open profile, so merge each endpoint pair explicitly
-    # through the segments' own point objects (sgMERGEPOINTS).
     with no_sketch_inference(adapter):
-        line = sk2.CreateLine(TS_SH_R / 1000.0, 0.635 / 1000.0, 0.0,
-                              TS_SH_R / 1000.0, 3.175 / 1000.0, 0.0)
-        if line is None:
-            raise RuntimeError("flare chord failed")
-        arc = sk2.Create3PointArc(TS_SH_R / 1000.0, 0.635 / 1000.0, 0.0,
-                                  TS_SH_R / 1000.0, 3.175 / 1000.0, 0.0,
-                                  2.096452 / 1000.0, 1.905 / 1000.0, 0.0)
-        if arc is None:
-            raise RuntimeError("flare arc failed")
-        model = _early_bound(adapter.currentModel, "IModelDoc2")
-        for la in ("GetStartPoint2", "GetEndPoint2"):
-            lp = _early_bound(getattr(_early_bound(line, "ISketchLine"),
-                                      la)(), "ISketchPoint")
-            best, best_d = None, 1e9
-            for name in ("GetStartPoint2", "GetEndPoint2"):
-                ap = _early_bound(getattr(_early_bound(arc, "ISketchArc"),
-                                          name)(), "ISketchPoint")
-                d = (float(_read_member(ap, "X"))
-                     - float(_read_member(lp, "X"))) ** 2 + \
-                    (float(_read_member(ap, "Y"))
-                     - float(_read_member(lp, "Y"))) ** 2
-                if d < best_d:
-                    best, best_d = ap, d
-            model.ClearSelection2(True)
-            if not lp.Select4(False, None) or not best.Select4(True, None):
-                raise RuntimeError("flare endpoint selection failed")
-            model.SketchAddConstraints("sgMERGEPOINTS")
-        model.ClearSelection2(True)
+        # Revolve axis: raw construction geometry, drawn under the same
+        # suppression as the profile so it cannot snap to the silhouette
+        # either.
+        if adapter.currentSketchManager.CreateCenterLine(
+                0.0, 0.0, 0.0, 0.0, 1.0 / 1000.0, 0.0) is None:
+            raise RuntimeError("flare centerline failed")
+    await draw_closed_profile(adapter, flare_profile(), label="flare lens", loops=1)
     check("exit_sketch flare", await adapter.exit_sketch())
     name_last_feature(adapter, "FlareProfile")
     check("flare cut", await adapter.create_revolve(
@@ -197,9 +220,10 @@ async def build_99607A213(adapter, truth=None):
 
     offset_plane(adapter, "TipPlane", tip_y)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, (TS_LEN + pitch) / pitch, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
@@ -244,7 +268,13 @@ async def build_99607A213(adapter, truth=None):
         True, False, True,               # Merge -> re-unites the bodies
         0, 0.0, False)
     if feat is None:
-        raise RuntimeError("runout extrude failed")
+        capture_com_failure(
+            adapter,
+            "runout-extrude",
+            "runout extrude failed",
+            api="IFeatureManager.FeatureExtrusion3",
+            sketch="RunoutProfile",
+        )
     name_last_feature(adapter, "ThreadRunout")
     v_after_thread = mass_properties(adapter)["volume_mm3"]
     _telemetry.info(f"post-thread volume: {v_after_thread}")
@@ -311,7 +341,13 @@ async def build_99607A213(adapter, truth=None):
         if feat is not None:
             break
     if feat is None:
-        raise RuntimeError("knurl stripe cut failed (all flag combos)")
+        capture_com_failure(
+            adapter,
+            "knurl-stripe-cut",
+            "knurl stripe cut failed (all flag combos)",
+            api="IFeatureManager.FeatureCut4",
+            sketch="KnurlStripe",
+        )
     name_last_feature(adapter, "KnurlGroove")
     v_knurl1 = mass_properties(adapter)["volume_mm3"]
     _telemetry.info(f"one-groove volume: {v_knurl1} "

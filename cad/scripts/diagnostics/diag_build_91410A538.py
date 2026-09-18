@@ -67,10 +67,10 @@ async def build_91410A538(adapter, truth=None):
     # --- shank + cup point ---------------------------------------------------
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, 0.0, 0.0,
-                           0.0, -SQ_LEN / 1000.0, 0.0) is None:
-        raise RuntimeError("91410 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, 0.0, 0.0,
+                               0.0, -SQ_LEN / 1000.0, 0.0) is None:
+            raise RuntimeError("91410 shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
@@ -91,10 +91,10 @@ async def build_91410A538(adapter, truth=None):
     # --- head revolve (OD cylinder + 75-deg chamfer cones) -------------------
     check("create_sketch head", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, 0.0, 0.0,
-                           0.0, SQ_HH / 1000.0, 0.0) is None:
-        raise RuntimeError("91410 head: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, 0.0, 0.0,
+                               0.0, SQ_HH / 1000.0, 0.0) is None:
+            raise RuntimeError("91410 head: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, SQ_HH),
             (major_r, SQ_HH),
@@ -171,9 +171,10 @@ async def build_91410A538(adapter, truth=None):
     # --- tip-seeded ascending helix, L+P (vendor stores start angle 90) -----
     offset_plane(adapter, "TipPlane", -SQ_LEN)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, SQ_LEN / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
@@ -197,10 +198,10 @@ async def build_91410A538(adapter, truth=None):
     taper_h = (major_r - root_r) / math.sqrt(3.0)
     check("create_sketch runout", await adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
-    if sk2.CreateCenterLine(0.0, 0.0, 0.0,
-                            0.0, -taper_h / 1000.0, 0.0) is None:
-        raise RuntimeError("runout: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk2.CreateCenterLine(0.0, 0.0, 0.0,
+                                0.0, -taper_h / 1000.0, 0.0) is None:
+            raise RuntimeError("runout: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),

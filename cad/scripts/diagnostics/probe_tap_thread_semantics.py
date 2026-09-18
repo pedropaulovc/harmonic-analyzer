@@ -34,6 +34,7 @@ from _drawing_common import (
 from _drawing_registry import DrawingLayout
 from _hole_spec import HoleSpec
 from _holes import blind_hole_volume_mm3, wizard_holes
+from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from solidworks_mcp.adapters.base import ExtrusionParameters
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -163,8 +164,9 @@ async def build(adapter, output):
                     sm = _early_bound(
                         adapter.currentModel.SketchManager, "ISketchManager"
                     )
-                    if sm.CreateCornerRectangle(-0.01, -0.01, 0, 0.01, 0.01, 0) is None:
-                        raise RuntimeError("rectangle creation failed")
+                    with no_sketch_inference(adapter):
+                        if sm.CreateCornerRectangle(-0.01, -0.01, 0, 0.01, 0.01, 0) is None:
+                            raise RuntimeError("rectangle creation failed")
                     check("close sketch", await adapter.exit_sketch())
                     check(
                         "extrude plate",

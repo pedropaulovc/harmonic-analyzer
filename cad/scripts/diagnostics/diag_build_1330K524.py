@@ -443,11 +443,12 @@ async def _sketch_on(
 def _circle(adapter, u_mm: float, v_mm: float, radius_mm: float, label: str) -> None:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.SketchManager, "ISketchManager")
-    circle = manager.CreateCircleByRadius(
-        u_mm / 1000.0, v_mm / 1000.0, 0.0, radius_mm / 1000.0
-    )
-    if circle is None:
-        raise RuntimeError(f"{label}: CreateCircleByRadius failed")
+    with no_sketch_inference(adapter):
+        circle = manager.CreateCircleByRadius(
+            u_mm / 1000.0, v_mm / 1000.0, 0.0, radius_mm / 1000.0
+        )
+        if circle is None:
+            raise RuntimeError(f"{label}: CreateCircleByRadius failed")
 
 
 def _helix(
