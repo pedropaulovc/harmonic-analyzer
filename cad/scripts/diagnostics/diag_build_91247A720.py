@@ -378,9 +378,21 @@ async def build_91247A720(adapter, truth=None):
     # orients the view -- px/mm is inherited from the part template and the
     # window size, per seat, unasserted and unrecorded (see
     # diagnostics/exp_inference_zoom.py, which measured it).  And the sketch's
-    # OWN points are snap candidates too: each inner-triangle vertex IS an
-    # outer corner arc's centre, so it sits 0.400 mm from four outer-loop
-    # points -- 2.25x tighter than the model clearance that was checked.
+    # OWN points are snap candidates too, not just model silhouettes: each
+    # inner-triangle vertex IS an outer corner arc's centre -- arc centres are
+    # a first-class snap target (swSketchSnapsCenterPoints) -- so every outer
+    # arc endpoint has a competitor at exactly 0.400 mm, and at each corner the
+    # competitor is THREE coincident targets (the centre plus the two inner
+    # endpoints meeting there) against one correct partner at 0 mm.  Of the 24
+    # snap targets in this profile, 15 pairs are exactly coincident and 69 more
+    # sit within 0.75 mm.
+    #
+    # 0.400 mm is not merely tighter than the 0.898 mm that was audited -- it is
+    # 0.53x a snap distance this codebase has WATCHED fire: a rectangle corner
+    # authored 0.75 mm off the origin snapped back to 0 with inference on and
+    # rebuilt the untrimmed shape with no error at all, caught only by a volume
+    # gate (memory/solidworks-modeling-pitfalls.md:145-150).  That is what makes
+    # the old comment's conclusion unsound rather than just unproven.
     #
     # Closure is now AUTHORED and has no pixel term: segments go straight to
     # the sketch database, arcs are centre-based rather than re-fitted from
