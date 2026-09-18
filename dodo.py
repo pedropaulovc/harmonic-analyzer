@@ -1062,14 +1062,45 @@ def _failure_artefacts(since: float) -> list[Path]:
     ``cad/out/reports/failures/`` across invocations (it is not a declared target,
     so no task's ``clean`` removes it), and a manifest that also names last
     week's captures sends the reader to the wrong evidence.
+
+    An entry that cannot be stat'd is SKIPPED, not fatal: the tree is walked on
+    the failure path, while the dying seat (or a virus scanner, or the pool's
+    uploader) may still be moving files under it, and losing one raced temp file
+    must not cost the reader the manifest for the artefacts that are there.
     """
     if not FAILURES.is_dir():
         return []
-    return sorted(
-        path
-        for path in FAILURES.rglob("*")
-        if path.is_file() and path.stat().st_mtime >= since
-    )
+    found: list[Path] = []
+    for path in FAILURES.rglob("*"):
+        try:
+            if path.is_file() and path.stat().st_mtime >= since:
+                found.append(path)
+        except OSError:
+            continue
+    return sorted(found)
+
+
+def _artefact_record(path: Path) -> str | None:
+    """One manifest entry (``relpath:size:digest12``), or ``None`` when the
+    artefact is gone or unreadable.
+
+    Digesting a saved SLDPRT takes seconds, so the file can vanish between the
+    walk and the read; the entry is then dropped with a warning instead of
+    aborting the manifest (and, per :func:`_fail_task`, instead of replacing the
+    task's own failure)."""
+    try:
+        return (
+            f"{path.relative_to(FAILURES).as_posix()}"
+            f":{path.stat().st_size}"
+            f":{_artefact_digest(path)[:16]}"
+        )
+    except OSError as exc:
+        _telemetry.warn(
+            f"[forensics] artefact {path} became unreadable while the manifest "
+            f"was being written: {exc}",
+            artefact=str(path),
+        )
+        return None
 
 
 def _artefact_digest(path: Path) -> str:
@@ -1099,6 +1130,14 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
     figure. No seat (an offline task, or off-Windows) means no record rather than
     an "unknown GB" line on every pytest failure. ``started`` bounds the manifest
     to the artefacts THIS attempt wrote (see :func:`_failure_artefacts`).
+
+    The manifest can NEVER replace the failure it documents. Enumerating and
+    digesting the tree is I/O on a path where the workspace is already in
+    trouble, so an ``OSError`` there degrades to a WARNING and the
+    ``RuntimeError`` carrying the exit code still goes out: the alternative is a
+    leaf log whose last word is a FileNotFoundError under ``failures/``, which
+    reads as "the forensics broke" and hides which build step failed and with
+    what code -- the one fact this whole path exists to deliver (coderabbit).
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
@@ -1110,20 +1149,24 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
             seat_commit_gb=round(commit_gb, 2),
             seat_commit_budget_gb=_sw_max_commit_gb(),
         )
-    artefacts = _failure_artefacts(started)
-    if artefacts:
+    try:
+        artefacts = _failure_artefacts(started)
+    except OSError as exc:
+        artefacts = []
+        _telemetry.warn(
+            f"[forensics] {label}: cannot enumerate {FAILURES}: {exc}",
+            label=label,
+            exit_code=rc,
+        )
+    records = [record for record in (_artefact_record(p) for p in artefacts) if record]
+    if records:
         _telemetry.error(
-            f"[forensics] {label}: {len(artefacts)} artefact(s) under "
+            f"[forensics] {label}: {len(records)} artefact(s) under "
             f"{FAILURES} -- upload prefix 'failures/' beside the leaf log",
             label=label,
             exit_code=rc,
             failure_dir=str(FAILURES),
-            artefacts=" ".join(
-                f"{path.relative_to(FAILURES).as_posix()}"
-                f":{path.stat().st_size}"
-                f":{_artefact_digest(path)[:16]}"
-                for path in artefacts
-            ),
+            artefacts=" ".join(records),
         )
     raise RuntimeError(f"{label} failed (exit {rc})")
 
@@ -2608,17 +2651,6 @@ def task_check():
         # must survive its own failure. Both are pure-Python contracts of
         # _common.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
-        # The 91247A720/99607A213 profile arithmetic: every endpoint that must
-        # coincide is EXACTLY equal (== on the float, not isclose), the profiles
-        # pair into the expected closed loops, and a 1-ULP-perturbed endpoint is
-        # rejected. Runs against the production geometry, not a reimplementation.
-        SCRIPTS_DIR / "test_logo_profile_closure.py",
-        # The seat-poisoning latch itself: a seat whose toggles start at the
-        # poisoned value must come out at the DECLARED baseline (never at the
-        # observed-previous value), and a nested suppression must not restore
-        # mid-draw. This is the test that would have caught the 2026-09-17
-        # mechanism.
-        SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",

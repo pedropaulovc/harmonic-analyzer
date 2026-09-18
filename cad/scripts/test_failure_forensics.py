@@ -33,6 +33,7 @@ from __future__ import annotations
 import contextlib
 import json
 import ctypes
+import importlib.util
 import io
 import logging
 import re
@@ -97,10 +98,7 @@ class _Sketch:
         return 2  # swUnderConstrained
 
     def GetSketchPoints2(self) -> list[object]:
-        return [
-            type("_P", (), {"X": x, "Y": y, "Z": z})()
-            for x, y, z in self._points
-        ]
+        return [type("_P", (), {"X": x, "Y": y, "Z": z})() for x, y, z in self._points]
 
 
 class _Model:
@@ -155,7 +153,9 @@ class _View:
         # Metres: a 100 mm x 80 mm visible region centred on the origin.
         return [-0.05, -0.04, -0.01, 0.05, 0.04, 0.01]
 
-    def ProjectModelPoint(self, x: float, y: float, z: float) -> tuple[int, float, float, float]:
+    def ProjectModelPoint(
+        self, x: float, y: float, z: float
+    ) -> tuple[int, float, float, float]:
         # [out] params ride the return tuple under early binding.
         return 0, x * 1000.0 * self._px, y * 1000.0 * self._px, 0.0
 
@@ -416,7 +416,10 @@ def test_merged_profile_reports_no_coincident_pairs(tmp_path):
     adapter = _unmerged_profile(tmp_path)
     with pytest.raises(RuntimeError):
         _common.capture_com_failure(
-            adapter, "logo-ring-extrude", "boom", sketch=_Sketch(contours=1, points=corners)
+            adapter,
+            "logo-ring-extrude",
+            "boom",
+            sketch=_Sketch(contours=1, points=corners),
         )
 
     sketch = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())["sketch"]
@@ -457,7 +460,9 @@ def test_capture_emits_one_error_log_and_bounded_span_events(
             "logo ring extrude failed",
             api="IFeatureManager.FeatureExtrusion3",
             # 40 sketch points must NOT become 40 span events.
-            sketch=_Sketch(contours=0, points=[(0.001 * n, 0.0, 0.0) for n in range(40)]),
+            sketch=_Sketch(
+                contours=0, points=[(0.001 * n, 0.0, 0.0) for n in range(40)]
+            ),
         )
 
     (sp,) = [s for s in spans.get_finished_spans() if s.name.startswith("com.failure ")]
@@ -655,6 +660,7 @@ def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
     class _User32:
         def __getattr__(self, name):
             if name in rects:
+
                 def fill(hwnd, pointer, _name=name):
                     rect = ctypes.cast(pointer, ctypes.POINTER(_common._Rect))[0]
                     rect.left, rect.top, rect.right, rect.bottom = rects[_name]
@@ -903,10 +909,15 @@ def test_enforce_on_a_clean_seat_is_silent(capture_telemetry):
     spans, logs = capture_telemetry
     adapter = _preference_adapter({_SW_SKETCH_INFERENCE: True})
 
-    assert _common.enforce_preferences(
-        adapter,
-        _common.PreferenceSpec(label="test-clean", toggles={"swSketchInference": True}),
-    ) == {}
+    assert (
+        _common.enforce_preferences(
+            adapter,
+            _common.PreferenceSpec(
+                label="test-clean", toggles={"swSketchInference": True}
+            ),
+        )
+        == {}
+    )
     assert not [
         r for r in logs.get_finished_logs() if r.log_record.severity_text == "WARN"
     ]
@@ -1041,9 +1052,7 @@ def test_a_closure_verdict_that_cannot_be_read_never_raises(capture_telemetry):
         def __getattr__(self, name):
             raise OSError("RPC_E_DISCONNECTED")
 
-    verdict = _common.record_sketch_closure(
-        _Adapter(sw=_Seat()), "logo", _Hostile()
-    )
+    verdict = _common.record_sketch_closure(_Adapter(sw=_Seat()), "logo", _Hostile())
 
     assert verdict["closure"] == "unknown"
 
@@ -1150,6 +1159,136 @@ def test_success_path_context_never_fails_a_good_build(tmp_path, monkeypatch):
     assert "no IModelView wrapper bound" in context["preferences"]["capture_error"]
     # The bags that CAN be read are still read: a broken probe is not a blackout.
     assert context["sketch_manager"]["AddToDB"] is True
+
+
+# --- The doit parent's half of the same contract ---------------------------
+# capture_com_failure runs inside the dying COM child. The MANIFEST that tells
+# the submitter which artefacts to pull (path:size:sha256) is emitted by the
+# doit parent in ``dodo._fail_task``, after that child's log has closed, and it
+# is the parent that raises the ``RuntimeError`` carrying the exit code. Same
+# rule across the process boundary: the diagnostic may never replace the
+# failure it documents. Enumerating and digesting that tree is real I/O on a
+# workspace the dying seat (and the pool's uploader) is still churning, so
+# every raise site on that path is pinned here.
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dodo() -> Any:
+    """``dodo.py`` is doit's task file at the repo root, loaded by path rather
+    than importable by name (same loader as test_dodo_recipe.py)."""
+    spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+    assert spec is not None and spec.loader is not None, (
+        f"could not locate dodo.py under {REPO_ROOT}"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def dodo_failures(tmp_path, monkeypatch):
+    """``dodo`` with its failure tree redirected into ``tmp_path`` and no seat.
+
+    ``_sw_commit_gb`` is pinned to ``None`` (the offline answer: no sldworks.exe
+    to charge), so these tests read only the manifest records.
+    """
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo, "FAILURES", tmp_path / "failures")
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: None)
+    return dodo
+
+
+def test_a_vanished_artefact_never_replaces_the_task_failure(
+    dodo_failures, capture_telemetry, monkeypatch
+):
+    """Digesting a saved SLDPRT is a multi-second read of tens of MB, so the
+    file can be gone before ``open()`` -- and an OSError escaping the manifest
+    would end the leaf log in a FileNotFoundError under ``failures/`` instead of
+    naming the step and its exit code, which is the one fact the pool's uploaded
+    ``task.log`` exists to carry (coderabbit).
+    """
+    dodo = dodo_failures
+    _spans, logs = capture_telemetry
+    capture = dodo.FAILURES / "logo-ring-extrude" / "capture.json"
+    capture.parent.mkdir(parents=True)
+    capture.write_bytes(b'{"api": "IFeatureManager.FeatureExtrusion3"}')
+    (dodo.FAILURES / "logo-ring-extrude" / "failing.SLDPRT").write_bytes(b"\0" * 4096)
+    real_digest = dodo._artefact_digest
+
+    def racing_digest(path: Path) -> str:
+        # Deleted between the walk and the read; the FileNotFoundError then
+        # comes out of the production ``path.open("rb")``, not a fake raise.
+        if path.suffix == ".SLDPRT":
+            path.unlink()
+        return real_digest(path)
+
+    monkeypatch.setattr(dodo, "_artefact_digest", racing_digest)
+
+    with pytest.raises(RuntimeError, match=r"^logo ring extrude failed \(exit 86\)$"):
+        dodo._fail_task("logo ring extrude", 86, started=0.0)
+
+    bodies = [str(record.log_record.body) for record in logs.get_finished_logs()]
+    (manifest,) = [
+        record.log_record
+        for record in logs.get_finished_logs()
+        if "artefact(s) under" in str(record.log_record.body)
+    ]
+    # The evidence that DID survive is still named with its size and digest...
+    assert re.fullmatch(
+        r"logo-ring-extrude/capture\.json:44:[0-9a-f]{16}",
+        manifest.attributes["artefacts"],
+    )
+    assert manifest.attributes["exit_code"] == 86
+    # ... and the artefact that vanished is reported, not silently dropped.
+    assert any("failing.SLDPRT" in body and "unreadable" in body for body in bodies)
+
+
+def test_an_artefact_lost_mid_walk_does_not_blind_the_manifest(
+    dodo_failures, monkeypatch
+):
+    """``_failure_artefacts`` needs two syscalls per entry (is-it-a-file, then
+    its mtime). A file that disappears between them must cost that one entry,
+    never the whole manifest: the reader still has to be told about the
+    captures that ARE on disk."""
+    dodo = dodo_failures
+    dodo.FAILURES.mkdir()
+    kept = dodo.FAILURES / "capture.json"
+    kept.write_bytes(b"{}")
+    (dodo.FAILURES / "seat.bmp").write_bytes(b"BM")
+    real_is_file = Path.is_file
+
+    def is_file_then_vanish(self: Path, *args: Any, **kwargs: Any) -> bool:
+        answer = real_is_file(self, *args, **kwargs)
+        if self.name == "seat.bmp":
+            self.unlink()
+        return answer
+
+    monkeypatch.setattr(Path, "is_file", is_file_then_vanish)
+
+    assert dodo._failure_artefacts(0.0) == [kept]
+
+
+def test_an_unwalkable_failure_tree_costs_a_warning_not_the_exit_code(
+    dodo_failures, capture_telemetry
+):
+    """The walk itself can fail (an unreadable directory, a handle the dying
+    seat still holds). The task's own failure still goes out."""
+    dodo = dodo_failures
+    _spans, logs = capture_telemetry
+
+    def unreadable(_since: float) -> list[Path]:
+        raise PermissionError(13, "Permission denied", str(dodo.FAILURES))
+
+    with mock.patch.object(dodo, "_failure_artefacts", unreadable):
+        with pytest.raises(RuntimeError, match=r"^rib cut failed \(exit 1\)$"):
+            dodo._fail_task("rib cut", 1, started=0.0)
+
+    assert any(
+        "cannot enumerate" in str(record.log_record.body)
+        and record.log_record.severity_text == "WARN"
+        for record in logs.get_finished_logs()
+    )
 
 
 if __name__ == "__main__":
