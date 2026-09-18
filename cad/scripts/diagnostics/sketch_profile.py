@@ -102,7 +102,29 @@ def minor_arc(center: Vertex, first: Vertex, second: Vertex) -> Arc:
     flag.  The endpoint COORDINATES are passed through untouched -- reordering
     them cannot perturb a double -- which is what keeps the merge pairing in
     :func:`endpoint_merges` exact.
+
+    This is one of the two OFFLINE gates that catch the failure mode the
+    91247A720 logo ring is exposed to.  Inference's nearest wrong target there
+    is an outer arc's own CENTRE, 0.400 mm from its endpoints, so a snap
+    collapses the arc to zero radius; an endpoint that has arrived at the
+    centre is refused here, by name, before any COM call.  (The other gate is
+    :func:`endpoint_merges`, which refuses any vertex not shared by exactly two
+    ends.)  The ``CheckFeatureUse`` read-back in ``diag_mcmaster_lib`` is
+    FORENSICS and is deliberately incapable of failing healthy geometry -- it
+    is not where a degenerate corner is caught.
+
+    Raises:
+        OpenProfileError: when an endpoint coincides with ``center`` (zero
+            radius), or when the span is degenerate or exactly semicircular and
+            so has no unique minor arc.
     """
+    for label, point in (("start", first), ("end", second)):
+        if point == center:
+            raise OpenProfileError(
+                f"arc about {center}: its {label} endpoint IS the centre, so the "
+                "arc has zero radius -- this is the shape an inference snap to "
+                "an arc centre produces"
+            )
     sweep = _ccw_sweep_deg(center, first, second)
     if sweep == 0.0 or sweep == 180.0:
         raise OpenProfileError(
