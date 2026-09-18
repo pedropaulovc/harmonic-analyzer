@@ -453,14 +453,61 @@ def test_farm_build_refuses_a_dirty_tree_before_publishing(
     assert not any(_published(argv) for argv in launched), "no publish subprocess"
 
 
-def _preflight_fakes(monkeypatch, *, publish=None, git=None):
-    """Fake ``subprocess.run`` for a clean, pushed HEAD and a publish summary.
+AGENT = "7" * 64
+AGENT_TAG = AGENT[:16]
+
+
+def _agents_summary(**overrides):
+    """``farm.py agents --json``: one worker, freshly reporting this agent."""
+    summary = {
+        "agent_identity_sha256": AGENT,
+        "agent_version": AGENT_TAG,
+        "verdict": "matched",
+        "report": None,
+        "fresh_within_s": 120,
+        "evidence_horizon_s": 1209600,
+        "listed": 1,
+        "workers": [
+            {
+                "worker_id": "swmaker000004@4",
+                "agent_version": AGENT_TAG,
+                "observed_at": "2026-09-18T10:39:07Z",
+                "age_s": 30,
+                "written_age_s": None,
+                "fresh": True,
+            }
+        ],
+        "ignored": [],
+        "unreadable": [],
+        "mismatch": [],
+    }
+    summary.update(overrides)
+    return json.dumps(summary) + "\n"
+
+
+# A pool that blocks but prints no report: the preflight must still stop, since
+# proceeding would dispatch every leaf at a prefix nobody reads.
+_UNREPORTED_BLOCK = _agents_summary(
+    verdict="mismatch",
+    mismatch=[{"agent_version": "0" * 16, "workers": ["swmaker000004@4"]}],
+    report=None,
+)
+
+
+def _preflight_fakes(monkeypatch, *, publish=None, agents=None, git=None):
+    """Fake ``subprocess.run`` for a clean, pushed HEAD and the two pool reads.
 
     ``git`` maps a git subcommand to an override: a string stdout or an
-    exception to raise. ``publish`` is the subprocess's stdout (default: a valid
-    ``published`` summary) or an exception to raise at launch.
+    exception to raise. ``publish`` and ``agents`` are the matching pool
+    subprocess's stdout (default: a valid summary) or an exception to raise at
+    launch.
     """
-    summary = {"source_identity_sha256": IDENTITY, "commit": SHA, "state": "published"}
+    summary = {
+        "source_identity_sha256": IDENTITY,
+        "agent_identity_sha256": AGENT,
+        "commit": SHA,
+        "state": "published",
+    }
     stdout = {
         "status": "",
         "submodule": "",
@@ -471,6 +518,8 @@ def _preflight_fakes(monkeypatch, *, publish=None, git=None):
     stdout.update(git or {})
     if publish is None:
         publish = "uploading 12 files\n" + json.dumps(summary) + "\n"
+    if agents is None:
+        agents = _agents_summary()
     launched = []
 
     def fake_run(argv, **kwargs):
@@ -480,10 +529,14 @@ def _preflight_fakes(monkeypatch, *, publish=None, git=None):
             if isinstance(out, BaseException):
                 raise out
             return subprocess.CompletedProcess(argv, 0, out, "")
-        assert argv[-4:] == ["publish", "--commit", SHA, "--json"]
-        if isinstance(publish, BaseException):
-            raise publish
-        return subprocess.CompletedProcess(argv, 0, publish, None)
+        if argv[-2:] == ["agents", "--json"]:
+            out = agents
+        else:
+            assert argv[-4:] == ["publish", "--commit", SHA, "--json"]
+            out = publish
+        if isinstance(out, BaseException):
+            raise out
+        return subprocess.CompletedProcess(argv, 0, out, None)
 
     monkeypatch.setattr(build.subprocess, "run", fake_run)
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
@@ -521,7 +574,14 @@ def test_successful_preflight_stamps_the_environment_before_doit_runs(
     branch = next(a for a in launched if a[:2] == ["git", "branch"])
     assert "--prune" in fetch and fetch[-1] == "origin"
     assert branch[-2:] == ["--list", "origin/*"]
+    # The fleet's agent build is read before the package is uploaded: a package
+    # published for another agent is a prefix no worker ever reads.
+    assert [a[-2:] for a in launched if a[0] != "git"] == [
+        ["agents", "--json"],
+        [SHA, "--json"],
+    ]
     assert capsys.readouterr().out == (
+        f"farm: agent {AGENT_TAG} on 1 worker(s)\n"
         f"farm: sources {'5' * 16} @ {'c' * 12} published\n"
         "farm: every SolidWorks task runs on the farm (parts, assemblies, "
         "drawings, verify:*, preflight, export, package:release)\n"
@@ -607,13 +667,104 @@ def test_default_build_target_carries_the_verify_gates_under_every_executor(
         (
             dict(
                 publish=json.dumps(
-                    {"source_identity_sha256": IDENTITY, "commit": "d" * 40, "state": "exists"}
+                    {
+                        "source_identity_sha256": IDENTITY,
+                        "agent_identity_sha256": AGENT,
+                        "commit": "d" * 40,
+                        "state": "exists",
+                    }
                 )
             ),
             f"farm: publish summary is for commit '{'d' * 40}', expected {SHA}",
         ),
+        (
+            dict(
+                publish=json.dumps(
+                    {
+                        "source_identity_sha256": IDENTITY,
+                        "agent_identity_sha256": "abc",
+                        "commit": SHA,
+                        "state": "exists",
+                    }
+                )
+            ),
+            "farm: publish summary agent_identity_sha256 is not 64 hex: 'abc'",
+        ),
+        (
+            dict(
+                publish=json.dumps(
+                    {
+                        "source_identity_sha256": IDENTITY,
+                        "agent_identity_sha256": "a" * 64,
+                        "commit": SHA,
+                        "state": "published",
+                    }
+                )
+            ),
+            f"farm: publish used agent {'a' * 16}, but the fleet was checked against "
+            f"{AGENT_TAG}; the pool checkout changed mid-preflight",
+        ),
+        (
+            dict(agents=FileNotFoundError(2, "No such file", "uv")),
+            "farm: agents could not start (uv): [Errno 2] No such file: 'uv'",
+        ),
+        (
+            dict(agents="reading seat reports\nnot json at all\n"),
+            "farm: agents printed no JSON summary; last line: not json at all",
+        ),
+        (
+            dict(agents=_agents_summary(agent_version="deployed")),
+            "farm: agents summary agent_version is not 16 hex: 'deployed'",
+        ),
+        (
+            dict(agents=_agents_summary(workers={"swmaker000004@4": "ready"})),
+            "farm: agents summary workers is not a list: "
+            + _agents_summary(workers={"swmaker000004@4": "ready"}).strip()[:200],
+        ),
+        (
+            dict(agents=_agents_summary(verdict="probably-fine")),
+            "farm: agents summary verdict is not one of ('mismatch', 'unreadable', "
+            "'matched', 'unverified'): 'probably-fine'",
+        ),
+        (
+            dict(agents=_agents_summary(fresh_within_s="120")),
+            "farm: agents summary fresh_within_s is not an integer: '120'",
+        ),
+        (
+            dict(agents=_agents_summary(evidence_horizon_s=1209600.0)),
+            "farm: agents summary evidence_horizon_s is not an integer: 1209600.0",
+        ),
+        (
+            dict(agents=_agents_summary(ignored=None)),
+            "farm: agents summary ignored is not a list: "
+            + _agents_summary(ignored=None).strip()[:200],
+        ),
+        (
+            dict(agents=_UNREPORTED_BLOCK),
+            "farm: agents returned verdict 'mismatch' without a report: "
+            + _UNREPORTED_BLOCK.strip()[:200],
+        ),
     ],
-    ids=["not-on-origin", "fetch-fails", "uv-missing", "not-json", "bad-state", "bad-identity", "wrong-commit"],
+    ids=[
+        "not-on-origin",
+        "fetch-fails",
+        "uv-missing",
+        "not-json",
+        "bad-state",
+        "bad-identity",
+        "wrong-commit",
+        "bad-publish-agent",
+        "agent-changed-mid-preflight",
+        "agents-uv-missing",
+        "agents-not-json",
+        "agents-bad-version",
+        "agents-workers-not-a-list",
+        "agents-bad-verdict",
+        "agents-bad-fresh-window",
+        "agents-bad-horizon-window",
+        "agents-ignored-not-a-list",
+        "agents-block-without-report",
+    ],
 )
 def test_preflight_faults_exit_2_with_one_farm_line(fakes, message, monkeypatch, capsys):
     _preflight_fakes(monkeypatch, **fakes)
@@ -623,6 +774,184 @@ def test_preflight_faults_exit_2_with_one_farm_line(fakes, message, monkeypatch,
 
     assert capsys.readouterr().err == message + "\n"
     assert all(os.environ.get(key) is None for key in FARM_ENV)
+
+
+def test_a_fleet_on_another_agent_stops_the_build_before_it_publishes(
+    monkeypatch, capsys
+):
+    """One clear error instead of ~100 leaves failing ``package_download``.
+
+    The package prefix is ``<source identity>-<agent identity>`` and each worker
+    rebuilds it from the agent deployed on it, so a pool checkout ahead of the
+    fleet publishes where no worker looks. On 2026-09-18 that lost a whole farm
+    build: the submitter hashed to 26accae1d3036f63 while the fleet still ran
+    7ee489025c3358d0, and every COM leaf died with an unexplained
+    ``package_download``. The preflight has to name both identities and stop
+    before a single leaf is dispatched -- and before anything is published.
+    """
+    deployed = "7ee489025c3358d0"
+    report = (
+        f"this pool checkout's agent is {AGENT_TAG}, but the fleet reports running:\n"
+        f"  {deployed}: swmaker000004@4 (3h 0m ago), swmaker000005@5 (3h 1m ago)\n"
+        "Deploy the agent with deploy.ps1."
+    )
+    launched = _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            verdict="mismatch",
+            workers=[
+                {
+                    "worker_id": worker,
+                    "agent_version": deployed,
+                    "observed_at": "2026-09-18T07:39:07Z",
+                    "age_s": 10800,
+                    "fresh": False,
+                }
+                for worker in ("swmaker000004@4", "swmaker000005@5")
+            ],
+            mismatch=[
+                {
+                    "agent_version": deployed,
+                    "workers": ["swmaker000004@4", "swmaker000005@5"],
+                }
+            ],
+            report=report,
+        ),
+        publish=AssertionError("published for an agent the fleet does not run"),
+    )
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+
+    captured = capsys.readouterr()
+    assert captured.err == f"farm: {report}\n"
+    assert AGENT_TAG in captured.err and deployed in captured.err
+    assert [a[-2:] for a in launched if a[0] != "git"] == [["agents", "--json"]]
+    assert all(os.environ.get(key) is None for key in FARM_ENV)
+
+
+def test_an_unreadable_fleet_stops_the_build_like_a_mismatch(monkeypatch, capsys):
+    """Reports this pool cannot parse are a contract skew, hence a mismatch.
+
+    The realistic fleet-wide cause is a SeatReport field the deployed agent
+    writes and this checkout does not understand -- which means the two sides
+    are on different agent builds, arriving as the guard's blind spot.
+    """
+    report = (
+        "1 worker(s) published a seat report this checkout cannot read, so "
+        "nothing says which agent build the fleet runs:\n"
+        "  swmaker000004@4: invalid_report:seat report fields are wrong\n"
+        "Deploy the agent with deploy.ps1."
+    )
+    launched = _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            verdict="unreadable",
+            workers=[],
+            listed=1,
+            unreadable=[
+                {
+                    "worker_id": "swmaker000004@4",
+                    "evidence": "invalid_report:seat report fields are wrong",
+                }
+            ],
+            report=report,
+        ),
+        publish=AssertionError("published against an unreadable fleet"),
+    )
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+
+    assert capsys.readouterr().err == f"farm: {report}\n"
+    assert [a[-2:] for a in launched if a[0] != "git"] == [["agents", "--json"]]
+
+
+def test_a_sleeping_fleet_at_this_agent_builds_and_says_so(monkeypatch, capsys):
+    """Every build more than FARM_IDLE_DEALLOCATE_S after the last looks like this.
+
+    Nothing is polling, so no report is fresh, yet each worker's last report
+    still names the build on its own disk -- the pool has already matched them,
+    and the line must say the fleet is asleep rather than unverified.
+    """
+    _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            workers=[
+                {
+                    "worker_id": "swmaker000004@4",
+                    "agent_version": AGENT_TAG,
+                    "observed_at": "2026-09-18T04:39:07Z",
+                    "age_s": 21600,
+                    "fresh": False,
+                }
+            ]
+        ),
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 0
+
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == (
+        f"farm: agent {AGENT_TAG}; no worker has reported within 120s, but the "
+        "last report of 1 worker(s) names this build"
+    )
+
+
+def test_a_fleet_that_never_reported_says_nothing_was_confirmed(monkeypatch, capsys):
+    """A new scale-out instance is the only fleet with no readable report."""
+    _preflight_fakes(
+        monkeypatch, agents=_agents_summary(verdict="unverified", workers=[], listed=0)
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 0
+
+    assert capsys.readouterr().out.splitlines()[0] == (
+        f"farm: agent {AGENT_TAG}; no worker has ever reported, so nothing "
+        "confirms which agent build the fleet will run"
+    )
+
+
+def test_a_fleet_whose_every_report_aged_out_is_not_called_silent(monkeypatch, capsys):
+    """Two reports in hand must not be announced as "never reported".
+
+    The pool believes no report past its evidence horizon, so this fleet is
+    ``unverified`` with an empty ``workers`` list -- but it has reported, twice,
+    and an operator told otherwise looks for a fleet that never started instead
+    of instances that were renumbered or idle for a fortnight.
+    """
+    _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            verdict="unverified",
+            workers=[],
+            listed=2,
+            ignored=[
+                {
+                    "worker_id": worker,
+                    "agent_version": AGENT_TAG,
+                    "observed_at": "2026-09-01T10:39:07Z",
+                    "age_s": 1555200,
+                    "written_age_s": None,
+                    "fresh": False,
+                }
+                for worker in ("swmaker000004@4", "swmaker000005@5")
+            ],
+        ),
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 0
+
+    assert capsys.readouterr().out.splitlines()[0] == (
+        f"farm: agent {AGENT_TAG}; 2 worker(s) last reported more than 14d ago, "
+        "too old to prove anything"
+    )
 
 
 @pytest.mark.parametrize(
