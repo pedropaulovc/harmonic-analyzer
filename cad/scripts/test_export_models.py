@@ -848,3 +848,46 @@ def test_sanitize_glb_honours_khr_texture_transform_tex_coord(tmp_path: Path) ->
     assert clone["pbrMetallicRoughness"]["baseColorTexture"]["index"] == 0
     assert "normalTexture" not in clone
     assert clone["occlusionTexture"]["index"] == 2
+
+
+def test_exporter_digest_is_checkout_eol_independent() -> None:
+    """The export-freshness sentinel must be identical on a CRLF and an LF checkout.
+
+    It is compared ACROSS machines: a farm worker runs `export` and publishes
+    `export-src.json`, the submitter restores it from the remote cache and decides
+    whether the recorded per-mesh digests are trustworthy. Hashing raw bytes made a
+    worker's LF checkout disagree with the submitter's CRLF one for byte-for-byte
+    identical code, so EVERY farm-produced ledger read as "written by a foreign
+    exporter": the submitter silently re-exported everything and the comparison
+    gallery's freshness check failed on a current tree (v36's release, 2026-09-18).
+
+    Pin the property directly: the digest equals the md5 of the LF-canonical closure
+    bytes, so it cannot regress to raw bytes without this failing.
+    """
+    import hashlib
+
+    from _buildgraph import module_deps_of
+
+    self_path = Path(export_models.__file__).resolve()
+    files = sorted({self_path, *(Path(p).resolve() for p in module_deps_of(self_path))})
+    expected = hashlib.md5()
+    for path in files:
+        expected.update(path.read_bytes().replace(b"\r\n", b"\n"))
+    assert export_models._exporter_digest() == expected.hexdigest()
+
+
+def test_canonical_file_bytes_cleans_text_but_never_binary(tmp_path: Path) -> None:
+    """The ONE canonicalisation rule: CRLF -> LF for text, untouched for binary.
+
+    A NUL in the first 8 KiB marks binary (Git's own heuristic), and a .SLDPRT whose
+    bytes happened to contain CRLF must keep its exact digest.
+    """
+    dodo = export_models._import_dodo()
+    text = tmp_path / "recipe.py"
+    text.write_bytes(b"a = 1\r\nb = 2\r\n")
+    assert dodo._canonical_file_bytes(str(text)) == b"a = 1\nb = 2\n"
+
+    binary = tmp_path / "model.sldprt"
+    payload = b"\x00SLDPRT\r\npayload\r\n"
+    binary.write_bytes(payload)
+    assert dodo._canonical_file_bytes(str(binary)) == payload

@@ -96,27 +96,30 @@ def resolve_blender(override: str | None = None) -> str:
 STL_DIR = CAD_OUT / "stl"
 
 
-_EXPORTER_KEY = "__exporter__"
-
-
 def _recorded_digests() -> dict[str, str]:
     """The exporter's own recorded source digests, keyed by output stem/mesh.
 
-    ``export_models.py`` writes ``cad/out/stl/export-src.json``: for every mesh it
-    exported, the churn-immune RECIPE digest of the ``.SLDPRT``/``.SLDASM`` it was
-    exported from (``dodo._stable_artefact_digest``). Unreadable/foreign-exporter
-    sidecars yield {} so the caller falls back to mtime, mirroring
-    ``export_models.load_src_digests``.
+    Delegate to ``export_models.load_src_digests`` rather than re-parsing
+    ``cad/out/stl/export-src.json`` here: it validates the ``__exporter__``
+    sentinel against the exporter's current source closure and returns {} when the
+    sidecar was written by a DIFFERENT exporter version. Trusting a foreign
+    sidecar's digests would let `_stale` reject an output that is current instead
+    of falling back to mtime, and the sentinel is the only thing that can tell the
+    difference -- so this must not become a second, laxer reader of that file.
+
+    An unimportable exporter (no COM bindings on a Blender-only seat) yields {} and
+    the caller falls back to mtime, exactly as it does for an undeclared target.
     """
-    path = STL_DIR / "export-src.json"
-    if not path.exists():
-        return {}
     try:
-        data = dict(json.loads(path.read_text(encoding="utf-8")))
+        scripts = str(REPO / "cad" / "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        import export_models  # noqa: PLC0415
+
+        return {k: v for k, v in export_models.load_src_digests().items()
+                if isinstance(v, str)}
     except Exception:
         return {}
-    data.pop(_EXPORTER_KEY, None)
-    return {k: v for k, v in data.items() if isinstance(v, str)}
 
 
 def _artefact_digest(src: Path) -> str | None:
