@@ -59,6 +59,18 @@ RAW_SKETCH_CALLS = frozenset({
     "CreateTangentArc",
 })
 
+# DELIBERATELY excluded: ``CreateSplinesByEqnParams2``, the only other
+# ``ISketchManager`` entity creator this repo calls
+# (``diag_build_1330K524._transition_sketch``, ``diag_build_9432K31``).  It
+# takes an ``ISplineParamData`` -- control points and a knot vector, no
+# interactive point input -- and the family is documented to IGNORE
+# ``AddToDB``/``DisplayWhenAdded`` and write straight to the sketch database
+# (cited at ``diag_build_1330K524.py:520`` and ``diag_build_9432K31.py:496``,
+# both proven live on a seat).  That is permanently the state
+# ``AddToDB = True`` is used to reach, so there is no inference stage for a
+# user setting to change and a guard would be theatre.  Anything that grows
+# interactive point input belongs in the set above.
+
 # Contextmanagers that force the sketch preferences for their block.
 GUARD_CONTEXTMANAGERS = frozenset({"no_sketch_inference", "preference_override"})
 
@@ -227,6 +239,23 @@ def test_an_exception_in_a_nested_block_does_not_pin_the_depth_counter() -> None
     assert adapter.swApp.writes, "a later block stopped applying preferences"
 
 
+def _is_guard_call(expr: ast.expr) -> bool:
+    """Is ``expr`` a call to one of the guard contextmanagers?
+
+    Both spellings count: a bare ``no_sketch_inference(adapter)`` and a
+    qualified ``diag.no_sketch_inference(adapter)``.  Matching only the bare
+    name would make the audit report every primitive inside a legitimately
+    guarded block the moment a recipe imported the module instead of the
+    function -- a false alarm, which is how a gate gets switched off.
+    """
+    if not isinstance(expr, ast.Call):
+        return False
+    func = expr.func
+    if isinstance(func, ast.Name):
+        return func.id in GUARD_CONTEXTMANAGERS
+    return isinstance(func, ast.Attribute) and func.attr in GUARD_CONTEXTMANAGERS
+
+
 def _assigns_add_to_db(node: ast.AST, *, value: bool | None) -> bool:
     """Is ``node`` an ``*.AddToDB = <value>`` assignment?
 
@@ -266,12 +295,7 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
     for node in ast.walk(tree):
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
-                call = item.context_expr
-                if (
-                    isinstance(call, ast.Call)
-                    and isinstance(call.func, ast.Name)
-                    and call.func.id in GUARD_CONTEXTMANAGERS
-                ):
+                if _is_guard_call(item.context_expr):
                     spans.append((node.lineno, node.end_lineno))
         elif isinstance(node, ast.Try) and node.finalbody:
             if not any(
@@ -323,10 +347,23 @@ def test_every_raw_sketch_primitive_is_authored_under_a_guard() -> None:
     geometry, which is per-seat, unasserted and unrecorded.  That is not a
     setting that can be normalised; it is a dependency that has to go.
     """
+    # rglob, not glob: a recipe moved into a subpackage must not fall out of
+    # the audit silently.  And the audited set is asserted non-empty, because
+    # a renamed or missing directory would otherwise make this whole gate pass
+    # by inspecting nothing -- the failure mode that turns a regression gate
+    # into decoration.
+    audited = [
+        path
+        for path in sorted(DIAGNOSTICS_DIR.rglob("*.py"))
+        if path.name not in AUDIT_EXEMPT
+    ]
+    assert len(audited) > 20, (
+        f"the audit inspected {len(audited)} files under {DIAGNOSTICS_DIR}; "
+        "it is meant to cover every recipe in the tree"
+    )
     offenders = {
         path.name: calls
-        for path in sorted(DIAGNOSTICS_DIR.glob("*.py"))
-        if path.name not in AUDIT_EXEMPT
+        for path in audited
         for calls in [_unguarded_raw_calls(path)]
         if calls
     }
@@ -385,6 +422,25 @@ def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
     )
 
     assert _unguarded_raw_calls(good) == []
+
+
+def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
+    """``diag.no_sketch_inference(...)`` guards exactly as the bare name does.
+
+    Failing to see the qualified spelling would report primitives inside a
+    properly guarded block, and a gate that cries wolf is a gate somebody
+    switches off.
+    """
+    guarded = tmp_path / "diag_build_qualified.py"
+    guarded.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    with diag.no_sketch_inference(adapter):\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded) == []
 
 
 def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
