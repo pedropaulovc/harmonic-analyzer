@@ -36,7 +36,8 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from diagnostics.diag_mcmaster_lib import (  # noqa: E402
+from diagnostics.diag_mcmaster_lib import (
+    assert_profile_closed,  # noqa: E402
     _rev_frustum,
     draw_closed_profile,
     insert_helix,
@@ -422,6 +423,9 @@ async def build_91247A720(adapter, truth=None):
     await draw_closed_profile(adapter, logo_segs, label="logo ring", loops=2)
     check("exit_sketch logo", await adapter.exit_sketch())
     name_last_feature(adapter, "LogoProfile")
+    # ONE closure read, shared with the forensics record: no second COM call,
+    # and the extrude's failure context below comes from these same numbers.
+    closure = assert_profile_closed(adapter, "logo ring", loops=2)
     model.ClearSelection2(True)
     # FeatureExtrusion3 also returns None when NOTHING is selected, so an
     # unchecked Select2 leaves a failed selection and a bad profile
@@ -452,6 +456,8 @@ async def build_91247A720(adapter, truth=None):
             expected_points=len(logo_segs),
             segments=len(logo_segs),
             merges=len(endpoint_merges(logo_segs)),
+            contour_count=closure.get("contour_count"),
+            unmerged_points=closure.get("unmerged_points"),
         )
     name_last_feature(adapter, "LogoRing")
     # Outer top rim is tangent-continuous (offset corner arcs r=0.4) so one
