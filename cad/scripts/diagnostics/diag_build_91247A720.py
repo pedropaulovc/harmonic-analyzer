@@ -416,8 +416,7 @@ async def build_91247A720(adapter, truth=None):
     # The two gates that catch a degenerate corner are OFFLINE, in
     # sketch_profile: endpoint_merges refuses any vertex not shared by exactly
     # two ends, and minor_arc refuses an endpoint that has arrived at the
-    # centre.  The CheckFeatureUse read-back in draw_closed_profile is
-    # forensics, not a gate.
+    # centre.  The closure read after exit_sketch is forensics, not a gate.
     logo_segs = logo_ring_profile()
     check("create_sketch logo", await adapter.create_sketch("HeadTopPlane"))
     await draw_closed_profile(adapter, logo_segs, label="logo ring", loops=2)

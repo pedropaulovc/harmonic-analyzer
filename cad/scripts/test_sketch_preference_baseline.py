@@ -16,11 +16,12 @@ failed`` leaf on ``swmaker000005@5``:
   stops the class from regrowing: a new recipe that calls ``CreateLine``
   outside a guard fails here, offline, with the file and line named.
 
-* **The read-back's error policy.** The closure read-back must be incapable of
-  failing a build on healthy geometry, because two things about
-  ``ISketch.CheckFeatureUse`` are unresolved until someone runs it on a seat.
-  Those tests pin "warn and proceed" as the default and leave exactly one
-  raising condition.
+* **The closure verdict's error policy.** ``assert_profile_closed`` decides
+  from ONE shared read (``_common.record_sketch_closure``).  It must raise on a
+  MEASURED open profile and must NOT raise when the read failed or when the
+  contour count merely disagrees -- the absence of a measurement is not a
+  measurement of absence, and a guard that fails closed on healthy geometry is
+  worse than no guard.
 """
 
 from __future__ import annotations

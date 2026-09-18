@@ -16,8 +16,9 @@ exactness was necessary, already true, and never sufficient.  What these tests
 pin is the property that makes the authored ``merge`` relations resolvable at
 all: **each shared vertex must be written as the same expression in both
 segments**, so the two doubles are identical and the pairing is unambiguous.
-Closure itself is guaranteed by the relations, and verified live against
-``ISketch.CheckFeatureUse``.
+Closure itself is guaranteed by the relations; the seat's outcome is recorded
+once after ``exit_sketch`` (``_common.record_sketch_closure``) as evidence, not
+as the guarantee.
 """
 
 from __future__ import annotations
@@ -181,8 +182,8 @@ def test_three_segments_meeting_at_a_point_is_rejected() -> None:
     """``swSketchCheckFeatureStatus_ThreeEnts`` (4), caught offline.
 
     SolidWorks reports "an endpoint is wrongly shared by multiple entities" as
-    a distinct ``CheckFeatureUse`` status.  The offline pairing refuses the same
-    shape, so the two checks agree by construction instead of by coincidence.
+    a distinct sketch-check status.  The offline pairing refuses the same shape,
+    so the two agree by construction instead of by coincidence.
     """
     shared = (0.0, 0.0)
     segments = (
@@ -207,8 +208,8 @@ def test_an_endpoint_that_reached_the_arc_centre_is_refused() -> None:
     """The exact shape an inference snap to an arc centre produces.
 
     This is one of the two OFFLINE gates, and it is where a collapsed corner is
-    actually caught -- NOT at the ``CheckFeatureUse`` read-back, which is
-    deliberately incapable of failing healthy geometry.  In the logo ring the
+    actually caught -- NOT at the closure read-back, which raises only on a
+    measured zero-contour sketch.  In the logo ring the
     nearest wrong snap target for an outer arc's endpoint is that arc's own
     centre, 0.400 mm away, so "endpoint == centre" is the realised failure and
     it must be named, not inferred from a zero sweep.
