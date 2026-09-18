@@ -26,7 +26,6 @@ failed`` leaf on ``swmaker000005@5``:
 from __future__ import annotations
 
 import ast
-import types
 from pathlib import Path
 
 import pytest
@@ -227,6 +226,23 @@ def test_an_exception_in_a_nested_block_does_not_pin_the_depth_counter() -> None
     assert adapter.swApp.writes, "a later block stopped applying preferences"
 
 
+def _assigns_add_to_db(node: ast.AST, *, value: bool | None) -> bool:
+    """Is ``node`` an ``*.AddToDB = <value>`` assignment?
+
+    ``value=True`` matches only the literal enable; ``value=None`` matches any
+    assignment, which is what a restore of the saved previous value looks like.
+    """
+    if not isinstance(node, ast.Assign):
+        return False
+    if not any(
+        isinstance(t, ast.Attribute) and t.attr == "AddToDB" for t in node.targets
+    ):
+        return False
+    if value is None:
+        return True
+    return isinstance(node.value, ast.Constant) and node.value.value is True
+
+
 def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
     """Line spans of the two controls that defeat inference.
 
@@ -236,6 +252,14 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
     -- and with it the SCREEN-SPACE snap tolerance that made this failure
     view-dependent -- never runs at all.  Either is sufficient; both are
     accepted here because the fleet legitimately uses both.
+
+    The ``AddToDB`` form is matched STRUCTURALLY, and it must be the whole
+    shape: ``AddToDB = True`` assigned before the ``try``, and some
+    ``AddToDB`` assignment in the ``finally`` that puts it back.  Merely
+    mentioning ``AddToDB`` in a ``finally`` is not a guard -- a block that only
+    ever assigns ``AddToDB = False`` restores a value it never enabled, so its
+    primitives went through inference after all.  Accepting that shape would
+    make the audit's teeth cosmetic.
     """
     spans: list[tuple[int, int]] = []
     for node in ast.walk(tree):
@@ -249,10 +273,30 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
                 ):
                     spans.append((node.lineno, node.end_lineno))
         elif isinstance(node, ast.Try) and node.finalbody:
-            restores = ast.dump(ast.Module(body=node.finalbody, type_ignores=[]))
-            if "AddToDB" in restores:
+            if not any(
+                _assigns_add_to_db(stmt, value=None) for stmt in node.finalbody
+            ):
+                continue
+            # The enable must PRECEDE the try, in the same suite.
+            enabled = any(
+                _assigns_add_to_db(sibling, value=True)
+                for parent in ast.walk(tree)
+                for suite in _suites(parent)
+                if node in suite
+                for sibling in suite[: suite.index(node)]
+            )
+            if enabled:
                 spans.append((node.lineno, node.end_lineno))
     return spans
+
+
+def _suites(node: ast.AST) -> list[list[ast.stmt]]:
+    return [
+        value
+        for value in (getattr(node, field, None) for field in ("body", "orelse",
+                                                               "finalbody"))
+        if isinstance(value, list)
+    ]
 
 
 def _unguarded_raw_calls(path: Path) -> list[tuple[int, str]]:
@@ -324,103 +368,107 @@ def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:
     assert _unguarded_raw_calls(offender) == [(3, "CreateLine")]
 
 
-class _Sketch:
-    def __init__(self, checked, points: int = 9) -> None:
-        self._checked = checked
-        self._points = points
+def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
+    """The engine-level control: enable before the try, restore in finally."""
+    good = tmp_path / "diag_build_addtodb.py"
+    good.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = prev\n",
+        encoding="utf-8",
+    )
 
-    def GetSketchPoints2(self) -> tuple[object, ...]:
-        return tuple(range(self._points))
-
-    def CheckFeatureUse(self, usage: int, _open: int, _closed: int):
-        assert usage == diag._SW_CHECK_BASEEXTRUDE
-        return self._checked
-
-
-class _CheckAdapter:
-    """Just enough adapter for :func:`_report_profile_closure`."""
-
-    def __init__(self, checked, points: int = 9) -> None:
-        self.currentModel = types.SimpleNamespace(
-            SketchManager=types.SimpleNamespace(ActiveSketch=_Sketch(checked, points))
-        )
-
-    def _attempt(self, thunk, default=None):
-        try:
-            return thunk()
-        except Exception:
-            return default
+    assert _unguarded_raw_calls(good) == []
 
 
-def _closure(monkeypatch, checked, *, loops: int = 2) -> tuple[str, list[str]]:
-    warnings: list[str] = []
-    monkeypatch.setattr(diag._telemetry, "warn", warnings.append)
-    monkeypatch.setattr(diag, "_early_bound", lambda obj, _iface: obj)
-    evidence = diag._report_profile_closure(_CheckAdapter(checked), "ring", loops, 9)
-    return evidence, warnings
-
-
-@pytest.mark.parametrize("checked", [(0, 0, 2), (0, 2, 0)])
-def test_closure_read_back_accepts_a_healthy_profile_in_either_count_order(
-    monkeypatch, checked
+def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
+    tmp_path: Path,
 ) -> None:
-    """The unresolved half of ``CheckFeatureUse`` must not be a coin flip.
+    """The shape that a text search for "AddToDB" would wave through.
 
-    The live signature reads ``(status, open, closed)``; the skill bundle's
-    learning reads the last value as the open count.  A healthy profile is the
-    same UNORDERED pair under either reading, so comparing it as a set settles
-    the question by not asking it.  If this guard ever bets on one order, a
-    wrong bet fails every closed profile in the repo.
+    Restoring a value that was never enabled means the primitives went through
+    the inference stage after all -- pixel tolerance, per-seat window size,
+    exactly the failure this audit exists to prevent. A mention of ``AddToDB``
+    is not a guard; the enable is.
     """
-    evidence, warnings = _closure(monkeypatch, checked)
+    offender = tmp_path / "diag_build_pretend.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = False\n",
+        encoding="utf-8",
+    )
 
-    assert warnings == []
-    assert "contours=0/2" in evidence
+    assert _unguarded_raw_calls(offender) == [(4, "CreateLine")]
 
 
-def test_closure_read_back_raises_only_when_no_contour_exists(monkeypatch) -> None:
-    """Zero closed contours under EVERY reading -- the one unambiguous defect."""
-    with pytest.raises(RuntimeError, match="NO contours at all"):
-        _closure(monkeypatch, (0, 0, 0))
+def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
+    """Drive :func:`assert_profile_closed` against a canned closure verdict.
 
-
-@pytest.mark.parametrize(
-    "checked",
-    [
-        (6, 1, 1),    # a revolve centreline may or may not count as open
-        (11, 9, 0),   # MixedContours: the real unmerged shape
-        (0, 3, 2),
-        (99, 0, 2),   # a status nobody has characterised
-    ],
-)
-def test_closure_read_back_warns_and_proceeds_on_anything_else(
-    monkeypatch, checked
-) -> None:
-    """Unexplained counts cost a log line, never a build.
-
-    Two questions about this diagnostic are open until someone runs it on a
-    seat: which count is which, and whether construction geometry registers as
-    an open contour (99607A213 draws a revolve centreline into the same sketch
-    as its profile).  Until both are settled, the closure GUARANTEE is the
-    offline assertion plus the checked merge relations; this call is forensics.
-    A guard that can fail closed on healthy geometry is worse than no guard.
+    The verdict is produced by ``_common.record_sketch_closure`` -- ONE read,
+    shared with the forensics record -- so this decision is pure and testable
+    without any COM at all.
     """
-    evidence, warnings = _closure(monkeypatch, checked)
-
-    assert len(warnings) == 1
-    assert "proceeding to the extrude" in warnings[0]
-    assert evidence
+    monkeypatch.setattr(diag, "record_sketch_closure",
+                        lambda _a, _l, **_kw: verdict)
+    return diag.assert_profile_closed(object(), "ring", loops=loops)
 
 
-@pytest.mark.parametrize("checked", [None, 0, (0, 2), (0, 0, 2, 4), (0, -1, 2)])
-def test_an_unreadable_check_result_is_unknown_not_failure(
-    monkeypatch, checked
+def test_a_measured_open_profile_fails_the_build(monkeypatch) -> None:
+    """Zero contours is a MEASUREMENT of the failure mode, so it must raise."""
+    with pytest.raises(RuntimeError, match="profile did not close"):
+        _verdict(monkeypatch, {
+            "closure": "open",
+            "contour_count": 0,
+            "segment_count": 9,
+            "point_count": 18,
+            "unmerged_points": 9,
+        })
+
+
+def test_an_unreadable_verdict_does_not_fail_the_build(monkeypatch) -> None:
+    """The ABSENCE of a measurement is not a measurement of absence.
+
+    An RPC hiccup becoming a geometry failure would be a guard that fails
+    closed on healthy geometry, which is worse than no guard.  The real gates
+    are offline (``endpoint_merges``, ``minor_arc``) and have already run.
+    """
+    verdict = {"closure": "unknown", "point_census_error": "RPC_E_DISCONNECTED"}
+
+    assert _verdict(monkeypatch, verdict) is verdict
+
+
+def test_a_contour_count_that_disagrees_does_not_fail_the_build(
+    monkeypatch,
 ) -> None:
-    """Including the shape the learning doc implies: anything but a triple."""
-    evidence, warnings = _closure(monkeypatch, checked)
+    """It is unmeasured whether a revolve centreline counts as a contour.
 
-    assert len(warnings) == 1
-    assert evidence == "points=9, check=unreadable"
+    99607A213 draws its revolve axis into the same sketch as its profile, so a
+    healthy one-loop flare could legitimately report two contours.  Until that
+    is measured on a seat, the COUNT may warn but may not fail; only zero does.
+    """
+    verdict = {"closure": "closed", "contour_count": 3, "segment_count": 9}
+
+    assert _verdict(monkeypatch, verdict) is verdict
+
+
+def test_the_closed_verdict_is_returned_for_failure_context(monkeypatch) -> None:
+    """The caller passes these counts to ``capture_com_failure``.
+
+    Returning the verdict is what removes the SECOND COM read: the extrude's
+    failure context and the closure record come from the same numbers.
+    """
+    verdict = {"closure": "closed", "contour_count": 2, "unmerged_points": 0}
+
+    assert _verdict(monkeypatch, verdict) == verdict
 
 
 def test_the_snap_family_is_recorded_and_never_written(monkeypatch) -> None:

@@ -43,6 +43,8 @@ from _common import (  # noqa: E402
     _early_bound,
     _read_member,
     check,
+    log_profile_geometry,
+    record_sketch_closure,
 )
 from diagnostics.sketch_profile import (  # noqa: E402
     Line,
@@ -330,134 +332,55 @@ def no_sketch_inference(adapter):
             apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
 
 
-# swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE
-_SW_CHECK_BASEEXTRUDE = 1
+def assert_profile_closed(adapter, label: str, *, loops: int) -> dict:
+    """Decide, from ONE closure read, whether the profile really closed.
 
-# swSketchCheckFeatureStatus_e values, for NAMING what the read-back saw.  None
-# of these fails a build; see :func:`_report_profile_closure` for why.
-_SW_CHECK_STATUS: dict[int, str] = {
-    1: "EntXEnt (self-intersecting contour)",
-    2: "EntXSelf (self-intersecting entity)",
-    3: "EntUnspecBad (self-intersecting entity)",
-    4: "ThreeEnts (an endpoint is shared by more than two entities)",
-    6: "WrongOpen (the sketch contains an open contour)",
-    9: "ManyOpen (more than one open contour)",
-    11: "MixedContours (both open and closed contours -- a merge did not take)",
-    12: "CturXCtur (intersecting contours)",
-    14: "OpenWantClosed (the contour is open)",
-    22: "OpenOrUnclear (selected contours are open or ambiguous)",
-}
+    Call immediately after ``exit_sketch``.  The read itself belongs to
+    ``_common.record_sketch_closure``, which resolves the last profile
+    feature's sketch, logs one uniform line, emits a ``sketch.closure`` span
+    event and returns the verdict -- so the seat is interrogated ONCE and both
+    the forensics record and this decision come from the same numbers.  This
+    function only decides the raise.
 
+    The decision turns on the verdict's TRI-STATE ``closure``:
 
-def _report_profile_closure(adapter, label: str, loops: int, segments: int) -> str:
-    """Read back what the ACTIVE sketch thinks of itself, before extruding.
+    * ``"closed"`` -- contours exist.  Accepted.
+    * ``"open"`` -- the seat reported zero contours.  That is a MEASUREMENT of
+      the exact failure mode this module exists to prevent, so it raises.
+    * ``"unknown"`` -- the read failed.  The ABSENCE of a measurement, not a
+      measurement of absence, so it must NOT raise: an RPC hiccup becoming a
+      geometry failure would be a guard that fails closed on healthy geometry,
+      which is worse than no guard.
 
-    ``ISketch.CheckFeatureUse`` is the purpose-built answer to "why did
-    ``FeatureExtrusion3`` return ``None``": a status plus two contour counts.
-    It is used here as FORENSICS, not as the closure guarantee.  The guarantee
-    is the explicit merge relations, every one of which was checked as it was
-    added; this call exists so a failure names the defect at the sketch that
-    has it instead of surfacing later as a bare ``None``.
+    A contour count that merely disagrees with ``loops`` also does not raise.
+    ``record_sketch_closure`` warns about it, and the count cannot be trusted
+    to fail a build while it is unmeasured whether a revolve centreline in the
+    same sketch registers as a contour (99607A213 draws exactly that).
 
-    That distinction decides the error policy, because TWO things about the
-    return are unresolved and neither can be settled without a seat:
+    The REAL gates are offline and have already run by the time this is
+    called: :func:`endpoint_merges` refuses any vertex not shared by exactly
+    two segment ends, and :func:`minor_arc` refuses an endpoint that has
+    arrived at its arc's centre -- which is the realised shape of an inference
+    snap, since an outer arc's nearest wrong target is its own centre.  This
+    read-back is the seat's OUTCOME set against that authored intent, not the
+    guarantee.
 
-    * **Which count is which.**  ``learnings/troubleshooting-extrusion-\
-failures.md`` reads the second value as the status and the third as the open
-      count; the live signature reads ``(status, open, closed)``.  Comparing
-      the two counts as an unordered pair makes the order immaterial -- a
-      healthy profile is ``{0, loops}`` under EITHER reading -- so nothing here
-      bets on an interpretation.
-    * **Whether construction geometry counts.**  Several callers draw a revolve
-      centreline into the same sketch (99607A213's flare, for one).  If a
-      centreline registers as an open contour then a perfectly good profile
-      reports ``open=1`` and status 6 ``WrongOpen``.  Nobody has measured this.
-
-    So the ONLY condition that raises is the one that is a defect under every
-    candidate reading of every unresolved question: **both counts zero**, i.e.
-    the sketch has no contour of any kind after ``segments`` segments were
-    drawn and related.  No ordering makes that healthy and no construction-
-    geometry rule explains it away.
-
-    Everything else is a log line.  Counts that match ``{0, loops}`` are
-    reported as clean; anything else is reported as UNRESOLVED and the build
-    proceeds to the extrude, where :func:`capture_com_failure` produces the
-    forensics if it really is broken.  A guard that can fail closed on healthy
-    geometry is worse than no guard: this one cannot.
-
-    The sketch-point count is the second, independent signal.  Each ``merge``
-    WELDS two endpoints into one point, so a fully merged profile has one point
-    per vertex and a wholly unmerged one has two.  That is why the junctions are
-    related with ``merge`` rather than ``coincident`` -- a coincident pair stays
-    two points and this count cannot tell the two states apart.
-
-    Returns the evidence string, which the caller logs either way.
+    Returns the verdict dict, so the caller can pass its counts into
+    :func:`capture_com_failure` as context instead of re-reading the sketch.
     """
-    sketch = adapter._attempt(lambda: adapter.currentModel.SketchManager.ActiveSketch)
-    if sketch is None:
-        raise RuntimeError(f"{label}: no active sketch to verify closure on")
-    sketch = _early_bound(sketch, "ISketch")
-    points = adapter._attempt(lambda: len(sketch.GetSketchPoints2() or ()), default=None)
-    checked = adapter._attempt(
-        lambda: sketch.CheckFeatureUse(_SW_CHECK_BASEEXTRUDE, 0, 0), default=None
-    )
-    counts = _check_use_counts(checked)
-    if counts is None:
-        _telemetry.warn(
-            f"{label}: ISketch.CheckFeatureUse returned {checked!r}, which is not "
-            f"a status and two counts -- closure unverified, relations were all "
-            f"applied (points={points})"
-        )
-        return f"points={points}, check=unreadable"
-    status, pair = counts
-    named = _SW_CHECK_STATUS.get(status)
-    evidence = (
-        f"points={points}, status={status}"
-        + (f" = {named}" if named else "")
-        + f", contours={pair[0]}/{pair[1]}"
-    )
-    if pair == (0, 0):
+    verdict = record_sketch_closure(adapter, label, expect_contours=loops)
+    if verdict.get("closure") == "open":
         raise RuntimeError(
-            f"{label}: profile did not close -- the sketch reports NO contours "
-            f"at all after {segments} segments were drawn and every merge "
-            f"relation was applied ({evidence}).  Zero closed contours whichever "
-            "way CheckFeatureUse orders its counts, so this is a geometry defect "
-            "in the profile, not a seat setting."
+            f"{label}: profile did not close -- the seat reports "
+            f"{verdict.get('contour_count')} contours over "
+            f"{verdict.get('segment_count')} segments "
+            f"({verdict.get('point_count')} sketch points, "
+            f"unmerged_points={verdict.get('unmerged_points')}).  Every merge "
+            "relation was applied and the coordinates closed offline, so this "
+            "is a geometry defect in the profile, not a seat setting."
         )
-    if pair != tuple(sorted((0, loops))):
-        # UNRESOLVED, not failed: see the docstring.  Extruding anyway is what
-        # keeps a wrong reading of this diagnostic from failing good builds.
-        _telemetry.warn(
-            f"{label}: CheckFeatureUse reports contour counts {pair[0]}/{pair[1]}, "
-            f"expected {{0, {loops}}} in some order; proceeding to the extrude "
-            f"({evidence}).  Construction geometry in this sketch may account "
-            "for it -- unmeasured."
-        )
-    elif status != 0:
-        _telemetry.warn(
-            f"{label}: contour counts are what was authored but CheckFeatureUse "
-            f"still reports a nonzero status; proceeding to the extrude "
-            f"({evidence})"
-        )
-    return evidence
+    return verdict
 
-
-def _check_use_counts(checked) -> tuple[int, tuple[int, int]] | None:
-    """``CheckFeatureUse``'s return as ``(status, sorted counts)``, or ``None``.
-
-    ``None`` means the shape is not the one this code knows how to read -- the
-    diagnostic was unavailable, or returned something other than a status and
-    two non-negative integer counts.  The caller treats that as unknown.
-    """
-    if checked is None:
-        return None
-    try:
-        values = [int(v) for v in checked]
-    except (TypeError, ValueError):
-        return None
-    if len(values) != 3 or values[1] < 0 or values[2] < 0:
-        return None
-    return values[0], (min(values[1], values[2]), max(values[1], values[2]))
 
 
 async def draw_closed_profile(
@@ -500,13 +423,16 @@ async def draw_closed_profile(
     ``loops`` is the number of closed loops the profile must form -- 2 for a
     ring (outer boundary plus the hole), 1 for a plain region.  It is ASSERTED
     offline, against the coordinates, before any COM call: that assertion plus
-    the checked merge relations ARE the closure guarantee.  The finished sketch
-    is then read back through ``ISketch.CheckFeatureUse``
-    (:func:`_report_profile_closure`) purely to record what the seat made of
-    it, so a later failure names the sketch that has the defect instead of
-    surfacing as a bare ``None`` from the extrude that consumes it.  That
-    read-back deliberately cannot fail a build except when the sketch reports
-    no contours at all; see its docstring.
+    the checked merge relations ARE the closure guarantee, and together with
+    :func:`minor_arc`'s refusal of a zero-radius arc they are what catches a
+    corner that an inference snap would have collapsed.
+
+    The authored INTENT is recorded before drawing
+    (``_common.log_profile_geometry``); the seat's OUTCOME is read once after
+    ``exit_sketch`` by :func:`assert_profile_closed`, which the CALLER invokes
+    because the read resolves the last profile feature's sketch and so needs
+    the sketch closed.  The pair is what makes a success comparable with a
+    failure -- the leaf that failed on 2026-09-17 recorded neither.
 
     Returns the created entity IDs, in ``segments`` order.
     """
@@ -516,6 +442,14 @@ async def draw_closed_profile(
         raise ValueError(
             f"{label}: profile forms {found} closed loop(s), expected {loops}"
         )
+    # The author's INTENT, in pure Python, before a single COM call: authored
+    # points, distinct places, expected merges.  Set against the seat's
+    # outcome in assert_profile_closed, this is what turns "it failed" into
+    # "it failed HERE, and here is what it should have been".
+    log_profile_geometry(
+        label,
+        [end for segment in segments for end in (segment.start, segment.end)],
+    )
     ids: list[str] = []
     with no_sketch_inference(adapter):
         sketch_mgr = adapter.currentSketchManager
@@ -548,10 +482,9 @@ async def draw_closed_profile(
                     "merge",
                 ),
             )
-    evidence = _report_profile_closure(adapter, label, loops, len(segments))
     _telemetry.info(
         f"{label}: {len(segments)} segments, {len(merges)} explicit merges, "
-        f"{loops} loops ({evidence})"
+        f"{loops} loops authored"
     )
     return ids
 
