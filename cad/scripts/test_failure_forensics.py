@@ -189,6 +189,9 @@ class _Seat:
     def RevisionNumber(self) -> str:
         return "34.3.0"
 
+    def GetCurrentWorkingDirectory(self) -> str:
+        return r"C:\harmonic\work\sources\6621e07a\workspace\cad\out\sldprt\\"
+
     def GetUserPreferenceToggle(self, pref: int) -> Any:
         if pref in self._toggles:
             return self._toggles[pref]
@@ -525,6 +528,19 @@ def test_seat_provenance_names_the_seat_and_its_origin(capture_telemetry):
     # phase span, so logs.jsonl is the only place their seat is attributable.
     bodies = [r.log_record.body for r in logs.get_finished_logs()]
     assert any("pid=4242" in str(body) for body in bodies)
+
+
+def test_seat_provenance_records_where_the_seat_is_parked():
+    """A seat's working directory inside a leaf workspace PINS that directory:
+    eviction's ``os.rmdir`` then fails with a sharing violation even though every
+    file in it deleted, and the leaf dies carrying no log. Tonight that took a
+    PEB probe of every process over run-command to establish; the seat answers
+    the same question itself, so record its answer."""
+    prov = _common.seat_provenance(_Adapter(sw=_Seat()))
+
+    assert prov["seat_working_directory"].endswith(r"workspace\cad\out\sldprt" + "\\\\")
+    # Unreadable is absent, never a fabricated path.
+    assert "seat_working_directory" not in _common.seat_provenance(_Adapter())
 
 
 def test_seat_origin_distinguishes_a_seat_this_build_started(monkeypatch):

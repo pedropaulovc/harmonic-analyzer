@@ -2618,6 +2618,27 @@ def _seat_identity_of(adapter: Any) -> dict[str, Any]:
     return ident
 
 
+def _seat_working_directory(adapter: Any) -> dict[str, Any]:
+    """The directory the SEAT is sitting in, re-read per call.
+
+    ``sldworks.exe`` moves its own working directory as documents are opened and
+    saved, and a seat parked inside a leaf's workspace PINS that directory: the
+    pool's source-root eviction then fails ``os.rmdir`` with a sharing violation
+    on a directory whose files all deleted fine, and the leaf dies with
+    ``(log: None)`` -- an infrastructure failure carrying no log at all. That
+    happened tonight on the ``export`` leaf and was identified only by probing
+    every process's PEB for its current directory over run-command. Recording
+    the seat's own answer makes the next one readable off the artefact.
+    """
+    sw = getattr(adapter, "swApp", None)
+    if sw is None:
+        return {}
+    value = adapter._attempt(
+        lambda: _read_member(sw, "GetCurrentWorkingDirectory"), default=None
+    )
+    return {"seat_working_directory": str(value)} if value else {}
+
+
 def _seat_liveness(pid: Any, started: Any) -> dict[str, Any]:
     """How old and how big the seat is RIGHT NOW (re-read on every call)."""
     live: dict[str, Any] = {}
@@ -2639,8 +2660,9 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
     Flat ``seat_*`` keys, so the whole set can ride as span attributes (OTel
     attribute values are scalars) and one filter over ``traces.jsonl`` /
     ``logs.jsonl`` finds every one of them. The immutable half is resolved once
-    per process and cached; uptime and memory are re-read per call, so a failure
-    capture records the seat as it was at the moment it failed.
+    per process and cached; uptime, memory and the seat's working directory are
+    re-read per call, so a failure capture records the seat as it was at the
+    moment it failed.
     """
     global _seat_identity
     if not _seat_identity:
@@ -2653,6 +2675,7 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
         prov.update(
             _seat_liveness(prov.get("seat_pid"), prov.get("seat_started_epoch_s"))
         )
+        prov.update(_seat_working_directory(adapter))
     except Exception as exc:  # noqa: BLE001 - provenance is never fatal
         prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
     return prov
