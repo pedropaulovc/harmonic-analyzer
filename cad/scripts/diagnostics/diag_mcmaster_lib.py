@@ -262,26 +262,40 @@ def apply_sketch_preferences(
     and faithfully writes it back forever.  Every write target here is a
     declared constant, so nothing can latch.
 
-    ``ISldWorks.SetUserPreferenceToggle`` reports refusal by RETURNING False,
-    not by raising: a preference the seat will not change is left at its old
-    value and the call otherwise looks like a success.  Discarding that return
-    would let the two silent lies this module exists to prevent straight
-    through -- :func:`no_sketch_inference` drawing with inference still live,
-    and :func:`assert_seat_sketch_baseline` announcing a repair that never
-    happened -- so every write is checked and a refusal raises.  Raising is
-    what routes a refused SUPPRESSION into ``no_sketch_inference``'s failed-
-    ENTRY path, which puts the declared baseline back before propagating.
+    A refused write is DETECTED BY READ-BACK, never by the call's return
+    value.  ``ISldWorks.SetUserPreferenceToggle`` is declared ``VT_VOID``
+    (dispid 45, retval ``(24, 0)`` in this install's makepy module), so
+    pywin32 hands back ``None`` on SUCCESS and ``if not app.Set...()`` would
+    reject every write that worked.  The ``VT_BOOL`` form of this method
+    belongs to other interfaces -- ``IModelDoc``/``IModelDoc2`` (dispid 65844)
+    and ``IModelDocExtension`` (dispid 159) -- and ``adapter.swApp`` is none of
+    them.  This is the repo's standing COM rule (truth-test only a real
+    ``VARIANT_BOOL``; verify a void mutator by authoritative read-back) and the
+    same shape that once produced a false dimension-prefix failure from
+    ``IDisplayDimension.SetText``.  ``_common._write_preferences`` verifies the
+    same API the same way, for the same reason.
+
+    Checking at all is what keeps two silent lies out: a seat that declines the
+    write leaves :func:`no_sketch_inference` drawing with inference still live,
+    and leaves :func:`assert_seat_sketch_baseline` announcing a repair that
+    never happened to the pool's leaf-admission audit.  A refusal RAISES here,
+    unlike ``_write_preferences`` (which reports), because these three are
+    application-level system options a recipe declares it needs, not the
+    per-document family that is write-ignored by design; and raising is what
+    routes a refused SUPPRESSION into ``no_sketch_inference``'s failed-ENTRY
+    path, which puts the declared baseline back before propagating.
     """
     app = adapter.swApp
     changed: list[str] = []
     for name, (toggle, required) in state.items():
         if bool(app.GetUserPreferenceToggle(toggle)) != required:
             changed.append(name)
-        if not app.SetUserPreferenceToggle(toggle, required):
+        app.SetUserPreferenceToggle(toggle, required)
+        settled = bool(app.GetUserPreferenceToggle(toggle))
+        if settled != required:
             raise RuntimeError(
                 f"the seat refused to set {name} (toggle {toggle}) to "
-                f"{required}: SetUserPreferenceToggle returned False, so the "
-                "preference still holds its previous value"
+                f"{required}: it still reads back {settled} after the write"
             )
     return changed
 
@@ -338,7 +352,7 @@ def no_sketch_inference(adapter):
     The counter is raised only AFTER the suppression write succeeds.  Raising
     it first would pin it forever if ``apply_sketch_preferences`` threw --
     ``SetUserPreferenceToggle`` is a COM call on a seat that may be dying, and
-    it also RETURNS False for a write the seat refuses, which
+    a seat that silently declines the write fails its read-back, which
     ``apply_sketch_preferences`` turns into a raise -- because the ``finally``
     that lowers it would never have been entered.
     Every later block on that adapter would then see a nonzero depth and
@@ -412,6 +426,23 @@ def assert_profile_closed(
 
     Returns the verdict dict, so the caller can pass its counts into
     :func:`capture_com_failure` as context instead of re-reading the sketch.
+
+    The raise reports ``coincident_point_pairs``, the direct fingerprint of
+    this failure: a closed N-segment chain whose endpoints MERGED keeps N
+    points at N distinct places, while the same chain unmerged keeps 2N points
+    sitting in N coincident pairs.  ``_point_census`` fills it in whenever the
+    seat returned point coordinates it could read -- it is gated on ``places``
+    being non-empty, so an unreadable census degrades it to absent, which is
+    honest: the number was not measured.  That is the opposite of
+    ``unmerged_points``, which ``_sketch_state`` derives only when it is given
+    ``expected_points`` and which this path therefore could NEVER populate --
+    a permanently absent number in the one message that has to be readable off
+    a dead leaf's log.  ``expected_points`` is not plumbed through to supply
+    it, because it would be wrong here: it is
+    compared against the sketch's TOTAL point count, and 99607A213 draws a
+    revolve centreline in this same sketch, so the authored vertex count would
+    understate the total by that centreline's two points and report a healthy
+    profile as having two unmerged endpoints.
     """
     verdict = record_sketch_closure(
         adapter, label, feature, expect_contours=loops
@@ -421,10 +452,12 @@ def assert_profile_closed(
             f"{label}: profile did not close -- the seat reports "
             f"{verdict.get('contour_count')} contours over "
             f"{verdict.get('segment_count')} segments "
-            f"({verdict.get('point_count')} sketch points, "
-            f"unmerged_points={verdict.get('unmerged_points')}).  Every merge "
-            "relation was applied and the coordinates closed offline, so this "
-            "is a geometry defect in the profile, not a seat setting."
+            f"({verdict.get('point_count')} sketch points over "
+            f"{verdict.get('distinct_point_positions')} distinct places, "
+            f"coincident_point_pairs={verdict.get('coincident_point_pairs')})."
+            "  Every merge relation was applied and the coordinates closed "
+            "offline, so this is a geometry defect in the profile, not a seat "
+            "setting."
         )
     return verdict
 

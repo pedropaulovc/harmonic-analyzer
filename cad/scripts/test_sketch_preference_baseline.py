@@ -91,12 +91,20 @@ AUDIT_EXEMPT = {
 class _SwApp:
     """Records every preference write, so restore ORDER and VALUES are visible.
 
-    ``refuse`` models the real API's SILENT failure mode: ISldWorks
-    .SetUserPreferenceToggle returns False and leaves the preference at its old
-    value rather than raising, so a seat that will not take a write is
-    indistinguishable from one that took it unless the return is read.  Each
-    member is a ``(toggle, value)`` pair, so a fake can refuse the suppression
-    write while still accepting the baseline restore that follows it.
+    ``SetUserPreferenceToggle`` returns ``None``, because that is what the real
+    one does: on ``ISldWorks`` it is declared ``VT_VOID`` (dispid 45, retval
+    ``(24, 0)``), so pywin32 returns ``None`` on SUCCESS.  The ``VT_BOOL`` form
+    lives on ``IModelDoc``/``IModelDoc2`` (65844) and ``IModelDocExtension``
+    (159), and ``adapter.swApp`` is none of those.  A fake that returned a
+    truthy value here would agree with the code under test instead of with the
+    interface, and would green-light a guard that rejects every successful
+    write on a live seat.
+
+    ``refuse`` models the real SILENT failure: the call is accepted, returns
+    nothing, and the preference simply does not move -- so a refused write is
+    indistinguishable from a successful one except by READ-BACK.  Each member
+    is a ``(toggle, value)`` pair, so a fake can decline the suppression write
+    while still accepting the baseline restore that follows it.
     """
 
     def __init__(
@@ -111,12 +119,12 @@ class _SwApp:
     def GetUserPreferenceToggle(self, toggle: int) -> bool:
         return self.toggles[toggle]
 
-    def SetUserPreferenceToggle(self, toggle: int, value: bool) -> bool:
-        if (toggle, bool(value)) in self.refuse:
-            return False
-        self.toggles[toggle] = bool(value)
+    def SetUserPreferenceToggle(self, toggle: int, value: bool) -> None:
+        # The seat receives the call either way; only the effect differs.
         self.writes.append((toggle, bool(value)))
-        return True
+        if (toggle, bool(value)) in self.refuse:
+            return
+        self.toggles[toggle] = bool(value)
 
 
 class _Adapter:
@@ -279,12 +287,11 @@ def test_a_failed_entry_does_not_pin_the_depth_counter() -> None:
     failing = adapter.swApp
     calls: list[int] = []
 
-    def _set(toggle: int, value: bool) -> bool:
+    def _set(toggle: int, value: bool) -> None:
         calls.append(toggle)
         if value is False:
             raise OSError("the seat dropped the connection")
         failing.toggles[toggle] = bool(value)
-        return True
 
     adapter.swApp.SetUserPreferenceToggle = _set
 
@@ -304,16 +311,37 @@ def test_a_failed_entry_does_not_pin_the_depth_counter() -> None:
     assert adapter.swApp.writes, "a later block stopped applying preferences"
 
 
-def test_a_refused_suppression_write_is_not_reported_as_applied() -> None:
-    """``SetUserPreferenceToggle`` returning False is a REFUSED write.
+def test_a_successful_void_write_is_not_mistaken_for_a_failure() -> None:
+    """The regression that the return-value guard would fail on every seat.
 
-    The API does not raise for a preference it will not change: it returns
-    False and leaves the old value in place.  If the return is discarded, the
-    guard enters its body with inference still LIVE on a seat that never took
-    the suppression -- the exact per-seat divergence this module exists to
-    remove, now hidden behind a guard that claims to have removed it.  So the
-    refusal must propagate, the body must never run, and the seat must be left
-    at the declared baseline rather than half-suppressed.
+    ``ISldWorks.SetUserPreferenceToggle`` is ``VT_VOID``, so pywin32 returns
+    ``None`` when the write SUCCEEDS.  A guard written as
+    ``if not app.SetUserPreferenceToggle(...)`` therefore rejects every
+    successful write -- ``no_sketch_inference`` would raise before
+    ``draw_closed_profile`` authored a single segment, taking
+    ``_stock_fastener`` and every ``diag_build_*`` recipe with it, with an
+    error asserting the opposite of what happened.  The fake returns ``None``
+    here precisely so this test can see that; a fake that returned ``True``
+    would be agreeing with the code instead of with the interface.
+    """
+    adapter = _adapter_at(True)
+    assert adapter.swApp.SetUserPreferenceToggle(_ids()[0], True) is None
+
+    with diag.no_sketch_inference(adapter):
+        assert adapter.swApp.toggles == _state(False)
+    assert adapter.swApp.toggles == _state(True)
+    assert diag.assert_seat_sketch_baseline(adapter, "91247A720") == []
+
+
+def test_a_silently_declined_suppression_is_caught_by_read_back() -> None:
+    """A declined write is invisible in the return, so it is READ BACK.
+
+    The seat accepts the call, returns nothing, and leaves the preference
+    where it was.  Undetected, the guard enters its body with inference still
+    LIVE on a seat that never took the suppression -- the per-seat divergence
+    this module exists to remove, now hidden behind the guard that claims to
+    have removed it.  So the refusal must propagate, the body must never run,
+    and the seat must be left at the declared baseline, not half-suppressed.
     """
     inference = diag.SKETCH_DRAWING_STATE["swSketchInference"][0]
     adapter = _adapter_at(True, refuse=frozenset({(inference, False)}))
@@ -322,15 +350,19 @@ def test_a_refused_suppression_write_is_not_reported_as_applied() -> None:
         with diag.no_sketch_inference(adapter):
             raise AssertionError("the block must never run under a refused write")
 
+    # The call WAS made -- this is not a missing write, it is an ignored one.
+    assert (inference, False) in adapter.swApp.writes
     assert adapter.swApp.toggles == _state(True), "the baseline was not restored"
     assert getattr(adapter, "_sketch_drawing_depth", 0) == 0
 
 
-def test_a_refused_baseline_write_is_not_reported_as_a_repair(monkeypatch) -> None:
+def test_a_silently_declined_baseline_write_is_not_reported_as_a_repair(
+    monkeypatch,
+) -> None:
     """A repair that did not happen must not be announced as one.
 
     ``assert_seat_sketch_baseline`` decides "drifted" from a read taken BEFORE
-    the write.  On a seat that refuses the write, that read is still evidence
+    the write.  On a seat that declines the write, that read is still evidence
     of drift but the write did not fix it, so returning the name (and warning
     that it "has been reset") would tell the pool's leaf-admission audit the
     seat was repaired while it is still poisoned.
@@ -969,16 +1001,49 @@ def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
     return result
 
 
+# The verdict shape this call path can ACTUALLY produce.  Every key here is one
+# ``_sketch_state``/``_point_census`` fills in unconditionally; the logo ring
+# unmerged is 18 points sitting in 9 coincident pairs over 9 distinct places.
+# Deliberately does NOT carry ``unmerged_points``: ``_sketch_state`` derives
+# that only when given ``expected_points``, and
+# ``assert_profile_closed`` passes only ``expect_contours``.  Feeding it here
+# is what hid a permanently absent number in the raise.
+_OPEN_LOGO_VERDICT = {
+    "closure": "open",
+    "contour_count": 0,
+    "segment_count": 9,
+    "point_count": 18,
+    "distinct_point_positions": 9,
+    "coincident_point_pairs": 9,
+}
+
+
 def test_a_measured_open_profile_fails_the_build(monkeypatch) -> None:
     """Zero contours is a MEASUREMENT of the failure mode, so it must raise."""
     with pytest.raises(RuntimeError, match="profile did not close"):
-        _verdict(monkeypatch, {
-            "closure": "open",
-            "contour_count": 0,
-            "segment_count": 9,
-            "point_count": 18,
-            "unmerged_points": 9,
-        })
+        _verdict(monkeypatch, _OPEN_LOGO_VERDICT)
+
+
+def test_the_failure_message_carries_only_numbers_that_were_measured(
+    monkeypatch,
+) -> None:
+    """A dead leaf's log gets this string and nothing else, so it must be whole.
+
+    The message used to name ``unmerged_points``, which this path can never
+    populate, so the sole human-readable record of the failure carried a
+    literal ``None`` where the merge evidence should be.  A field that is
+    always absent is worse than an omitted one: it reads as "measured, and the
+    answer is nothing".
+    """
+    with pytest.raises(RuntimeError) as raised:
+        _verdict(monkeypatch, _OPEN_LOGO_VERDICT)
+    message = str(raised.value)
+
+    assert "None" not in message, message
+    # The fingerprint of an unmerged profile: 18 points over 9 places, 9 pairs.
+    assert "coincident_point_pairs=9" in message
+    assert "18 sketch points" in message
+    assert "9 distinct places" in message
 
 
 def test_an_unreadable_verdict_does_not_fail_the_build(monkeypatch) -> None:
