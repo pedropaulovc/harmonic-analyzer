@@ -45,49 +45,47 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 # --------------------------------------------------------------------------- #
-# Stub the one solidworks_mcp symbol verify.py imports at module load. The COM  #
-# behaviour itself comes from the mock adapter below; _gear_mate_links is       #
-# monkeypatched per-test, so this only needs to satisfy the import.             #
+# SolidWorks isolation. This module used to install bare `types.ModuleType`    #
+# stand-ins for `solidworks_mcp`, `.adapters`, `.adapters.solidworks` and      #
+# `.adapters.solidworks.assembly`, plus hand-written fakes for the few symbols #
+# the verify import graph reached. A bare ModuleType has no `__path__`, so     #
+# every submodule the enumeration did NOT fake died on import with            #
+# "solidworks_mcp.adapters is not a package" -- and the graph kept growing     #
+# past the list (`_part_pmi` -> `...pywin32_adapter.null_callout`,             #
+# `_native_spring_contact` -> `...com_variant.dispatch_array`), which is how   #
+# collection of this file broke. Faking submodules one at a time is a race     #
+# against the import graph, so the fakes are GONE: the REAL package is         #
+# imported instead. It is import-safe and seat-free -- importing it binds      #
+# pywin32 but never dispatches SolidWorks (no `sw.connect`, ~0.6 s), and the   #
+# COM behaviour under test still comes from the mock adapter below, which      #
+# `_verify_static_one` is handed explicitly. `_gear_mate_links` is             #
+# monkeypatched per-test, so the real one is never called either.              #
+#                                                                             #
+# What the fakes DID carry that the real package cannot is one behavioural     #
+# neutralization, kept below.                                                  #
 # --------------------------------------------------------------------------- #
-def _install_solidworks_stub() -> None:
-    for name in (
-        "solidworks_mcp",
-        "solidworks_mcp.adapters",
-        "solidworks_mcp.adapters.solidworks",
-        "solidworks_mcp.adapters.solidworks.assembly",
-    ):
-        if name not in sys.modules:
-            sys.modules[name] = types.ModuleType(name)
-    asm = sys.modules["solidworks_mcp.adapters.solidworks.assembly"]
-    if not hasattr(asm, "_gear_mate_links"):
-        asm._gear_mate_links = lambda adapter: []  # type: ignore[attr-defined]
-    # _common._flag does `from solidworks_mcp.adapters import sw_type_info` then
-    # sw_type_info.flag_methods(...). Provide a no-op so method-flagging is a
-    # silent no-op on the mock (real seat flags COM dispatch; the mock needs none).
-    sti_name = "solidworks_mcp.adapters.sw_type_info"
-    if sti_name not in sys.modules:
-        sti = types.ModuleType(sti_name)
-        sti.flag_methods = lambda obj, iface: None  # type: ignore[attr-defined]
-        sys.modules[sti_name] = sti
-        sys.modules["solidworks_mcp.adapters"].sw_type_info = sti  # type: ignore[attr-defined]
-    # Some helpers import parameter classes from solidworks_mcp.adapters.base at
-    # runtime; a permissive kwargs holder is enough to satisfy those imports.
-    base_name = "solidworks_mcp.adapters.base"
-    if base_name not in sys.modules:
-        base = types.ModuleType(base_name)
+def _neutralize_com_method_flagging() -> None:
+    """Keep `sw_type_info.flag_methods` a no-op against the mock.
 
-        class _Params:  # accepts any kwargs
-            def __init__(self, **kw: Any) -> None:
-                self.__dict__.update(kw)
+    Flagging exists so pywin32 dispatches zero-arg SolidWorks methods as
+    methods rather than properties; the mock objects are plain Python with no
+    `_oleobj_`, so there is nothing to flag. On the real module the call would
+    import the vendored makepy wrapper (6 MB of generated classes) just to
+    attempt `_FlagAsMethod` on objects that have none.
 
-        base.SuppressMateParameters = _Params  # type: ignore[attr-defined]
-        base.MateEntityRef = _Params  # type: ignore[attr-defined]
-        base.RenameFeatureParameters = _Params  # type: ignore[attr-defined]
-        sys.modules[base_name] = base
-        sys.modules["solidworks_mcp.adapters"].base = base  # type: ignore[attr-defined]
+    Measured today the gate never reaches it (0 calls across the 14 tests):
+    `_common._early_bound` passes a test double straight through before it
+    touches `sw_type_info`, and `_common._flag` -- the caller the removed stub
+    was written for -- no longer has call sites. This stays as the standing
+    isolation invariant the stub module used to provide, so a gate that starts
+    flagging methods cannot pull real COM type info into a seatless gate.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    sw_type_info.flag_methods = lambda obj, *interfaces: 0  # type: ignore[assignment]
 
 
-_install_solidworks_stub()
+_neutralize_com_method_flagging()
 
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
