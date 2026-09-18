@@ -34,10 +34,17 @@ materials) -> gray.
 Run after any --rebuild so the render cache tracks geometry:
 
     uv run python cad\\scripts\\export_models.py
+
+The comparison gallery (Blender, no SolidWorks) is a SEPARATE stage -- this
+module's ``--comparisons`` mode, wired as the ``gallery`` doit task -- so the
+export above can run on a SolidWorks farm worker that has no renderer:
+
+    uv run python cad\\scripts\\export_models.py --comparisons
 """
 
 from __future__ import annotations
 
+import argparse
 import copy
 import hashlib
 import json
@@ -95,11 +102,9 @@ NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
 NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
 TOP_ASSEMBLY = "harmonic-analyzer"
 
-# Comparison gallery, produced by THIS export stage from the STLs written above
-# (so `doit export` yields an up-to-date gallery for the release to bundle). Both
-# are PEP-723 scripts run via `uv run`; render_offline drives Blender (no
-# SolidWorks). See refresh_comparison_gallery -- best-effort (Blender is on a
-# separate GPU seat), and cut_release.stage_comparisons ships the result.
+# Comparison gallery, produced separately from the exported STLs by
+# ``--comparisons``. The PEP-723 tools run without SolidWorks; render_offline
+# drives Blender, and cut_release.stage_comparisons ships the generated result.
 REPO = CAD_ROOT.parent
 COMPARISONS_DIR = CAD_ROOT / "comparisons"
 RENDER_OFFLINE = COMPARISONS_DIR / "tools" / "render_offline.py"
@@ -1091,7 +1096,7 @@ def assert_configs_distinct(stem: str, crc_by_mesh: dict[str, int]) -> None:
 def _run_tool(cmd: list[str], tag: str) -> list[str]:
     """Run a PEP-723 comparison tool via ``uv run`` from the repo root, streaming
     its output line-by-line (a Blender render takes minutes) and raising on a
-    non-zero exit (kept for the caller's best-effort catch)."""
+    non-zero exit."""
     proc = subprocess.Popen(cmd, cwd=str(REPO), stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, bufsize=1)
     output: list[str] = []
@@ -1173,8 +1178,9 @@ def _gallery_outputs_complete(manifest: dict[str, Any]) -> bool:
 def _stamp_gallery_outputs_current(manifest: dict[str, Any]) -> None:
     """Restamp the complete, digest-matched gallery after a stale-only no-op.
 
-    Export restamps its certified scene/mesh cache, so release staging's mtime
-    honesty guard needs the gallery certificate to move with that post-condition.
+    This task's post-condition is "gallery current", so release staging's mtime
+    honesty guard needs the gallery certificate to move with it even when
+    nothing re-rendered.
     This is safe only on the branch where the input digest matches and every
     required output was validated as complete.
     """
@@ -1249,9 +1255,7 @@ def _prune_stale_gallery() -> None:
             scores = json.loads(scores_f.read_text(encoding="utf-8"))
         except ValueError:
             # An interrupted run can leave the (ignored, regenerable) file
-            # malformed; raising here would ride refresh_comparison_gallery's
-            # best-effort catch and block regeneration forever. Delete it —
-            # the composite pass rewrites it from scratch.
+            # malformed. Delete it so the composite pass can regenerate it.
             scores_f.unlink()
             log("deleted corrupt scores.json (composite pass regenerates it)")
             return
@@ -1263,10 +1267,8 @@ def _prune_stale_gallery() -> None:
                 f"{'y' if len(scores) - len(kept) == 1 else 'ies'}")
 
 
-def refresh_comparison_gallery() -> bool:
-    """Produce the offline comparison gallery from the STLs this export just
-    wrote, so ``doit export`` yields an up-to-date gallery that the release then
-    bundles (cut_release.stage_comparisons). Returns True if refreshed.
+def refresh_comparison_gallery() -> None:
+    """Produce the offline comparison gallery from the exported STLs.
 
     Runs render_offline (Blender, no SolidWorks) ``--stale-only`` when the
     content-keyed gallery inputs are unchanged, so only pairs whose geometry
@@ -1276,66 +1278,109 @@ def refresh_comparison_gallery() -> bool:
     composite pass is needed only when outputs remain incomplete. Gallery HTML
     is rebuilt only when renders or gallery inputs changed.
 
-    Blender is a release prerequisite: a missing renderer fails the export loudly
-    rather than silently producing a bundle without its comparison gallery. Other
-    renderer failures remain best-effort so a transient comparison fault does not
-    discard certified CAD exports.
+    This is the whole of ``--comparisons`` (the ``gallery`` doit task), so every
+    failure is FATAL: a missing renderer or a failed render/scoring step must
+    fail the task rather than let the release bundle a stale gallery.
     """
     with _telemetry.span("export.comparisons") as sp:
+        manifest = json.loads(
+            (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
+        )
+        input_digest = _gallery_input_digest(manifest)
+        inputs_changed = _gallery_stamp_digest() != input_digest
+        _prune_stale_gallery()
+        render_cmd = ["uv", "run", str(RENDER_OFFLINE)]
+        if not inputs_changed:
+            render_cmd.append("--stale-only")
         try:
-            manifest = json.loads(
-                (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
-            )
-            input_digest = _gallery_input_digest(manifest)
-            inputs_changed = _gallery_stamp_digest() != input_digest
-            _prune_stale_gallery()
-            render_cmd = ["uv", "run", str(RENDER_OFFLINE)]
-            if not inputs_changed:
-                render_cmd.append("--stale-only")
             render_lines = _run_tool(render_cmd, "cmp")
-            rendered = _rendered_pair_ids(render_lines)
-            pair_count = len(manifest.get("pairs", []))
-            outputs_complete = _gallery_outputs_complete(manifest)
-            full_composite = (
-                not outputs_complete
-                or (inputs_changed and len(rendered) < pair_count)
-            )
-            if full_composite:
-                _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
-            refreshed = bool(rendered or inputs_changed or not outputs_complete)
-            if refreshed:
-                _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
-            else:
-                _stamp_gallery_outputs_current(manifest)
-                _telemetry.info("comparison gallery already current")
-                _telemetry.event("comparisons.current", pairs=pair_count)
-            _write_gallery_stamp(input_digest)
-            sp.set_attribute("rendered_pairs", len(rendered))
-            sp.set_attribute("full_composite", full_composite)
-            sp.set_attribute("outcome", "refreshed" if refreshed else "current")
-        except Exception as exc:  # noqa: BLE001 -- renderer faults are best-effort
-            if "BLENDER_UNAVAILABLE:" in str(exc):
-                raise RuntimeError(
-                    "comparison gallery requires Blender, but none was found; "
-                    "install Blender or set $HARMONIC_BLENDER"
-                ) from exc
-            _telemetry.warn(
-                f"comparison gallery not refreshed ({exc}); export continues -- "
-                "refresh on a Blender-equipped seat with "
-                "`uv run cad/comparisons/tools/render_offline.py`.")
-            _telemetry.event("comparisons.skipped", reason=str(exc)[:200])
-            sp.set_attribute("outcome", "skipped")
-            return False
+        except RuntimeError as exc:
+            # render_offline exits on the BLENDER_UNAVAILABLE sentinel when it
+            # cannot find a renderer; translate it into the fix instead of
+            # leaving a truncated tool tail as the whole diagnosis.
+            if "BLENDER_UNAVAILABLE:" not in str(exc):
+                raise
+            raise RuntimeError(
+                "comparison gallery requires Blender, but none was found; "
+                "install Blender or set $HARMONIC_BLENDER"
+            ) from exc
+        rendered = _rendered_pair_ids(render_lines)
+        pair_count = len(manifest.get("pairs", []))
+        outputs_complete = _gallery_outputs_complete(manifest)
+        full_composite = (
+            not outputs_complete
+            or (inputs_changed and len(rendered) < pair_count)
+        )
+        if full_composite:
+            _run_tool(["uv", "run", str(COMPOSITE_PY)], "composite")
+        refreshed = bool(rendered or inputs_changed or not outputs_complete)
         if refreshed:
+            _run_tool(["uv", "run", str(GALLERY_PY)], "gallery")
             _telemetry.info("comparison gallery refreshed from exported STLs")
-        return True
+        else:
+            _stamp_gallery_outputs_current(manifest)
+            _telemetry.info("comparison gallery already current")
+            _telemetry.event("comparisons.current", pairs=pair_count)
+        # ``outputs_complete`` was measured BEFORE composite/gallery ran, and
+        # ``_run_tool`` only proves exit 0. A tool that exits clean without
+        # writing its outputs would stamp the input digest anyway, so the next
+        # build -- and the release staging that trusts this certificate --
+        # would treat a hollow gallery as current (CodeRabbit, PR #770).
+        if not _gallery_outputs_complete(manifest):
+            raise RuntimeError(
+                "comparison gallery tools exited 0 without producing every "
+                "required render, composite and score output"
+            )
+        _write_gallery_stamp(input_digest)
+        sp.set_attribute("rendered_pairs", len(rendered))
+        sp.set_attribute("full_composite", full_composite)
+        sp.set_attribute("outcome", "refreshed" if refreshed else "current")
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Export the neutral CAD cache out of SolidWorks, or -- with "
+                    "--comparisons -- refresh only the offline comparison gallery.",
+    )
+    parser.add_argument(
+        "--comparisons",
+        action="store_true",
+        help="refresh ONLY the comparison gallery (Blender, never SolidWorks) "
+             "and exit; exports nothing",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="re-export every neutral output, ignoring the freshness cache",
+    )
+    parser.add_argument(
+        "--record-digests",
+        action="store_true",
+        help="RECORD the source recipe digests as the freshness cache -- only "
+             "the doit export task, which vouches every native is current",
+    )
+    args = parser.parse_args()
+    if args.comparisons and (args.force or args.record_digests):
+        parser.error(
+            "--comparisons refreshes only the comparison gallery and never "
+            "attaches to SolidWorks, so it cannot be combined with the export "
+            "selection flags --force / --record-digests"
+        )
+    return args
 
 
 def main() -> int:
+    args = _parse_args()
+    # The gallery is a separate, SolidWorks-free doit task (``gallery``) so the
+    # export above can run on a farm worker with no Blender and no GPU.
+    if args.comparisons:
+        refresh_comparison_gallery()
+        return 0
+
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
     # mtime-gated undeclared targets regenerate through the current logic, not just the
     # digest-gated declared ones (codex review).
-    force = "--force" in sys.argv[1:] or exporter_untrusted()
+    force = args.force or exporter_untrusted()
     # Only RECORD source digests when the caller vouches the natives are current --
     # i.e. the doit ``export`` task, which runs on the COM spine AFTER every part /
     # assembly is (re)built (dodo passes ``--record-digests``). A bare standalone run
@@ -1343,7 +1388,7 @@ def main() -> int:
     # later same-recipe build's fresh geometry look already-exported and get skipped
     # (codex review). Standalone still READS the cache (fast "all fresh"); it just
     # never writes, so it can never poison it.
-    record = "--record-digests" in sys.argv[1:]
+    record = args.record_digests
     colors = load_colors()
     digests = load_src_digests()
     certified = _certified_outputs()
@@ -1418,10 +1463,6 @@ def main() -> int:
             write_release_neutral_manifest(
                 parts, assemblies, scene_meshes, scene_assemblies, colors, digests,
             )
-        # Geometry unchanged, but still reconcile the gallery (cheap: --stale-only
-        # is a no-op when nothing drifted) so `doit export` always leaves an
-        # up-to-date gallery for the release to bundle.
-        refresh_comparison_gallery()
         return 0
     _telemetry.info(
         f"exporting parts={stale_parts or sorted(stale_scene_mesh_stems) or '[]'} "
@@ -1593,9 +1634,6 @@ def main() -> int:
             restore_export_prefs(adapter, old)
 
     rc = run_build(build)
-    # Only produce the gallery once the glTF/STL/boxes export actually succeeded --
-    # a failed COM export leaves the render cache half-written (fail loud there);
-    # the stamp keeps mtime-based downstream guards satisfied.
     if rc == 0:
         stamp_render_cache_current(validated_outputs(parts, assemblies, scene_assemblies))
         if record:
@@ -1603,7 +1641,6 @@ def main() -> int:
                 parts, assemblies, all_scene_part_meshes(scene_assemblies),
                 scene_assemblies, colors, digests,
             )
-        refresh_comparison_gallery()
     return rc
 
 

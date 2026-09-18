@@ -2,11 +2,61 @@
 
 from __future__ import annotations
 
+import json
+import os
+import time
 from pathlib import Path
 
 import pytest
 
 import cut_release
+
+
+def test_release_refuses_an_incomplete_or_stale_comparison_gallery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The `gallery` task owns the showcase and fails loud, so staging must too:
+    a missing overlay, or a gallery older than the geometry it claims to show,
+    would publish a dishonest release."""
+    comparisons = tmp_path / "comparisons"
+    for name in ("render", "composite", "ref"):
+        (comparisons / name).mkdir(parents=True)
+    (comparisons / "manifest.json").write_text(
+        json.dumps({"pairs": [{"id": "ch30"}]}), encoding="utf-8"
+    )
+    (comparisons / "scores.json").write_text(json.dumps({"ch30": 1.5}), "utf-8")
+    (comparisons / "index.html").write_bytes(b"gallery")
+    (comparisons / "ATTRIBUTION.md").write_bytes(b"credits")
+    for relative in (
+        "render/ch30.jpg",
+        "composite/ch30_cad.jpg",
+        "composite/ch30_blend.jpg",
+        "ref/ch30.jpg",
+    ):
+        (comparisons / relative).write_bytes(b"jpg")
+    scene = tmp_path / "harmonic-analyzer.json"
+    scene.write_text("{}", encoding="utf-8")
+    older = time.time() - 600
+    os.utime(scene, (older, older))
+    os.utime(comparisons / "manifest.json", (older, older))
+    monkeypatch.setattr(cut_release, "COMPARISONS_DIR", comparisons)
+    monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
+
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    facts = cut_release.stage_comparisons(stage)
+    assert facts["pairs"] == 1
+    assert facts["mean_score"] == 1.5
+    assert (stage / "comparisons" / "index.html").is_file()
+
+    os.utime(comparisons / "scores.json", (older - 60, older - 60))
+    with pytest.raises(SystemExit, match="doit gallery"):
+        cut_release.stage_comparisons(stage)
+
+    os.utime(comparisons / "scores.json", None)
+    (comparisons / "composite" / "ch30_blend.jpg").unlink()
+    with pytest.raises(SystemExit, match="doit gallery"):
+        cut_release.stage_comparisons(stage)
 
 
 def _tags(monkeypatch: pytest.MonkeyPatch, *tags: str) -> None:
@@ -185,3 +235,26 @@ def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
     with pytest.raises(RuntimeError, match="not tracked"):
         cut_release.require_tracked("cad/docs/not-a-page.md", "closure")
     cut_release.require_tracked("cad/docs/device-operation.md", "closure")
+
+
+def test_release_notes_report_the_native_pack_and_go_count() -> None:
+    """The native Pack-and-Go count and the neutral export inventory are two
+    different numbers. They shared the ``documents`` key, so
+    ``stage_release_neutral``'s inventory silently overwrote the COM-derived
+    count and the notes advertised the wrong one (CodeRabbit, PR #770)."""
+    facts = {
+        "native_documents": 137,
+        "documents": 99,
+        "sw_revision": "35",
+        "parts": 99,
+        "assemblies": 8,
+        "config_meshes": 22,
+        "pngs": 107,
+        "comparisons": {"pairs": 3, "mean_score": None},
+        "size_mb": 42.0,
+    }
+
+    notes = cut_release.release_notes("v42", facts)
+
+    assert "native Pack-and-Go (137 referenced documents" in notes
+    assert "99 referenced documents" not in notes

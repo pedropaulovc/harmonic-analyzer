@@ -576,12 +576,20 @@ def _stage_name(label: str) -> str:
         return "assembly-build"
     if label.startswith(("drawing:", "drawing ")):
         return "drawing-export"
+    if label.startswith("verify_soundness:"):
+        return "verify-soundness"
+    if label.startswith("verify:"):
+        return "verify-" + label.split(":", 2)[1]
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
-    if label.startswith("cut release") or label == "release":
+    if label.startswith("cut release") or label in ("release", "package:release"):
         return "release"
+    if label == "preflight":
+        return "preflight"
+    if label == "gallery":
+        return "gallery"
     if label.startswith("export"):
         return "export"
     return "harmonic-analyzer"
@@ -896,41 +904,22 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             _sw_lifecycle.wait_until_ready()
 
 
-def _run(
-    cmd: list[str], label: str, log_stem: str | None = None, com: bool = False
-) -> None:
+def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     """Open a ``task <label>`` span and run the subprocess inside it (see
     :func:`_exec`). One span per task action, NAMED for the doit task
-    (``task part:cone_gear``) so the trace reads as the task itself; the build
-    subprocess CONTINUES this span (via the injected TRACEPARENT) instead of adding a
+    (``task check:math``) so the trace reads as the task itself; the subprocess
+    CONTINUES this span (via the injected TRACEPARENT) instead of adding a
     duplicate root layer under it.
 
-    ``com=True`` marks a SolidWorks-touching task: the subprocess runs holding the
-    single COM seat (``_com_seat``), so it is serialized against every other COM task
-    on the machine. The seat is acquired OUTSIDE this span -- its wait is a sibling
-    ``com.seat.wait <label>`` span -- so ``task <label>`` starts once the seat is held
-    and its duration is the task's own work. SolidWorks-free tasks (the ``check:*``
-    gates) pass ``com=False`` and never take the lock, so they fan out under ``-n``.
-
-    Under the farm executor only the cached part/assembly/drawing leaves are
-    dispatched; a COM task routed through here has no farm workflow, so it fails
-    loud instead of silently taking the local seat."""
-    if com and _farm.enabled():
-        raise RuntimeError(
-            f"{label}: SolidWorks gate tasks (verify:soundness/verify:kinematics/"
-            "export/preflight/release) are not farm-dispatchable; run with "
-            "HARMONIC_EXECUTOR=local"
-        )
-    with _com_seat(label) if com else contextlib.nullcontext() as waited:
-        if com:
-            _sw_ensure_once()  # top-level sibling of the task span (once/worker)
-        with _telemetry.span(
-            f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
-        ) as sp:
-            _tag_seat_wait(sp, waited)
-            # COM tasks get reactive SolidWorks recovery; SW-free tasks
-            # (check:* gates) run the plain fail-loud _exec.
-            (_exec_com if com else _exec)(cmd, label, log_stem)
+    SolidWorks-FREE tasks ONLY -- it never takes the COM seat, so these fan out
+    under ``-n N``. Every COM-touching task goes through
+    :func:`_cached_com_action`, which owns the seat lock, the remote-cache
+    probe/store and the farm dispatch; there is therefore no code path that can
+    reach SolidWorks while bypassing the cache or the farm."""
+    with _telemetry.span(
+        f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
+    ):
+        _exec(cmd, label, log_stem)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -1052,6 +1041,10 @@ INTERFERENCE_CONTRACTS_PY = (SCRIPTS_DIR / "_interference_contracts.py").resolve
 EXPORT_PY = (SCRIPTS_DIR / "export_models.py").resolve()
 RELEASE_PY = (SCRIPTS_DIR / "cut_release.py").resolve()
 PREFLIGHT_PY = (SCRIPTS_DIR / "preflight_release.py").resolve()
+# COM half of a release: SolidWorks Pack-and-Go of the top assembly and of every
+# drawing, merged into cad/out/release/native/ (the `package:release` leaf). Split
+# out of cut_release.py so the publisher itself needs no seat.
+PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
@@ -1081,12 +1074,12 @@ _CHECK_NAMES = (
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
 
 
-def _run_stamped(cmd: list[str], label: str, stamp: str, com: bool = False) -> None:
-    """Run a gate subprocess; on success write its stamp target. _run raises on
-    non-zero, so a failed gate never writes a stamp (stays stale -> re-runs).
-    ``com=True`` runs it holding the COM seat (SolidWorks ``verify:*``/preflight);
-    the offline ``check:*`` gates pass ``com=False`` and stay parallel."""
-    _run(cmd, label, log_stem=Path(stamp).stem, com=com)
+def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
+    """Run a SolidWorks-free gate subprocess; on success write its stamp target.
+    _run raises on non-zero, so a failed gate never writes a stamp (stays stale ->
+    re-runs). The COM gates (``verify:*``/``preflight``) do NOT come here: they are
+    cache-keyed leaves whose stamp is written by :func:`_cached_com_action`."""
+    _run(cmd, label, log_stem=Path(stamp).stem)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
@@ -1494,6 +1487,154 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
 
 
+# --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
+# export, release packaging).
+#
+# Each is a cache-keyed COM leaf exactly like a part or an assembly, so ONE list is
+# both doit's file_dep and the remote-cache key -- and `cache_status` reuses it to
+# explain a miss. Every member MUST be machine-stable: repo files, the recipe-
+# digested .SLDPRT/.SLDASM (immune to SolidWorks' save churn) and their execution
+# tokens (exact CAD identity). A local absolute path or a timestamp here would make
+# the submitter and the worker compute different keys, and every farm leaf would
+# fail with "farm reported success but cache key ... is absent".
+def _dof_json(stem: str) -> str:
+    """The assembly's free-DOF manifest sidecar (gate input, not a build input)."""
+    sldasm = Path(_sldasm(stem))
+    return str(sldasm.parent / f".{sldasm.stem}.dof.json")
+
+
+def _cad_identity_deps() -> list[str]:
+    """Every built model plus its execution token -- the exact CAD identity the
+    fleet-wide stages (neutral export, release packaging) consume. The token is
+    what stops a same-recipe rebuild with fresh persistent-reference IDs from
+    hitting a cache entry made against the previous identity."""
+    deps: list[str] = []
+    for stem in part_stems():
+        deps += [_sldprt(stem), _part_execution_token(stem)]
+    for stem in ASSEMBLY_ORDER:
+        deps += [_sldasm(stem), _assembly_execution_token(stem)]
+    return deps
+
+
+def _soundness_file_deps(stem: str) -> list[str]:
+    """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
+    outside every build closure (_assembly_postbuild, the interference contract),
+    and the assembly itself with its execution token."""
+    deps = [
+        str(VERIFY_PY),
+        str(POSTBUILD_PY),
+        str(INTERFERENCE_CONTRACTS_PY),
+        _sldasm(stem),
+        _assembly_execution_token(stem),
+    ]
+    if stem == "paper_drive":
+        deps.append(_dof_json(stem))
+    return deps
+
+
+def _kinematics_file_deps() -> list[str]:
+    """``verify:kinematics`` inputs.
+
+    verify.py's gate LOGIC lives partly in _assembly_postbuild.py
+    (load_dof_manifest/author_dof_drives -- the kinematics replays). Unlike
+    verify's other helper imports (_assembly/_common/build_*), that module is
+    deliberately OUTSIDE every assembly recipe (it is on NO build script's
+    closure), so a change to the replay logic does NOT bump any .SLDASM digest --
+    and the .SLDASM deps below would then leave a fresh verify-kinematics.ok stamp
+    valid, SKIPPING the gate (codex PR #193). Depend on it directly. The build_*
+    helpers verify imports for constants need no such dep: they ride their
+    .SLDPRT -> .SLDASM digest.
+
+    The magnifier live-chain sweep (verify._verify_live_chain_one) opens
+    magnifier.SLDASM and authors its recorded lever drive spec transiently; the
+    paper-feed proof (verify._verify_paper_feed_one) opens paper-drive.SLDASM and
+    drives the crank -- without those deps a rebuild of either would leave the
+    stamp valid and SKIP the gates (codex #177/#189). The pen sweep + magnifier
+    chain sweep read the .dof.json manifests directly (codex #221), and the
+    transient pen equation reads _config VALUES through pen_driver/truth_model
+    (machine/output.yaml + channels.yaml), which post-#221 are no longer on pen's
+    build recipe -- so an amplitude edit would otherwise skip the sweep (codex
+    #224). Those config deps are derived by the same static analyzer as the build
+    recipes, so a new config read is picked up automatically.
+    """
+    return [
+        str(VERIFY_PY),
+        str(POSTBUILD_PY),
+        _sldasm("pen"),
+        _assembly_execution_token("pen"),
+        _sldasm("magnifier"),
+        _assembly_execution_token("magnifier"),
+        _sldasm("paper_drive"),
+        _assembly_execution_token("paper_drive"),
+        _dof_json("pen"),
+        _dof_json("magnifier"),
+        str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
+        str((SCRIPTS_DIR / "pen_driver.py").resolve()),
+        str((SCRIPTS_DIR / "truth_model.py").resolve()),
+        *_config_deps(SCRIPTS_DIR / "pen_driver.py"),
+    ]
+
+
+def _preflight_file_deps() -> list[str]:
+    """Release-preflight inputs: the gear-ratios proof reopens drive-train +
+    channel (the only assemblies carrying real gear meshes)."""
+    return [
+        str(PREFLIGHT_PY),
+        str(VERIFY_PY),
+        str((SCRIPTS_DIR / "_assembly.py").resolve()),
+        str(POSTBUILD_PY),
+        _sldasm("drive_train"),
+        _assembly_execution_token("drive_train"),
+        _sldasm("channel"),
+        _assembly_execution_token("channel"),
+    ]
+
+
+def _export_file_deps() -> list[str]:
+    """Neutral-export inputs: the exporter plus every model's exact identity."""
+    return [str(EXPORT_PY), *_cad_identity_deps()]
+
+
+def _export_cache_outputs() -> list[Path]:
+    """What the export stage OWNS -- the neutral formats, the per-assembly STLs, the
+    colour map, the export-freshness sidecar and the release-neutral certificate.
+
+    Deliberately NOT the whole cad/out/stl or cad/out/png tree: the per-PART STL
+    sidecar and every render are part/assembly cache outputs already, so packing
+    them here would duplicate ~300 MB in every export cache entry to restore bytes
+    the part leaves restore anyway."""
+    stl = CAD_OUT / "stl"
+    return [
+        (CAD_OUT / "step").resolve(),
+        (CAD_OUT / "gltf").resolve(),
+        (CAD_OUT / "boxes").resolve(),
+        (stl / "colors.json").resolve(),
+        (stl / "export-src.json").resolve(),
+        *((stl / f"{s.replace('_', '-')}.STL").resolve() for s in ASSEMBLY_ORDER),
+        (REPORTS / "release-neutral.json").resolve(),
+    ]
+
+
+def _package_file_deps() -> list[str]:
+    """Release-packaging inputs: the Pack-and-Go script, the revision the title
+    blocks carry, every model's exact identity, and every native drawing (each is
+    Pack-and-Go'd with its references)."""
+    return [
+        str(PACKAGE_NATIVE_PY),
+        str(RELEASE_VERSION_FILE),
+        *_cad_identity_deps(),
+        *(
+            str(DRAWINGS_BY_NAME[stem].outputs["slddrw"].resolve())
+            for stem in _drawing_order()
+        ),
+    ]
+
+
+def _package_cache_outputs() -> list[Path]:
+    """The prepared native tree cut_release.py copies into the release stage."""
+    return [(CAD_OUT / "release" / "native").resolve()]
+
+
 def _probe_cache(
     key: str, outputs: list[Path], label: str, span: Any, hit: str = "hit"
 ) -> str:
@@ -1574,21 +1715,36 @@ def _reprobe_under_seat(
         released = True
 
 
-def _cached_drawing_action(stem: str) -> None:
-    """Restore a matched part+drawing pair or build and publish the drawing.
+def _cached_com_action(
+    label: str,
+    cmd: list[str],
+    file_deps: list[str],
+    outputs: list[Path],
+    log_stem: str,
+    stamp: str | None = None,
+) -> None:
+    """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
+    local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
+    the verify gates, preflight, the neutral export and the release Pack-and-Go).
 
-    Mirrors the part/assembly cache contract exactly: HIT always skips COM work;
-    MISS takes the seat, re-probes after any wait, builds once, then stores outside
-    the seat. The spans and console therefore state one unambiguous disposition.
-    """
-    spec = DRAWINGS_BY_NAME[stem]
-    label = f"drawing:{stem}"
-    cmd = [sys.executable, str(spec.script.resolve()), spec.artifact_stem]
-    outputs = _drawing_cache_outputs(stem)
+    A HIT always skips the COM work. A MISS under ``--executor farm`` dispatches ONE
+    leaf: the worker runs this same doit task with the cache in ``rw`` mode and
+    publishes ``key``, which this side then restores -- so a machine with no
+    SolidWorks seat can drive every stage of a release. A MISS locally takes the
+    seat, re-probes in case a peer published while we queued, builds once, and
+    publishes OUTSIDE the seat. The phase spans (``cache.probe`` /
+    ``com.seat.wait`` / ``cache.reprobe`` / ``task`` / ``cache.store``) stay
+    siblings, so queueing and network transfer can never be billed as work.
+
+    ``stamp`` is the gate idiom: a task whose only output is
+    ``cad/out/reports/<gate>.ok`` writes it HERE, after the gate passed, so a failed
+    gate leaves no stamp (it stays stale and re-runs) while a cached gate restores
+    the stamp instead of reopening the models. Every ``outputs`` path MUST live
+    under ``cad/out`` -- the cache refuses to extract anything else."""
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
-        key = _cache_key(_drawing_file_deps(stem), label)
+        key = _cache_key(file_deps, label)
         probed = _probe_cache(key, outputs, label, probe)
         if probed == "hit":
             return
@@ -1607,14 +1763,28 @@ def _cached_drawing_action(stem: str) -> None:
         ) as sp:
             _tag_seat_wait(sp, waited)
             sp.set_attribute("cache", "miss")
-            _exec_com(cmd, label, log_stem=f"drawing-{stem}")
+            _exec_com(cmd, label, log_stem=log_stem)
+            if stamp is not None:
+                _write_stamp(label, stamp)
 
+    # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
+    # not hold the seat the next task is waiting for.
     with _telemetry.span(
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
-        store.set_attribute(
-            "cache", _cache.store(key, _drawing_cache_outputs(stem), label)
-        )
+        store.set_attribute("cache", _cache.store(key, outputs, label))
+
+
+def _cached_drawing_action(stem: str) -> None:
+    """Restore a matched part+drawing pair or build and publish the drawing."""
+    spec = DRAWINGS_BY_NAME[stem]
+    _cached_com_action(
+        f"drawing:{stem}",
+        [sys.executable, str(spec.script.resolve()), spec.artifact_stem],
+        _drawing_file_deps(stem),
+        _drawing_cache_outputs(stem),
+        log_stem=f"drawing-{stem}",
+    )
 
 
 def _part_file_deps(script: Path, stem: str) -> list[str]:
@@ -2156,7 +2326,9 @@ def task_drawing():
 
 
 def task_verify_soundness():
-    """One independently stamped soundness gate per assembly.
+    """One independently stamped soundness gate per assembly, each a cache-keyed
+    COM leaf whose stamp IS the cached output -- so a gate a peer (or a farm
+    worker) already proved restores instead of reopening the model.
 
     A change to one assembly no longer invalidates a monolithic gate that reopens
     all eight models. The public ``verify:soundness`` task below aggregates these
@@ -2164,86 +2336,39 @@ def task_verify_soundness():
     """
     for stem in ASSEMBLY_ORDER:
         name = stem.replace("_", "-")
-        sldasm = Path(_sldasm(stem))
-        deps = [
-            str(VERIFY_PY),
-            str(POSTBUILD_PY),
-            str(INTERFERENCE_CONTRACTS_PY),
-            str(sldasm),
-            _assembly_execution_token(stem),
-        ]
-        if stem == "paper_drive":
-            deps.append(str(sldasm.parent / f".{sldasm.stem}.dof.json"))
+        deps = _soundness_file_deps(stem)
         stamp = str(REPORTS / f"verify-soundness-{name}.ok")
         cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
         yield {
             "name": stem,
             "file_dep": deps,
             "targets": [stamp],
-            "actions": [(_run_stamped, [cmd, f"verify soundness {name}", stamp, True])],
+            "actions": [
+                (
+                    _cached_com_action,
+                    [
+                        f"verify_soundness:{stem}",
+                        cmd,
+                        deps,
+                        [Path(stamp)],
+                        f"verify-soundness-{name}",
+                        stamp,
+                    ],
+                )
+            ],
             "clean": True,
             "verbosity": 2,
         }
 
 
 def task_verify():
-    """SolidWorks verification suites -- need SW open, serialized on the COM seat lock.
-
-    ``verify:soundness`` / ``verify:subsystems`` / ``verify:kinematics`` each wrap
-    ``verify.py --suite <x>`` and stamp ``cad/out/reports/verify-<x>.ok`` on
-    success. The ``verify:`` prefix marks them as SolidWorks-dependent (vs the
+    """SolidWorks verification suites -- cache-keyed COM leaves: the seat lock
+    serializes them locally, and under ``--executor farm`` each dispatches ONE leaf
+    to a worker (the submitter needs no seat). Each stamps
+    ``cad/out/reports/verify-<x>.ok`` on success, and that stamp is the cached
+    output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-
-    def _dof_json(stem: str) -> str:
-        sldasm = Path(_sldasm(stem))
-        return str(sldasm.parent / f".{sldasm.stem}.dof.json")
-
-    suite_deps = {
-        # subsystems retired: its one unique gate (channel-independence) is folded
-        # into soundness, which already opens `channel` (see verify._verify_static_one).
-        "kinematics": [
-            _sldasm("pen"),
-            _assembly_execution_token("pen"),
-            # The magnifier live-chain sweep (verify._verify_live_chain_one)
-            # opens magnifier.SLDASM and authors its recorded lever drive spec
-            # transiently; without this dep a magnifier rebuild would leave a
-            # fresh verify-kinematics.ok stamp valid and SKIP the WIRE-1 gates
-            # (codex review, PR #177).
-            _sldasm("magnifier"),
-            _assembly_execution_token("magnifier"),
-            # The paper-feed kinematic proof (verify._verify_paper_feed_one) opens
-            # paper-drive.SLDASM and drives the crank; without these deps a paper-drive
-            # or probe change would leave a fresh verify-kinematics.ok stamp valid and
-            # SKIP the crank->feed gate (codex #189).
-            _sldasm("paper-drive"),
-            _assembly_execution_token("paper_drive"),
-            # The pen sweep + magnifier chain sweep read these manifests
-            # directly (the transient drive specs). Same rationale as
-            # soundness's paper-drive manifest dep above (codex #221).
-            _dof_json("pen"),
-            _dof_json("magnifier"),
-            str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
-            str((SCRIPTS_DIR / "pen_driver.py").resolve()),
-            str((SCRIPTS_DIR / "truth_model.py").resolve()),
-            # The transient pen equation reads _config VALUES through
-            # pen_driver/truth_model (machine/output.yaml pen_rest_crank_deg /
-            # pen_trace_half_mm / magnify_factor + channels.yaml harmonics/
-            # phases/amplitudes). Post-#221 those files are no longer on pen's
-            # build recipe (the saved model carries no equation), so without
-            # these deps an amplitude edit would leave a fresh
-            # verify-kinematics.ok stamp valid and SKIP the sweep (codex #224).
-            # Derived by the same static analyzer as the build recipes, so a
-            # new config read in pen_driver/truth_model is picked up
-            # automatically. (_config.py itself needs no direct dep: it is on
-            # pen's build closure, so it rides the pen.SLDASM recipe digest.)
-            *_config_deps(SCRIPTS_DIR / "pen_driver.py"),
-        ],
-    }
-    # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
-    # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
-    # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets the pen + magnifier subs (verify.py's own defaults), no names.
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER
@@ -2251,8 +2376,13 @@ def task_verify():
     soundness_stamp = str(REPORTS / "verify-soundness.ok")
     yield {
         "name": "soundness",
-        # Child stamps are targets of verify_soundness:* tasks, so doit derives
-        # the real producer edges from file_dep without a synthetic task_dep.
+        # The child stamps are targets of the verify_soundness:* tasks, so doit
+        # derives the real producer edges from file_dep alone. The task_dep repeats
+        # them for the FARM: the graph a worker receives is the task_dep CLOSURE of
+        # the packaged scopes (doit's tasks_and_deps_iter walks task_dep, never
+        # file_dep), so without it every dispatched verify_soundness:<stem> leaf is
+        # refused as "not in the packaged graph".
+        "task_dep": [f"verify_soundness:{stem}" for stem in ASSEMBLY_ORDER],
         "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *child_stamps],
         "targets": [soundness_stamp],
         "actions": [(_write_stamp, ["verify soundness", soundness_stamp])],
@@ -2260,29 +2390,34 @@ def task_verify():
         "verbosity": 2,
     }
 
-    for suite, deps in suite_deps.items():
-        stamp = str(REPORTS / f"verify-{suite}.ok")
-        cmd = [sys.executable, str(VERIFY_PY)]
-        cmd += ["--suite", suite]
-        yield {
-            "name": suite,
-            # verify.py's gate LOGIC lives partly in _assembly_postbuild.py
-            # (load_dof_manifest/author_dof_drives -- the kinematics replays).
-            # Unlike verify's other helper imports (_assembly/_common/build_*),
-            # that module is deliberately OUTSIDE every assembly recipe (it is on
-            # NO build script's closure), so a change to the replay logic does NOT
-            # bump any .SLDASM digest -- and the .SLDASM file_deps below would then
-            # leave a fresh verify-*.ok stamp valid, SKIPPING the gate (codex PR
-            # #193). Depend on it directly. The build_* helpers verify imports for
-            # constants need no such dep: they ride their .SLDPRT -> .SLDASM digest.
-            "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *deps],
-            "targets": [stamp],
-            # No spine: the file_dep on the built .SLDASM above orders this after the
-            # assemblies; the COM seat lock (com=True) serializes it on the SW seat.
-            "actions": [(_run_stamped, [cmd, f"verify {suite}", stamp, True])],
-            "clean": True,
-            "verbosity": 2,
-        }
+    # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
+    # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
+    # assembly left in a worktree must not be verified (codex review). kinematics
+    # targets the pen + magnifier subs (verify.py's own defaults), no names.
+    deps = _kinematics_file_deps()
+    stamp = str(REPORTS / "verify-kinematics.ok")
+    yield {
+        "name": "kinematics",
+        "file_dep": deps,
+        "targets": [stamp],
+        # No spine: the file_dep on the built .SLDASM orders this after the
+        # assemblies; the COM seat lock (inside _cached_com_action) serializes it.
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:kinematics",
+                    [sys.executable, str(VERIFY_PY), "--suite", "kinematics"],
+                    deps,
+                    [Path(stamp)],
+                    "verify-kinematics",
+                    stamp,
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
 
 
 def task_check():
@@ -2700,63 +2835,95 @@ def task_check():
 
 
 def task_export():
-    """Export neutral CAD plus the offline comparison gallery.
+    """Export neutral CAD: STEP / STL / assembly glTF / boxes scene + the
+    release-neutral manifest, from every built model.
 
-    ``export_models.py`` writes STEP / STL / assembly glTF / PNG manifest + scene,
-    then invokes ``cad/comparisons/tools/render_offline.py`` so the export task leaves
-    the comparison renders, composites, scores, and gallery current. COM seat.
+    A cache-keyed COM leaf like a part: a HIT downloads the neutral set, and a MISS
+    under ``--executor farm`` runs ONE leaf on a worker -- which is what lets a
+    seatless machine cut a release. The comparison gallery is NOT here: it needs
+    Blender and a GPU (which no farm worker has), so it is the separate,
+    SolidWorks-free ``gallery`` task that ``release`` depends on.
 
-    Always runs ``export_models.py`` (``uptodate: False``) -- it self-checks every
-    output's per-file staleness cheaply and prints "all exports fresh" when there
-    is nothing to do. That self-check keys on the SAME churn-immune recipe digest
-    (``_stable_artefact_digest``) doit/the remote cache use, NOT the .SLDPRT/.SLDASM
-    mtime -- SolidWorks' save-cascade + cache-restore bump those mtimes on every
-    build, which used to make the script re-export every part each release. We do
-    NOT gate on a single declared target: a deleted STEP/STL/colors output (with the
-    boxes JSON + CAD inputs unchanged) must still be regenerated, which doit would
-    otherwise skip (codex review).
+    Always runs (``uptodate: False``) rather than gating on a single declared
+    target: a deleted STEP/STL/colors output (with the boxes JSON + CAD inputs
+    unchanged) must still be repaired, which doit would otherwise skip (codex
+    review). On a HIT the cache restore repairs it; on a MISS the exporter
+    self-checks every output's per-file staleness cheaply and prints "all exports
+    fresh" when there is nothing to do -- keyed on the SAME churn-immune recipe
+    digest (``_stable_artefact_digest``) doit and the remote cache use, NOT the
+    .SLDPRT/.SLDASM mtime, which SolidWorks' save cascade bumps on every build.
     """
-    targets = [
-        str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
-        str((REPORTS / "release-neutral.json").resolve()),
-    ]
-    deps = [_sldprt(s) for s in part_stems()] + [_sldasm(s) for s in ASSEMBLY_ORDER]
-    comparison_tools = [
-        str((REPO_ROOT / "cad" / "comparisons" / "manifest.json").resolve()),
-        str(
-            (
-                REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py"
-            ).resolve()
-        ),
-        str(
-            (
-                REPO_ROOT / "cad" / "comparisons" / "tools" / "blender_worker.py"
-            ).resolve()
-        ),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()),
-        str((REPO_ROOT / "cad" / "comparisons" / "tools" / "gallery.py").resolve()),
-    ]
+    deps = _export_file_deps()
     return {
-        "file_dep": [str(EXPORT_PY), *deps, *comparison_tools],
-        "targets": targets,
-        # REAL gate edge (was implicit via the spine): export writes neutral formats +
-        # refreshes the comparison gallery into cad/out, side effects that must NOT be
-        # generated from a model that then fails soundness/kinematics. So export waits
-        # on the SW verify gates -- a genuine dependency, not a serialization hack.
+        "file_dep": deps,
+        "targets": [
+            str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
+            str((REPORTS / "release-neutral.json").resolve()),
+        ],
+        # REAL gate edge (was implicit via the spine): export writes the neutral
+        # formats a release ships, which must NOT be generated from a model that
+        # then fails soundness/kinematics. So export waits on the SW verify gates --
+        # a genuine dependency, not a serialization hack.
         "task_dep": ["verify:soundness", "verify:kinematics"],
         "uptodate": [False],
         # --record-digests: this runs AFTER every part/assembly is (re)built (its
-        # file_dep) and the verify gates, so the natives are current and their recipe
-        # digests are safe to RECORD as the export-freshness cache (a bare standalone
-        # run must not -- see export_models.main). com=True: holds the COM seat.
+        # file_dep) and the verify gates, so the natives are current and their
+        # recipe digests are safe to RECORD as the export-freshness cache (a bare
+        # standalone run must not -- see export_models.main).
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "export",
+                    [sys.executable, str(EXPORT_PY), "--record-digests"],
+                    deps,
+                    _export_cache_outputs(),
+                    "export",
+                ],
+            )
+        ],
+        "verbosity": 2,
+    }
+
+
+def task_gallery():
+    """Refresh the reference-photo comparison gallery from the exported STLs
+    (renders, composites, RMS scores, index.html) -- the showcase a release ships.
+
+    SolidWorks-FREE but Blender+GPU-bound, so it is deliberately NOT a farm leaf and
+    never takes the COM seat: it runs on the submitter, after ``export`` (the
+    file_dep on the release-neutral manifest is that edge). It fails LOUD when
+    Blender or a render is unavailable -- it is the only thing standing between a
+    release and a stale gallery.
+    """
+    comparisons = REPO_ROOT / "cad" / "comparisons"
+    tools = comparisons / "tools"
+    return {
+        "file_dep": [
+            str(EXPORT_PY),
+            str((REPORTS / "release-neutral.json").resolve()),
+            str((comparisons / "manifest.json").resolve()),
+            *(
+                str((tools / name).resolve())
+                for name in (
+                    "render_offline.py",
+                    "blender_worker.py",
+                    "composite.py",
+                    "gallery.py",
+                )
+            ),
+        ],
+        "targets": [str((REPORTS / "comparison-gallery.json").resolve())],
+        # Always run: the gallery's own --stale-only pass is the cheap freshness
+        # check, and a pair whose render was deleted must be regenerated.
+        "uptodate": [False],
         "actions": [
             (
                 _run,
                 [
-                    [sys.executable, str(EXPORT_PY), "--record-digests"],
-                    "export",
-                    "export",
-                    True,
+                    [sys.executable, str(EXPORT_PY), "--comparisons"],
+                    "gallery",
+                    "gallery",
                 ],
             )
         ],
@@ -2765,37 +2932,69 @@ def task_export():
 
 
 def task_preflight():
-    """Release preflight (OPT-IN, COM seat): the gear-ratios proof on the
-    reopened drive-train + channel (the only assemblies carrying real gear
-    meshes), WITHOUT saving. Gates `release`.
+    """Release preflight (OPT-IN): the gear-ratios proof on the reopened
+    drive-train + channel (the only assemblies carrying real gear meshes), WITHOUT
+    saving. A cache-keyed COM leaf (farm-dispatchable) that gates `release`.
 
     NOT in `build`/`default_tasks` -- gear-ratios re-proves a property the
-    tooth-count config fixes (check:math validates it analytically), so it
-    runs at release time only. Its file_dep on the two .SLDASM orders it after
-    them; the COM seat lock keeps it serial on the STA seat. Stamps
+    tooth-count config fixes (check:math validates it analytically), so it runs at
+    release time only. Its file_dep on the two .SLDASM orders it after them.
+    Always run, so a stale stamp can never let release skip the proof; stamps
     `cad/out/reports/preflight.ok`.
     """
+    deps = _preflight_file_deps()
     stamp = str(REPORTS / "preflight.ok")
-    deps = [
-        str(PREFLIGHT_PY),
-        str(VERIFY_PY),
-        str((SCRIPTS_DIR / "_assembly.py").resolve()),
-        str(POSTBUILD_PY),
-        _sldasm("drive_train"),
-        _sldasm("channel"),
-    ]
     return {
         "file_dep": deps,
         "targets": [stamp],
-        # No spine: the file_dep on drive-train + channel .SLDASM orders this after
-        # those assemblies; the COM seat lock (com=True) serializes it on the SW seat.
-        # Always run (like export/release), so a stale stamp can never let
-        # release skip the proof.
         "uptodate": [False],
         "actions": [
             (
-                _run_stamped,
-                [[sys.executable, str(PREFLIGHT_PY)], "release preflight", stamp, True],
+                _cached_com_action,
+                [
+                    "preflight",
+                    [sys.executable, str(PREFLIGHT_PY)],
+                    deps,
+                    [Path(stamp)],
+                    "preflight",
+                    stamp,
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def task_package():
+    """``package:release`` -- the COM half of a release: SolidWorks Pack-and-Go of
+    the top assembly and of every native drawing, merged and de-duplicated into
+    ``cad/out/release/native/`` with a ``native-package.json`` sidecar carrying the
+    document revision and the per-drawing source lists.
+
+    This exists so ``release`` itself needs no seat: a cache-keyed COM leaf runs the
+    Pack-and-Go (locally, or as ONE farm leaf), and cut_release.py then only copies
+    the prepared tree. OPT-IN -- only `release` depends on it.
+    """
+    deps = _package_file_deps()
+    native = _package_cache_outputs()[0]
+    yield {
+        "name": "release",
+        "file_dep": deps,
+        "targets": [str(native / "native-package.json")],
+        # Always run: a native member deleted from the prepared tree (with the CAD
+        # inputs unchanged) must be repaired, which a target-only check would skip.
+        "uptodate": [False],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "package:release",
+                    [sys.executable, str(PACKAGE_NATIVE_PY)],
+                    deps,
+                    [native],
+                    "package-release",
+                ],
             )
         ],
         "clean": True,
@@ -2806,23 +3005,25 @@ def task_preflight():
 def _run_release(relargs):
     """Run cut_release.py, forwarding any positional args (``doit release -- v22``).
 
-    com=True: the release job holds the COM seat for its ENTIRE duration -- including
-    its non-COM tail (renders, zip, ``gh`` upload) -- so it blocks any other worktree's
-    COM work until the release finishes. Accepted: a release is a serialized,
-    machine-owning operation."""
-    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release", com=True)
+    SolidWorks-FREE since the Pack-and-Go moved to the `package:release` leaf: the
+    publisher stages the prepared native tree, the neutral exports, the drawings,
+    the renders and the gallery, then tags and uploads. It takes NO COM seat, so it
+    neither blocks another worktree's build nor needs SolidWorks on this machine --
+    which is the whole point: a release can be cut from a seatless box, with every
+    COM stage dispatched to the farm."""
+    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
 
 
 def task_release():
-    """Cut a tagged release (Pack-and-Go + neutral exports + diff + GitHub
-    release). OPT-IN -- not in default_tasks. Needs SW + gh; holds the COM seat.
+    """Cut a tagged release (native Pack-and-Go + neutral exports + gallery + diff +
+    GitHub release). OPT-IN -- not in default_tasks. Needs `gh`; needs NO seat.
 
     Publishing is a side effect (no doit target), so it always runs. Forward
     Args after ``--``: ``doit release -- v22 --draft``. With no version, the
     latest compact release tag is incremented (for example, ``v21`` -> ``v22``).
-    Gated on EVERY gate via REAL task_dep edges (the spine is gone, so these are now
-    explicit): ``export`` (which itself pulls the parts/assemblies + the ``verify:*``
-    gates), every registered ``drawing:*`` artifact that release stages,
+    Gated on EVERY gate via REAL task_dep edges: ``export`` (which itself pulls the
+    parts/assemblies + the ``verify:*`` gates), ``gallery``, ``package:release``
+    (the Pack-and-Go tree it stages), every registered ``drawing:*`` artifact,
     ``preflight`` (gear-ratios), the ``verify:*`` suites, and every offline
     ``check:*`` -- so a release cannot publish past a stale/failing gate or package
     a missing/stale drawing.
@@ -2830,6 +3031,8 @@ def task_release():
     return {
         "task_dep": [
             "export",
+            "gallery",
+            "package:release",
             "preflight",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
@@ -2855,19 +3058,20 @@ def task_build():
     SolidWorks-free work before piling onto the COM seat, and the parts are in
     per-seat order so two cold builders diverge and split the fleet cache.
 
-    Under the farm executor the ``verify:*`` gates are omitted: they hold a local
-    COM seat on the assembled models, which the farm submitter by design does not
-    have (``_run`` refuses them). ``build.py`` says so once per farm run.
+    Every gate is farm-dispatchable, so the ``verify:*`` suites are included under
+    every executor: under ``--executor farm`` each cache-missing gate runs as its
+    own leaf on a worker instead of needing a local COM seat.
     """
-    deps = (
-        [f"check:{s}" for s in _CHECK_NAMES]
-        + [f"part:{s}" for s in _seat_part_order()]
-        + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
-        + [f"drawing:{s}" for s in _drawing_order()]
-    )
-    if not _farm.enabled():
-        deps += [f"verify:{s}" for s in _VERIFY_NAMES]
-    return {"actions": None, "task_dep": deps}
+    return {
+        "actions": None,
+        "task_dep": (
+            [f"check:{s}" for s in _CHECK_NAMES]
+            + [f"part:{s}" for s in _seat_part_order()]
+            + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
+            + [f"drawing:{s}" for s in _drawing_order()]
+            + [f"verify:{s}" for s in _VERIFY_NAMES]
+        ),
+    }
 
 
 def task_build_bare():
@@ -2901,6 +3105,12 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
         rows.append((f"assembly:{stem}", _assembly_file_deps(stem)))
     for stem in _drawing_order():
         rows.append((f"drawing:{stem}", _drawing_file_deps(stem)))
+    for stem in ASSEMBLY_ORDER:
+        rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
+    rows.append(("verify:kinematics", _kinematics_file_deps()))
+    rows.append(("preflight", _preflight_file_deps()))
+    rows.append(("export", _export_file_deps()))
+    rows.append(("package:release", _package_file_deps()))
     return rows
 
 

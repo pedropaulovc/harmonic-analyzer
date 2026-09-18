@@ -296,19 +296,92 @@ def test_drawing_failure_raises_the_farm_diagnosis(farm_drawing, monkeypatch):
     assert calls["store"] == []
 
 
-def test_com_gates_are_refused_under_the_farm_executor(monkeypatch):
+@pytest.fixture
+def farm_gate(tmp_path, monkeypatch):
+    """A farm-mode COM gate (``verify_soundness:pen``) whose probe misses.
+
+    A gate's cached output is its stamp, so this is the shape every gate, the
+    neutral export and the release Pack-and-Go share (`_cached_com_action`).
+    """
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
     dodo = _load_dodo()
-    monkeypatch.setattr(
-        dodo, "_com_seat", lambda label: pytest.fail(f"{label} took the COM seat")
-    )
-    ran = []
-    monkeypatch.setattr(dodo, "_exec", lambda cmd, label, log_stem: ran.append(label))
+    stamp = tmp_path / "verify-soundness-pen.ok"
+    calls: dict[str, list] = {"restore": [], "store": []}
 
-    with pytest.raises(RuntimeError, match=r"verify soundness: .*HARMONIC_EXECUTOR=local"):
-        dodo._run(["x"], "verify soundness", com=True)
-    dodo._run(["x"], "check math", com=False)
-    assert ran == ["check math"]
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "g" * 64)
+    _refuse_local_build(dodo, monkeypatch, calls)
+
+    def restore(outcomes):
+        _restore_sequence(
+            dodo,
+            monkeypatch,
+            calls,
+            outcomes,
+            on_hit=lambda: stamp.write_text("verify_soundness:pen\n", encoding="utf-8"),
+        )
+
+    def run():
+        dodo._cached_com_action(
+            "verify_soundness:pen",
+            ["verify.py", "pen", "--suite", "soundness"],
+            ["verify.py"],
+            [stamp],
+            "verify-soundness-pen",
+            str(stamp),
+        )
+
+    return dodo, stamp, calls, restore, run
+
+
+def test_a_com_gate_is_dispatched_and_its_stamp_restored(farm_gate, monkeypatch):
+    """The gates are farm leaves now: the submitter holds no seat, runs no
+    SolidWorks, publishes nothing, and ends up with the stamp the worker made."""
+    dodo, stamp, calls, restore, run = farm_gate
+    restore((False, True))
+    dispatched = []
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda label, key: dispatched.append((label, key)) or _leaf_result(),
+    )
+
+    assert run() is None
+
+    assert dispatched == [("verify_soundness:pen", "g" * 64)]
+    assert calls["store"] == []
+    assert stamp.read_text(encoding="utf-8") == "verify_soundness:pen\n"
+
+
+def test_a_failed_gate_leaf_fails_the_task_and_leaves_no_stamp(farm_gate, monkeypatch):
+    dodo, stamp, calls, restore, run = farm_gate
+    restore((False,))
+    monkeypatch.setattr(
+        dodo._farm, "run_leaf", lambda label, key: _leaf_result(**_FAILED_LEAF)
+    )
+
+    with pytest.raises(
+        RuntimeError, match=r"verify_soundness:pen failed on sw-01@3 \[task_failed\]"
+    ):
+        run()
+
+    assert not stamp.exists(), "a failed gate must not stamp"
+    assert calls["store"] == []
+
+
+def test_a_cached_gate_never_dispatches_a_leaf(farm_gate, monkeypatch):
+    dodo, stamp, calls, restore, run = farm_gate
+    restore((True,))
+    monkeypatch.setattr(
+        dodo._farm, "run_leaf", lambda label, key: pytest.fail("dispatched on a hit")
+    )
+
+    assert run() is None
+
+    assert len(calls["restore"]) == 1
+    assert calls["store"] == []
+    # The restored stamp IS the gate's verdict -- a hit that leaves no stamp
+    # would make doit re-run the gate on the next build.
+    assert stamp.read_text(encoding="utf-8") == "verify_soundness:pen\n"
 
 
 # --- build.py: farm preflight and argv handling ------------------------------
@@ -446,8 +519,8 @@ def test_successful_preflight_stamps_the_environment_before_doit_runs(
     assert branch[-2:] == ["--list", "origin/*"]
     assert capsys.readouterr().out == (
         f"farm: sources {'5' * 16} @ {'c' * 12} published\n"
-        "farm: SolidWorks verify:* gates are not run on the farm; "
-        "run them with --executor local\n"
+        "farm: every SolidWorks task runs on the farm (parts, assemblies, "
+        "drawings, verify:*, preflight, export, package:release)\n"
     )
 
 
@@ -466,15 +539,21 @@ def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeyp
     assert not _farm.enabled()
 
 
-def test_default_build_target_omits_verify_gates_under_the_farm_executor(monkeypatch):
+def test_default_build_target_carries_the_verify_gates_under_every_executor(
+    monkeypatch,
+):
+    """The gates are cache-keyed farm leaves, so `build` no longer has to drop them
+    for a seatless submitter -- both executors offer the identical closure."""
     monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
     local_deps = _load_dodo().task_build()["task_dep"]
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
     farm_deps = _load_dodo().task_build()["task_dep"]
 
-    verify = [d for d in local_deps if d.startswith("verify:")]
-    assert verify == ["verify:soundness", "verify:kinematics"]
-    assert farm_deps == [d for d in local_deps if not d.startswith("verify:")]
+    assert [d for d in local_deps if d.startswith("verify:")] == [
+        "verify:soundness",
+        "verify:kinematics",
+    ]
+    assert farm_deps == local_deps
     assert any(d.startswith("check:") for d in farm_deps)
     assert any(d.startswith("drawing:") for d in farm_deps)
 

@@ -17,12 +17,17 @@ What it does, in order:
      ``cad/config/release.yaml`` to reserve that same CAD Revision.
   2. Pre-flight: tag must not already exist; the committed tree must be clean
      (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
-  3. SolidWorks (COM): open harmonic-analyzer.SLDASM and run Pack-and-Go flattened.
-     Validate and stage the complete recipe-keyed neutral set produced by the
-     prerequisite ``export`` task: AP214 STEP for every part, fine binary STL for
-     every part/assembly plus distinct configurations, and the build-owned
-     isometric PNG for every document. Neutral staging opens no SolidWorks docs.
-     Also copies the millimetre
+  3. Stage the bundle. This script opens NO SolidWorks document and needs NO
+     seat: ``package_native.py`` (doit task ``package:release``, dispatchable to
+     the farm) already ran every Pack-and-Go and left a PREPARED native tree
+     under ``cad/out/release/native/`` -- ``solidworks/`` + ``slddrw/`` plus
+     ``native-package.json``, the sidecar carrying every COM-derived fact (the
+     SolidWorks revision, the referenced-document count, the per-drawing
+     members). Here those directories are COPIED in, and the complete
+     recipe-keyed neutral set produced by the prerequisite ``export`` task is
+     validated and staged: AP214 STEP for every part, fine binary STL for every
+     part/assembly plus distinct configurations, and the build-owned isometric
+     PNG for every document. Also copies the millimetre
      scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
      Everything is staged and zipped into ONE bundle
@@ -44,8 +49,8 @@ What it does, in order:
      agent to commit and merge that tracked version bump. A failed post-publication
      install reports the published version and required manual ``next_revision``.
 
-Run (SolidWorks already open, NOTHING else driving it -- single STA COM server,
-a concurrent build_all/verify deadlocks):
+Run (no SolidWorks needed -- but ``doit package:release`` must have produced
+``cad/out/release/native/`` first, on a seat or on a farm worker):
 
     uv run python cad\scripts\cut_release.py [vNN] [--allow-dirty] [--draft]
 
@@ -67,7 +72,7 @@ import tempfile
 import time
 import traceback
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from _common import CAD_ROOT, OUT_SLDASM, log
@@ -94,9 +99,9 @@ RENDER_DIFF = CAD_ROOT / "comparisons" / "tools" / "render_diff.py"
 SCENE_JSON = CAD_ROOT / "out" / "boxes" / f"{TOP_ASSEMBLY}.json"
 DRAWING_OUTPUTS = {drawing.name: drawing.outputs for drawing in DRAWINGS}
 
-# Comparison gallery (reference-photo overlays). PRODUCED BY THE EXPORT STAGE
-# (export_models.refresh_comparison_gallery renders it from the STLs once they're
-# written, on the COM spine right before release); this module only STAGES the
+# Comparison gallery (reference-photo overlays). PRODUCED BY THE ``gallery`` TASK
+# (`export_models.py --comparisons`: a SolidWorks-free offline Blender render off
+# the stable STLs, which `release` depends on); this module only STAGES the
 # result into the bundle's ``cad/comparisons/`` so each release ships an up-to-date
 # showcase. The DERIVED refs/renders/composites/scores/index are gitignored +
 # regenerable (nothing tracked is touched); the manifest (pose/align source of
@@ -115,13 +120,16 @@ _GALLERY_STAGE = (
 _VERSION_RE = re.compile(r"^v([1-9]\d*)$")
 RELEASE_VERSION_FILE = (CAD_ROOT / "config" / "release.yaml").resolve()
 
-# SolidWorks COM type library (SldWorks); the version pins the same revision the
-# pywin32 gen_py module exposes (...x0x34x0) so comtypes generates matching stubs.
-SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
-SW_TYPELIB_VER = (34, 0)
-SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
-SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
-SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
+# The prepared native tree + sidecar produced by cad/scripts/package_native.py
+# (doit task ``package:release``) -- the release's ONLY SolidWorks work, which is
+# why it lives in its own task: it can be dispatched to a farm worker while this
+# publisher runs on a machine with no seat. ``PurePosixPath`` everywhere below:
+# every path in the sidecar is repo-relative POSIX, written on a worker and read
+# here.
+NATIVE_PACKAGE_DIR = RELEASE_DIR / "native"
+NATIVE_PACKAGE_FILE = NATIVE_PACKAGE_DIR / "native-package.json"
+NATIVE_PACKAGE_SCHEMA = 1
+_NATIVE_PACKAGE_FIX = "uv run python -m doit package:release"
 
 
 # --------------------------------------------------------------------------- #
@@ -343,32 +351,31 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
     return data
 
 
-def stage_comparisons(stage: Path) -> dict[str, Any] | None:
-    """Stage the comparison gallery -- PRODUCED BY THE EXPORT STAGE -- into the
+def stage_comparisons(stage: Path) -> dict[str, Any]:
+    """Stage the comparison gallery -- PRODUCED BY THE ``gallery`` TASK -- into the
     bundle (``stage/comparisons``), so each release ships an up-to-date "this
     model vs Michelson's ch30 photos" showcase.
 
-    The gallery is refreshed upstream by
-    ``export_models.refresh_comparison_gallery`` (offline Blender render off the
-    stable STLs), which runs on the COM spine right before release; here we only
-    COPY the result in. Every gallery output is gitignored + regenerable
-    (reference crops included -- re-derived from the pinned ``references``
-    submodule), so nothing TRACKED is staged and the tagged tree stays clean.
+    The gallery is refreshed upstream by ``export_models.py --comparisons`` (the
+    SolidWorks-free ``gallery`` task: an offline Blender render off the stable
+    STLs); here we only COPY the result in. Every gallery output is gitignored +
+    regenerable (reference crops included -- re-derived from the pinned
+    ``references`` submodule), so nothing TRACKED is staged and the tagged tree
+    stays clean.
 
-    Best-effort: if the export stage could not produce the gallery (the offline
-    renderer needs Blender, which lives on a separate GPU seat), it is absent or
-    incomplete -- warn and ship the bundle without it rather than failing the
-    release. If a gallery exists but predates this export's geometry, ship it
-    but warn loudly.
+    Fail loud, NOT best-effort: ``release`` depends on ``gallery``, which exits
+    non-zero on any render/composite/scoring fault, so by the time we stage there
+    is no legitimate path to a missing, incomplete or stale gallery -- warning and
+    shipping anyway would hide a pipeline bug and publish a stale showcase.
     """
     with _telemetry.span("release.comparisons") as sp:
         scores_file = COMPARISONS_DIR / "scores.json"
-        # COMPLETE or absent -- a partial gallery (render_offline succeeded but
-        # gallery.py/composite died, or an interrupted run left renders without
-        # index.html) must not ship: the notes point users at index.html and the
-        # reveal slider needs every overlay. Validate the full per-manifest file
-        # set + a parseable scores.json covering every pair; anything short is
-        # treated exactly like "not produced" (all regenerable, never fatal).
+        # COMPLETE and CURRENT, or the release stops here. A partial gallery
+        # (render_offline succeeded but gallery.py/composite died, or an
+        # interrupted run left renders without index.html) must not ship: the
+        # notes point users at index.html and the reveal slider needs every
+        # overlay. Validate the full per-manifest file set + a parseable
+        # scores.json covering every pair.
         manifest = json.loads(
             (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
         )
@@ -392,36 +399,33 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
                 missing.append("scores.json (unparseable)")
         missing += [f"scores.json[{pid}]" for pid in ids if pid not in scores]
         if missing:
-            _telemetry.warn(
-                "comparison gallery absent/incomplete -- the export stage did not "
-                f"produce it (needs Blender on the export seat); {len(missing)} "
-                f"missing, e.g. {', '.join(missing[:4])}. Shipping bundle without "
-                "it. Produce it with `doit export` on a Blender seat, or "
-                "`uv run cad/comparisons/tools/render_offline.py`."
-            )
             _telemetry.event(
                 "comparisons.skipped",
                 reason=f"incomplete: {', '.join(missing[:8])}"[:200],
             )
             sp.set_attribute("staged", False)
-            return None
+            raise SystemExit(
+                f"!!  comparison gallery absent/incomplete -- {len(missing)} "
+                f"missing, e.g. {', '.join(missing[:4])}; the `gallery` task "
+                "owns it and fails loud, so this means it never ran (or its "
+                "output was deleted) -- regenerate it with "
+                "`uv run python -m doit gallery`"
+            )
 
         # Honesty guard: a gallery older than the exported scene graph OR the
-        # manifest does not reflect this release (export ran without Blender, so
-        # an old render lingers -- or a pose/align/crop edit landed after the
-        # last refresh). Ship it, but make the staleness loud (also disclosed in
-        # the release notes, see release_notes).
-        stale = scores_file.stat().st_mtime < max(
+        # manifest does not reflect this release (a pose/align/crop edit landed
+        # after the last refresh, or the geometry was re-exported since), and a
+        # stale showcase is exactly what a release must never publish.
+        if scores_file.stat().st_mtime < max(
             SCENE_JSON.stat().st_mtime,
             (COMPARISONS_DIR / "manifest.json").stat().st_mtime,
-        )
-        if stale:
-            _telemetry.warn(
-                "comparison gallery is OLDER than the exported scene graph or the "
-                "manifest -- it may not reflect this release's geometry/poses "
-                "(export ran without Blender?). Shipping the existing gallery."
-            )
+        ):
             sp.set_attribute("stale", True)
+            raise SystemExit(
+                "!!  comparison gallery is OLDER than the exported scene graph or "
+                "the manifest -- it does not reflect this release's "
+                "geometry/poses; refresh it with `uv run python -m doit gallery`"
+            )
 
         dst = stage / "comparisons"
         dst.mkdir(exist_ok=True)
@@ -442,7 +446,6 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
             "pairs": len(scores),
             "mean_score": round(sum(vals) / len(vals), 1) if vals else None,
             "files": staged,
-            "stale": stale,
         }
         sp.set_attribute("staged", True)
         sp.set_attribute("pairs", facts["pairs"])
@@ -450,13 +453,12 @@ def stage_comparisons(stage: Path) -> dict[str, Any] | None:
             f"comparison gallery: staged {facts['pairs']} pairs"
             + (f" (mean RMS score {facts['mean_score']})" if vals else "")
             + f", {staged} files"
-            + (" [STALE vs geometry]" if stale else "")
         )
         return facts
 
 
 def preflight(version: str, allow_dirty: bool) -> None:
-    """Fail fast before touching SolidWorks or creating anything."""
+    """Fail fast before staging or creating anything."""
     require_configured_revision(version)
     if _git("tag", "--list", version):
         raise SystemExit(f"!!  tag {version} already exists -- pick another version")
@@ -492,151 +494,97 @@ def preflight(version: str, allow_dirty: bool) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# SolidWorks Pack-and-Go (COM via comtypes)
+# Prepared native tree (produced on the COM seat by package_native.py)
 # --------------------------------------------------------------------------- #
-def _close_active_documents(sw: Any) -> None:
-    """Close every open document WITHOUT a "Save Modified Documents" prompt.
+def load_native_package() -> dict[str, Any]:
+    """Read ``native-package.json`` -- the COM-derived facts this publisher cannot
+    obtain itself, because it runs on a machine with no SolidWorks seat.
 
-    Close the active doc by its TITLE, not the empty string: although
-    ``CloseDoc("")`` is documented to close the active doc, in 3DX R2026x it
-    silently NO-OPS on any assembly that has loaded components (it only closes a
-    standalone part) -- so an export that relied on it left every assembly + its
-    components resident. ``CloseDoc(GetTitle())`` closes the assembly AND its
-    hidden components (document count drops to 0), and ``CloseDoc`` still discards
-    a dirty document without saving, so no save modal appears. Loop until no
-    document is active; bounded so a misbehaving session can't spin.
-
-    Refuse an empty title: ``CloseDoc("")`` is the very no-op trap above, so
-    falling back to it would silently spin this loop and leave the doc resident.
-    Fail loud instead of regressing invisibly.
+    Written by ``cad/scripts/package_native.py`` beside the prepared tree it
+    describes; every path inside is repo-relative POSIX, so a sidecar produced on
+    a farm worker reads correctly here.
     """
-    for _ in range(500):
-        doc = sw.IActiveDoc2
-        if doc is None:
-            break
-        title = doc.GetTitle()
-        if not title:
-            raise RuntimeError(
-                f"active document has an empty title ({title!r}) -- refusing "
-                f"CloseDoc(''), which silently no-ops on assemblies and would "
-                f"leave the document resident"
-            )
-        sw.CloseDoc(title)
-
-
-def _discard_open_documents(sw: Any) -> None:
-    """Close every open document WITHOUT a "Save Modified Documents" prompt.
-
-    ``CloseAllDocuments(True)`` still pops that modal in 3DX R2026x when an open
-    assembly has a DIRTY referenced child -- e.g. after a ``verify.py --suite
-    motion`` run re-solved a child, or an interrupted build left a doc un-saved.
-    Headless, that modal hangs the release forever.
-
-    Discard the active docs first (above), then ``CloseAllDocuments(True)`` as a
-    backstop -- with nothing dirty left, it has nothing to prompt about.
-    """
-    _close_active_documents(sw)
-    sw.CloseAllDocuments(True)
-
-
-def attach_solidworks() -> tuple[Any, str]:
-    """Attach to the running SolidWorks via comtypes; return (ISldWorks, revision).
-
-    Uses comtypes, NOT the pywin32 adapter: ``GetPackAndGo`` returns an
-    ``[out, retval] IPackAndGo**`` param that win32com cannot marshal (it returns
-    null across every invocation style -- pywin32 issues #1303/#622), whereas
-    comtypes generates correct [out,retval] handling straight from the typelib.
-    GetActiveObject attaches to the SW instance the user already launched from the
-    3DEXPERIENCE Platform shortcut (never start sldworks.exe -- the Makers seat
-    rejects a COM-launched instance as unlicensed).
-    """
-    import comtypes
-    import comtypes.client
-
-    mod = comtypes.client.GetModule((comtypes.GUID(SW_TYPELIB), *SW_TYPELIB_VER))
-    sw = comtypes.client.GetActiveObject(
-        "SldWorks.Application", interface=mod.ISldWorks
+    if not NATIVE_PACKAGE_FILE.is_file():
+        raise SystemExit(
+            f"!!  {NATIVE_PACKAGE_FILE} missing -- the native Pack-and-Go tree is "
+            f"the release's only SolidWorks work and it runs as its own task; "
+            f"produce it with `{_NATIVE_PACKAGE_FIX}`"
+        )
+    package = json.loads(NATIVE_PACKAGE_FILE.read_text(encoding="utf-8"))
+    schema = package.get("schema")
+    if schema != NATIVE_PACKAGE_SCHEMA:
+        raise SystemExit(
+            f"!!  {NATIVE_PACKAGE_FILE} has schema={schema!r}, expected "
+            f"{NATIVE_PACKAGE_SCHEMA} -- regenerate it with "
+            f"`{_NATIVE_PACKAGE_FIX}`"
+        )
+    log(
+        f"native package: {package['documents']} referenced documents, "
+        f"SolidWorks revision {package['solidworks_revision']} "
+        f"(packaged {package['packaged_utc']})"
     )
-    revision = sw.RevisionNumber()
-    log(f"attached to SolidWorks, revision {revision}")
-    return sw, revision
+    return package
 
 
-def _pack_and_go_document(
-    sw: Any, source: Path, doc_type: int, zip_path: Path
-) -> tuple[Path, ...]:
-    """Pack-and-Go ``source`` and all references into a flat zip.
+def _copy_prepared(
+    stage: Path, package: dict[str, Any], dir_key: str, count_key: str
+) -> Path:
+    """Copy one prepared directory into the stage, keeping its own name.
 
-    Pack-and-Go bundles a document with every file it references; SetSaveToName2
-    with a ``.zip`` target writes a single archive, FlattenToSingleFolder drops
-    the original folder tree so the zip opens cleanly anywhere.
+    The prepared tree mirrors the bundle's layout (``solidworks/``, ``slddrw/``),
+    so publishing is a directory copy with no path rewriting. The recorded file
+    count is the guard that the tree restored from the remote cache is whole.
     """
-    # Discard any open docs silently first: a dirty referenced child (left by a
-    # prior motion verify) would make CloseAllDocuments(True) prompt.
-    _discard_open_documents(sw)
-    log("discarded any open documents (clean session)")
-    sw.OpenDoc6(str(source), doc_type, SW_OPEN_SILENT, "", 0, 0)
-    log(f"opened {source.name}")
-
-    active = sw.IActiveDoc2
-    if active is None:
-        raise RuntimeError(f"SolidWorks did not open {source}")
-    active_path = Path(str(active.GetPathName())).resolve()
-    if active_path != source.resolve():
-        raise RuntimeError(
-            f"active document {active_path} != Pack-and-Go source {source.resolve()}"
+    source = REPO_ROOT / package[dir_key]
+    if not source.is_dir():
+        raise SystemExit(
+            f"!!  prepared native directory missing: {source} -- regenerate the "
+            f"tree with `{_NATIVE_PACKAGE_FIX}`"
         )
-
-    ext = active.Extension
-    pg = ext.GetPackAndGo()
-    if pg is None:
-        raise RuntimeError("GetPackAndGo returned None")
-
-    # Bundle exactly the CAD: no drawings/sim/toolbox, but DO include components
-    # suppressed in the active config so no part is dropped from the archive.
-    pg.IncludeDrawings = False
-    pg.IncludeSimulationResults = False
-    pg.IncludeToolboxComponents = False
-    pg.IncludeSuppressed = True
-    pg.FlattenToSingleFolder = True
-
-    names_count = pg.GetDocumentNamesCount()
-    document_names, got_names = pg.GetDocumentNames()
-    if not got_names:
-        raise RuntimeError("Pack-and-Go did not return original document names")
-    documents = tuple(Path(str(name)).resolve() for name in document_names)
-    if len(documents) != names_count:
+    relative = PurePosixPath(package[dir_key]).relative_to(package["out_dir"])
+    target = stage / relative
+    shutil.copytree(source, target)
+    staged = sum(1 for path in target.iterdir() if path.is_file())
+    if staged != package[count_key]:
         raise RuntimeError(
-            "Pack-and-Go document-name count mismatch: "
-            f"reported {names_count}, returned {len(documents)}"
+            f"prepared native directory {source} holds {staged} files, "
+            f"{NATIVE_PACKAGE_FILE.name} recorded {package[count_key]} -- "
+            f"regenerate the tree with `{_NATIVE_PACKAGE_FIX}`"
         )
-    log(f"pack-and-go: {names_count} referenced documents")
-
-    if not pg.SetSaveToName2(True, str(zip_path)):
-        raise RuntimeError(f"SetSaveToName2 rejected {zip_path}")
-
-    statuses = ext.SavePackAndGo(pg)
-    log(f"pack-and-go: SavePackAndGo statuses = {statuses}")
-
-    # Run-don't-build: the only proof Pack-and-Go succeeded is the file on disk.
-    if not zip_path.exists() or zip_path.stat().st_size == 0:
-        raise RuntimeError(f"Pack-and-Go produced no zip at {zip_path}")
-
-    return documents
+    return target
 
 
-def package(sw: Any, revision: str, zip_path: Path) -> dict[str, Any]:
-    """Pack-and-Go the top assembly into ``zip_path``."""
-    top = OUT_SLDASM / f"{TOP_ASSEMBLY}.SLDASM"
-    documents = _pack_and_go_document(sw, top, SW_DOC_ASSEMBLY, zip_path)
+def stage_native(stage: Path, package: dict[str, Any]) -> dict[str, str]:
+    """Stage the prepared native tree and return the drawings' staged paths.
 
-    return {
-        "zip": zip_path,
-        "size_mb": zip_path.stat().st_size / 1e6,
-        "documents": len(documents),
-        "_native_sources": _source_index(documents),
-        "sw_revision": revision,
-    }
+    COM-free by construction: ``package_native.py`` already ran the top assembly's
+    Pack-and-Go, every drawing's Pack-and-Go and the merge/dedup between them.
+    """
+    _copy_prepared(stage, package, "native_dir", "native_files")
+    _copy_prepared(stage, package, "drawing_dir", "drawing_files")
+
+    staged: dict[str, str] = {}
+    for drawing_name, entry in package["drawings"].items():
+        for fact, member_key in (
+            ("solidworks_slddrw", "native_slddrw"),
+            ("slddrw", "portable_slddrw"),
+        ):
+            relative = PurePosixPath(entry[member_key]).relative_to(
+                package["out_dir"]
+            )
+            member = stage / relative
+            if not member.is_file() or member.stat().st_size == 0:
+                raise RuntimeError(
+                    f"prepared native tree is missing the {drawing_name} member "
+                    f"{relative}; regenerate it with `{_NATIVE_PACKAGE_FIX}`"
+                )
+            staged[f"{drawing_name}:{fact}"] = relative.as_posix()
+    log(
+        f"native tree: staged {package['native_files']} native files + "
+        f"{package['drawing_files']} drawing files for "
+        f"{len(package['drawings'])} drawings"
+    )
+    return staged
 
 
 # --------------------------------------------------------------------------- #
@@ -711,6 +659,7 @@ def write_provenance(
         },
         "model": {
             "documents": facts.get("documents"),
+            "native_documents": facts.get("native_documents"),
             "parts": facts.get("parts"),
             "assemblies": facts.get("assemblies"),
             "config_meshes": facts.get("config_meshes"),
@@ -762,138 +711,6 @@ def stage_drawings(stage: Path) -> dict[str, str]:
             staged[f"{drawing_name}:{kind}"] = str(
                 destination.relative_to(stage)
             ).replace("\\", "/")
-    return staged
-
-
-def _source_index(paths: tuple[Path, ...]) -> dict[str, Path]:
-    """Index Pack-and-Go originals by their case-insensitive flat filename."""
-    indexed: dict[str, Path] = {}
-    for path in paths:
-        key = path.name.casefold()
-        previous = indexed.get(key)
-        if previous is not None and previous != path:
-            raise RuntimeError(
-                "Pack-and-Go cannot flatten distinct source files with the same "
-                f"name: {previous} and {path}"
-            )
-        indexed[key] = path
-    return indexed
-
-
-def _merge_pack_and_go_zip(
-    archive: Path,
-    original_sources: tuple[Path, ...],
-    destinations: tuple[tuple[Path, dict[str, Path]], ...],
-) -> tuple[str, ...]:
-    """Merge one flat Pack-and-Go archive using original source identity.
-
-    Pack-and-Go rewrites internal reference paths, so two archives made from the
-    same source document can legitimately have different bytes.  A duplicate is
-    accepted only when ``GetDocumentNames`` proves both copies came from the exact
-    same original path; a same-filename collision from distinct originals remains
-    a hard failure.
-    """
-    unpacked = archive.with_suffix("")
-    if unpacked.exists():
-        shutil.rmtree(unpacked)
-    unpacked.mkdir(parents=True)
-    archive_sources = _source_index(original_sources)
-    members: list[str] = []
-    try:
-        shutil.unpack_archive(str(archive), str(unpacked), "zip")
-        for source in unpacked.iterdir():
-            if not source.is_file():
-                raise RuntimeError(
-                    f"Pack-and-Go archive is not flat: {source.relative_to(unpacked)}"
-                )
-            key = source.name.casefold()
-            original = archive_sources.get(key)
-            if original is None:
-                raise RuntimeError(
-                    "Pack-and-Go archive member has no original source identity: "
-                    f"{source.name}"
-                )
-            for destination, known_sources in destinations:
-                known = known_sources.get(key)
-                if known is not None and known != original:
-                    raise RuntimeError(
-                        "Pack-and-Go filename collision comes from different "
-                        f"sources: {known} and {original}"
-                    )
-                target = destination / source.name
-                if not target.exists():
-                    shutil.copy2(source, target)
-                elif _sha256(source) != _sha256(target):
-                    _telemetry.event(
-                        "release.pack_collision_same_source",
-                        filename=source.name,
-                        original_source=str(original),
-                        destination=str(destination),
-                    )
-                    log(
-                        "pack-and-go: kept existing rewritten copy of "
-                        f"{source.name}; original source identity matches"
-                    )
-                known_sources[key] = original
-            members.append(source.name)
-        missing = sorted(
-            path.name
-            for key, path in archive_sources.items()
-            if key not in {name.casefold() for name in members}
-        )
-        if missing:
-            raise RuntimeError(
-                "Pack-and-Go archive omitted named source documents: "
-                + ", ".join(missing)
-            )
-    finally:
-        shutil.rmtree(unpacked, ignore_errors=True)
-    return tuple(sorted(members))
-
-
-def package_drawings(
-    sw: Any,
-    stage: Path,
-    native_sources: dict[str, Path],
-) -> dict[str, str]:
-    """Pack each native drawing with its model references into ``solidworks/``."""
-    native_dir = stage / "solidworks"
-    native_dir.mkdir(parents=True, exist_ok=True)
-    drawing_dir = stage / "slddrw"
-    drawing_dir.mkdir(parents=True, exist_ok=True)
-    drawing_sources: dict[str, Path] = {}
-    staged: dict[str, str] = {}
-    for drawing_name, outputs in DRAWING_OUTPUTS.items():
-        source = outputs["slddrw"]
-        archive = RELEASE_DIR / f"_{drawing_name}-drawing-packandgo.zip"
-        archive.unlink(missing_ok=True)
-        try:
-            original_sources = _pack_and_go_document(
-                sw, source, SW_DOC_DRAWING, archive
-            )
-            _merge_pack_and_go_zip(
-                archive,
-                original_sources,
-                (
-                    (native_dir, native_sources),
-                    (drawing_dir, drawing_sources),
-                ),
-            )
-        finally:
-            archive.unlink(missing_ok=True)
-
-        native_drawing = native_dir / source.name
-        if not native_drawing.is_file() or native_drawing.stat().st_size == 0:
-            raise RuntimeError(
-                f"drawing Pack-and-Go omitted its source document: {source.name}"
-            )
-        staged[f"{drawing_name}:solidworks_slddrw"] = str(
-            native_drawing.relative_to(stage)
-        ).replace("\\", "/")
-        portable_drawing = drawing_dir / source.name
-        staged[f"{drawing_name}:slddrw"] = str(
-            portable_drawing.relative_to(stage)
-        ).replace("\\", "/")
     return staged
 
 
@@ -1045,37 +862,46 @@ def stage_readout_procedure(stage: Path, tag: str) -> list[str]:
 
 
 def bundle(
-    sw: Any, revision: str, version: str, prev_tag: str | None = None
+    version: str, prev_tag: str | None = None
 ) -> tuple[Path, dict[str, Any]]:
-    """Assemble the single release zip: Pack-and-Go + cached neutral STEP/STL/PNG.
+    """Assemble the single release zip: prepared native tree + cached neutral set.
 
     One ``harmonic-analyzer-<version>.zip`` with everything a consumer needs:
     ``solidworks/`` the native Pack-and-Go files (open as-is in SolidWorks),
     ``step/`` + ``stl/`` neutral geometry, ``png/`` multi-angle previews. Staged
     under the gitignored release dir, then zipped whole.
+
+    Opens nothing in SolidWorks: every native document came out of
+    ``package_native.py``, whose prepared tree + sidecar this reads.
     """
+    # 0. The COM-derived half. Read FIRST: a missing or stale sidecar is the one
+    #    prerequisite failure that must not cost a staging rebuild.
+    package = load_native_package()
+    revision = package["solidworks_revision"]
+
     stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
     if stage.exists():
         shutil.rmtree(stage)  # regenerate-don't-repair: stale staging never shipped
     stage.mkdir(parents=True)
 
-    # 1. Pack-and-Go writes a .zip (the proven comtypes path); extract it flat
-    #    into stage/solidworks so the native files ride in the one bundle.
-    pg_tmp = RELEASE_DIR / f"_{TOP_ASSEMBLY}-{version}-packandgo.zip"
-    if pg_tmp.exists():
-        pg_tmp.unlink()
-    facts = package(sw, revision, pg_tmp)
-    native_sources = facts.pop("_native_sources")
+    # 1. Copy the prepared native tree (stage/solidworks + stage/slddrw) so the
+    #    native files ride in the one bundle. Two counts, two keys:
+    #    ``native_documents`` is the Pack-and-Go referenced set (COM-derived,
+    #    from the sidecar); ``documents`` is the neutral export inventory
+    #    ``stage_release_neutral`` reports below. They are NOT the same number,
+    #    and one shared key let the neutral count overwrite the native one and
+    #    mislabel it in the release notes (CodeRabbit, PR #770).
+    facts: dict[str, Any] = {
+        "native_documents": package["documents"],
+        "sw_revision": revision,
+    }
+    native_drawings = stage_native(stage, package)
     sw_dir = stage / "solidworks"
-    sw_dir.mkdir()
-    shutil.unpack_archive(str(pg_tmp), str(sw_dir), "zip")
-    pg_tmp.unlink()
 
-    # 2. Validate + stage the complete export cache. This is intentionally COM-free:
-    #    Pack-and-Go is the release's only native-document open.
+    # 2. Validate + stage the complete export cache.
     facts.update(stage_release_neutral(stage))
     facts["drawings"] = stage_drawings(stage)
-    facts["drawings"].update(package_drawings(sw, stage, native_sources))
+    facts["drawings"].update(native_drawings)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())
 
     # 3. Scene graph (mm): per-component transforms + mesh keys + colours. The
@@ -1091,9 +917,10 @@ def bundle(
     #    a previous release that predates the neutral bundle.
     facts["diff"] = render_diff(stage, prev_tag) if prev_tag else None
 
-    # 4b. Comparison gallery: ship the gallery the EXPORT stage produced (offline
-    #     Blender render off the stable STLs) under stage/comparisons. Export fails
-    #     loudly when Blender is unavailable, so a release cannot silently omit it.
+    # 4b. Comparison gallery: ship the gallery the `gallery` task produced (offline
+    #     Blender render off the stable STLs) under stage/comparisons. Both that
+    #     task and this staging fail loud, so a release cannot ship a missing,
+    #     incomplete or stale showcase.
     facts["comparisons"] = stage_comparisons(stage)
 
     # 4c. Operating/readout procedure: the release ships the drawings, and the
@@ -1175,7 +1002,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"part). This release attaches a single **CAD bundle** "
         f"`harmonic-analyzer-{version}.zip` so the model can be opened without "
         f"rebuilding -- with or without SolidWorks:\n\n"
-        f"- `solidworks/` -- native Pack-and-Go ({facts['documents']} referenced "
+        f"- `solidworks/` -- native Pack-and-Go ({facts['native_documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
         f"- `step/` -- AP214 STEP for {facts['parts']} parts; `stl/` fine binary "
         f"STL (mm) for all {facts['parts']} parts "
@@ -1194,19 +1021,10 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
             f"({facts['comparisons']['pairs']} pairs"
             + (
                 f", mean RMS score {facts['comparisons']['mean_score']}"
-                if facts["comparisons"].get("mean_score") is not None
+                if facts["comparisons"]["mean_score"] is not None
                 else ""
             )
-            + "; open `comparisons/index.html`)"
-            + (
-                " **[STALE -- rendered from an OLDER geometry export/manifest; "
-                "do not treat the visual fit as authoritative for this release]**"
-                if facts["comparisons"].get("stale")
-                else ""
-            )
-            + "\n"
-            if facts.get("comparisons")
-            else ""
+            + "; open `comparisons/index.html`)\n"
         )
         + (
             f"- `diff/` -- changed-parts diff renders vs "
@@ -1433,7 +1251,7 @@ def main() -> int:
         _telemetry.set_service("release")
         # Wrap the whole release in a span; run_pipeline_span extracts the
         # TRACEPARENT dodo._run injected (under `doit release`), so the release
-        # COM work + logs continue the doit task span instead of being detached.
+        # staging + logs continue the doit task span instead of being detached.
         with _telemetry.run_pipeline_span("release", version=version) as rel:
             _telemetry.info(f"cutting release {version}")
             preflight(version, opts.allow_dirty)
@@ -1443,8 +1261,7 @@ def main() -> int:
 
             started = time.perf_counter()
             try:
-                sw, revision = attach_solidworks()
-                zip_path, facts = bundle(sw, revision, version, prev)
+                zip_path, facts = bundle(version, prev)
             except Exception as exc:
                 # Mark the span ERROR before the early return, else the caught
                 # failure would exit the span cleanly and trace as success.

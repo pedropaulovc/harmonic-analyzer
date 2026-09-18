@@ -9,13 +9,15 @@ The wrapper only consumes ``--verbosity`` and ``--executor``; every other argume
 is passed to ``doit`` unchanged. Structured telemetry capture remains full-fidelity.
 
 ``--executor farm`` (the ``build`` / ``build.cmd`` entry points) keeps doit as the
-local dependency scheduler but runs every cache-missing part/assembly/drawing on
-the SolidWorks build farm instead of the local seat (``dodo._farm_build``). It
+local dependency scheduler but runs every cache-missing COM task -- parts,
+assemblies, drawings, the ``verify:*`` gates, ``preflight``, the neutral ``export``
+and the release Pack-and-Go (``package:release``) -- on the SolidWorks build farm
+instead of a local seat (``dodo._cached_com_action`` -> ``dodo._farm_build``). It
 needs a clean tree whose HEAD is on ``origin`` (the farm clones from there), the
 remote cache enabled (the farm hands results back through it), and the commit's
-sources published to the pool (``farm.py publish``) before doit starts. The
-SolidWorks ``verify:*`` gates need a local COM seat, so the default ``build``
-target omits them under the farm executor; run them with ``--executor local``.
+sources published to the pool (``farm.py publish``) before doit starts. A full
+release therefore needs no local SolidWorks; only the Blender-bound ``gallery``
+task and the publishing half of ``release`` run here.
 """
 
 from __future__ import annotations
@@ -78,8 +80,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"farm: {problem}", file=sys.stderr)
                 return 2
             print(
-                "farm: SolidWorks verify:* gates are not run on the farm; "
-                "run them with --executor local"
+                "farm: every SolidWorks task runs on the farm (parts, assemblies, "
+                "drawings, verify:*, preflight, export, package:release)"
             )
             doit_args = _with_farm_parallelism(doit_args, run_at)
     # dodo reads the executor from the environment; an explicit --executor must

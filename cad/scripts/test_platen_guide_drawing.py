@@ -13,6 +13,7 @@ import pytest
 from PIL import Image
 
 import cut_release
+import package_native
 import draw_platen_guide as drawing
 import build_platen_guide as guide
 import _drawing_common as drawing_common
@@ -356,6 +357,28 @@ def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     )
 
 
+def _prepared_native_tree(
+    monkeypatch, tmp_path: Path, drawing_outputs: dict, fake_pack
+) -> Path:
+    """Point package_native at a throwaway repo with a faked Pack-and-Go, and
+    point the (SolidWorks-free) publisher at the tree it prepares."""
+    out = tmp_path / "native"
+    monkeypatch.setattr(package_native, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        package_native, "OUT_SLDASM", tmp_path / "cad" / "out" / "sldasm"
+    )
+    monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(package_native, "DRAWING_OUTPUTS", drawing_outputs)
+    monkeypatch.setattr(package_native, "_pack_and_go_document", fake_pack)
+    package_native.RELEASE_DIR.mkdir(exist_ok=True)
+    package_native.prepare_out(out)
+    monkeypatch.setattr(cut_release, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        cut_release, "NATIVE_PACKAGE_FILE", out / package_native.SIDECAR_NAME
+    )
+    return out
+
+
 def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
     sources: dict[str, Path] = {}
     for kind, name in (
@@ -385,16 +408,21 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
 
     def fake_pack(_sw, source, doc_type, archive):
         assert source == sources["slddrw"]
-        assert doc_type == cut_release.SW_DOC_DRAWING
+        assert doc_type == package_native.SW_DOC_DRAWING
         with zipfile.ZipFile(archive, "w") as package:
             package.writestr(source.name, source.read_bytes())
             package.writestr("platen-guide.SLDPRT", b"referenced model")
         return (source, referenced_model)
 
-    monkeypatch.setattr(cut_release, "_pack_and_go_document", fake_pack)
-    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
-    cut_release.RELEASE_DIR.mkdir()
-    native = cut_release.package_drawings(object(), stage, {})
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"platen_guide": sources}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+
+    # The publisher holds no seat: it copies the prepared tree and rebuilds the
+    # very drawing facts the COM half used to return inline.
+    native = cut_release.stage_native(stage, cut_release.load_native_package())
     assert native == {
         "platen_guide:solidworks_slddrw": "solidworks/platen-guide.SLDDRW",
         "platen_guide:slddrw": "slddrw/platen-guide.SLDDRW",
@@ -409,6 +437,95 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     ).read_bytes() == b"referenced model"
 
 
+def test_native_package_sidecar_carries_only_repo_relative_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The sidecar is written on a farm worker and read on the submitter, whose
+    checkout is somewhere else: an absolute path would point at the worker's
+    disk."""
+    drawing = tmp_path / "source" / "slddrw" / "platen-guide.SLDDRW"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_bytes(b"slddrw")
+
+    def fake_pack(_sw, source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+        return (source,)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"platen_guide": {"slddrw": drawing}}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    sidecar = package_native.write_sidecar(out, "R2026x-test", (), drawings)
+
+    assert sidecar["schema"] == 1
+    assert sidecar["solidworks_revision"] == "R2026x-test"
+    assert sidecar["out_dir"] == "native"
+    assert sidecar["native_dir"] == "native/solidworks"
+    assert sidecar["drawing_dir"] == "native/slddrw"
+    assert sidecar["native_files"] == 1
+    assert sidecar["drawing_files"] == 1
+    assert sidecar["drawings"]["platen_guide"] == {
+        "source": "source/slddrw/platen-guide.SLDDRW",
+        "native_slddrw": "native/solidworks/platen-guide.SLDDRW",
+        "portable_slddrw": "native/slddrw/platen-guide.SLDDRW",
+        "sources": ["source/slddrw/platen-guide.SLDDRW"],
+    }
+
+    def _strings(node):
+        if isinstance(node, dict):
+            return [s for value in node.values() for s in _strings(value)]
+        if isinstance(node, list):
+            return [s for value in node for s in _strings(value)]
+        return [node] if isinstance(node, str) else []
+
+    assert not [
+        text for text in _strings(sidecar) if "\\" in text or ":" in text[1:3]
+    ]
+
+
+def test_release_rejects_a_truncated_prepared_native_tree(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A partial remote-cache restore must fail the release, not ship a bundle
+    whose solidworks/ is missing documents."""
+    drawing = tmp_path / "source" / "slddrw" / "platen-guide.SLDDRW"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_bytes(b"slddrw")
+
+    def fake_pack(_sw, source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+        return (source,)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"platen_guide": {"slddrw": drawing}}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+    (out / "solidworks" / "platen-guide.SLDDRW").unlink()
+
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    with pytest.raises(RuntimeError, match="recorded 1"):
+        cut_release.stage_native(stage, cut_release.load_native_package())
+
+
+def test_release_rejects_a_stale_native_package_schema(
+    tmp_path: Path, monkeypatch
+) -> None:
+    sidecar = tmp_path / "native-package.json"
+    sidecar.write_text('{"schema": 0}', encoding="utf-8")
+    monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_FILE", sidecar)
+
+    with pytest.raises(SystemExit, match="doit package:release"):
+        cut_release.load_native_package()
+
+    sidecar.unlink()
+    with pytest.raises(SystemExit, match="doit package:release"):
+        cut_release.load_native_package()
+
+
 def test_release_accepts_pack_rewrite_of_same_original_source(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -418,16 +535,6 @@ def test_release_accepts_pack_rewrite_of_same_original_source(
     assembly.parent.mkdir(parents=True)
     drawing.write_bytes(b"drawing")
     assembly.write_bytes(b"source assembly")
-    monkeypatch.setattr(
-        cut_release,
-        "DRAWING_OUTPUTS",
-        {"pen_assembly": {"slddrw": drawing}},
-    )
-
-    stage = tmp_path / "stage"
-    native_dir = stage / "solidworks"
-    native_dir.mkdir(parents=True)
-    (native_dir / assembly.name).write_bytes(b"top-level Pack-and-Go rewrite")
 
     def fake_pack(_sw, _source, _doc_type, archive):
         with zipfile.ZipFile(archive, "w") as package:
@@ -435,21 +542,23 @@ def test_release_accepts_pack_rewrite_of_same_original_source(
             package.writestr(assembly.name, b"drawing Pack-and-Go rewrite")
         return (drawing, assembly)
 
-    monkeypatch.setattr(cut_release, "_pack_and_go_document", fake_pack)
-    monkeypatch.setattr(cut_release, "RELEASE_DIR", tmp_path / "release")
-    cut_release.RELEASE_DIR.mkdir()
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"pen_assembly": {"slddrw": drawing}}, fake_pack
+    )
+    # The top assembly's Pack-and-Go laid its own rewrite down first; it wins.
+    (out / "solidworks" / assembly.name).write_bytes(b"top-level Pack-and-Go rewrite")
 
-    staged = cut_release.package_drawings(
-        object(), stage, {assembly.name.casefold(): assembly}
+    drawings = package_native.package_drawings(
+        object(), out, {assembly.name.casefold(): assembly}
     )
 
-    assert staged["pen_assembly:solidworks_slddrw"] == (
-        "solidworks/pen-assembly.SLDDRW"
+    assert drawings["pen_assembly"]["native_slddrw"] == (
+        "native/solidworks/pen-assembly.SLDDRW"
     )
-    assert (native_dir / assembly.name).read_bytes() == (
+    assert (out / "solidworks" / assembly.name).read_bytes() == (
         b"top-level Pack-and-Go rewrite"
     )
-    assert (stage / "slddrw" / assembly.name).read_bytes() == (
+    assert (out / "slddrw" / assembly.name).read_bytes() == (
         b"drawing Pack-and-Go rewrite"
     )
 
@@ -470,7 +579,7 @@ def test_release_rejects_pack_collision_from_distinct_original_sources(
     destination.mkdir()
 
     with pytest.raises(RuntimeError, match="different sources"):
-        cut_release._merge_pack_and_go_zip(
+        package_native._merge_pack_and_go_zip(
             archive,
             (second,),
             ((destination, {first.name.casefold(): first}),),

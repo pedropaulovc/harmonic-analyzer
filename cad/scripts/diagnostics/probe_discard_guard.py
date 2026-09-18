@@ -1,4 +1,4 @@
-r"""Validate cut_release._discard_open_documents closes a dirty session silently.
+r"""Validate package_native._discard_open_documents closes a dirty session silently.
 
 Reproduces the exact condition that popped the "Save Modified Documents" modal:
 an open top assembly whose flexible drive-train child is dirty (from activating
@@ -16,13 +16,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for cut_release
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for package_native
 
 import comtypes
 import comtypes.client
 
 import _telemetry
-from cut_release import SW_TYPELIB, SW_TYPELIB_VER, _discard_open_documents
+from package_native import SW_TYPELIB, SW_TYPELIB_VER, _discard_open_documents
 
 ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\harmonic-analyzer.SLDASM"
 SW_DOC_ASSEMBLY = 2
