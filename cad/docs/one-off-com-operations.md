@@ -32,7 +32,7 @@ If it needs a seat, pick ONE of four:
 | **D — don't** | you only want to *look* at a model or drawing | audit the artefact offline; never launch a build to inspect one |
 
 Route **C is unavailable from this checkout** — it attaches to an already
-running `SldWorks.Application` in the Registered Object Table
+running `SldWorks.Application` in the Running Object Table
 (`win32com.client.GetActiveObject`), which requires a licensed seat on the same
 machine. The only seats left are the farm workers, and driving one directly is
 a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
@@ -178,11 +178,12 @@ throw away afterwards. Non-negotiable shape:
 - `cad/out/logs/<log_stem>.log` — the per-task console tee (only for tasks that
   pass a `log_stem`; otherwise output is inherited straight to the terminal).
 - `cad/out/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
-  log record as JSON. Debug from these, not from scrollback: filter by span
-  name, ERROR status, `service.name` (pipeline stage), or a trace id lifted
-  from a log line. The phase spans are siblings — `cache.probe` →
-  `com.seat.wait` → `cache.reprobe` → `task` → `cache.store` — so queueing and
-  Azure transfer are never billed as work.
+  log record as JSON; query them with `rg`/`jq` instead of scraping the console
+  (`AGENTS.md`, "Observability"). What matters for an ad-hoc operation: the
+  phase spans are SIBLINGS — `cache.probe` → `com.seat.wait` →
+  `cache.reprobe` → `task` → `cache.store` — so a slow leaf is attributable to
+  queueing, Azure transfer or real work without arithmetic, and correlating
+  them means filtering on the `label` attribute, not on a parent span.
 - Watchdog story, one filter: every watchdog record carries the
   `watchdog_signal` attribute. Absence of the one "COM watchdog armed" info per
   COM session means that session ran unprotected.
