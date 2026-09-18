@@ -276,29 +276,41 @@ class _FakeNote:
 
 
 class _FakeDrawingDoc:
-    """Just enough ``IDrawingDoc`` to walk one sheet-format note."""
+    """Just enough ``IDrawingDoc`` to walk one sheet-format note.
+
+    ``GetEditSheet`` is a METHOD on the generated wrapper -- dispid retval
+    ``(11,0)`` ``VT_BOOL``, in neither prop map -- and it is the read-back
+    that verifies ``EditTemplate``/``EditSheet``, both of which declare
+    ``(24,0)`` ``VT_VOID`` and so report nothing themselves. Exposing it here
+    as a plain attribute would let a bare read pass the suite while returning
+    a permanently-truthy bound method on a seat, which is precisely how the
+    ``IsHeightSpecifiedInPts`` defect survived review.
+    """
 
     def __init__(self, note: _FakeNote):
         self.note = note
-        self.GetEditSheet = True
+        self._edit_sheet = True
         self.edit_template_calls = 0
 
-    def EditTemplate(self):
-        self.edit_template_calls += 1
-        self.GetEditSheet = False
+    def GetEditSheet(self) -> bool:
+        return self._edit_sheet
 
-    def EditSheet(self):
-        self.GetEditSheet = True
+    def EditTemplate(self) -> None:
+        self.edit_template_calls += 1
+        self._edit_sheet = False
+
+    def EditSheet(self) -> None:
+        self._edit_sheet = True
 
     def GetFirstView(self):
         # Template notes are only reachable in edit-sheet-format mode.
-        note = None if self.GetEditSheet else self.note
+        note = None if self._edit_sheet else self.note
         return SimpleNamespace(GetFirstNote2=lambda: note)
 
 
 class _FakeAdapter:
     def __init__(self):
-        self.currentModel = SimpleNamespace(GraphicsRedraw2=lambda: True)
+        self.currentModel = SimpleNamespace(GraphicsRedraw2=lambda: None)
 
     @staticmethod
     def _attempt(call, default=None):
@@ -380,7 +392,7 @@ def test_a_reauthored_template_fails_every_sheet(seat, name, adjust, authored, m
 
     # Nothing is written on the way to the refusal, on either sheet class.
     assert annotation.writes == 0
-    assert ddoc.GetEditSheet is True
+    assert ddoc.GetEditSheet() is True
 
 
 def test_a_template_authoring_its_height_in_millimetres_is_read_correctly(seat):
@@ -424,7 +436,7 @@ def test_an_untouched_sheets_ink_is_never_written(seat):
     assert fit.adjust is False
     assert annotation.writes == 0
     assert vars(annotation.text_format) == before
-    assert ddoc.GetEditSheet is True
+    assert ddoc.GetEditSheet() is True
 
 
 def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
@@ -455,7 +467,7 @@ def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
     assert annotation.text_format.LineLength * 1000.0 == pytest.approx(
         fit.line_length_mm
     )
-    assert ddoc.GetEditSheet is True
+    assert ddoc.GetEditSheet() is True
 
 
 def test_a_millimetre_authored_sheet_is_fitted_in_its_own_unit(seat):
