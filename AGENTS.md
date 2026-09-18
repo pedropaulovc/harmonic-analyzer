@@ -302,6 +302,20 @@ falling through, and the seat-holding action runs `release_seat_documents.py`
 (an empty `run_build` session — the discard IS the work) and re-probes; still
 locked after that is fatal.
 
+**Empty of directories, too.** SolidWorks moves its own *process current directory*
+to follow the documents it opens, so after a build that saved into `cad/out/sldprt`
+the seat's `cwd` **is** that directory — and Windows refuses to remove a directory
+that is any process's `cwd`. Closing documents does not release it (the `cwd`
+belongs to the process, not to a document), so `run_build`'s teardown and
+`package_native._release_seat` both re-point it out of the checkout with
+`_common.release_seat_working_directory`. Off the farm this is invisible: the
+checkout outlives the seat. On a farm worker the checkout is a disposable source
+root the agent removes between leaves and evicts to bound the disk, so a seat
+parked in one fails an *unrelated* leaf's cleanup with `WinError 32` — the
+release's first farm `export` leaf died three times that way (2026-09-18,
+swmaker000006, seat parked in an hours-old `drawing:*` root). It is re-pointed at
+teardown, not at connect: the seat drifts back in on the next open/save.
+
 Tradeoff (documented, accepted): under a cold `-n N` full build, workers that grab a
 COM task block on the seat, so the `check:*` gates can be starved toward the end of
 the run (they still run N-wide once COM drains) — a few tens of seconds on a ~25 min
