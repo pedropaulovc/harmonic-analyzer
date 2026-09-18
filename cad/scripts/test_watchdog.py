@@ -341,14 +341,32 @@ def test_run_build_cleans_up_when_session_setup_fails(
 
 
 def _seat(
-    readings: list[object], *, moved: object = True
+    start: str, *, moved: object = True
 ) -> tuple[SimpleNamespace, SimpleNamespace]:
-    """An adapter whose seat answers ``readings`` for its working directory."""
+    """A seat whose working directory is STATE, not a fixed answer sequence.
+
+    The seat is read more than once per session -- connect samples it for the
+    provenance attributes, teardown reads it before and after the re-point --
+    and a fake keyed to call ORDER silently mis-answers (and then raises
+    ``StopIteration``) the moment a caller adds a reading. So the fake owns a
+    directory and the setter moves it.
+
+    ``moved`` is what ``SetCurrentWorkingDirectory`` does: ``True`` accepts the
+    move, ``False`` refuses it, and ``"ignored"`` answers True without moving --
+    the case that proves the readback, not the return value, is the evidence.
+    """
+
+    seat = SimpleNamespace(cwd=start)
+
+    def _set(target: str) -> object:
+        if moved is True:
+            seat.cwd = target
+        return True if moved == "ignored" else moved
 
     app = SimpleNamespace(
         CloseAllDocuments=Mock(),
-        GetCurrentWorkingDirectory=Mock(side_effect=readings),
-        SetCurrentWorkingDirectory=Mock(return_value=moved),
+        GetCurrentWorkingDirectory=Mock(side_effect=lambda: seat.cwd),
+        SetCurrentWorkingDirectory=Mock(side_effect=_set),
     )
     adapter = SimpleNamespace(
         connect=AsyncMock(),
@@ -374,6 +392,10 @@ def _session(
     monkeypatch.setattr(_common, "discard_open_documents", Mock())
     monkeypatch.setattr(_common, "_resident_output_documents", lambda _adapter: [])
     monkeypatch.setattr(_common, "_pin_default_part_template", Mock())
+    # Seat provenance is resolved once per PROCESS and cached in a module
+    # global, so one session's reading (or its failure) would otherwise leak
+    # into every later test in the same pytest run.
+    monkeypatch.setattr(_common, "_seat_identity", {})
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
@@ -403,7 +425,7 @@ def test_teardown_moves_the_seat_out_of_the_checkout(
     # release it: the cwd belongs to the process, not to a document.
     temp = tempfile.gettempdir()
     parked = str(_common.CAD_ROOT / "out" / "sldprt")
-    adapter, app = _seat([parked, temp])
+    adapter, app = _seat(parked)
 
     session = _session(monkeypatch, adapter)
 
@@ -426,7 +448,7 @@ def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
     # parked unconditionally.
     temp = tempfile.gettempdir()
     sibling = r"C:\harmonic\work\sources\6621e07aabfb412916eeae68\workspace\cad\out"
-    adapter, app = _seat([sibling, temp])
+    adapter, app = _seat(sibling)
 
     assert _session(monkeypatch, adapter).warnings == []
 
@@ -436,7 +458,7 @@ def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
 def test_a_seat_already_parked_there_is_left_alone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter, app = _seat([tempfile.gettempdir()])
+    adapter, app = _seat(tempfile.gettempdir())
 
     assert _session(monkeypatch, adapter).warnings == []
 
@@ -448,7 +470,7 @@ def test_a_seat_that_refuses_to_move_warns_instead_of_failing_the_build(
 ) -> None:
     # Same standing as the teardown close: a directory this session cannot
     # release is the NEXT leaf's hazard, not a failure of work already done.
-    adapter, _app = _seat([str(_common.CAD_ROOT / "out" / "sldprt")], moved=False)
+    adapter, _app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved=False)
 
     warnings = _session(monkeypatch, adapter).warnings
 
@@ -460,7 +482,7 @@ def test_a_move_the_seat_ignored_is_not_reported_as_released(
 ) -> None:
     # SetCurrentWorkingDirectory answering True is not evidence: the readback is.
     parked = str(_common.CAD_ROOT / "out" / "sldprt")
-    adapter, _app = _seat([parked, parked])
+    adapter, _app = _seat(parked, moved="ignored")
 
     session = _session(monkeypatch, adapter)
 
@@ -494,7 +516,7 @@ def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
     checkout = _common._normal_path(_common.CAD_ROOT.parent)
     assert target.is_dir()
     assert checkout not in _common._normal_path(target).parents
-    adapter, app = _seat([str(_common.CAD_ROOT / "out" / "sldprt"), str(target)])
+    adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"))
     assert _session(monkeypatch, adapter).warnings == []
     app.SetCurrentWorkingDirectory.assert_called_once_with(str(target))
 
