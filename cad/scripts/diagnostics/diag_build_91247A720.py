@@ -31,16 +31,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 from _common import (  # noqa: E402
+    capture_com_failure,
     check,
     name_last_feature,
     volume_check,
 )
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
+    draw_closed_profile,
     insert_helix,
     offset_plane,
     replica_main,
     thread_sweep_cut,
+)
+from diagnostics.sketch_profile import (  # noqa: E402
+    Line,
+    Segment,
+    endpoint_merges,
+    minor_arc,
 )
 
 GB_MAJOR_R = 12.7 / 2.0
@@ -51,6 +59,68 @@ GB_PITCH = 25.4 / 13.0     # stored 1.953846
 GB_MTL = 31.75
 GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
 GB_WASHER_T = 0.2
+
+# --- raised triangle logo ring -----------------------------------------------
+# The vendor authored this as a mid-plane Extrude-Thin over a 6-segment
+# centreline, but FeatureExtrusionThin2 rejects ANY closed chain that contains
+# tangent arcs on this build (probed: closed lines-only loops thin-extrude
+# fine; line+tangent-arc loops fail at every wall/type/depth).  The FACES
+# prove the equivalent explicit region, which is what these constants
+# describe: the three corner-arc centres of the vendor's centreline triangle,
+# and the 0.4 offset that turns it into a ring.
+LOGO_APEX_CENTRE = (0.0, -5.33911)        # apex corner-arc centre (core vertex)
+LOGO_BOTTOM_RIGHT_CENTRE = (1.201402, -7.42)
+LOGO_BOTTOM_LEFT_CENTRE = (-1.201402, -7.42)
+LOGO_OUTER_R = 0.4
+# Outward normal of the right-hand slant line.  Kept as the literal pair the
+# geometry was authored and gated with -- NOT recomputed as
+# ``math.sqrt(3.0) / 2.0``, which is one ULP lower and would move every offset
+# vertex.  Closure does not depend on this value being exactly cos(30 deg); it
+# depends on the same expression being used on both sides of every joint.
+LOGO_NX, LOGO_NY = 0.8660254037844387, 0.5
+
+
+def logo_ring_profile() -> tuple[Segment, ...]:
+    """The logo ring's nine segments: outer boundary CW, then the inner core.
+
+    Outer boundary = the vendor centreline's three lines offset out 0.2, joined
+    by r=0.4 corner arcs.  Inner boundary = the SHARP triangle through the
+    three corner-arc centres: the inner offset degenerates, because the
+    centreline lines are tangent to the r=0.2 corner circles, so
+    ``centreline - 0.2`` IS the centre-to-centre edge.  Ring area check:
+    ``P_core * R + pi * R**2 = 7.208412 * 0.4 + pi * 0.16 = 3.38602``, the
+    vendor's 3.386 bottom face.
+
+    Every vertex shared by two segments is written as the SAME expression in
+    both places, so the two doubles are bit-identical and
+    :func:`sketch_profile.endpoint_merges` pairs them on ``==``.  Do not
+    "simplify" one side of a pair: a one-ULP difference opens the profile, and
+    nothing -- no user setting, no tolerance -- can be relied on to bridge it.
+
+    Pure: no COM, no adapter.  ``test_logo_profile_closure.py`` asserts the
+    exact-equality and loop-count invariants against this function directly.
+    """
+    ct = LOGO_APEX_CENTRE
+    cbr = LOGO_BOTTOM_RIGHT_CENTRE
+    cbl = LOGO_BOTTOM_LEFT_CENTRE
+    r_out, nx, ny = LOGO_OUTER_R, LOGO_NX, LOGO_NY
+    apex_right = (ct[0] + r_out * nx, ct[1] + r_out * ny)
+    apex_left = (ct[0] - r_out * nx, ct[1] + r_out * ny)
+    right_slant = (cbr[0] + r_out * nx, cbr[1] + r_out * ny)
+    right_flat = (cbr[0], cbr[1] - r_out)
+    left_flat = (cbl[0], cbl[1] - r_out)
+    left_slant = (cbl[0] - r_out * nx, cbl[1] + r_out * ny)
+    return (
+        Line(apex_right, right_slant),               # outer right slant
+        minor_arc(cbr, right_slant, right_flat),     # outer BR corner, 120 deg
+        Line(right_flat, left_flat),                 # outer bottom
+        minor_arc(cbl, left_flat, left_slant),       # outer BL corner, 120 deg
+        Line(left_slant, apex_left),                 # outer left slant
+        minor_arc(ct, apex_left, apex_right),        # outer apex corner, 120 deg
+        Line(ct, cbr),                               # inner core triangle
+        Line(cbr, cbl),
+        Line(cbl, ct),
+    )
 
 
 async def build_91247A720(adapter, truth=None):
@@ -78,10 +148,14 @@ async def build_91247A720(adapter, truth=None):
     # --- shank with tip chamfer (Revolve1 + Chamfer1) -----------------------
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, GB_UNDERSIDE / 1000.0, 0.0,
-                           0.0, tip_y / 1000.0, 0.0) is None:
-        raise RuntimeError("91247 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        # The revolve axis is raw construction geometry drawn before the
+        # profile, so it was the one entity in this sketch still authored at
+        # the seat's inference setting.  An axis that snaps is a revolve about
+        # the wrong line.
+        if sk.CreateCenterLine(0.0, GB_UNDERSIDE / 1000.0, 0.0,
+                               0.0, tip_y / 1000.0, 0.0) is None:
+            raise RuntimeError("91247 shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, GB_UNDERSIDE),
             (major_r, GB_UNDERSIDE),
@@ -143,7 +217,8 @@ async def build_91247A720(adapter, truth=None):
     name_last_feature(adapter, "TrimProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
-    _feature_by_name(adapter, "TrimProfile").Select2(False, 0)
+    if not _feature_by_name(adapter, "TrimProfile").Select2(False, 0):
+        raise RuntimeError("corner trim: TrimProfile selection failed")
     fm = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
     feat = fm.FeatureCut4(
         True, True, False, 1, 0, 0.0, 0.0,
@@ -152,7 +227,13 @@ async def build_91247A720(adapter, truth=None):
         False, False, True, False, False, False,
         0, 0.0, False, False)
     if feat is None:
-        raise RuntimeError("corner trim cut failed")
+        capture_com_failure(
+            adapter,
+            "corner-trim-cut",
+            "corner trim cut failed",
+            api="IFeatureManager.FeatureCut4",
+            sketch="TrimProfile",
+        )
     name_last_feature(adapter, "CornerTrim")
 
     # --- split at the THREAD TOP, thread, runout -----------------------------
@@ -169,9 +250,10 @@ async def build_91247A720(adapter, truth=None):
 
     offset_plane(adapter, "TipPlane", tip_y)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, GB_MTL / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
@@ -199,7 +281,8 @@ async def build_91247A720(adapter, truth=None):
     check("exit_sketch runout", await adapter.exit_sketch())
     name_last_feature(adapter, "RunoutProfile")
     model.ClearSelection2(True)
-    _feature_by_name(adapter, "RunoutProfile").Select2(False, 0)
+    if not _feature_by_name(adapter, "RunoutProfile").Select2(False, 0):
+        raise RuntimeError("thread runout: RunoutProfile selection failed")
     feat = fm.FeatureExtrusion3(
         True, False, True,               # single ended, down
         1, 0, 0.0, 0.0,                  # ThroughAll
@@ -209,7 +292,13 @@ async def build_91247A720(adapter, truth=None):
         True, False, True,
         0, 0.0, False)
     if feat is None:
-        raise RuntimeError("runout extrude failed")
+        capture_com_failure(
+            adapter,
+            "runout-extrude",
+            "runout extrude failed",
+            api="IFeatureManager.FeatureExtrusion3",
+            sketch="RunoutProfile",
+        )
     name_last_feature(adapter, "ThreadRunout")
     v_before_marks = mass_properties(adapter)["volume_mm3"]
 
@@ -237,7 +326,8 @@ async def build_91247A720(adapter, truth=None):
         check(f"exit_sketch dash{i}", await adapter.exit_sketch())
         name_last_feature(adapter, f"DashProfile{i}")
         model.ClearSelection2(True)
-        _feature_by_name(adapter, f"DashProfile{i}").Select2(False, 0)
+        if not _feature_by_name(adapter, f"DashProfile{i}").Select2(False, 0):
+            raise RuntimeError(f"dash {i}: DashProfile{i} selection failed")
         feat = fm.FeatureExtrusion3(
             True, False, False,          # single ended, up (sketch normal)
             0, 0, 0.2 / 1000.0, 0.0,
@@ -246,7 +336,14 @@ async def build_91247A720(adapter, truth=None):
             False, False, True,          # Merge=FALSE -> separate body
             0, 0.0, False)
         if feat is None:
-            raise RuntimeError(f"dash extrude {i} failed")
+            capture_com_failure(
+                adapter,
+                f"dash-extrude-{i}",
+                f"dash extrude {i} failed",
+                api="IFeatureManager.FeatureExtrusion3",
+                sketch=f"DashProfile{i}",
+                angle_deg=deg,
+            )
         name_last_feature(adapter, f"Dash{i}")
         if i == 0:
             # Dash0 sits entirely at sketch y in [4.84, 7.62]; the sign of
@@ -268,64 +365,39 @@ async def build_91247A720(adapter, truth=None):
         name_last_feature(adapter, f"DashFillet{i}")
 
     # --- raised triangle logo ring (separate body) --------------------------
-    # The vendor authored this as a mid-plane Extrude-Thin over a 6-segment
-    # centreline, but FeatureExtrusionThin2 rejects ANY closed chain that
-    # contains tangent arcs on this build (probed: closed lines-only loops
-    # thin-extrude fine; line+tangent-arc loops fail at every wall/type/
-    # depth).  The FACES prove the equivalent explicit region: outer
-    # boundary = the centreline's 3 lines offset out 0.2 joined by r=0.4
-    # corner arcs; inner boundary = the SHARP triangle through the 3 corner
-    # arc centres (the inner offset degenerates: the centreline lines are
-    # tangent to the r=0.2 corner circles, so centreline - 0.2 IS the
-    # centre-to-centre edge).  Ring area check: P_core*R + pi*R^2 =
-    # 7.208412*0.4 + pi*0.16 = 3.38602 = the vendor's 3.386 bottom face.
-    ct = (0.0, -5.33911)        # apex corner-arc centre (core vertex)
-    cbr = (1.201402, -7.42)     # bottom-right centre
-    cbl = (-1.201402, -7.42)    # bottom-left centre
-    r_out = 0.4
-    nx, ny = 0.8660254037844387, 0.5   # outward normal of the right line
-    logo_segs = [
-        # outer: right line, BR arc, bottom line, BL arc, left line, apex arc
-        ("line", (ct[0] + r_out * nx, ct[1] + r_out * ny),
-                 (cbr[0] + r_out * nx, cbr[1] + r_out * ny)),
-        ("arc", (cbr[0] + r_out * nx, cbr[1] + r_out * ny),
-                (cbr[0], cbr[1] - r_out),
-                (cbr[0] + r_out * nx, cbr[1] - r_out * ny)),
-        ("line", (cbr[0], cbr[1] - r_out), (cbl[0], cbl[1] - r_out)),
-        ("arc", (cbl[0], cbl[1] - r_out),
-                (cbl[0] - r_out * nx, cbl[1] + r_out * ny),
-                (cbl[0] - r_out * nx, cbl[1] - r_out * ny)),
-        ("line", (cbl[0] - r_out * nx, cbl[1] + r_out * ny),
-                 (ct[0] - r_out * nx, ct[1] + r_out * ny)),
-        ("arc", (ct[0] - r_out * nx, ct[1] + r_out * ny),
-                (ct[0] + r_out * nx, ct[1] + r_out * ny),
-                (ct[0], ct[1] + r_out)),
-        # inner: the sharp core triangle
-        ("line", ct, cbr),
-        ("line", cbr, cbl),
-        ("line", cbl, ct),
-    ]
+    # Geometry and its derivation: :func:`logo_ring_profile` (module level, so
+    # the offline closure test asserts against the real thing).
+    #
+    # THIS is the site that failed 2026-09-17 on swmaker000005 as "logo ring
+    # extrude failed" and passed on retry.  It used to draw nine bare
+    # CreateLine/Create3PointArc segments through the inference engine, on the
+    # theory that exactly-coincident endpoints would merge into closed loops,
+    # having audited the endpoints against MODEL silhouettes and found the
+    # nearest 0.898 mm away.  Two things were wrong with that audit.  Snapping
+    # is measured in PIXELS, not millimetres, and nothing on this path fits or
+    # orients the view -- px/mm is inherited from the part template and the
+    # window size, per seat, unasserted and unrecorded (see
+    # diagnostics/exp_inference_zoom.py, which measured it).  And the sketch's
+    # OWN points are snap candidates too: each inner-triangle vertex IS an
+    # outer corner arc's centre, so it sits 0.400 mm from four outer-loop
+    # points -- 2.25x tighter than the model clearance that was checked.
+    #
+    # Closure is now AUTHORED and has no pixel term: segments go straight to
+    # the sketch database, arcs are centre-based rather than re-fitted from
+    # three points, and every shared vertex gets an explicit merge relation.
+    # The ring extrudes identically at any view scale, on any seat.
+    logo_segs = logo_ring_profile()
     check("create_sketch logo", await adapter.create_sketch("HeadTopPlane"))
-    sk4 = adapter.currentSketchManager
-    # Inference stays ON: exactly-coincident endpoints must merge into
-    # closed loops.  No endpoint radius (5.15-7.91) sits near a model
-    # silhouette (6.35/8.81/9.525), so the circle-snap hazard is absent.
-    for seg in logo_segs:
-        if seg[0] == "line":
-            (x1, y1), (x2, y2) = seg[1], seg[2]
-            if sk4.CreateLine(x1 / 1000.0, y1 / 1000.0, 0.0,
-                              x2 / 1000.0, y2 / 1000.0, 0.0) is None:
-                raise RuntimeError("logo line failed")
-        else:
-            (x1, y1), (x2, y2), (xm, ym) = seg[1], seg[2], seg[3]
-            if sk4.Create3PointArc(x1 / 1000.0, y1 / 1000.0, 0.0,
-                                   x2 / 1000.0, y2 / 1000.0, 0.0,
-                                   xm / 1000.0, ym / 1000.0, 0.0) is None:
-                raise RuntimeError("logo arc failed")
+    await draw_closed_profile(adapter, logo_segs, label="logo ring", loops=2)
     check("exit_sketch logo", await adapter.exit_sketch())
     name_last_feature(adapter, "LogoProfile")
     model.ClearSelection2(True)
-    _feature_by_name(adapter, "LogoProfile").Select2(False, 0)
+    # FeatureExtrusion3 also returns None when NOTHING is selected, so an
+    # unchecked Select2 makes a failed selection and a bad profile
+    # indistinguishable in the log -- which is part of why tonight's failure
+    # took a night to explain.
+    if not _feature_by_name(adapter, "LogoProfile").Select2(False, 0):
+        raise RuntimeError("logo ring: LogoProfile selection failed")
     feat = fm.FeatureExtrusion3(
         True, False, False,              # single ended, up (sketch normal)
         0, 0, 0.2 / 1000.0, 0.0,
@@ -334,7 +406,15 @@ async def build_91247A720(adapter, truth=None):
         False, False, True,              # Merge=FALSE -> separate body
         0, 0.0, False)
     if feat is None:
-        raise RuntimeError("logo ring extrude failed")
+        capture_com_failure(
+            adapter,
+            "logo-ring-extrude",
+            "logo ring extrude failed",
+            api="IFeatureManager.FeatureExtrusion3",
+            sketch="LogoProfile",
+            segments=len(logo_segs),
+            merges=len(endpoint_merges(logo_segs)),
+        )
     name_last_feature(adapter, "LogoRing")
     # Outer top rim is tangent-continuous (offset corner arcs r=0.4) so one
     # propagated point covers it; the INNER rim's corner arcs degenerate to
@@ -349,6 +429,10 @@ async def build_91247A720(adapter, truth=None):
     # silently misses back-facing edges).
     ft = 0.15
     rim_y = top_y + 0.2
+    ct = LOGO_APEX_CENTRE
+    cbr = LOGO_BOTTOM_RIGHT_CENTRE
+    cbl = LOGO_BOTTOM_LEFT_CENTRE
+    r_out, nx, ny = LOGO_OUTER_R, LOGO_NX, LOGO_NY
     mid_out = ((ct[0] + cbr[0]) / 2.0 + r_out * nx,
                (ct[1] + cbr[1]) / 2.0 + r_out * ny)
     mid_in = ((ct[0] + cbr[0]) / 2.0, (ct[1] + cbr[1]) / 2.0)

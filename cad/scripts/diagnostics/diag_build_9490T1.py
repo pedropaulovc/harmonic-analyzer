@@ -322,11 +322,12 @@ async def _thread(adapter) -> None:
     """
     offset_plane(adapter, "ThreadDatum", A.shank_end_y_mm)
     check("create_sketch helix seed", await adapter.create_sketch("ThreadDatum"))
-    seed = _sketch_manager(adapter).CreateCircleByRadius(
-        0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
-    )
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = _sketch_manager(adapter).CreateCircleByRadius(
+            0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
+        )
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
     # InsertHelix consumes the ACTIVE sketch.  In this Top-offset frame,
     # clockwise=False and reversed_dir=False match the supplier's helix in
     # model space; pi/2 starts on +X, the cutter's meridian.  Native helix

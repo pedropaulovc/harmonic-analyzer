@@ -78,11 +78,12 @@ async def build_fillister(adapter, part_no: str):
     # --- revolve profile ----------------------------------------------------
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
-    if (
-        sk_mgr.CreateCenterLine(0.0, hh / 1000.0, 0.0, 0.0, -length / 1000.0, 0.0)
-        is None
-    ):
-        raise RuntimeError("fillister profile: CreateCenterLine failed")
+    with no_sketch_inference(adapter):
+        if (
+            sk_mgr.CreateCenterLine(0.0, hh / 1000.0, 0.0, 0.0, -length / 1000.0, 0.0)
+            is None
+        ):
+            raise RuntimeError("fillister profile: CreateCenterLine failed")
     # Dome arc as a THREE-POINT arc under no_sketch_inference.  Two traps,
     # both hit here: inference snapping is PIXEL-based (view-dependent)
     # and silently re-solved scripted arcs (centre snapped to the
@@ -170,11 +171,12 @@ async def build_fillister(adapter, part_no: str):
 
     # --- helix (junction -> P past the tip) ---------------------------------
     check("create_sketch helix seed", await adapter.create_sketch("Top"))
-    seed = adapter.currentSketchManager.CreateCircleByRadius(
-        0.0, 0.0, 0.0, major_r / 1000.0
-    )
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = adapter.currentSketchManager.CreateCircleByRadius(
+            0.0, 0.0, 0.0, major_r / 1000.0
+        )
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(
         adapter,
         pitch,
@@ -207,13 +209,14 @@ async def build_fillister(adapter, part_no: str):
     # from the junction down to -P/2, then a 30-deg taper cone below it
     # until the cone falls under the thread root (adds nothing deeper).
     check("create_sketch runout fill", await adapter.create_sketch("Top"))
-    if (
-        adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0
-        )
-        is None
-    ):
-        raise RuntimeError("runout fill circle failed")
+    with no_sketch_inference(adapter):
+        if (
+            adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0
+            )
+            is None
+        ):
+            raise RuntimeError("runout fill circle failed")
     check("exit_sketch runout fill", await adapter.exit_sketch())
     name_last_feature(adapter, "RunoutFillProfile")
     check(
@@ -230,14 +233,14 @@ async def build_fillister(adapter, part_no: str):
     taper_h = (major_r - root_r) * math.sqrt(3.0)  # 30 deg from the axis
     check("create_sketch runout taper", await adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
-    if (
-        sk2.CreateCenterLine(
-            0.0, -pitch / 2.0 / 1000.0, 0.0, 0.0, (-pitch / 2.0 - taper_h) / 1000.0, 0.0
-        )
-        is None
-    ):
-        raise RuntimeError("runout taper: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if (
+            sk2.CreateCenterLine(
+                0.0, -pitch / 2.0 / 1000.0, 0.0, 0.0, (-pitch / 2.0 - taper_h) / 1000.0, 0.0
+            )
+            is None
+        ):
+            raise RuntimeError("runout taper: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [

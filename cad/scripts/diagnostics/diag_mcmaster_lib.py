@@ -44,6 +44,12 @@ from _common import (  # noqa: E402
     _read_member,
     check,
 )
+from diagnostics.sketch_profile import (  # noqa: E402
+    Line,
+    Segment,
+    closed_loops,
+    endpoint_merges,
+)
 
 OUT_DIR = CAD_ROOT / "out" / "reference"
 REPORTS_DIR = CAD_ROOT / "out" / "reports"
@@ -134,34 +140,309 @@ async def export_views(adapter, stem: str) -> dict[str, str]:
     return out
 
 
-# swUserPreferenceToggle_e (values read from swconst.tlb on this install)
+# swUserPreferenceToggle_e ids, confirmed by a live swconst.tlb walk on an
+# R2026x seat (see ``memory/solidworks-center-rectangle-determinism.md``).
 _SW_SKETCH_AUTOMATIC_RELATIONS = 9
+_SW_SKETCH_INFER_FROM_MODEL = 95
 _SW_SKETCH_INFERENCE = 249
+
+# What a recipe REQUIRES while it draws.  All three off.
+#
+# SolidWorks inference snapping is PIXEL-based and therefore view-dependent:
+# it has silently re-solved a scripted arc by snapping its centre to a
+# centreline midpoint and an endpoint to a horizontal alignment, at distances
+# that depend on the current zoom; it has flattened a 0.6-degree taper line
+# into a cylinder by inferring ``horizontal``; and -- this is what
+# ``swSketchInferFromModel`` adds over the two toggles this file used to
+# suppress -- it has snapped a scripted circle authored 0.0508 from the shank
+# silhouette out to the silhouette's own radius (seen live, recorded at
+# ``diag_build_93075A194.py``'s runout circle).  That last one is inference
+# FROM MODEL GEOMETRY, which id 249 alone does not govern.
+#
+# No recipe is allowed to require any of these ON: profiles are closed with
+# explicit ``merge`` relations instead (see :func:`draw_closed_profile`).
+SKETCH_DRAWING_STATE: dict[str, tuple[int, bool]] = {
+    "swSketchAutomaticRelations": (_SW_SKETCH_AUTOMATIC_RELATIONS, False),
+    "swSketchInferFromModel": (_SW_SKETCH_INFER_FROM_MODEL, False),
+    "swSketchInference": (_SW_SKETCH_INFERENCE, False),
+}
+
+# What a seat must look like BETWEEN leaves.
+#
+# This is deliberately NOT :data:`SKETCH_DRAWING_STATE`, and it is deliberately
+# the opposite of the state a crashed suppression block leaks.  These are
+# APPLICATION-level preferences, so they outlive the document, the recipe and
+# the leaf; a leaf that dies mid-suppression (SolidWorks crash, COM
+# disconnect, a watchdog ``os._exit``, a killed process) leaves them FALSE for
+# the rest of the seat's life.  If the between-leaves baseline were also
+# FALSE, a poisoned seat would be indistinguishable from a healthy one and the
+# pool's leaf-admission audit could never detect or repair it.  Restoring TRUE
+# on the way out keeps "FALSE between leaves" a reliable signal of an
+# unwound-crash, and costs recipe correctness nothing because every recipe
+# asserts what it needs on the way in.
+#
+# MUST match ``REQUIRED_TOGGLES`` in the pool repo's ``agent/seat_settings.py``,
+# which is the source of truth for the fleet; the two repos cannot import each
+# other, so this constant is the harmonic-side copy.
+SEAT_SKETCH_BASELINE: dict[str, tuple[int, bool]] = {
+    "swSketchAutomaticRelations": (_SW_SKETCH_AUTOMATIC_RELATIONS, True),
+    "swSketchInferFromModel": (_SW_SKETCH_INFER_FROM_MODEL, True),
+    "swSketchInference": (_SW_SKETCH_INFERENCE, True),
+}
+
+
+def apply_sketch_preferences(
+    adapter, state: dict[str, tuple[int, bool]]
+) -> list[str]:
+    """Force the sketch preferences in ``state``; report the names changed.
+
+    Idempotent, and it never reads a value in order to put it back later --
+    save-and-restore-observed is what made the poisoning permanent, because the
+    first run on a poisoned seat records the poisoned value as "the original"
+    and faithfully writes it back forever.  Every write target here is a
+    declared constant, so nothing can latch.
+    """
+    app = adapter.swApp
+    changed: list[str] = []
+    for name, (toggle, required) in state.items():
+        if bool(app.GetUserPreferenceToggle(toggle)) != required:
+            changed.append(name)
+        app.SetUserPreferenceToggle(toggle, required)
+    return changed
+
+
+def assert_seat_sketch_baseline(adapter, label: str) -> list[str]:
+    """Put the seat at :data:`SEAT_SKETCH_BASELINE` before a recipe runs.
+
+    Called at the start of every recipe, in both the replica entry point and
+    the production stock-fastener path, so a recipe never inherits ambient
+    application state and a seat poisoned by an earlier crashed leaf is
+    repaired by the next one.  Drift is warned about by name: it is evidence a
+    previous leaf on this seat did not unwind.
+    """
+    drifted = apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
+    if drifted:
+        _telemetry.warn(
+            f"{label}: seat sketch preferences were off-baseline and have been "
+            f"reset: {', '.join(drifted)} (a previous leaf on this seat did not "
+            "unwind its suppression block)"
+        )
+    return drifted
 
 
 @contextmanager
 def no_sketch_inference(adapter):
-    """Disable sketch inference + automatic relations for the duration.
+    """Force :data:`SKETCH_DRAWING_STATE` for a block of raw sketch drawing.
 
-    SolidWorks inference snapping is PIXEL-based (view-dependent): it
-    silently re-solved a scripted arc by snapping its centre to a
-    centreline midpoint and an endpoint to a horizontal alignment, at
-    distances that depend on the current zoom.  Scripted geometry must
-    never depend on the view, so profile sketching runs with both
-    toggles off.  (AddToDB also suppresses snapping but leaves contours
-    the boss revolve rejects.)"""
-    app = adapter.swApp
-    prev = [
-        bool(app.GetUserPreferenceToggle(t))
-        for t in (_SW_SKETCH_AUTOMATIC_RELATIONS, _SW_SKETCH_INFERENCE)
-    ]
-    app.SetUserPreferenceToggle(_SW_SKETCH_AUTOMATIC_RELATIONS, False)
-    app.SetUserPreferenceToggle(_SW_SKETCH_INFERENCE, False)
+    On exit the seat goes to :data:`SEAT_SKETCH_BASELINE` -- a declared
+    constant, never the observed previous value -- so the block cannot latch a
+    poisoned state and cannot leave the seat looking crash-damaged to the
+    pool's leaf-admission audit.
+
+    REENTRANT, by depth count on the adapter.  Restoring an application-level
+    preference on the way out of an inner block is wrong in both possible
+    designs: restoring the observed previous value hands the outer block a
+    value an inner block chose, and restoring a declared baseline switches
+    inference back ON while the outer block is still drawing.  Only the
+    outermost exit restores.  No nesting exists in the fleet today (checked
+    across all 15 files that use this contextmanager, lexically and through
+    calls), so this is a guard against the next caller, not a fix for a live
+    bug -- but it is cheap and the failure it prevents is silent.
+
+    Correctness does not depend on this contextmanager: every recipe asserts
+    the seat baseline at its start, and profiles are closed by explicit
+    relations rather than by inference.  It is scoping -- it makes a recipe
+    self-describing at the point it draws, and it narrows the window in which
+    a crash can leak the suppressed state at all.
+    """
+    depth = getattr(adapter, "_sketch_drawing_depth", 0)
+    adapter._sketch_drawing_depth = depth + 1
+    if depth == 0:
+        apply_sketch_preferences(adapter, SKETCH_DRAWING_STATE)
     try:
         yield
     finally:
-        app.SetUserPreferenceToggle(_SW_SKETCH_AUTOMATIC_RELATIONS, prev[0])
-        app.SetUserPreferenceToggle(_SW_SKETCH_INFERENCE, prev[1])
+        adapter._sketch_drawing_depth = depth
+        if depth == 0:
+            apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
+
+
+# swSketchCheckFeatureProfileUsage_e.swSketchCheckFeature_BASEEXTRUDE
+_SW_CHECK_BASEEXTRUDE = 1
+
+# swSketchCheckFeatureStatus_e values that NAME a defect of the kind an
+# unmerged profile produces, or that make the sketch unusable outright.  A
+# status outside this set is reported but never fails the build: the hard gate
+# is the contour COUNT (open == 0, closed == expected), and a status nobody has
+# characterised must not be the reason a provably closed profile is rejected.
+_SW_CHECK_FATAL: dict[int, str] = {
+    1: "EntXEnt (self-intersecting contour)",
+    2: "EntXSelf (self-intersecting entity)",
+    3: "EntUnspecBad (self-intersecting entity)",
+    4: "ThreeEnts (an endpoint is shared by more than two entities)",
+    6: "WrongOpen (the sketch contains an open contour)",
+    9: "ManyOpen (more than one open contour)",
+    11: "MixedContours (both open and closed contours -- a merge did not take)",
+    12: "CturXCtur (intersecting contours)",
+    14: "OpenWantClosed (the contour is open)",
+    22: "OpenOrUnclear (selected contours are open or ambiguous)",
+}
+
+
+def _assert_profile_closed(adapter, label: str, loops: int, segments: int) -> str:
+    """Read back from the ACTIVE sketch that it really closed, before extruding.
+
+    ``ISketch.CheckFeatureUse`` is the purpose-built answer to "why did
+    ``FeatureExtrusion3`` return ``None``" -- it reports a status plus the open
+    and closed contour counts, so the failure names the defect at the sketch
+    that has it instead of surfacing twenty lines later as a bare ``None``.
+
+    The hard gate is ``open == 0 and closed == loops``.  ``status`` is reported
+    always and fatal only when it is one of the characterised defects in
+    :data:`_SW_CHECK_FATAL`; an uncharacterised nonzero status on a profile
+    whose contour counts are correct is a WARNING, because failing a good build
+    on a diagnostic we have not verified would be worse than the bug.
+
+    The sketch-point count is logged as the second, independent signal: each
+    ``merge`` WELDS two endpoints into one point, so a fully merged profile has
+    one point per vertex and a wholly unmerged one has two.  That is why the
+    junctions are related with ``merge`` rather than ``coincident`` -- a
+    coincident pair stays two points and this count cannot tell the two states
+    apart.
+
+    Returns the evidence string; raises :class:`RuntimeError` when the profile
+    is not closed as specified.
+    """
+    sketch = adapter._attempt(lambda: adapter.currentModel.SketchManager.ActiveSketch)
+    if sketch is None:
+        raise RuntimeError(f"{label}: no active sketch to verify closure on")
+    sketch = _early_bound(sketch, "ISketch")
+    points = adapter._attempt(lambda: len(sketch.GetSketchPoints2() or ()), default=None)
+    checked = adapter._attempt(
+        lambda: sketch.CheckFeatureUse(_SW_CHECK_BASEEXTRUDE, 0, 0), default=None
+    )
+    if checked is None:
+        # The diagnostic itself is unavailable on this build.  Do not fail: the
+        # closure GUARANTEE is the merge relations, every one of which was
+        # checked as it was added.
+        _telemetry.warn(
+            f"{label}: ISketch.CheckFeatureUse unavailable, closure unverified "
+            f"(relations were all applied; points={points})"
+        )
+        return f"points={points}, check=unavailable"
+    status, open_count, closed_count = (int(v) for v in checked)
+    evidence = (
+        f"points={points}, status={status}, open={open_count}, closed={closed_count}"
+    )
+    fatal = _SW_CHECK_FATAL.get(status)
+    if open_count != 0 or closed_count != loops or fatal:
+        detail = f"status {status}" + (f" = {fatal}" if fatal else " (uncharacterised)")
+        raise RuntimeError(
+            f"{label}: profile did not close -- expected {loops} closed contour(s) "
+            f"and 0 open, got {closed_count} closed and {open_count} open; "
+            f"{detail}.  {segments} segments were drawn and every merge relation "
+            "was applied, so this is a geometry defect in the profile, not a "
+            "seat setting."
+        )
+    if status != 0:
+        _telemetry.warn(
+            f"{label}: contours are correct ({evidence}) but CheckFeatureUse "
+            f"returned uncharacterised status {status}"
+        )
+    return evidence
+
+
+async def draw_closed_profile(
+    adapter, segments: tuple[Segment, ...], *, label: str, loops: int
+) -> list[str]:
+    """Author ``segments`` as EXPLICITLY closed loops, whatever the seat thinks.
+
+    Inference cannot participate, by two independent mechanisms.  The segments
+    go straight to the sketch database (``AddToDB = True``), which bypasses the
+    inference stage entirely -- that is the same switch
+    ``diagnostics/exp_inference_zoom.py`` flips to MEASURE inference, so it is
+    the one control this repo has already characterised.  And the seat's
+    sketch-inference / automatic-relations user preferences are forced off for
+    the duration (:func:`no_sketch_inference`), so a future change of drawing
+    path cannot quietly re-admit it.
+
+    That matters because inference snapping is SCREEN-space: its tolerance is
+    pixels, and nothing on the authoring path fits, orients or even reads the
+    view (the only ``ViewZoomtofit2``/``ShowNamedView2`` calls in the adapter
+    are inside ``export_image``, i.e. after the geometry exists).  A profile
+    authored through inference therefore depends on the seat's window size and
+    the template's zoom -- unasserted, unrecorded, and different per worker.
+    Writing direct to the database has no pixel term at all, which is why this
+    path produces identical geometry at any view scale.
+
+    Closure is then AUTHORED: :func:`endpoint_merges` pairs the endpoints on
+    exact float equality and each pair gets a ``merge`` relation
+    (``swConstraintType_MERGEPOINTS``), individually checked.  ``merge`` welds
+    two endpoints into one point, which is what inference itself would have
+    done; ``coincident`` would leave two distinct points held together by the
+    solver, i.e. exactly the tolerant state whose reliability we are trying to
+    stop depending on.
+
+    That ordering -- draw direct-to-DB, restore ``AddToDB``, then relate -- is
+    the one ``_common.add_line_chain`` + ``define_rectilinear_chain`` already
+    use, and relations are added through the adapter's
+    ``ISketchRelationManager.AddRelation`` path (``IModelDoc2``'s legacy
+    ``SketchAddConstraints`` silently no-ops on SW 2026/3DEXPERIENCE).
+
+    ``loops`` is the number of closed loops the profile must form -- 2 for a
+    ring (outer boundary plus the hole), 1 for a plain region.  It is asserted
+    twice: offline against the coordinates before any COM call, and then read
+    back off the finished sketch with ``ISketch.CheckFeatureUse``
+    (:func:`_assert_profile_closed`), so "profile did not close" is reported
+    here, at the sketch that has the defect, instead of as a bare ``None`` from
+    the extrude that consumes it.
+
+    Returns the created entity IDs, in ``segments`` order.
+    """
+    merges = endpoint_merges(segments)
+    found = len(closed_loops(segments))
+    if found != loops:
+        raise ValueError(
+            f"{label}: profile forms {found} closed loop(s), expected {loops}"
+        )
+    ids: list[str] = []
+    with no_sketch_inference(adapter):
+        sketch_mgr = adapter.currentSketchManager
+        prev_add_to_db = bool(sketch_mgr.AddToDB)
+        sketch_mgr.AddToDB = True
+        try:
+            for index, segment in enumerate(segments):
+                if isinstance(segment, Line):
+                    result = await adapter.add_line(
+                        segment.start[0], segment.start[1],
+                        segment.end[0], segment.end[1],
+                    )
+                else:
+                    result = await adapter.add_arc(
+                        segment.center[0], segment.center[1],
+                        segment.start[0], segment.start[1],
+                        segment.end[0], segment.end[1],
+                    )
+                kind = "line" if isinstance(segment, Line) else "arc"
+                ids.append(check(f"{label}: add_{kind} {index}", result))
+        finally:
+            sketch_mgr.AddToDB = prev_add_to_db
+        for (first, first_end), (second, second_end) in merges:
+            check(
+                f"{label}: merge {ids[first]}.{first_end} <-> "
+                f"{ids[second]}.{second_end}",
+                await adapter.add_sketch_constraint(
+                    f"{ids[first]}.{first_end}",
+                    f"{ids[second]}.{second_end}",
+                    "merge",
+                ),
+            )
+    evidence = _assert_profile_closed(adapter, label, loops, len(segments))
+    _telemetry.info(
+        f"{label}: {len(segments)} segments, {len(merges)} explicit merges, "
+        f"{loops} loops ({evidence})"
+    )
+    return ids
 
 
 def offset_plane(adapter, name: str, offset_mm: float, base: str = "Top Plane"):
@@ -795,6 +1076,7 @@ async def run_replica(adapter, part_no: str, builder) -> dict[str, str]:
     artefacts: dict[str, str] = {}
     with _telemetry.span("replica.build", label=part_no):
         check(f"create_part {part_no}", await adapter.create_part())
+        assert_seat_sketch_baseline(adapter, part_no)
         await builder(adapter, truth)
         artefacts.update(await gate_and_save(adapter, part_no, truth))
         await close_all(adapter)
