@@ -83,6 +83,142 @@ def canonical(census: dict) -> list[dict]:
     return bodies
 
 
+def _box_delta(left: dict, right: dict) -> float | None:
+    """Largest corner disagreement in mm, or ``None`` if either box is unusable."""
+    box_a = [float(v) for v in left.get("box_mm") or ()]
+    box_b = [float(v) for v in right.get("box_mm") or ()]
+    if len(box_a) != 6 or len(box_b) != 6:
+        return None
+    return max(abs(x - y) for x, y in zip(box_a, box_b))
+
+
+def _same_face(left: dict, right: dict, *, area_tol_mm2: float, box_tol_mm: float):
+    delta = _box_delta(left, right)
+    if delta is None or delta > box_tol_mm:
+        return False
+    if abs(float(left["area_mm2"]) - float(right["area_mm2"])) > area_tol_mm2:
+        return False
+    return left.get("surface") == right.get("surface")
+
+
+def _same_body(left: dict, right: dict, *, box_tol_mm: float, **_: float):
+    """Bodies pair on EXTENTS alone, not on face count.
+
+    A body that lost a face is still that body, and saying "body 0 lost a
+    face (area 3.25 mm^2)" is the diagnosis worth having; refusing the pair
+    would degrade it to "a body vanished, another appeared".
+    """
+    delta = _box_delta(left, right)
+    return delta is not None and delta <= box_tol_mm
+
+
+def _persist_multiset(body: dict) -> list[str]:
+    return sorted(str(face.get("persist") or "") for face in body.get("faces") or ())
+
+
+def _pair(left: list[dict], right: list[dict], same, exact) -> tuple[list, list, list]:
+    """Greedy two-pass pairing: exact partners first, equivalent ones after.
+
+    Pairing by sorted POSITION is what this replaces, and it was wrong in
+    both directions on the very part this probe was written for.  91247A720
+    carries three identical raised grade marks and a great many identical
+    fillet faces, so ties are the rule here, not an edge case: sorted
+    position among equals is enumeration order, which is not a contract, so
+    the comparison would pair one mark's face against another's and report a
+    renumbering that never happened.  And a tolerated difference that crosses
+    a rounding boundary reverses the sort, which mispairs everything after
+    it.
+
+    The exact pass is what makes ties behave: among geometrically
+    indistinguishable candidates it takes the one whose reference also
+    matches, so an identity difference is reported only when the multiset of
+    references really changed.
+    """
+    unclaimed = list(range(len(right)))
+    pairs: list[tuple[dict, dict]] = []
+    lost: list[dict] = []
+    for item in left:
+        chosen = next(
+            (
+                index
+                for index in unclaimed
+                if same(item, right[index]) and exact(item, right[index])
+            ),
+            None,
+        )
+        if chosen is None:
+            chosen = next(
+                (index for index in unclaimed if same(item, right[index])), None
+            )
+        if chosen is None:
+            lost.append(item)
+            continue
+        unclaimed.remove(chosen)
+        pairs.append((item, right[chosen]))
+    return pairs, lost, [right[index] for index in unclaimed]
+
+
+def _describe(face: dict) -> str:
+    return f"area {face['area_mm2']} mm^2"
+
+
+def _diff_faces(
+    label: str, before: list[dict], after: list[dict], tolerances: dict
+) -> list[str]:
+    problems: list[str] = []
+    pairs, lost, gained = _pair(
+        before,
+        after,
+        lambda a, b: _same_face(a, b, **tolerances),
+        lambda a, b: bool(a.get("persist")) and a.get("persist") == b.get("persist"),
+    )
+    for face_a, face_b in pairs:
+        if not face_a.get("persist") or not face_b.get("persist"):
+            problems.append(
+                f"identity: {label} face ({_describe(face_a)}) has no persistent "
+                "reference in one of the censuses -- nothing was compared for it"
+            )
+        elif face_a["persist"] != face_b["persist"]:
+            problems.append(
+                f"identity: {label} face ({_describe(face_a)}) is the same face "
+                "geometrically but its persistent reference changed "
+                f"({face_a['persist']} -> {face_b['persist']})"
+            )
+    # Leftovers in equal number are the same face reported twice, so they are
+    # paired up to say HOW it moved; that is the diagnosis worth having.
+    if len(lost) == len(gained):
+        for face_a, face_b in zip(lost, gained):
+            area_delta = abs(float(face_a["area_mm2"]) - float(face_b["area_mm2"]))
+            if area_delta > tolerances["area_tol_mm2"]:
+                problems.append(
+                    f"geometry: {label} face area {face_a['area_mm2']} -> "
+                    f"{face_b['area_mm2']} (delta {area_delta:.6f} mm^2)"
+                )
+                continue
+            delta = _box_delta(face_a, face_b)
+            if delta is None:
+                problems.append(
+                    f"geometry: {label} face ({_describe(face_a)}) box is not six "
+                    "corners in one of the censuses -- it is incomplete"
+                )
+            elif delta > tolerances["box_tol_mm"]:
+                problems.append(
+                    f"geometry: {label} face ({_describe(face_a)}) box moved by "
+                    f"{delta:.9f} mm"
+                )
+            else:
+                problems.append(
+                    f"geometry: {label} face ({_describe(face_a)}) surface type "
+                    f"{face_a.get('surface')} -> {face_b.get('surface')}"
+                )
+        return problems
+    for face in lost:
+        problems.append(f"geometry: {label} lost a face ({_describe(face)})")
+    for face in gained:
+        problems.append(f"geometry: {label} gained a face ({_describe(face)})")
+    return problems
+
+
 def diff_census(
     before: dict,
     after: dict,
@@ -100,67 +236,47 @@ def diff_census(
     * ``identity`` -- the geometry matches face for face but a persistent
       reference changed.  Nothing in a build notices, and nothing in this repo
       consumes it today; a stored downstream reference would.
+
+    Bodies and faces are matched by GEOMETRY within the tolerances, never by
+    position in either census: SolidWorks does not promise an enumeration
+    order, and this part has identical bodies and identical faces.
     """
+    tolerances = {"area_tol_mm2": area_tol_mm2, "box_tol_mm": box_tol_mm}
     problems: list[str] = []
     left, right = canonical(before), canonical(after)
     if len(left) != len(right):
         problems.append(f"geometry: body count {len(left)} -> {len(right)}")
-    for index, (a, b) in enumerate(zip(left, right)):
-        label = f"body {index}"
-        box_delta = max(
-            (
-                abs(float(x) - float(y))
-                for x, y in zip(a.get("box_mm") or (), b.get("box_mm") or ())
-            ),
-            default=0.0,
+    pairs, lost, gained = _pair(
+        left,
+        right,
+        lambda a, b: _same_body(a, b, **tolerances),
+        lambda a, b: _persist_multiset(a) == _persist_multiset(b),
+    )
+    for index, (body_a, body_b) in enumerate(pairs):
+        problems.extend(
+            _diff_faces(f"body {index}", body_a["faces"], body_b["faces"], tolerances)
         )
-        if box_delta > box_tol_mm:
-            problems.append(
-                f"geometry: {label} bounding box moved by {box_delta:.9f} mm"
+    if len(lost) == len(gained):
+        for index, (body_a, body_b) in enumerate(zip(lost, gained), start=len(pairs)):
+            label = f"body {index}"
+            delta = _box_delta(body_a, body_b)
+            if delta is None:
+                problems.append(
+                    f"geometry: {label} bounding box is not six corners in one of "
+                    "the censuses -- it is incomplete"
+                )
+            elif delta > box_tol_mm:
+                problems.append(
+                    f"geometry: {label} bounding box moved by {delta:.9f} mm"
+                )
+            problems.extend(
+                _diff_faces(label, body_a["faces"], body_b["faces"], tolerances)
             )
-        faces_a, faces_b = a["faces"], b["faces"]
-        if len(faces_a) != len(faces_b):
-            problems.append(
-                f"geometry: {label} face count {len(faces_a)} -> {len(faces_b)}"
-            )
-        for position, (face_a, face_b) in enumerate(zip(faces_a, faces_b)):
-            where = f"{label} face {position}"
-            area_delta = abs(float(face_a["area_mm2"]) - float(face_b["area_mm2"]))
-            if area_delta > area_tol_mm2:
-                problems.append(
-                    f"geometry: {where} area {face_a['area_mm2']} -> "
-                    f"{face_b['area_mm2']} (delta {area_delta:.6f} mm^2)"
-                )
-                continue
-            box_a = [float(v) for v in face_a["box_mm"]]
-            box_b = [float(v) for v in face_b["box_mm"]]
-            if len(box_a) != len(box_b) or len(box_a) != 6:
-                problems.append(
-                    f"geometry: {where} box has {len(box_a)} and {len(box_b)} "
-                    "corners, not 6 each -- one of these censuses is incomplete"
-                )
-                continue
-            box_delta = max(abs(x - y) for x, y in zip(box_a, box_b))
-            if box_delta > box_tol_mm:
-                problems.append(f"geometry: {where} box moved by {box_delta:.9f} mm")
-                continue
-            if face_a.get("surface") != face_b.get("surface"):
-                problems.append(
-                    f"geometry: {where} surface type "
-                    f"{face_a.get('surface')} -> {face_b.get('surface')}"
-                )
-                continue
-            if not face_a.get("persist") or not face_b.get("persist"):
-                problems.append(
-                    f"identity: {where} has no persistent reference in one of "
-                    "the censuses -- nothing was compared for this face"
-                )
-            elif face_a["persist"] != face_b["persist"]:
-                problems.append(
-                    f"identity: {where} is the same face geometrically but its "
-                    f"persistent reference changed "
-                    f"({face_a['persist']} -> {face_b['persist']})"
-                )
+        return problems
+    for body in lost:
+        problems.append(f"geometry: body {body.get('name')!r} has no counterpart")
+    for body in gained:
+        problems.append(f"geometry: body {body.get('name')!r} is new")
     return problems
 
 

@@ -79,6 +79,13 @@ def test_a_renumbered_face_is_reported_as_identity_not_geometry() -> None:
 
 
 def test_a_lost_face_is_reported_as_geometry() -> None:
+    """A dropped face has no counterpart, so it is named rather than counted.
+
+    The body bounding box is deliberately left alone: a face can vanish
+    without changing the extents (a merged tangent pair, a fillet that
+    swallowed its neighbour), which is precisely the case a count-only check
+    on the bodies would let through.
+    """
     before = _census(
         _face(12.5, (0, 0, 0, 5, 5, 0), "aaaa"),
         _face(3.25, (0, 0, 0, 5, 0, 5), "bbbb"),
@@ -87,7 +94,7 @@ def test_a_lost_face_is_reported_as_geometry() -> None:
 
     problems = diff_census(before, after)
 
-    assert any(p.startswith("geometry:") and "face count 2 -> 1" in p for p in problems)
+    assert problems == ["geometry: body 0 lost a face (area 3.25 mm^2)"]
 
 
 def test_a_moved_face_is_reported_as_geometry_not_identity() -> None:
@@ -145,7 +152,7 @@ def test_a_truncated_box_is_reported_rather_than_zipped_away() -> None:
 
     assert len(problems) == 1
     assert problems[0].startswith("geometry:")
-    assert "not 6 each" in problems[0]
+    assert "not six corners" in problems[0]
 
 
 def test_noise_below_the_tolerance_is_not_a_difference() -> None:
@@ -165,7 +172,7 @@ def test_multi_body_parts_are_paired_by_geometry() -> None:
     """91247A720 ships its raised grade marks as separate bodies.
 
     Body order is no more a contract than face order, so the pairing is by
-    box and face count -- otherwise the grade marks would look swapped.
+    box -- otherwise the grade marks would look swapped.
     """
     small = {
         "name": "Mark",
@@ -182,3 +189,79 @@ def test_multi_body_parts_are_paired_by_geometry() -> None:
 
     assert diff_census(before, after) == []
     assert [body["name"] for body in canonical(before)] == ["Mark", "Bolt"]
+
+
+def test_identical_faces_are_paired_by_reference_not_by_order() -> None:
+    """Ties are the RULE on this part, not an edge case.
+
+    91247A720 has three identical raised grade marks and many identical
+    fillet faces, so any number of faces share a sort key.  Position among
+    equals is enumeration order, which SolidWorks does not promise, so
+    comparing by position would report renumberings that never happened --
+    and a probe that cries wolf on the part it was written for is a probe
+    that gets switched off.
+    """
+    faces = [
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p1"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p2"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p3"),
+    ]
+
+    assert diff_census(_census(*faces), _census(faces[2], faces[0], faces[1])) == []
+
+
+def test_one_changed_reference_among_identical_faces_is_reported_once() -> None:
+    """The tie tolerance must not swallow a real renumbering."""
+    before = _census(
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p1"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p2"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p3"),
+    )
+    after = _census(
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p1"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p2"),
+        _face(1.0, (0, 0, 0, 1, 1, 0), "zzz"),
+    )
+
+    problems = diff_census(before, after)
+
+    assert problems == [
+        "identity: body 0 face (area 1.0 mm^2) is the same face geometrically "
+        "but its persistent reference changed (p3 -> zzz)"
+    ]
+
+
+def test_tolerated_noise_that_reverses_the_sort_order_is_not_a_difference() -> None:
+    """Two faces closer together than the tolerance can swap places.
+
+    Sorting rounds; the comparison tolerates. So rebuild noise smaller than
+    the tolerance can still reverse the sort key, and pairing by position
+    would then compare face A against face B and report two identity
+    changes out of nothing.
+    """
+    before = _census(
+        _face(1.0, (0, 0, 0, 1, 1, 0), "p1"),
+        _face(1.00005, (0, 0, 0, 1, 1, 0), "p2"),
+    )
+    after = _census(
+        _face(1.00004, (0, 0, 0, 1, 1, 0), "p1"),
+        _face(0.99999, (0, 0, 0, 1, 1, 0), "p2"),
+    )
+
+    assert diff_census(before, after) == []
+
+
+def test_identical_bodies_are_paired_by_their_face_references() -> None:
+    """The three grade marks are congruent, so their boxes tie as well."""
+    marks = [
+        {
+            "name": f"Mark{index}",
+            "box_mm": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            "faces": [_face(1.0, (0, 0, 0, 1, 1, 0), reference)],
+        }
+        for index, reference in enumerate(("m1", "m2", "m3"))
+    ]
+    before = {"part": "p", "bodies": marks}
+    after = {"part": "p", "bodies": [marks[1], marks[2], marks[0]]}
+
+    assert diff_census(before, after) == []
