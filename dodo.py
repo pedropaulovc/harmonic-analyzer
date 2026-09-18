@@ -2777,16 +2777,26 @@ def task_check():
         SCRIPTS_DIR / "prompts" / "machinist_review_schema.json",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
-    # every top-level build script and every diagnostics/*.py looking for
-    # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
-    # cover a file the test merely opens. Without these, the first green stamp
-    # would freeze the gate: adding a VT_BYREF to a build script, or an unmarked
-    # late-bound probe, leaves check:recipe "up to date" and the enforcement
-    # silently stops enforcing (codex #418). Same failure shape as the
-    # never-enrolled contract test above -- a green gate that checks nothing.
+    # every build script and every diagnostics probe looking for VT_BYREF), so
+    # module_deps_of cannot see them -- an import graph does not cover a file
+    # the test merely opens. Without these, the first green stamp would freeze
+    # the gate: adding a VT_BYREF to a build script, or an unmarked late-bound
+    # probe, leaves check:recipe "up to date" and the enforcement silently
+    # stops enforcing (codex #418). Same failure shape as the never-enrolled
+    # contract test above -- a green gate that checks nothing.
+    # RECURSIVE on purpose, and it is the same bug one level up: the scanning
+    # tests declare their reach with rglob (test_sketch_preference_baseline's
+    # authoring audit walks SCRIPTS_DIR.rglob("*.py")), so a dep set spelled
+    # as two non-recursive globs is a reach declared one way and a dependency
+    # declared another. Today only SCRIPTS_DIR and diagnostics/ hold .py, so
+    # the two agreed exactly -- which is what makes it a latent hazard rather
+    # than a live one: add cad/scripts/<newdir>/foo.py and the scans read it
+    # while the gate does not depend on it, so a hand-rolled AddToDB or a
+    # VT_BYREF in that file leaves the stamp valid forever. rglob SUBSUMES the
+    # diagnostics glob, so that term is gone rather than left as a second
+    # spelling of one intent.
     scanned_by_binding_gate = {
-        *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
-        *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+        str(path.resolve()) for path in SCRIPTS_DIR.rglob("*.py")
     }
     recipe_test_deps = sorted(
         {
