@@ -5788,15 +5788,22 @@ def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> floa
     method-or-property idiom and is already used for ``GetEditSheet`` here.
 
     A system-units note is REFUSED rather than converted. ``CharHeight`` is
-    not the em size in metres: writing the em into it made the note render
-    1.2053x taller than one line. That factor is the SAME sheet measured
-    twice -- slotted_screw's 15 pt note measured 13.15 mm with the write,
-    10.91 mm without it (c99e0026, worker 5) -- and the write's extent was
-    uniform across four names at 12, 15 and 16 pt (2.4850-2.4856 em), which
-    is what makes it a size-independent scale factor rather than per-sheet
-    noise. The 1.381 this comment used to quote was NOT the inflation: it
-    was 2.4850 em divided by the old ONE_LINE_EXTENT_EM of 1.8, a constant
-    that was itself derived from 1.381 (see _title_block_text). Its apparent
+    not the em size in metres: writing the em into it made every fitted note
+    render taller than one line. The clearest single reading is the SAME
+    sheet measured twice -- slotted_screw's 15 pt note measured 13.15 mm with
+    the write, 10.91 mm without it (c99e0026, worker 5), a factor of 1.2053.
+    It is not ONE factor, though, and an earlier version of this comment
+    claimed it was: the four inflated readings span 2.4850-2.6362 em, and
+    against each sheet's own clean reading they inflate by 1.2053
+    (slotted_screw, 15 pt), 1.2629 (hanger_screw, 12 pt), 1.2801
+    (fillister/lag, 16 pt) and 1.3261 (swing_stop_screw, 15 pt). What the
+    write does is unambiguous -- 21% to 33% taller, on every sheet that took
+    it, including two names that needed no size change and so could only
+    have been inflated by the write -- but the "size-independent scale
+    factor" it was described with was contradicted by the 2.6362 reading in
+    the same build. The 1.381 quoted before that was not the inflation at
+    all: it was 2.4850 em divided by the old ONE_LINE_EXTENT_EM of 1.8, a
+    constant itself derived from 1.381 (see _title_block_text). Its apparent
     confirmation -- 1/1.381 = 0.7241 against Century Gothic's 0.718 cap
     height -- was manufactured by that circle; 1/1.2053 = 0.830 lands on no
     metric this module has measured. So what the system-units height means
@@ -6021,11 +6028,11 @@ def fit_title_block_part_name(
             # -units height is the CHARACTER height, so writing the em size
             # into it renders every glyph too big. Measured on the farm, not
             # reasoned about -- four names at 12, 15 and 16 pt on three
-            # workers all came back with an extent of 2.4850-2.4856 em,
-            # size-independent and 1.2053x the same sheet's extent without
-            # the write (slotted_screw at 15 pt: 13.15 mm with, 10.91 mm
-            # without), including two names that needed no size change at all
-            # and so could only have been inflated by the write itself.
+            # workers came back with extents of 2.4850-2.6362 em, each 1.21x
+            # to 1.33x the same sheet's extent without the write
+            # (slotted_screw at 15 pt: 13.15 mm with, 10.91 mm without),
+            # including two names that needed no size change at all and so
+            # could only have been inflated by the write itself.
             # Writing "the same height through both properties" was therefore
             # writing two DIFFERENT heights, and the wider one won.
             #
@@ -6100,13 +6107,15 @@ def fit_title_block_part_name(
     extent_em = height_mm / em_mm
     # Record the measurement on EVERY sheet that reaches here, not only the
     # ones refused below. ONE_LINE_EXTENT_EM is an envelope over a measured
-    # distribution, and the only reason the sample behind it is 15 sheets is
-    # that a REFUSAL used to be the sole thing that ever printed the number
-    # -- so the sample was exactly the set that failed, and a taller sheet
-    # that happened to pass would have been invisible. With this line every
-    # fitted sheet reports its extent, in the log and as a span event, so
-    # the next build widens the sample and the constant is re-measured
-    # instead of re-argued.
+    # distribution, and that sample is 15 sheets because a REFUSAL used to be
+    # the only thing that printed the number -- which, for those 15, cost
+    # nothing: the old bound refused everything above 1.89 em and the
+    # shortest reading is 1.9123, so no sheet reached this check and passed
+    # quietly. The sample is complete, not selected. What it is not is
+    # RE-MEASURABLE: with the bound corrected, every sheet passes and the
+    # next build would print nothing. This line is what keeps the
+    # distribution observable once the guard is quiet, in the log and as a
+    # span event, so the constant is re-measured instead of re-argued.
     #
     # The LAYOUT is part of the record because it is the discriminating
     # variable: the extent is a function of the size and the template, not

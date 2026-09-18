@@ -59,6 +59,22 @@ FLEET = tuple(
 )
 
 
+# Every SHEET the fleet prints, not every drawing: a spec may also be rendered
+# on a second template through ``additional_layouts``, and that sheet gets its
+# own title block with its own field. Deriving the rows from ``spec.layout``
+# alone is how the portrait template came to be described as carrying two
+# names when it carries three -- ``frame-assembly`` reaches it only through
+# ``additional_layouts``.
+FLEET_SHEETS = tuple(
+    (spec.artifact_stem, printed_part_name(spec), layout, source)
+    for spec in DRAWINGS
+    for layout, source in (
+        (spec.layout, "layout"),
+        *((extra, "additional_layouts") for extra in spec.additional_layouts),
+    )
+)
+
+
 def test_width_model_reproduces_the_measured_wrap_bracket():
     """The glyph model must agree with what the released sheets actually did.
 
@@ -133,6 +149,42 @@ def test_names_that_already_fit_are_left_untouched():
     assert len(touched) < len(FLEET)
 
 
+def test_no_portrait_sheet_needs_its_name_fitted():
+    """The portrait template's names must all print at the authored size.
+
+    ONE_LINE_EXTENT_EM is measured on landscape sheets only, and it can be,
+    because no portrait name reaches the height check: the check runs behind
+    ``fit.adjust``. That is an OBSERVATION about today's names, not something
+    the code enforces -- ``fit_title_block_part_name`` accepts either layout
+    and the portrait template has a PART field of its own -- so it is pinned
+    here. This is contract hardening, not a bug fix: a portrait name that
+    grew past its field would be refused loudly, with its extent logged,
+    rather than shipping a wrapped sheet. What it buys is that the refusal
+    would be a NEW measurement nobody has, so the constant's provenance has
+    to be revisited rather than the tolerance widened.
+
+    The rows come from FLEET_SHEETS, so ``additional_layouts`` counts: three
+    portrait sheets exist, and the third is reachable no other way.
+    """
+    field = DRAWING_TEMPLATES[DrawingLayout.PORTRAIT].part_name_field
+    portrait = [row for row in FLEET_SHEETS if row[2] is DrawingLayout.PORTRAIT]
+    # A scan that matched nothing would pass forever; both derivations of a
+    # portrait sheet have to be represented.
+    assert {source for _stem, _name, _layout, source in portrait} == {
+        "layout",
+        "additional_layouts",
+    }
+
+    for stem, name, _layout, _source in portrait:
+        fit = fit_part_name(name, field)
+        assert fit.adjust is False, (stem, name, fit.point_size)
+        assert fit.point_size == field.nominal_point_size, stem
+        assert text_width_mm(name, field.nominal_point_size) <= field.proven_line_length_mm, (
+            stem,
+            text_width_mm(name, field.nominal_point_size),
+        )
+
+
 def test_widest_fleet_name_steps_down_but_stays_legible():
     """The longest name in the fleet still prints above the ASME minimum."""
     fit = fit_part_name(
@@ -163,6 +215,12 @@ def test_an_unfittable_name_fails_the_build():
 # -- slotted_screw's 15 pt note measured 13.15 mm with the em written into
 # CharHeight, 10.91 mm without it -- puts the inflation at 1.2053, so the
 # fraction the renderer treats as a character height is 1/1.2053 = 0.8297.
+#
+# That factor is per-SHEET, not global: the four inflated readings divide by
+# their own clean readings to 1.2053, 1.2629, 1.2801 and 1.3261. The fake
+# models the SMALLEST, which is the least favourable choice for a test that
+# wants to see the inflation -- a fake built on 1.3261 would pass a guard
+# that 1.2053 slips past.
 #
 # The 0.7241 this fake used to carry was 1/1.381, and 1.381 was the inflated
 # extent divided by the OLD one-line constant of 1.8 -- which was itself
@@ -254,9 +312,10 @@ class _FakeTextFormat:
     ``height_in_points`` chooses which of the two height properties the
     template authored, since ``CharHeightInPts`` is stale when it did not.
 
-    This fake deliberately reproduces three things about the GENERATED
+    This fake deliberately reproduces four things about the GENERATED
     wrapper and about SolidWorks itself that a plain attribute bag does not,
-    because the applier runs against those and all three hid a real defect:
+    because the applier runs against those and the first three hid a real
+    defect:
 
     * ``IsHeightSpecifiedInPts`` is a METHOD (dispid 11, retval ``VT_BOOL``),
       absent from ``_prop_map_get_``. Read as an attribute it yields a bound
@@ -272,6 +331,11 @@ class _FakeTextFormat:
       same height through both" therefore wrote two different heights and
       the taller one won -- which is what ``rendered_point_size`` exists to
       make visible offline.
+    * the size the format REPORTS BACK and the size the note renders at are
+      separate numbers (``readback_pts``). They are equal in every honest
+      case, and the applier's readback tolerates them differing by up to
+      0.49 pt, so which of the two the extent is judged against is a real
+      choice that only shows up in a test that can drive them apart.
     """
 
     def __init__(
@@ -282,8 +346,15 @@ class _FakeTextFormat:
         italic: bool = False,
         point_size: float = LANDSCAPE.nominal_point_size,
         height_in_points: bool = True,
+        readback_pts: float | None = None,
     ):
         self.__dict__["_height_in_points"] = height_in_points
+        # What a re-read of the format REPORTS, when that is not the size the
+        # note renders at. ``None`` is the honest format: it reports back what
+        # was written. The applier's readback accepts up to 0.49 pt of
+        # divergence (it compares ``round(applied_pts)``), so this is the
+        # slack the code itself permits, not a COM artefact.
+        self.__dict__["_readback_pts"] = readback_pts
         self.TypeFaceName = typeface
         self.Bold = bold
         self.Italic = italic
@@ -292,6 +363,7 @@ class _FakeTextFormat:
         # both properties describe the same rendered size. These go straight
         # into __dict__ so that the authority rule below only ever sees what
         # the APPLIER does.
+        self.__dict__["_rendered_pts"] = float(point_size)
         self.__dict__["CharHeightInPts"] = point_size if height_in_points else 0
         self.__dict__["CharHeight"] = (
             point_size * MM_PER_POINT * SW_CHARACTER_HEIGHT_EM / 1000.0
@@ -306,6 +378,13 @@ class _FakeTextFormat:
             # Last height write wins the unit, which is how the farm's
             # points-authored notes ended up rendering from CharHeight.
             self.__dict__["_height_in_points"] = name == "CharHeightInPts"
+        if name == "CharHeightInPts":
+            # The ink follows the write; the PROPERTY may report something
+            # else. Keeping the two apart is what makes the applier's choice
+            # of denominator observable offline.
+            self.__dict__["_rendered_pts"] = float(value)
+            if self.__dict__["_readback_pts"] is not None:
+                value = self.__dict__["_readback_pts"]
         self.__dict__[name] = value
 
     def IsHeightSpecifiedInPts(self) -> bool:
@@ -315,7 +394,7 @@ class _FakeTextFormat:
     def rendered_point_size(self) -> float:
         """The em the note actually prints at, in points."""
         if self.__dict__["_height_in_points"]:
-            return float(self.__dict__["CharHeightInPts"])
+            return float(self.__dict__["_rendered_pts"])
         char_height_pts = self.__dict__["CharHeight"] * 1000.0 / MM_PER_POINT
         return char_height_pts / SW_CHARACTER_HEIGHT_EM
 
@@ -587,11 +666,11 @@ def test_a_fitted_note_renders_no_taller_than_one_line(seat):
     """The RATIO, which is what the farm actually measured going wrong.
 
     Pinning "this name fits" passes again the day a unit factor comes back
-    on a shorter name. What failed on the farm was a constant multiplicative
-    inflation -- extent 2.4850-2.4856 em across four names, three sizes and
-    three workers, 1.2053x the same sheet without the write -- so the
-    assertion is on extent/bound, at the size the note reports back rather
-    than the one that was requested.
+    on a shorter name. What failed on the farm was a multiplicative
+    inflation -- extents of 2.4850-2.6362 em across four names, three sizes
+    and three workers, 1.21x to 1.33x the same sheets without the write --
+    so the assertion is on extent/bound, at the size the note reports back
+    rather than the one that was requested.
 
     The note renders at the TALLEST one line the farm measured (2.0617 em),
     so this passes only while the model clears every real sheet: against the
@@ -627,7 +706,7 @@ def test_the_one_line_extents_the_farm_measured_are_all_accepted(
 ):
     """Every real one-line sheet must PASS -- this is the defect being fixed.
 
-    All 14 sheets whose fitted notes reached the height check in c99e0026
+    All 15 sheets whose fitted notes reached the height check in c99e0026
     were refused, because the bound (1.8 em) sat below the quantity it
     bounds: a correct one line measures 1.9123..2.0617 em, since the extent
     carries a full line pitch of leading above the glyph box. These are the
@@ -673,10 +752,15 @@ def test_the_extents_the_farm_measured_when_broken_are_still_refused(
 
     Raising the bound to clear a real one line must not raise it past a real
     defect, and the two populations are 11.8% apart, not an order of
-    magnitude: the legitimate 1.9123..2.0617 em maps to 2.3049..2.4854 em
-    under the 1.2053x system-units inflation. The last case is that band's
-    FLOOR -- the hardest defect to catch -- and it is the one that fails
-    first if anyone widens ONE_LINE_EXTENT_TOLERANCE for comfort.
+    magnitude: the legitimate 1.9123..2.0617 em maps to 2.4850..2.6362 em
+    under per-sheet inflations of 1.2053..1.3261, whose extrapolated floor
+    (1.9123 x 1.2053) is 2.3049. The last case is that floor -- the hardest
+    defect to catch -- and it is the one that fails first if anyone widens
+    ONE_LINE_EXTENT_TOLERANCE for comfort: green at 0.10, red at 0.118.
+
+    What these cases pin is the PRODUCT ONE_LINE_EXTENT_EM * (1 + tolerance),
+    which has to land in (2.0617, 2.3049]. Neither factor is pinned alone --
+    a constant of 2.0 passes every case here too.
     """
     assert provenance
     name = "harmonic-analyzer assembly"
@@ -697,12 +781,14 @@ def test_the_extents_the_farm_measured_when_broken_are_still_refused(
 def test_a_passing_sheet_still_records_what_it_measured(seat):
     """The measurement must reach the log on sheets that PASS.
 
-    The 14-sheet sample behind ONE_LINE_EXTENT_EM is exactly the set that
-    FAILED, because a refusal used to be the only thing that printed the
-    number -- so a sheet taller than 2.0617 em that happened to pass was
-    invisible, and the constant could only ever be defended by argument. A
-    passing sheet now emits its extent in em, as a log line and as a span
-    event, so the next build re-measures the distribution.
+    The 15-sheet sample behind ONE_LINE_EXTENT_EM is complete for the sheets
+    that reached the check: the old bound refused everything above 1.89 em
+    and the shortest reading is 1.9123, so nothing could have passed
+    quietly. The problem is the other direction -- with the bound corrected
+    every sheet passes, so a refusal-only record would print nothing ever
+    again and the distribution would stop being re-measurable. A passing
+    sheet therefore emits its extent in em, as a log line and as a span
+    event.
     """
     recorded: list[tuple[str, dict]] = []
     name = "harmonic-analyzer assembly"
@@ -731,6 +817,73 @@ def test_a_passing_sheet_still_records_what_it_measured(seat):
     )
 
 
+# The longest name in the fleet fits at 11 pt; this one is a plausible
+# McMaster description one qualifier longer, and it fits only at the fit
+# step's 9 pt floor. The floor is where the requested and the reported size
+# are furthest apart in RELATIVE terms, which is the only place the choice of
+# denominator is observable at today's tolerance.
+NAME_THAT_FITS_AT_THE_FLOOR = (
+    "Black-Oxide Stainless Steel Flared-Collar Knurled-Head Thumb Screw"
+)
+
+
+@pytest.mark.parametrize(
+    "readback_pts,refused",
+    [(None, False), (8.51, True)],
+    ids=["reports-the-size-it-was-written", "reports-0.49-pt-lower"],
+)
+def test_the_extent_is_judged_at_the_size_the_note_reports(seat, readback_pts, refused):
+    """One line of ink is measured against the size the NOTE claims.
+
+    The applier does not trust the size it wrote: it reads the format back
+    and accepts the note only if ``round(applied_pts)`` equals the requested
+    size. That comparison admits up to 0.49 pt of divergence -- a
+    code-contract bound from ``round()``, not a measured COM behaviour, and
+    nothing to do with VARIANT drift, which is ~1e-12 -- so a note may be
+    accepted as "kept the format" while reporting 8.51 pt after a 9 pt write.
+
+    Which of the two sizes the extent is divided by then decides the verdict
+    once 0.49 pt exceeds the tolerance, and at the 9 pt floor it does:
+    9/8.51 = 1.0576, against a 1.05 refusal point. A note printing a full
+    line of ink at 9 pt while reporting 8.51 pt is 1.057x the one-line model
+    at the size it claims -- refused, correctly, because ink that does not
+    match the reported size IS the failure this check exists to catch -- and
+    exactly one line at the size it was asked for, which is what the
+    requested size would say.
+
+    Above 10 pt the two agree inside the tolerance (0.49 pt is at most 4.7%
+    there), which is why every other case in this file is blind to the
+    difference: computing ``em_mm`` from ``fit.point_size`` instead of
+    ``applied_pts`` survives all of them. This pair is what kills it.
+    """
+    fit = fit_part_name(NAME_THAT_FITS_AT_THE_FLOOR, LANDSCAPE)
+    assert fit.adjust is True
+    assert fit.point_size == 9
+    ddoc, annotation = seat(NAME_THAT_FITS_AT_THE_FLOOR, readback_pts=readback_pts)
+
+    def apply():
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=NAME_THAT_FITS_AT_THE_FLOOR,
+        )
+
+    if not refused:
+        apply()
+        assert annotation.text_format.rendered_point_size == pytest.approx(9.0)
+        return
+
+    with pytest.raises(RuntimeError) as refusal:
+        apply()
+    message = str(refusal.value)
+    # The ratio, and the two sizes it was computed from, all have to be in
+    # the message: a reader has to be able to see WHICH size was used.
+    assert "renders 1.057x taller than one line" in message
+    assert "at the 8.51 pt the note reports back (requested 9 pt)" in message
+
+
 def test_writing_the_system_units_height_inflates_the_note(seat):
     """The fake can SEE the defect the applier used to ship.
 
@@ -746,7 +899,9 @@ def test_writing_the_system_units_height_inflates_the_note(seat):
     which was itself back-derived from 1.381. Against the measured one-line
     extent the same physical reading is 1.205 -- and the same sheet measured
     13.15 mm with the write and 10.91 mm without it, independently of any
-    constant, which is where 1.2053 comes from.
+    constant, which is where 1.2053 comes from. It is the SMALLEST of the
+    four inflations the build measured (up to 1.3261), so this pins the
+    least visible version of the defect.
     """
     name = "harmonic-analyzer assembly"
     ddoc, annotation = seat(name)

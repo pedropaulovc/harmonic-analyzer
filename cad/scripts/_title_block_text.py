@@ -122,26 +122,38 @@ LINE_SPACING_EM = 1.0
 # scale-invariant, so the fit step's step-down loop moves the width and
 # leaves the height ratio exactly where it was.
 #
-# Six discrete values, each shared to the last digit by every sheet that
-# reports it, spanning 7.8%, and the sample stopped producing new values as
-# it grew past 14 sheets -- a quantised distribution, not a continuous
-# spread. The quantising variable is not identified: the repo ships exactly
-# two sheet formats (cad/templates/harmonic-analyzer-{landscape,portrait}
-# .DRWDOT) and all 15 sheets use the landscape one, so it is not a template
-# revision; and GetExtent is proven to report unscaled sheet millimetres
-# (_purchased_fastener_drawing checks its own notes' extents against
-# absolute cell geometry on these very sheets), so it is not sheet scale.
-# Which is why every sheet now logs its extent WITH its layout (see
-# _drawing_common.fit_title_block_part_name): one build then enumerates the
-# whole space, and the next person to touch this number gets the
-# distribution instead of a two-point sample.
+# Six discrete values over 15 sheets, each shared to the last digit by every
+# sheet that reports it and spanning 7.8% -- a quantised distribution, not a
+# continuous spread. The quantising variable is not identified: the repo
+# ships exactly two sheet formats (cad/templates/harmonic-analyzer-
+# {landscape,portrait}.DRWDOT) and all 15 sheets use the landscape one, so it
+# is not a template revision; and GetExtent is proven to report unscaled
+# sheet millimetres (_purchased_fastener_drawing checks its own notes'
+# extents against absolute cell geometry on these very sheets), so it is not
+# sheet scale.
 #
-# The portrait template is NOT in that sample, and cannot be: 18 of the 96
-# fleet names need fitting and all 18 are on landscape sheets (both portrait
-# sheets print at the template's authored size, so they never reach this
-# check). If a portrait name ever does grow long enough, its measurement
-# arrives in the info line the check now logs -- whether it passes or is
-# refused -- and this constant is where it gets recorded.
+# The sample is COMPLETE for the sheets that reached the check, not a
+# survivors' sample. The bound it replaces refused anything above
+# 1.8 x 1.05 = 1.89 em, and the smallest value here is 1.9123 em, so no
+# sheet could have reached this check and passed: every one of the 15 was
+# refused and printed its measurement. There is no taller sheet hiding
+# behind a silent pass.
+#
+# What the new logging buys is the NEXT build, not this sample: every sheet
+# that reaches the check now reports its extent with its layout (see
+# _drawing_common.fit_title_block_part_name), pass or refusal, so the
+# distribution is re-measured instead of re-argued.
+#
+# The portrait template is not in the sample, and no portrait sheet reaches
+# this check: of the 96 fleet names 18 need fitting and all 18 are
+# landscape, while the three portrait sheets (cylinder-gear 36.51 mm,
+# tube-frame 31.03 mm, and frame-assembly 43.06 mm, which is portrait only
+# through additional_layouts) all print at the authored 16 pt inside a
+# 68.834 mm proven line. That is pinned by
+# test_no_portrait_sheet_needs_its_name_fitted rather than assumed, because
+# nothing in the code restricts this check to one layout. If a portrait name
+# ever does grow long enough, its extent arrives in that log line and this
+# constant is where the reading gets recorded.
 #
 # The earlier value was 1.8, which was never a measurement of anything. It
 # was the threshold 37e961c4 placed between the glyph box (1.025 em) and what
@@ -159,27 +171,46 @@ ONE_LINE_EXTENT_EM = 2.062
 # an order of magnitude -- an earlier version of this comment claimed that,
 # and the claim was part of the defect.
 #
-# Both the legitimate value and the defect value scale with the same unknown
-# per-sheet factor, so the two populations are close:
+# What is actually being separated, in em (all measured, see above):
 #
-#   legitimate                     1.9123 .. 2.0617 em  (measured, above)
-#   x1.2053 system-units inflation 2.3049 .. 2.4854 em
+#   legitimate one line     1.9123 .. 2.0617
+#   with the units write    2.4850 .. 2.6362   (four sheets; the inflation is
+#                                              per-sheet, 1.2053 .. 1.3261,
+#                                              NOT one factor)
+#   floor of that band      2.3049             (the shortest legitimate sheet
+#                                              times the smallest measured
+#                                              inflation: 1.9123 x 1.2053)
+#   a second line           2.9 .. 3.2         (one line + LINE_SPACING_EM;
+#                                              cone_tip_adjuster, the sheet
+#                                              that did wrap, measured 3.173
+#                                              em de-inflated)
 #
-# The gap between the highest legitimate sheet (2.0617) and the LOWEST sheet
-# a unit-bugged write could produce (2.3049) is 11.8%, and this tolerance
-# splits it: the refusal starts at 2.1651 em, 5.0% above the tallest measured
-# one-line sheet and 6.1% below the shortest possible inflated one. A second
-# line is much further out -- one line plus LINE_SPACING_EM, i.e. 1.539x this
-# bound on the one sheet that actually wrapped (cone_tip_adjuster measured
-# 3.173 em de-inflated) and 1.485x on the tallest.
+# So the corridor to place the refusal in runs from the tallest legitimate
+# sheet (2.0617) to the extrapolated floor of the defect band (2.3049),
+# 11.8% wide. At this tolerance the refusal starts at 2.1651 em: 5.0% above
+# the tallest legitimate sheet, 6.1% below the floor.
 #
-# Widening this past ~0.058 therefore does not buy headroom, it buys the
-# 2.3049 em sheet. And it may not be TIGHTENED below ~0.032 without a second
-# change: the applier's format readback (see _drawing_common) accepts a note
-# reporting up to 0.5 pt away from the size it was asked for (a COM VARIANT
-# round trip), so below that the difference between the requested and the
-# reported size starts to decide verdicts, and every sheet's ratio has to be
-# re-measured against the size it reports.
+# The bounds on editing it, since all three were once stated wrongly here:
+#
+# * 0.1178 is where a defective sheet gets through (2.3049/2.062 - 1). Not
+#   0.058: that is sqrt(2.3049/2.0617) - 1, the geometric midpoint of the
+#   corridor -- where the split stops being even, which is not the same
+#   thing as where the guard stops working. 0.205 is where the lowest
+#   OBSERVED defect (2.4850) gets through.
+# * 0.034 is where it may no longer be TIGHTENED (0.0337 = 15/14.51 - 1, at
+#   the 15 pt end; 0.0576 at the 9 pt floor). Below that, which of two sizes
+#   the extent is divided by starts to decide verdicts: the applier accepts
+#   a note whose reported size rounds to the requested one, so the two may
+#   differ by up to 0.49 pt. That is a bound from round(), a code contract
+#   in _drawing_common -- not COM noise; a VARIANT round trip drifts 1e-12,
+#   not half a point.
+#
+# Note that the tests defend the PRODUCT, ONE_LINE_EXTENT_EM * (1 + this),
+# which has to land in (2.0617, 2.3049]. They do not pin either factor: all
+# six readings pass at a constant of 2.0 as well (2.0617/2.0 = 1.031 < 1.05).
+# Simplifying the constant and staying green is therefore possible -- and
+# the reason not to is that the constant is a MEASUREMENT with a provenance
+# and the tolerance is a decision about how much of the corridor to spend.
 ONE_LINE_EXTENT_TOLERANCE = 0.05
 
 # Glyph advances in 1/1000 em, from the ``/W`` array of the Century Gothic CID
