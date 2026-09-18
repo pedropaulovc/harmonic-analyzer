@@ -92,7 +92,10 @@ build):
 - **`cad/out/reports/cache.jsonl`** — an append-only event log (one JSON object per
   restore/store: `ts`, `event`, `label`, `key`, `epoch`, `salt`). Events:
   `store` / `store_skip` (ro seat) / `store_empty` / `store_error`,
-  `restore_hit` / `restore_miss` / `restore_hit_drift` / `restore_error`. Post-hoc
+  `restore_hit` / `restore_miss` / `restore_hit_drift` / `restore_error` /
+  `restore_locked` (a HIT whose extract a share lock refused — the one restore
+  failure that raises instead of "building locally", see AGENTS.md's seat
+  contract). Post-hoc
   debugging reads this file instead of scrollback. Gitignored (under `cad/out/`).
 
 **Store-skip-on-hit drift.** `restore` returns early on a HIT and never re-stores,

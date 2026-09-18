@@ -157,16 +157,17 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     assert revision_source in drawing["file_dep"]
 
 
-def test_drawing_tasks_depend_only_on_their_selected_layout_template():
+def test_drawing_tasks_depend_on_all_selected_layout_templates():
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_drawing()}
 
     assert tasks.keys() == dodo.DRAWINGS_BY_NAME.keys()
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
-        selected = {str(path.resolve()) for path in spec.assets}
-        assert selected == {str(dodo.DRAWING_TEMPLATES[spec.layout].path.resolve())}, (
-            stem
-        )
+        layouts = dict.fromkeys((spec.layout, *spec.additional_layouts))
+        selected = {
+            str(dodo.DRAWING_TEMPLATES[layout].path.resolve()) for layout in layouts
+        }
+        assert {str(path.resolve()) for path in spec.assets} == selected, stem
         template_deps = {
             str(Path(path).resolve())
             for path in tasks[stem]["file_dep"]
@@ -752,7 +753,8 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
         "gooseneck": {"summing"},
         "harmonic_base": {"frame"},
         "cylinder_gear": {"drive_train"},
-        "frame_side_screw": {"frame", "channel"},
+        "frame_side_screw": {"channel"},
+        "frame_cross_screw": {"frame"},
     }
     for source, expected in cases.items():
         part_tokens[source].write_text("b" * 64 + "\n")
@@ -883,6 +885,158 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     assert builds == [True]
     assert len(stores) == 1
     assert stores[0][1] == [output]
+
+
+def _locked(dodo, key, label):
+    return dodo._cache.RestoreLocked(
+        label, key, PermissionError(13, "Permission denied", "platen-guide.SLDDRW")
+    )
+
+
+def test_cached_drawing_locked_restore_releases_seat_then_restores(
+    tmp_path, monkeypatch
+):
+    """A HIT refused by a share lock must NOT fall through to a local build (that
+    forks the artefact identity off the fleet's): release the seat's resident
+    documents under the seat, then the re-probe restores the cached build."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    events = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    outcomes = iter(("locked", True))
+
+    def restore(key, outputs, label):
+        outcome = next(outcomes)
+        events.append(("restore", outcome))
+        if outcome == "locked":
+            raise _locked(dodo, key, label)
+        return outcome
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo,
+        "_exec_com",
+        lambda cmd, label, **_kwargs: events.append(("exec", Path(cmd[1]).name)),
+    )
+    monkeypatch.setattr(
+        dodo._cache,
+        "store",
+        lambda *_args: events.append(("store", None)) or "stored",
+    )
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert events == [
+        ("restore", "locked"),
+        ("exec", "release_seat_documents.py"),
+        ("restore", True),
+    ]
+
+
+def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
+    tmp_path, monkeypatch
+):
+    """Outside probe: miss. A peer publishes while we queue; the under-seat
+    probe is the first to hit the lock -- it still gets the release + one
+    re-probe instead of failing (CodeRabbit, #754)."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    events = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    outcomes = iter((False, "locked", True))
+
+    def restore(key, outputs, label):
+        outcome = next(outcomes)
+        events.append(("restore", outcome))
+        if outcome == "locked":
+            raise _locked(dodo, key, label)
+        return outcome
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo,
+        "_exec_com",
+        lambda cmd, label, **_kwargs: events.append(("exec", Path(cmd[1]).name)),
+    )
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "stored")
+
+    dodo._cached_drawing_action("platen_guide")
+
+    assert events == [
+        ("restore", False),
+        ("restore", "locked"),
+        ("exec", "release_seat_documents.py"),
+        ("restore", True),
+    ]
+
+
+def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+    builds = []
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+
+    def restore(key, outputs, label):
+        raise _locked(dodo, key, label)
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext())
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo, "_exec_com", lambda cmd, label, **_kwargs: builds.append(Path(cmd[1]).name)
+    )
+
+    with pytest.raises(RuntimeError, match="still share-locked"):
+        dodo._cached_drawing_action("platen_guide")
+
+    # The release ran; the drawing itself was never built over the locked file.
+    assert builds == ["release_seat_documents.py"]
+
+
+def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypatch):
+    """The farm submitter holds no seat to release: a locked restore is fatal
+    before any leaf is dispatched."""
+    dodo = _load_dodo()
+    output = tmp_path / "platen-guide.SLDDRW"
+
+    monkeypatch.setattr(
+        dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
+    )
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
+    monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+
+    def restore(key, outputs, label):
+        raise _locked(dodo, key, label)
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("leaf dispatched")),
+    )
+
+    with pytest.raises(dodo._cache.RestoreLocked, match="share-locked"):
+        dodo._cached_drawing_action("platen_guide")
 
 
 def test_cache_status_covers_drawings():
@@ -1993,7 +2147,6 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_drawing_marks.py",
         "test_cone_drawing_batch_contract.py",
         "test_fastener_catalog.py",
-        "test_direct_dimension_tolerances.py",
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
         "test_gtol_spec.py",

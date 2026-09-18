@@ -181,7 +181,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 view=end,
                 position=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
                 attachment_xy=base_circle,
-                position_tolerance_m=0.003,
             ),
             "seat_cylindricity": PmiDrawingPlacement(
                 view=front,

@@ -277,13 +277,25 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 5.105,
                 9.2471875,
             ),
+            # MHA-132 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
+            # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest
+            # socket chord is 25.039163803929238 mm at the major envelope,
+            # leaving at most 19.410836196070765 mm in both casting walls.
             **_expected_numbered_pairs(
-                "frame-side-screw",
+                "frame-cross-screw",
                 range(1, 5),
+                "harmonic-base",
+                4.826,
+                4.0386,
+                19.410836196070765,
+            ),
+            **_expected_numbered_pairs(
+                "frame-cross-screw",
+                range(5, 9),
                 "top-frame",
-                4.1656,
-                3.454,
-                12.7,
+                4.826,
+                4.0386,
+                19.410836196070765,
             ),
             frozenset(("gooseneck-set-screw-1", "top-frame-1")): _annulus_limit(
                 6.35, 5.105, 6.95
@@ -485,6 +497,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
+        # Exact pair equality also forbids tube/screw and cap/tube exemptions.
         assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
         for pair, expected_limit in expected_threaded.items():
             assert allowed[pair] == pytest.approx(expected_limit)

@@ -66,10 +66,8 @@ def test_direct_limits_replace_ambiguous_gdt() -> None:
         "        edge_xy=(FRONT_CENTER[0] + end_radius, FRONT_CENTER[1]),\n"
         "        symbol_xy=(0.105, 0.228),\n"
         '        datum="A",\n'
-        '        label="cam-pin cylindrical-shank datum axis",\n'
-        "        position_tolerance_m=0.0065," in source
+        '        label="cam-pin cylindrical-shank datum axis",\n' in source
     )
-    assert source.count("position_tolerance_m=0.0065") == 1
     assert source.count("add_surface_finish(") == 1
     assert 'surface_finish_by_key(SURFACE_FINISHES, "finished_shank")' in source
     assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in Path(

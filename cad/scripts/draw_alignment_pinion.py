@@ -151,9 +151,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="drum bore axis",
         shoulder=True,
-        # SOLIDWORKS 2026 normalizes the live sheet position by 0.10455 mm.
-        # Bound that measured annotation drift without admitting layout moves.
-        position_tolerance_m=0.00011,
     )
     add_feature_control_frame(
         adapter,

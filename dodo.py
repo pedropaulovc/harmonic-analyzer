@@ -76,6 +76,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 import yaml as _yaml
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from filelock import FileLock, Timeout  # noqa: E402
@@ -1493,6 +1494,86 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     return [path.resolve() for path in DRAWINGS_BY_NAME[stem].outputs.values()]
 
 
+def _probe_cache(
+    key: str, outputs: list[Path], label: str, span: Any, hit: str = "hit"
+) -> str:
+    """One remote-cache restore attempt for a phase span; returns its disposition.
+
+    ``hit`` (or the caller's ``hit`` wording, e.g. ``hit-after-wait``) / ``miss`` /
+    ``locked`` -- the last when the cached build exists but an output is
+    share-locked by a document SolidWorks still holds
+    (:class:`_artifact_cache.RestoreLocked`). A locked probe must NOT fall through
+    to a local build (that forks the artefact's identity off the fleet's); the
+    seat-holding caller releases the documents and re-probes instead. Under the
+    farm executor the submitter holds no seat to release, so it fails loud.
+    """
+    try:
+        outcome = hit if _cache.restore(key, outputs, label) else "miss"
+    except _cache.RestoreLocked:
+        if _farm.enabled():
+            raise
+        outcome = "locked"
+    span.set_attribute("cache", outcome)
+    return outcome
+
+
+def _release_seat_documents(label: str) -> None:
+    """Free the cad/out documents a dead COM session left resident (share-locked).
+
+    Runs ``release_seat_documents.py`` -- a ``run_build`` session with no work, so
+    its connect-time discard + teardown close are the whole job -- HOLDING the
+    seat, right before the under-seat re-probe. A crashed/killed build never
+    reached its own teardown, which is the only other place documents are
+    released; this is the recovery for that hole.
+    """
+    with _telemetry.span(
+        f"sw.release_documents {label}",
+        label=label,
+        service=_telemetry.BUILD_INFRA_SERVICE,
+    ):
+        _sw_ensure_once()
+        _exec_com(
+            [sys.executable, str(SCRIPTS_DIR / "release_seat_documents.py")],
+            f"release documents {label}",
+            log_stem="release-seat-documents",
+        )
+
+
+def _reprobe_under_seat(
+    key: str, outputs: list[Path], label: str, probed: str
+) -> bool:
+    """The under-seat re-probe every cached COM action runs: a peer may have
+    published this exact artefact while we blocked for the seat, so restore it
+    rather than rebuild (the fleet cache-split win; fable/codex review). Its OWN
+    phase span, never inside the task span: it is another network round-trip, and
+    on a hit a full download -- which would otherwise make the "work" span pure
+    transfer. ``probed`` is the outside-seat disposition. Whichever probe first
+    reads ``locked`` -- the outside one, or this one after a peer published
+    while we queued -- gets ONE release of the seat's documents and one more
+    probe; a probe still locked after the release is fatal.
+    Returns True on a hit (the caller skips the build)."""
+    released = False
+    if probed == "locked":
+        _release_seat_documents(label)
+        released = True
+    while True:
+        with _telemetry.span(
+            f"cache.reprobe {label}",
+            label=label,
+            service=_telemetry.BUILD_INFRA_SERVICE,
+        ) as reprobe:
+            outcome = _probe_cache(key, outputs, label, reprobe, hit="hit-after-wait")
+        if outcome != "locked":
+            return outcome == "hit-after-wait"
+        if released:
+            raise RuntimeError(
+                f"{label}: cached outputs still share-locked after releasing the "
+                "seat's documents -- close them in SolidWorks and rerun"
+            )
+        _release_seat_documents(label)
+        released = True
+
+
 def _cached_drawing_action(stem: str) -> None:
     """Restore a matched part+drawing pair or build and publish the drawing.
 
@@ -1508,25 +1589,17 @@ def _cached_drawing_action(stem: str) -> None:
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
         key = _cache_key(_drawing_file_deps(stem), label)
-        if _cache.restore(key, outputs, label):
-            probe.set_attribute("cache", "hit")
+        probed = _probe_cache(key, outputs, label, probe)
+        if probed == "hit":
             return
-        probe.set_attribute("cache", "miss")
 
     if _farm.enabled():
         _farm_build(label, key, outputs)
         return
 
     with _com_seat(label) as waited:
-        with _telemetry.span(
-            f"cache.reprobe {label}",
-            label=label,
-            service=_telemetry.BUILD_INFRA_SERVICE,
-        ) as reprobe:
-            if _cache.restore(key, outputs, label):
-                reprobe.set_attribute("cache", "hit-after-wait")
-                return
-            reprobe.set_attribute("cache", "miss")
+        if _reprobe_under_seat(key, outputs, label, probed):
+            return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         with _telemetry.span(
@@ -1631,11 +1704,10 @@ def _cached_part_action(stem: str, script: Path) -> None:
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
         key = _cache_key(_part_file_deps(script, stem), label)
-        if _cache.restore(key, outputs, label):
-            probe.set_attribute("cache", "hit")
+        probed = _probe_cache(key, outputs, label, probe)
+        if probed == "hit":
             _stamp_part_execution(stem)
             return
-        probe.set_attribute("cache", "miss")
 
     if _farm.enabled():
         _farm_build(label, key, outputs)
@@ -1643,21 +1715,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
         return
 
     with _com_seat(label) as waited:
-        # Re-probe under the seat: we may have blocked for the seat for minutes while
-        # a peer builder published this exact part -- restore it rather than rebuild
-        # (the fleet cache-split win; fable/codex review). Its OWN phase span, never
-        # inside the task span: it is another network round-trip, and on a hit it is a
-        # full download -- which would otherwise make the "work" span pure transfer.
-        with _telemetry.span(
-            f"cache.reprobe {label}",
-            label=label,
-            service=_telemetry.BUILD_INFRA_SERVICE,
-        ) as reprobe:
-            if _cache.restore(key, outputs, label):
-                reprobe.set_attribute("cache", "hit-after-wait")
-                _stamp_part_execution(stem)
-                return
-            reprobe.set_attribute("cache", "miss")
+        if _reprobe_under_seat(key, outputs, label, probed):
+            _stamp_part_execution(stem)
+            return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         with _telemetry.span(
@@ -1908,12 +1968,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
         cache_key = _cache_key(_assembly_file_deps(stem), label)
-        if _cache.restore(cache_key, cache_outputs, label):
-            probe.set_attribute("cache", "hit")
+        probed = _probe_cache(cache_key, cache_outputs, label, probe)
+        if probed == "hit":
             _stamp_assembly_execution(stem)
             _record_recipe_digest()
             return
-        probe.set_attribute("cache", "miss")
 
     if _farm.enabled():
         _farm_build(label, cache_key, cache_outputs)
@@ -1922,21 +1981,10 @@ def build_or_refresh(stem, dependencies, changed, targets):
         return
 
     with _com_seat(label) as waited:
-        # Re-probe under the seat: a peer builder may have published this assembly
-        # while we blocked for the seat (fable/codex review) -> restore, don't
-        # rebuild. Its own phase span (see the part action), so a hit-after-wait is
-        # reported as the download it is rather than as build work.
-        with _telemetry.span(
-            f"cache.reprobe {label}",
-            label=label,
-            service=_telemetry.BUILD_INFRA_SERVICE,
-        ) as reprobe:
-            if _cache.restore(cache_key, cache_outputs, label):
-                reprobe.set_attribute("cache", "hit-after-wait")
-                _stamp_assembly_execution(stem)
-                _record_recipe_digest()
-                return
-            reprobe.set_attribute("cache", "miss")
+        if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
+            _stamp_assembly_execution(stem)
+            _record_recipe_digest()
+            return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
         # The FULL+hooks (or REFRESH) run HOLDING the seat, so the hooks operate on
@@ -2290,7 +2338,6 @@ def task_check():
         # discover them.  They must execute under the required recipe gate: these
         # tests reject drawing-owned tolerances/finishes and validate the typed
         # model-PMI controls that drawings consume.
-        SCRIPTS_DIR / "test_direct_dimension_tolerances.py",
         SCRIPTS_DIR / "test_drawing_specification_purity.py",
         SCRIPTS_DIR / "test_drawing_surface_finish_validation.py",
         SCRIPTS_DIR / "test_gtol_spec.py",

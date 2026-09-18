@@ -263,7 +263,25 @@ subprocess holds the seat.
 **Serializes but does NOT isolate:** SolidWorks keys open documents by *filename* and
 carries session-global state, so the lock is a safety belt — not a green light for
 genuinely-independent concurrent builds on one machine. Still: never hand-launch two
-SolidWorks build scripts at once.
+SolidWorks build scripts at once. Corollary — **the lock holder owns the session**:
+whoever acquires the seat is right to, and must, discard every open document and
+start from an empty session (`_common.run_build` does exactly that at connect and
+fails if any `cad/out` document survives). Work left open across a lock release was
+never protected: save or discard before releasing, and never expect a document to
+be there when you get the seat back. A read-only probe that opens a drawing also
+loads its parts read-only by the same filename a sibling's part build wants — the
+fresh start is what makes that harmless. **And the holder leaves the seat EMPTY:**
+`run_build`'s teardown closes every `cad/out` document too, because a resident
+document (a part after its own build, the hidden models behind a closed drawing)
+share-locks its file past the COM session, and the NEXT task's remote-cache restore
+runs *outside* the seat, before any connect-time discard — the extract fails with
+`PermissionError`, and "build locally" would mint a fresh `.execution` token no
+other seat can reproduce, silently forking every dependent's cache key (2026-09-17,
+farm worker 4). A build that dies before its teardown (crash, kill) is covered on
+the restore side: `_artifact_cache.restore` raises `RestoreLocked` instead of
+falling through, and the seat-holding action runs `release_seat_documents.py`
+(an empty `run_build` session — the discard IS the work) and re-probes; still
+locked after that is fatal.
 
 Tradeoff (documented, accepted): under a cold `-n N` full build, workers that grab a
 COM task block on the seat, so the `check:*` gates can be starved toward the end of

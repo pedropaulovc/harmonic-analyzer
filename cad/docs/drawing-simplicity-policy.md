@@ -40,11 +40,28 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    saying "material not critical". For a coated ferrous part, the Finish field
    also carries any masking and bare-surface corrosion protection; those
    instructions do not belong in Manufacturing Notes.
-2. **Decimal places carry the tolerance.** A dimension with no explicit band
-   is governed by its decimal places. A tighter band goes ON that dimension
-   as a native model tolerance (`_drawing_marks.set_dimension_*_tolerance`),
-   never in a note and never as a frame. Three decimals mean "hold it"; two
-   mean "routine". Do not print three decimals on a routine feature.
+2. **Decimal places carry the tolerance, and the MODEL owns both.** A
+   dimension with no explicit band is governed by its decimal places. A
+   tighter band goes ON that dimension as a native model tolerance
+   (`_drawing_marks.set_dimension_*_tolerance`), never in a note and never
+   as a frame. Three decimals mean "hold it"; two mean "routine". Do not
+   print three decimals on a routine feature. The decimal places are
+   likewise a property of the model dimension: the part build authors them
+   (`<part>_spec.DRAWING_PRECISION`, applied natively on the `.SLDPRT`) and
+   the drawing imports the dimension verbatim, reading the precision back to
+   prove it. A drawing script that rewrites precision at render time
+   (`SetPrecision3`, `set_dimension_precision`) or types a spec constant
+   into note text (`f"{DEPTH:.1f} DEEP"`) is hiding a part without its
+   tolerance: the nominal the shop reads must be the model's value, at the
+   model's precision, with the model's band. A value the sheet prints but no
+   feature dimension carries is not an exemption -- model it, even if that
+   takes a hidden reference sketch whose one driving dimension IS the value.
+   The single exception is a pure REFERENCE dimension: a read-only restatement
+   of values the model already owns, carrying no band and having no model
+   dimension to import. Its places are still specification, so a migrated
+   sheet reads them from a `*_spec` constant (`DRAWING_REFERENCE_PRECISION`),
+   never from a literal. Migrated packages are gated by
+   `test_drawing_specification_purity.py`; the remaining fleet is #766.
    A matched-fit callout identifies the mating part by name and its drawing
    or part number when assigned, and states the required clearance,
    interference, or unambiguous functional acceptance. Specify diametral or
@@ -110,9 +127,46 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      (draft/faceted quality off) and high-quality cosmetic threads. The
      isometric supplements the manufacturing views; it never replaces an
      orthographic, section, or detail view needed to define a feature.
-   - Hidden lines ON in every orthographic view (both books); never dimension
-     to a hidden line — cut a section or breakout instead.
-   - One origin per view; the overall length is real and conspicuous.
+   - Hidden lines only where they inform (ASME Y14.3: omit them when not
+     required for clarity). Every internal feature whose SHAPE the print
+     must convey — a stepped bore, a pocket floor, a cross-hole's position
+     through a wall, a blind depth no callout states — is defined by SOLID
+     lines in at least one view, section, or breakout. A standard hole
+     (drill, ream, tap, counterbore, spotface, with its depth) is fully
+     defined by its hole callout or hole-table row (ASME Y14.5) and needs
+     neither hidden lines nor a section; do not add either for it. A view
+     shows hidden lines only when some feature is communicated by them
+     there (a cross-hole through a turned part; a blind depth no section
+     covers); every other orthographic view is hidden-lines-removed so its
+     dimensions and leaders sit on clean geometry. That usually means one
+     hidden-line view per part, sometimes none when sections and callouts
+     cover everything, occasionally two for orthogonal cross-hole
+     families — it is a criterion, not a count. Assembly views
+     are hidden-lines-removed. **Section views are always
+     hidden-lines-removed**: the cut exists to show the interior in solid
+     lines, so dashed edges in a section only say the cut was placed wrong.
+     A section either shows the geometry beyond the cutting plane (the
+     default) or is cut-surface-only (`IDrSection::SetDisplayOnlySurfaceCut`)
+     — never cut-surface-only WITH hidden lines, which prints hatched slices
+     floating among dashed ghosts of the material that was removed. A
+     dimension that needs an edge behind the cut takes the full section, not
+     hidden lines. Never dimension to a hidden line — cut a
+     section or breakout instead. (This supersedes the earlier
+     "hidden lines ON in every orthographic view" rule: on the castings it
+     buried every dimension in dashed haystacks and drove the crowding
+     that rule 8 now resolves with extra sheets.)
+   - One origin per view, and it is a FEATURE: every location dimension
+     starts on something the shop can indicate or pick up -- a finished
+     face or edge, the axis of a real bore or boss -- never a construction
+     centreline, a symmetry axis or the model origin with nothing there.
+     "LOCATIONS FROM FRAME CENTRE" is mid-air with a note on it; a centre
+     the machinist must first derive from a symmetric pattern is that
+     derivation's own stack-up. Baseline (or ordinate) from that one datum,
+     never chained feature to feature. (A Hole Wizard placement sketch
+     cannot carry a datum point -- every point in it is a hole -- so a
+     hole's model dims stay origin-based; the print dimensions it from the
+     datum feature with a driven dimension picked on both features.) The
+     overall length is real and conspicuous.
    - Turned parts: oriented as they sit in the lathe, diameters on the side
      view (not leader-piled on the end view), lengths from one faced end.
    - Slots dimensioned to the radius centres; chamfers preferred to radii on
@@ -140,8 +194,16 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    Projected orthographic views preserve ASME alignment; front, top, and side
    views are never staggered merely to improve composition. Correctness comes
    before visual balance. Resolve crowding by moving the aligned view group,
-   choosing a better sheet orientation or scale, or repositioning nonprojected
-   views and annotations.
+   choosing a better sheet orientation or scale, repositioning nonprojected
+   views and annotations — or, once those are exhausted, by **adding a
+   sheet**. A drawing package is not limited to one sheet, and extra sheets
+   are cheap; cramming is not. The diagnostic symptom of a sheet that is too
+   crowded is callouts, dimensions, or notes belonging to one view or section
+   overlapping, or being squeezed against, those of another. When that
+   happens, move whole sections, detail views, or the hole table with its
+   notes to a new sheet of the same package rather than shrinking scale,
+   abbreviating qualifiers, or threading text between lines. Each sheet
+   should then read cleanly on its own, with its views still at a useful scale.
    Choose landscape or portrait according to the view arrangement, useful
    drawing scale, and space needed by dimensions and notes. A sparse sheet
    with undersized views has the wrong orientation when rotating the layout
@@ -156,10 +218,9 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    steps, and contradictions across all sheets. The review also asks for what
    a fitter needs: assembled views, an exploded view, a parts list with
    balloons, ordered assembly steps, the assembly-level fits and checks, and
-   the parked/engaged setup. The current three-view sheets
+   the parked/engaged setup. Legacy three-view sheets
    (`drawing_recipe_assembly.md`) are orientation placeholders and are
-   EXPECTED to fail that review until they are built out; single-sheet part
-   prints are the gate this policy enforces today.
+   EXPECTED to fail that review until they are built out.
 10. **Inspection assumes a hobby shop, not a CMM.** Surface plate, height
    gauge, indicators, V-blocks, sine bar and gauge blocks are fair game, so a
    geometric control is never rejected as uninspectable, only as
@@ -181,10 +242,19 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 
 ## The gate
 
-`uv run cad/scripts/machinist_review.py <name>...` (or `--all`) renders the
-verdict a blind senior machinist gives each drawing package under the calibrated
-prompt in `cad/scripts/prompts/`. Parts use their single PNG; assemblies render
-every PDF page and submit all sheet images to one review. A package passes when
+`uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
+`--all`) renders the verdict a blind senior machinist gives each drawing package
+under the calibrated prompt in `cad/scripts/prompts/`. **The reviewer MUST be a
+different model family from whoever authored or last edited the drawing
+script.** An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
+`--reviewer codex`; an agent running on a Codex/GPT model reviews with
+`--reviewer claude`. A same-family review shares the author's blind spots and
+does not count as the gate, even when it returns `SHIP`; if the cross-family
+reviewer is over quota, the package waits for it rather than falling back.
+Part and assembly packages render every native PDF page at 300 dpi and submit
+all sheet images to one review, using the rubric for that package kind. A
+downscaled contact-sheet preview is not a substitute for reviewing every page.
+A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
 finding. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,

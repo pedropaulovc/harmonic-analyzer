@@ -31,6 +31,23 @@ _TOLERANCE_SETTERS = frozenset(
     }
 )
 
+# Drawing scripts whose part builds own display precision (policy rule 2):
+# ``<part>_spec.DRAWING_PRECISION`` is applied natively on the .SLDPRT and the
+# drawing only reads it back.  A render-time ``SetPrecision3`` /
+# ``set_dimension_precision`` in one of these is a part missing its tolerance.
+#
+# One exception, and only one: a pure REFERENCE dimension is a read-only sum
+# of model-owned values, carries no tolerance, and has no model dimension to
+# import, so its places are not a tolerance statement.  Those places are still
+# specification, so a sheet may pass them through ``SetPrecision3`` ONLY from
+# a ``*_spec`` constant (``DRAWING_REFERENCE_PRECISION``) -- never a literal.
+# The remaining fleet migrates under #766; until then the rule is scoped here.
+PRECISION_MIGRATED_DRAWINGS = frozenset(
+    {"draw_harmonic_base.py", "draw_top_frame.py", "draw_tube_frame.py"}
+)
+_PRECISION_SETTERS = frozenset({"set_dimension_precision"})
+_DIRECT_PRECISION_METHODS = frozenset({"SetPrecision3"})
+
 _UNSIGNED_VALUE_FRAGMENT = r"(?:\d+(?:\.\d*)?|\.\d+|\x00)"
 _SIGNED_VALUE_FRAGMENT = rf"(?:[-+]\s*{_UNSIGNED_VALUE_FRAGMENT})"
 _VALUE_FRAGMENT = r"(?:[-+]?(?:\d+(?:\.\d*)?|\.\d+)|\x00)"
@@ -169,6 +186,46 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
                 if is_part_spec(alias.name):
                     modules.add(alias.asname or alias.name.split(".")[-1])
     return frozenset(direct), frozenset(modules)
+
+
+REFERENCE_PRECISION_NAME = "DRAWING_REFERENCE_PRECISION"
+
+
+def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
+    """Local bindings of a ``*_spec`` module's ``DRAWING_REFERENCE_PRECISION``."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        leaf = (node.module or "").rsplit(".", 1)[-1]
+        if not leaf.endswith("_spec") or leaf.startswith("_"):
+            continue
+        names.update(
+            alias.asname or alias.name
+            for alias in node.names
+            if alias.name == REFERENCE_PRECISION_NAME
+        )
+    return frozenset(names)
+
+
+def _reference_precision_sourced(
+    expression: ast.expr, *, names: frozenset[str], modules: frozenset[str]
+) -> bool:
+    """Whether ``expression`` IS the spec's ``DRAWING_REFERENCE_PRECISION`` (or an
+    item of it) -- the one value a sheet may pass to ``SetPrecision3``. Any other
+    ``*_spec`` value (a diameter, a count) is spec data, not a places statement,
+    and must not launder a render-time precision (CodeRabbit, #754)."""
+    if isinstance(expression, ast.Subscript):
+        expression = expression.value
+    if isinstance(expression, ast.Name):
+        return expression.id in names
+    if isinstance(expression, ast.Attribute):
+        return (
+            expression.attr == REFERENCE_PRECISION_NAME
+            and isinstance(expression.value, ast.Name)
+            and expression.value.id in modules
+        )
+    return False
 
 
 def _bound_names(target: ast.expr) -> frozenset[str]:
@@ -570,6 +627,25 @@ def _is_tolerance_expression(node: ast.expr, names: frozenset[str]) -> bool:
     return False
 
 
+def _leaves_primary_precision(node: ast.Call) -> bool:
+    """``SetPrecision3(-1, ...)``: the primary places are left alone.
+
+    The first positional argument is ``swDimensionPrecisionSettings_e`` for the
+    primary value; ``-1`` (do-not-change) is how the model-side tolerance helper
+    sets only the tolerance places.  Anything else, or a non-literal, rewrites
+    the nominal's precision on the sheet.
+    """
+    if not node.args:
+        return False
+    first = node.args[0]
+    return (
+        isinstance(first, ast.UnaryOp)
+        and isinstance(first.op, ast.USub)
+        and isinstance(first.operand, ast.Constant)
+        and first.operand.value == 1
+    )
+
+
 def drawing_specification_violations(
     source: str, *, filename: str = "<string>"
 ) -> tuple[DrawingSpecificationViolation, ...]:
@@ -588,6 +664,7 @@ def drawing_specification_violations(
     assignments = _simple_assignments(tree)
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
+    reference_precision_names = _reference_precision_names(tree)
     finish_lookup_direct, finish_lookup_modules = _imported_functions(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
@@ -743,6 +820,31 @@ def drawing_specification_violations(
                             )
 
             name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name in _PRECISION_SETTERS:
+                add(
+                    node,
+                    "drawing-owned-precision",
+                    f"{name}(...) rewrites display precision at render time",
+                )
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in _DIRECT_PRECISION_METHODS
+                and not _leaves_primary_precision(node)
+                and not (
+                    node.args
+                    and _reference_precision_sourced(
+                        node.args[0],
+                        names=reference_precision_names,
+                        modules=part_spec_modules,
+                    )
+                )
+            ):
+                add(
+                    node,
+                    "drawing-owned-precision",
+                    f"direct COM {node.func.attr}(...) writes a precision that is "
+                    f"not the spec's {REFERENCE_PRECISION_NAME}",
+                )
             if name in _TOLERANCE_SETTERS:
                 add(
                     node,
@@ -787,13 +889,19 @@ def drawing_specification_violations(
 def drawing_fleet_specification_violations(
     paths: Iterable[Path],
 ) -> tuple[DrawingSpecificationViolation, ...]:
-    """Scan drawing scripts in deterministic path/line order."""
+    """Scan drawing scripts in deterministic path/line order.
+
+    ``drawing-owned-precision`` applies only to ``PRECISION_MIGRATED_DRAWINGS``
+    until #766 moves the rest of the fleet's precision into its part builds.
+    """
     violations = (
         violation
         for path in sorted(paths)
         for violation in drawing_specification_violations(
             path.read_text(encoding="utf-8"), filename=str(path)
         )
+        if violation.rule != "drawing-owned-precision"
+        or path.name in PRECISION_MIGRATED_DRAWINGS
     )
     return tuple(sorted(violations))
 

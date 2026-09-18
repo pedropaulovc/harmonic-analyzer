@@ -237,8 +237,7 @@ def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
 def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 3
-    assert 'label="guide bottom edge",\n        position_tolerance_m=0.0001' in source
-    assert source.count("position_tolerance_m=0.0001") == 1
+    assert 'label="guide bottom edge",' in source
     assert source.count("add_feature_control_frame(") == 3
     assert 'characteristic="flatness"' in source
     assert 'characteristic="parallelism"' in source
@@ -348,7 +347,12 @@ def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
     outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
     assert len(set(outputs)) == len(outputs)
     assert all(
-        spec.assets == (DRAWING_TEMPLATES[spec.layout].path,) for spec in DRAWINGS
+        spec.assets
+        == tuple(
+            DRAWING_TEMPLATES[layout].path
+            for layout in dict.fromkeys((spec.layout, *spec.additional_layouts))
+        )
+        for spec in DRAWINGS
     )
 
 

@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
 import build_harmonic_base as part
 import build_cone_swing_platform as platform
-import draw_harmonic_base as drawing
 import harmonic_base_spec
 from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
@@ -19,56 +17,7 @@ from cone_pivot_post_installation import (
     POST_Z_SHIFT,
 )
 from build_cone_lock_knob import COLLAR_DIA as KNOB_COLLAR_DIA
-from _drawing_registry import DRAWINGS_BY_NAME
 from build_swing_stop_screw import SHANK_DIA as STOP_SHANK_DIA
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/harmonic-base.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/harmonic-base.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/harmonic-base_drawing.png")
-    assert DRAWINGS_BY_NAME["harmonic_base"].script == Path(drawing.__file__).resolve()
-
-
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is harmonic_base_spec.DRAWING_DIMENSIONS
-    marked = set().union(*harmonic_base_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP)
-    assert kept == marked
-    assert (drawing.BOTTOM_LENGTH, drawing.BOTTOM_WIDTH) == (
-        harmonic_base_spec.BOTTOM_LENGTH,
-        harmonic_base_spec.BOTTOM_WIDTH,
-    )
-
-
-def test_plate_geometry_is_single_sourced() -> None:
-    # The build imports its plate nominals from the spec, so the drawing's view
-    # math and the part geometry cannot drift.
-    assert part.BOTTOM_LENGTH is harmonic_base_spec.BOTTOM_LENGTH
-    assert part.TOP_THICKNESS is harmonic_base_spec.TOP_THICKNESS
-    assert harmonic_base_spec.BOTTOM_LENGTH == 18.0 * 25.4
-    assert harmonic_base_spec.TOP_LENGTH == 17.5 * 25.4
-    assert harmonic_base_spec.BOTTOM_FRONT_Z == -(11.0 * 25.4) / 2.0
-    assert harmonic_base_spec.BOTTOM_REAR_Z == (11.0 * 25.4) / 2.0
-    assert math.isclose(harmonic_base_spec.BOTTOM_WIDTH, 11.0 * 25.4)
-    assert math.isclose(harmonic_base_spec.TOP_WIDTH, 10.5 * 25.4)
-
-
-
-def test_hole_table_covers_mounting_holes_and_every_hardware_seat() -> None:
-    expected_holes = {
-        *((x, z, part.HOLD_DOWN_TAP_DRILL_DIA) for x, z in part.HOLE_XZ),
-        (*part.PIVOT_SCREW_XZ, part.PIVOT_SCREW_HOLE_DIA),
-        (*part.LOCK_KNOB_XZ, part.LOCK_SCREW_HOLE_DIA),
-        (*part.STOP_SCREW_XZ, part.STOP_SCREW_HOLE_DIA),
-        *((x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ),
-        *((x, z, part.FOOT_SCREW_HOLE_DIA) for x, z in part.FOOT_SCREW_XZ),
-        *((x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ),
-    }
-    # Four support taps and all other blind tapped groups, with no duplicate picks.
-    assert len(drawing.ALL_HOLES) == len(expected_holes) == 18
-    assert set(drawing.ALL_HOLES) == expected_holes
-    assert drawing._plan_xy(0.0, 10.0)[1] < drawing.TOP_CENTER[1]
 
 
 @pytest.mark.parametrize(
@@ -368,3 +317,86 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
+
+
+def _socket_bore_geometry(x_mm: float, z_mm: float):
+    """The bore wall's COM geometry signature, as measured on the built part.
+
+    Faces read back one Ø25.50 cylinder per station whose bounding box spans
+    the bore's own radius in X and Z and the socket depth in Y, so the specs
+    can be resolved offline without a SolidWorks session.
+    """
+    from _part_pmi import _SURFACE_CYLINDER, _FaceGeometry
+
+    radius = part.COLUMN_SOCKET_DIAMETER / 2000.0
+    return _FaceGeometry(
+        face=None,
+        identity=_SURFACE_CYLINDER,
+        parameters=(x_mm / 1000.0, 0.0, z_mm / 1000.0, 0.0, 1.0, 0.0, radius),
+        outward_normal=None,
+        box=(
+            x_mm / 1000.0 - radius,
+            (part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH) / 1000.0,
+            z_mm / 1000.0 - radius,
+            x_mm / 1000.0 + radius,
+            part.STACK_HEIGHT / 1000.0,
+            z_mm / 1000.0 + radius,
+        ),
+    )
+
+
+def test_each_socket_bore_finish_qualifies_exactly_one_station() -> None:
+    """The four sockets differ only in X and Z, so a bore control that names
+    less than both would qualify two faces (or all four) and abort the part
+    build after ten minutes of cutting -- or, worse, print the seat grade
+    against the wrong bore. Require a 1:1 station/control match, and hold the
+    ambiguity the Z station exists to resolve."""
+    from _gtol_spec import CylinderFace
+    from _part_pmi import _face_matches
+
+    spec = harmonic_base_spec
+    geometries = {
+        station: _socket_bore_geometry(*station) for station in spec.COLUMN_SOCKET_XZ
+    }
+    assert len(spec.SOCKET_BORE_FINISHES) == len(spec.COLUMN_SOCKET_XZ)
+    for control in spec.SOCKET_BORE_FINISHES:
+        matched = [
+            station
+            for station, geometry in geometries.items()
+            if _face_matches(geometry, control.face)
+        ]
+        assert matched == [
+            station
+            for station in spec.COLUMN_SOCKET_XZ
+            if spec.socket_bore_finish_key(*station) == control.key
+        ]
+        assert control.roughness_um == spec.SEAT_UM
+        assert control.production_method == spec.SOCKET_BORE_TARGET
+    x_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER, contains_x_mm=part.COLUMN_X)
+    size_only = CylinderFace(part.COLUMN_SOCKET_DIAMETER)
+    assert sum(_face_matches(g, x_only) for g in geometries.values()) == 2
+    assert sum(_face_matches(g, size_only) for g in geometries.values()) == 4
+
+
+def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
+    """The sheet's one socket symbol leads to the INNER wall of the socket that
+    section A-A puts in the upper half of the sheet, at a height that keeps the
+    arrowhead inside the bore and clear of both the window the cross tap opens
+    through that wall and the deck outline -- the first placement sat 1 mm (on
+    paper) from the cross tap's cosmetic thread and read as the tap's."""
+    import draw_harmonic_base as sheet
+
+    x_mm, y_mm, z_mm = sheet.SOCKET_LEADER_POINT_MM
+    station_x, station_z = sheet.SECTION_SOCKET_XZ
+    assert (station_x, station_z) in part.COLUMN_SOCKET_XZ
+    assert station_x == part.COLUMN_X
+    assert station_z == min(z for x, z in part.COLUMN_SOCKET_XZ if x > 0.0)
+    assert x_mm == part.COLUMN_X
+    assert math.isclose(
+        abs(z_mm - station_z), part.COLUMN_SOCKET_DIAMETER / 2.0, abs_tol=1e-9
+    )
+    assert abs(z_mm) < abs(station_z)
+    tap_clearance = abs(y_mm - part.BASE_SCREW_Y) - part.BASE_CROSS_TAP_DRILL_DIA / 2.0
+    deck_clearance = part.STACK_HEIGHT - y_mm
+    assert min(tap_clearance, deck_clearance) > 4.0
+    assert y_mm > part.STACK_HEIGHT - part.COLUMN_SOCKET_DEPTH

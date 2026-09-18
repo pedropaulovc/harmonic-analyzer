@@ -259,11 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=bore_symbol,
         datum="B",
         label="cam final bore axis",
-        position_tolerance_m=0.003,
     )
-    # The OD-axis datum is constrained more strongly: live readback places its
-    # tag 18.197 mm from the requested sheet point.  Keep the intended anchor
-    # and bound only this annotation-placement normalization.
     add_datum_feature(
         adapter,
         front,
@@ -271,21 +267,21 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(0.155, 0.105),
         datum="C",
         label="cam OD datum axis",
-        position_tolerance_m=0.019,
     )
     # Datum D attaches on the boss's LEFT flank, opposite the two position
     # frames on the right, so its leader unambiguously lands on the boss OD
-    # rather than the tap/axis region (machinist round 1).
-    # Live readback normalizes the restricted tag by 4.072 mm; bound only that
-    # annotation-placement behavior while retaining the reviewed sheet point.
+    # rather than the tap/axis region (machinist round 1). The symbol sits on
+    # the SAME horizontal ray, 35 mm out: the earlier down-left request
+    # (0.192, 0.170) gave the tag a 77 mm angled leader that SolidWorks
+    # re-solved 41-51 mm off (seat-dependent) and drove across the BOSS OD
+    # AXIS frame's leader (farm workers 4 and 6, 2026-09-17, sheet inspected).
     add_datum_feature(
         adapter,
         bottom,
         edge_xy=bottom_boss_left,
-        symbol_xy=(0.192, 0.170),
+        symbol_xy=(0.232, bottom_boss_center[1]),
         datum="D",
         label="cam boss OD axis",
-        position_tolerance_m=0.0041,
     )
     add_feature_control_frame(
         adapter,

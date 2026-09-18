@@ -78,6 +78,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A194",
     ),
+    "frame-cross-screw": _stock(
+        "frame-cross-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A837",
+    ),
     "gooseneck-set-screw": _stock(
         "gooseneck-set-screw",
         "Steel Square-Head Cup-Point Set Screw",
@@ -139,6 +144,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "boss-hook",
         "Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)",
         "9490T1",
+    ),
+    "tube-frame-cap": _stock(
+        "tube-frame-cap",
+        "Metal Round Cap",
+        "9275K141",
     ),
 }
 

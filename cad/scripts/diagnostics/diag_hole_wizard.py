@@ -1,6 +1,4 @@
-"""Live probe for ``_holes.wizard_holes`` -- validates every hole KIND and
-SIZE TOKEN the Hole Wizard conversion will use, on a throwaway part, before
-any production script is converted.
+"""Live regression for ``_holes.wizard_holes`` on a disposable native coupon.
 
 Verifies (fail loud on each):
 - ANSI-inch size tokens resolve in the wizard table (``#8-32``, ``#4-40``,
@@ -10,7 +8,9 @@ Verifies (fail loud on each):
 - multi-point placement lands N instances (volume drop = N x hole area);
 - blind depth + counterbore overrides apply;
 - expected cut diameters (tap drill for taps, fit dia for clearances) match
-  the published ANSI tables within 0.06 mm.
+  the published ANSI tables within 0.06 mm;
+- through-next and through-all taps retain their specified thread class and
+  thread termination, rather than zero-depth blind thread metadata.
 
 Run (SolidWorks open)::
 
@@ -25,9 +25,12 @@ import math
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "cad/scripts"))
+sys.path.insert(0, str(ROOT))
 
-from _common import check, run_build  # noqa: E402
+import dodo  # noqa: E402
+from _common import _early_bound, check, run_build  # noqa: E402
 from _holes import HoleSpec, wizard_holes  # noqa: E402
 import _telemetry  # noqa: E402
 
@@ -55,6 +58,19 @@ CASES = [
         6.0,
     ),
     (
+        "tap 10-32 blind readback",
+        HoleSpec(
+            "tapped_bottoming",
+            "#10-32",
+            end="blind",
+            depth_mm=6.0,
+            overrides_mm={"ThreadDepth": 4.0},
+        ),
+        [[-10.0, BLOCK_T, 0.0]],
+        4.0386,
+        6.0,
+    ),
+    (
         "clearance #8 normal x2",
         HoleSpec("clearance", "#8"),
         [[0.0, BLOCK_T, -20.0], [0.0, BLOCK_T, 20.0]],
@@ -76,6 +92,13 @@ CASES = [
         HoleSpec("drilled_number", "#47"),
         [[10.0, BLOCK_T, -20.0], [10.0, BLOCK_T, 20.0]],
         1.994,
+        BLOCK_T,
+    ),
+    (
+        "tap 1/4-20 through next",
+        HoleSpec("tapped", "1/4-20", end="through_next"),
+        [[10.0, BLOCK_T, 0.0]],
+        5.1054,
         BLOCK_T,
     ),
     (
@@ -134,6 +157,19 @@ async def build(adapter) -> dict[str, str]:
             res = wizard_holes(
                 adapter, spec, pts, (0.0, 1.0, 0.0), label, expect_dia_mm=want_dia
             )
+            if spec.kind in ("tapped", "tapped_bottoming") and spec.end != "blind":
+                part = _early_bound(adapter.currentModel, "IPartDoc")
+                feature = _early_bound(part.FeatureByName(res.name), "IFeature")
+                definition = _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2")
+                expected_end = {"through_all": 1, "through_next": 2}[spec.end]
+                actual = (
+                    definition.ThreadClass,
+                    int(definition.ThreadEndCondition),
+                    int(definition.EndCondition),
+                )
+                expected = (spec.thread_class, expected_end, expected_end)
+                if actual != expected:
+                    failures.append(f"{label}: native thread class/thread end/hole end {actual!r} != {expected!r}")
             after = await _volume(adapter)
             removed = vol - after
             # The native diameter readback and an independent removed-volume
@@ -176,4 +212,5 @@ async def build(adapter) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    sys.exit(run_build(build))
+    with dodo._com_seat("diagnostic:hole-wizard-regression"):
+        sys.exit(run_build(build))

@@ -1,9 +1,9 @@
 r"""Pure-data dimensional contract shared by the top-frame casting and drawing.
 
 PURE DATA, no SolidWorks/COM imports.  ``build_top_frame`` imports the marked-
-dimension NAME map + notes from here; ``draw_top_frame`` keeps exactly
-``DRAWING_DIMENSIONS`` and imports the casting's plan geometry (column
-stations, bore diameters) from ``build_top_frame`` for its view math.
+dimension NAME map, notes and the machined-surface geometry from here;
+``draw_top_frame`` keeps exactly ``DRAWING_DIMENSIONS`` and imports the rest of
+the casting's plan geometry from ``build_top_frame`` for its view math.
 
 2026-08-02 rederive (ch30 px measurement anchored on the 394x224 column pitch
 + GT bundle rescale + ch19 closeups): the ring absorbed the old top-crossbar
@@ -15,86 +15,239 @@ west-rail fulcrum-keeper taps.
 
 from __future__ import annotations
 
+from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, FRAME_REAR_COLUMN_Z
+from frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
 
-OUTER_PROFILE_TOLERANCE_MM = 0.25
+# --- Machined-surface geometry ------------------------------------------------
+#
+# The stations and diameters the cut surfaces sit at. They live in the spec (not
+# in ``build_top_frame``) because a surface-finish symbol on the sheet has to be
+# provenance-checked against the very face spec the casting authors -- see
+# ``_drawing_contract``'s drawing-surface-finish-provenance rule. Everything
+# else about the plan geometry stays in the build script.
+COLUMN_X = 197.0  # column stations (frame.SLDASM)
+FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
+REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
+RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)
+HALF_H = RING_HEIGHT / 2.0  # 18.25; band local y -18.25..+18.25
+BOSS_ABOVE = 4.5  # boss proud of the rail top (corner-crop step)
+BORE_DIA = COLUMN_SOCKET_DIAMETER
+CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
+GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
+GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows. The rail outside profile (OuterProfile Width/Depth) is marked;
-# limits and the datum-controlled bore pattern stay together in the notes rather
-# than being duplicated by isolated native diameter dimensions. ---
+# --- Machining-required surfaces ---------------------------------------------
+#
+# Why these nine faces and nothing else. The title block names no grade
+# ("CAST/MACHINED"), so a surface that MUST be cut on an otherwise as-cast
+# casting has to say so on the face (simplicity policy rule 5: what LOCATES the
+# part gets the control).
+#
+# * The four tube-socket bores take the MHA-083 columns on a match-fitted close
+#   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
+# * The four cap-recess floors are the axial seats the MHA-133 caps land on --
+#   they set the columns' shoulder height, so their roughness is a fit surface,
+#   not cosmetic.
+# * The gooseneck bore guides the O16 counter-spring post through the hub and
+#   is pinched by the set screw against it.
+#
+# SEAT grade throughout: nothing runs on these surfaces continuously, so the
+# commercial machine finish is what the fit needs. The part authors one native
+# symbol per qualified face; each sheet states the requirement ONCE, and the
+# target text names the family so a single symbol cannot be misread as one
+# instance (harmonic-base FLANGE_PERIMETER_TARGET precedent).
+SOCKET_BORE_TARGET = "TUBE SOCKET BORES, 4X"
+CAP_SEAT_TARGET = "CAP SEAT FLOORS, 4X"
+SURFACE_FINISHES = tuple(
+    control
+    for rail, x in (("east", GOOSENECK_X), ("west", COLUMN_X))
+    for end, z in (("front", FRONT_COLUMN_Z), ("rear", REAR_COLUMN_Z))
+    for control in (
+        SurfaceFinishControl(
+            f"socket_{rail}_{end}",
+            SEAT_UM,
+            CylinderFace(BORE_DIA, contains_x_mm=x, contains_z_mm=z),
+            production_method=SOCKET_BORE_TARGET,
+        ),
+        SurfaceFinishControl(
+            f"cap_seat_{rail}_{end}",
+            SEAT_UM,
+            PlanarFace(
+                (0.0, 1.0, 0.0),
+                CAP_RECESS_FLOOR_Y,
+                contains_x_mm=x,
+                contains_z_mm=z,
+            ),
+            production_method=CAP_SEAT_TARGET,
+        ),
+    )
+) + (
+    SurfaceFinishControl(
+        "hub_bore",
+        SEAT_UM,
+        CylinderFace(GOOSENECK_BORE_DIA, contains_x_mm=GOOSENECK_X),
+    ),
+)
+
+
+# --- Marked-dimension contract -------------------------------------------------
+#
+# The hole sizes remain associative callouts; named Hole Wizard placement
+# dimensions expose the stations without duplicating those sizes.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "OuterProfile": {"Width", "Depth"},
+    "OuterProfile": {"Width", "Depth", "WinWidth", "WinDepth"},
+    "WebProfile": {
+        "WebOuterWidth",
+        "WebOuterDepth",
+        "WebInnerWidth",
+        "WebInnerDepth",
+    },
+    "WebRing": {"RingHeight"},
+    "BossUpProfile": {"C0Dia"},
+    "BossesUpper": {"BossTopExtent"},
+    "BossesLower": {"BossBottomExtent"},
+    "BoreProfile": {"B0X", "B0Z", "B0Dia"},
+    "SpotFaceRearProfile": {"S1Dia"},
+    "BarProfile": {
+        "BarAnchorX",
+        "BarAnchorZ",
+        "BarFootSpan",
+        "GussetRunE",
+        "BarSideE",
+    },
+    "HubBossProfile": {"HubDia"},
+    "HubBoss": {"HubBossExtent"},
+    "RibProfile": {"RibWidth"},
+    "SetPocketProfile": {"PocketRun", "PocketRise"},
+    "GooseneckTap": {"SetTapZ"},
+    "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
+    # The hanger-stud and keeper-tap placement dims (StudFrontX ...,
+    # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
+    # measures from the origin -- mid-air on the print -- so sheet 3
+    # dimensions those stations from the socket bore axes with sheet-derived
+    # dimensions (DRAWING_REFERENCE_PRECISION below, policy rule 7).
+    "CapRecessProfile": {"CapRecessDia"},
+    "CapRecesses": {"CapRecessDepth"},
 }
 
-# Two linked note blocks: notes 1-5 in the lower-left column, 6-10 in the
-# right-hand column -- one 29-line block ran off the sheet bottom.
-DRAWING_NOTES = "\n".join(
-    (
-        "1. GREEN-PAINTED GRAY IRON CASTING; MACHINE DATUM FACES, BORES, SEATS;",
-        "   CAST ELSEWHERE, 1.5 MAX DRAFT. T-ROOT FILLETS R3; TOP-FACE RIM EDGES",
-        "   C2.00 X 45 DEG; ALL OTHER CAST EDGES (BAND BOTTOM, BOSSES) SHARP.",
-        "2. PLAN PROFILE: 428.20 X 262.00 OUTER RAIL RING; SIDE RAILS 34.20 WIDE,",
-        "   FRONT/REAR RAILS 38.00 WIDE; CLEAR WINDOW 359.80 X 186.00 BETWEEN",
-        "   STRAIGHT INNER FACES. INTEGRAL CROSSBAR 22.00 WIDE AT X -26.00..-4.00",
-        "   SPANNING THE WINDOW, FLUSH BOTH FACES, 18X18 GUSSETS AT ALL FOUR",
-        "   JUNCTIONS. RING BAND 36.50 TALL; ENVELOPE 446.20 +/-0.25 X 276.20",
-        "   +/-0.25 X 47.30.",
-        "3. 4X CORNER BOSSES DIA52.20, 47.30 TALL (PROUD 4.50 ABOVE / 6.30 BELOW",
-        "   THE RAIL BAND), BORED DIA25.50 +0.05/0 THRU; POSITION <MOD-DIAM>0.20",
-        "   A|B|C ON 394.00 X 224.00 BASIC PITCH.",
-        "4. DATUM A = RAIL BOTTOM FACE; B = EAST (-X) OUTER RAIL FACE;",
-        "   C = REAR OUTER RAIL FACE.",
-        "5. WEBBED FACES: 12.70 WEB CENTRED ON EACH RAIL -- PANELS RECESSED",
-        "   10.75 INTO THE SIDE-RAIL FACES / 12.65 INTO THE FRONT/REAR-RAIL",
-        "   FACES FROM 8.00 BELOW THE TOP FACE THROUGH THE BOTTOM EDGE (TOP",
-        "   FLANGE ONLY -- THE WEB THINS AND STAYS THIN TO THE BOTTOM);",
-        "   FULL-THICKNESS LANDS AT BOSSES, HUB RIB AND CROSSBAR JUNCTIONS.",
-        "   CAST FINISH INSIDE PANELS.",
-    )
-)
-DRAWING_NOTES_B = "\n".join(
-    (
-        "6. GOOSENECK HUB, EAST RAIL AT Z +3.09: RIB 27.00 WIDE FULL HEIGHT,",
-        "   BORE <MOD-DIAM>17.00 +0.20/0 THRU; UNDERSIDE BOSS DIA30 X 8.00 WITH",
-        "   TWIN GUSSETS; DRILL + TAP 1/4-20 UNC-2B THRU RIB TO BORE ON THE BAND",
-        "   MID-PLANE, 16X16X2 SPOT POCKET.",
-        "7. 4X DRILL + TAP #8-32 UNC-2B X 14.00 DEEP INTO THE BOSS Z-FACES ON",
-        "   THE BAND MID-PLANE (FRONT PAIR FROM FRONT, REAR PAIR FROM REAR),",
-        "   DIA9.00 X 0.90 SPOT-FACE EACH.",
-        "8. 2X <MOD-DIAM>13.49 (1/2 CLOSE) HANGER-STUD HOLES THRU THE CROSSBAR AT",
-        "   Z -83.97 / +90.15; POSITION <MOD-DIAM>0.20 A|B|C.",
-        "9. ALL BORES Ra 1.6, TOP ENDS BROKEN C1.00 X 45 DEG. MASK DATUMS, BORES,",
-        "   BOSS END LANDS AND TAPPED HOLES BEFORE COATING;",
-        "   DIMENSIONS/GD&T APPLY BEFORE COATING.",
-        "10. 2X DRILL + TAP #8-32 UNC-2B X 10.00 DEEP INTO THE WEST RAIL TOP",
-        "   FACE AT (X +199.90, Z +77.09 / -70.91): FULCRUM-KEEPER FEET.",
-    )
-)
-INSPECTION_NOTES = "\n".join(
-    (
-        "INSPECTION NOTES — 4X BOSS OD/BORE:",
-        "FIT LEAST-SQUARES CYLINDERS TO EACH EXPOSED OD ARC",
-        "AND FULL BORE.",
-        "USE 8 EQUALLY SPACED AXIAL SECTIONS OVER 47.30 AND",
-        "8 EQUALLY SPACED ACCESSIBLE-ARC POINTS PER SECTION.",
-        "AXIS OFFSET 0.05 MAX = GREATEST AXIS SEPARATION AT",
-        "EITHER END PLANE.",
-        "RADIAL WALL = POINT-TO-BORE-AXIS DISTANCE MINUS",
-        "FITTED BORE RADIUS.",
-        "MAX-MIN RADIAL WALL THICKNESS SHALL NOT EXCEED 0.10",
-        "ACROSS ALL 64 OD POINTS. THIS CHECK IS ADDITIONAL TO",
-        "NATIVE SIZE/POSITION CONTROLS.",
-    )
-)
-TOP_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
-FRONT_VIEW_NOTE = "FRONT VIEW SCALE 1:4"
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "column-bore true position": "0.20",
-    "column-boss true position": "0.20",
-    "gooseneck-bore true position": "0.20",
-    "hanger-stud-hole true position": "0.20",
+# --- Decimal places, authored ON THE PART -------------------------------------
+#
+# Policy rule 2: the places a dimension prints are part of the tolerance it
+# claims, and the model owns both.  ``build_top_frame`` applies this table
+# natively (``_drawing_marks.apply_drawing_precision``) right after the drawing
+# marks, so ``draw_top_frame`` imports each dimension verbatim and only reads
+# ``GetPrimaryPrecision2()`` back off the sheet.
+#
+# One place is this casting's routine band.  The hanger and keeper stations are
+# drilled and tapped clearance features: .X (+/-0.8) is the band they need, and
+# a second place claimed a tolerance nothing on the part requires.  Two places
+# appear only where a fit lives there -- the cap recess diameter and depth carry
+# the bilateral bands above, and the gooseneck bore prints the clearance a
+# purchased post is set into.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
+    "WebRing": {"RingHeight": 1},
+    "BossUpProfile": {"C0Dia": 1},
+    "BoreProfile": {"B0Dia": 1},
+    "SpotFaceRearProfile": {"S1Dia": 1},
+    "BarProfile": {"GussetRunE": 1},
+    "HubBossProfile": {"HubDia": 1},
+    "RibProfile": {"RibWidth": 1},
+    "SetPocketProfile": {"PocketRise": 1},
+    "GooseneckProfile": {"GnDia": 2},
+    "CapRecessProfile": {"CapRecessDia": 2},
+    "CapRecesses": {"CapRecessDepth": 2},
 }
+
+# The drawing reads this flat view back off the sheet: a dimension name is
+# unique across the features that expose one, and a marked dimension nobody
+# authored places for would otherwise print SolidWorks' template default.
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: decimals
+    for dimensions in DRAWING_PRECISION.values()
+    for name, decimals in dimensions.items()
+}
+if len(DRAWING_PRECISION_BY_NAME) != sum(
+    len(dimensions) for dimensions in DRAWING_PRECISION.values()
+):
+    raise AssertionError("two features share a drawing-precision dimension name")
+for _feature, _dimensions in DRAWING_PRECISION.items():
+    _unmarked = sorted(set(_dimensions) - DRAWING_DIMENSIONS.get(_feature, set()))
+    if _unmarked:
+        raise AssertionError(
+            f"{_feature}: precision authored for unmarked dimensions {_unmarked}"
+        )
+
+
+# --- Decimal places for the dimensions the SHEET derives ----------------------
+#
+# Rule 2's one exception.  Some numbers on this print are distances between two
+# model faces that no single model dimension expresses: a web thickness that is
+# the difference of two profile offsets, a flange thickness between two extrude
+# extents, a boss stack that sums three, a chamfer leg, a spotface-floor
+# separation, a ramp angle.  Their VALUE is still the model's -- every one is
+# measured in the view and the build fails if the geometry moved -- but there is
+# no model dimension to carry the places, so the places live here, in the part's
+# own contract, instead of as a literal in the drawing script.  Keyed by the
+# recipe's own dimension label.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
+    # section E-E -- cast stock under the title block's general band.
+    "overall casting width": 1,
+    "overall casting depth": 1,
+    "side flange width": 1,
+    "left window clear width": 1,
+    "right window clear width": 1,
+    "central web width": 1,
+    "rail web thickness": 1,
+    "front rear flange width": 1,
+    "top flange thickness": 1,
+    "top rim chamfer": 1,
+    "T rail root radius": 1,
+    "side rail web thickness": 1,
+    # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
+    # column plan is drilled from, and MHA-035 states them to 0.01, so they
+    # are the one pair of sheet-derived numbers that earns a second place.
+    "socket horizontal pitch": 2,
+    "socket vertical pitch": 2,
+    # The hole stations, baseline from the socket bore axes (X from the left
+    # pair, Z from the upper pair): drilled positions under the general band.
+    "hanger x from left sockets": 1,
+    "front hanger z from upper sockets": 1,
+    "rear hanger z from upper sockets": 1,
+    "keeper x from left sockets": 1,
+    "front keeper z from upper sockets": 1,
+    "rear keeper z from upper sockets": 1,
+    # Sheet 3, CROSS-TAPS: boss stack, cap-mouth chamfer, opposed spotface
+    # floors and the tap axis below the boss top.
+    "socket boss overall height": 1,
+    "boss top above rail top": 1,
+    "top bore mouth chamfer": 1,
+    "opposed spotface floor separation": 1,
+    "cross screw axis from boss top": 1,
+    "spotface floor from socket axis": 1,
+    # Sheet 4, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
+    # cropped set-pocket section D-D.
+    "hub from left front socket": 1,
+    "set screw axis from rail top": 1,
+    "hub boss underside drop": 1,
+    "hub gusset feather span": 1,
+    "hub gusset ramp angle": 1,
+    "set-pocket depth from outer rail face": 1,
+    # Sheet 5, UNDERSIDE.
+    "crossbar junction land": 1,
+    "underside gusset thickness": 1,
+}
+
+
+# The nominal socket geometry stays fixed; the assigned actual tube governs fit.
+DRAWING_NOTES = (
+    "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-083 TUBE.\n"
+    "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"
+    "RETAIN CORNER AND ORIENTATION MATCH MARKS."
+)
+DRAWING_NOTES_B = ""

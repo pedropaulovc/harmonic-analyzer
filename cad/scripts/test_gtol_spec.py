@@ -155,6 +155,34 @@ def test_planar_face_can_disambiguate_coplanar_trunnions_by_z_station() -> None:
     )
 
 
+def test_planar_face_pins_one_of_four_coplanar_cap_seats_by_x_and_z() -> None:
+    """The top frame's four cap-recess floors share one plane and one area.
+
+    Only both plan stations together name one of them, so a control that
+    pins just the plane -- or pins the wrong corner -- must not match.
+    """
+    geometry = _FaceGeometry(
+        face=SimpleNamespace(),
+        identity=4001,
+        parameters=(0.0, -1.0, 0.0, 0.197, 0.00645, 0.112),
+        outward_normal=(0.0, 1.0, 0.0),
+        box=(0.18325, 0.00645, 0.09825, 0.21075, 0.00645, 0.12575),
+    )
+
+    assert _face_matches(
+        geometry,
+        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=112.0),
+    )
+    assert not _face_matches(
+        geometry,
+        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=-197.0, contains_z_mm=112.0),
+    )
+    assert not _face_matches(
+        geometry,
+        PlanarFace((0.0, 1.0, 0.0), 6.45, contains_x_mm=197.0, contains_z_mm=-112.0),
+    )
+
+
 def test_sphere_identity_is_not_cone_identity() -> None:
     geometry = _FaceGeometry(
         face=SimpleNamespace(),

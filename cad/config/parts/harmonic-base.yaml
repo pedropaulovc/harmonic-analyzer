@@ -1,7 +1,7 @@
 harmonic-base:
   number: MHA-035
   material_family: ferrous_noncritical
-  finish: SSPC-SP3;ALKYD PRIMER 25-40um;RAL6000 ALKYD ENAMEL 50-85um;75-125um TOTAL DFT
+  finish: "ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID"
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"

@@ -324,9 +324,14 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
     saved = json.loads((report_dir / "part.json").read_text(encoding="utf-8"))
     failed, succeeded = saved["extra"]["evidence"]["attempts"]
     assert failed["outcome"] == ("timed_out" if failure == "timeout" else "failed")
-    assert failed["exit_code"] == {
-        "nonzero_exit": 17, "invalid_verdict": 0, "timeout": None,
-    }[failure]
+    assert (
+        failed["exit_code"]
+        == {
+            "nonzero_exit": 17,
+            "invalid_verdict": 0,
+            "timeout": None,
+        }[failure]
+    )
     assert {
         "nonzero_exit": "codex exit 17: reviewer diagnostic: interrupted response",
         "invalid_verdict": "final message is not JSON",
@@ -347,12 +352,16 @@ def test_retry_retains_failure_outputs_and_artifacts_after_success(
     )
     assert Path(succeeded["stderr_file"]).read_bytes() == b""
     success_artifacts = {Path(path).name: Path(path) for path in succeeded["artifacts"]}
-    assert json.loads(success_artifacts["verdict.json"].read_text(encoding="utf-8")) == (
-        _clean_verdict()
-    )
+    assert json.loads(
+        success_artifacts["verdict.json"].read_text(encoding="utf-8")
+    ) == (_clean_verdict())
     for record in (failed, succeeded):
         assert not Path(record["cwd"]).exists()
-        for path in (record["stdout_file"], record["stderr_file"], *record["artifacts"]):
+        for path in (
+            record["stdout_file"],
+            record["stderr_file"],
+            *record["artifacts"],
+        ):
             assert Path(path).is_relative_to(report_dir)
             assert Path(path).exists()
     events = [
@@ -566,7 +575,11 @@ def test_pdfium_operations_share_one_module_lock(tmp_path: Path, monkeypatch) ->
     monkeypatch.setitem(
         sys.modules, "pypdfium2", types.SimpleNamespace(PdfDocument=FakeDocument)
     )
-    barrier = threading.Barrier(2, timeout=5)
+    # The barrier is a rendezvous, not a stopwatch: both threads must be inside
+    # the lock's reach at once. The deadline only stops a real deadlock from
+    # hanging the suite, so it is generous -- a 5 s budget failed this gate when
+    # the machine was busy with a parallel `doit -n 4` and a review subprocess.
+    barrier = threading.Barrier(2, timeout=120)
     source = tmp_path / "assembly.pdf"
     package = mr.ReviewPackage("assembly", "assembly", (source,))
     workdir = tmp_path / "images"
@@ -651,19 +664,139 @@ def test_multi_sheet_assembly_is_one_cross_sheet_review(
     assert len(attachments) == 2
     assert len(signatures) == 2
     assert all(signature == b"\x89PNG" for signature in signatures)
-    prompt_text = " ".join(prompt.split())
-    assert "Compare every sheet against every other sheet" in prompt_text
-    assert "every balloon against its BOM row" in prompt_text
     assert review.sheet_count == 2
     assert review.sources == [str(source)]
     assert len(review.source_sha256) == 1
     assert not review.passed
 
-    part_sheets = (tmp_path / "part-a.png", tmp_path / "part-b.png")
-    for sheet in part_sheets:
-        sheet.write_bytes(b"part")
-    with pytest.raises(ValueError, match="part review requires exactly one"):
-        mr._validate_package(mr.ReviewPackage("part", "part", part_sheets))
+
+def test_registry_part_pdf_reviews_every_page_at_print_resolution(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import hashlib
+    import subprocess
+    from types import SimpleNamespace
+
+    from PIL import Image
+    from pypdf import PdfWriter
+
+    source = tmp_path / "part.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=144)
+    writer.add_blank_page(width=144, height=72)
+    with source.open("wb") as stream:
+        writer.write(stream)
+    monkeypatch.setitem(
+        mr.DRAWINGS_BY_NAME,
+        "two-sheet-part",
+        SimpleNamespace(source_kind="part", outputs={"pdf": source}),
+    )
+    dimensions = []
+    prompts = []
+    verdict = _clean_verdict("FIX")
+    verdict["blockers"] = [
+        {
+            "where": "sheets 1 and 2, bore",
+            "issue": "conflicting bore diameters",
+            "fix": "specify one consistent bore diameter",
+        }
+    ]
+
+    def fake_run(command, **kwargs):
+        attachments = [
+            Path(command[index + 1])
+            for index, value in enumerate(command)
+            if value == "-i"
+        ]
+        for path in attachments:
+            with Image.open(path) as image:
+                dimensions.append(image.size)
+                assert image.info["dpi"] == pytest.approx((300, 300), abs=0.01)
+        assert kwargs["input"].startswith(mr.load_prompt("part"))
+        prompts.append(kwargs["input"])
+        output = Path(command[command.index("-o") + 1])
+        output.write_text(json.dumps(verdict), encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"type": "turn.completed"}), stderr=""
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    report_dir = tmp_path / "reports"
+    review = mr.review_package(
+        mr.package_for("two-sheet-part"),
+        reviewer="codex",
+        report_dir=report_dir,
+        retries=0,
+        codex="codex-test",
+    )
+
+    assert review.error is None
+    assert dimensions == [(300, 600), (600, 300)]
+    assert review.kind == "part"
+    assert review.sheet_count == 2
+    assert review.sources == [str(source)]
+    assert review.source_sha256 == [hashlib.sha256(source.read_bytes()).hexdigest()]
+    assert (
+        review.prompt_sha256 == hashlib.sha256(prompts[0].encode("utf-8")).hexdigest()
+    )
+    assert review.verdict == verdict
+    assert not review.passed
+    saved = json.loads((report_dir / "two-sheet-part.json").read_text(encoding="utf-8"))
+    assert saved["sheet_count"] == 2
+    assert saved["source_sha256"] == review.source_sha256
+
+
+def test_explicit_part_png_package_accepts_multiple_sheets(tmp_path: Path) -> None:
+    from PIL import Image
+
+    sheets = (tmp_path / "part-a.png", tmp_path / "part-b.png")
+    for sheet in sheets:
+        Image.new("RGB", (10, 10), "white").save(sheet)
+    package = mr._package_for_pngs(sheets, "part")
+    assert mr._validate_package(package) == 2
+    workdir = tmp_path / "images"
+    workdir.mkdir()
+    images = mr._materialize_images(package, workdir)
+    assert [image.read_bytes() for image in images] == [
+        sheet.read_bytes() for sheet in sheets
+    ]
+
+
+@pytest.mark.parametrize("contents", [b"", b"not a PDF"])
+def test_part_pdf_rejects_unreadable_input(tmp_path: Path, contents: bytes) -> None:
+    import pypdfium2 as pdfium
+
+    source = tmp_path / "part.pdf"
+    source.write_bytes(contents)
+    with pytest.raises(pdfium.PdfiumError):
+        mr._validate_package(mr.ReviewPackage("part", "part", (source,)))
+
+
+def test_part_pdf_rejects_package_without_sheets(tmp_path: Path) -> None:
+    import pypdfium2 as pdfium
+    from pypdf import PdfWriter
+
+    with pytest.raises(ValueError):
+        mr._validate_package(mr.ReviewPackage("part", "part", ()))
+    source = tmp_path / "empty.pdf"
+    with source.open("wb") as stream:
+        PdfWriter().write(stream)
+    with pytest.raises((ValueError, pdfium.PdfiumError)):
+        mr._validate_package(mr.ReviewPackage("part", "part", (source,)))
+
+
+def test_part_package_rejects_missing_source_and_unsupported_kind_or_extension(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "missing.pdf"
+    with pytest.raises(FileNotFoundError):
+        mr._validate_package(mr.ReviewPackage("part", "part", (source,)))
+    with pytest.raises(ValueError):
+        mr._validate_package(mr.ReviewPackage("part", "unknown", (source,)))
+    source = tmp_path / "part.txt"
+    source.write_text("not a drawing", encoding="utf-8")
+    with pytest.raises(ValueError):
+        mr._validate_package(mr.ReviewPackage("part", "part", (source,)))
 
 
 def test_write_index_creates_missing_report_directory(tmp_path: Path) -> None:
@@ -730,18 +863,6 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
     data = json.loads((tmp_path / "crank_arm.json").read_text())
     assert data["name"] == "crank_arm"
     assert data["sources"] == ["x.png"]
-
-
-def test_every_registered_drawing_has_a_prompt_kind_and_package_source() -> None:
-    for package in mr.all_packages():
-        assert package.kind in mr.PROMPT_FILES
-        assert len(package.sources) == 1
-        expected_suffix = ".pdf" if package.kind == "assembly" else ".png"
-        assert package.sources[0].suffix.casefold() == expected_suffix
-        if package.kind == "part":
-            assert package.sources[0].name.endswith("_drawing.png")
-        else:
-            assert package.sources[0].parent.name == "pdf"
 
 
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:

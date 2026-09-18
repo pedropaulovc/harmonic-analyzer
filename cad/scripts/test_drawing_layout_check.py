@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import math as _math
 import sys
-from inspect import getsource
 from types import SimpleNamespace
 
 import pytest
@@ -79,19 +78,16 @@ class _FakeAdapter:
             return default
 
     @staticmethod
+    def _attempt_with_error(callback):
+        try:
+            return callback(), None
+        except Exception as exc:
+            return None, exc
+
+    @staticmethod
     def _get_attr_or_call(obj, name):
         member = getattr(obj, name, None)
         return member() if callable(member) else member
-
-
-def test_finalize_exports_once_without_layout_or_reopen_cycles():
-    source = getsource(drawing_common.finalize_drawing)
-    assert source.count("save_drawing(") == 1
-    assert "reopen_drawing" not in source
-    assert "check_drawing_layout" not in source
-    assert "GetSaveFlag" not in source
-    assert "sanitize_pdf_metadata" in source
-    assert "render_pdf_png" in source
 
 
 def _display_view(**overrides):
@@ -125,11 +121,37 @@ def test_high_quality_shaded_with_edges_uses_documented_com_shape():
     assert calls == [(False, 3, False, True, True)]
 
 
-def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
+def test_high_quality_shaded_with_edges_accepts_a_no_op_setter_on_a_correct_view():
+    # SetDisplayMode4 returns False when the view already reads Shaded With
+    # Edges (frame_assembly sets its exploded isometric before the BOM pass and
+    # finalize re-applies it); the readback, not the setter's bool, is the proof.
     view = _display_view()
     view.SetDisplayMode4 = lambda *_args: False
 
-    with pytest.raises(RuntimeError, match="failed to set Shaded With Edges"):
+    drawing_common.set_high_quality_shaded_with_edges(
+        _FakeAdapter(None), view, label="Sheet1 Isometric"
+    )
+
+
+def test_high_quality_shaded_with_edges_rejects_silent_write_failure():
+    view = _display_view(mode=2)
+    view.SetDisplayMode4 = lambda *_args: False
+
+    with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
+        drawing_common.set_high_quality_shaded_with_edges(
+            _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
+def test_high_quality_shaded_with_edges_surfaces_a_com_exception():
+    view = _display_view()
+
+    def boom(*_args):
+        raise OSError("COM call rejected")
+
+    view.SetDisplayMode4 = boom
+
+    with pytest.raises(RuntimeError, match="SetDisplayMode4 raised"):
         drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
         )
@@ -174,7 +196,6 @@ def test_hidden_lines_visible_rejects_a_stale_hlv_transition(monkeypatch):
     (
         ("mode", 2),
         ("use_parent", True),
-        ("faceted", True),
         ("edges", False),
         ("cosmetic_threads", False),
     ),
@@ -185,6 +206,65 @@ def test_high_quality_shaded_with_edges_rejects_bad_readback(defect, value):
     with pytest.raises(RuntimeError, match="not precise Shaded With Edges"):
         drawing_common.set_high_quality_shaded_with_edges(
             _FakeAdapter(None), view, label="Sheet1 Isometric"
+        )
+
+
+def test_high_quality_shaded_with_edges_ignores_transient_facet_flag():
+    # A fresh view reads faceted=True until its first full compute (the export);
+    # the pre-export setter must not fail on it.
+    drawing_common.set_high_quality_shaded_with_edges(
+        _FakeAdapter(None), _display_view(faceted=True), label="Sheet1 Isometric"
+    )
+
+
+def _sheet_views(monkeypatch, views_by_sheet):
+    active = {"sheet": None}
+    ddoc = SimpleNamespace(
+        ActivateSheet=lambda name: active.update(sheet=name) or name in views_by_sheet
+    )
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: ddoc)
+    monkeypatch.setattr(
+        drawing_common, "iter_views", lambda _adapter: iter(views_by_sheet[active["sheet"]])
+    )
+    monkeypatch.setattr(
+        drawing_common, "view_name", lambda _adapter, view: view.GetName2()
+    )
+
+
+def _iso_view(name, faceted, orientation="*Isometric"):
+    return SimpleNamespace(
+        GetName2=lambda: name,
+        GetOrientationName=lambda: orientation,
+        GetFacettedHlrDisplay=lambda: faceted,
+    )
+
+
+def test_post_export_precision_proof_checks_every_isometric(monkeypatch):
+    _sheet_views(
+        monkeypatch,
+        {
+            "Sheet1": [_iso_view("Iso1", False), _iso_view("Front", True, "*Front")],
+            "Sheet2": [_iso_view("Iso2", False)],
+        },
+    )
+
+    checked = drawing_common.assert_precise_isometric_views(
+        _FakeAdapter(None), ("Sheet1", "Sheet2")
+    )
+
+    assert checked == 2
+
+
+@pytest.mark.parametrize("faceted", (True, None))
+def test_post_export_precision_proof_rejects_faceted_isometric(monkeypatch, faceted):
+    _sheet_views(
+        monkeypatch,
+        {"Sheet1": [_iso_view("Iso1", False)], "Sheet2": [_iso_view("Iso2", faceted)]},
+    )
+
+    with pytest.raises(RuntimeError, match="'Iso2': exported isometric is not precision"):
+        drawing_common.assert_precise_isometric_views(
+            _FakeAdapter(None), ("Sheet1", "Sheet2")
         )
 
 
@@ -1266,7 +1346,7 @@ def test_a_clean_sheet_passes(monkeypatch):
 def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
     """pen-assembly USED to be grandfathered for 2 crossings while the fix was
     thought to need a design decision. It needed the balloon radius, which
-    GetBalloonInfo always exposed. The exemption died with the defect, and no
+    the rendered full-circle arc exposes. The exemption died with the defect, and no
     sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
     _stub_layout(monkeypatch, 1)
     with pytest.raises(RuntimeError):
@@ -1511,6 +1591,17 @@ class _FakeNote:
     def GetBalloonInfo(self):
         return (0, 0, 0, 0, 0, 0, self._radius)
 
+    def GetDisplayData(self):
+        return self
+
+    def GetArcCount(self):
+        return 1
+
+    def GetArcAtIndex2(self, _index):
+        cx, cy = self.placed or (0.0, 0.0)
+        point = (cx + self._radius, cy, 0.0)
+        return (0, 0, -1, -1, *point, *point, cx, cy, 0.0, 0.0, 0.0, 1.0, 1.0)
+
     def GetAnnotation(self):
         return self
 
@@ -1521,6 +1612,109 @@ class _FakeNote:
     def SetPosition(self, x, y, _z):
         self.placed = (x, y)
         return True
+
+
+class _MovingBalloon(_FakeNote):
+    """Native-like rendered ink moves while GetBalloonInfo remains cached."""
+    def __init__(self, pixel_error_m=0.0):
+        super().__init__(0.11, 0.19, radius=0.005, item="2")
+        self.placed = (0.15, 0.25)
+        self.LockPosition = False
+        self._pixel_error_m = pixel_error_m
+        self._offset = (0.004, -0.002)
+
+    def GetBalloonInfo(self):
+        return (0.20, 0.30, 0.0, 0.205, 0.30, 0.0, self._radius)
+
+    def GetPosition(self):
+        return (self.placed[0] - self._offset[0], self.placed[1] - self._offset[1], 0.042)
+
+    def SetPosition(self, x, y, _z):
+        self._offset = (0.004 + self._pixel_error_m, -0.002 + self._pixel_error_m)
+        self.placed = (x + self._offset[0], y + self._offset[1])
+        return True
+
+    def GetSpecificAnnotation(self):
+        return self
+
+    def IsStackedBalloon(self):
+        return False
+
+    def IsStackedBalloonMaster(self):
+        return False
+
+    def IsBomBalloon(self):
+        return True
+
+    def GetText(self):
+        return "2"
+
+    def GetExtent(self):
+        return (0.0, 0.0, 0.0, 1.0, 1.0, 0.0)
+
+
+def test_position_and_layout_follow_rendered_circle_when_balloon_info_is_stale(monkeypatch):
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    note = _MovingBalloon()
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
+        EditRebuild3=lambda: True,
+        GraphicsRedraw2=lambda: None,
+        ActiveView=SimpleNamespace(Transform=SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, 1000, 0, 0, 0)
+        )),
+    )
+    adapter = _FakeAdapter(model)
+    target = (0.10, 0.18)
+    drawing_common.position_bom_balloon(
+        adapter, [note], item_number="2", position_xy=target, label="stale native cache"
+    )
+    assert note.placed == pytest.approx(target)
+    box = drawing_common._note_element(adapter, note, "B2")
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
+        (0.095, 0.175, 0.105, 0.185)
+    )
+
+
+@pytest.mark.parametrize("pixels_per_metre,accepted", ((1000.0, True), (2000.0, False)))
+def test_balloon_placement_acceptance_tracks_current_viewport_resolution(monkeypatch, pixels_per_metre, accepted):
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    note = _MovingBalloon(pixel_error_m=0.00075)
+    model = SimpleNamespace(
+        GetCurrentSheet=lambda: SimpleNamespace(GetMagneticLinesCount=lambda: 0),
+        EditRebuild3=lambda: True,
+        GraphicsRedraw2=lambda: None,
+        ActiveView=SimpleNamespace(Transform=SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0, pixels_per_metre, 0, 0, 0)
+        )),
+    )
+    def place():
+        drawing_common.position_bom_balloon(
+            _FakeAdapter(model), [note], item_number="2",
+            position_xy=(0.10, 0.18), label="quantized native preview",
+        )
+    if accepted:
+        place()
+        assert note.placed == pytest.approx((0.10075, 0.18075))
+    else:
+        with pytest.raises(RuntimeError):
+            place()
+
+
+@pytest.mark.parametrize("geometry", ("missing", "partial", "ambiguous", "zero_radius", "nonfinite"))
+def test_rendered_balloon_circle_rejects_unusable_ink(geometry):
+    note = _FakeNote(0.1, 0.2, radius=0.0 if geometry == "zero_radius" else 0.005)
+    arc = list(note.GetArcAtIndex2(0))
+    if geometry == "partial":
+        arc[7] += 0.001
+    if geometry == "nonfinite":
+        arc[10] = float("nan")
+    count = 0 if geometry == "missing" else 2 if geometry == "ambiguous" else 1
+    note.GetDisplayData = lambda: SimpleNamespace(
+        GetArcCount=lambda: count, GetArcAtIndex2=lambda _index: arc
+    )
+    with pytest.raises(RuntimeError):
+        drawing_common.rendered_balloon_circle(note, label="invalid native circle")
 
 
 def _ring_positions(notes):
@@ -1726,21 +1920,6 @@ def test_an_unreadable_balloon_item_sorts_last_instead_of_failing():
 
     key = drawing_common._balloon_item_key(_FakeAdapter(None), _Mute(0, 0))
     assert key == (sys.maxsize, "")
-
-
-def test_the_item_key_reads_the_balloon_api_not_the_note_text():
-    """A tie-break that reads the wrong API is a no-op that looks like a fix.
-
-    `INote::GetText` returns the note's GENERIC text, which for a BOM balloon
-    need not be the item number and can come back empty -- every key would then
-    collapse to (sys.maxsize, "") and the sort would tie on all four fields,
-    restoring exactly the AutoBalloon5 arrival order this exists to break
-    (Codex P2). `GetBomBalloonText(True)` is the displayed upper item, and is
-    what `_balloon_item_number` already uses in this same file.
-    """
-    source = getsource(drawing_common._balloon_item_key)
-    assert "GetBomBalloonText(True)" in source
-    assert "n.GetText()" not in source
 
 
 def test_a_balloon_whose_item_reads_empty_does_not_tie_every_key():

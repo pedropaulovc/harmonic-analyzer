@@ -1,0 +1,8 @@
+# Project settings for omp sessions in this repo (merged over ~/.omp/agent/config.yml).
+#
+# cad/scripts is NOT ruff-formatted: with the global lsp.formatOnWrite the LSP
+# formatter rewrote whole files on every edit (a 2-line docstring change came
+# back as 173 lines, 2026-09-16), so every agent fell back to string-patching
+# scripts. Keep writes byte-exact here; run `ruff check` explicitly instead.
+lsp:
+  formatOnWrite: false

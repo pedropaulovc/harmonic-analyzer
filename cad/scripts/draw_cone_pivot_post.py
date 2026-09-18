@@ -398,7 +398,6 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="inclined journal axis",
         entity=journal_entity,
-        position_tolerance_m=0.0009,
     )
     add_feature_control_frame(
         adapter,

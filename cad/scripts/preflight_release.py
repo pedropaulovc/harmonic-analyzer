@@ -21,7 +21,7 @@ import sys
 from typing import Any
 
 from _common import OUT_SLDASM, active_configuration_name, check, run_build
-from _assembly_postbuild import discard_open_documents as _discard_open_documents
+from _common import discard_open_documents as _discard_open_documents
 from verify import REST, assert_gear_ratios
 
 import _telemetry

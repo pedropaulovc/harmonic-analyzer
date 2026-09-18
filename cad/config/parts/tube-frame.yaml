@@ -1,8 +1,8 @@
 tube-frame:
   number: MHA-083
-  material: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
-  material_specification: ASTM A513 Type 5 SAE 1020 DOM tube, 1.000 x 0.120 in
-  finish: OD polished Ra 1.6; corrosion-preventive oil after inspection; ends faced; ID as-procured
+  material: ASTM A513 T5 SAE1020 DOM 1x.120in
+  material_specification: ASTM A513 T5 SAE1020 DOM 1x.120in
+  finish: OD POLISHED; OIL AFTER INSPECTION; ID AS-PROCURED
   quantity: 4
   tolerance_class: plate_profile
   process: "machined (steel)"

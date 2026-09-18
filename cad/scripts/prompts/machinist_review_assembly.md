@@ -18,6 +18,14 @@ THE SHOP AND THE JOB
 READ THE TITLE BLOCK FIRST: assembly name, number, revision, scale, units,
 sheet count. Anything it says is not missing.
 
+The approved project title block retains the general linear/angular tolerances,
+DRILLED HOLES +0.10/0, edge-break, surface and thread-class rows on assembly
+sheets. These are baseline controls, including for work performed during assembly
+such as match-drilling; they do not require reinspection of supplied parts.
+Do not request their removal merely because this is an assembly sheet. Flag
+incorrect values or contradictions normally. Specific part-manufacturing
+requirements repeated outside that standard block remain unnecessary detail.
+
 WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
 - An assembled view set that shows the finished sub-assembly in its working
   pose, at a scale where every part is identifiable.
@@ -92,8 +100,12 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   usable drawing region, not bunched against an edge beside a large dead field,
   but correctness comes first. Projected orthographic views preserve ASME
   alignment; they are not staggered for aesthetics. Resolve crowding by moving
-  the aligned group, changing orientation or scale, or moving nonprojected
-  views and annotations.
+  the aligned group, changing orientation or scale, moving nonprojected
+  views and annotations — or by adding a sheet. A package may have as many
+  sheets as it needs; a sheet is too crowded when the balloons, callouts, steps
+  or notes of one view overlap or crowd those of another. Report that as a
+  clarity defect and say which view, exploded view, BOM or step list should
+  move to its own sheet; never ask for smaller views or squeezed text instead.
 - Judge whether each sheet fits better in landscape or portrait. Compare them
   by useful scale of the assembled and exploded views, the space for the BOM
   and steps, and the resulting empty or crowded areas. Report a clarity defect

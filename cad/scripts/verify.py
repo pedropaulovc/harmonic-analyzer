@@ -77,6 +77,7 @@ from _common import (
     OUT_SLDASM,
     active_configuration_name,
     check,
+    discard_open_documents,
     log,
     run_build,
 )
@@ -99,7 +100,6 @@ from _assembly import (
 )
 from _assembly_postbuild import (
     author_dof_drives,
-    discard_open_documents,
     load_dof_manifest,
 )
 from _interference_contracts import allowed_interference_pairs

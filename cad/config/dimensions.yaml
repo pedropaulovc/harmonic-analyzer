@@ -96,6 +96,13 @@ sections:
 
       Cross-validation: base 46 × 28 cm = 18.1" × 11.0" **confirms** legacy
       HarmonicBase.cs bottom plate 18.0" × 11.0" (within rounding of the cm callouts).
+      DESIGN DEPARTURE (2026-09-15): the modelled base is 457.2 × 287.2 (pad
+      444.5 × 274.5), i.e. +7.8 mm deeper than the 28 cm callout, so the four
+      column sockets keep an equal 5.5 mm deck land to the rim on both axes
+      (the photographed 11.0" plate leaves only 1.6 mm in Z at the ±112 column
+      stations, which manufacturing tolerances could consume). The columns stay
+      at the photographed stations; only the base plate grew. Source of truth:
+      `cad/scripts/harmonic_base_spec.py` (TOP_WIDTH derivation).
       Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
       40 cm of counter-spring rod arc above the frame.
 - heading: Chapter 26/29/8/9 — System-level facts (gear law, scale references)
@@ -1939,8 +1946,8 @@ sections:
           scales to Ø29.83, confirming the Ø30.6 integral cam. Modelled as the
           kinematically-equivalent circular eccentric, ecc 8.64 (ch. 13 rows).
       - - harmonic-base
-        - 'ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0")'
-        - PASS (footprint) — thicknesses photo-verify in M2
+        - 'ch.6: base 46 × 28 cm ✓ (= 18.1" × 11.0"); depth widened to 287.2 by design 2026-09-15 (equal socket land, see ch. 6 cross-validation note)'
+        - PASS (footprint length; depth is a recorded design departure) — thicknesses photo-verify in M2
       - - summing-lever
         - none
         - UNVERIFIED — p.42–43 proportion check in M2

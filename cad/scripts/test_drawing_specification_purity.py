@@ -349,3 +349,51 @@ def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
     assert not violations, "drawing-owned manufacturing specifications:\n" + "\n".join(
         str(item) for item in violations
     )
+
+
+def test_detector_flags_render_time_precision_but_not_tolerance_places() -> None:
+    source = """
+from _drawing_common import set_dimension_precision
+
+set_dimension_precision(adapter, dims, {"HubDia": 1})
+display.SetPrecision3(1, -1, -1, -1)
+display.SetPrecision3(-1, -1, 3, -1)
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (4, "drawing-owned-precision"),
+        (5, "drawing-owned-precision"),
+    ]
+
+
+def test_precision_exception_is_the_spec_reference_precision_only() -> None:
+    """Only DRAWING_REFERENCE_PRECISION (direct, aliased, module attribute, or an
+    item of it) may reach SetPrecision3; any other *_spec value is spec data,
+    not a places statement, and still writes a drawing-owned precision."""
+    source = """
+import top_frame_spec
+from harmonic_base_spec import DRAWING_REFERENCE_PRECISION as REF
+from tube_frame_spec import DRAWING_REFERENCE_PRECISION, SHANK_DIA
+
+display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+display.SetPrecision3(DRAWING_REFERENCE_PRECISION["Height"], -1, -1, -1)
+display.SetPrecision3(REF, -1, -1, -1)
+display.SetPrecision3(top_frame_spec.DRAWING_REFERENCE_PRECISION["Web"], -1, -1, -1)
+display.SetPrecision3(SHANK_DIA, -1, -1, -1)
+display.SetPrecision3(top_frame_spec.WEB_WIDTH, -1, -1, -1)
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (10, "drawing-owned-precision"),
+        (11, "drawing-owned-precision"),
+    ]
+
+
+def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:
+    legacy = tmp_path / "draw_legacy.py"
+    migrated = tmp_path / "draw_harmonic_base.py"
+    body = "display.SetPrecision3(1, -1, -1, -1)\n"
+    legacy.write_text(body, encoding="utf-8")
+    migrated.write_text(body, encoding="utf-8")
+    violations = drawing_fleet_specification_violations([legacy, migrated])
+    assert [Path(item.filename).name for item in violations] == ["draw_harmonic_base.py"]

@@ -115,18 +115,6 @@ def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
     assert "def _front_end_edge(" in source
     assert "edge_entity=_front_end_edge(top)" in source
     assert source.count("add_feature_control_frame(") == 2
-    assert (
-        'symbol_xy=(0.155, 0.105),\n        datum="C",\n'
-        '        label="cam OD datum axis",\n'
-        "        position_tolerance_m=0.019," in source
-    )
-    assert source.count("position_tolerance_m=0.019") == 1
-    assert (
-        'symbol_xy=(0.192, 0.170),\n        datum="D",\n'
-        '        label="cam boss OD axis",\n'
-        "        position_tolerance_m=0.0041," in source
-    )
-    assert source.count("position_tolerance_m=0.0041") == 1
     assert "set_basic_dimension(" in source
     assert 'datums=("A", "B", "C")' in source
     assert 'datums=("D",)' in source

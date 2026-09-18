@@ -172,7 +172,6 @@ async def build(adapter: Any) -> dict[str, str]:
                 view=front,
                 position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
                 attachment_xy=end_top,
-                position_tolerance_m=0.0001,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=front, position=(0.065, 0.250), attachment_xy=end_upper

@@ -312,8 +312,9 @@ def test_run_build_cleans_up_when_session_setup_fails(
     )
     monkeypatch.setattr(_common._watchdog, "start", Mock())
     monkeypatch.setattr(_common._watchdog, "stop", Mock())
+    monkeypatch.setattr(_common, "discard_open_documents", Mock())
     monkeypatch.setattr(
-        _common, "_visible_document_paths", lambda _adapter: ["stuck.SLDDRW"]
+        _common, "_resident_output_documents", lambda _adapter: ["stuck.SLDDRW"]
     )
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
@@ -323,6 +324,12 @@ def test_run_build_cleans_up_when_session_setup_fails(
     assert _common.run_build(build) == 1
     build.assert_not_awaited()
     adapter.disconnect.assert_awaited_once_with()
+    # Setup discarded once and failed on the survivor; teardown still discards
+    # (the seat must be left empty even when the session never built).
+    assert _common.discard_open_documents.call_args_list == [
+        ((adapter,),),
+        ((adapter,),),
+    ]
     _common._watchdog.start.assert_called_once_with()
     _common._watchdog.stop.assert_called_once_with()
 
