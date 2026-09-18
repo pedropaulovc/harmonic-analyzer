@@ -15,11 +15,18 @@ failed`` leaf on ``swmaker000005@5``:
   inheriting whatever the seat happens to be set to.  This is the test that
   stops the class from regrowing: a new recipe that calls ``CreateLine``
   outside a guard fails here, offline, with the file and line named.
+
+* **The read-back's error policy.** The closure read-back must be incapable of
+  failing a build on healthy geometry, because two things about
+  ``ISketch.CheckFeatureUse`` are unresolved until someone runs it on a seat.
+  Those tests pin "warn and proceed" as the default and leave exactly one
+  raising condition.
 """
 
 from __future__ import annotations
 
 import ast
+import types
 from pathlib import Path
 
 import pytest
@@ -309,3 +316,102 @@ def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:
     )
 
     assert _unguarded_raw_calls(offender) == [(3, "CreateLine")]
+
+
+class _Sketch:
+    def __init__(self, checked, points: int = 9) -> None:
+        self._checked = checked
+        self._points = points
+
+    def GetSketchPoints2(self) -> tuple[object, ...]:
+        return tuple(range(self._points))
+
+    def CheckFeatureUse(self, usage: int, _open: int, _closed: int):
+        assert usage == diag._SW_CHECK_BASEEXTRUDE
+        return self._checked
+
+
+class _CheckAdapter:
+    """Just enough adapter for :func:`_report_profile_closure`."""
+
+    def __init__(self, checked, points: int = 9) -> None:
+        self.currentModel = types.SimpleNamespace(
+            SketchManager=types.SimpleNamespace(ActiveSketch=_Sketch(checked, points))
+        )
+
+    def _attempt(self, thunk, default=None):
+        try:
+            return thunk()
+        except Exception:
+            return default
+
+
+def _closure(monkeypatch, checked, *, loops: int = 2) -> tuple[str, list[str]]:
+    warnings: list[str] = []
+    monkeypatch.setattr(diag._telemetry, "warn", warnings.append)
+    monkeypatch.setattr(diag, "_early_bound", lambda obj, _iface: obj)
+    evidence = diag._report_profile_closure(_CheckAdapter(checked), "ring", loops, 9)
+    return evidence, warnings
+
+
+@pytest.mark.parametrize("checked", [(0, 0, 2), (0, 2, 0)])
+def test_closure_read_back_accepts_a_healthy_profile_in_either_count_order(
+    monkeypatch, checked
+) -> None:
+    """The unresolved half of ``CheckFeatureUse`` must not be a coin flip.
+
+    The live signature reads ``(status, open, closed)``; the skill bundle's
+    learning reads the last value as the open count.  A healthy profile is the
+    same UNORDERED pair under either reading, so comparing it as a set settles
+    the question by not asking it.  If this guard ever bets on one order, a
+    wrong bet fails every closed profile in the repo.
+    """
+    evidence, warnings = _closure(monkeypatch, checked)
+
+    assert warnings == []
+    assert "contours=0/2" in evidence
+
+
+def test_closure_read_back_raises_only_when_no_contour_exists(monkeypatch) -> None:
+    """Zero closed contours under EVERY reading -- the one unambiguous defect."""
+    with pytest.raises(RuntimeError, match="NO contours at all"):
+        _closure(monkeypatch, (0, 0, 0))
+
+
+@pytest.mark.parametrize(
+    "checked",
+    [
+        (6, 1, 1),    # a revolve centreline may or may not count as open
+        (11, 9, 0),   # MixedContours: the real unmerged shape
+        (0, 3, 2),
+        (99, 0, 2),   # a status nobody has characterised
+    ],
+)
+def test_closure_read_back_warns_and_proceeds_on_anything_else(
+    monkeypatch, checked
+) -> None:
+    """Unexplained counts cost a log line, never a build.
+
+    Two questions about this diagnostic are open until someone runs it on a
+    seat: which count is which, and whether construction geometry registers as
+    an open contour (99607A213 draws a revolve centreline into the same sketch
+    as its profile).  Until both are settled, the closure GUARANTEE is the
+    offline assertion plus the checked merge relations; this call is forensics.
+    A guard that can fail closed on healthy geometry is worse than no guard.
+    """
+    evidence, warnings = _closure(monkeypatch, checked)
+
+    assert len(warnings) == 1
+    assert "proceeding to the extrude" in warnings[0]
+    assert evidence
+
+
+@pytest.mark.parametrize("checked", [None, 0, (0, 2), (0, 0, 2, 4), (0, -1, 2)])
+def test_an_unreadable_check_result_is_unknown_not_failure(
+    monkeypatch, checked
+) -> None:
+    """Including the shape the learning doc implies: anything but a triple."""
+    evidence, warnings = _closure(monkeypatch, checked)
+
+    assert len(warnings) == 1
+    assert evidence == "points=9, check=unreadable"
