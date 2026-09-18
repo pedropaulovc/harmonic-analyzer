@@ -1275,6 +1275,54 @@ def _prune_stale_gallery() -> None:
                 f"{'y' if len(scores) - len(kept) == 1 else 'ies'}")
 
 
+def assert_gallery_inputs_current(manifest: dict) -> None:
+    """Fail LOUD when the STL/scene inputs the gallery renders are not this model's.
+
+    The renderer cannot check this itself: it runs under its own PEP 723 metadata,
+    so `uv run render_offline.py` gets an ephemeral pillow-only env with neither
+    `dodo` nor this module importable. And mtimes are meaningless here -- `export`'s
+    outputs arrive by remote-cache RESTORE, in arbitrary order, carrying the
+    archive's timestamps. So the check belongs HERE, in the project env, right
+    before the renderer is launched.
+
+    Compare what the exporter RECORDED for each mesh/scene against that artefact's
+    current churn-immune recipe digest (the same `_stable_artefact_digest` doit and
+    the remote cache key use). It is purely COMPARATIVE: an unrecorded key, an
+    undeclared target (`src_digest` -> None) or a model with no built artefact
+    cannot decide staleness and is skipped -- a foreign ledger already forces a
+    full re-export, and a missing export is the renderer's own error to raise.
+    """
+    recorded = load_src_digests()
+    models = sorted({p["model"] for p in manifest.get("pairs", []) if p.get("model")})
+    stale: list[str] = []
+    for model in models:
+        dashed = model.replace("_", "-")
+        asm = OUT_SLDASM / f"{dashed}.SLDASM"
+        prt = OUT_SLDPRT / f"{dashed}.SLDPRT"
+        if asm.exists():
+            targets = [(dashed, asm)]
+            for stem, entries in scene_part_meshes(OUT_BOXES / f"{dashed}.json").items():
+                src = OUT_SLDPRT / f"{stem}.SLDPRT"
+                targets += [(mesh, src) for _cfg, mesh in entries]
+        elif prt.exists():
+            targets = [(dashed, prt)]
+        else:
+            continue
+        for key, src in targets:
+            want = src_digest(src)
+            if want is None:
+                continue
+            got = recorded.get(key)
+            if got is not None and got != want:
+                stale.append(f"{key}: exported from {got[:12]}, {src.name} is {want[:12]}")
+    if stale:
+        raise RuntimeError(
+            f"{len(stale)} gallery input(s) were exported from a different model — "
+            f"re-run export: " + "; ".join(sorted(stale)[:5])
+        )
+    log(f"gallery inputs current ({len(models)} model(s))")
+
+
 def refresh_comparison_gallery() -> None:
     """Produce the offline comparison gallery from the exported STLs.
 
@@ -1294,6 +1342,7 @@ def refresh_comparison_gallery() -> None:
         manifest = json.loads(
             (COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
         )
+        assert_gallery_inputs_current(manifest)
         input_digest = _gallery_input_digest(manifest)
         inputs_changed = _gallery_stamp_digest() != input_digest
         _prune_stale_gallery()
