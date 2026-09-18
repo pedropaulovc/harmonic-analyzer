@@ -5784,11 +5784,19 @@ def fit_title_block_part_name(
                 "rich-text run does this)"
             )
         applied = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
-        applied_pts = int(applied.CharHeightInPts or 0)
+        # This readback exists to catch an IGNORED format, so it compares at
+        # the resolution that changes the rendered result and no finer. A
+        # character height is integral by contract, but it arrives through a
+        # COM VARIANT, so 16 pt coming back as 15.999... must read as 16 and
+        # not abort a sheet that was fitted correctly. Likewise the line length
+        # is compared at 0.05 mm: ten times tighter than the 0.5 mm the fit
+        # keeps in hand, so no difference this check tolerates can move a wrap
+        # decision.
+        applied_pts = round(float(applied.CharHeightInPts or 0.0))
         applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
         if (
             applied_pts != fit.point_size
-            or abs(applied_line_mm - fit.line_length_mm) > 0.01
+            or abs(applied_line_mm - fit.line_length_mm) > 0.05
         ):
             raise RuntimeError(
                 f"sheet {sheet_name!r} PART note did not keep the fitted format: "
