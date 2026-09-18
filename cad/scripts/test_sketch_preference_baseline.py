@@ -382,10 +382,19 @@ def _check_call(node: ast.Call, guards: frozenset[str]) -> tuple[int, str] | Non
     return (node.lineno, func.attr)
 
 
-def _visit(node: ast.AST, guards: frozenset[str], found: list) -> None:
-    """Walk ``node``, carrying the set of receivers guarded at this point."""
+def _visit(
+    node: ast.AST, guards: frozenset[str], found: list, enabled: dict[str, bool]
+) -> set[str]:
+    """Walk ``node``, carrying what is guarded and enabled at this point.
+
+    Returns the receivers this node left DISABLED, so an enclosing suite can
+    be pessimistic about a disable inside a branch it cannot evaluate.
+    """
     if isinstance(node, _DEFERRED_CODE):
-        guards = frozenset()
+        # Its body runs later, so neither the guard nor the enable in force
+        # HERE says anything about it -- and by the same argument a disable
+        # in there says nothing about the code around it.
+        guards, enabled = frozenset(), {}
     if isinstance(node, (ast.With, ast.AsyncWith)) and any(
         _is_guard_call(item.context_expr) for item in node.items
     ):
@@ -394,41 +403,70 @@ def _visit(node: ast.AST, guards: frozenset[str], found: list) -> None:
         offender = _check_call(node, guards)
         if offender is not None:
             found.append(offender)
+    disabled: set[str] = set()
     for _field, value in ast.iter_fields(node):
         items = value if isinstance(value, list) else [value]
         if items and all(isinstance(item, ast.stmt) for item in items):
-            _visit_suite(items, guards, found)
+            disabled |= _visit_suite(items, guards, found, enabled)
             continue
         for item in items:
             if isinstance(item, ast.AST):
-                _visit(item, guards, found)
+                disabled |= _visit(item, guards, found, enabled)
+    return set() if isinstance(node, _DEFERRED_CODE) else disabled
 
 
-def _visit_suite(suite: list[ast.stmt], guards: frozenset[str], found: list) -> None:
+def _visit_suite(
+    suite: list[ast.stmt],
+    guards: frozenset[str],
+    found: list,
+    enabled: dict[str, bool] | None = None,
+) -> set[str]:
     """Walk a statement suite IN ORDER, tracking ``AddToDB`` as it changes.
 
     Order matters: the enable, the ``try`` it guards and any later disable are
     separate statements, and only their sequence says what was in force when a
     primitive ran.
+
+    ``enabled`` arrives from the enclosing suite, because nothing requires the
+    enable and the ``try`` it guards to be siblings -- a recipe may well
+    enable once and then guard inside an ``if`` or a ``for``.  Starting each
+    nested suite blank reported that as unguarded geometry.
+
+    State flows DOWN by copy, so one branch cannot enable a receiver for its
+    siblings, and a disable flows back UP via the return value, so a branch
+    this walk cannot evaluate is assumed to have taken it.
     """
-    enabled: dict[str, bool] = {}
+    state = dict(enabled or {})
+    disabled: set[str] = set()
+
+    def sink(receivers: set[str]) -> None:
+        for receiver in receivers:
+            state[receiver] = False
+            disabled.add(receiver)
+
     for stmt in suite:
         assignment = _add_to_db_assignment(stmt)
         if assignment is not None:
-            enabled[assignment[0]] = _enable_state(assignment[1])
+            receiver, value = assignment
+            state[receiver] = _enable_state(value)
+            if state[receiver]:
+                disabled.discard(receiver)
+            else:
+                disabled.add(receiver)
         if isinstance(stmt, ast.Try) and stmt.finalbody:
-            active = _try_guarded_receivers(stmt, enabled)
-            _visit_suite(stmt.body, guards | active, found)
+            active = _try_guarded_receivers(stmt, state)
+            sink(_visit_suite(stmt.body, guards | active, found, state))
             # An `except`/`else`/`finally` clause runs after or instead of the
             # guarded work -- and the restore itself lives in `finally` -- so
             # a primitive there is not covered by the enable.
             for handler in stmt.handlers:
-                _visit(handler, guards, found)
+                sink(_visit(handler, guards, found, state))
             for clause in (stmt.orelse, stmt.finalbody):
                 if clause:
-                    _visit_suite(clause, guards, found)
+                    sink(_visit_suite(clause, guards, found, state))
             continue
-        _visit(stmt, guards, found)
+        sink(_visit(stmt, guards, found, state))
+    return disabled
 
 
 def _unguarded_raw_calls(path: Path) -> list[tuple[int, str]]:
@@ -755,6 +793,87 @@ def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
     )
 
     assert _unguarded_raw_calls(offender) == [(4, "CreateLine")]
+
+
+def test_an_enable_in_an_outer_suite_still_guards_a_nested_block(
+    tmp_path: Path,
+) -> None:
+    """Nothing requires the enable and its ``try`` to be siblings.
+
+    A recipe that enables once and then guards inside an ``if`` or a ``for``
+    is authoring its geometry exactly as this PR asks; reporting it as
+    unguarded would be a false positive on correct code, and those are what
+    get a gate deleted instead of fixed.
+    """
+    guarded = tmp_path / "diag_build_nested_suite.py"
+    guarded.write_text(
+        "async def build(adapter, deep):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "    if deep:\n"
+        "        try:\n"
+        "            sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "        finally:\n"
+        "            sk.AddToDB = prev\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded) == []
+
+
+def test_a_disable_in_a_branch_cancels_a_later_guard(tmp_path: Path) -> None:
+    """State flows down by copy, but a DISABLE flows back up.
+
+    This walk cannot evaluate ``if deep``, so it has to assume the branch was
+    taken: crediting the outer enable here would bless a primitive that may
+    well have gone through the inference engine, which is the failure this
+    audit exists to catch.
+    """
+    offender = tmp_path / "diag_build_branch_disable.py"
+    offender.write_text(
+        "async def build(adapter, deep):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "    if deep:\n"
+        "        sk.AddToDB = False\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = prev\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(8, "CreateLine")]
+
+
+def test_a_disable_inside_a_nested_function_does_not_leak_out(
+    tmp_path: Path,
+) -> None:
+    """Deferred code runs later, so it says nothing about the code around it.
+
+    The inner ``reset`` may never be called at all; letting its assignment
+    cancel the enclosing guard would report correct geometry as unguarded.
+    """
+    guarded = tmp_path / "diag_build_deferred_disable.py"
+    guarded.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "\n"
+        "    def reset():\n"
+        "        sk.AddToDB = False\n"
+        "\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = prev\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded) == []
 
 
 def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
