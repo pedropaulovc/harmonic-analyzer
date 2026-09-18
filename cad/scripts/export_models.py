@@ -1287,10 +1287,12 @@ def assert_gallery_inputs_current(manifest: dict) -> None:
 
     Compare what the exporter RECORDED for each mesh/scene against that artefact's
     current churn-immune recipe digest (the same `_stable_artefact_digest` doit and
-    the remote cache key use). It is purely COMPARATIVE: an unrecorded key, an
-    undeclared target (`src_digest` -> None) or a model with no built artefact
-    cannot decide staleness and is skipped -- a foreign ledger already forces a
-    full re-export, and a missing export is the renderer's own error to raise.
+    the remote cache key use). It is COMPARATIVE where it can be: an unrecorded key,
+    an undeclared target (`src_digest` -> None) or a model with no built artefact
+    cannot decide staleness and is skipped -- a foreign ledger already forces a full
+    re-export, and a missing model is the renderer's own error to raise. A missing
+    COMPONENT source is fatal here: the digest is recipe-derived, so it matches for
+    a source that no longer exists.
     """
     recorded = load_src_digests()
     models = sorted({p["model"] for p in manifest.get("pairs", []) if p.get("model")})
@@ -1309,6 +1311,16 @@ def assert_gallery_inputs_current(manifest: dict) -> None:
         else:
             continue
         for key, src in targets:
+            if not src.is_file():
+                # `_stable_artefact_digest` is RECIPE-derived, so it happily
+                # digests a declared target whose file is gone -- and that digest
+                # can match the ledger. The renderer used to catch this with its
+                # `src.stat()`; now that it only checks the output exists, an
+                # orphaned STL would render and ship unless this rejects it.
+                raise FileNotFoundError(
+                    f"gallery source {src} is missing but {key} claims to come "
+                    f"from it — re-run export"
+                )
             want = src_digest(src)
             if want is None:
                 continue

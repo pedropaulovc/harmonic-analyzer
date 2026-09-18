@@ -928,3 +928,20 @@ def test_gallery_gate_skips_keys_the_exporter_never_recorded(monkeypatch) -> Non
     monkeypatch.setattr(export_models, "load_src_digests", dict)
 
     export_models.assert_gallery_inputs_current(_gallery_manifest())
+
+
+def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(monkeypatch, tmp_path: Path) -> None:
+    """A recipe digest matches even when the .SLDPRT is gone — reject the orphan.
+
+    `_stable_artefact_digest` keys on the producing task's recipe, not the file's
+    bytes, so it answers for a declared target that was deleted. The renderer no
+    longer stats the source, so nothing else would stop the release rendering and
+    certifying an STL with no model behind it.
+    """
+    manifest = _gallery_manifest()
+    missing = tmp_path / "sldprt"
+    missing.mkdir()
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", missing)
+
+    with pytest.raises(FileNotFoundError, match="is missing but"):
+        export_models.assert_gallery_inputs_current(manifest)
