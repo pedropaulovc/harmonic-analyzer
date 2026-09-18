@@ -22,6 +22,18 @@ failed`` leaf on ``swmaker000005@5``:
   relevant.  ``drawing:top_frame``'s oblique D-D cut plane
   (``cad/docs/section-line-inference-snap.md``) is what that cost.
 
+* **The preference writes.** The guard above is keyed on a NAME, so a recipe
+  could keep its own set/try/finally beside a guarded call and the primitive
+  audit would say nothing.  ``AddToDB`` is therefore permitted in exactly one
+  SCOPE -- the contextmanager's own body -- with every unmigrated copy
+  enrolled and equality-asserted, and the three OTHER per-session sketch
+  preferences (``AutoInference``, ``AutoSolve``, ``DisplayWhenAdded``) are
+  asserted to have no writer at all.  ``DisplayWhenAdded`` was the last one,
+  hand-rolled around the guard at two drawing sites, and it is deleted rather
+  than guarded because it cannot move a coordinate -- see
+  :data:`HAND_ROLLED_SESSION_PREFERENCES` for why that is the cheaper
+  invariant, and what stops the four lines growing back by symmetry.
+
 * **The closure verdict's error policy.** ``assert_profile_closed`` decides
   from ONE shared read (``_common.record_sketch_closure``).  It must raise on a
   MEASURED open profile and must NOT raise when the read failed or when the
@@ -304,6 +316,33 @@ TEST_FAKE_ADD_TO_DB_ANCHORS = {
     # It does, and the answer is stated rather than implied by a prefix rule.
     "test_sketch_geometry_guards.py": "__init__",
 }
+
+# ``AddToDB`` is not the only per-SESSION sketch preference a recipe can reach.
+# ``_common.sketch_manager_state`` (``_common`` 2986) enumerates the set
+# the forensics bag snapshots, and that enumeration -- not this file's taste --
+# is the authority; :func:`test_the_session_preference_names_come_from_the_forensics_bag`
+# asserts the two agree, so a rename there cannot leave this audit auditing a
+# spelling nothing writes.
+SESSION_SKETCH_PREFERENCES = ("AddToDB", "AutoInference", "AutoSolve", "DisplayWhenAdded")
+
+# The three besides ``AddToDB`` are not guarded, they are ABSENT: no non-test
+# module writes any of them.  ``DisplayWhenAdded`` was the last one, hand-rolled
+# around the guard at ``_drawing_common::create_view_theoretical_datum`` and
+# ``draw_rocker_arm_support::_create_view_centerline``, and it is deleted rather
+# than guarded: per ``ISketchManager::DisplayWhenAdded`` it only decides whether
+# an entity is drawn between creation and the next redraw, it needs ``AddToDB``
+# true to decide even that, and both sites rebuild before returning -- so no
+# artifact can observe the value, and an assertion on it would fail a two-hour
+# farm build over a cosmetic no-op while making the inference guard's message
+# lie about what moved.  Absence is the cheaper invariant, and it is worth
+# auditing precisely BECAUSE it is cheap to break: the deletion leaves an
+# asymmetry at both sites that the next reader will be tempted to "fix" by
+# symmetry with ``AddToDB``.  Equality-asserted like the registry above, so a
+# re-added write fails as unregistered and an entry whose site is gone fails as
+# stale.  A future diagnostics experiment whose SUBJECT is one of these
+# preferences belongs here with its reason, exactly as the inference
+# experiments are enrolled above.
+HAND_ROLLED_SESSION_PREFERENCES: dict[str, str] = {}
 
 _MODULE_SCOPE = "<module>"
 
@@ -917,6 +956,38 @@ def _add_to_db_writers(path: Path) -> dict[str, list[int]]:
     return writers
 
 
+def _session_preference_writers(path: Path) -> dict[str, list[int]]:
+    """``{function::attribute: lines}`` for the NON-``AddToDB`` preferences.
+
+    Same scope carry-down as :func:`_add_to_db_writers`, and deliberately
+    disjoint from it: ``AddToDB`` has a guard whose shape has to be analysed,
+    these three have no legitimate writer at all, so reporting them together
+    would make one registry's green depend on the other's shape analysis.
+    Keyed by attribute as well as function because the two hand-rolled sites
+    that were deleted wrote ``DisplayWhenAdded`` in a function that also wrote
+    ``AddToDB`` -- a function-only key would have let one hide the other.
+    """
+    writers: dict[str, list[int]] = {}
+    audited = set(SESSION_SKETCH_PREFERENCES) - {"AddToDB"}
+
+    def walk(node: ast.AST, function: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            inner = (
+                child.name
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                else function
+            )
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Attribute) and target.attr in audited:
+                        key = f"{function}::{target.attr}"
+                        writers.setdefault(key, []).append(child.lineno)
+            walk(child, inner)
+
+    walk(ast.parse(path.read_text(encoding="utf-8")), _MODULE_SCOPE)
+    return writers
+
+
 def _preference_write_tree() -> list[Path]:
     """Every non-test module under ``cad/scripts``, for the write registry."""
     return [
@@ -1114,6 +1185,110 @@ def test_the_test_module_exclusion_still_covers_only_fake_managers() -> None:
         "enrol the new one with the function its FAKE writes from, or delete "
         "the entry whose fake is gone"
     )
+
+
+def test_the_session_preference_names_come_from_the_forensics_bag() -> None:
+    """The audited spellings are the repo's own, not this file's guess.
+
+    ``AutoInference`` is one ``ISketchManager`` member among four with almost
+    the same name (``AutoInference``, ``AutoSolve``, ``AutomaticSolve``,
+    ``AutomaticRelations``), and a registry asserted empty against a spelling
+    nothing can write is the purest vacuous pass there is: it would stay green
+    through any number of real writes.  So the set is read out of
+    ``sketch_manager_state``, which is the function that has to know
+    these names to snapshot them, and a rename there reds HERE instead of
+    silently retiring the audit.
+    """
+    tree = ast.parse((SCRIPTS_DIR / "_common.py").read_text(encoding="utf-8"))
+    enumerations = [
+        tuple(element.value for element in node.iter.elts)
+        for function in ast.walk(tree)
+        if isinstance(function, ast.FunctionDef)
+        and function.name == "sketch_manager_state"
+        for node in ast.walk(function)
+        if isinstance(node, ast.For)
+        and isinstance(node.iter, ast.Tuple)
+        and all(
+            isinstance(element, ast.Constant) and isinstance(element.value, str)
+            for element in node.iter.elts
+        )
+    ]
+    assert len(enumerations) == 1, (
+        "sketch_manager_state no longer enumerates the sketch "
+        f"preferences in exactly one tuple (found {len(enumerations)}): the "
+        "audited set has no authority to read, so name it there again"
+    )
+    assert enumerations[0] == SESSION_SKETCH_PREFERENCES, (
+        f"the forensics bag records {enumerations[0]} but this audit covers "
+        f"{SESSION_SKETCH_PREFERENCES}: update the audited set, and decide "
+        "for any NEW preference whether a recipe may write it"
+    )
+
+
+def test_no_module_writes_a_session_preference_other_than_add_to_db() -> None:
+    """The three preferences besides ``AddToDB`` have no writer, and stay so.
+
+    ``DisplayWhenAdded`` was hand-rolled around the guard at two sites and is
+    deleted, not guarded, because it cannot move a coordinate and both sites
+    rebuild before returning.  The deletion leaves an asymmetry a reader can
+    "restore" in four lines, and it would be a write to an application-level
+    preference with no read-back and no restore on an early ``return`` -- the
+    same shape as the eight the contextmanager replaced, minus the one
+    consequence that made those visible.  Equality in both directions: a
+    re-added write is unregistered, an entry whose site is gone is stale.
+    """
+    derived = {
+        f"{path.relative_to(SCRIPTS_DIR).as_posix()}::{key}"
+        for path in _preference_write_tree()
+        for key in _session_preference_writers(path)
+    }
+    unregistered = sorted(derived - set(HAND_ROLLED_SESSION_PREFERENCES))
+    assert unregistered == [], (
+        "writes a per-session sketch preference with no registered reason: "
+        f"{', '.join(unregistered)} -- these outlive the document, the recipe "
+        "and the leaf, and none of them is needed: DisplayWhenAdded is "
+        "cosmetic before the next rebuild, and inference is already owned by "
+        f"{SKETCH_DB_CONTEXTMANAGER}(...)"
+    )
+    stale = sorted(set(HAND_ROLLED_SESSION_PREFERENCES) - derived)
+    assert stale == [], (
+        f"registered as writing a session preference but no longer does: "
+        f"{', '.join(stale)} -- delete the entry"
+    )
+
+
+def test_the_session_preference_matcher_sees_a_hand_rolled_display_pair(
+    tmp_path: Path,
+) -> None:
+    """The empty registry's positive control, without which it proves nothing.
+
+    An equality assertion between two empty sets passes whether the matcher
+    works or not, so the matcher is shown finding the exact shape that was
+    deleted -- keyed by attribute, and NOT reporting the ``AddToDB`` write
+    beside it, which belongs to the other registry and would otherwise be
+    counted twice.
+    """
+    offender = tmp_path / "draw_regrown_display.py"
+    offender.write_text(
+        "def _centerline(sketch_manager):\n"
+        "    previous_display = bool(sketch_manager.DisplayWhenAdded)\n"
+        "    sketch_manager.DisplayWhenAdded = True\n"
+        "    try:\n"
+        "        with sketch_geometry_direct_to_db(sketch_manager):\n"
+        "            return sketch_manager.CreateCenterLine(0.0, 0.0, 0.0, 1.0, 0.0, 0.0)\n"
+        "    finally:\n"
+        "        sketch_manager.DisplayWhenAdded = previous_display\n"
+        "\n"
+        "def _probe(sk):\n"
+        "    sk.AddToDB = True\n"
+        "    sk.AutoSolve = False\n",
+        encoding="utf-8",
+    )
+
+    assert _session_preference_writers(offender) == {
+        "_centerline::DisplayWhenAdded": [3, 8],
+        "_probe::AutoSolve": [12],
+    }
 
 
 def test_the_audit_exemptions_still_exist_and_are_still_raw_com_probes() -> None:

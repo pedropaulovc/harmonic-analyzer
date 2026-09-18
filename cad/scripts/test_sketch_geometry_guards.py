@@ -15,8 +15,7 @@ idiom that path does not execute -- the exception route out of the guard, the
 selection companion's two refusals, the circle traversal, and
 ``create_view_theoretical_datum`` -- each one written against a mutation that
 otherwise ships silently: a dropped restore, an unchecked ``Select4``, a radius
-compared against a diameter, a removed centre or point read-back, and a datum
-whose ``DisplayWhenAdded`` restore or read-back is gone.
+compared against a diameter, and a removed centre or point read-back.
 """
 
 from __future__ import annotations
@@ -47,11 +46,8 @@ class _SketchManager:
 
     def __init__(self, add_to_db: bool = False, snap: float = 0.0) -> None:
         self.AddToDB = add_to_db
-        self.DisplayWhenAdded = False
         self.add_to_db_when_created: bool | None = None
-        self.display_when_created: bool | None = None
         self.writes: list[bool] = []
-        self.raise_on_create = False
         self._snap = snap
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -61,9 +57,6 @@ class _SketchManager:
 
     def CreatePoint(self, x, y, z):
         self.add_to_db_when_created = self.AddToDB
-        self.display_when_created = self.DisplayWhenAdded
-        if self.raise_on_create:
-            raise RuntimeError("the seat died mid-create")
         return _point(x + self._snap, y, z)
 
 
@@ -269,28 +262,6 @@ def _datum_doubles(monkeypatch, manager):
     return _adapter(model)
 
 
-def test_theoretical_datum_restores_display_when_added_on_failure(monkeypatch):
-    """The datum's second preference must unwind too, on the exception route.
-
-    ``DisplayWhenAdded`` is application-level exactly like ``AddToDB``, and it
-    is written OUTSIDE the contextmanager because the shared idiom owns only
-    ``AddToDB``.  A dropped restore there leaves every later recipe's
-    direct-to-DB geometry visible on its sheet.
-    """
-    manager = _SketchManager()
-    manager.raise_on_create = True
-    adapter = _datum_doubles(monkeypatch, manager)
-
-    with pytest.raises(RuntimeError, match="the seat died mid-create"):
-        drawing_common.create_view_theoretical_datum(
-            adapter, object(), point_xy=(0.030, 0.040), label="hole table origin"
-        )
-
-    assert (manager.add_to_db_when_created, manager.display_when_created) == (True, True)
-    assert manager.AddToDB is False
-    assert manager.DisplayWhenAdded is False
-
-
 def test_theoretical_datum_refuses_a_snapped_point(monkeypatch):
     """A snapped theoretical sharp silently relocates a whole hole table.
 
@@ -319,4 +290,3 @@ def test_theoretical_datum_returns_the_point_it_authored(monkeypatch):
     assert (point.X, point.Y, point.Z) == (0.030, 0.040, 0.0)
     assert manager.add_to_db_when_created is True
     assert manager.AddToDB is False
-    assert manager.DisplayWhenAdded is False

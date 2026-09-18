@@ -235,6 +235,14 @@ def _create_view_centerline(
     automatic-relation candidate there is, and the chamfer corners are within
     a millimetre.  Nothing downstream consumes a selection -- every caller
     discards the returned segment -- so none is made.
+
+    ``DisplayWhenAdded`` used to be hand-rolled around the guard here and is
+    deliberately gone.  It only decides whether the segment is drawn between
+    creation and the next redraw, it needs ``AddToDB`` true to decide even
+    that, and the ``EditRebuild3`` below -- let alone ``finalize_drawing``'s
+    settling rebuild right before the PDF export -- displays it either way.
+    It cannot move a coordinate, so it has no read-back worth writing and
+    nothing to guard.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
@@ -242,14 +250,9 @@ def _create_view_centerline(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate centerline view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.DisplayWhenAdded = True
     points = ((start_xy[0], start_xy[1], 0.0), (end_xy[0], end_xy[1], 0.0))
-    try:
-        with sketch_geometry_direct_to_db(sketch_manager):
-            centerline = sketch_manager.CreateCenterLine(*points[0], *points[1])
-    finally:
-        sketch_manager.DisplayWhenAdded = previous_display
+    with sketch_geometry_direct_to_db(sketch_manager):
+        centerline = sketch_manager.CreateCenterLine(*points[0], *points[1])
     if centerline is None:
         raise RuntimeError(f"failed to create {label} centerline")
     assert_sketch_line_placed(

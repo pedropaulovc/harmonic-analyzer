@@ -3760,6 +3760,15 @@ def create_view_theoretical_datum(
     a millimetre away.  The point is authored direct-to-DB and read back for
     that reason; a snapped datum silently relocates every coordinate in the
     hole table that keys on it.
+
+    ``DisplayWhenAdded`` was hand-rolled around the guard here and is
+    deliberately gone.  Per ``ISketchManager::DisplayWhenAdded`` it only
+    decides whether the point is drawn between creation and the next redraw,
+    it needs ``AddToDB`` true to decide even that, and the rebuild below --
+    let alone ``finalize_drawing``'s settling rebuild right before the PDF
+    export -- displays it either way.  Guarding a preference that cannot move
+    a coordinate would fail a build over a cosmetic no-op and make the
+    inference guard's message lie about what went wrong.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
@@ -3767,13 +3776,8 @@ def create_view_theoretical_datum(
     if not drawing.ActivateView(name):
         raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.DisplayWhenAdded = True
-    try:
-        with sketch_geometry_direct_to_db(sketch_manager):
-            point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
-    finally:
-        sketch_manager.DisplayWhenAdded = previous_display
+    with sketch_geometry_direct_to_db(sketch_manager):
+        point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
     if point is None:
         raise RuntimeError(f"failed to create {label} theoretical datum point")
     point = _early_bound(point, "ISketchPoint")
