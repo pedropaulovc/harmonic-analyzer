@@ -230,6 +230,42 @@ def test_nested_spans_share_one_trace(capture):
     assert len(traces) == 1  # no gaps: every span hangs off the one root trace
 
 
+def test_attribute_names_the_log_farm_selects_on_are_pinned_here(capture):
+    """CONSUMER: solidworks-pool ``farm.py logs`` (``_logs_labels_block``), which
+    reads a RUNNING leaf's lines out of the workspace these spans feed:
+
+        | extend depth = toint(todynamic(Attributes)['harmonic.depth'])
+        | extend label = tostring(todynamic(Attributes).label)
+        | where depth == 0 and isnotempty(label)
+
+    Rename either key here, or stop emitting 0 at the trace root, and that query
+    matches nothing: every farm leaf becomes unattributable, its lines arrive
+    with no leaf name, and the command can only fall back to guessing from the
+    worker. No test in the pool repo can red on a rename in this file -- it
+    builds the attribute names by hand, because it has no other choice -- so the
+    pin belongs here, on the producing side.
+
+    The depth-1 assertion is load-bearing, not decoration: ``label`` is reused
+    at depth >= 1 for DIMENSION names (``blank_od``), and the measured ratio in
+    one build window was 1443 depth-1 labels against 309 depth-0 leaf labels.
+    ``depth == 0`` is the only thing stopping the pool from filing a leaf's
+    output under a sketch dimension, so a change that flattens depth is as
+    damaging as a rename.
+    """
+    spans, _ = capture
+    with _telemetry.span("task part:cone_gear", label="part:cone_gear"):
+        with _telemetry.span("sketch.circle", label="blank_od"):
+            pass
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    root = finished["task part:cone_gear"]
+    child = finished["sketch.circle"]
+    assert root.attributes["harmonic.depth"] == 0
+    assert root.attributes["label"] == "part:cone_gear"
+    assert child.attributes["harmonic.depth"] == 1
+    assert child.attributes["label"] == "blank_od"
+
+
 def test_traced_decorator_wraps_sync_and_async(capture):
     spans, _ = capture
 
