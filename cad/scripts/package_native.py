@@ -33,7 +33,7 @@ The seat is left EMPTY on every exit path (``_release_seat``): a document still
 resident here share-locks its ``cad/out`` file past this COM session, and the NEXT
 task's remote-cache restore runs OUTSIDE the seat -- it would fail with
 ``PermissionError(13)`` (AGENTS.md, "the holder leaves the seat EMPTY").
-And the seat's own WORKING DIRECTORY is moved out of the checkout: Pack-and-Go
+And the seat's own WORKING DIRECTORY is parked outside every checkout: Pack-and-Go
 opens documents from ``cad/out``, SolidWorks parks its process current directory
 in the directory it last opened, and Windows refuses to remove a directory that
 is any process's cwd -- which on a farm worker is how an unrelated leaf's source

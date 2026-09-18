@@ -307,14 +307,17 @@ to follow the documents it opens, so after a build that saved into `cad/out/sldp
 the seat's `cwd` **is** that directory — and Windows refuses to remove a directory
 that is any process's `cwd`. Closing documents does not release it (the `cwd`
 belongs to the process, not to a document), so `run_build`'s teardown and
-`package_native._release_seat` both re-point it out of the checkout with
+`package_native._release_seat` both park it in the temp directory with
 `_common.release_seat_working_directory`. Off the farm this is invisible: the
 checkout outlives the seat. On a farm worker the checkout is a disposable source
 root the agent removes between leaves and evicts to bound the disk, so a seat
 parked in one fails an *unrelated* leaf's cleanup with `WinError 32` — the
 release's first farm `export` leaf died three times that way (2026-09-18,
-swmaker000006, seat parked in an hours-old `drawing:*` root). It is re-pointed at
-teardown, not at connect: the seat drifts back in on the next open/save.
+swmaker000006, seat parked in an hours-old `drawing:*` root). Parked at teardown,
+not at connect (the seat drifts back in on the next open/save), and
+unconditionally rather than only out of *this* checkout: a worker holds several
+source roots, and the one pinning a seat is often a sibling whose own leaf died
+before its teardown — re-pointing always is what heals that.
 
 Tradeoff (documented, accepted): under a cold `-n N` full build, workers that grab a
 COM task block on the seat, so the `check:*` gates can be starved toward the end of

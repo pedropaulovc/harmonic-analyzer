@@ -415,7 +415,24 @@ def test_teardown_moves_the_seat_out_of_the_checkout(
     assert session.fields["seat_working_directory"] == temp
 
 
-def test_teardown_leaves_a_seat_that_is_already_outside_alone(
+def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A worker keeps several source roots, and the one that failed was pinned by
+    # a leaf OTHER than the running one (2026-09-18: the export leaf's root was
+    # fa07428b, the pinned root 6621e07a). A teardown that only left its own
+    # checkout would leave that root pinned until the seat died, so the seat is
+    # parked unconditionally.
+    temp = tempfile.gettempdir()
+    sibling = r"C:\harmonic\work\sources\6621e07aabfb412916eeae68\workspace\cad\out"
+    adapter, app = _seat([sibling, temp])
+
+    assert _session(monkeypatch, adapter).warnings == []
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
+
+
+def test_a_seat_already_parked_there_is_left_alone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     adapter, app = _seat([tempfile.gettempdir()])
@@ -446,7 +463,7 @@ def test_a_move_the_seat_ignored_is_not_reported_as_released(
 
     session = _session(monkeypatch, adapter)
 
-    assert [w for w in session.warnings if "still inside the checkout" in w]
+    assert [w for w in session.warnings if "did not move" in w]
     assert "seat_working_directory" not in session.fields
 
 

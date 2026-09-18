@@ -2413,13 +2413,8 @@ def _normal_path(path: str | Path) -> Path:
     return Path(os.path.normcase(os.path.realpath(path)))
 
 
-def _within(path: str | Path, root: Path) -> bool:
-    candidate = _normal_path(path)
-    return candidate == root or root in candidate.parents
-
-
 def release_seat_working_directory(sw: Any) -> str | None:
-    """Move the seat's working directory OUT of this checkout; return where it went.
+    """Park the seat's working directory where nothing is disposable; return it.
 
     SolidWorks follows the documents it opens: after a build that saved into
     ``cad/out/sldprt``, the seat's own PROCESS current directory IS that
@@ -2436,33 +2431,38 @@ def release_seat_working_directory(sw: Any) -> str | None:
     from an earlier drawing leaf and the release's first farm ``export`` leaf
     failed three times with ``WinError 32`` before it ran a line.
 
-    Teardown, not connect: the seat drifts back into the workspace on the next
+    Parked UNCONDITIONALLY, not only when the seat sits in *this* checkout: a
+    worker keeps several source roots, and the seat this session inherited may
+    still be parked in a SIBLING root whose own leaf died before its teardown
+    (that is exactly the shape above -- the failing leaf's root was not the
+    pinned one). Re-pointing only out of our own checkout would leave that root
+    pinned until the seat itself died; re-pointing always heals it.
+
+    Teardown, not connect: the seat drifts back into a workspace on the next
     open/save, so a session that re-points only at startup ends parked again.
 
     Takes the raw ``ISldWorks`` (``adapter.swApp``, or ``package_native``'s
     comtypes pointer), so both COM entrypoints share this one implementation.
 
     Returns the directory the seat was left in, or ``None`` when it was already
-    outside this checkout. Raises when the seat will not move -- the caller
-    decides what that is worth (both callers warn: it is the NEXT leaf's
-    hazard, not this build's failure).
+    there. Raises when the seat will not move -- the caller decides what that is
+    worth (both callers warn: it is the NEXT leaf's hazard, not this build's
+    failure).
     """
 
-    checkout = _normal_path(CAD_ROOT.parent)
+    target = Path(tempfile.gettempdir())
     before = sw.GetCurrentWorkingDirectory()
     if type(before) is not str or not before:
         raise RuntimeError(f"seat working directory unreadable: {before!r}")
-    if not _within(before, checkout):
+    if _normal_path(before) == _normal_path(target):
         return None
-    target = Path(tempfile.gettempdir())
     if sw.SetCurrentWorkingDirectory(str(target)) is not True:
         raise RuntimeError(f"seat refused working directory {target}")
+    # A True answer is not evidence: the readback is. Anything else and the
+    # caller must not report a directory the seat never took.
     after = sw.GetCurrentWorkingDirectory()
-    if type(after) is not str or not after or _within(after, checkout):
-        raise RuntimeError(
-            f"seat working directory still inside the checkout after the move: "
-            f"{after!r}"
-        )
+    if type(after) is not str or _normal_path(after) != _normal_path(target):
+        raise RuntimeError(f"seat working directory did not move: {after!r}")
     return after
 
 
