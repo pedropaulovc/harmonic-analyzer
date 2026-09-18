@@ -2436,3 +2436,38 @@ def test_sw_preflight_budget_rejects_non_finite_overrides(monkeypatch):
         assert dodo._sw_max_commit_gb() == dodo._SW_MAX_COMMIT_GB_DEFAULT, raw
     monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "12.5")
     assert dodo._sw_max_commit_gb() == 12.5
+
+
+def test_export_cache_ships_every_file_it_certifies():
+    """The export cache entry must cover the whole release-neutral inventory.
+
+    `release-neutral.json` records a sha256 + byte count per bundle file and
+    `cut_release` refuses to stage a file whose bytes moved, so any inventory
+    member missing from the cache payload means a farm-run export certifies bytes
+    the submitter never receives -- it keeps its own older, recipe-equivalent copy,
+    and the release dies at staging (v36: `alignment-pinion_isometric.png`).
+    Renders are the sharp case: they are not reproducible across seats.
+    """
+    dodo = _load_dodo()
+    sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+    import export_models
+
+    parts = export_models.part_stems()
+    assemblies = list(export_models.ASSEMBLY_ORDER)
+    # Scene meshes come from built boxes JSONs; the per-config STLs they add live in
+    # cad/out/stl, already covered by the part entries below, so an empty scene map
+    # keeps this test independent of whether anything is built.
+    inventory = export_models._release_inventory(parts, assemblies, {}, set(assemblies))
+    covered = [p.resolve() for p in dodo._export_cache_outputs()]
+
+    uncovered = sorted(
+        destination for destination, source in inventory.items()
+        if not any(
+            source.resolve() == entry or entry in source.resolve().parents
+            for entry in covered
+        )
+    )
+    assert not uncovered, (
+        f"{len(uncovered)} certified release file(s) are not in the export cache "
+        f"payload: {uncovered[:5]}"
+    )

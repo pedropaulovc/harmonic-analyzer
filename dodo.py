@@ -1608,21 +1608,41 @@ def _export_file_deps() -> list[str]:
 
 
 def _export_cache_outputs() -> list[Path]:
-    """What the export stage OWNS -- the neutral formats, the per-assembly STLs, the
-    colour map, the export-freshness sidecar and the release-neutral certificate.
+    """What the export stage CERTIFIES, and therefore what it must ship.
 
-    Deliberately NOT the whole cad/out/stl or cad/out/png tree: the per-PART STL
-    sidecar and every render are part/assembly cache outputs already, so packing
-    them here would duplicate ~300 MB in every export cache entry to restore bytes
-    the part leaves restore anyway."""
-    stl = CAD_OUT / "stl"
+    `release-neutral.json` records a sha256 and byte count for every file the
+    bundle will contain -- each part's STEP + STL + isometric render, each
+    assembly's GLB + render, each config mesh's STL, each scene JSON -- and
+    `cut_release` refuses to stage a file whose bytes differ. So the cache entry
+    MUST carry that whole inventory: a certificate written on a worker plus bytes
+    taken from the submitter is exactly the "certify on machine A, ship machine B"
+    hole it exists to close.
+
+    The renders and per-part STLs are build-owned (a part leaf emits them; export
+    only REPAIRS a missing one), so they are also part-cache outputs -- but that is
+    not enough. doit's freshness is the recipe digest, deliberately immune to
+    artefact bytes, so an up-to-date part task neither runs nor restores, and a
+    submitter keeps whatever bytes its own older builds left. Renders in particular
+    are NOT reproducible across seats (the window's pixel size sets the frame), so
+    "equivalent by recipe" is not "the render we certified". v36's release failed
+    on exactly that: `alignment-pinion_isometric.png` differed in size from the
+    worker's certified copy.
+
+    Cost, accepted: ~260 MB on top of the ~550 MB this entry already carries
+    (step + gltf), duplicating bytes the part entries also hold. One transfer per
+    export key buys a bundle whose every file is the one a single export validated.
+    """
     return [
         (CAD_OUT / "step").resolve(),
         (CAD_OUT / "gltf").resolve(),
         (CAD_OUT / "boxes").resolve(),
-        (stl / "colors.json").resolve(),
-        (stl / "export-src.json").resolve(),
-        *((stl / f"{s.replace('_', '-')}.STL").resolve() for s in ASSEMBLY_ORDER),
+        # The whole STL dir: per-part sidecars, per-config meshes, per-assembly
+        # exports, plus colors.json and the export-src.json ledger.
+        (CAD_OUT / "stl").resolve(),
+        *(
+            (_png_dir(stem) / f"{stem.replace('_', '-')}_isometric.png").resolve()
+            for stem in (*part_stems(), *ASSEMBLY_ORDER)
+        ),
         (REPORTS / "release-neutral.json").resolve(),
     ]
 
