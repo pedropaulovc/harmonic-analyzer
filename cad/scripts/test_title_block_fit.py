@@ -159,19 +159,54 @@ def test_an_unfittable_name_fails_the_build():
 
 # Measured on the farm, and the reason this fake renders instead of returning
 # a canned box: SolidWorks' system-units height (``ITextFormat.CharHeight``,
-# metres) is the CHARACTER height, not the em. Four names at 12, 15 and 16 pt
-# across three workers came back with extents 1.3806-1.3813x the single-line
-# bound after the applier wrote the em size into it; 1/1.38095 = 0.7241.
-SW_CHARACTER_HEIGHT_EM = 0.7241
+# metres) is the CHARACTER height, not the em. The same sheet measured twice
+# -- slotted_screw's 15 pt note measured 13.15 mm with the em written into
+# CharHeight, 10.91 mm without it -- puts the inflation at 1.2053, so the
+# fraction the renderer treats as a character height is 1/1.2053 = 0.8297.
+#
+# The 0.7241 this fake used to carry was 1/1.381, and 1.381 was the inflated
+# extent divided by the OLD one-line constant of 1.8 -- which was itself
+# derived from 1.381. Both numbers came out of the same circle.
+SW_CHARACTER_HEIGHT_EM = 0.8297
+
+# Every one-line extent the c99e0026 farm build measured, as
+# ``(point_size, extent_mm, sheets)``. These are the raw readings from the 15
+# sheets whose fitted notes reached the height check, every one of them
+# refused; ``em = extent_mm / (pt * MM_PER_POINT)`` runs 1.9123..2.0617, and
+# the readings are a property of the size and the TEMPLATE, not of the name
+# -- 'harmonic-analyzer assembly' and 'Brass Fillister Head Slotted Screw'
+# both measured 10.96 mm at 16 pt, while the same name on two sheets
+# measured 10.91 and 10.52 mm at 15 pt.
+#
+# They are written here as MILLIMETRES, deliberately. The fake below renders
+# from these, not from ``ONE_LINE_EXTENT_EM``, so a change to the constant
+# cannot move both sides of an assertion at once: reverting the model to 1.8
+# reds these tests instead of quietly re-agreeing with itself.
+FARM_ONE_LINE_EXTENTS_MM = (
+    (15, 10.91, "slotted_screw, frame_side_screw"),
+    (15, 10.52, "foot_screw, gooseneck_set_screw, clamp_screw, swing_stop_screw"),
+    (12, 8.33, "hex_bolt, hanger_screw"),
+    (16, 10.96, "fillister_screw, lag_screw, harmonic_analyzer_assembly"),
+    (11, 7.45, "cone_pivot_screw"),
+    (13, 8.77, "cone_tip_adjuster"),
+)
+
+# The tallest of them, in em: the envelope ``ONE_LINE_EXTENT_EM`` has to
+# clear, and therefore the worst legitimate case to render a fake note at.
+FARM_TALLEST_ONE_LINE_EM = max(mm / (pt * MM_PER_POINT) for pt, mm, _ in FARM_ONE_LINE_EXTENTS_MM)
 
 
-def _one_line_extent(point_size: float, *, width_mm: float = 60.0):
+def _one_line_extent(
+    point_size: float, *, width_mm: float = 60.0, extent_em: float = FARM_TALLEST_ONE_LINE_EM
+):
     """``INote::GetExtent`` (metres) for one line drawn in ``LANDSCAPE``.
 
-    The box is ``ONE_LINE_EXTENT_EM`` tall, which is what the farm measured
-    for a correctly-sized note, and it is anchored on the descender because
-    that is the edge the cell-rule check reads; SolidWorks' padding sits
-    above it.
+    The box defaults to the TALLEST one line the farm measured, so the
+    applier's tests run against the worst legitimate sheet rather than a
+    comfortable one. It is anchored on the descender because that is the edge
+    the cell-rule check reads; SolidWorks' padding -- about a full
+    ``LINE_SPACING_EM`` of leading, which is why one line measures close to
+    2 em and not the 1.025 em glyph box -- sits above it.
     """
     size_mm = point_size * MM_PER_POINT
     bottom_mm = LANDSCAPE.baseline_mm - DESCENDER_EM * size_mm
@@ -180,7 +215,7 @@ def _one_line_extent(point_size: float, *, width_mm: float = 60.0):
         bottom_mm / 1000.0,
         0.0,
         (LANDSCAPE.text_left_mm + width_mm) / 1000.0,
-        (bottom_mm + ONE_LINE_EXTENT_EM * size_mm) / 1000.0,
+        (bottom_mm + extent_em * size_mm) / 1000.0,
         0.0,
     )
 
@@ -311,14 +346,27 @@ class _FakeNote:
     way ``_get_attr_or_call`` accepts either.
     """
 
-    def __init__(self, text: str, annotation: _FakeAnnotation, *, width_mm=60.0):
+    def __init__(
+        self,
+        text: str,
+        annotation: _FakeAnnotation,
+        *,
+        width_mm=60.0,
+        extent_em: float = FARM_TALLEST_ONE_LINE_EM,
+    ):
         self.text = text
         self.annotation = annotation
         self.width_mm = width_mm
+        # Which sheet of the measured family this note renders like. Defaults
+        # to the tallest one line the farm reported, so every test that does
+        # not care runs against the worst legitimate case.
+        self.extent_em = extent_em
 
     def GetExtent(self):
         return _one_line_extent(
-            self.annotation.text_format.rendered_point_size, width_mm=self.width_mm
+            self.annotation.text_format.rendered_point_size,
+            width_mm=self.width_mm,
+            extent_em=self.extent_em,
         )
 
     def GetText(self):
@@ -391,9 +439,10 @@ def seat(monkeypatch):
         lambda value, *_args, **_kwargs: value,
     )
 
-    def build(name: str, **format_kwargs):
+    def build(name: str, *, extent_em: float = FARM_TALLEST_ONE_LINE_EM, **format_kwargs):
         annotation = _FakeAnnotation(_FakeTextFormat(**format_kwargs))
-        return _FakeDrawingDoc(_FakeNote(name, annotation)), annotation
+        note = _FakeNote(name, annotation, extent_em=extent_em)
+        return _FakeDrawingDoc(note), annotation
 
     return build
 
@@ -458,9 +507,10 @@ def test_a_millimetre_authored_note_is_refused_not_converted(seat, name, adjust)
     """A note that prints from ``CharHeight`` is refused, on either class.
 
     ``CharHeight`` is a CHARACTER height in metres, so it is not the em the
-    width model is keyed to; the farm measured the difference at a factor of
-    1.381. The applier used to convert with the em factor and write both
-    properties, which inflated every fitted note by that factor. There is no
+    width model is keyed to; the same sheet measured 13.15 mm with the em
+    written into it and 10.91 mm without, a factor of 1.2053. The applier
+    used to convert with the em factor and write both properties, which
+    inflated every fitted note by that factor. There is no
     measured font constant to convert with, so the rule now names the gap
     instead of guessing across it -- on the untouched sheets too, because
     ``adjust=False`` is a verdict of the same width model.
@@ -507,7 +557,7 @@ def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
 
     The note must come out of the fit still declaring points, and with its
     system-units height untouched: two properties nominally describing the
-    same height in different units is what shipped a 1.381x inflation, and
+    same height in different units is what shipped a 1.2053x inflation, and
     the one the applier does not own is the one whose unit it got wrong.
     """
     name = "harmonic-analyzer assembly"
@@ -538,10 +588,14 @@ def test_a_fitted_note_renders_no_taller_than_one_line(seat):
 
     Pinning "this name fits" passes again the day a unit factor comes back
     on a shorter name. What failed on the farm was a constant multiplicative
-    inflation -- extent 1.3806-1.3813x the single-line bound across four
-    names, three sizes and three workers -- so the assertion is on
-    extent/bound, at the size the note reports back rather than the one that
-    was requested.
+    inflation -- extent 2.4850-2.4856 em across four names, three sizes and
+    three workers, 1.2053x the same sheet without the write -- so the
+    assertion is on extent/bound, at the size the note reports back rather
+    than the one that was requested.
+
+    The note renders at the TALLEST one line the farm measured (2.0617 em),
+    so this passes only while the model clears every real sheet: against the
+    1.8 em the constant used to carry, this reads 1.145x and reds.
     """
     name = "harmonic-analyzer assembly"
     ddoc, annotation = seat(name)
@@ -563,15 +617,136 @@ def test_a_fitted_note_renders_no_taller_than_one_line(seat):
     assert height_mm / one_line_mm <= 1.0 + ONE_LINE_EXTENT_TOLERANCE
 
 
+@pytest.mark.parametrize(
+    "point_size,extent_mm,sheets",
+    FARM_ONE_LINE_EXTENTS_MM,
+    ids=[f"{mm:g}mm@{pt}pt" for pt, mm, _ in FARM_ONE_LINE_EXTENTS_MM],
+)
+def test_the_one_line_extents_the_farm_measured_are_all_accepted(
+    seat, point_size, extent_mm, sheets
+):
+    """Every real one-line sheet must PASS -- this is the defect being fixed.
+
+    All 14 sheets whose fitted notes reached the height check in c99e0026
+    were refused, because the bound (1.8 em) sat below the quantity it
+    bounds: a correct one line measures 1.9123..2.0617 em, since the extent
+    carries a full line pitch of leading above the glyph box. These are the
+    six distinct readings, replayed as ems -- the ratio the guard computes is
+    size-independent by construction, so the reading is carried as an em and
+    rendered at the name's own fitted size, while the millimetres in
+    FARM_ONE_LINE_EXTENTS_MM stay the raw evidence.
+
+    ``sheets`` is unused by the assertion and names which drawings produced
+    the reading, so a future refusal can be traced back to a sheet.
+    """
+    assert sheets
+    name = "harmonic-analyzer assembly"
+    measured_em = extent_mm / (point_size * MM_PER_POINT)
+    ddoc, _annotation = seat(name, extent_em=measured_em)
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is True
+    assert measured_em <= ONE_LINE_EXTENT_EM * (1.0 + ONE_LINE_EXTENT_TOLERANCE)
+
+
+@pytest.mark.parametrize(
+    "extent_em,provenance",
+    (
+        (2.4850, "slotted_screw 13.15 mm @ 15 pt, with the system-units write"),
+        (2.6362, "swing_stop_screw 13.95 mm @ 15 pt, with the system-units write"),
+        (3.8246, "cone_tip_adjuster 17.54 mm @ 13 pt, wrapped at the inflated size"),
+        (2.3049, "the shortest sheet a unit-bugged write could produce: 1.9123 x 1.2053"),
+    ),
+    ids=("slotted_inflated", "swing_inflated", "cone_tip_wrapped", "band_floor"),
+)
+def test_the_extents_the_farm_measured_when_broken_are_still_refused(
+    seat, extent_em, provenance
+):
+    """The other side of the band, from the same build's measurements.
+
+    Raising the bound to clear a real one line must not raise it past a real
+    defect, and the two populations are 11.8% apart, not an order of
+    magnitude: the legitimate 1.9123..2.0617 em maps to 2.3049..2.4854 em
+    under the 1.2053x system-units inflation. The last case is that band's
+    FLOOR -- the hardest defect to catch -- and it is the one that fails
+    first if anyone widens ONE_LINE_EXTENT_TOLERANCE for comfort.
+    """
+    assert provenance
+    name = "harmonic-analyzer assembly"
+    ddoc, _annotation = seat(name, extent_em=extent_em)
+
+    with pytest.raises(RuntimeError) as raised:
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )
+
+    assert "taller than one line" in str(raised.value)
+
+
+def test_a_passing_sheet_still_records_what_it_measured(seat):
+    """The measurement must reach the log on sheets that PASS.
+
+    The 14-sheet sample behind ONE_LINE_EXTENT_EM is exactly the set that
+    FAILED, because a refusal used to be the only thing that printed the
+    number -- so a sheet taller than 2.0617 em that happened to pass was
+    invisible, and the constant could only ever be defended by argument. A
+    passing sheet now emits its extent in em, as a log line and as a span
+    event, so the next build re-measures the distribution.
+    """
+    recorded: list[tuple[str, dict]] = []
+    name = "harmonic-analyzer assembly"
+    ddoc, _annotation = seat(name)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(
+            drawing_common._telemetry,
+            "event",
+            lambda event_name, **fields: recorded.append((event_name, fields)),
+        )
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )
+
+    events = [fields for event_name, fields in recorded if event_name == "title_block.extent"]
+    assert len(events) == 1
+    assert events[0]["sheet"] == "Sheet1"
+    assert events[0]["extent_em"] == pytest.approx(FARM_TALLEST_ONE_LINE_EM, abs=0.001)
+    assert events[0]["extent_mm"] == pytest.approx(
+        FARM_TALLEST_ONE_LINE_EM * events[0]["applied_pts"] * MM_PER_POINT
+    )
+
+
 def test_writing_the_system_units_height_inflates_the_note(seat):
     """The fake can SEE the defect the applier used to ship.
 
     Without this, the ratio assertion above is unfalsifiable: a fake whose
     extent ignores the format would pass it whatever the applier wrote. This
     reproduces the removed write -- ``CharHeight = em_mm / 1000`` after the
-    points write -- and pins the inflation at the farm's measured 1.381, so
+    points write -- and pins the inflation at the farm's measured 1.2053, so
     reinstating that line in ``fit_title_block_part_name`` makes the sheet
     fail here instead of on a worker.
+
+    The expectation used to read 1.381. That was never the inflation: it was
+    the inflated extent (2.4850 em) over the OLD one-line constant of 1.8,
+    which was itself back-derived from 1.381. Against the measured one-line
+    extent the same physical reading is 1.205 -- and the same sheet measured
+    13.15 mm with the write and 10.91 mm without it, independently of any
+    constant, which is where 1.2053 comes from.
     """
     name = "harmonic-analyzer assembly"
     ddoc, annotation = seat(name)
@@ -588,7 +763,9 @@ def test_writing_the_system_units_height_inflates_the_note(seat):
     _x0, y0, _z0, _x1, y1, _z1 = ddoc.note.GetExtent()
     height_mm = abs(y1 - y0) * 1000.0
     one_line_mm = ONE_LINE_EXTENT_EM * fit.point_size * MM_PER_POINT
-    assert height_mm / one_line_mm == pytest.approx(1.381, abs=0.001)
+    assert height_mm / one_line_mm == pytest.approx(1.205, abs=0.001)
+    # The farm's own reading at this size: an inflated 16 pt note, 14.03 mm.
+    assert height_mm == pytest.approx(14.03, abs=0.01)
 
 
 def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
@@ -597,9 +774,12 @@ def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
     The refusal has to say what was MEASURED, not what it infers. An earlier
     version reported "renders on more than one line" for every over-tall
     extent, and that wording sent three agents after font ladders when the
-    real cause was a unit factor on notes that never wrapped. A wrap here
-    adds one em to a 1.8 em line, so the ratio it must report is 1.556, and
-    the size it must report is the one read BACK off the note.
+    real cause was a unit factor on notes that never wrapped. A wrap adds one
+    LINE_SPACING_EM to a line that already measures 2.0617 em, so the ratio
+    it must report is 1.485 -- NOT 2x, because the extent already carries a
+    line of leading; on cone_tip_adjuster, the one sheet that really wrapped,
+    the same arithmetic reads 1.539. And the size it must report is the one
+    read BACK off the note.
     """
     name = "harmonic-analyzer assembly"
     ddoc, _annotation = seat(name)
@@ -625,5 +805,46 @@ def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
         )
 
     message = str(raised.value)
-    assert "renders 1.556x taller than one line" in message
+    assert "renders 1.485x taller than one line" in message
     assert f"at the {point_size:g} pt the note reports back" in message
+
+
+def test_a_one_line_note_that_hangs_below_its_cell_still_fails(seat):
+    """Right height, wrong place: the cell rule is a SEPARATE refusal.
+
+    Raising the height bound to clear a real one line means a note can now
+    be the correct height and still be wrong, so the check that catches a
+    note sitting on DWG. NO. has to be exercised by an extent the height
+    guard PASSES. Without this test, deleting the cell-rule check leaves the
+    suite green -- the wrapped-note case above never reaches it, because the
+    height guard refuses that sheet first.
+    """
+    name = "harmonic-analyzer assembly"
+    ddoc, _annotation = seat(name)
+    point_size = fit_part_name(name, LANDSCAPE).point_size
+    x0, _y0, z0, x1, _y1, z1 = _one_line_extent(point_size)
+    # One line tall (so the height guard passes), dropped 1 mm through the
+    # cell's bottom rule.
+    bottom_mm = LANDSCAPE.cell_bottom_mm - 1.0
+    height_mm = FARM_TALLEST_ONE_LINE_EM * point_size * MM_PER_POINT
+    ddoc.note.GetExtent = (
+        x0,
+        bottom_mm / 1000.0,
+        z0,
+        x1,
+        (bottom_mm + height_mm) / 1000.0,
+        z1,
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )
+
+    message = str(raised.value)
+    assert "hangs below its cell" in message
+    assert "taller than one line" not in message
