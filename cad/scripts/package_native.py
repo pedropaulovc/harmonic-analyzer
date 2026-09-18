@@ -90,7 +90,12 @@ def _close_active_documents(sw: Any) -> None:
     components resident. ``CloseDoc(GetTitle())`` closes the assembly AND its
     hidden components (document count drops to 0), and ``CloseDoc`` still discards
     a dirty document without saving, so no save modal appears. Loop until no
-    document is active; bounded so a misbehaving session can't spin.
+    document is active; bounded so a misbehaving session can't spin, and RAISE
+    on exhaustion -- returning
+    normally would make a still-occupied seat indistinguishable from an empty
+    one, hand a resident document to ``CloseAllDocuments(True)`` (the modal path
+    this function exists to avoid), and let ``_release_seat`` log "seat
+    released" over an occupied seat.
 
     Refuse an empty title: ``CloseDoc("")`` is the very no-op trap above, so
     falling back to it would silently spin this loop and leave the doc resident.
@@ -99,7 +104,7 @@ def _close_active_documents(sw: Any) -> None:
     for _ in range(500):
         doc = sw.IActiveDoc2
         if doc is None:
-            break
+            return
         title = doc.GetTitle()
         if not title:
             raise RuntimeError(
@@ -108,6 +113,12 @@ def _close_active_documents(sw: Any) -> None:
                 f"leave the document resident"
             )
         sw.CloseDoc(title)
+    if sw.IActiveDoc2 is not None:
+        raise RuntimeError(
+            "documents are still open after 500 CloseDoc calls -- the seat is "
+            "not empty, so refusing to report it released; close SolidWorks' "
+            "documents by hand"
+        )
 
 
 def _discard_open_documents(sw: Any) -> None:
@@ -516,13 +527,25 @@ def main() -> int:
     opts = ap.parse_args()
 
     out = opts.out.resolve()
-    try:
-        out.relative_to(REPO_ROOT.resolve())
-    except ValueError:
-        raise SystemExit(
-            f"!!  --out must live inside the repository ({REPO_ROOT}) so the "
-            f"sidecar's paths stay repo-relative: {out}"
-        ) from None
+    # prepare_out() rmtree's this directory, so containment in the repo is NOT
+    # enough: `--out .` or `--out cad/out` would pass that check and delete
+    # tracked sources or every build output. Accept only the dedicated
+    # NATIVE_DIR, or a path under RELEASE_DIR that does not exist yet.
+    native = NATIVE_DIR.resolve()
+    release = RELEASE_DIR.resolve()
+    if out != native:
+        try:
+            out.relative_to(release)
+        except ValueError:
+            raise SystemExit(
+                f"!!  --out must be {native} or a new path under {release} -- "
+                f"it is wiped before packaging: {out}"
+            ) from None
+        if out.exists():
+            raise SystemExit(
+                f"!!  --out already exists and is not the dedicated "
+                f"{native} -- refusing to wipe it: {out}"
+            )
 
     # Advertise "package-native" as this process's telemetry resource (Aspire
     # "resource" column); fallback-only, so dodo's inherited OTEL_SERVICE_NAME wins
