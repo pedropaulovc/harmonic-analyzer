@@ -340,9 +340,10 @@ async def _coil_helix(adapter, length_mm: float | None, feature_name: str) -> No
     plane = "CoilStartPlane"
     offset_plane(adapter, plane, x_start, base="Right Plane")
     check(f"create_sketch {plane}", await adapter.create_sketch(plane))
-    seed = _sketch_manager(adapter).CreateCircleByRadius(0.0, 0.0, 0.0, a / 1000.0)
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = _sketch_manager(adapter).CreateCircleByRadius(0.0, 0.0, 0.0, a / 1000.0)
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
 
     frame = _sketch_frame(_active_sketch(adapter))
     origin = _to_sketch_mm(frame, (x_start, 0.0, 0.0))
@@ -424,23 +425,24 @@ def _hook_sketch(adapter, length_mm: float | None, feature_name: str) -> None:
     _require_identity_frame(_sketch_frame(_active_sketch(adapter)), feature_name)
     sk = _sketch_manager(adapter)
     # CCW from the +Y transition end to the -Y free tip -> the eye bulges -X.
-    arc = sk.CreateArc(
-        x_eye / 1000.0,
-        0.0,
-        0.0,
-        x_eye / 1000.0,
-        a / 1000.0,
-        0.0,
-        x_eye / 1000.0,
-        -a / 1000.0,
-        0.0,
-        1,
-    )
-    if arc is None:
-        raise RuntimeError("hook arc failed")
-    axis = sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, -PATTERN_AXIS_LEN_MM / 1000.0, 0.0)
-    if axis is None:
-        raise RuntimeError("pattern centreline failed")
+    with no_sketch_inference(adapter):
+        arc = sk.CreateArc(
+            x_eye / 1000.0,
+            0.0,
+            0.0,
+            x_eye / 1000.0,
+            a / 1000.0,
+            0.0,
+            x_eye / 1000.0,
+            -a / 1000.0,
+            0.0,
+            1,
+        )
+        if arc is None:
+            raise RuntimeError("hook arc failed")
+        axis = sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, -PATTERN_AXIS_LEN_MM / 1000.0, 0.0)
+        if axis is None:
+            raise RuntimeError("pattern centreline failed")
 
 
 def _transition_sketch(
