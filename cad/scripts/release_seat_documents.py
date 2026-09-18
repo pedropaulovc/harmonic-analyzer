@@ -8,6 +8,10 @@ sessions, and extracting the cached artefact over them fails. Building locally
 instead would fork the artefact's ``.execution`` token off the fleet's, so the
 task must first free the file, then retry the restore.
 
+``run_build``'s teardown also re-points the seat's working directory out of the
+checkout, so this is equally the way to unpark a seat whose current directory is
+blocking a farm worker from removing a source root.
+
     uv run cad/scripts/release_seat_documents.py
 """
 from __future__ import annotations
