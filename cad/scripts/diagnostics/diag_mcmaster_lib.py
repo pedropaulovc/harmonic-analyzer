@@ -161,8 +161,9 @@ _SW_SKETCH_INFERENCE = 249
 # ``diag_build_93075A194.py``'s runout circle).  That last one is inference
 # FROM MODEL GEOMETRY, which id 249 alone does not govern.
 #
-# No recipe is allowed to require any of these ON: profiles are closed with
-# explicit ``merge`` relations instead (see :func:`draw_closed_profile`).
+# No recipe is allowed to require any of these ON: profiles are closed by
+# authoring exact-coordinate endpoints straight into the sketch database,
+# which welds them at creation (see :func:`draw_closed_profile`).
 SKETCH_DRAWING_STATE: dict[str, tuple[int, bool]] = {
     "swSketchAutomaticRelations": (_SW_SKETCH_AUTOMATIC_RELATIONS, False),
     "swSketchInferFromModel": (_SW_SKETCH_INFER_FROM_MODEL, False),
