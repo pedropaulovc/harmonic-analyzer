@@ -320,6 +320,28 @@ def test_read_only_seat_hit_on_foreign_key_does_not_warn(
     assert event["drift_reason"] == "cache_mode=ro"
 
 
+def test_drift_bookkeeping_failure_cannot_demote_a_hit(tmp_path, fake, monkeypatch):
+    """The severity decision runs AFTER the outputs are on disk (it reads the
+    sidecar and imports `_farm`). If it raises, the HIT must still stand: falling
+    through to "building locally" would mint a fresh .execution token and fork
+    every dependent's cache key off the fleet's."""
+    out = tmp_path / "out.bin"
+    out.write_text("v0", encoding="utf-8")
+    k_old = "1" * 64
+    k_new = "2" * 64
+
+    cache.store(k_old, [out], "part:x")
+    fake.blobs[k_new] = b"built-elsewhere"
+
+    def boom():
+        raise ModuleNotFoundError("No module named '_farm'")
+
+    monkeypatch.setattr(cache, "_cannot_publish_reason", boom)
+
+    assert cache.restore(k_new, [out], "part:x") is True
+    assert "restore_error" not in [e["event"] for e in _events(tmp_path)]
+
+
 def test_hit_under_same_key_is_not_drift(tmp_path, fake):
     out = tmp_path / "out.bin"
     out.write_text("v0", encoding="utf-8")

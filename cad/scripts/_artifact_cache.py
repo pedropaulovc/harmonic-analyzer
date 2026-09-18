@@ -370,9 +370,10 @@ def writable() -> bool:
 
 def _farm_executor() -> bool:
     """Are this run's cache-missing leaves dispatched to the build farm (rather
-    than executed on this box)? Read through ``_farm`` -- the one definition of
-    what ``--executor farm`` means -- and imported locally, like ``_telemetry``,
-    so the cache stays importable wherever the farm module is not in play."""
+    than executed on this box)? Answered by ``_farm.enabled()`` -- the one
+    definition of what ``--executor farm`` means, never a second copy of the env
+    check. Imported inside the call, like ``_telemetry``, so this module keeps no
+    import-time dependency on the farm stack."""
     import _farm
 
     return _farm.enabled()
@@ -581,6 +582,38 @@ class RestoreLocked(RuntimeError):
         )
 
 
+def _note_hit_provenance(label: str, key: str) -> None:
+    """Record a HIT and, when it lands on a key this seat never published, decide
+    how loudly to say so (see :func:`_cannot_publish_reason`).
+
+    Best-effort like every other provenance sink, and deliberately its OWN guard:
+    this runs after the outputs are already on disk, so an exception escaping into
+    ``restore``'s handler would demote a served HIT to "building locally" -- which
+    mints a fresh ``.execution`` token and forks every dependent's cache key off
+    the fleet's. Bookkeeping must never cost a restore."""
+    try:
+        prev = last_stored_key(label)
+        if not prev or prev == key:
+            _record("restore_hit", label, key)
+            return
+        expected = _cannot_publish_reason()
+        if expected:
+            _debug_log(f"{label}: HIT under {key[:12]}; last published here was "
+                       f"{prev[:12]}, but this process never publishes "
+                       f"({expected}) -- expected, not store-skip-on-hit drift")
+        else:
+            _warn(f"{label}: HIT under {key[:12]} but this seat last published "
+                  f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
+                  f"re-published from here")
+        tags: dict[str, bool | str] = {"drift_expected": bool(expected)}
+        if expected:
+            tags["drift_reason"] = expected
+        _event("cache.hit_drift", label, key, prev_key=prev[:12], **tags)
+        _record("restore_hit_drift", label, key, **tags)
+    except Exception as exc:  # noqa: BLE001 -- a HIT already succeeded; keep it
+        _debug_log(f"{label}: drift check skipped ({exc!r})")
+
+
 def restore(key: str, outputs: list[Path], label: str) -> bool:
     """Try to download+unpack a cached build for ``key``. Return True on a HIT (the
     outputs are now on disk and the COM build can be skipped), False on a miss or
@@ -621,24 +654,7 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             raise locked from exc
         _log(f"HIT   {label} ({key[:12]}) -> skipped COM build")
         _event("cache.hit", label, key)
-        prev = last_stored_key(label)
-        if prev and prev != key:
-            expected = _cannot_publish_reason()
-            if expected:
-                _debug_log(f"{label}: HIT under {key[:12]}; last published here was "
-                           f"{prev[:12]}, but this process never publishes "
-                           f"({expected}) -- expected, not store-skip-on-hit drift")
-            else:
-                _warn(f"{label}: HIT under {key[:12]} but this seat last published "
-                      f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
-                      f"re-published from here")
-            tags: dict[str, bool | str] = {"drift_expected": bool(expected)}
-            if expected:
-                tags["drift_reason"] = expected
-            _event("cache.hit_drift", label, key, prev_key=prev[:12], **tags)
-            _record("restore_hit_drift", label, key, **tags)
-        else:
-            _record("restore_hit", label, key)
+        _note_hit_provenance(label, key)
         return True
     except RestoreLocked:
         raise
