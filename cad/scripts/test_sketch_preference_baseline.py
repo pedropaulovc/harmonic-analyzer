@@ -344,7 +344,11 @@ def _try_guarded_receivers(
       ``True`` -- an intervening ``sk.AddToDB = False`` puts the manager back
       through the inference engine, and an earlier enable does not undo it;
     * the body must not reassign it -- from that statement on the guarantee is
-      gone, so the whole block is refused rather than split at it.
+      gone, so the whole block is refused rather than split at it.  Only the
+      BODY counts here: an ``except``/``else``/``finally`` clause runs after or
+      instead of the guarded work, so a reassignment there cannot reach a
+      primitive in the body, and treating it as one would report guarded work
+      as unguarded.
     """
     restored = {
         found[0]
@@ -356,9 +360,9 @@ def _try_guarded_receivers(
         return frozenset()
     inside = {
         found[0]
-        for stmt in ast.walk(node)
+        for body_stmt in node.body
+        for stmt in ast.walk(body_stmt)
         if isinstance(stmt, ast.stmt)
-        and stmt not in node.finalbody
         and (found := _add_to_db_assignment(stmt)) is not None
     }
     return frozenset(active - inside)
@@ -610,6 +614,35 @@ def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> Non
     )
 
     assert _unguarded_raw_calls(offender) == [(9, "CreateCircleByRadius")]
+
+
+def test_a_reset_in_an_except_clause_does_not_unguard_the_body(
+    tmp_path: Path,
+) -> None:
+    """A handler runs after the body, so it cannot reach a primitive in it.
+
+    This is the shape a recipe takes when it disables direct-to-database
+    before reporting a failure -- and crediting that reset to the body would
+    make the audit report correctly guarded geometry, which is the failure
+    mode that gets a gate deleted.
+    """
+    guarded = tmp_path / "diag_build_reset_on_error.py"
+    guarded.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    prev = sk.AddToDB\n"
+        "    sk.AddToDB = True\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    except RuntimeError:\n"
+        "        sk.AddToDB = False\n"
+        "        raise\n"
+        "    finally:\n"
+        "        sk.AddToDB = prev\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded) == []
 
 
 def test_a_call_on_an_unguarded_receiver_inside_the_block_is_reported(
