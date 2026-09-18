@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -475,6 +476,75 @@ def test_an_unreadable_working_directory_is_not_papered_over() -> None:
     with pytest.raises(RuntimeError, match="unreadable"):
         _common.release_seat_working_directory(app)
     app.SetCurrentWorkingDirectory.assert_not_called()
+
+
+def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # tempfile.gettempdir() is not a constant: it takes TMPDIR/TEMP/TMP from
+    # the environment and, with none usable, falls back to the PROCESS CURRENT
+    # DIRECTORY -- which under the farm helper is the workspace being torn
+    # down. Parking there would make the whole re-point a silent no-op.
+    monkeypatch.setattr(
+        _common.tempfile, "gettempdir", lambda: str(_common.CAD_ROOT / "out")
+    )
+
+    target = _common._seat_park_directory()
+
+    checkout = _common._normal_path(_common.CAD_ROOT.parent)
+    assert target.is_dir()
+    assert checkout not in _common._normal_path(target).parents
+    adapter, app = _seat([str(_common.CAD_ROOT / "out" / "sldprt"), str(target)])
+    assert _session(monkeypatch, adapter).warnings == []
+    app.SetCurrentWorkingDirectory.assert_called_once_with(str(target))
+
+
+def test_a_sibling_source_root_is_not_a_park_target_either(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A worker keeps several source roots under one work root and removes them
+    # with the same housekeeping, so "outside MY checkout" is not enough:
+    # parking in a sibling root just moves which leaf fails. FARM_WORK_ROOT is
+    # the worker's own name for that tree, and job_environment passes it on.
+    work_root = tmp_path / "harmonic" / "work"
+    mine = work_root / "sources" / "aaa" / "workspace"
+    sibling = work_root / "sources" / "bbb" / "workspace"
+    (mine / "cad").mkdir(parents=True)
+    sibling.mkdir(parents=True)
+    monkeypatch.setattr(_common, "CAD_ROOT", mine / "cad")
+    monkeypatch.setenv("FARM_WORK_ROOT", str(work_root))
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(sibling))
+
+    target = _common._normal_path(_common._seat_park_directory())
+
+    assert _common._normal_path(work_root) not in target.parents
+
+
+def test_a_close_that_fails_still_moves_the_seat_out_of_the_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # package_native's release: an exit that dies mid-teardown is exactly the
+    # one that leaves a seat parked in a disposable source root, so the
+    # re-point cannot sit behind a close that raises.
+    import package_native
+
+    target = str(_common._seat_park_directory())
+    app = SimpleNamespace(
+        GetCurrentWorkingDirectory=Mock(
+            side_effect=[str(_common.CAD_ROOT / "out" / "sldasm"), target]
+        ),
+        SetCurrentWorkingDirectory=Mock(return_value=True),
+    )
+    monkeypatch.setattr(
+        package_native,
+        "_discard_open_documents",
+        Mock(side_effect=RuntimeError("modal")),
+    )
+
+    with pytest.raises(RuntimeError, match="modal"):
+        package_native._release_seat(app)
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(target)
 
 
 def test_span_boundaries_poke_the_heartbeat() -> None:

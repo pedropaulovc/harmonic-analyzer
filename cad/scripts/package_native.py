@@ -154,15 +154,20 @@ def _release_seat(sw: Any) -> None:
     close above: a `cwd` this session cannot move is the next leaf's hazard, and
     failing a finished release over it would be worse than reporting it.
     """
-    _discard_open_documents(sw)
-    log("seat released: no document left open")
     try:
-        left = release_seat_working_directory(sw)
-    except Exception as error:  # noqa: BLE001
-        _telemetry.warn(f"seat working directory re-point failed: {error}")
-    else:
-        if left is not None:
-            log(f"seat working directory moved to {left}")
+        _discard_open_documents(sw)
+        log("seat released: no document left open")
+    finally:
+        # In a ``finally``, so a close that RAISES still re-points: an exit that
+        # dies mid-teardown is exactly the one that leaves a seat parked in a
+        # source root, and the raising close propagates either way.
+        try:
+            left = release_seat_working_directory(sw)
+        except Exception as error:  # noqa: BLE001
+            _telemetry.warn(f"seat working directory re-point failed: {error}")
+        else:
+            if left is not None:
+                log(f"seat working directory moved to {left}")
 
 
 def attach_solidworks() -> tuple[Any, str]:
