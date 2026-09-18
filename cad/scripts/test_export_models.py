@@ -891,3 +891,57 @@ def test_canonical_file_bytes_cleans_text_but_never_binary(tmp_path: Path) -> No
     payload = b"\x00SLDPRT\r\npayload\r\n"
     binary.write_bytes(payload)
     assert dodo._canonical_file_bytes(str(binary)) == payload
+
+
+def _gallery_manifest() -> dict:
+    return json.loads(
+        (export_models.COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
+    )
+
+
+def test_gallery_gate_rejects_inputs_exported_from_another_model(monkeypatch) -> None:
+    """The gallery must refuse an STL whose recorded source digest moved.
+
+    This is the check the renderer cannot make (pillow-only ephemeral env), so it
+    lives here, in the project env, and is what stops a release bundling a gallery
+    rendered from a previous build's meshes.
+    """
+    manifest = _gallery_manifest()
+    export_models.assert_gallery_inputs_current(manifest)  # current tree passes
+
+    real = export_models.load_src_digests
+    monkeypatch.setattr(
+        export_models, "load_src_digests",
+        lambda: {**real(), "cone-gear--t102": "0" * 32},
+    )
+    with pytest.raises(RuntimeError, match="exported from"):
+        export_models.assert_gallery_inputs_current(manifest)
+
+
+def test_gallery_gate_skips_keys_the_exporter_never_recorded(monkeypatch) -> None:
+    """An unrecorded key cannot decide staleness and must not fail the gallery.
+
+    A foreign ledger (`__exporter__` sentinel mismatch) yields {} and already
+    forces a full re-export; turning "unknown" into a failure here would make every
+    exporter-source change fail the release instead of re-rendering it.
+    """
+    monkeypatch.setattr(export_models, "load_src_digests", dict)
+
+    export_models.assert_gallery_inputs_current(_gallery_manifest())
+
+
+def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(monkeypatch, tmp_path: Path) -> None:
+    """A recipe digest matches even when the .SLDPRT is gone — reject the orphan.
+
+    `_stable_artefact_digest` keys on the producing task's recipe, not the file's
+    bytes, so it answers for a declared target that was deleted. The renderer no
+    longer stats the source, so nothing else would stop the release rendering and
+    certifying an STL with no model behind it.
+    """
+    manifest = _gallery_manifest()
+    missing = tmp_path / "sldprt"
+    missing.mkdir()
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", missing)
+
+    with pytest.raises(FileNotFoundError, match="is missing but"):
+        export_models.assert_gallery_inputs_current(manifest)

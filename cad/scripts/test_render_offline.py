@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 
+import pytest
 from PIL import Image, ImageDraw
 
 
@@ -201,3 +204,52 @@ def test_stale_only_refreshes_align_without_launching_blender(
     assert refreshed == [{pair["id"]}]
     assert json.loads(sidecar.read_text())["align"] == pair["align"]
     assert "REFRESHED  pair" in capsys.readouterr().out
+
+
+def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
+    """The renderer's freshness gate must work in the env uv ACTUALLY gives it.
+
+    `render_offline.py` carries PEP 723 metadata (`dependencies = ["pillow"]`), so
+    `export_models` launching it with `uv run` gets an ephemeral pillow-only env --
+    no `dodo`, no `export_models`. A gate that silently degrades there (to mtimes,
+    which remote-cache RESTORE order makes meaningless) rejected current STLs and
+    failed two v36 release attempts, while passing every in-venv test.
+
+    So drive `_stale` through `uv run --no-project --with pillow`, reproducing that
+    isolation, on an output written BEFORE its source -- exactly what a restore
+    leaves behind.
+    """
+    stl = tmp_path / "cone-gear--t102.STL"
+    stl.write_bytes(b"solid restored\n")
+    src = tmp_path / "cone-gear.SLDPRT"
+    src.write_bytes(b"source rebuilt later\n")
+    os.utime(stl, (1_600_000_000, 1_600_000_000))
+    assert stl.stat().st_mtime < src.stat().st_mtime
+
+    driver = tmp_path / "drive.py"
+    driver.write_text(
+        "import importlib.util, sys\n"
+        f"spec = importlib.util.spec_from_file_location('ro', r'{MODULE_PATH}')\n"
+        "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+        "assert 'dodo' not in sys.modules and 'export_models' not in sys.modules\n"
+        f"m._stale(__import__('pathlib').Path(r'{stl}'), "
+        f"__import__('pathlib').Path(r'{src}'), 'restored.STL')\n"
+        "print('CURRENT')\n",
+        encoding="utf-8",
+    )
+    done = subprocess.run(
+        ["uv", "run", "--no-project", "--with", "pillow", str(driver)],
+        capture_output=True, text=True, cwd=REPO_ROOT, timeout=180,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "CURRENT" in done.stdout
+
+
+def test_missing_export_still_fails_the_renderer(tmp_path: Path) -> None:
+    """Existence is the one freshness question the isolated renderer can answer."""
+    renderer = _load_render_offline()
+    src = tmp_path / "cone-gear.SLDPRT"
+    src.write_bytes(b"x")
+
+    with pytest.raises(FileNotFoundError):
+        renderer._stale(tmp_path / "never-exported.STL", src, "never-exported.STL")

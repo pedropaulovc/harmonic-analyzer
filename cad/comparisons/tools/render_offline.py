@@ -96,78 +96,26 @@ def resolve_blender(override: str | None = None) -> str:
 STL_DIR = CAD_OUT / "stl"
 
 
-def _recorded_digests() -> dict[str, str]:
-    """The exporter's own recorded source digests, keyed by output stem/mesh.
+def _stale(path: Path, src: Path, what: str) -> None:
+    """Refuse to render against a MISSING export. Freshness is the caller's job.
 
-    Delegate to ``export_models.load_src_digests`` rather than re-parsing
-    ``cad/out/stl/export-src.json`` here: it validates the ``__exporter__``
-    sentinel against the exporter's current source closure and returns {} when the
-    sidecar was written by a DIFFERENT exporter version. Trusting a foreign
-    sidecar's digests would let `_stale` reject an output that is current instead
-    of falling back to mtime, and the sentinel is the only thing that can tell the
-    difference -- so this must not become a second, laxer reader of that file.
+    This script runs under its own PEP 723 metadata (`dependencies = ["pillow"]`),
+    so `uv run render_offline.py` executes in an ephemeral env that has neither
+    `dodo` nor `export_models` -- it CANNOT compute a recipe digest, and it must not
+    grow an import that only works when someone happens to run it inside the project
+    venv.
 
-    An unimportable exporter (no COM bindings on a Blender-only seat) yields {} and
-    the caller falls back to mtime, exactly as it does for an undeclared target.
-    """
-    try:
-        scripts = str(REPO / "cad" / "scripts")
-        if scripts not in sys.path:
-            sys.path.insert(0, scripts)
-        import export_models  # noqa: PLC0415
+    It also cannot use mtimes: `export`'s outputs arrive by remote-cache RESTORE,
+    which writes them in arbitrary order carrying the archive's timestamps, so an STL
+    restored moments before its own `.SLDPRT` legitimately reads "older". That check
+    failed v36's release twice on a tree that was current.
 
-        return {k: v for k, v in export_models.load_src_digests().items()
-                if isinstance(v, str)}
-    except Exception:
-        return {}
-
-
-def _artefact_digest(src: Path) -> str | None:
-    """Recipe digest of a built artefact, or None when it is not a declared target.
-
-    Same chokepoint the exporter and verify.py use, so "is this export current?"
-    answers identically in all three.
-    """
-    try:
-        repo = str(REPO)
-        if repo not in sys.path:
-            sys.path.insert(0, repo)
-        import dodo  # noqa: PLC0415
-
-        return dodo._stable_artefact_digest(str(src.resolve()))
-    except Exception:
-        return None
-
-
-def _stale(path: Path, src: Path, what: str, key: str | None = None) -> None:
-    """Refuse to render an output older than the model it came from.
-
-    Compare RECORDED source digests, not mtimes: every COM task's outputs can be
-    RESTORED from the remote build cache, which writes them in arbitrary order with
-    the archive's timestamps, so an STL restored moments before its own .SLDPRT
-    legitimately reads "older" and mtime reports a stale export that is in fact
-    current. This is the same churn `export_models.src_digest` exists to defeat --
-    the gallery was the one consumer still comparing timestamps, and it failed the
-    first release whose `export` ran on the farm.
-
-    Fall back to mtime only when the digest cannot decide: an undeclared target
-    (generated mesh, `_artefact_digest` -> None) or an output the exporter recorded
-    no digest for.
+    So the digest comparison lives in `export_models.assert_gallery_inputs_current`,
+    which runs in the project env immediately before launching this renderer, and
+    this function is reduced to the one question it can answer for itself.
     """
     if not path.exists():
         raise FileNotFoundError(f"{path} missing — run cad/scripts/export_models.py")
-    recorded = _recorded_digests().get(key or path.stem)
-    current = _artefact_digest(src)
-    if recorded is not None and current is not None:
-        if recorded != current:
-            raise RuntimeError(
-                f"{what} was exported from a different {src.name} "
-                f"(recorded {recorded[:12]}, current {current[:12]}) "
-                f"— re-run export_models.py"
-            )
-        return
-    if path.stat().st_mtime < src.stat().st_mtime:
-        raise RuntimeError(f"{what} older than {src.name} — re-run export_models.py")
 
 
 def model_source(model: str) -> Path:
