@@ -1039,11 +1039,19 @@ def sketch_geometry_direct_to_db(sketch_manager: Any) -> Iterator[None]:
     leaves the whole seat direct-to-DB for every recipe that follows it.  One
     ``finally`` cannot be got wrong in eight places.
 
-    The previous value is read HERE, live off the sketch manager.  A caller
-    that captured it earlier would restore whatever the seat happened to hold
-    at that moment, which for an application-level preference can be a value
-    some previous leaf left behind -- the failure mode this guard exists to
-    close.
+    The previous value is read HERE, live off the sketch manager, and that buys
+    NESTING correctness, not seat healing.  An inner block reads ``True`` and
+    restores ``True``, so it cannot switch inference back on while an outer
+    block is still drawing; a caller that captured the value once and passed it
+    down would restore the OUTER block's value on the inner exit.  Be clear
+    about what this does not do: a seat that arrives already leaked to ``True``
+    is read as ``True`` and restored to ``True``, so this perpetuates a leak
+    rather than repairing one.  Healing would mean restoring a declared
+    constant, and every other ``AddToDB`` site in the repo restores the
+    observed value (``_common`` 500/544/648/716, ``_holes`` 447, ``_assembly``
+    137/187), with ``_common.set_sketch_direct_db`` already WARNing on an
+    already-``True`` seat.  Consistency with those wins; the warning is where a
+    leak gets reported.
 
     Two consequences for callers.  A preference the seat declines to write
     fails SILENTLY, so entering this block is not evidence: read the geometry
@@ -1089,6 +1097,30 @@ def _refuse_sketch_drift(
     )
 
 
+def _read_sketch_number(
+    adapter: Any,
+    entity: Any,
+    member: str,
+    *,
+    measurement: str,
+    what: str,
+    label: str,
+) -> float:
+    """Read one number off a sketch entity, refusing an absent member cleanly.
+
+    ``adapter._get_attr_or_call`` is ``getattr(obj, name, None)``, so a member
+    the strict early-bound wrapper does not declare reads back as ``None``.
+    Passing that to ``float`` would raise ``TypeError`` -- a guard that reads
+    like a code bug instead of a refusal.  It cannot happen with the vendored
+    wrapper (``GetRadius`` is declared ``retval VT_R8`` and ``X``/``Y``/``Z``
+    are declared properties), so this is the error shape, not a live defect.
+    """
+    value = adapter._get_attr_or_call(entity, member)
+    if value is None:
+        raise RuntimeError(f"{label}: the {what} has no {measurement}")
+    return float(value)
+
+
 def assert_sketch_geometry_placed(
     adapter: Any,
     reads: Sequence[tuple[str, Any, tuple[float, ...]]],
@@ -1117,7 +1149,15 @@ def assert_sketch_geometry_placed(
             raise RuntimeError(f"{label}: the {what} has no {measurement}")
         point = _early_bound(point, "ISketchPoint")
         actual = tuple(
-            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
+            _read_sketch_number(
+                adapter,
+                point,
+                axis,
+                measurement=f"{measurement} {axis}",
+                what=what,
+                label=label,
+            )
+            for axis in ("X", "Y", "Z")
         )
         _refuse_sketch_drift(
             drift_m=max(abs(a - b) for a, b in zip(actual, expected)),
@@ -1178,7 +1218,9 @@ def assert_sketch_circle_placed(
         what=what,
         label=label,
     )
-    actual = float(adapter._get_attr_or_call(arc, "GetRadius"))
+    actual = _read_sketch_number(
+        adapter, arc, "GetRadius", measurement="radius", what=what, label=label
+    )
     _refuse_sketch_drift(
         drift_m=abs(actual - radius_m),
         actual=actual,

@@ -195,19 +195,33 @@ def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
 
 
 class _FakeSketchManager:
-    """Records the ``CreateLine`` call and can snap the segment like inference."""
+    """Records the ``CreateLine`` call and can snap either endpoint like inference."""
 
-    def __init__(self, snap: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> None:
+    def __init__(
+        self,
+        snap: tuple[float, float, float] = (0.0, 0.0, 0.0),
+        snapped_endpoint: str = "end",
+    ) -> None:
         self.AddToDB = False
         self.add_to_db_when_created: bool | None = None
         self.calls: list[tuple[float, ...]] = []
         self._snap = snap
+        self._snapped_endpoint = snapped_endpoint
 
     def CreateLine(self, *args: float) -> SimpleNamespace:
         self.add_to_db_when_created = self.AddToDB
         self.calls.append(args)
-        start = tuple(args[0:3])
-        end = tuple(value + shift for value, shift in zip(args[3:6], self._snap))
+        # Inference captures ONE endpoint and rotates the line about it, so the
+        # read-back has to check both: a start-point capture is exactly as
+        # oblique as an end-point one.
+        moved = tuple(
+            value + shift
+            for value, shift in zip(
+                args[0:3] if self._snapped_endpoint == "start" else args[3:6], self._snap
+            )
+        )
+        start = moved if self._snapped_endpoint == "start" else tuple(args[0:3])
+        end = tuple(args[3:6]) if self._snapped_endpoint == "start" else moved
         return SimpleNamespace(
             GetStartPoint2=lambda: SimpleNamespace(X=start[0], Y=start[1], Z=start[2]),
             GetEndPoint2=lambda: SimpleNamespace(X=end[0], Y=end[1], Z=end[2]),
@@ -225,6 +239,7 @@ def _section_doubles(
     monkeypatch,
     scale: float,
     snap: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    snapped_endpoint: str = "end",
 ) -> SimpleNamespace:
     origin = drawing.FRONT_CENTER
     transform = object()
@@ -253,7 +268,7 @@ def _section_doubles(
     section = Mock()
     section.GetSection.return_value = section_definition
     section.SetViewPosition.return_value = True
-    sketch_manager = _FakeSketchManager(snap)
+    sketch_manager = _FakeSketchManager(snap, snapped_endpoint)
     model = Mock()
     model.ActivateView.return_value = True
     model.SketchManager = sketch_manager
@@ -309,23 +324,46 @@ def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
     assert doubles.sketch_manager.calls[0] == pytest.approx(
         (0.0, -0.050 / scale, 0.0, 0.0, 0.050 / scale, 0.0)
     )
-    # The cutting line is authored direct-to-DB, out of sketch inference's
-    # reach, and the seat's own mode is left as it was found.
+    # Two separate contracts, not one: the first says inference was out of
+    # reach AT CREATION TIME (drop it and a bare CreateLine passes), the second
+    # says the application-level preference was handed back as found (drop it
+    # and every later recipe on the seat authors direct-to-DB).  Neither
+    # subsumes the other.
     assert doubles.sketch_manager.add_to_db_when_created is True
     assert doubles.sketch_manager.AddToDB is False
     doubles.section_definition.SetAutoHatch.assert_called_once_with(True)
     doubles.section_definition.SetLabel2.assert_called_once_with("A")
 
 
-def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("snapped_endpoint", "message"),
+    [
+        ("start", r"start point sits 0\.674 mm"),
+        ("end", r"end point sits 0\.674 mm"),
+    ],
+)
+def test_section_cut_refuses_a_cutting_line_inference_moved(
+    monkeypatch, snapped_endpoint, message
+) -> None:
     """A snapped endpoint tilts the cut plane; no section may be created.
 
     top_frame's D-D was cut 4.29 degrees oblique this way (0.674 mm off
     station at the rail face), and the tilt only surfaced much later, as a
     missing cut-face line in a different recipe's dimension pick.
+
+    Both endpoints are exercised because inference captures ONE of them and
+    rotates the line about it -- on D-D it was the START, dragged inboard onto
+    the plan boundary entity it had deliberately overshot.  Each case pins its
+    own message rather than a regex loose enough to match either, so the
+    refusal still has to name the endpoint that moved.
     """
-    doubles = _section_doubles(monkeypatch, 1.0, snap=(0.0, 0.000674, 0.0))
-    with pytest.raises(RuntimeError, match=r"end point sits 0\.674 mm"):
+    doubles = _section_doubles(
+        monkeypatch,
+        1.0,
+        snap=(0.0, 0.000674, 0.0),
+        snapped_endpoint=snapped_endpoint,
+    )
+    with pytest.raises(RuntimeError, match=message):
         _drawing_common.create_section_view(
             doubles.adapter,
             doubles.parent,
