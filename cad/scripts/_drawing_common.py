@@ -5684,6 +5684,64 @@ def _iter_template_notes(adapter: Any, ddoc: Any):
         note = adapter._attempt(lambda n=note: n.GetNext())
 
 
+def _part_name_note(
+    adapter: Any,
+    ddoc: Any,
+    *,
+    sheet_name: str,
+    expected_name: str,
+) -> tuple[Any, Any, Any]:
+    """Find this sheet's PART note and prove the width model describes it.
+
+    Returns ``(INote, IAnnotation, ITextFormat)``. The caller must already be
+    in edit-sheet-format mode: the sheet format's notes are only reachable
+    through ``IDrawingDoc::EditTemplate``.
+
+    This runs for EVERY sheet, including the ones that are left untouched.
+    Leaving a name alone is itself a verdict of the width model -- "this name
+    is narrower than the note's authored box at the template's own size" --
+    and that verdict is only sound while the note still prints in the typeface
+    those glyph advances were measured from. Validating the typeface only on
+    the sheets that get fitted would let a template re-authored in a wider
+    font silently wrap exactly the names nothing checks afterwards.
+    """
+    candidates = [
+        (note, annotation)
+        for note, annotation in _iter_template_notes(adapter, ddoc)
+        if str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
+        == expected_name
+    ]
+    if len(candidates) != 1:
+        seen = [
+            str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
+            for note, _ in _iter_template_notes(adapter, ddoc)
+        ]
+        raise RuntimeError(
+            f"sheet {sheet_name!r} title block has {len(candidates)} "
+            f"template notes reading {expected_name!r}, expected exactly 1; "
+            f"template notes: {seen!r}"
+        )
+    note, annotation = candidates[0]
+    text_format = adapter._attempt(lambda: annotation.GetTextFormat(0))
+    if text_format is None:
+        raise RuntimeError(f"sheet {sheet_name!r} PART note has no ITextFormat to fit")
+    text_format = _early_bound(text_format, "ITextFormat")
+    typeface = str(adapter._attempt(lambda: text_format.TypeFaceName, default="") or "")
+    # The width model IS this typeface's own glyph table, so a template that
+    # changed font must fail here rather than be fitted -- or cleared -- with
+    # the wrong metrics.
+    if (
+        typeface.replace(" ", "").casefold()
+        != TITLE_BLOCK_TYPEFACE.replace(" ", "").casefold()
+    ):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note prints in {typeface!r}, but the "
+            f"title-block width model is measured for {TITLE_BLOCK_TYPEFACE!r}; "
+            "re-measure _title_block_text.GLYPH_ADVANCE_PER_MILLE"
+        )
+    return note, annotation, text_format
+
+
 def fit_title_block_part_name(
     adapter: Any,
     ddoc: Any,
@@ -5705,9 +5763,13 @@ def fit_title_block_part_name(
     So the note is told the width it actually has, and the name is stepped down
     to the largest integer point size that fits it (see
     :func:`_title_block_text.fit_part_name`). A name that already fits the
-    note's PROVEN authored width is left completely alone: no template edit, no
-    format override, byte-identical ink. That is what keeps the 78 sheets that
-    render correctly today out of this code path entirely.
+    note's PROVEN authored width keeps its ink: no template edit, no format
+    override, byte-identical output. That is the path 78 of the 96 sheets take.
+
+    Every sheet is still INSPECTED, though, fitted or not. "This name fits the
+    authored box at 16 pt" is a verdict of the width model, so it is only
+    sound while the note prints in the typeface that model was measured from;
+    see :func:`_part_name_note`.
 
     Editing sheet-format ink needs ``IDrawingDoc::EditTemplate``; the edit is
     per sheet and in-document, so neither the checked-in DRWDOT nor any other
@@ -5720,9 +5782,7 @@ def fit_title_block_part_name(
     """
     field = DRAWING_TEMPLATES[layout].part_name_field
     fit = fit_part_name(expected_name, field)
-    if not fit.adjust:
-        return fit
-    if not fit_is_contained(fit, field):
+    if fit.adjust and not fit_is_contained(fit, field):
         raise RuntimeError(
             f"sheet {sheet_name!r} PART name {expected_name!r} fitted to "
             f"{fit.point_size} pt still leaves its field: "
@@ -5736,73 +5796,41 @@ def fit_title_block_part_name(
             "the title block's note is not editable"
         )
     try:
-        candidates = [
-            (note, annotation)
-            for note, annotation in _iter_template_notes(adapter, ddoc)
-            if str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
-            == expected_name
-        ]
-        if len(candidates) != 1:
-            seen = [
-                str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
-                for note, _ in _iter_template_notes(adapter, ddoc)
-            ]
-            raise RuntimeError(
-                f"sheet {sheet_name!r} title block has {len(candidates)} "
-                f"template notes reading {expected_name!r}, expected exactly 1; "
-                f"template notes: {seen!r}"
-            )
-        note, annotation = candidates[0]
-        text_format = adapter._attempt(lambda: annotation.GetTextFormat(0))
-        if text_format is None:
-            raise RuntimeError(
-                f"sheet {sheet_name!r} PART note has no ITextFormat to fit"
-            )
-        text_format = _early_bound(text_format, "ITextFormat")
-        typeface = str(
-            adapter._attempt(lambda: text_format.TypeFaceName, default="") or ""
+        note, annotation, text_format = _part_name_note(
+            adapter, ddoc, sheet_name=sheet_name, expected_name=expected_name
         )
-        # The width model IS this typeface's own glyph table, so a template
-        # that changed font must fail here rather than be fitted with the
-        # wrong metrics.
-        if typeface.replace(" ", "").casefold() != TITLE_BLOCK_TYPEFACE.replace(
-            " ", ""
-        ).casefold():
-            raise RuntimeError(
-                f"sheet {sheet_name!r} PART note prints in {typeface!r}, but the "
-                f"title-block width model is measured for {TITLE_BLOCK_TYPEFACE!r}; "
-                "re-measure _title_block_text.GLYPH_ADVANCE_PER_MILLE"
-            )
-        text_format.LineLength = fit.line_length_mm / 1000.0
-        # CharHeightInPts is ignored unless the format is in points.
-        text_format.IsHeightSpecifiedInPts = True
-        text_format.CharHeightInPts = int(fit.point_size)
-        if not annotation.SetTextFormat(0, False, text_format):
-            raise RuntimeError(
-                f"sheet {sheet_name!r} PART note rejected the fitted text format "
-                "(IAnnotation::SetTextFormat returned False -- an embedded "
-                "rich-text run does this)"
-            )
-        applied = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
-        # This readback exists to catch an IGNORED format, so it compares at
-        # the resolution that changes the rendered result and no finer. A
-        # character height is integral by contract, but it arrives through a
-        # COM VARIANT, so 16 pt coming back as 15.999... must read as 16 and
-        # not abort a sheet that was fitted correctly. Likewise the line length
-        # is compared at 0.05 mm: ten times tighter than the 0.5 mm the fit
-        # keeps in hand, so no difference this check tolerates can move a wrap
-        # decision.
-        applied_pts = round(float(applied.CharHeightInPts or 0.0))
-        applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
-        if (
-            applied_pts != fit.point_size
-            or abs(applied_line_mm - fit.line_length_mm) > 0.05
-        ):
-            raise RuntimeError(
-                f"sheet {sheet_name!r} PART note did not keep the fitted format: "
-                f"{applied_pts} pt / {applied_line_mm:.3f} mm line length, "
-                f"expected {fit.point_size} pt / {fit.line_length_mm:.3f} mm"
-            )
+        if fit.adjust:
+            text_format.LineLength = fit.line_length_mm / 1000.0
+            # CharHeightInPts is ignored unless the format is in points.
+            text_format.IsHeightSpecifiedInPts = True
+            text_format.CharHeightInPts = int(fit.point_size)
+            if not annotation.SetTextFormat(0, False, text_format):
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} PART note rejected the fitted text "
+                    "format (IAnnotation::SetTextFormat returned False -- an "
+                    "embedded rich-text run does this)"
+                )
+            applied = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+            # This readback exists to catch an IGNORED format, so it compares
+            # at the resolution that changes the rendered result and no finer.
+            # A character height is integral by contract, but it arrives
+            # through a COM VARIANT, so 16 pt coming back as 15.999... must
+            # read as 16 and not abort a sheet that was fitted correctly.
+            # Likewise the line length is compared at 0.05 mm: ten times
+            # tighter than the 0.5 mm the fit keeps in hand, so no difference
+            # this check tolerates can move a wrap decision.
+            applied_pts = round(float(applied.CharHeightInPts or 0.0))
+            applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
+            if (
+                applied_pts != fit.point_size
+                or abs(applied_line_mm - fit.line_length_mm) > 0.05
+            ):
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} PART note did not keep the fitted "
+                    f"format: {applied_pts} pt / {applied_line_mm:.3f} mm line "
+                    f"length, expected {fit.point_size} pt / "
+                    f"{fit.line_length_mm:.3f} mm"
+                )
     finally:
         ddoc.EditSheet()
     if not bool(adapter._get_attr_or_call(ddoc, "GetEditSheet")):
@@ -5810,6 +5838,16 @@ def fit_title_block_part_name(
             f"sheet {sheet_name!r} is stuck in edit-sheet-format mode after the "
             "PART name fit"
         )
+    if not fit.adjust:
+        # Nothing was written, so there is no applied fit to verify: the name
+        # is narrower than the width the note is PROVEN to render unwrapped
+        # at, and its ink is exactly what v36 shipped.
+        _telemetry.info(
+            f"{sheet_name}: PART name {expected_name!r} is {fit.width_mm:.2f} mm "
+            f"at the template's own {fit.point_size} pt, inside the note's "
+            f"proven {fit.line_length_mm:.2f} mm box; left untouched"
+        )
+        return fit
 
     # SetTextFormat's effect reaches the note's geometry only after a redraw.
     adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2())
@@ -6024,7 +6062,7 @@ async def finalize_drawing(
         # make it fit the cell it is printed in.
         part_name = str(
             adapter._attempt(
-                lambda: linked_model.SummaryInfo(_SUM_INFO_TITLE), default=""
+                lambda m=linked_model: m.SummaryInfo(_SUM_INFO_TITLE), default=""
             )
             or ""
         )

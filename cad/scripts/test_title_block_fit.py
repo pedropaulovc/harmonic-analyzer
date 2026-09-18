@@ -15,11 +15,18 @@ rule untouched.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+import _drawing_common as drawing_common
 from _common import part_properties
 from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
 from _title_block_text import (
+    CAP_HEIGHT_EM,
+    DESCENDER_EM,
+    MM_PER_POINT,
+    TITLE_BLOCK_TYPEFACE,
     PartNameDoesNotFit,
     fit_is_contained,
     fit_part_name,
@@ -105,9 +112,9 @@ def test_names_that_already_fit_are_left_untouched():
     """The sheets that render correctly must not be re-inked at all.
 
     A name inside the note's PROVEN authored width returns ``adjust=False``,
-    which is what makes the applier skip ``EditTemplate`` entirely -- so those
-    sheets' ink cannot change. This is the regression guard for the release:
-    78 of the fleet's 96 sheets take this path.
+    which is what makes the applier leave the note's ink alone -- no format
+    override, byte-identical output. This is the regression guard for the
+    release: 78 of the fleet's 96 sheets take this path.
     """
     touched = []
     for stem, name, layout in FLEET:
@@ -138,3 +145,221 @@ def test_an_unfittable_name_fails_the_build():
     """A name that cannot be printed legibly raises instead of overflowing."""
     with pytest.raises(PartNameDoesNotFit):
         fit_part_name("W" * 120, LANDSCAPE)
+
+
+# --- the applier, with a faked seat ------------------------------------------
+#
+# ``fit_title_block_part_name`` is the half of the rule that touches COM. Its
+# guards are what stand between a mis-measured width model and a shipped
+# title block, so they are exercised here against a fake note rather than
+# only on a seat.
+
+
+def _one_line_extent(point_size: int, *, width_mm: float = 60.0):
+    """``INote::GetExtent`` (metres) for one line drawn in ``LANDSCAPE``."""
+    size_mm = point_size * MM_PER_POINT
+    return (
+        LANDSCAPE.text_left_mm / 1000.0,
+        (LANDSCAPE.baseline_mm - DESCENDER_EM * size_mm) / 1000.0,
+        0.0,
+        (LANDSCAPE.text_left_mm + width_mm) / 1000.0,
+        (LANDSCAPE.baseline_mm + CAP_HEIGHT_EM * size_mm) / 1000.0,
+        0.0,
+    )
+
+
+class _FakeTextFormat:
+    def __init__(self, typeface: str):
+        self.TypeFaceName = typeface
+        self.CharHeightInPts = LANDSCAPE.nominal_point_size
+        self.LineLength = 0.0
+        self.IsHeightSpecifiedInPts = False
+
+
+class _FakeAnnotation:
+    def __init__(self, text_format: _FakeTextFormat):
+        # swAnnotationOwner_e.swAnnotationOwner_DrawingTemplate
+        self.OwnerType = 2
+        self.text_format = text_format
+        self.writes = 0
+
+    def GetTextFormat(self, _index):
+        return self.text_format
+
+    def SetTextFormat(self, _index, _all_notes, text_format):
+        self.writes += 1
+        self.text_format = text_format
+        return True
+
+
+class _FakeNote:
+    def __init__(self, text: str, annotation: _FakeAnnotation, extent):
+        self.text = text
+        self.annotation = annotation
+        self.GetExtent = extent
+
+    def GetText(self):
+        return self.text
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetNext(self):
+        return None
+
+
+class _FakeDrawingDoc:
+    """Just enough ``IDrawingDoc`` to walk one sheet-format note."""
+
+    def __init__(self, note: _FakeNote):
+        self.note = note
+        self.GetEditSheet = True
+        self.edit_template_calls = 0
+
+    def EditTemplate(self):
+        self.edit_template_calls += 1
+        self.GetEditSheet = False
+
+    def EditSheet(self):
+        self.GetEditSheet = True
+
+    def GetFirstView(self):
+        # Template notes are only reachable in edit-sheet-format mode.
+        note = None if self.GetEditSheet else self.note
+        return SimpleNamespace(GetFirstNote2=lambda: note)
+
+
+class _FakeAdapter:
+    def __init__(self):
+        self.currentModel = SimpleNamespace(GraphicsRedraw2=lambda: True)
+
+    @staticmethod
+    def _attempt(call, default=None):
+        try:
+            return call()
+        except Exception:
+            return default
+
+    @staticmethod
+    def _get_attr_or_call(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+
+@pytest.fixture
+def seat(monkeypatch):
+    """A fake seat holding one PART note, plus the early-bind casts removed."""
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        drawing_common._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args, **_kwargs: value,
+    )
+
+    def build(name: str, *, typeface: str = TITLE_BLOCK_TYPEFACE):
+        annotation = _FakeAnnotation(_FakeTextFormat(typeface))
+        point_size = fit_part_name(name, LANDSCAPE).point_size
+        note = _FakeNote(name, annotation, _one_line_extent(point_size))
+        return _FakeDrawingDoc(note), annotation
+
+    return build
+
+
+@pytest.mark.parametrize(
+    "name,adjust",
+    [("channel-spring-installed", False), ("harmonic-analyzer assembly", True)],
+    ids=["untouched-sheet", "fitted-sheet"],
+)
+def test_a_retypefaced_template_fails_every_sheet(seat, name, adjust):
+    """A changed template font must fail the sheets it does NOT fit too.
+
+    The width model is Century Gothic's own glyph table, so ``adjust=False``
+    -- "this name renders unwrapped at 16 pt" -- is a verdict of that model,
+    not an observation. Re-author the template in a wider font and those are
+    precisely the names that would start wrapping, with no fit applied
+    afterwards to catch it. Validating the typeface only on the fitted sheets
+    left that hole open.
+    """
+    assert fit_part_name(name, LANDSCAPE).adjust is adjust
+    ddoc, annotation = seat(name, typeface="Arial")
+
+    with pytest.raises(RuntimeError, match="prints in 'Arial'"):
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )
+
+    assert annotation.writes == 0
+    assert ddoc.GetEditSheet is True
+
+
+def test_an_untouched_sheets_ink_is_never_written(seat):
+    """Inspecting the 78 good sheets must not re-ink any of them."""
+    name = "channel-spring-installed"
+    ddoc, annotation = seat(name)
+    before = vars(annotation.text_format).copy()
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is False
+    assert annotation.writes == 0
+    assert vars(annotation.text_format) == before
+    assert ddoc.GetEditSheet is True
+
+
+def test_a_fitted_sheet_gets_the_planned_size_and_line_length(seat):
+    """The fitted sheets still get the format the plan asked for."""
+    name = "harmonic-analyzer assembly"
+    ddoc, annotation = seat(name)
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is True
+    assert annotation.writes == 1
+    assert annotation.text_format.CharHeightInPts == fit.point_size
+    assert annotation.text_format.IsHeightSpecifiedInPts is True
+    assert annotation.text_format.LineLength * 1000.0 == pytest.approx(
+        fit.line_length_mm
+    )
+    assert ddoc.GetEditSheet is True
+
+
+def test_a_wrapped_note_fails_the_sheet_it_was_meant_to_fix(seat):
+    """If ``LineLength`` is ignored, the two-line extent must fail the build."""
+    name = "harmonic-analyzer assembly"
+    ddoc, _annotation = seat(name)
+    point_size = fit_part_name(name, LANDSCAPE).point_size
+    x0, y0, z0, x1, _y1, z1 = _one_line_extent(point_size)
+    # A second line drops one em BELOW the first, through the cell's rule.
+    ddoc.note.GetExtent = (
+        x0,
+        y0 - point_size * MM_PER_POINT / 1000.0,
+        z0,
+        x1,
+        _y1,
+        z1,
+    )
+
+    with pytest.raises(RuntimeError, match="more than one line"):
+        drawing_common.fit_title_block_part_name(
+            _FakeAdapter(),
+            ddoc,
+            layout=DrawingLayout.LANDSCAPE,
+            sheet_name="Sheet1",
+            expected_name=name,
+        )

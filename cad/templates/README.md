@@ -82,8 +82,8 @@ name fits the cell's real usable width, and
 template note through `EditTemplate` → `ITextFormat.LineLength` /
 `CharHeightInPts` → `EditSheet`, then re-reads `INote::GetExtent` to prove the
 result is one line inside the cell. The DRWDOT binary is never written; the
-edit lives in the SLDDRW. A name that already fits the note's authored box is
-left completely alone.
+edit lives in the SLDDRW. A name that already fits the note's authored box
+keeps its ink: the note is read, but no format is written.
 
 The width model is the template font's own glyph advances, taken from the
 Century Gothic CID subset embedded in the released PDFs. **If the title block
@@ -92,7 +92,9 @@ geometry lives in `_drawing_registry.DRAWING_TEMPLATES[...].part_name_field`
 and the glyph table in `_title_block_text.GLYPH_ADVANCE_PER_MILLE`, both with
 their provenance recorded in comments. A font change fails the build loudly
 rather than mis-fitting, because the applier checks `ITextFormat.TypeFaceName`
-before it trusts the model.
+on **every** sheet before it trusts the model — including the sheets it
+decides to leave alone, since "this name fits unwrapped at 16 pt" is itself a
+verdict of the model and a wider font would break it.
 
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
