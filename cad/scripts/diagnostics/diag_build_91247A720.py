@@ -412,6 +412,11 @@ async def build_91247A720(adapter, truth=None):
             "logo ring extrude failed",
             api="IFeatureManager.FeatureExtrusion3",
             sketch="LogoProfile",
+            # Each merge WELDS two endpoints into one point, so a closed
+            # nine-segment ring has nine sketch points and a wholly
+            # unmerged one has eighteen.  FailureForensics reports the
+            # difference as unmerged_points.
+            expected_points=len(logo_segs),
             segments=len(logo_segs),
             merges=len(endpoint_merges(logo_segs)),
         )
