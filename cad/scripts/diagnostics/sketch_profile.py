@@ -109,9 +109,10 @@ def minor_arc(center: Vertex, first: Vertex, second: Vertex) -> Arc:
     collapses the arc to zero radius; an endpoint that has arrived at the
     centre is refused here, by name, before any COM call.  (The other gate is
     :func:`endpoint_merges`, which refuses any vertex not shared by exactly two
-    ends.)  The ``CheckFeatureUse`` read-back in ``diag_mcmaster_lib`` is
-    FORENSICS and is deliberately incapable of failing healthy geometry -- it
-    is not where a degenerate corner is caught.
+    ends.)  ``diag_mcmaster_lib.assert_profile_closed`` reads the seat's
+    OUTCOME afterwards, but that is FORENSICS: it raises only on a MEASURED
+    zero-contour sketch, so a collapsed corner that still closes would pass it.
+    This is where a degenerate corner is caught.
 
     Raises:
         OpenProfileError: when an endpoint coincides with ``center`` (zero
