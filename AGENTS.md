@@ -307,8 +307,13 @@ to follow the documents it opens, so after a build that saved into `cad/out/sldp
 the seat's `cwd` **is** that directory — and Windows refuses to remove a directory
 that is any process's `cwd`. Closing documents does not release it (the `cwd`
 belongs to the process, not to a document), so `run_build`'s teardown and
-`package_native._release_seat` both park it in the temp directory with
-`_common.release_seat_working_directory`. Off the farm this is invisible: the
+`package_native._release_seat` both park it with
+`_common.release_seat_working_directory`. The park directory is *checked*, never
+assumed: `tempfile.gettempdir()` reads `TMPDIR`/`TEMP`/`TMP` and falls back to the
+process `cwd` — which under the farm helper is the workspace being torn down — so
+`_seat_park_directory` rejects any candidate inside this checkout or inside
+`FARM_WORK_ROOT` and falls through to `%SystemRoot%\Temp`, then the drive root.
+Off the farm this is invisible: the
 checkout outlives the seat. On a farm worker the checkout is a disposable source
 root the agent removes between leaves and evicts to bound the disk, so a seat
 parked in one fails an *unrelated* leaf's cleanup with `WinError 32` — the

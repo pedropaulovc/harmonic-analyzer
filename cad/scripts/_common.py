@@ -2413,6 +2413,46 @@ def _normal_path(path: str | Path) -> Path:
     return Path(os.path.normcase(os.path.realpath(path)))
 
 
+def _seat_park_directory() -> Path:
+    """An existing directory no build owns, for the seat to sit in.
+
+    The system temp directory is the intent, but ``tempfile.gettempdir()`` is
+    not a constant: it takes ``TMPDIR``/``TEMP``/``TMP`` from the environment
+    and, with none of them usable, falls back to the PROCESS CURRENT DIRECTORY
+    -- which under the farm helper IS the workspace being torn down. Parking
+    there would make this helper a silent no-op for exactly the bug it guards,
+    so every candidate is checked and a drive root, which no checkout can be,
+    is the last resort.
+
+    Disposable means this checkout AND every sibling checkout: a farm worker
+    keeps several source roots under one work root and removes them with the
+    same housekeeping, so parking in a sibling only moves which leaf fails.
+    ``FARM_WORK_ROOT`` is the worker's own name for that tree and reaches the
+    helper in its environment.
+    """
+
+    checkout = _normal_path(CAD_ROOT.parent)
+    disposable = [checkout]
+    work_root = os.environ.get("FARM_WORK_ROOT")
+    if work_root:
+        disposable.append(_normal_path(work_root))
+    windows = os.environ.get("SystemRoot") or os.environ.get("windir")
+    candidates = [Path(tempfile.gettempdir())]
+    if windows:
+        candidates.append(Path(windows) / "Temp")
+    candidates.append(Path(_normal_path(CAD_ROOT).anchor))
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        resolved = _normal_path(candidate)
+        if any(root == resolved or root in resolved.parents for root in disposable):
+            continue
+        return candidate
+    raise RuntimeError(
+        f"no seat working directory outside {disposable}: tried {candidates}"
+    )
+
+
 def release_seat_working_directory(sw: Any) -> str | None:
     """Park the seat's working directory where nothing is disposable; return it.
 
@@ -2450,7 +2490,7 @@ def release_seat_working_directory(sw: Any) -> str | None:
     failure).
     """
 
-    target = Path(tempfile.gettempdir())
+    target = _seat_park_directory()
     before = sw.GetCurrentWorkingDirectory()
     if type(before) is not str or not before:
         raise RuntimeError(f"seat working directory unreadable: {before!r}")
@@ -3935,7 +3975,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                                 seat_working_directory=left,
                             )
                     except Exception as exc:  # noqa: BLE001
-                        _telemetry.warn(f"seat working directory re-point failed: {exc}")
+                        _telemetry.warn(
+                            f"seat working directory re-point failed: {exc}"
+                        )
                     try:
                         await adapter.disconnect()
                         _telemetry.success("disconnected")
