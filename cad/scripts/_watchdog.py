@@ -105,6 +105,23 @@ def _info(message: str, **fields: object) -> None:
     _telemetry.info(message, watchdog_signal=True, **fields)
 
 
+# Provenance of the seat this session drives, pushed in by ``_common`` right
+# after connect (pushed rather than imported: ``_common`` imports this module).
+# A fatal watchdog signal is the one failure that leaves no build-side record at
+# all -- the process is gone before any handler runs -- so the abort must name
+# the seat it killed, or "SolidWorks crashed" stays unattributable to a pid,
+# a Windows session or a seat uptime.
+_seat_fields: dict[str, object] = {}
+
+
+def set_seat_provenance(fields: dict[str, object]) -> None:
+    """Record the ``seat_*`` provenance to attach to any later abort."""
+    global _seat_fields
+    _seat_fields = {
+        key: value for key, value in fields.items() if key.startswith("seat_")
+    }
+
+
 def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     """Record a fatal watchdog signal on BOTH telemetry channels, then flush.
 
@@ -114,10 +131,14 @@ def _abort(reason: str, message: str, code: int, **fields: object) -> None:
     explicit span a fatal exit would leave no trace-side record at all. Both
     carry the same structured attrs (reason / idle_s / last_op / exit code),
     so either channel alone reconstructs what happened."""
-    _error(message, reason=reason, exit_code=code, **fields)
+    _error(message, reason=reason, exit_code=code, **_seat_fields, **fields)
     with contextlib.suppress(Exception):
         with _telemetry.span(
-            "watchdog.abort", reason=reason, exit_code=code, **fields
+            "watchdog.abort",
+            reason=reason,
+            exit_code=code,
+            **_seat_fields,
+            **fields,
         ) as sp:
             sp.set_status(
                 _telemetry.Status(_telemetry.StatusCode.ERROR, f"{reason}: {message}")
