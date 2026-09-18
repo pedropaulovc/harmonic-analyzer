@@ -10,11 +10,17 @@ failed`` leaf on ``swmaker000005@5``:
   leaf records the leaked value as "the original" and faithfully restores it
   forever.  These tests pin the declared-constant behaviour that replaces it.
 
-* **The authoring audit.** Every raw sketch primitive in the diagnostics
-  recipes must be authored inside a control that defeats inference, rather than
-  inheriting whatever the seat happens to be set to.  This is the test that
-  stops the class from regrowing: a new recipe that calls ``CreateLine``
-  outside a guard fails here, offline, with the file and line named.
+* **The authoring audit.** Every raw sketch primitive in the DRAWING recipes,
+  the shared drawing helpers and the diagnostics recipes must be authored
+  inside a control that defeats inference, rather than inheriting whatever the
+  seat happens to be set to.  This is the test that stops the class from
+  regrowing: a new recipe that calls ``CreateLine`` outside a guard fails
+  here, offline, with the file and line named.  Its reach is declared as
+  NAMED GROUPS, each with its own minimum count, because this audit used to
+  walk ``DIAGNOSTICS_DIR`` alone -- the one directory where a drawing defect
+  cannot occur -- and so passed for its whole life while auditing nothing
+  relevant.  ``drawing:top_frame``'s oblique D-D cut plane
+  (``cad/docs/section-line-inference-snap.md``) is what that cost.
 
 * **The closure verdict's error policy.** ``assert_profile_closed`` decides
   from ONE shared read (``_common.record_sketch_closure``).  It must raise on a
@@ -27,6 +33,7 @@ failed`` leaf on ``swmaker000005@5``:
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -52,12 +59,26 @@ RAW_SKETCH_CALLS = frozenset({
     "CreateLine2",
     "CreateParabola",
     "CreatePolygon",
+    "CreatePoint",
     "Create3PointArc",
     "CreateSketchSlot",
     "CreateSketchText",
     "CreateSpline",
     "CreateTangentArc",
 })
+
+# ``CreatePoint`` is the one name two interfaces share, and only one of them
+# authors sketch geometry: ``ISketchManager.CreatePoint(x, y, z)`` takes three
+# doubles and puts a snappable point IN the sketch, while
+# ``IMathUtility.CreatePoint(array)`` takes ONE SafeArray of three doubles and
+# returns an ``IMathPoint`` that never enters a sketch -- every drawing recipe
+# uses it to transform sheet coordinates
+# (``utility.CreatePoint(double_array([x, y, 0.0]))``).  Discriminating by
+# ARGUMENT COUNT is structural, straight off the two declared signatures;
+# discriminating by receiver NAME would be a guess, and it would report every
+# coordinate transform in the drawing tier as unguarded geometry -- a gate
+# that cries wolf is a gate somebody switches off.
+MINIMUM_ARGUMENTS = {"CreatePoint": 3}
 
 # DELIBERATELY excluded: ``CreateSplinesByEqnParams2``, the only other
 # ``ISketchManager`` entity creator this repo calls
@@ -71,21 +92,189 @@ RAW_SKETCH_CALLS = frozenset({
 # user setting to change and a guard would be theatre.  Anything that grows
 # interactive point input belongs in the set above.
 
-# Contextmanagers that force the sketch preferences for their block.
-GUARD_CONTEXTMANAGERS = frozenset({"no_sketch_inference", "preference_override"})
+# The ONE idiom a drawing recipe may use to author raw sketch geometry:
+# ``_drawing_common.sketch_geometry_direct_to_db(sketch_manager)``, which
+# reads the previous ``AddToDB`` off the live COM property, sets it, and
+# restores it in ``finally``.  The audit keys on that NAME rather than on the
+# hand-rolled set/try/finally SHAPE deliberately: the shape has to get the
+# ``bool()``, the ``try`` and the ``finally`` right at every site, and a copy
+# whose restore sits on the wrong path -- in the ``try``, or skipped by an
+# early ``return`` -- leaves ``AddToDB`` flipped for the whole APPLICATION,
+# which outlives the document, the recipe and the leaf.  That persistence is
+# why seats drifting with inference OFF masked the oblique-cut defect for
+# weeks.  A shape matcher cannot tell a correct copy from that one; a name can.
+SKETCH_DB_CONTEXTMANAGER = "sketch_geometry_direct_to_db"
+
+# Contextmanagers that make a receiver safe, per tier.  The drawing tier has
+# exactly one; the diagnostics tier uses the APPLICATION-preference
+# suppressors in ``diag_mcmaster_lib``, which a production recipe must not
+# import (the diagnostics tree is not in any recipe's dependency closure).
+DRAWING_GUARDS = frozenset({SKETCH_DB_CONTEXTMANAGER})
+DIAGNOSTICS_GUARDS = frozenset({"no_sketch_inference", "preference_override"})
+
+# ``no_sketch_inference``/``preference_override`` write APPLICATION
+# preferences, so they cover every sketch manager in scope.
+# ``sketch_geometry_direct_to_db`` writes ONE manager's ``AddToDB``, so it
+# covers only the manager it was handed -- ``sk1`` says nothing about ``sk2``.
+RECEIVER_SCOPED_GUARDS = frozenset({SKETCH_DB_CONTEXTMANAGER})
+
+# The contextmanager's parameter, so its keyword spelling names the same
+# receiver its positional spelling does.
+GUARD_RECEIVER_KEYWORD = "sketch_manager"
 
 # Files exempt from the audit, with the reason.  Both drive a bare ``sw`` COM
 # application rather than the adapter -- there is no ``adapter`` to guard with
 # -- and both draw a single hard-coded circle into an EMPTY throwaway part, so
 # there is no model geometry and no second sketch entity for inference to snap
 # to.  They exist to reproduce COM/assembly semantics, not to build parts.
-# Keyed by path RELATIVE to the diagnostics directory, because the audit walks
-# the tree: a bare file name would also exempt a same-named file dropped into
-# any subdirectory, which is an exemption nobody wrote and nobody would see.
+# Keyed by path RELATIVE to the scripts directory, because the audit walks the
+# tree: a bare file name would also exempt a same-named file dropped into any
+# subdirectory, which is an exemption nobody wrote and nobody would see.
 AUDIT_EXEMPT = {
-    "diag_cwm_min.py": "raw swApp probe; one circle in an empty throwaway part",
-    "diag_cwm_gear_min.py": "raw swApp probe; circles in an empty throwaway part",
+    "diagnostics/diag_cwm_min.py": "raw swApp probe; one circle in an empty throwaway part",
+    "diagnostics/diag_cwm_gear_min.py": "raw swApp probe; circles in an empty throwaway part",
 }
+
+
+@dataclass(frozen=True)
+class _SourceGroup:
+    """One named set of files the audit must READ, with its own tier policy.
+
+    ``minimum`` is the anti-vacuity anchor and it is PER GROUP on purpose: one
+    count over the union still passes when a whole group drops out, which is
+    the shape of the defect this file is fixing.  A group that matches nothing
+    -- a renamed directory, a pattern that went one level stale -- fails
+    NAMING ITSELF instead of quietly contributing zero files.
+
+    Patterns are matched with ``rglob``, so a recipe moved into a subpackage
+    stays audited rather than falling silently out of reach.
+    """
+
+    root: Path
+    patterns: tuple[str, ...]
+    minimum: int
+    guards: frozenset[str]
+    inline_add_to_db_is_a_guard: bool
+
+    def files(self) -> list[Path]:
+        found = {
+            path for pattern in self.patterns for path in self.root.rglob(pattern)
+        }
+        return sorted(
+            path
+            for path in found
+            if path.relative_to(SCRIPTS_DIR).as_posix() not in AUDIT_EXEMPT
+        )
+
+
+# Every tier that authors sketch geometry through a guard this audit can read.
+# ``build_*.py``/``_common.py``/``_assembly.py`` are deliberately absent and
+# the reason is recorded in ``HAND_ROLLED_ADD_TO_DB`` rather than left as an
+# absent glob -- an exclusion nobody can see is how this audit came to walk
+# ``DIAGNOSTICS_DIR`` alone.
+#
+# The diagnostics tier still accepts the hand-rolled ``AddToDB`` try/finally,
+# because its three remaining users predate the contextmanager and cannot
+# import it; that tolerance is bounded, not open, because every one of those
+# writes is named in ``HAND_ROLLED_ADD_TO_DB`` and a new one fails as an
+# unregistered write.  So the hand-rolled shape can be used nowhere new.
+SOURCE_GROUPS = {
+    "drawing recipes": _SourceGroup(
+        SCRIPTS_DIR, ("draw_*.py",), 90, DRAWING_GUARDS, False
+    ),
+    "shared drawing helpers": _SourceGroup(
+        SCRIPTS_DIR, ("_drawing_common.py", "_stock_*.py"), 3, DRAWING_GUARDS, False
+    ),
+    "diagnostics recipes": _SourceGroup(
+        DIAGNOSTICS_DIR, ("*.py",), 150, DIAGNOSTICS_GUARDS, True
+    ),
+}
+
+_DRAWING_POLICY = SOURCE_GROUPS["drawing recipes"]
+_DIAGNOSTICS_POLICY = SOURCE_GROUPS["diagnostics recipes"]
+
+# Files that call a raw sketch primitive and are NOT in any group above, with
+# the reason.  This is the reach assertion: the audit's coverage is checked
+# against the tree rather than trusted, so a group deleted from
+# ``SOURCE_GROUPS`` -- or a new tier of recipes nobody enrolled -- fails
+# NAMING THE FILES it stopped auditing, instead of shrinking the audit in
+# silence.  Asserted for equality, so an entry that gets audited or migrated
+# must be deleted rather than left as a false statement about coverage.
+#
+# The whole model/assembly tier is here for ONE reason, and it is the build
+# graph, not layering: the shared helper lives in ``_drawing_common.py``,
+# which only drawing recipes import, so guarding these files means promoting
+# it to ``_common.py`` -- in the helper closure of every part and assembly
+# recipe, i.e. ~100 recipe digests and hours of farm time on a seat-limited
+# fleet.  The drawing tier's digests are already moving this run, so the
+# drawing half cost no extra COM work.  The hazard here is UNFIXED, not
+# absent.
+UNAUDITED_RAW_SKETCH_FILES = {
+    "_assembly.py": "assembly tier; CreateEllipse",
+    "_common.py": "model tier; CreateCenterRectangle",
+    "_holes.py": "model tier; hole-wizard CreatePoint",
+    "build_magnifying_wheel.py": "model tier; CreatePoint",
+    "build_motion_study_springs.py": "model tier; CreatePoint",
+    "build_output_fixture.py": "model tier; CreatePoint",
+    "build_rocker_arm_support.py": "model tier; CreateLine",
+}
+
+# The single place allowed to write ``AddToDB`` by hand: the contextmanager's
+# own body.  This is a SCOPE permission, not a line permission -- see
+# :func:`_add_to_db_writers`.
+ADD_TO_DB_ALLOW_LIST = f"_drawing_common.py::{SKETCH_DB_CONTEXTMANAGER}"
+
+# Every place OUTSIDE that one definition which still writes ``AddToDB`` by
+# hand, keyed ``<path relative to cad/scripts>::<enclosing function>``, with
+# the reason it is not migrated.  A permission with no liveness check is
+# untestable by construction, so this registry is asserted for EQUALITY
+# against the tree: a new hand-rolled copy anywhere fails as an unregistered
+# write, and an entry whose site HAS been migrated fails as a stale exemption
+# that must be deleted.  It therefore self-deletes on migration instead of
+# rotting into permanent cover for a gap nobody can see.
+HAND_ROLLED_ADD_TO_DB = {
+    # Model tier.  The correct fix is this same contextmanager promoted to
+    # ``_common.py``, done when a full cold rebuild is already being paid for:
+    # ``_common.py`` sits in the helper closure of every part and assembly
+    # recipe, so touching it moves ~100 recipe digests and every assembly's.
+    # ``_drawing_common.py`` is imported only by drawing recipes, whose
+    # digests are already moving this run.  The hazard is real and unfixed:
+    # these sites carry the same application-level preference that outlives
+    # the leaf, and ``set_sketch_direct_db`` is a PAIRED call with no
+    # ``finally``, so a raise between its True and its False leaks the flag.
+    "_common.py::set_sketch_direct_db": "model tier's paired toggle; 50 build recipes call it",
+    "_common.py::define_circle": "model tier sketch helper",
+    "_common.py::define_centered_rectangle": "model tier sketch helper",
+    "_common.py::add_line_chain": "model tier sketch helper",
+    "_assembly.py::insert_sketch_text": "assembly tier sketch helper",
+    "_assembly.py::add_ellipse": "assembly tier sketch helper",
+    "_features.py::sketch_rounded_rect": "model tier feature helper",
+    "_holes.py::wizard_holes": "model tier hole wizard",
+    "build_motion_study_springs.py::_eye_point": "build recipe; authors no drawing",
+    "build_rocker_arm_support.py::_add_construction_diagonals": "build recipe; authors no drawing",
+    # Diagnostics tier.  These probe COM behaviour rather than build shipped
+    # geometry, and two of them have inference itself as their SUBJECT, so
+    # writing the preference is the experiment.
+    "diagnostics/diag_build_91829A560.py::build_91829A560": "diagnostics probe",
+    "diagnostics/diag_build_9489T111.py::_wire_path": "diagnostics probe",
+    "diagnostics/diag_build_9490T1.py::_wire_path": "diagnostics probe",
+    "diagnostics/diag_mcmaster_lib.py::draw_closed_profile": "diagnostics library; runs inside no_sketch_inference",
+    "diagnostics/exp_inference_determinism.py::_one": "inference experiment; AddToDB is the subject",
+    "diagnostics/exp_inference_zoom.py::_build_inference": "inference experiment; AddToDB is the subject",
+    "diagnostics/exp_inference_zoom.py::main": "inference experiment; AddToDB is the subject",
+}
+
+# Test modules are outside that registry: their ``AddToDB`` assignments are a
+# FAKE sketch manager initialising its own attribute, not a write to a seat
+# preference.  The exclusion is pinned rather than assumed -- these fakes must
+# still carry such a write -- so it is re-justified if they change shape,
+# instead of silently covering a real write a test file grew later.
+TEST_FAKE_ADD_TO_DB_ANCHORS = {
+    "test_failure_forensics.py": "__init__",
+    "test_rocker_arm_support_drawing.py": "__init__",
+}
+
+_MODULE_SCOPE = "<module>"
 
 
 class _SwApp:
@@ -379,21 +568,51 @@ def test_a_silently_declined_baseline_write_is_not_reported_as_a_repair(
     assert warnings == [], "a refused write was announced as a completed repair"
 
 
-def _is_guard_call(expr: ast.expr) -> bool:
-    """Is ``expr`` a call to one of the guard contextmanagers?
+def _is_guard_call(expr: ast.expr, guards: frozenset[str]) -> frozenset[str]:
+    """Receivers the contextmanager ``expr`` covers; empty if it is not one.
 
     Both spellings count: a bare ``no_sketch_inference(adapter)`` and a
     qualified ``diag.no_sketch_inference(adapter)``.  Matching only the bare
     name would make the audit report every primitive inside a legitimately
     guarded block the moment a recipe imported the module instead of the
     function -- a false alarm, which is how a gate gets switched off.
+
+    An APPLICATION-preference guard covers every manager in scope.
+    ``sketch_geometry_direct_to_db`` writes ONE manager's ``AddToDB``, so it
+    covers only the manager it was handed: crediting it to a second manager
+    would bless a primitive that really did go through the inference engine.
     """
     if not isinstance(expr, ast.Call):
-        return False
+        return frozenset()
     func = expr.func
     if isinstance(func, ast.Name):
-        return func.id in GUARD_CONTEXTMANAGERS
-    return isinstance(func, ast.Attribute) and func.attr in GUARD_CONTEXTMANAGERS
+        name = func.id
+    elif isinstance(func, ast.Attribute):
+        name = func.attr
+    else:
+        return frozenset()
+    if name not in guards:
+        return frozenset()
+    if name not in RECEIVER_SCOPED_GUARDS:
+        return frozenset({_EVERY_RECEIVER})
+    receiver = _guard_receiver(expr)
+    return frozenset() if receiver is None else frozenset({receiver})
+
+
+def _guard_receiver(expr: ast.Call) -> str | None:
+    """The sketch manager a receiver-scoped guard was handed, if it is named.
+
+    The positional and keyword spellings have to agree, and a call this walk
+    cannot read (``*args``) covers nothing rather than everything.
+    """
+    for argument in expr.args:
+        if isinstance(argument, ast.Starred):
+            return None
+        return ast.unparse(argument)
+    for keyword in expr.keywords:
+        if keyword.arg == GUARD_RECEIVER_KEYWORD:
+            return ast.unparse(keyword.value)
+    return None
 
 
 def _add_to_db_assignment(node: ast.AST) -> tuple[str, ast.expr] | None:
@@ -469,22 +688,46 @@ def _try_guarded_receivers(
     return frozenset(active - inside)
 
 
+def _is_raw_primitive_call(node: ast.AST) -> bool:
+    """Is ``node`` a call that puts raw geometry into a sketch?
+
+    ``MINIMUM_ARGUMENTS`` discriminates the shared ``CreatePoint`` name by
+    signature.  A STARRED argument defeats the count -- ``CreatePoint(*(value
+    / 1000.0 for value in local_point))`` in ``build_motion_study_springs`` is
+    the sketch overload spelled through an unpack -- so a call whose arity
+    this walk cannot read counts as the sketch one.  An audit that cannot tell
+    must report, never quietly skip.
+    """
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return False
+    if node.func.attr not in RAW_SKETCH_CALLS:
+        return False
+    minimum = MINIMUM_ARGUMENTS.get(node.func.attr, 0)
+    if not minimum or any(isinstance(argument, ast.Starred) for argument in node.args):
+        return True
+    return len(node.args) >= minimum
+
+
 def _check_call(node: ast.Call, guards: frozenset[str]) -> tuple[int, str] | None:
     """Report ``node`` if it is a raw primitive whose RECEIVER is unguarded.
 
     ``sk1.AddToDB = True`` says nothing about primitives drawn through ``sk2``,
     so the call's own receiver has to be the guarded one.
     """
-    func = node.func
-    if not isinstance(func, ast.Attribute) or func.attr not in RAW_SKETCH_CALLS:
+    if not _is_raw_primitive_call(node):
         return None
+    func = node.func
     if _EVERY_RECEIVER in guards or ast.unparse(func.value) in guards:
         return None
     return (node.lineno, func.attr)
 
 
 def _visit(
-    node: ast.AST, guards: frozenset[str], found: list, enabled: dict[str, bool]
+    node: ast.AST,
+    guards: frozenset[str],
+    found: list,
+    enabled: dict[str, bool],
+    policy: _SourceGroup,
 ) -> set[str]:
     """Walk ``node``, carrying what is guarded and enabled at this point.
 
@@ -496,10 +739,9 @@ def _visit(
         # HERE says anything about it -- and by the same argument a disable
         # in there says nothing about the code around it.
         guards, enabled = frozenset(), {}
-    if isinstance(node, (ast.With, ast.AsyncWith)) and any(
-        _is_guard_call(item.context_expr) for item in node.items
-    ):
-        guards = guards | {_EVERY_RECEIVER}
+    if isinstance(node, (ast.With, ast.AsyncWith)):
+        for item in node.items:
+            guards = guards | _is_guard_call(item.context_expr, policy.guards)
     if isinstance(node, ast.Call):
         offender = _check_call(node, guards)
         if offender is not None:
@@ -508,11 +750,11 @@ def _visit(
     for _field, value in ast.iter_fields(node):
         items = value if isinstance(value, list) else [value]
         if items and all(isinstance(item, ast.stmt) for item in items):
-            disabled |= _visit_suite(items, guards, found, enabled)
+            disabled |= _visit_suite(items, guards, found, enabled, policy)
             continue
         for item in items:
             if isinstance(item, ast.AST):
-                disabled |= _visit(item, guards, found, enabled)
+                disabled |= _visit(item, guards, found, enabled, policy)
     return set() if isinstance(node, _DEFERRED_CODE) else disabled
 
 
@@ -520,7 +762,8 @@ def _visit_suite(
     suite: list[ast.stmt],
     guards: frozenset[str],
     found: list,
-    enabled: dict[str, bool] | None = None,
+    enabled: dict[str, bool] | None,
+    policy: _SourceGroup,
 ) -> set[str]:
     """Walk a statement suite IN ORDER, tracking ``AddToDB`` as it changes.
 
@@ -536,6 +779,14 @@ def _visit_suite(
     State flows DOWN by copy, so one branch cannot enable a receiver for its
     siblings, and a disable flows back UP via the return value, so a branch
     this walk cannot evaluate is assumed to have taken it.
+
+    ``policy.inline_add_to_db_is_a_guard`` is what makes the drawing tier
+    stricter than the diagnostics tier: there, only
+    ``sketch_geometry_direct_to_db`` counts, and the hand-rolled
+    set/try/finally is refused even when it is written correctly, because a
+    matcher cannot distinguish a correct copy from one whose restore an early
+    ``return`` skips -- and that copy leaves the preference flipped for the
+    whole application.
     """
     state = dict(enabled or {})
     disabled: set[str] = set()
@@ -555,25 +806,90 @@ def _visit_suite(
             else:
                 disabled.add(receiver)
         if isinstance(stmt, ast.Try) and stmt.finalbody:
-            active = _try_guarded_receivers(stmt, state)
-            sink(_visit_suite(stmt.body, guards | active, found, state))
+            active = (
+                _try_guarded_receivers(stmt, state)
+                if policy.inline_add_to_db_is_a_guard
+                else frozenset()
+            )
+            sink(_visit_suite(stmt.body, guards | active, found, state, policy))
             # An `except`/`else`/`finally` clause runs after or instead of the
             # guarded work -- and the restore itself lives in `finally` -- so
             # a primitive there is not covered by the enable.
             for handler in stmt.handlers:
-                sink(_visit(handler, guards, found, state))
+                sink(_visit(handler, guards, found, state, policy))
             for clause in (stmt.orelse, stmt.finalbody):
                 if clause:
-                    sink(_visit_suite(clause, guards, found, state))
+                    sink(_visit_suite(clause, guards, found, state, policy))
             continue
-        sink(_visit(stmt, guards, found, state))
+        sink(_visit(stmt, guards, found, state, policy))
     return disabled
 
 
-def _unguarded_raw_calls(path: Path) -> list[tuple[int, str]]:
+def _unguarded_raw_calls(path: Path, policy: _SourceGroup) -> list[tuple[int, str]]:
     found: list[tuple[int, str]] = []
-    _visit_suite(ast.parse(path.read_text(encoding="utf-8")).body, frozenset(), found)
+    _visit_suite(
+        ast.parse(path.read_text(encoding="utf-8")).body,
+        frozenset(),
+        found,
+        None,
+        policy,
+    )
     return sorted(found)
+
+
+def _add_to_db_writers(path: Path) -> dict[str, list[int]]:
+    """``{enclosing function: lines}`` for every direct ``*.AddToDB = ...``.
+
+    The permission this feeds is a SCOPE condition -- "only inside the
+    contextmanager's own definition" -- and text cannot express a scope: a
+    line matcher for ``sketch_manager.AddToDB = True`` permits that line
+    anywhere in the file, including at a site that never got migrated, which
+    is exactly the hole the audit exists to close.  So the enclosing function
+    is carried DOWN the tree (``ast.walk`` discards the parent link) and the
+    INNERMOST one is reported: a write inside a nested helper is that
+    helper's, not its parent's.
+
+    Only ASSIGNMENTS count.  READING ``AddToDB`` is how the contextmanager
+    learns what to restore, so reporting a read would make the audit fail on
+    the very definition it requires -- a check whose only route to green is
+    being weakened into decoration.
+    """
+    writers: dict[str, list[int]] = {}
+
+    def walk(node: ast.AST, function: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            inner = (
+                child.name
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                else function
+            )
+            if _add_to_db_assignment(child) is not None:
+                writers.setdefault(function, []).append(child.lineno)
+            walk(child, inner)
+
+    walk(ast.parse(path.read_text(encoding="utf-8")), _MODULE_SCOPE)
+    return writers
+
+
+def _preference_write_tree() -> list[Path]:
+    """Every non-test module under ``cad/scripts``, for the write registry."""
+    return [
+        path
+        for path in sorted(SCRIPTS_DIR.rglob("*.py"))
+        if not path.name.startswith("test_")
+    ]
+
+
+def _raw_sketch_calls_in(path: Path) -> bool:
+    """Does ``path`` call a raw sketch primitive at all, guarded or not?
+
+    Reach, not correctness: this is what decides whether a file OUGHT to be
+    audited, so it ignores guards entirely.
+    """
+    return any(
+        _is_raw_primitive_call(node)
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+    )
 
 
 def test_every_raw_sketch_primitive_is_authored_under_a_guard() -> None:
@@ -586,33 +902,155 @@ def test_every_raw_sketch_primitive_is_authored_under_a_guard() -> None:
     geometry, which is per-seat, unasserted and unrecorded.  That is not a
     setting that can be normalised; it is a dependency that has to go.
     """
-    # rglob, not glob: a recipe moved into a subpackage must not fall out of
-    # the audit silently.  And the audited set is asserted non-empty, because
-    # a renamed or missing directory would otherwise make this whole gate pass
-    # by inspecting nothing -- the failure mode that turns a regression gate
-    # into decoration.
-    audited = [
-        path
-        for path in sorted(DIAGNOSTICS_DIR.rglob("*.py"))
-        if str(path.relative_to(DIAGNOSTICS_DIR).as_posix()) not in AUDIT_EXEMPT
-    ]
-    assert len(audited) > 20, (
-        f"the audit inspected {len(audited)} files under {DIAGNOSTICS_DIR}; "
-        "it is meant to cover every recipe in the tree"
-    )
-    offenders = {
-        path.name: calls
-        for path in audited
-        for calls in [_unguarded_raw_calls(path)]
-        if calls
-    }
+    offenders: list[tuple[str, str, int, str]] = []
+    for name, group in SOURCE_GROUPS.items():
+        parsed = 0
+        for path in group.files():
+            # PARSING is the proof the audit really read this file: a path
+            # that moved raises here instead of contributing zero findings.
+            # Emptiness is not the signal -- ``diagnostics/__init__.py`` is
+            # legitimately empty -- the per-group COUNT is.
+            calls = _unguarded_raw_calls(path, group)
+            parsed += 1
+            offenders.extend(
+                (name, path.relative_to(SCRIPTS_DIR).as_posix(), line, call)
+                for line, call in calls
+            )
+        # Per-group anti-vacuity, named.  One count over the union still
+        # passes when a WHOLE group drops out, and a group that matches
+        # nothing -- a renamed directory, a pattern gone one level stale after
+        # an innocent file move -- must fail saying which group it was rather
+        # than quietly contributing zero files.
+        assert parsed >= group.minimum, (
+            f"source group {name!r} read {parsed} files "
+            f"({', '.join(group.patterns)} under {group.root}), expected at "
+            f"least {group.minimum}: the files this audit claims to audit "
+            "have moved or gone, so it would pass by inspecting nothing"
+        )
 
-    assert offenders == {}, "\n".join(
-        f"{name}:{line} {call} is outside a suppression block or AddToDB=True "
-        "try/finally"
-        for name, calls in offenders.items()
-        for line, call in calls
+    assert offenders == [], "\n".join(
+        f"{relative}:{line} {call} is not inside "
+        f"{' or '.join(sorted(SOURCE_GROUPS[name].guards))}(...) "
+        f"[{name}]"
+        for name, relative, line, call in offenders
     )
+
+
+def test_every_file_that_authors_sketch_geometry_is_claimed() -> None:
+    """The audit's REACH, asserted against the tree instead of trusted.
+
+    The defect this file exists to close was reach, not logic: the scan walked
+    ``DIAGNOSTICS_DIR`` alone -- the one directory where a drawing defect
+    cannot occur -- and passed for its whole life while auditing nothing
+    relevant.  A per-group count cannot catch that, because a group deleted
+    from ``SOURCE_GROUPS`` takes its own count with it.  So every file in the
+    tree that calls a raw primitive must be either audited or NAMED as
+    unaudited, and dropping a group fails here listing the files it stopped
+    covering.
+    """
+    audited = {path for group in SOURCE_GROUPS.values() for path in group.files()}
+    exempt = {SCRIPTS_DIR / relative for relative in AUDIT_EXEMPT}
+    unclaimed = sorted(
+        path.relative_to(SCRIPTS_DIR).as_posix()
+        for path in _preference_write_tree()
+        if path not in audited
+        and path not in exempt
+        and _raw_sketch_calls_in(path)
+        and path.relative_to(SCRIPTS_DIR).as_posix() not in UNAUDITED_RAW_SKETCH_FILES
+    )
+    assert unclaimed == [], (
+        "these files author raw sketch geometry and no source group reads "
+        f"them: {', '.join(unclaimed)} -- enrol them in SOURCE_GROUPS, or "
+        "name them in UNAUDITED_RAW_SKETCH_FILES with the reason"
+    )
+    covered = {
+        path.relative_to(SCRIPTS_DIR).as_posix()
+        for path in audited
+        if _raw_sketch_calls_in(path)
+    }
+    claimed_but_audited = sorted(covered & set(UNAUDITED_RAW_SKETCH_FILES))
+    assert claimed_but_audited == [], (
+        f"named unaudited but now audited: {', '.join(claimed_but_audited)}"
+        " -- delete the entry; it reads as a statement that the gap is still "
+        "open"
+    )
+    gone = sorted(
+        relative
+        for relative in UNAUDITED_RAW_SKETCH_FILES
+        if not (SCRIPTS_DIR / relative).exists()
+        or not _raw_sketch_calls_in(SCRIPTS_DIR / relative)
+    )
+    assert gone == [], (
+        f"named unaudited but no longer authors sketch geometry: "
+        f"{', '.join(gone)} -- delete the entry"
+    )
+
+
+def test_the_only_hand_rolled_preference_writes_are_the_registered_ones() -> None:
+    """``AddToDB`` may be written by hand in ONE place, and nowhere new.
+
+    This is the half that makes the name-keyed guard honest.  Without it a
+    recipe could keep its own set/try/finally next to a guarded call and the
+    primitive audit would say nothing, so the eight hand-rolled copies the
+    contextmanager replaced could simply regrow.
+
+    Equality, in both directions, on purpose: an unregistered write is a new
+    copy, and a registered write that is GONE is an exemption asserting a
+    false fact -- documentation the next reader trusts.  A permission with no
+    liveness check is untestable by construction.
+    """
+    derived = {
+        f"{path.relative_to(SCRIPTS_DIR).as_posix()}::{function}"
+        for path in _preference_write_tree()
+        for function in _add_to_db_writers(path)
+    }
+    unregistered = sorted(derived - {ADD_TO_DB_ALLOW_LIST} - set(HAND_ROLLED_ADD_TO_DB))
+    assert unregistered == [], (
+        "hand-rolled AddToDB juggling outside "
+        f"{ADD_TO_DB_ALLOW_LIST}: {', '.join(unregistered)} -- author the "
+        f"geometry inside {SKETCH_DB_CONTEXTMANAGER}(...) instead, so the "
+        "restore cannot be skipped by a path nobody tested"
+    )
+    stale = sorted(set(HAND_ROLLED_ADD_TO_DB) - derived)
+    assert stale == [], (
+        f"exempt but no longer hand-rolling the preference: {', '.join(stale)}"
+        " -- delete the exemption; it now excuses nothing and reads as a "
+        "statement that the gap is still open"
+    )
+
+
+def test_the_one_allowed_preference_writer_is_a_live_definition() -> None:
+    """The audit's single permission must point at code that exists.
+
+    This is the self-rejection hazard, which is the vacuity class inverted: if
+    the write moves out of ``sketch_geometry_direct_to_db`` into a helper, the
+    scan refuses the definition it requires, every drawing recipe is reported
+    and the cheapest way to green becomes weakening the guard.  Naming the
+    move here says what actually happened.
+    """
+    writers = _add_to_db_writers(SCRIPTS_DIR / "_drawing_common.py")
+    assert SKETCH_DB_CONTEXTMANAGER in writers, (
+        f"_drawing_common.py writes AddToDB in {sorted(writers)} but not in "
+        f"{SKETCH_DB_CONTEXTMANAGER}: the audit's one permission is scoped to "
+        "that definition, so the preference scoping has moved out of the only "
+        "place allowed to do it"
+    )
+
+
+def test_the_test_module_exclusion_still_covers_only_fake_managers() -> None:
+    """Test modules are outside the write registry because their fakes assign
+    their OWN ``AddToDB`` attribute.  Pinned, so the exclusion cannot quietly
+    start covering a real preference write a test file grew later.
+    """
+    for name, function in TEST_FAKE_ADD_TO_DB_ANCHORS.items():
+        path = SCRIPTS_DIR / name
+        assert path.exists(), f"exclusion names a file that is gone: {name}"
+        writers = _add_to_db_writers(path)
+        assert function in writers, (
+            f"{name} no longer assigns AddToDB in {function} (writes: "
+            f"{sorted(writers)}): the test-module exclusion is covering "
+            "something else now, so re-justify it"
+        )
 
 
 def test_the_audit_exemptions_still_exist_and_are_still_raw_com_probes() -> None:
@@ -622,12 +1060,14 @@ def test_the_audit_exemptions_still_exist_and_are_still_raw_com_probes() -> None
     belongs in the audit.
     """
     for relative, reason in AUDIT_EXEMPT.items():
-        path = DIAGNOSTICS_DIR / relative
+        path = SCRIPTS_DIR / relative
         assert path.exists(), f"exemption for a file that no longer exists: {relative}"
         assert reason
         source = path.read_text(encoding="utf-8")
         assert "no_sketch_inference" not in source
-        assert _unguarded_raw_calls(path), f"{relative} no longer needs an exemption"
+        assert _unguarded_raw_calls(path, _DIAGNOSTICS_POLICY), (
+            f"{relative} no longer needs an exemption"
+        )
 
 
 def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:
@@ -642,11 +1082,20 @@ def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(3, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(3, "CreateLine")]
 
 
-def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
-    """The engine-level control: enable before the try, restore in finally."""
+def test_a_real_add_to_db_block_is_a_guard_only_in_the_diagnostics_tier(
+    tmp_path: Path,
+) -> None:
+    """The hand-rolled engine-level control: enable, restore in ``finally``.
+
+    It is still a real guard where it is the only option (three diagnostics
+    recipes predate the contextmanager and cannot import it), and it is
+    refused where the contextmanager exists.  Both halves in one test, because
+    the tier difference IS the invariant: 28 lines of duplicated preference
+    juggling become unreachable rather than merely correct today.
+    """
     good = tmp_path / "diag_build_addtodb.py"
     good.write_text(
         "async def build(adapter):\n"
@@ -660,7 +1109,12 @@ def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(good) == []
+    assert _unguarded_raw_calls(good, _DIAGNOSTICS_POLICY) == []
+    # ... and is REFUSED in the drawing tier, where the contextmanager exists.
+    # A correct copy and a copy whose restore an early ``return`` skips are
+    # the same four lines to a matcher, and the second leaves the preference
+    # flipped for the whole application, outliving the leaf.
+    assert _unguarded_raw_calls(good, _DRAWING_POLICY) == [(6, "CreateLine")]
 
 
 def test_an_intervening_disable_cancels_the_guard(tmp_path: Path) -> None:
@@ -683,7 +1137,7 @@ def test_an_intervening_disable_cancels_the_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(6, "CreateLine")]
 
 
 def test_an_enable_on_a_different_receiver_is_not_a_guard(tmp_path: Path) -> None:
@@ -706,7 +1160,7 @@ def test_an_enable_on_a_different_receiver_is_not_a_guard(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(6, "CreateLine")]
 
 
 def test_a_disable_inside_the_block_ends_the_guard(tmp_path: Path) -> None:
@@ -729,7 +1183,7 @@ def test_a_disable_inside_the_block_ends_the_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(6, "CreateLine")]
 
 
 def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> None:
@@ -752,7 +1206,9 @@ def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(9, "CreateCircleByRadius")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [
+        (9, "CreateCircleByRadius")
+    ]
 
 
 def test_a_reset_in_an_except_clause_does_not_unguard_the_body(
@@ -781,7 +1237,7 @@ def test_a_reset_in_an_except_clause_does_not_unguard_the_body(
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(guarded) == []
+    assert _unguarded_raw_calls(guarded, _DIAGNOSTICS_POLICY) == []
 
 
 def test_a_call_on_an_unguarded_receiver_inside_the_block_is_reported(
@@ -809,7 +1265,7 @@ def test_a_call_on_an_unguarded_receiver_inside_the_block_is_reported(
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(8, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(8, "CreateLine")]
 
 
 def test_a_nested_function_does_not_inherit_the_guard(tmp_path: Path) -> None:
@@ -830,7 +1286,7 @@ def test_a_nested_function_does_not_inherit_the_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(5, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(5, "CreateLine")]
 
 
 def test_a_nested_function_with_its_own_guard_is_clean(tmp_path: Path) -> None:
@@ -850,7 +1306,7 @@ def test_a_nested_function_with_its_own_guard_is_clean(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(guarded) == []
+    assert _unguarded_raw_calls(guarded, _DIAGNOSTICS_POLICY) == []
 
 
 def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
@@ -869,7 +1325,7 @@ def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(guarded) == []
+    assert _unguarded_raw_calls(guarded, _DIAGNOSTICS_POLICY) == []
 
 
 def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
@@ -893,7 +1349,7 @@ def test_a_finally_that_never_enabled_add_to_db_is_not_a_guard(
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(4, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(4, "CreateLine")]
 
 
 def test_an_enable_in_an_outer_suite_still_guards_a_nested_block(
@@ -920,7 +1376,7 @@ def test_an_enable_in_an_outer_suite_still_guards_a_nested_block(
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(guarded) == []
+    assert _unguarded_raw_calls(guarded, _DIAGNOSTICS_POLICY) == []
 
 
 def test_a_disable_in_a_branch_cancels_a_later_guard(tmp_path: Path) -> None:
@@ -946,7 +1402,7 @@ def test_a_disable_in_a_branch_cancels_a_later_guard(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(offender) == [(8, "CreateLine")]
+    assert _unguarded_raw_calls(offender, _DIAGNOSTICS_POLICY) == [(8, "CreateLine")]
 
 
 def test_a_disable_inside_a_nested_function_does_not_leak_out(
@@ -974,7 +1430,104 @@ def test_a_disable_inside_a_nested_function_does_not_leak_out(
         encoding="utf-8",
     )
 
-    assert _unguarded_raw_calls(guarded) == []
+    assert _unguarded_raw_calls(guarded, _DIAGNOSTICS_POLICY) == []
+
+
+def test_the_drawing_guard_covers_the_manager_it_was_handed(tmp_path: Path) -> None:
+    """The idiom a migrated drawing recipe uses, in both spellings."""
+    guarded = tmp_path / "draw_guarded.py"
+    guarded.write_text(
+        "def _detail(draw, sketch_manager):\n"
+        "    with sketch_geometry_direct_to_db(sketch_manager):\n"
+        "        sketch_manager.CreateCenterLine(0.0, 0.0, 0.0, 1.0, 0.0, 0.0)\n"
+        "    with dc.sketch_geometry_direct_to_db(sketch_manager=sketch_manager):\n"
+        "        sketch_manager.CreateCircle(0.0, 0.0, 0.0, 1.0, 0.0, 0.0)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded, _DRAWING_POLICY) == []
+
+
+def test_the_drawing_guard_does_not_cover_a_second_manager(tmp_path: Path) -> None:
+    """It writes ONE manager's ``AddToDB``, so it protects only that one.
+
+    An assembly drawing holding the sheet's manager and a view's is the
+    realistic shape; crediting the block to both would bless a primitive that
+    really did go through the inference engine.
+    """
+    offender = tmp_path / "draw_two_managers.py"
+    offender.write_text(
+        "def _detail(sk1, sk2):\n"
+        "    with sketch_geometry_direct_to_db(sk1):\n"
+        "        sk1.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "        sk2.CreateLine(0.0, 0.0, 0.0, 2.0, 2.0, 0.0)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender, _DRAWING_POLICY) == [(4, "CreateLine")]
+
+
+def test_the_diagnostics_suppressors_do_not_guard_a_drawing_recipe(
+    tmp_path: Path,
+) -> None:
+    """One spelling per tier.  ``no_sketch_inference`` lives in the
+    diagnostics tree, which is in no recipe's dependency closure, so a
+    drawing recipe reaching for it is not authored correctly -- it is
+    authored against a module it must not import.
+    """
+    offender = tmp_path / "draw_wrong_guard.py"
+    offender.write_text(
+        "def _detail(adapter, sk):\n"
+        "    with no_sketch_inference(adapter):\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender, _DRAWING_POLICY) == [(3, "CreateLine")]
+
+
+def test_a_preference_write_is_attributed_to_its_enclosing_function(
+    tmp_path: Path,
+) -> None:
+    """The permission is a SCOPE, not a line.
+
+    The same assignment appears three times here: inside the allow-listed
+    contextmanager, inside a sibling function, and inside a nested helper.  A
+    text matcher for the line permits all three, which would bless every
+    unmigrated site in a file that merely CONTAINS the definition.  Only the
+    innermost enclosing function is credited, and a READ is not a write.
+    """
+    module = tmp_path / "_drawing_common_like.py"
+    module.write_text(
+        "import contextlib\n"
+        "\n"
+        "@contextlib.contextmanager\n"
+        "def sketch_geometry_direct_to_db(sketch_manager):\n"
+        "    previous = bool(sketch_manager.AddToDB)\n"
+        "    sketch_manager.AddToDB = True\n"
+        "    try:\n"
+        "        yield\n"
+        "    finally:\n"
+        "        sketch_manager.AddToDB = previous\n"
+        "\n"
+        "def _unmigrated(sketch_manager):\n"
+        "    sketch_manager.AddToDB = True\n"
+        "\n"
+        "def _outer(sketch_manager):\n"
+        "    def _inner():\n"
+        "        sketch_manager.AddToDB = False\n"
+        "    _inner()\n"
+        "\n"
+        "def _only_reads(sketch_manager):\n"
+        "    return bool(sketch_manager.AddToDB)\n",
+        encoding="utf-8",
+    )
+
+    assert _add_to_db_writers(module) == {
+        "sketch_geometry_direct_to_db": [6, 10],
+        "_unmigrated": [13],
+        "_inner": [17],
+    }
 
 
 def _verdict(monkeypatch, verdict: dict, *, loops: int = 2) -> dict:
