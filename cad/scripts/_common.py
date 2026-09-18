@@ -3282,13 +3282,20 @@ def _sketch_state(
     status = adapter._attempt(lambda: int(resolved.GetConstrainedStatus()), default=None)
     state["constrained_status"] = status
     state["constrained"] = _CONSTRAINED_STATUS.get(status, "unknown")
-    state.update(adapter._attempt(lambda: _point_census(resolved), default={}) or {})
+    try:
+        state.update(_point_census(resolved))
+    except Exception as exc:  # noqa: BLE001 - a lost census must SAY it was lost
+        state["point_census_error"] = f"{type(exc).__name__}: {exc}"
     if expected_points is not None:
+        # Compare against the POINT COUNT, not the distinct positions: coincident
+        # endpoints occupy the SAME place whether or not they merged, so distinct
+        # positions are identical in both cases and only the point count moves
+        # (N when merged, 2N when not). >0 means merges the author declared MUST
+        # happen did not.
         state["expected_distinct_points"] = expected_points
-        distinct = state.get("distinct_point_positions")
-        if isinstance(distinct, int):
-            # >0 means merges that the author declared MUST happen did not.
-            state["missing_merges"] = distinct - expected_points
+        points = state.get("point_count")
+        if isinstance(points, int):
+            state["unmerged_points"] = points - expected_points
     return state
 
 

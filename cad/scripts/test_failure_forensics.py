@@ -641,22 +641,70 @@ def test_sketch_manager_state_is_captured_separately_from_preferences(tmp_path):
 
 
 def test_expected_points_turns_the_census_into_a_verdict(tmp_path):
-    """An author that declares how many distinct points a merged profile has
-    lets the artefact state the discrepancy instead of leaving it to be
-    counted: 18 distinct where 9 were expected means nothing merged."""
-    corners = [(0.001 * n, 0.0, 0.0) for n in range(18)]
+    """An author that declares how many points a MERGED profile keeps lets the
+    artefact state the verdict instead of leaving it to be counted.
+
+    The fingerprint is the point COUNT, not the distinct positions: two
+    exactly-coincident endpoints sit at the same place whether or not they
+    merged, so an unmerged 9-segment ring reports 18 points across 9 distinct
+    places -- nine coincident pairs, nine merges that did not happen.
+    """
+    places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
     with pytest.raises(RuntimeError):
         _common.capture_com_failure(
             _unmerged_profile(tmp_path),
             "logo-ring-extrude",
             "logo ring extrude failed",
-            sketch=_Sketch(contours=0, points=corners),
+            sketch=_Sketch(contours=0, points=places + places),
             expected_points=9,
         )
 
     sketch = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())["sketch"]
     assert sketch["expected_distinct_points"] == 9
-    assert sketch["missing_merges"] == 9
+    assert sketch["point_count"] == 18
+    assert sketch["distinct_point_positions"] == 9
+    assert sketch["coincident_point_pairs"] == 9
+    assert sketch["unmerged_points"] == 9
+
+
+def test_a_merged_profile_reports_no_unmerged_points(tmp_path):
+    """The control: the same declaration against a profile whose endpoints DID
+    merge must read zero, or the verdict means nothing."""
+    places = [(0.001 * n, 0.0, 0.0) for n in range(9)]
+    with pytest.raises(RuntimeError):
+        _common.capture_com_failure(
+            _unmerged_profile(tmp_path),
+            "logo-ring-extrude",
+            "logo ring extrude failed",
+            sketch=_Sketch(contours=1, points=places),
+            expected_points=9,
+        )
+
+    sketch = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())["sketch"]
+    assert sketch["coincident_point_pairs"] == 0
+    assert sketch["unmerged_points"] == 0
+
+
+def test_a_census_that_cannot_be_read_says_so(tmp_path):
+    """A census that raised must leave a stated error, not an absent key: the
+    reader must never mistake "could not count" for "nothing coincident"."""
+
+    class _Unreadable(_Sketch):
+        def GetSketchPoints2(self):
+            raise OSError("RPC_E_DISCONNECTED")
+
+    with pytest.raises(RuntimeError):
+        _common.capture_com_failure(
+            _unmerged_profile(tmp_path),
+            "logo-ring-extrude",
+            "logo ring extrude failed",
+            sketch=_Unreadable(contours=0, points=[]),
+            expected_points=9,
+        )
+
+    sketch = json.loads((_failure_dir(tmp_path) / "capture.json").read_text())["sketch"]
+    assert "RPC_E_DISCONNECTED" in sketch["point_census_error"]
+    assert "point_count" not in sketch
 
 
 def test_retry_capture_does_not_erase_the_first_failure(tmp_path):
