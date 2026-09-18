@@ -469,6 +469,19 @@ async def build_stock_fastener(
                 sku=component.sku,
                 component=component_count,
             ):
+                # Sketch inference / automatic relations are APPLICATION-level
+                # preferences, so a seat carries whatever the last leaf left
+                # behind -- including a suppression block that never unwound
+                # (SolidWorks crash, COM disconnect, watchdog exit, killed
+                # process).  Every recipe asserts the state it requires instead
+                # of inheriting it, which also repairs a seat an earlier leaf
+                # poisoned.  Imported here, not at module scope, to keep the
+                # build-graph note at the top of this file true.
+                from diagnostics.diag_mcmaster_lib import (
+                    assert_seat_sketch_baseline,
+                )
+
+                assert_seat_sketch_baseline(adapter, component.sku)
                 try:
                     if component.parameters is None:
                         await component.author(adapter, None)

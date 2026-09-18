@@ -69,6 +69,7 @@ from _common import (  # noqa: E402
     run_build,
     volume_check,
 )
+from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
 
 OUT_DIR = CAD_ROOT / "out" / "reference"
 REPLICA = OUT_DIR / "91829A560-replica.SLDPRT"
@@ -259,10 +260,11 @@ async def build_91829A560(adapter, truth=None):
     y_land_bot = y_jct - UC_W
     check("create_sketch undercut", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
-    axis = sk_mgr.CreateCenterLine(
-        0.0, y_jct / 1000.0, 0.0, 0.0, -UNDERHEAD_LEN / 1000.0, 0.0)
-    if axis is None:
-        raise RuntimeError("undercut: CreateCenterLine failed")
+    with no_sketch_inference(adapter):
+        axis = sk_mgr.CreateCenterLine(
+            0.0, y_jct / 1000.0, 0.0, 0.0, -UNDERHEAD_LEN / 1000.0, 0.0)
+        if axis is None:
+            raise RuntimeError("undercut: CreateCenterLine failed")
     prev_db = bool(sk_mgr.AddToDB)
     sk_mgr.AddToDB = True
     try:
@@ -308,10 +310,11 @@ async def build_91829A560(adapter, truth=None):
     # --- helix (vendor Helix/Spiral2: tip-seeded, ascending, 9 revs) ---------
     _offset_plane(adapter, "TipPlane", -UNDERHEAD_LEN)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    seed = adapter.currentSketchManager.CreateCircleByRadius(
-        0.0, 0.0, 0.0, major_r / 1000.0)
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = adapter.currentSketchManager.CreateCircleByRadius(
+            0.0, 0.0, 0.0, major_r / 1000.0)
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
     # InsertHelix consumes the ACTIVE sketch.  Ascending from the tip toward
     # the head; start azimuth +X so the start lies on the Front plane where
     # the cutter is drawn (the flipped offset plane maps ang pi/2 -> +X).

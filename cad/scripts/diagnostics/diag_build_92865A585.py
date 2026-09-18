@@ -69,10 +69,10 @@ async def build_92865A585(adapter, truth=None):
 
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, G5_UNDERSIDE / 1000.0, 0.0,
-                           0.0, tip_y / 1000.0, 0.0) is None:
-        raise RuntimeError("92865 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, G5_UNDERSIDE / 1000.0, 0.0,
+                               0.0, tip_y / 1000.0, 0.0) is None:
+            raise RuntimeError("92865 shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, G5_UNDERSIDE),
             (major_r, G5_UNDERSIDE),
@@ -110,9 +110,10 @@ async def build_92865A585(adapter, truth=None):
 
     offset_plane(adapter, "HeadTopPlane", top_y)
     check("create_sketch trim", await adapter.create_sketch("HeadTopPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, flat_r / 1000.0) is None:
-        raise RuntimeError("trim circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, flat_r / 1000.0) is None:
+            raise RuntimeError("trim circle failed")
     check("exit_sketch trim", await adapter.exit_sketch())
     name_last_feature(adapter, "TrimProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -210,9 +211,10 @@ async def build_92865A585(adapter, truth=None):
 
     offset_plane(adapter, "TipPlane", tip_y)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, G5_LEN / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")

@@ -1,0 +1,42 @@
+diagnostics: pin the resolved face's own body, pair bodies by their faces
+
+Three holes, all of the same species: the probe could certify something it
+had not checked.
+
+1. `diff_resolution` ignored WHICH body the reference resolved into.
+   91247A720's three raised grade marks are congruent separate bodies, so a
+   reference that drifted to another mark's corresponding face matches on
+   area, box and surface type -- the probe would have reported a broken
+   reference as healthy. `resolve_census` now records the owning body of
+   the resolved face (`IFace2.GetBody` -> `GetBodyBox`) and the verdict
+   requires it to match the stored one. Bodies are compared by EXTENTS, not
+   by name: a body name comes from the feature that made it and is not
+   something this rewrite promises to preserve. A resolved face whose owner
+   was not recorded reads as "proves nothing", not as a pass.
+
+2. The body pairing used the persistent-reference multiset as its exact
+   pass. Those bytes are allowed to change on rebuild, so for two bodies
+   with equal extents -- congruent marks, a mirrored pair -- it would
+   routinely find no exact partner and fall back to enumeration order.
+   Where such bodies differ in their FACES, that mispairing reported both
+   as having swapped faces, out of nothing. It now disambiguates on the
+   sorted face-geometry multiset; extents alone remain the fallback, so a
+   body that really did change a face is still paired and diagnosed.
+
+3. The raw-primitive audit collects files with `rglob` but excluded them by
+   `path.name`, so a same-named file in any subdirectory of `diagnostics`
+   would have been exempt silently -- an exemption nobody wrote and nobody
+   would see. Exemptions are now keyed by path relative to the diagnostics
+   directory, and the companion staleness test builds the path the same
+   way.
+
+Verification:
+- uv run python -m pytest cad/scripts/test_face_identity_diff.py
+  cad/scripts/test_sketch_preference_baseline.py
+  cad/scripts/test_logo_profile_closure.py -> 65 passed
+- New cases: a reference landing in another body is reported; a resolved
+  face with no owning body recorded proves nothing; congruent bodies whose
+  faces differ pair by their faces. The last one returns exactly the two
+  false "face area 4.0 -> 9.0 / 9.0 -> 4.0" lines under the old
+  persist-based exact pass, confirmed by substituting it back in.
+- uv run ruff check / ruff format --check -> clean

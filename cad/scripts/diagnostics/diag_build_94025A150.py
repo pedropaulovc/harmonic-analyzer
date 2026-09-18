@@ -32,6 +32,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     _rev_frustum,
     bodies,
     insert_helix,
+    no_sketch_inference,
     offset_plane,
     replica_main,
     thread_sweep_cut_modern,
@@ -71,10 +72,11 @@ async def build_94025A150(adapter, truth=None):
     # --- revolve profile (vendor Sketch2 mapped (r, y) = (y_v, -x_v)) -----
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
-    axis = sk_mgr.CreateCenterLine(0.0, SS_HALF / 1000.0, 0.0,
-                                   0.0, -SS_HALF / 1000.0, 0.0)
-    if axis is None:
-        raise RuntimeError("set-screw profile: CreateCenterLine failed")
+    with no_sketch_inference(adapter):
+        axis = sk_mgr.CreateCenterLine(0.0, SS_HALF / 1000.0, 0.0,
+                                       0.0, -SS_HALF / 1000.0, 0.0)
+        if axis is None:
+            raise RuntimeError("set-screw profile: CreateCenterLine failed")
     await add_line_chain(adapter, [
         (SS_CHAM_R, SS_HALF),                    # slot-end rim
         (SS_MAJOR_R, SS_HALF - SS_CHAM_H),       # chamfer -> OD
@@ -132,10 +134,11 @@ async def build_94025A150(adapter, truth=None):
     offset_plane(adapter, "ThreadTopPlane", SS_HALF + SS_PITCH)
     check("create_sketch helix seed",
           await adapter.create_sketch("ThreadTopPlane"))
-    seed = adapter.currentSketchManager.CreateCircleByRadius(
-        0.0, 0.0, 0.0, SS_MAJOR_R / 1000.0)
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = adapter.currentSketchManager.CreateCircleByRadius(
+            0.0, 0.0, 0.0, SS_MAJOR_R / 1000.0)
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, SS_PITCH, SS_REVS, clockwise=True,
                  reversed_dir=True, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")

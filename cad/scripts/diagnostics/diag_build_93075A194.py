@@ -71,10 +71,10 @@ async def build_93075A194(adapter, truth=None):
     # --- shank with tip chamfer (their Boss-Extrude1 + Chamfer1) ------------
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, HX_UNDERSIDE / 1000.0, 0.0,
-                           0.0, tip_y / 1000.0, 0.0) is None:
-        raise RuntimeError("93075 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, HX_UNDERSIDE / 1000.0, 0.0,
+                               0.0, tip_y / 1000.0, 0.0) is None:
+            raise RuntimeError("93075 shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, HX_UNDERSIDE),
             (major_r, HX_UNDERSIDE),
@@ -114,9 +114,10 @@ async def build_93075A194(adapter, truth=None):
     # --- corner trim: outside the inscribed circle, 60-deg cone --------------
     offset_plane(adapter, "HeadTopPlane", top_y)
     check("create_sketch trim", await adapter.create_sketch("HeadTopPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, flat_r / 1000.0) is None:
-        raise RuntimeError("trim circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, flat_r / 1000.0) is None:
+            raise RuntimeError("trim circle failed")
     check("exit_sketch trim", await adapter.exit_sketch())
     name_last_feature(adapter, "TrimProfile")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -139,10 +140,10 @@ async def build_93075A194(adapter, truth=None):
     # --- crown dish (45-deg revolved cut) ------------------------------------
     check("create_sketch crown", await adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
-    if sk2.CreateCenterLine(0.0, top_y / 1000.0, 0.0,
-                            0.0, (top_y - crown_d) / 1000.0, 0.0) is None:
-        raise RuntimeError("crown: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk2.CreateCenterLine(0.0, top_y / 1000.0, 0.0,
+                                0.0, (top_y - crown_d) / 1000.0, 0.0) is None:
+            raise RuntimeError("crown: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, top_y + 0.2),
             (crown_r + 0.2, top_y + 0.2),
@@ -169,9 +170,10 @@ async def build_93075A194(adapter, truth=None):
     # --- tip-seeded ascending helix, L+P (17 revs) ---------------------------
     offset_plane(adapter, "TipPlane", tip_y)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, HX_LEN / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
