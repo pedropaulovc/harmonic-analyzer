@@ -43,6 +43,7 @@ import sys
 import time
 import urllib.parse
 from collections.abc import AsyncGenerator, Generator, Mapping
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import IO, Any, cast
 
@@ -376,6 +377,10 @@ def _resolve_otlp_endpoint(
 
 _T0 = time.perf_counter()
 _LAST_TICK = _T0
+# Wall-clock (epoch) instant of _T0. Every ``[total +step]`` stamp is relative to
+# it, so this is what makes an elapsed-seconds log correlatable with a blob's
+# last_modified, an Application Insights row, or another worker's log.
+_T0_EPOCH_S = time.time()
 
 # Monotonic timestamp of the last telemetry ACTIVITY -- a span boundary or a log
 # record. This is the per-operation heartbeat the COM watchdog (_watchdog.py)
@@ -445,15 +450,39 @@ def _stamp() -> str:
     return prefix
 
 
+def _utc(epoch_s: float | None = None) -> str:
+    """ISO-8601 UTC to the millisecond, always with the ``Z``.
+
+    Every absolute timestamp this repo emits is UTC, because the other half of
+    any correlation is Azure blob metadata, which is UTC and cannot be changed.
+    On 2026-09-17 the leaf's only absolute timestamp was a LOCAL one
+    (``2026-09-17 21:58:42``, from the connector library's own logger) while the
+    blob holding that same log read ``last_modified 2026-09-18T04:59:59Z``: the
+    same event, seven hours apart on the page, which reads as two runs.
+    """
+    when = datetime.fromtimestamp(
+        time.time() if epoch_s is None else epoch_s, tz=timezone.utc
+    )
+    return when.strftime("%Y-%m-%dT%H:%M:%S.") + f"{when.microsecond // 1000:03d}Z"
+
+
 class _FriendlyFormatter(logging.Formatter):
-    """Render a record as the historical ``  <glyph>  [stamp] message`` line."""
+    """Render a record as the historical ``  <glyph>  [stamp] message`` line.
+
+    Relative stamps keep a 600-line build log readable, so WARNING-and-above
+    records -- the ones a reader correlates against a blob, an Application
+    Insights row or another worker's log -- carry an absolute UTC stamp as well.
+    """
 
     def format(self, record: logging.LogRecord) -> str:
         glyph = _GLYPH.get(record.levelno, "..")
         message = record.getMessage()
         if record.exc_info:
             message = f"{message}\n{self.formatException(record.exc_info)}"
-        return f"  {glyph}  {_stamp()} {message}"
+        line = f"  {glyph}  {_stamp()} {message}"
+        if record.levelno >= logging.WARNING:
+            return f"{line}  @{_utc(record.created)}"
+        return line
 
 
 def _compact_span(span: ReadableSpan) -> str:
@@ -996,8 +1025,79 @@ def configure(*, console: bool = True, force: bool = False) -> None:
         stream.setFormatter(_FriendlyFormatter())
         stream.setLevel(console_level)
         pylog.addHandler(stream)
+        _log_utc_anchor(pylog, stream)
+    _use_utc_in_loguru()
     for warning in pending_otlp_warnings:
         pylog.warning("%s", warning)
+
+
+_anchor_printed = False
+
+
+def _log_utc_anchor(pylog: logging.Logger, stream: logging.Handler) -> None:
+    """State, once per process, what the relative ``[total +step]`` stamps mean.
+
+    Without this a leaf log is a list of elapsed seconds with no absolute
+    instant anywhere -- so correlating it with the blob it was uploaded as, or
+    with another worker's log, depends on whichever library happened to print a
+    timestamp. On 2026-09-17 that was the connector library, in LOCAL time,
+    seven hours off the blob metadata it had to be lined up against.
+
+    Written straight to the console stream as a HEADER, not as a log record at a
+    severity chosen to sneak past a filter: the anchor is needed most in the
+    terse (warning-only) mode a farm leaf runs in, where an INFO record would be
+    dropped. The structured sinks get it as a real INFO record as well, and the
+    banner prints at most once per process so a reconfigure cannot double it.
+    """
+    global _anchor_printed
+    message = (
+        f"log anchor: t=0.0s is {_utc(_T0_EPOCH_S)} (UTC); every [total +step] "
+        f"stamp is seconds since it, and every WARN/ERROR line carries its own @UTC"
+    )
+    if not _anchor_printed:
+        _anchor_printed = True
+        with contextlib.suppress(Exception):
+            stream.stream.write(f"  --  [    0.0s +  0.0s] {message}\n")  # type: ignore[attr-defined]
+            stream.flush()
+    pylog.info("%s", message)
+
+
+_loguru_sink_id: int | None = None
+
+
+def _use_utc_in_loguru() -> None:
+    """Make the connector library's loguru lines UTC too.
+
+    ``solidworks_mcp`` logs through loguru, whose default sink stamps LOCAL time
+    (``2026-09-17 21:58:42`` for an event whose blob reads ``04:59:59Z``). Its
+    lines land in the same leaf log as ours, so they are normalised here rather
+    than left as the one local-time island in an otherwise UTC record.
+
+    Idempotent: loguru hands out a NEW id per ``add``, so a reconfigure removes
+    the sink this module installed before installing another, and the default
+    sink (id 0) is removed only if it is still there. Telemetry must never break
+    a build, so every step is best-effort.
+    """
+    global _loguru_sink_id
+    with contextlib.suppress(Exception):
+        from loguru import logger as _loguru
+
+        with contextlib.suppress(Exception):
+            _loguru.remove(0 if _loguru_sink_id is None else _loguru_sink_id)
+        _loguru_sink_id = _loguru.add(
+            _LiveStderr(),
+            format=(
+                "{time:YYYY-MM-DDTHH:mm:ss.SSS!UTC}Z | {level: <8} | "
+                "{name}:{function}:{line} - {message}"
+            ),
+            # dodo already sets LOGURU_LEVEL in every COM child from
+            # HARMONIC_VERBOSITY (warning by default), and loguru's own default
+            # sink honoured it. Re-registering the sink must not quietly restore
+            # connector INFO chatter to a warning-only leaf log, so the
+            # established variable is what governs; the level is normalised
+            # because loguru rejects a lowercase name.
+            level=(os.environ.get("LOGURU_LEVEL") or "INFO").strip().upper(),
+        )
 
 
 def get_logger() -> logging.Logger:
