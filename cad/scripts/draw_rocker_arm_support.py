@@ -28,6 +28,8 @@ from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_surface_finish,
+    assert_sketch_line_placed,
+    sketch_geometry_direct_to_db,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
@@ -219,33 +221,42 @@ def _create_view_centerline(
     end_xy: tuple[float, float],
     label: str,
 ) -> Any:
-    """Create a retained centerline in one drawing view's sketch."""
+    """Create a retained centerline in one drawing view's sketch.
+
+    This site already had the ``AddToDB`` guard hand-rolled (``4821f797``),
+    which is why it never produced a snapped axis -- but it had no read-back,
+    and a preference the seat DECLINES to write fails silently, so it had no
+    evidence either.  Both halves come from ``_drawing_common`` now.
+
+    The endpoints are authored on the part's own half-extents
+    (``+/-HALF_Y``, ``+/-BOSS_DEPTH/2``), so they sit exactly on projected
+    edges rather than overshooting past them: lower risk than an axis drawn
+    past a silhouette, but a coordinate on an edge is the strongest
+    automatic-relation candidate there is, and the chamfer corners are within
+    a millimetre.  Nothing downstream consumes a selection -- every caller
+    discards the returned segment -- so none is made.
+    """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate centerline view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
     previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
     sketch_manager.DisplayWhenAdded = True
+    points = ((start_xy[0], start_xy[1], 0.0), (end_xy[0], end_xy[1], 0.0))
     try:
-        centerline = sketch_manager.CreateCenterLine(
-            start_xy[0],
-            start_xy[1],
-            0.0,
-            end_xy[0],
-            end_xy[1],
-            0.0,
-        )
+        with sketch_geometry_direct_to_db(sketch_manager):
+            centerline = sketch_manager.CreateCenterLine(*points[0], *points[1])
     finally:
-        sketch_manager.AddToDB = previous_add_to_db
         sketch_manager.DisplayWhenAdded = previous_display
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
     if centerline is None:
         raise RuntimeError(f"failed to create {label} centerline")
+    assert_sketch_line_placed(
+        adapter, centerline, points, what=f"{label} centreline", label=name
+    )
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
     return centerline
 
 

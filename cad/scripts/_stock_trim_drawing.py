@@ -16,7 +16,13 @@ import math
 from typing import Any
 
 from _common import _early_bound, _read_member
-from _drawing_common import dimension_name, model_point_in_view
+from _drawing_common import (
+    assert_sketch_circle_placed,
+    dimension_name,
+    model_point_in_view,
+    select_sketch_geometry,
+    sketch_geometry_direct_to_db,
+)
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import view_name
 
@@ -41,7 +47,16 @@ class TrimSheet:
 
 
 def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
-    """Crop the real cut end; transform the fence as in the cylinder-gear recipe."""
+    """Crop the real cut end; transform the fence as in the cylinder-gear recipe.
+
+    ``CreateDetailViewAt4`` crops to the SELECTED closed profile, so the fence
+    is authored direct-to-DB and then selected explicitly: direct-to-DB
+    creation removes the leaves-it-selected side effect this call inherited
+    from inference.  The centre is offset off the cut end by
+    ``detail_offset_mm`` so the fence straddles the deburr the detail exists to
+    show; a snap onto the cut face itself would crop the chamfer out of its own
+    detail.
+    """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(front, "IView")
@@ -66,8 +81,25 @@ def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    with sketch_geometry_direct_to_db(manager):
+        fence = manager.CreateCircle(*points[0], *points[1])
+    if fence is None:
         raise RuntimeError("cannot create native cut-end detail fence")
+    assert_sketch_circle_placed(
+        adapter,
+        fence,
+        points[0],
+        math.dist(points[0], points[1]),
+        what="cut-end detail fence",
+        label="stock trim cut-end detail",
+    )
+    select_sketch_geometry(
+        adapter,
+        fence,
+        front,
+        what="cut-end detail fence",
+        label="stock trim cut-end detail",
+    )
     detail = ddoc.CreateDetailViewAt4(
         *sheet.detail_center, 0.0, 0, *sheet.detail_scale, "A", 1, True, False, False, 5
     )

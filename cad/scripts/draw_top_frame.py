@@ -35,6 +35,10 @@ from _drawing_common import (
     place_pictorial_sheet,
     add_native_hole_callout,
     assert_imported_precision,
+    assert_sketch_circle_placed,
+    assert_sketch_line_placed,
+    select_sketch_geometry,
+    sketch_geometry_direct_to_db,
     add_edge_dimension,
     add_surface_finish,
     dimension_name,
@@ -404,10 +408,20 @@ def _add_view_centerlines(
 
     Returns the ``ISketchSegment`` per axis, in order, so a recipe can
     dimension FROM one (``add_edge_dimension`` with ``"SKETCHSEGMENT"``).
+
+    Every axis here deliberately OVERSHOOTS the feature it marks (``-2.0``,
+    ``+3.0`` mm past a boss extent, or the full ``+/-PLAN_HALF_X`` boundary) so
+    the centreline reads past the silhouette the way a print expects.  That
+    overshoot is exactly what puts an endpoint within screen-space snap range
+    of the edge it just cleared -- the same bait that captured the D-D cutting
+    line onto ``-PLAN_HALF_X`` -- so the axes are authored direct-to-DB and
+    read back.  ``add_edge_dimension`` selects the returned segment itself, so
+    creation-time selection is not relied on here.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
+    name = view_name(adapter, view)
+    if not drawing.ActivateView(name):
         raise RuntimeError("failed to activate drawing centreline view")
     draw.ClearSelection2(True)
     sketch = _early_bound(view.GetSketch(), "ISketch")
@@ -424,9 +438,13 @@ def _add_view_centerlines(
             )
             point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
             points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-        segment = manager.CreateCenterLine(*points[0], *points[1])
+        with sketch_geometry_direct_to_db(manager):
+            segment = manager.CreateCenterLine(*points[0], *points[1])
         if segment is None:
             raise RuntimeError("failed to create owned drawing centreline")
+        assert_sketch_line_placed(
+            adapter, segment, points, what="owned drawing centreline", label=name
+        )
         segment = _early_bound(segment, "ISketchSegment")
         segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
         if int(segment.Color) != 0:
@@ -832,7 +850,14 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
     return view
 
 def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
-    """Enlarge the native underside; the circular fence is presentation only."""
+    """Enlarge the native underside; the circular fence is presentation only.
+
+    ``CreateDetailViewAt4`` crops to the SELECTED closed profile, so the fence
+    is authored direct-to-DB (its perimeter point is a bare sheet coordinate
+    with no geometry under it, free to snap) and then selected explicitly --
+    direct-to-DB creation is precisely what removes ``CreateCircle``'s
+    leaves-it-selected side effect this call used to inherit.
+    """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(parent_view, "IView")
@@ -853,8 +878,18 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
         points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    with sketch_geometry_direct_to_db(manager):
+        fence = manager.CreateCircle(*points[0], *points[1])
+    if fence is None:
         raise RuntimeError("failed to create native underside detail fence")
+    assert_sketch_circle_placed(
+        adapter, fence, points[0], math.dist(points[0], points[1]),
+        what="underside detail fence", label="hub underside detail",
+    )
+    select_sketch_geometry(
+        adapter, fence, parent_view,
+        what="underside detail fence", label="hub underside detail",
+    )
     detail = drawing.CreateDetailViewAt4(
         *HUB_DETAIL_CENTER, 0.0, 0, *HUB_DETAIL_SCALE, "C", 1, True, False, False, 5,
     )

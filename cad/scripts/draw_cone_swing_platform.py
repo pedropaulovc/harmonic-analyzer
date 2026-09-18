@@ -27,6 +27,8 @@ from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
+    assert_sketch_line_placed,
+    sketch_geometry_direct_to_db,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -150,11 +152,21 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     # this keeps the centerline coincident with the projected model axis.
     drawing.EditSheet()
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
-    )
+    points = ((north[0], north[1], 0.0), (south[0], south[1], 0.0))
+    with sketch_geometry_direct_to_db(sketch_manager):
+        centerline = sketch_manager.CreateCenterLine(*points[0], *points[1])
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
+    # Both endpoints are ON the view outline -- that is, exactly where the
+    # part's extreme silhouette edges are -- and X is the projected pivot-hole
+    # centre, so a snap in X tilts the axis off the hole it is marking and a
+    # snap in Y shortens it onto the rim it was drawn past.  Sheet-owned
+    # geometry is no protection: the views' projected edges are in the same
+    # sheet space the inference engine searches.
+    assert_sketch_line_placed(
+        adapter, centerline, points, what="cone-axis centreline",
+        label="cone-platform plan",
+    )
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     return pivot

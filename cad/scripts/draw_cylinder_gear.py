@@ -20,6 +20,9 @@ from _drawing_common import (
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    assert_sketch_circle_placed,
+    select_sketch_geometry,
+    sketch_geometry_direct_to_db,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -127,7 +130,17 @@ def _project_mm(
 
 
 def _notch_detail(adapter: Any, front: Any) -> Any:
-    """Enlarge the actual kerf and its neighbouring teeth, without redrawing them."""
+    """Enlarge the actual kerf and its neighbouring teeth, without redrawing them.
+
+    The fence centre is deliberately placed BETWEEN the tip and notch-floor
+    radii -- in the gap the teeth cut, with a tooth flank either side -- and
+    its perimeter point is a bare sheet coordinate.  ``CreateDetailViewAt4``
+    crops to the SELECTED closed profile, so the fence is authored
+    direct-to-DB and then selected explicitly, since direct-to-DB creation is
+    what removes the leaves-it-selected side effect this call inherited.  A
+    snapped fence crops a different set of teeth than the detail's dimensions
+    were written for.
+    """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(front, "IView")
@@ -152,8 +165,25 @@ def _notch_detail(adapter: Any, front: Any) -> Any:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
+    with sketch_geometry_direct_to_db(sketch_manager):
+        fence = sketch_manager.CreateCircle(*points[0], *points[1])
+    if fence is None:
         raise RuntimeError("failed to create notch-detail fence")
+    assert_sketch_circle_placed(
+        adapter,
+        fence,
+        points[0],
+        math.dist(points[0], points[1]),
+        what="notch-detail fence",
+        label="cylinder gear notch detail",
+    )
+    select_sketch_geometry(
+        adapter,
+        fence,
+        front,
+        what="notch-detail fence",
+        label="cylinder gear notch detail",
+    )
     detail = ddoc.CreateDetailViewAt4(
         *NOTCH_DETAIL_CENTER,
         0.0,

@@ -86,26 +86,73 @@ right line without also accepting the floor of an obliquely cut pocket, and
 candidates. Widening it would silently ship a drawing whose every sectional
 dimension is measured on a 4.3 deg oblique plane.
 
-## Fix (this branch)
+## Fix: one idiom, every drawing-sketch call site
 
-`create_section_view` now creates the cutting line with
-`ISketchManager.AddToDB = True` (restored in `finally`), READS THE ENDPOINTS
-BACK off the `ISketchLine` and raises if either moved more than 1e-9 m (a
-declined preference write is silent, so suppression is not evidence), and
-selects the segment explicitly via `ISelectionMgr.Select4` because
-direct-to-DB creation does not leave it selected -- the `CreateSectionViewAt5`
-precondition the old docstring relied on.
+`_drawing_common` now owns the idiom and every drawing recipe uses it. There is
+no second spelling: the hand-rolled `AddToDB` set/restore no longer appears
+anywhere in the drawing tier, and `test_sketch_preference_baseline.py` rejects
+it rather than accepting it.
 
-## Same class, still unguarded (outside this patch)
+- `sketch_geometry_direct_to_db(sketch_manager)` -- contextmanager, sets
+  `AddToDB` and restores it in `finally`. It reads the previous value LIVE off
+  the sketch manager: `AddToDB` is an APPLICATION-level preference, so a value
+  captured earlier can be one a previous leaf left behind. Eight hand-rolled
+  copies were four lines each that had to get `bool()`, the `try` and the
+  `finally` independently right; a copy that loses its restore under a later
+  early `return` leaves the whole seat direct-to-DB.
+- `assert_sketch_line_placed` / `assert_sketch_circle_placed` /
+  `assert_sketch_geometry_placed` -- the read-back, refusing any drift above
+  1e-9 m. This is the load-bearing half: a preference the seat DECLINES to
+  write fails silently, so entering the block is not evidence. The comparison,
+  the tolerance and the message are shared; the TRAVERSAL is per geometry
+  type, because a line carries `GetStartPoint2`/`GetEndPoint2`, a circle a
+  centre and a radius, and a created sketch point IS the point. Forcing one
+  traversal over the three reaches for a member the entity does not have and
+  surfaces as an `AttributeError` -- a guard that reads like a code bug instead
+  of a placement refusal. A circle is checked on centre AND radius, not on its
+  perimeter point: that catches a snap of either authored coordinate without
+  depending on where SolidWorks puts a full circle's start point.
+- `select_sketch_geometry` -- explicit `ISelectionMgr.Select4` plus a
+  selected-count check. The guard CREATES the need for this: `AddToDB = True`
+  is precisely what removes `CreateLine`/`CreateCircle`'s leaves-it-selected
+  side effect that `CreateSectionViewAt5` and `CreateDetailViewAt4` consume.
+  A site that worked *because* inference left the segment selected breaks the
+  moment it is guarded, unless the selection is added.
 
-Raw drawing-sketch creations with no inference guard:
-`draw_top_frame.py:427` (`CreateCenterLine`, same parent view, created BEFORE
-the section -- itself a snap target) and `:856` (`CreateCircle`),
-`draw_arbor_pedestal.py:282`, `draw_cone_swing_platform.py:153`,
-`draw_cylinder_gear.py:155`, `draw_rocker_arm_support.py:234`,
-`_stock_trim_drawing.py:69`. `test_sketch_preference_baseline.py` only walks
-`DIAGNOSTICS_DIR.rglob("*.py")` (lines 36-37, 589-600), so none of the drawing
-or build recipes are audited at all -- widening that scan is the durable fix.
+## The overshoot is the bait
+
+Ranked by how much slack a coordinate has between where the recipe put it and
+the nearest entity that can capture it:
+
+| risk | site | geometry | overshoot |
+| --- | --- | --- | --- |
+| 1 | `draw_top_frame.py` `_add_view_centerlines` | 7 `CreateCenterLine` | yes -- `-2.0`/`+3.0` mm past boss extents, and the full `+/-PLAN_HALF_X` plan boundary |
+| 2 | `draw_cone_swing_platform.py` `_add_cone_axis_centerline` | `CreateCenterLine` | yes -- both endpoints ON the view outline, i.e. at the extreme silhouette |
+| 3 | `draw_top_frame.py` `_hub_underside_detail` | `CreateCircle` fence | partial -- centre on a model point, perimeter point a free sheet coordinate |
+| 4 | `draw_cylinder_gear.py` `_notch_detail` | `CreateCircle` fence | partial -- centre in the tooth gap with a flank either side |
+| 5 | `_stock_trim_drawing.py` `end_detail` | `CreateCircle` fence | partial -- centre offset off the cut face by `detail_offset_mm` |
+| 6 | `_drawing_common.py` `create_view_theoretical_datum` | `CreatePoint` | inherent -- a theoretical sharp is BY CONSTRUCTION not on the geometry shown |
+| 7 | `draw_arbor_pedestal.py` `_add_bore_hidden_lines` | 4 `CreateLine` | no -- every endpoint on a bore silhouette or a physical face |
+| 8 | `draw_rocker_arm_support.py` `_create_view_centerline` | `CreateCenterLine` | no -- endpoints on the part's own half-extents |
+
+A recipe's defensive habit of extending past a boundary so a cut or an axis
+spans the whole feature is exactly what puts an endpoint within screen-space
+snap range of the boundary entity it just cleared. D-D authored endpoint A at
+`-PLAN_HALF_X - 6.0`; the fitted oblique plane reaches the requested Z at
+`x = -223.0945`, and `-PLAN_HALF_X` is `-223.1` -- 0.0055 mm apart. One
+endpoint captured, one free, and the line rotated about the captured one.
+
+Sites 7 and 8 overshoot nothing and are the lower-risk end, but a coordinate
+sitting exactly ON an edge is the strongest automatic-relation candidate there
+is, and the next entity (the far face 2 mm away, a chamfer corner) would move
+the OTHER coordinate. Both are guarded; neither is exonerated.
+
+Corrections to this document's own earlier claim: `draw_rocker_arm_support.py`
+was NOT unguarded -- `4821f797` had already hand-rolled `AddToDB` +
+`DisplayWhenAdded` there. It had no read-back, so it had the protection without
+the evidence. And the list omitted `_drawing_common.py`'s own
+`create_view_theoretical_datum`, which hand-rolled the same shape in the very
+file that now defines the idiom.
 
 ## The one COM measurement that would close the loop
 

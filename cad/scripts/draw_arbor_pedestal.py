@@ -13,6 +13,8 @@ from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
     add_surface_finish,
+    assert_sketch_line_placed,
+    sketch_geometry_direct_to_db,
     add_native_hole_callout,
     curate_view_dimensions,
     finalize_drawing,
@@ -261,7 +263,17 @@ def _disable_diameter_second_arrow(
 
 @_telemetry.traced("drawing.arbor.bore_hidden_lines")
 def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
-    """Draw the bore's two derived hidden edges in the plan view."""
+    """Draw the bore's two derived hidden edges in the plan view.
+
+    Both endpoints of every segment land ON real projected geometry -- the two
+    bore silhouette lines in X, a physical face in Z -- so this authors no
+    overshoot and is the lower-risk end of the family.  It is still guarded:
+    an endpoint sitting exactly on an edge is the strongest automatic-relation
+    candidate there is, and the nearest snap target to the face endpoints is
+    the far face 2 mm away, which would double a dash run instead of stopping
+    it at the face this recipe is drawing to.  Nothing downstream consumes a
+    selection, so no explicit selection is needed.
+    """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
@@ -276,16 +288,26 @@ def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
     midpoint = (z0 + z1) / 2.0
     # Start one hidden segment at each physical face. The dash pattern then
     # visibly reaches both boundaries instead of leaving an apparent short stop.
-    for x in (-bore_radius, bore_radius):
-        for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
-            draw.ClearSelection2(True)
-            segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
-            if segment is None:
-                raise RuntimeError("failed to create an arbor bore hidden line")
-            segment = _early_bound(segment, "ISketchSegment")
-            segment.Style = 1  # swLineHIDDEN
-            if int(segment.Style) != 1:
-                raise RuntimeError("arbor bore line did not retain hidden line style")
+    with sketch_geometry_direct_to_db(sketch_manager):
+        for x in (-bore_radius, bore_radius):
+            for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
+                draw.ClearSelection2(True)
+                segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
+                if segment is None:
+                    raise RuntimeError("failed to create an arbor bore hidden line")
+                assert_sketch_line_placed(
+                    adapter,
+                    segment,
+                    ((x, start_z, 0.0), (x, end_z, 0.0)),
+                    what="bore hidden line",
+                    label="arbor pedestal plan",
+                )
+                segment = _early_bound(segment, "ISketchSegment")
+                segment.Style = 1  # swLineHIDDEN
+                if int(segment.Style) != 1:
+                    raise RuntimeError(
+                        "arbor bore line did not retain hidden line style"
+                    )
     draw.ClearSelection2(True)
     draw.EditRebuild3()
 

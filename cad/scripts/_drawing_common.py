@@ -8,6 +8,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 import sys
@@ -15,7 +16,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Literal, Mapping, Sequence
 
 
 import _config
@@ -1006,61 +1007,220 @@ def add_view_centerline(
     return centerline
 
 
-# The section cutting line is a GEOMETRIC DATUM, not annotation: the plane it
-# defines is where every dimension taken off the section is measured, and a
-# cut-face line carries that plane's own coordinate (which is what the part
-# recipes pin dimensions to).  ``ISketchManager.CreateLine`` runs the new
-# segment through the INFERENCE engine unless the sketch manager is in
-# direct-to-DB mode, and sketch inference / automatic relations are
-# APPLICATION-level preferences a seat carries from one leaf to the next
-# (``diag_mcmaster_lib.SEAT_SKETCH_BASELINE`` restores all three ON), so an
-# endpoint authored within snap distance of a view edge is pulled onto it --
+# Sketch geometry a drawing recipe authors -- a section cutting line, a view
+# centreline, a detail fence, a theoretical datum point -- is a GEOMETRIC
+# DATUM, not annotation: the cutting line's plane is where every dimension
+# taken off a section is measured, a fence decides which features a detail
+# shows, a centreline is an entity later dimensions are taken FROM, and a
+# datum point is a hole table's origin.  The ``ISketchManager.Create*``
+# primitives run the new entity through the INFERENCE engine unless the sketch
+# manager is in direct-to-DB mode, and sketch inference / automatic relations
+# are APPLICATION-level preferences a seat carries from one leaf to the next
+# (``diag_mcmaster_lib.SEAT_SKETCH_BASELINE`` restores all three ON), so a
+# coordinate authored within snap distance of a view edge is pulled onto it --
 # in SCREEN space, which makes the outcome depend on the seat's zoom rather
-# than on this recipe.  A snap of a fraction of a millimetre on the sheet
-# tilts the plane: top_frame's D-D was cut 4.29 degrees oblique, 0.674 mm off
-# station at the rail face, by exactly that (leaf 2026-09-18T14:40Z).  Both
-# mechanisms are shut off here, and the placement is then read back, because a
-# preference the seat declines to write fails SILENTLY.
-_SECTION_LINE_TOLERANCE_M = 1e-9
+# than on the recipe.  A snap of a fraction of a millimetre on the sheet tilts
+# a plane: top_frame's D-D was cut 4.29 degrees oblique, 0.674 mm off station
+# at the rail face, by exactly that (leaf 2026-09-18T14:40Z).  A recipe's
+# defensive habit of overshooting a boundary so a cut or an axis spans the
+# whole feature is what puts a coordinate in snap range in the first place.
+_SKETCH_GEOMETRY_TOLERANCE_M = 1e-9
 
 
-def _assert_section_line_placed(
-    adapter: Any,
-    segment: Any,
-    points: list[tuple[float, ...]],
+@contextlib.contextmanager
+def sketch_geometry_direct_to_db(sketch_manager: Any) -> Iterator[None]:
+    """Author raw sketch geometry with the inference engine out of reach.
+
+    Every drawing recipe that creates a sketch primitive goes through this, so
+    the set/restore pair exists once instead of once per call site.  That is
+    not tidiness: ``AddToDB`` is an APPLICATION-level preference that outlives
+    the document, the recipe and the leaf, so a call site that loses its
+    restore -- on an exception, or under an early ``return`` added later --
+    leaves the whole seat direct-to-DB for every recipe that follows it.  One
+    ``finally`` cannot be got wrong in eight places.
+
+    The previous value is read HERE, live off the sketch manager.  A caller
+    that captured it earlier would restore whatever the seat happened to hold
+    at that moment, which for an application-level preference can be a value
+    some previous leaf left behind -- the failure mode this guard exists to
+    close.
+
+    Two consequences for callers.  A preference the seat declines to write
+    fails SILENTLY, so entering this block is not evidence: read the geometry
+    back (:func:`assert_sketch_geometry_placed`).  And direct-to-DB creation
+    does NOT leave the new entity selected the way an inferred draw does --
+    the guard is precisely what removes that side effect -- so a primitive
+    whose object feeds a selection-precondition API
+    (``CreateSectionViewAt5``, ``CreateDetailViewAt4``) must be selected
+    explicitly afterwards.
+    """
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        yield
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+
+
+def _refuse_sketch_drift(
     *,
+    drift_m: float,
+    actual: Any,
+    expected: Any,
+    measurement: str,
+    what: str,
     label: str,
 ) -> None:
-    """Read the created cutting line's endpoints back off the sketch.
+    """Fail loud when one read-back measurement moved at all.
 
-    Suppression is not evidence.  Exactness is the right bar: nothing
-    legitimately moves an endpoint authored in sketch coordinates, and the
-    smallest snap observed on a seat is five orders of magnitude above this
-    tolerance, so a real snap can never hide under it and float noise can
-    never trip it.
+    Exactness is the right bar: nothing legitimately moves a coordinate
+    authored in sketch coordinates, and the smallest snap observed on a seat is
+    five orders of magnitude above this tolerance, so a real snap can never
+    hide under it and float noise can never trip it.
     """
-    line = _early_bound(segment, "ISketchLine")
-    for expected, accessor, which in (
-        (points[0], "GetStartPoint2", "start"),
-        (points[1], "GetEndPoint2", "end"),
-    ):
-        raw = adapter._get_attr_or_call(line, accessor)
-        if raw is None:
-            raise RuntimeError(f"{label}: the section line has no {which} point")
-        point = _early_bound(raw, "ISketchPoint")
+    if drift_m <= _SKETCH_GEOMETRY_TOLERANCE_M:
+        return
+    raise RuntimeError(
+        f"{label}: the {what}'s {measurement} sits "
+        f"{drift_m * 1000.0:.4g} mm from where it was authored "
+        f"({actual} instead of {expected}) -- sketch inference snapped it onto "
+        "nearby geometry, so this sketch does not describe the geometry the "
+        "recipe asked for"
+    )
+
+
+def assert_sketch_geometry_placed(
+    adapter: Any,
+    reads: Sequence[tuple[str, Any, tuple[float, ...]]],
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Compare resolved sketch points against the coordinates authored.
+
+    Suppression is not evidence: ``sketch_geometry_direct_to_db`` writes a
+    preference the seat may decline, and it declines silently.  This is the
+    half that proves the geometry landed where the recipe put it.
+
+    ``reads`` is ALREADY-RESOLVED traversal -- ``(measurement, point,
+    expected)`` per coordinate, where ``point`` is an ``ISketchPoint``.  The
+    comparison, the tolerance and the message are shared; the traversal is not,
+    because it is a per-geometry contract: a line carries ``GetStartPoint2`` /
+    ``GetEndPoint2``, a circle a centre and a radius, and a created sketch
+    point IS the point, with no accessor hop at all.  Forcing one traversal
+    over the three would reach for a member the entity does not have and
+    surface as an ``AttributeError`` -- a guard that looks like a code bug
+    instead of a placement refusal.
+    """
+    for measurement, point, expected in reads:
+        if point is None:
+            raise RuntimeError(f"{label}: the {what} has no {measurement}")
+        point = _early_bound(point, "ISketchPoint")
         actual = tuple(
             float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
         )
-        drift = max(abs(a - b) for a, b in zip(actual, expected))
-        if drift > _SECTION_LINE_TOLERANCE_M:
-            raise RuntimeError(
-                f"{label}: the section cutting line's {which} point sits "
-                f"{drift * 1000.0:.4g} mm from where it was authored "
-                f"({actual} instead of {expected}) -- sketch inference snapped "
-                "it onto nearby geometry, so the cut plane is not the requested "
-                "one and every dimension taken off the section would be "
-                "measured on the wrong plane"
-            )
+        _refuse_sketch_drift(
+            drift_m=max(abs(a - b) for a, b in zip(actual, expected)),
+            actual=actual,
+            expected=expected,
+            measurement=measurement,
+            what=what,
+            label=label,
+        )
+
+
+def assert_sketch_line_placed(
+    adapter: Any,
+    segment: Any,
+    points: Sequence[tuple[float, ...]],
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Read a created line's or centreline's two endpoints back off the sketch."""
+    line = _early_bound(segment, "ISketchLine")
+    assert_sketch_geometry_placed(
+        adapter,
+        (
+            (
+                "start point",
+                adapter._get_attr_or_call(line, "GetStartPoint2"),
+                points[0],
+            ),
+            ("end point", adapter._get_attr_or_call(line, "GetEndPoint2"), points[1]),
+        ),
+        what=what,
+        label=label,
+    )
+
+
+def assert_sketch_circle_placed(
+    adapter: Any,
+    segment: Any,
+    center: tuple[float, ...],
+    radius_m: float,
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Read a created circle's centre and radius back off the sketch.
+
+    Centre and radius, not the perimeter point the primitive was handed: those
+    two are what a detail fence means, together they catch a snap of either
+    authored coordinate (a moved centre fails the first, a moved perimeter
+    point the second), and neither depends on where SolidWorks chooses to put a
+    full circle's start point.
+    """
+    arc = _early_bound(segment, "ISketchArc")
+    assert_sketch_geometry_placed(
+        adapter,
+        (("centre point", adapter._get_attr_or_call(arc, "GetCenterPoint2"), center),),
+        what=what,
+        label=label,
+    )
+    actual = float(adapter._get_attr_or_call(arc, "GetRadius"))
+    _refuse_sketch_drift(
+        drift_m=abs(actual - radius_m),
+        actual=actual,
+        expected=radius_m,
+        measurement="radius",
+        what=what,
+        label=label,
+    )
+
+
+def select_sketch_geometry(
+    adapter: Any,
+    segment: Any,
+    view: Any,
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Select a direct-to-DB sketch entity for a selection-precondition API.
+
+    ``sketch_geometry_direct_to_db`` is what CREATES the need for this: an
+    inferred draw leaves the new segment selected, and authoring straight into
+    the database does not.  ``CreateSectionViewAt5`` and
+    ``CreateDetailViewAt4`` both consume the current selection rather than an
+    object, so without this they would section or crop whatever happened to be
+    selected before -- or nothing.  The count is checked because a stale
+    selection plus the new one is two entities, and both of those APIs read
+    the wrong one silently.
+    """
+    manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    selection_data = manager.CreateSelectData()
+    selection_data.View = view
+    selectable = _sw_type_info.early_bound_or_flag(
+        segment, "ISketchSegment", "Select4"
+    )
+    if not selectable.Select4(False, selection_data):
+        raise RuntimeError(f"failed to select the {what} ({label})")
+    selected = int(manager.GetSelectedObjectCount2(-1))
+    if selected != 1:
+        raise RuntimeError(
+            f"selecting the {what} produced {selected} entities ({label})"
+        )
 
 
 @_telemetry.traced("drawing.section_view", label_param="label")
@@ -1082,14 +1242,14 @@ def create_section_view(
     parent sketch's transform before CreateLine, which takes view-local sketch
     coordinates. Passing sheet coordinates directly offsets and scales the cut
     again (at 1:2, a centre cut can miss the part entirely).
-    ``CreateLine`` is placed with the sketch manager in direct-to-DB mode and
-    its endpoints are read back (:func:`_assert_section_line_placed`): an
-    inferred endpoint snaps, and a snapped cutting line cuts an OBLIQUE plane.
-    Direct-to-DB creation does not leave the new segment selected the way an
-    inferred draw does, so it is selected explicitly for the
-    ``CreateSectionViewAt5`` precondition.  The section is deliberately
-    unaligned so a part recipe can place and scale it independently of the
-    parent view.
+    ``CreateLine`` runs inside :func:`sketch_geometry_direct_to_db` and its
+    endpoints are read back (:func:`assert_sketch_line_placed`): an inferred
+    endpoint snaps, and a snapped cutting line cuts an OBLIQUE plane.  That
+    guard is also what removes ``CreateLine``'s leaves-it-selected side
+    effect, so the segment is selected explicitly
+    (:func:`select_sketch_geometry`) for the ``CreateSectionViewAt5``
+    precondition.  The section is deliberately unaligned so a part recipe can
+    place and scale it independently of the parent view.
 
     ``partial=True`` is the ASME removed section: the cutting line spans ONLY
     the feature of interest (one rail of a frame, not the whole plan), and
@@ -1121,28 +1281,16 @@ def create_section_view(
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
+    with sketch_geometry_direct_to_db(sketch_manager):
         segment = sketch_manager.CreateLine(*points[0], *points[1])
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
     if segment is None:
         raise RuntimeError(f"failed to create section line ({label})")
-    _assert_section_line_placed(adapter, segment, points, label=label)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = parent_view
-    selectable = _sw_type_info.early_bound_or_flag(
-        segment, "ISketchSegment", "Select4"
+    assert_sketch_line_placed(
+        adapter, segment, points, what="section cutting line", label=label
     )
-    if not selectable.Select4(False, selection_data):
-        raise RuntimeError(f"failed to select the section line ({label})")
-    selected = int(selection_manager.GetSelectedObjectCount2(-1))
-    if selected != 1:
-        raise RuntimeError(
-            f"selecting the section line produced {selected} entities ({label})"
-        )
+    select_sketch_geometry(
+        adapter, segment, parent_view, what="section cutting line", label=label
+    )
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
     # (| swCreateSectionView_Partial for a removed section).
     options = 0x1 | 0x8 | (0x10 if partial else 0)
@@ -3563,6 +3711,13 @@ def create_view_theoretical_datum(
     retained user ``ISketchPoint`` in the view's drawing sketch.  Native tables
     can use that point as their origin while callers derive its coordinates
     from authoritative model dimensions.
+
+    A theoretical sharp is by construction NOT on the geometry the view shows
+    -- it is where two faces would have met before the fillet -- so it is
+    prime snap bait: the real filleted edge that replaced it is a fraction of
+    a millimetre away.  The point is authored direct-to-DB and read back for
+    that reason; a snapped datum silently relocates every coordinate in the
+    hole table that keys on it.
     """
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
@@ -3570,18 +3725,22 @@ def create_view_theoretical_datum(
     if not drawing.ActivateView(name):
         raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
     previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
     sketch_manager.DisplayWhenAdded = True
     try:
-        point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
+        with sketch_geometry_direct_to_db(sketch_manager):
+            point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
     finally:
-        sketch_manager.AddToDB = previous_add_to_db
         sketch_manager.DisplayWhenAdded = previous_display
     if point is None:
         raise RuntimeError(f"failed to create {label} theoretical datum point")
     point = _early_bound(point, "ISketchPoint")
+    assert_sketch_geometry_placed(
+        adapter,
+        (("position", point, (point_xy[0], point_xy[1], 0.0)),),
+        what="theoretical datum point",
+        label=label,
+    )
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="create_view_theoretical_datum")
     return point
