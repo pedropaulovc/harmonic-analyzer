@@ -66,6 +66,34 @@ issue #249.
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails before it can save blank tolerance cells.
 
+#### The PART name is fitted to its cell at build time
+
+The PART note is authored with a text box narrower than the cell it sits in
+(measured at 68.83–69.67 mm against a 106.62 mm cell), so a long `Title`
+wrapped onto a second line — and because a note grows downward from its
+anchor, that line landed under the cell's lower rule, on the `DWG. NO.`
+caption. `harmonic-analyzer-assembly` (MHA-A08) shipped that way in v36, along
+with 17 other sheets.
+
+`finalize_drawing` now fits the name instead: `_title_block_text.fit_part_name`
+picks the largest integer point size (16 pt down to a 9 pt floor) at which the
+name fits the cell's real usable width, and
+`_drawing_common.fit_title_block_part_name` applies it to that sheet's own
+template note through `EditTemplate` → `ITextFormat.LineLength` /
+`CharHeightInPts` → `EditSheet`, then re-reads `INote::GetExtent` to prove the
+result is one line inside the cell. The DRWDOT binary is never written; the
+edit lives in the SLDDRW. A name that already fits the note's authored box is
+left completely alone.
+
+The width model is the template font's own glyph advances, taken from the
+Century Gothic CID subset embedded in the released PDFs. **If the title block
+moves, the cell is resized, or its font changes, re-measure**: the field
+geometry lives in `_drawing_registry.DRAWING_TEMPLATES[...].part_name_field`
+and the glyph table in `_title_block_text.GLYPH_ADVANCE_PER_MILLE`, both with
+their provenance recorded in comments. A font change fails the build loudly
+rather than mis-fitting, because the applier checks `ITextFormat.TypeFaceName`
+before it trusts the model.
+
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
 the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The
