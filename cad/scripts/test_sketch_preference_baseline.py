@@ -28,6 +28,27 @@ failed`` leaf on ``swmaker000005@5``:
   contour count merely disagrees -- the absence of a measurement is not a
   measurement of absence, and a guard that fails closed on healthy geometry is
   worse than no guard.
+
+Re-deriving what the audit catches, so the claim is backed by the commit and
+not by a report -- the widened audit flags NINE pre-guard sites at
+``4c5a4322`` (the commit before the migration), and the number is
+re-derivable by anyone after any rebase::
+
+    git worktree add /tmp/pre 4c5a4322
+    cp cad/scripts/test_sketch_preference_baseline.py /tmp/pre/cad/scripts/
+    # run from the submodule-initialised clone: SCRIPTS_DIR comes from
+    # __file__, so the interpreter's tree does not matter, the FILE's does
+    uv run python -m pytest /tmp/pre/cad/scripts/test_sketch_preference_baseline.py \
+        -q -k authored_under_a_guard -p no:cacheprovider
+
+It fails listing ``_drawing_common.py:1127`` (``create_section_view``, the
+site that shipped the oblique cut), ``_drawing_common.py:3578``
+(``create_view_theoretical_datum``, whose overshoot is INHERENT: a
+theoretical sharp is by construction not on the geometry the view shows),
+``_stock_trim_drawing.py:69``, ``draw_arbor_pedestal.py:282``,
+``draw_cone_swing_platform.py:153``, ``draw_cylinder_gear.py:155``,
+``draw_rocker_arm_support.py:234``, ``draw_top_frame.py:427`` and
+``draw_top_frame.py:856``.
 """
 
 from __future__ import annotations
