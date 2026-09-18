@@ -309,119 +309,128 @@ def _add_to_db_assignment(node: ast.AST) -> tuple[str, ast.expr] | None:
     return None
 
 
-def _receivers_enabled_before(suite: list[ast.stmt], index: int) -> set[str]:
-    """Receivers whose LATEST ``AddToDB`` assignment before ``index`` is ``True``.
+# A ``no_sketch_inference`` block forces APPLICATION preferences, so it covers
+# every sketch manager in scope; an ``AddToDB`` block covers one receiver.
+_EVERY_RECEIVER = "*"
 
-    Latest, not any: an intervening ``sk.AddToDB = False`` puts the sketch
-    manager back through the inference engine, and an earlier enable does not
-    undo that.
+# Code objects whose body may run long after the enclosing guard has exited.
+# A raw primitive in one of them is NOT covered by a guard it was merely
+# written inside; only a guard within the object itself counts.  A class BODY
+# is not deferred -- its statements run during class creation, under the
+# guard -- so ``ClassDef`` is deliberately absent.
+_DEFERRED_CODE = (
+    ast.FunctionDef,
+    ast.AsyncFunctionDef,
+    ast.Lambda,
+    ast.GeneratorExp,
+)
+
+
+def _enable_state(value: ast.expr) -> bool:
+    return isinstance(value, ast.Constant) and value.value is True
+
+
+def _try_guarded_receivers(
+    node: ast.Try, enabled: dict[str, bool]
+) -> frozenset[str]:
+    """Receivers an ``AddToDB`` try/finally really guards for its body.
+
+    All of it is required, and each part is a failure this audit would
+    otherwise wave through:
+
+    * the ``finally`` must restore the receiver -- a ``finally`` that only
+      assigns ``AddToDB = False`` restores a value it never enabled;
+    * that receiver's LATEST assignment before the ``try`` must be literal
+      ``True`` -- an intervening ``sk.AddToDB = False`` puts the manager back
+      through the inference engine, and an earlier enable does not undo it;
+    * the body must not reassign it -- from that statement on the guarantee is
+      gone, so the whole block is refused rather than split at it.
     """
-    latest: dict[str, bool] = {}
-    for stmt in suite[:index]:
-        found = _add_to_db_assignment(stmt)
-        if found is not None:
-            receiver, value = found
-            latest[receiver] = (
-                isinstance(value, ast.Constant) and value.value is True
-            )
-    return {receiver for receiver, enabled in latest.items() if enabled}
+    restored = {
+        found[0]
+        for stmt in node.finalbody
+        if (found := _add_to_db_assignment(stmt)) is not None
+    }
+    active = {receiver for receiver in restored if enabled.get(receiver)}
+    if not active:
+        return frozenset()
+    inside = {
+        found[0]
+        for stmt in ast.walk(node)
+        if isinstance(stmt, ast.stmt)
+        and stmt not in node.finalbody
+        and (found := _add_to_db_assignment(stmt)) is not None
+    }
+    return frozenset(active - inside)
 
 
-def _suite_positions(tree: ast.Module) -> dict[ast.stmt, tuple[list[ast.stmt], int]]:
-    """Every statement's enclosing suite and its index in it."""
-    positions: dict[ast.stmt, tuple[list[ast.stmt], int]] = {}
-    for node in ast.walk(tree):
-        for field in ("body", "orelse", "finalbody"):
-            suite = getattr(node, field, None)
-            if isinstance(suite, list):
-                for index, stmt in enumerate(suite):
-                    if isinstance(stmt, ast.stmt):
-                        positions[stmt] = (suite, index)
-    return positions
+def _check_call(node: ast.Call, guards: frozenset[str]) -> tuple[int, str] | None:
+    """Report ``node`` if it is a raw primitive whose RECEIVER is unguarded.
 
-
-def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
-    """Line spans of the two controls that defeat inference.
-
-    ``no_sketch_inference`` forces the user preferences for its block.  An
-    ``AddToDB = True`` try/finally is the stronger, engine-level control: it
-    writes segments straight into the sketch database, so the inference stage
-    -- and with it the SCREEN-SPACE snap tolerance that made this failure
-    view-dependent -- never runs at all.  Either is sufficient; both are
-    accepted here because the fleet legitimately uses both.
-
-    The ``AddToDB`` form is matched STRUCTURALLY, and the whole shape is
-    required: for ONE receiver, its latest assignment before the ``try`` is
-    literal ``True``, and the ``finally`` restores THAT SAME receiver.  Each
-    part of that carries a failure this audit would otherwise wave through:
-
-    * a ``finally`` that only assigns ``AddToDB = False`` restores a value it
-      never enabled, so its primitives went through inference after all;
-    * an intervening ``sk.AddToDB = False`` puts the manager back through the
-      inference engine, and an earlier enable does not undo that;
-    * ``sk1.AddToDB = True`` guarantees nothing about primitives drawn through
-      ``sk2``;
-    * a reassignment of the guarded receiver INSIDE the block ends the
-      guarantee from that point on, so the span is refused outright rather
-      than split at the statement that broke it;
-    * the span covers the ``try`` BODY only.  ``except``/``else``/``finally``
-      run after or instead of the guarded work -- and the restore itself lives
-      in ``finally`` -- so a primitive there is not covered by the enable.
-
-    A guard the audit only believes it saw is worse than no guard, because it
-    is the thing that makes this whole PR's regression gate meaningless.
+    ``sk1.AddToDB = True`` says nothing about primitives drawn through ``sk2``,
+    so the call's own receiver has to be the guarded one.
     """
-    spans: list[tuple[int, int]] = []
-    positions = _suite_positions(tree)
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.With, ast.AsyncWith)):
-            for item in node.items:
-                if _is_guard_call(item.context_expr):
-                    spans.append((node.lineno, node.end_lineno))
-        elif isinstance(node, ast.Try) and node.finalbody:
-            restored = {
-                found[0]
-                for stmt in node.finalbody
-                if (found := _add_to_db_assignment(stmt)) is not None
-            }
-            if not restored:
-                continue
-            suite, index = positions.get(node, ([], 0))
-            guarded = restored & _receivers_enabled_before(suite, index)
-            # Any reassignment of a guarded receiver INSIDE the block ends the
-            # guarantee: `sk.AddToDB = False` there puts the manager back
-            # through the inference engine for everything after it.  Rather
-            # than track a per-statement timeline, the whole span is refused,
-            # which reports the block for a human to look at.
-            if any(
-                (found := _add_to_db_assignment(stmt)) is not None
-                and found[0] in guarded
-                for stmt in ast.walk(node)
-                if isinstance(stmt, ast.stmt) and stmt not in node.finalbody
-            ):
-                continue
-            if guarded:
-                # The BODY only.  An `except`/`else`/`finally` clause runs
-                # after or instead of the guarded work -- and the restore
-                # itself lives in `finally` -- so a primitive there is not
-                # covered by the enable.
-                spans.append(
-                    (node.body[0].lineno, node.body[-1].end_lineno)
-                )
-    return spans
+    func = node.func
+    if not isinstance(func, ast.Attribute) or func.attr not in RAW_SKETCH_CALLS:
+        return None
+    if _EVERY_RECEIVER in guards or ast.unparse(func.value) in guards:
+        return None
+    return (node.lineno, func.attr)
+
+
+def _visit(node: ast.AST, guards: frozenset[str], found: list) -> None:
+    """Walk ``node``, carrying the set of receivers guarded at this point."""
+    if isinstance(node, _DEFERRED_CODE):
+        guards = frozenset()
+    if isinstance(node, (ast.With, ast.AsyncWith)) and any(
+        _is_guard_call(item.context_expr) for item in node.items
+    ):
+        guards = guards | {_EVERY_RECEIVER}
+    if isinstance(node, ast.Call):
+        offender = _check_call(node, guards)
+        if offender is not None:
+            found.append(offender)
+    for _field, value in ast.iter_fields(node):
+        items = value if isinstance(value, list) else [value]
+        if items and all(isinstance(item, ast.stmt) for item in items):
+            _visit_suite(items, guards, found)
+            continue
+        for item in items:
+            if isinstance(item, ast.AST):
+                _visit(item, guards, found)
+
+
+def _visit_suite(suite: list[ast.stmt], guards: frozenset[str], found: list) -> None:
+    """Walk a statement suite IN ORDER, tracking ``AddToDB`` as it changes.
+
+    Order matters: the enable, the ``try`` it guards and any later disable are
+    separate statements, and only their sequence says what was in force when a
+    primitive ran.
+    """
+    enabled: dict[str, bool] = {}
+    for stmt in suite:
+        assignment = _add_to_db_assignment(stmt)
+        if assignment is not None:
+            enabled[assignment[0]] = _enable_state(assignment[1])
+        if isinstance(stmt, ast.Try) and stmt.finalbody:
+            active = _try_guarded_receivers(stmt, enabled)
+            _visit_suite(stmt.body, guards | active, found)
+            # An `except`/`else`/`finally` clause runs after or instead of the
+            # guarded work -- and the restore itself lives in `finally` -- so
+            # a primitive there is not covered by the enable.
+            for handler in stmt.handlers:
+                _visit(handler, guards, found)
+            for clause in (stmt.orelse, stmt.finalbody):
+                if clause:
+                    _visit_suite(clause, guards, found)
+            continue
+        _visit(stmt, guards, found)
 
 
 def _unguarded_raw_calls(path: Path) -> list[tuple[int, str]]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    spans = _guarded_line_ranges(tree)
-    return [
-        (node.lineno, node.func.attr)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr in RAW_SKETCH_CALLS
-        and not any(start <= node.lineno <= end for start, end in spans)
-    ]
+    found: list[tuple[int, str]] = []
+    _visit_suite(ast.parse(path.read_text(encoding="utf-8")).body, frozenset(), found)
+    return sorted(found)
 
 
 def test_every_raw_sketch_primitive_is_authored_under_a_guard() -> None:
@@ -601,6 +610,75 @@ def test_a_primitive_in_the_finally_clause_is_not_guarded(tmp_path: Path) -> Non
     )
 
     assert _unguarded_raw_calls(offender) == [(9, "CreateCircleByRadius")]
+
+
+def test_a_call_on_an_unguarded_receiver_inside_the_block_is_reported(
+    tmp_path: Path,
+) -> None:
+    """Enabling ``sk1`` says nothing about primitives drawn through ``sk2``.
+
+    The block is a perfectly well-formed guard -- enable before, restore in
+    ``finally`` -- for a sketch manager that never draws anything.  Crediting
+    it to the one that does is how a line-span audit blesses a primitive that
+    really did go through the inference engine.
+    """
+    offender = tmp_path / "diag_build_wrong_receiver.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk1 = adapter.currentSketchManager\n"
+        "    sk2 = adapter.otherSketchManager\n"
+        "    prev = sk1.AddToDB\n"
+        "    sk1.AddToDB = True\n"
+        "    try:\n"
+        "        sk1.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "        sk2.CreateLine(0.0, 0.0, 0.0, 2.0, 2.0, 0.0)\n"
+        "    finally:\n"
+        "        sk1.AddToDB = prev\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(8, "CreateLine")]
+
+
+def test_a_nested_function_does_not_inherit_the_guard(tmp_path: Path) -> None:
+    """A deferred body can run long after the contextmanager has exited.
+
+    ``adapter.register(draw)`` inside the block is the realistic shape: the
+    callback is CALLED later, with the seat back at its baseline, so lexical
+    containment proves nothing about what was in force when it drew.
+    """
+    offender = tmp_path / "diag_build_deferred.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    with no_sketch_inference(adapter):\n"
+        "        def draw():\n"
+        "            sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "        adapter.register(draw)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(5, "CreateLine")]
+
+
+def test_a_nested_function_with_its_own_guard_is_clean(tmp_path: Path) -> None:
+    """The fix must not punish the correct spelling of a deferred draw.
+
+    A callback that opens the guard itself is authored correctly whenever it
+    runs, which is the whole difference from the case above.
+    """
+    guarded = tmp_path / "diag_build_deferred_guarded.py"
+    guarded.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    def draw():\n"
+        "        with no_sketch_inference(adapter):\n"
+        "            sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    adapter.register(draw)\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(guarded) == []
 
 
 def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
