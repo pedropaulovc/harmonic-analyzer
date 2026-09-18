@@ -29,6 +29,7 @@ This pins the two span-shape fixes this module exists to prove:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import sys
 import time
@@ -64,8 +65,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # What the fakes DID carry that the real package cannot is one behavioural     #
 # neutralization, kept below.                                                  #
 # --------------------------------------------------------------------------- #
-def _neutralize_com_method_flagging() -> None:
-    """Keep `sw_type_info.flag_methods` a no-op against the mock.
+@contextlib.contextmanager
+def _com_method_flagging_neutralized():
+    """Keep `sw_type_info.flag_methods` a no-op against the mock, and PUT IT BACK.
 
     Flagging exists so pywin32 dispatches zero-arg SolidWorks methods as
     methods rather than properties; the mock objects are plain Python with no
@@ -79,13 +81,26 @@ def _neutralize_com_method_flagging() -> None:
     was written for -- no longer has call sites. This stays as the standing
     isolation invariant the stub module used to provide, so a gate that starts
     flagging methods cannot pull real COM type info into a seatless gate.
+
+    Scoped, not assigned at import: `check:recipe` runs every offline test
+    file in ONE pytest process, so a module-level assignment would leak into
+    a later test that legitimately reaches `_common._flag` and silently skip
+    real COM method flagging there (CodeRabbit, PR #771).
     """
     from solidworks_mcp.adapters import sw_type_info
 
+    original = sw_type_info.flag_methods
     sw_type_info.flag_methods = lambda obj, *interfaces: 0  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        sw_type_info.flag_methods = original
 
 
-_neutralize_com_method_flagging()
+@pytest.fixture(autouse=True, scope="module")
+def _neutralize_com_method_flagging():
+    with _com_method_flagging_neutralized():
+        yield
 
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
@@ -645,8 +660,10 @@ def _demo() -> None:
     mp = _Patch()
     tmp = Path(_telemetry._telemetry_dir() or ".") / "mock_sldasm"
     tmp.mkdir(parents=True, exist_ok=True)
+    # The autouse fixture covers the pytest path; --demo runs outside pytest.
     try:
-        spans, report = _run_soundness(names, mp, tmp)
+        with _com_method_flagging_neutralized():
+            spans, report = _run_soundness(names, mp, tmp)
     finally:
         mp.restore()
 
