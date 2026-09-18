@@ -291,11 +291,12 @@ async def _thread(adapter) -> None:
     """Vendor Helix/Spiral1 + Sketch4 + Cut-Sweep1."""
     offset_plane(adapter, "ThreadDatum", A.shank_end_y_mm)
     check("create_sketch helix seed", await adapter.create_sketch("ThreadDatum"))
-    seed = _sketch_manager(adapter).CreateCircleByRadius(
-        0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
-    )
-    if seed is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        seed = _sketch_manager(adapter).CreateCircleByRadius(
+            0.0, 0.0, 0.0, A.thread_major_radius_mm / 1000.0
+        )
+        if seed is None:
+            raise RuntimeError("helix seed circle failed")
     # InsertHelix consumes the ACTIVE sketch.  The datum plane is a negative
     # Top offset, so it carries the flipped normal: clockwise=False is the
     # vendor's right-hand thread in that frame and start angle pi/2 puts the
@@ -358,11 +359,12 @@ async def _hex_nut(adapter, bolt_volume: float) -> float:
     # where the bolt does not exist), revolved 360 deg about the shank axis.
     check("create_sketch nut corners", await adapter.create_sketch("Front"))
     sk = _sketch_manager(adapter)
-    axis = sk.CreateCenterLine(
-        0.0, nut.seat_y_mm / 1000.0, 0.0, 0.0, nut.top_y_mm / 1000.0, 0.0
-    )
-    if axis is None:
-        raise RuntimeError("nut corners: CreateCenterLine failed")
+    with no_sketch_inference(adapter):
+        axis = sk.CreateCenterLine(
+            0.0, nut.seat_y_mm / 1000.0, 0.0, 0.0, nut.top_y_mm / 1000.0, 0.0
+        )
+        if axis is None:
+            raise RuntimeError("nut corners: CreateCenterLine failed")
     await add_line_chain(adapter, [list(p) for p in nut_corner_chamfer_contour_mm(nut)])
     check("exit_sketch nut corners", await adapter.exit_sketch())
     name_last_feature(adapter, "NutCornerProfile")

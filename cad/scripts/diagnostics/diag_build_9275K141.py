@@ -45,21 +45,30 @@ async def build_9275K141(adapter, truth=None):
         b = math.atan2(end[1] - center[1], end[0] - center[0])
         sweep = (b - a + math.pi) % (2.0 * math.pi) - math.pi
         mid = a + sweep / 2.0
-        if (
-            sketch.Create3PointArc(
-                start[0] / 1000.0,
-                start[1] / 1000.0,
-                0.0,
-                end[0] / 1000.0,
-                end[1] / 1000.0,
-                0.0,
-                (center[0] + radius * math.cos(mid)) / 1000.0,
-                (center[1] + radius * math.sin(mid)) / 1000.0,
-                0.0,
-            )
-            is None
-        ):
-            raise RuntimeError("9275K141: section arc failed")
+        # Guarded here as well as at every call site.  All four calls already
+        # run inside the section's suppression block, so at runtime this is a
+        # no-op (the contextmanager is depth-counted and only the outermost
+        # entry writes preferences).  It is here so the invariant is LEXICAL:
+        # every raw sketch primitive in the fleet sits inside a suppression
+        # block in the same file you are reading, which is what
+        # test_sketch_preference_baseline.py enforces and what stops the next
+        # caller from inheriting a setting by accident.
+        with no_sketch_inference(adapter):
+            if (
+                sketch.Create3PointArc(
+                    start[0] / 1000.0,
+                    start[1] / 1000.0,
+                    0.0,
+                    end[0] / 1000.0,
+                    end[1] / 1000.0,
+                    0.0,
+                    (center[0] + radius * math.cos(mid)) / 1000.0,
+                    (center[1] + radius * math.sin(mid)) / 1000.0,
+                    0.0,
+                )
+                is None
+            ):
+                raise RuntimeError("9275K141: section arc failed")
 
     inner_r = INNER_DIAMETER / 2.0
     outer_r = OUTER_DIAMETER / 2.0

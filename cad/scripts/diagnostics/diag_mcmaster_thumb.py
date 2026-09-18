@@ -76,9 +76,9 @@ async def build_thumb_screw(adapter, part_no: str):
     # --- shank with tip chamfer (vendor Extrude1 + Chamfer1) ----------------
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sk = adapter.currentSketchManager
-    if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
-        raise RuntimeError("thumb shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk.CreateCenterLine(0.0, 0.0, 0.0, 0.0, tip_y / 1000.0, 0.0) is None:
+            raise RuntimeError("thumb shank: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),
@@ -149,9 +149,10 @@ async def build_thumb_screw(adapter, part_no: str):
 
     offset_plane(adapter, "TipPlane", tip_y)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, (length + pitch) / pitch, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
@@ -178,9 +179,10 @@ async def build_thumb_screw(adapter, part_no: str):
     offset_plane(adapter, "KnurlTopPlane", head_top)
     check("create_sketch knurl helix seed",
           await adapter.create_sketch("KnurlTopPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, head_r / 1000.0) is None:
-        raise RuntimeError("knurl helix seed failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, head_r / 1000.0) is None:
+            raise RuntimeError("knurl helix seed failed")
     insert_helix(adapter, head_h * 20.0, 0.05, clockwise=True,
                  reversed_dir=True, start_angle_rad=math.pi / 2.0,
                  feature_name="KnurlHelix")
