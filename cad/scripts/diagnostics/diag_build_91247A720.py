@@ -373,12 +373,22 @@ async def build_91247A720(adapter, truth=None):
     # CreateLine/Create3PointArc segments through the inference engine, on the
     # theory that exactly-coincident endpoints would merge into closed loops,
     # having audited the endpoints against MODEL silhouettes and found the
-    # nearest 0.898 mm away.  Two things were wrong with that audit.  Snapping
-    # is measured in PIXELS, not millimetres, and nothing on this path fits or
-    # orients the view -- px/mm is inherited from the part template and the
-    # window size, per seat, unasserted and unrecorded (see
-    # diagnostics/exp_inference_zoom.py, which measured it).  And the sketch's
-    # OWN points are snap candidates too, not just model silhouettes: each
+    # nearest 0.898 mm away.  Two things were wrong with that audit.
+    #
+    # First, snapping is measured in PIXELS, not millimetres, and nothing on
+    # this path fits or orients the view -- px/mm is inherited from the part
+    # template and the SolidWorks main-window size.  That is no longer a
+    # hypothesis: the seat variable was MEASURED across the three workers.  The
+    # window that failed was 1024x640; the two that passed were 1296x816, which
+    # is 1/0.620 of the area, so the failing seat resolved every millimetre into
+    # 0.62x the pixels.  Preference drift is REFUTED as the explanation -- zero
+    # divergence across 45 preference names, and the failing seat had every snap
+    # toggle ON exactly like the two that passed.  Nothing about the seat's
+    # settings differed; its WINDOW did.  (diagnostics/exp_inference_zoom.py had
+    # already measured the view dependence itself.)
+    #
+    # Second, the sketch's OWN points are snap candidates too, not just model
+    # silhouettes: each
     # inner-triangle vertex IS an outer corner arc's centre -- arc centres are
     # a first-class snap target (swSketchSnapsCenterPoints) -- so every outer
     # arc endpoint has a competitor at exactly 0.400 mm, and at each corner the
@@ -394,10 +404,19 @@ async def build_91247A720(adapter, truth=None):
     # gate (memory/solidworks-modeling-pitfalls.md:145-150).  That is what makes
     # the old comment's conclusion unsound rather than just unproven.
     #
-    # Closure is now AUTHORED and has no pixel term: segments go straight to
-    # the sketch database, arcs are centre-based rather than re-fitted from
-    # three points, and every shared vertex gets an explicit merge relation.
-    # The ring extrudes identically at any view scale, on any seat.
+    # Closure is now AUTHORED and has no pixel term at all: segments go
+    # straight to the sketch database (AddToDB), arcs are centre-based rather
+    # than re-fitted from three points, and every shared vertex gets an
+    # explicit merge relation.  Direct-to-DB is the fix precisely BECAUSE it
+    # removes the pixel term -- the measured seat variable was window size, so
+    # no preference baseline could have prevented this.  The ring extrudes
+    # identically at any window size, at any view scale, on any seat.
+    #
+    # The two gates that catch a degenerate corner are OFFLINE, in
+    # sketch_profile: endpoint_merges refuses any vertex not shared by exactly
+    # two ends, and minor_arc refuses an endpoint that has arrived at the
+    # centre.  The CheckFeatureUse read-back in draw_closed_profile is
+    # forensics, not a gate.
     logo_segs = logo_ring_profile()
     check("create_sketch logo", await adapter.create_sketch("HeadTopPlane"))
     await draw_closed_profile(adapter, logo_segs, label="logo ring", loops=2)
@@ -405,9 +424,11 @@ async def build_91247A720(adapter, truth=None):
     name_last_feature(adapter, "LogoProfile")
     model.ClearSelection2(True)
     # FeatureExtrusion3 also returns None when NOTHING is selected, so an
-    # unchecked Select2 makes a failed selection and a bad profile
-    # indistinguishable in the log -- which is part of why tonight's failure
-    # took a night to explain.
+    # unchecked Select2 leaves a failed selection and a bad profile
+    # indistinguishable in the log.  That is a real defect and it is fixed
+    # here, but it is NOT what happened on 2026-09-17: the extrude spent
+    # 1.925 s before returning None, which is contour analysis running on a
+    # selected profile, not an immediate refusal on an empty selection.
     if not _feature_by_name(adapter, "LogoProfile").Select2(False, 0):
         raise RuntimeError("logo ring: LogoProfile selection failed")
     feat = fm.FeatureExtrusion3(

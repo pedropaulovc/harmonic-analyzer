@@ -201,3 +201,20 @@ def test_a_semicircular_span_has_no_unique_minor_arc() -> None:
     """Refused rather than silently picking one of two equal arcs."""
     with pytest.raises(OpenProfileError):
         minor_arc((0.0, 0.0), (1.0, 0.0), (-1.0, 0.0))
+
+
+def test_an_endpoint_that_reached_the_arc_centre_is_refused() -> None:
+    """The exact shape an inference snap to an arc centre produces.
+
+    This is one of the two OFFLINE gates, and it is where a collapsed corner is
+    actually caught -- NOT at the ``CheckFeatureUse`` read-back, which is
+    deliberately incapable of failing healthy geometry.  In the logo ring the
+    nearest wrong snap target for an outer arc's endpoint is that arc's own
+    centre, 0.400 mm away, so "endpoint == centre" is the realised failure and
+    it must be named, not inferred from a zero sweep.
+    """
+    centre = LOGO_BOTTOM_RIGHT_CENTRE
+    with pytest.raises(OpenProfileError, match="IS the centre"):
+        minor_arc(centre, centre, (centre[0] + LOGO_OUTER_R, centre[1]))
+    with pytest.raises(OpenProfileError, match="IS the centre"):
+        minor_arc(centre, (centre[0] + LOGO_OUTER_R, centre[1]), centre)
