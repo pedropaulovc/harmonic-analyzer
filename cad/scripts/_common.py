@@ -47,15 +47,22 @@ driving dims, SolidworksMCP-python PRs #55/#56):
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import ctypes
 import functools
+import json
 import math
 import os
+import re
 import shutil
 import sys
 import time
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, NoReturn
 
 import _telemetry  # observability spine: console logging + tracing, preconfigured
 import _watchdog  # COM crash/hang watchdog (started per session in run_build)
@@ -65,6 +72,12 @@ OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
 OUT_STL = CAD_ROOT / "out" / "stl"
+# Forensic artefacts of a failed COM build step: a saved copy of the failing
+# document, a BMP of the seat and the capture.json that indexes them, one
+# directory per failure label AND per capture instant -- a retried failure must
+# not erase the evidence of the failure it is retrying (see
+# :func:`capture_com_failure`).
+OUT_FAILURES = CAD_ROOT / "out" / "reports" / "failures"
 # Vendored input artefacts a build imports at run time (e.g. the nameplate
 # engraving DXF). A build script that reads one of these must resolve it under
 # this dir so dodo's data_deps_of picks it up as a file_dep + cache-key input.
@@ -900,8 +913,26 @@ def set_sketch_direct_db(adapter: Any, enabled: bool) -> None:
     coincident endpoints still merge in the sketch DB (proven live: the
     pin chain closed and defined through fixed neighbours).
     """
-    adapter.currentSketchManager.AddToDB = enabled
-    _telemetry.success(f"sketch AddToDB = {enabled}")
+    manager = adapter.currentSketchManager
+    previous = adapter._attempt(lambda: bool(_read_member(manager, "AddToDB")), default=None)
+    manager.AddToDB = enabled
+    # AddToDB is SESSION state on a seat that outlives this leaf, and no user
+    # preference reflects it, so the transition is recorded: a leaf that dies
+    # between an ``enabled=True`` and its matching ``False`` hands the next leaf
+    # on this seat a different authoring mode with nothing on disk to show it.
+    _telemetry.event(
+        "seat.sketch_add_to_db", enabled=enabled, previous=_scalar(previous)
+    )
+    if enabled and previous:
+        # Already ON before this build turned it on: nothing in a healthy
+        # sequence leaves it that way, so the seat carried it in from a leaf
+        # that died between its True and its matching False.
+        _telemetry.warn(
+            "sketch AddToDB was already True before this build set it -- a "
+            "previous leaf on this seat left its session state behind",
+            add_to_db=enabled,
+        )
+    _telemetry.success(f"sketch AddToDB = {enabled} (was {previous})")
 
 
 @_telemetry.traced("check.volume", label_param="label")
@@ -996,16 +1027,253 @@ TOGGLE_STL_ONE_FILE = 72  # swSTLComponentsIntoOneFile
 TOGGLE_STL_NO_TRANSLATE = 71  # swSTLDontTranslateToPositive: keep model origin
 TOGGLE_STL_SHOW_INFO = 70  # swSTLShowInfoOnSave: the per-file "Save <name>.STL?" modal
 
-_STL_INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0}
+# ---------------------------------------------------------------------------
+# Process-global SolidWorks preferences: DECLARED baselines, not observed ones
+#
+# The defect class this replaces: mutate a process-global preference, capture
+# the value that happened to be there, restore it in a ``finally``. A leaf that
+# dies inside the block strands the seat with the mutated value -- and our OWN
+# watchdog exits (86/87/88) are ``os._exit``, which skips ``finally`` BY
+# CONSTRUCTION, so this is not a hypothetical. The next run on that seat then
+# captures the stranded value as "the original" and faithfully restores it
+# forever: self-perpetuating, deterministic per seat, random-looking across a
+# fleet -- exactly the signature of the 2026-09-17 "transient" leaf.
+#
+# Two shapes, one implementation each, and NO observed-value restore anywhere:
+#
+# * :func:`enforce_preferences` -- the family whose required state IS the
+#   baseline (STL/STEP export). Nothing restores anything, so nothing can be
+#   stranded; drift found at entry is reported, not inherited.
+# * :func:`preference_override` -- a family that must be temporarily different
+#   (e.g. suppressing sketch inference). Restores the DECLARED baseline, and is
+#   DEPTH-COUNTED so a nested block cannot restore mid-flight for the outer one.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PreferenceSpec:
+    """A named family of SolidWorks user preferences and its declared baseline.
+
+    Keys are swconst MEMBER NAMES (resolved at runtime -- ids move between
+    releases, names do not) or raw ids for the export families that predate this
+    rule and already carry the member name in a comment. ``baseline_*`` is the
+    state a seat is left in; when it equals the applied state the family is
+    simply enforced and there is nothing to restore.
+
+    The mappings are wrapped read-only at construction: ``frozen=True`` alone
+    stops ``spec.toggles = {}`` but not ``spec.toggles[9] = False``, and the
+    entire argument for this class is that the baseline is a DECLARED constant
+    -- one a recipe cannot quietly accumulate into.
+    """
+
+    label: str
+    integers: Mapping[str | int, int] = field(default_factory=dict)
+    toggles: Mapping[str | int, bool] = field(default_factory=dict)
+    baseline_integers: Mapping[str | int, int] = field(default_factory=dict)
+    baseline_toggles: Mapping[str | int, bool] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        for name in ("integers", "toggles", "baseline_integers", "baseline_toggles"):
+            object.__setattr__(
+                self, name, MappingProxyType(dict(getattr(self, name)))
+            )
+
+
 # SHOW_INFO -> False: every part build now exports an STL, so leaving the modal on
 # would block an unattended `doit` run on the first export (cut_release.py disables
 # it for the same reason; codex review #12).
-_STL_TOGGLES = {
-    TOGGLE_STL_BINARY: True,
-    TOGGLE_STL_ONE_FILE: True,
-    TOGGLE_STL_NO_TRANSLATE: True,
-    TOGGLE_STL_SHOW_INFO: False,
-}
+#
+# Declared baseline == applied state: every STL this repo writes is a fine binary
+# mesh in millimetres at the model origin (``stl_bbox_mm`` parses exactly that),
+# and no build step wants any other value, so the seat is deliberately LEFT in
+# this state instead of being handed back a value an earlier crash invented.
+STL_EXPORT_PREFERENCES = PreferenceSpec(
+    label="stl-export",
+    integers={PREF_STL_QUALITY: 2, PREF_STL_UNITS: 0},
+    toggles={
+        TOGGLE_STL_BINARY: True,
+        TOGGLE_STL_ONE_FILE: True,
+        TOGGLE_STL_NO_TRANSLATE: True,
+        TOGGLE_STL_SHOW_INFO: False,
+    },
+)
+
+
+def _preference_key(adapter: Any, key: str | int) -> int | None:
+    """A raw id passes through; a member name is resolved through swconst."""
+    if isinstance(key, int) and not isinstance(key, bool):
+        return key
+    return _preference_id(adapter, str(key))
+
+
+def _read_preferences(adapter: Any, spec: PreferenceSpec) -> dict[str | int, Any]:
+    """Current seat values for every key in ``spec`` (missing ones omitted)."""
+    sw = adapter.swApp
+    current: dict[str | int, Any] = {}
+    for keys, accessor, cast in (
+        (spec.integers or spec.baseline_integers, "GetUserPreferenceIntegerValue", int),
+        (spec.toggles or spec.baseline_toggles, "GetUserPreferenceToggle", bool),
+    ):
+        read = getattr(sw, accessor, None)
+        for key in keys:
+            pref = _preference_key(adapter, key)
+            if pref is None or read is None:
+                continue
+            value = adapter._attempt(lambda p=pref, r=read: r(p), default=None)
+            if value is not None:
+                current[key] = cast(value)
+    return current
+
+
+def _write_preferences(
+    adapter: Any,
+    spec: PreferenceSpec,
+    integers: Mapping[str | int, int],
+    toggles: Mapping[str | int, bool],
+) -> dict[str, Any]:
+    """Write ``integers``/``toggles``, then VERIFY by read-back.
+
+    A refused write is the whole failure mode being closed here, so it is
+    reported rather than assumed: ``SetUserPreference*`` returns nothing useful
+    on a preference the seat declines (an unknown id, or one a policy locks).
+
+    Reported, never RAISED: some preferences are write-ignored by design
+    (``swSketchAddConstToRectEntity`` reads fine and silently drops the write
+    because it is per-document), and a family whose recipe no longer depends on
+    the write succeeding is degraded-but-correct when it does. Raising here would
+    turn a cosmetic seat-hygiene problem into a build outage.
+    """
+    sw = adapter.swApp
+    refused: dict[str, Any] = {}
+    for values, writer, reader, cast in (
+        (integers, "SetUserPreferenceIntegerValue", "GetUserPreferenceIntegerValue", int),
+        (toggles, "SetUserPreferenceToggle", "GetUserPreferenceToggle", bool),
+    ):
+        write = getattr(sw, writer, None)
+        read = getattr(sw, reader, None)
+        for key, wanted in values.items():
+            pref = _preference_key(adapter, key)
+            if pref is None or write is None:
+                refused[str(key)] = "unresolved"
+                continue
+            adapter._attempt(lambda p=pref, v=wanted, w=write: w(p, v), default=None)
+            if read is None:
+                continue
+            got = adapter._attempt(lambda p=pref, r=read: r(p), default=None)
+            if got is None or cast(got) != wanted:
+                refused[str(key)] = f"wanted {wanted}, seat reports {got!r}"
+    return refused
+
+
+def _report_preference_state(
+    spec: PreferenceSpec,
+    stage: str,
+    drift: Mapping[str | int, tuple[Any, Any]],
+    refused: dict[str, Any],
+) -> None:
+    """One span event per stage (never one per preference), and a WARN only when
+    the seat actually disagreed -- drift is the evidence a seat was stranded."""
+    _telemetry.event(
+        f"seat.preferences.{stage}",
+        family=spec.label,
+        drift=json.dumps({str(k): list(v) for k, v in drift.items()}, sort_keys=True),
+        refused=json.dumps(refused, sort_keys=True),
+    )
+    if drift:
+        _telemetry.warn(
+            f"[seat] {spec.label}: {len(drift)} preference(s) differed from the "
+            f"declared baseline at {stage} "
+            + ", ".join(
+                f"{key}={actual!r} (want {wanted!r})"
+                for key, (actual, wanted) in sorted(drift.items(), key=repr)
+            )
+            + " -- a seat left mutated by an earlier run, now corrected",
+            family=spec.label,
+            stage=stage,
+        )
+    if refused:
+        _telemetry.warn(
+            f"[seat] {spec.label}: the seat refused {len(refused)} preference "
+            f"write(s) at {stage}: {refused}",
+            family=spec.label,
+            stage=stage,
+        )
+
+
+def _drift_against(
+    current: Mapping[str | int, Any],
+    integers: Mapping[str | int, int],
+    toggles: Mapping[str | int, bool],
+) -> dict[str | int, tuple[Any, Any]]:
+    """Keys whose read value differs from what this family declares."""
+    wanted: dict[str | int, Any] = {**integers, **toggles}
+    return {
+        key: (current[key], value)
+        for key, value in wanted.items()
+        if key in current and current[key] != value
+    }
+
+
+def enforce_preferences(adapter: Any, spec: PreferenceSpec) -> dict[str | int, Any]:
+    """Assert ``spec``'s required state on the seat; return the drift corrected.
+
+    For families whose required state IS the declared baseline: there is no
+    save and no restore, so no leaf -- however it dies -- can strand a value,
+    and the next leaf cannot mistake a stranded value for "the original".
+    Ambient state is never inherited: whatever the seat carried in is compared
+    against the declaration, reported, and overwritten.
+    """
+    current = _read_preferences(adapter, spec)
+    drift = _drift_against(current, spec.integers, spec.toggles)
+    refused = _write_preferences(adapter, spec, spec.integers, spec.toggles)
+    _report_preference_state(spec, "enforce", drift, refused)
+    return {key: actual for key, (actual, _wanted) in drift.items()}
+
+
+# Nesting depth per preference family (see preference_override). Module-global
+# because the seat is: two nested overrides of the same family share one seat,
+# whatever objects hold them.
+_override_depth: dict[str, int] = {}
+
+
+@contextlib.contextmanager
+def preference_override(adapter: Any, spec: PreferenceSpec) -> Iterator[None]:
+    """Apply ``spec``'s state for the duration of the block, then restore its
+    DECLARED baseline -- once, on the outermost exit.
+
+    Depth counting is load-bearing, not defensive: restoring a declared baseline
+    from a NESTED block is worse than the old observed-value latch, because the
+    inner exit would restore the baseline mid-flight while the outer block is
+    still relying on the override. The innermost blocks therefore do nothing on
+    entry or exit, and only the outermost restores.
+
+    This still cannot survive ``os._exit`` (nothing can), but the damage is now
+    bounded: the stranded value is a DECLARED one, the next entry reports the
+    drift it finds, and the restore target never depends on what an earlier
+    crash left behind.
+    """
+    depth = _override_depth.get(spec.label, 0)
+    _override_depth[spec.label] = depth + 1
+    try:
+        if depth == 0:
+            current = _read_preferences(adapter, spec)
+            drift = _drift_against(
+                current, spec.baseline_integers, spec.baseline_toggles
+            )
+            refused = _write_preferences(adapter, spec, spec.integers, spec.toggles)
+            _report_preference_state(spec, "override", drift, refused)
+        yield
+    finally:
+        # Decrement FIRST and unconditionally: if the restore write throws while
+        # unwinding, a depth left above zero would pin this family for the rest
+        # of the session -- every later block silently applying nothing and
+        # restoring nothing. That is the latch again, just a subtler one.
+        _override_depth[spec.label] = depth
+        if depth == 0:
+            refused = _write_preferences(
+                adapter, spec, spec.baseline_integers, spec.baseline_toggles
+            )
+            _report_preference_state(spec, "restore", {}, refused)
 
 
 @_telemetry.traced("export.stl")
@@ -1016,38 +1284,33 @@ async def export_part_stl(adapter: Any, out_path: Path) -> None:
     bbox-mirrored part, so a part build must emit its STL alongside the SLDPRT --
     ``export_models.py`` only refreshes the render cache and can't bootstrap a
     from-empty assembly (its part list is manifest-driven and otherwise needs an
-    already-built assembly to scan). Prefs are set then restored so the export
-    doesn't perturb later steps.
+    already-built assembly to scan).
+
+    The export preferences are ENFORCED, not saved-and-restored (see
+    :func:`enforce_preferences`). The previous version captured the seat's
+    OBSERVED values and restored them in a ``finally``: any death inside the
+    block -- including our own watchdog ``os._exit`` paths, which skip ``finally``
+    by construction -- stranded the mutated values on the seat, and the next run
+    then captured the stranded value as "the original" and restored it forever.
+    Nothing in this repo wants any other STL configuration, so the declared state
+    is asserted and deliberately left in place, which makes stranding impossible
+    rather than unlikely.
     """
-    sw = adapter.swApp
-    old_ints = {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in _STL_INT_PREFS}
-    old_toggles = {k: bool(sw.GetUserPreferenceToggle(k)) for k in _STL_TOGGLES}
-    for k, v in _STL_INT_PREFS.items():
-        sw.SetUserPreferenceIntegerValue(k, v)
-    for k, v in _STL_TOGGLES.items():
-        sw.SetUserPreferenceToggle(k, v)
-    try:
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        # Delete any prior STL first so a failed SaveAs3 (locked target, export
-        # error) cannot leave a stale file that the existence check below would
-        # accept as a fresh export (codex review #10). SaveAs3's return is not a
-        # reliable success flag here (it yields 0 on a successful write), so the
-        # post-delete "file exists" check is the real gate.
-        if out_path.exists():
-            out_path.unlink()
-        rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
-        if not out_path.exists():
-            raise RuntimeError(
-                f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}"
-            )
-        _telemetry.success(
-            f"export STL -> {out_path.name} ({out_path.stat().st_size / 1e6:.1f} MB)"
-        )
-    finally:
-        for k, v in old_ints.items():
-            sw.SetUserPreferenceIntegerValue(k, v)
-        for k, v in old_toggles.items():
-            sw.SetUserPreferenceToggle(k, v)
+    enforce_preferences(adapter, STL_EXPORT_PREFERENCES)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # Delete any prior STL first so a failed SaveAs3 (locked target, export
+    # error) cannot leave a stale file that the existence check below would
+    # accept as a fresh export (codex review #10). SaveAs3's return is not a
+    # reliable success flag here (it yields 0 on a successful write), so the
+    # post-delete "file exists" check is the real gate.
+    if out_path.exists():
+        out_path.unlink()
+    rc = adapter._attempt(lambda: adapter.currentModel.SaveAs3(str(out_path), 0, 0))
+    if not out_path.exists():
+        raise RuntimeError(f"STL export produced no file (SaveAs3 rc={rc!r}): {out_path}")
+    _telemetry.success(
+        f"export STL -> {out_path.name} ({out_path.stat().st_size / 1e6:.1f} MB)"
+    )
 
 
 @_telemetry.traced("export.part_images", label_param="part_name")
@@ -1057,6 +1320,13 @@ async def save_part_and_images(
     """Save the part to ``cad/out/sldprt``, its STL to ``cad/out/stl`` (the
     assembly build reads it for mirror placement), and PNG views to
     ``cad/out/png``."""
+    # Recorded BEFORE anything touches the camera: this runs at the end of
+    # authoring, and set_isometric_view below (like export_image further down) is
+    # the first thing in the whole build path that moves the view, so this is the
+    # last moment at which the screen-space state the sketches were authored
+    # under can still be read. A SUCCESS has to record it too -- otherwise a good
+    # run and a bad one cannot be compared (see record_authoring_context).
+    record_authoring_context(adapter, part_name)
     OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
     part_path = (OUT_SLDPRT / f"{part_name}.SLDPRT").resolve()
     set_isometric_view(adapter)  # save on isometric so the .SLDPRT opens isometric
@@ -1474,10 +1744,12 @@ def apply_summary_info(adapter: Any, *, title: str) -> None:
     the setter as ``SetSummaryInfo(field, value)``.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
-        model.SetSummaryInfo(field, value)
-        if model.SummaryInfo(field) != value:
-            raise RuntimeError(f"summary field {field} did not persist ({value!r})")
+    for summary_field, value in ((_SUMMARY_TITLE, title), (_SUMMARY_AUTHOR, PROJECT_AUTHOR)):
+        model.SetSummaryInfo(summary_field, value)
+        if model.SummaryInfo(summary_field) != value:
+            raise RuntimeError(
+                f"summary field {summary_field} did not persist ({value!r})"
+            )
     _telemetry.success(
         f"summary info stamped (Title={title!r}, Author={PROJECT_AUTHOR!r})"
     )
@@ -2163,6 +2435,1049 @@ def discard_open_documents(adapter: Any) -> None:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 
 
+# ---------------------------------------------------------------------------
+# Seat provenance + COM failure forensics
+#
+# A leaf that fails once and passes on retry is "transient" only while nothing
+# recorded WHICH seat ran it and WHAT that seat looked like when it failed. On
+# 2026-09-17 `logo ring extrude failed` (FeatureExtrusion3 -> None) failed one
+# leaf on swmaker000005@5 and passed on retry, having passed twice earlier the
+# same day; neither the trace nor the log could say which sldworks.exe had run
+# it, how old that seat was, or what the seat's sketch-authoring preferences
+# were -- the three facts that separate "the geometry is wrong" from "this seat
+# authors sketches differently". Both gaps are closed here: every session
+# records its seat's provenance, and a null COM return captures the seat's state
+# before it raises.
+#
+# Everything below is BEST-EFFORT by construction. Forensics that can fail a
+# build, or that can replace a clear geometry failure with an unrelated crash,
+# is worse than no forensics: it moves the diagnosis further away.
+# ---------------------------------------------------------------------------
+
+# ``PROCESS_QUERY_LIMITED_INFORMATION`` -- enough for the start time, memory and
+# session of a process this one did not create, and granted where the full
+# ``PROCESS_QUERY_INFORMATION`` right is not.
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+# FILETIME counts 100 ns ticks from 1601-01-01; Unix time runs from 1970-01-01.
+_FILETIME_UNIX_EPOCH_TICKS = 116_444_736_000_000_000
+
+
+class _MemoryCounters(ctypes.Structure):
+    """``PROCESS_MEMORY_COUNTERS_EX``.
+
+    ``PrivateUsage`` is the process's commit charge (Task Manager's "Commit
+    size"), ``WorkingSetSize`` its resident set. A seat that has been up for
+    hours across dozens of leaves carries a very different footprint from one
+    that just started, which is exactly the axis a "only fails on warm seats"
+    hypothesis needs.
+    """
+
+    _fields_ = (
+        ("cb", ctypes.c_uint32),
+        ("PageFaultCount", ctypes.c_uint32),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+        ("PrivateUsage", ctypes.c_size_t),
+    )
+
+
+@contextlib.contextmanager
+def _process_handle(pid: int):
+    """Open ``pid`` for limited query; yields ``None`` when it cannot be opened."""
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+    try:
+        yield handle or None
+    finally:
+        if handle:
+            kernel32.CloseHandle(handle)
+
+
+def _process_started_at(pid: int) -> float | None:
+    """Unix timestamp of ``pid``'s creation (``GetProcessTimes``)."""
+    created = ctypes.c_uint64()
+    exited = ctypes.c_uint64()
+    kernel = ctypes.c_uint64()
+    user = ctypes.c_uint64()
+    with _process_handle(pid) as handle:
+        if handle is None:
+            return None
+        if not ctypes.windll.kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(created),
+            ctypes.byref(exited),
+            ctypes.byref(kernel),
+            ctypes.byref(user),
+        ):
+            return None
+    return (created.value - _FILETIME_UNIX_EPOCH_TICKS) / 1e7
+
+
+def _process_memory(pid: int) -> tuple[int | None, int | None]:
+    """``(commit charge, working set)`` bytes of ``pid``, or ``(None, None)``."""
+    counters = _MemoryCounters()
+    counters.cb = ctypes.sizeof(counters)
+    with _process_handle(pid) as handle:
+        if handle is None:
+            return None, None
+        if not ctypes.windll.psapi.GetProcessMemoryInfo(
+            handle, ctypes.byref(counters), counters.cb
+        ):
+            return None, None
+    return int(counters.PrivateUsage), int(counters.WorkingSetSize)
+
+
+def _process_session_id(pid: int) -> int | None:
+    """Windows session of ``pid``: 0 is a service-launched seat with no
+    interactive desktop, 1+ an RDP/console login. A seat started from a signed-in
+    session behaves differently from one a scheduled task launched, so the
+    session id is part of "which seat was this"."""
+    session = ctypes.c_uint32()
+    if not ctypes.windll.kernel32.ProcessIdToSessionId(
+        int(pid), ctypes.byref(session)
+    ):
+        return None
+    return int(session.value)
+
+
+def _sldworks_pids() -> set[int]:
+    """Pids of every running ``sldworks.exe`` (the lifecycle library's scan)."""
+    from solidworks_mcp.adapters import sw_recovery
+
+    return set(sw_recovery.pids_of_image("sldworks.exe"))
+
+
+# Seats already running when this process began connecting, so a seat THIS build
+# started can be told from one it attached to. ``None`` means the sample never
+# ran (or failed), which is recorded as ``unknown`` rather than guessed: COM
+# starts SolidWorks when none is running, and a seat on its first document of the
+# process is the leading suspect in any first-run-only failure.
+_seat_pids_at_start: frozenset[int] | None = None
+_seat_identity: dict[str, Any] = {}
+
+
+def note_seats_before_connect() -> None:
+    """Sample the running seats BEFORE connecting (see ``_seat_pids_at_start``)."""
+    global _seat_pids_at_start
+    try:
+        _seat_pids_at_start = frozenset(_sldworks_pids())
+    except Exception as exc:  # noqa: BLE001 - provenance is never fatal
+        _telemetry.debug(f"pre-connect seat scan unavailable: {exc}")
+        _seat_pids_at_start = None
+
+
+def _seat_identity_of(adapter: Any) -> dict[str, Any]:
+    """Immutable facts about the seat this adapter drives (pid, origin, start)."""
+    sw = getattr(adapter, "swApp", None)
+    ident: dict[str, Any] = {}
+    pid = (
+        adapter._attempt(lambda: int(sw.GetProcessID()), default=None)
+        if sw is not None
+        else None
+    )
+    if pid is None:
+        # No ``ISldWorks.GetProcessID`` answer: one running seat is unambiguous,
+        # several are not -- and a wrong pid is worse than no pid.
+        running = sorted(_sldworks_pids())
+        pid = running[0] if len(running) == 1 else None
+        ident["seat_pid_source"] = "image-scan" if pid is not None else "unresolved"
+    else:
+        ident["seat_pid_source"] = "GetProcessID"
+    if pid is None:
+        return ident
+    ident["seat_pid"] = pid
+    if _seat_pids_at_start is None:
+        ident["seat_origin"] = "unknown"
+    elif pid in _seat_pids_at_start:
+        ident["seat_origin"] = "attached"
+    else:
+        ident["seat_origin"] = "started-by-build"
+    started = _process_started_at(pid)
+    if started is not None:
+        ident["seat_started_epoch_s"] = round(started, 3)
+        ident["seat_started_at"] = datetime.fromtimestamp(started, UTC).isoformat(
+            timespec="seconds"
+        )
+    session = _process_session_id(pid)
+    if session is not None:
+        ident["seat_session_id"] = session
+    revision = adapter._attempt(lambda: str(sw.RevisionNumber()), default=None)
+    if revision:
+        ident["seat_revision"] = revision
+    commit, working_set = _process_memory(pid)
+    if commit is not None:
+        ident["seat_commit_bytes_at_start"] = commit
+    if working_set is not None:
+        ident["seat_working_set_bytes_at_start"] = working_set
+    return ident
+
+
+def _seat_liveness(pid: Any, started: Any) -> dict[str, Any]:
+    """How old and how big the seat is RIGHT NOW (re-read on every call)."""
+    live: dict[str, Any] = {}
+    if not isinstance(pid, int):
+        return live
+    if isinstance(started, (int, float)):
+        live["seat_uptime_s"] = round(time.time() - float(started), 1)
+    commit, working_set = _process_memory(pid)
+    if commit is not None:
+        live["seat_commit_bytes"] = commit
+    if working_set is not None:
+        live["seat_working_set_bytes"] = working_set
+    return live
+
+
+def seat_provenance(adapter: Any) -> dict[str, Any]:
+    """WHICH ``sldworks.exe`` this session drives, how old it is and how big.
+
+    Flat ``seat_*`` keys, so the whole set can ride as span attributes (OTel
+    attribute values are scalars) and one filter over ``traces.jsonl`` /
+    ``logs.jsonl`` finds every one of them. The immutable half is resolved once
+    per process and cached; uptime and memory are re-read per call, so a failure
+    capture records the seat as it was at the moment it failed.
+    """
+    global _seat_identity
+    if not _seat_identity:
+        try:
+            _seat_identity = _seat_identity_of(adapter)
+        except Exception as exc:  # noqa: BLE001 - provenance is never fatal
+            _seat_identity = {"seat_provenance_error": f"{type(exc).__name__}: {exc}"}
+    prov = dict(_seat_identity)
+    try:
+        prov.update(
+            _seat_liveness(prov.get("seat_pid"), prov.get("seat_started_epoch_s"))
+        )
+    except Exception as exc:  # noqa: BLE001 - provenance is never fatal
+        prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
+    return prov
+
+
+def record_seat_provenance(adapter: Any) -> dict[str, Any]:
+    """Resolve the seat's provenance, publish it, and return it for the caller to
+    hang on the build PHASE span.
+
+    Published three ways, because each answers a different question: a
+    ``seat.provenance`` span event (WHEN in the session the seat was identified),
+    one INFO log record (so the entries with no phase span -- verify, export, the
+    ``diagnostics/`` probes -- are still attributable in ``logs.jsonl``), and a
+    push into the watchdog so a fatal crash/timeout abort names the seat it killed
+    rather than just the exit code.
+    """
+    prov = seat_provenance(adapter)
+    _watchdog.set_seat_provenance(prov)
+    _telemetry.event("seat.provenance", **prov)
+    _telemetry.info(
+        "seat "
+        + " ".join(
+            f"{key.removeprefix('seat_')}={value}" for key, value in prov.items()
+        ),
+        **prov,
+    )
+    return prov
+
+
+# The seat user preferences that govern SKETCH AUTHORING. A profile authored from
+# bare ``CreateLine``/``Create3PointArc`` calls closes into an extrudable contour
+# only if the seat merges exactly-coincident endpoints, which is application
+# state: inference and automatic relations persist across leaves on the same seat,
+# so a leaf that turns them off and dies before its ``finally`` restores them
+# poisons that seat for every later leaf -- deterministic per seat, random-looking
+# across a fleet. Every name below is a verified member of
+# ``swUserPreferenceToggle_e`` / ``swUserPreferenceIntegerValue_e`` (swconst
+# R2026x), and is resolved to its id AT RUNTIME by name: the ids move between
+# releases while the member names do not, and the captured id is recorded next to
+# the value so an id can be confirmed rather than assumed. The baseline the farm
+# ENFORCES lives in the pool repo (``agent/seat_settings.py``); this list is what
+# a failure READS.
+SKETCH_AUTHORING_TOGGLE_NAMES = (
+    # Inference, automatic relations and the solver: what merges coincident
+    # endpoints into a closed loop when the recipe adds no explicit relations.
+    "swSketchInference",
+    "swSketchAutomaticRelations",
+    "swSketchInferFromModel",
+    "swSketchNoSolveMove",
+    "swFullyConstrainedSketchMode",
+    # Snapping: which existing entity a new endpoint may land on. The
+    # quadrant/nearest snaps are the "circle-snap hazard" a raw-primitive
+    # profile has to reason about.
+    "swSnapToPoints",
+    "swSketchSnapsPoints",
+    "swSketchSnapsCenterPoints",
+    "swSketchSnapsMidPoints",
+    "swSketchSnapsQuadrantPoints",
+    "swSketchSnapsIntersections",
+    "swSketchSnapsNearest",
+    # Grid snapping quantizes coordinates AT CREATION -- the one snap preference
+    # with a direct "silently moves scripted geometry" mechanism (SeatSettings
+    # pins this one to False for exactly that reason).
+    "swSketchSnapsGrid",
+    # Autosolve/undo mode: swSketchTurnOffAutomaticSolveModeAndUndo decides
+    # whether the solver runs at all as segments are added.
+    "swSketchTurnOffAutomaticSolveModeAndUndo",
+    # Dimension entry: a seat that pops the dimension box, or rescales a sketch
+    # on its first dimension, authors different geometry from one that does not.
+    "swInputDimValOnCreate",
+    "swSketchAcceptNumericInput",
+    "swSketchCreateDimensionOnlyWhenEntered",
+    "swScaleSketchOnFirstDimension",
+    "swAddDimensionsToSketchEntity",
+)
+
+SKETCH_AUTHORING_INTEGER_NAMES = ("swSketch_Auto_Solve_Threshold",)
+
+# Preferences that wedge a seat with a modal dialog instead of failing it: a
+# ``#32770`` parked over the graphics area makes a leaf log healthy heartbeats
+# and no progress, and no COM read can see it. Captured because "leaf stalled,
+# no error" is otherwise indistinguishable from slow work (see the pool's
+# diagnose-wedged-solidworks-seat / unwedge-3dexperience-connector-modal
+# playbooks, and SeatSettings' baseline, which PINS these).
+MODAL_HAZARD_TOGGLE_NAMES = (
+    "swSketchPromptToCloseSketch",
+    "swSketchOverdefiningDimsPromptToSetState",
+    "swSketchOverdefiningDimsSetDrivenByDefault",
+    "swDrawingShowSheetFormatDialog",
+    "swShowErrorsEveryRebuild",
+    "swSaveReminderEnable",
+    "swWhileOpeningAssembliesAutoDismissMessages",
+    "swAlwaysUseDefaultTemplates",
+    "swOpenLastUsedDocumentAtStart",
+)
+
+# Per-DOCUMENT toggles, read through ``IModelDocExtension`` and reported in
+# their own bucket. ``swSketchAddConstToRectEntity`` is the reason this bucket
+# exists: RootCause read system=False while the active document read True on the
+# same worker, so mixing it into the system snapshot logs a value that governs
+# nothing (and pinning it system-wide manufactures permanent false drift, which
+# is why SeatSettings dropped it from the baseline).
+DOCUMENT_SCOPE_TOGGLE_NAMES = ("swSketchAddConstToRectEntity",)
+
+# The SolidWorks default-template preferences (``swUserPreferenceStringValue_e``
+# member names): the part template sets the document's INITIAL VIEW SCALE, which
+# is a load-bearing input to any inference-dependent sketch (see
+# :func:`display_geometry`), so "which template" is part of the geometry's
+# provenance, not mere configuration.
+TEMPLATE_PREFERENCE_NAMES = ("swDefaultTemplatePart", "swDefaultTemplateAssembly")
+
+
+def _preference_id(adapter: Any, name: str) -> int | None:
+    """Resolve a ``swUserPreference*_e`` MEMBER NAME to its id at runtime.
+
+    Through the swconst type library the early-bound adapter loads
+    (``win32com.client.constants``) first, then the adapter's own small
+    constants table. Never a hard-coded integer.
+    """
+    constants: Any = None
+    with contextlib.suppress(Exception):  # not on a seat: offline gate / no pywin32
+        from win32com.client import constants as sw_constants
+
+        constants = sw_constants
+    value = getattr(constants, name, None) if constants is not None else None
+    if value is None:
+        value = getattr(adapter, "constants", {}).get(name)
+    return int(value) if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def sketch_authoring_preferences(adapter: Any) -> dict[str, Any]:
+    """The seat's CURRENT values for the preferences that govern sketch authoring.
+
+    ``"unresolved"`` = the name is not in this seat's swconst (so nothing was
+    read); ``"unreadable"`` = the seat refused the read. Both are recorded rather
+    than dropped -- and neither is reported as ``False``, because
+    ``GetUserPreferenceToggle`` answers an unknown id with a plausible-looking
+    ``False`` and a silent one of those would send the next investigation the
+    wrong way. ``preference_ids`` carries the id each name resolved to, so the
+    id/member pairing can be confirmed against the type library.
+    """
+    sw = adapter.swApp
+    snapshot: dict[str, Any] = {}
+    ids: dict[str, int] = {}
+    readers = (
+        (SKETCH_AUTHORING_TOGGLE_NAMES, "GetUserPreferenceToggle", bool),
+        (MODAL_HAZARD_TOGGLE_NAMES, "GetUserPreferenceToggle", bool),
+        (SKETCH_AUTHORING_INTEGER_NAMES, "GetUserPreferenceIntegerValue", int),
+        (TEMPLATE_PREFERENCE_NAMES, "GetUserPreferenceStringValue", str),
+    )
+    for names, accessor, cast in readers:
+        read = getattr(sw, accessor, None)
+        for name in names:
+            pref = _preference_id(adapter, name)
+            if pref is None or read is None:
+                snapshot[name] = "unresolved"
+                continue
+            ids[name] = pref
+            value = adapter._attempt(lambda p=pref, r=read: r(p), default=None)
+            snapshot[name] = cast(value) if value is not None else "unreadable"
+    snapshot["preference_ids"] = ids
+    snapshot["document_scope"] = _document_scope_preferences(adapter, ids)
+    return snapshot
+
+
+def _document_scope_preferences(
+    adapter: Any, ids: dict[str, int]
+) -> dict[str, Any]:
+    """Per-DOCUMENT toggles, read through the document's own accessor.
+
+    Kept in a separate bucket, explicitly labelled: the system accessor answers
+    these with a value that does not govern the active document (system=False
+    while the document reads True, observed on worker 4), so folding them into
+    the system snapshot logs a misleading number.
+    """
+    model = adapter.currentModel
+    extension = _read_member(model, "Extension") if model is not None else None
+    if extension is None:
+        return {"scope": "document", "document": None}
+    scoped: dict[str, Any] = {"scope": "document"}
+    read = getattr(extension, "GetUserPreferenceToggle", None)
+    for name in DOCUMENT_SCOPE_TOGGLE_NAMES:
+        pref = _preference_id(adapter, name)
+        if pref is None or read is None:
+            scoped[name] = "unresolved"
+            continue
+        ids[name] = pref
+        # The document accessor takes (id, swUserPreferenceOption_e); 0 is
+        # swDetailingNoOptionSpecified, i.e. "this document's value".
+        value = adapter._attempt(lambda p=pref, r=read: r(p, 0), default=None)
+        scoped[name] = bool(value) if value is not None else "unreadable"
+    return scoped
+
+
+def sketch_manager_state(adapter: Any) -> dict[str, Any]:
+    """``ISketchManager``'s STICKY per-session state.
+
+    This is a second state bag that ``Get/SetUserPreferenceToggle`` cannot see,
+    and it overrides the preferences: with ``AddToDB=True`` a new segment
+    bypasses inference relations at creation time no matter what
+    ``swSketchInference`` says (that is exactly why
+    :func:`set_sketch_direct_db` exists). A snapshot that reads only user
+    preferences therefore reports a perfectly healthy seat while the thing that
+    actually governs endpoint merging sits in here -- which is what "the log was
+    clean and the failure still happened" looked like on 2026-09-17.
+
+    It is per SESSION, not per document, so a leaf that sets ``AddToDB`` and dies
+    before restoring it hands the next leaf on that seat a different authoring
+    mode, with nothing on disk to show it.
+    """
+    manager = adapter.currentSketchManager
+    if manager is None:
+        return {"sketch_manager": None}
+    state: dict[str, Any] = {"scope": "session"}
+    for name in ("AddToDB", "AutoInference", "AutoSolve", "DisplayWhenAdded"):
+        value = adapter._attempt(lambda n=name: _read_member(manager, n), default=None)
+        state[name] = bool(value) if isinstance(value, (bool, int)) else "unreadable"
+    return state
+
+
+class _Rect(ctypes.Structure):
+    """Win32 ``RECT`` (``GetClientRect`` fills it with client-area pixels)."""
+
+    _fields_ = (
+        ("left", ctypes.c_long),
+        ("top", ctypes.c_long),
+        ("right", ctypes.c_long),
+        ("bottom", ctypes.c_long),
+    )
+
+
+# GetSystemMetrics indices: primary screen pixels and monitor count. A session
+# whose RDP client disconnected reports a degenerate or stale desktop, which is
+# the documented "live frame froze after someone RDP'd in" shape -- and worker 5's
+# seat was hand-launched over RDP 54 min before the 2026-09-17 failure.
+_SM_CXSCREEN, _SM_CYSCREEN, _SM_CMONITORS = 0, 1, 80
+# A sketch-inference snap is a SCREEN-SPACE hit test of a few pixels. 8 px is the
+# pessimistic end of SolidWorks' observed 5-8 px tolerance, so
+# ``snap_floor_mm`` = 8 / (px per mm) is the model distance below which two
+# DISTINCT points stop being separately clickable -- compare it against the
+# profile's nearest non-coincident competitor (0.400 mm for the 91247A720 logo
+# ring) to decide whether that geometry could author correctly at all.
+_SNAP_TOLERANCE_PX = 8
+
+
+def _client_pixels(adapter: Any) -> tuple[int | None, int | None]:
+    """Client-area pixel size of the SolidWorks main frame."""
+    sw = adapter.swApp
+    frame = adapter._attempt(lambda: _read_member(sw, "Frame"), default=None)
+    hwnd = (
+        adapter._attempt(lambda: int(frame.GetHWnd()), default=None)
+        if frame is not None
+        else None
+    )
+    if not hwnd:
+        return None, None
+    rect = _Rect()
+    if not ctypes.windll.user32.GetClientRect(hwnd, ctypes.byref(rect)):
+        return None, None
+    return rect.right - rect.left, rect.bottom - rect.top
+
+
+def _projected_px_per_mm(adapter: Any, view: Any) -> dict[str, Any]:
+    """MEASURE pixels-per-millimetre by projecting model points to the screen.
+
+    ``IModelView.ProjectModelPoint`` is the only route that answers the governing
+    quantity directly instead of requiring ``Scale2`` to be interpreted: project
+    the origin and a point 1 mm along each axis, and the pixel distance IS px/mm
+    for that direction. The axes are reported separately because a rotated view
+    foreshortens them differently, and the maximum is the one a snap in the
+    sketch plane sees.
+
+    ``[out]`` params ride the return tuple (early binding; see
+    :func:`_early_bound`).
+    """
+    typed = _early_bound(view, "IModelView")
+    project = getattr(typed, "ProjectModelPoint", None)
+    if project is None:
+        return {}
+    def screen(x: float, y: float, z: float) -> tuple[float, float] | None:
+        out = adapter._attempt(lambda: project(x, y, z), default=None)
+        if not isinstance(out, (list, tuple)) or len(out) < 3:
+            return None
+        values = [v for v in out if isinstance(v, (int, float))]
+        return (float(values[0]), float(values[1])) if len(values) >= 2 else None
+
+    origin = screen(0.0, 0.0, 0.0)
+    if origin is None:
+        return {}
+    measured: dict[str, Any] = {}
+    for axis, point in (("x", (1e-3, 0.0, 0.0)), ("y", (0.0, 1e-3, 0.0)), ("z", (0.0, 0.0, 1e-3))):
+        far = screen(*point)
+        if far is None:
+            continue
+        measured[f"px_per_mm_{axis}"] = round(
+            math.dist(origin, far), 3
+        )  # 1 mm apart in model space -> pixels on screen
+    axes = [value for key, value in measured.items() if key.startswith("px_per_mm_")]
+    if axes:
+        px_per_mm = max(axes)
+        measured["px_per_mm"] = px_per_mm
+        if px_per_mm > 0:
+            measured["snap_floor_mm"] = round(_SNAP_TOLERANCE_PX / px_per_mm, 4)
+            measured["snap_tolerance_px"] = _SNAP_TOLERANCE_PX
+    return measured
+
+
+def display_geometry(adapter: Any) -> dict[str, Any]:
+    """The SCREEN-SPACE state an inference-dependent sketch is authored under.
+
+    Sketch inference snapping is a pixel hit test, so the authoring-time view
+    scale and the window's pixel size decide whether two points 0.4 mm apart are
+    distinguishable at all. Nothing in the build path fits or orients the view
+    before authoring (the only ``ViewZoomtofit2``/``ShowNamedView2`` calls on the
+    whole path are inside the adapter's screenshot helper), so this state is
+    INHERITED from the document template and the window size and was, until now,
+    never recorded -- which is why a run that produced correct geometry and one
+    that did not could not be compared.
+
+    Recorded: ``Scale2`` and the visible model box (the raw inputs, each
+    uninterpretable without the other), the frame client pixels, the measured
+    px/mm with the per-axis values behind it, the resulting snap floor in
+    millimetres, and the interactive session's screen metrics.
+    """
+    geometry: dict[str, Any] = {}
+    width_px, height_px = _client_pixels(adapter)
+    if width_px is not None:
+        geometry["frame_client_px"] = f"{width_px}x{height_px}"
+    geometry["screen_px"] = (
+        f"{ctypes.windll.user32.GetSystemMetrics(_SM_CXSCREEN)}"
+        f"x{ctypes.windll.user32.GetSystemMetrics(_SM_CYSCREEN)}"
+    )
+    geometry["monitors"] = int(ctypes.windll.user32.GetSystemMetrics(_SM_CMONITORS))
+    # 0x0 with no monitors is a session whose RDP client disconnected: screen
+    # capture stops and the seat's view geometry stops meaning anything.
+    geometry["session_has_display"] = geometry["screen_px"] != "0x0"
+    model = adapter.currentModel
+    view = (
+        adapter._attempt(lambda: _read_member(model, "ActiveView"), default=None)
+        if model is not None
+        else None
+    )
+    if view is None:
+        return geometry
+    scale = adapter._attempt(lambda: float(_read_member(view, "Scale2")), default=None)
+    if scale is not None:
+        geometry["view_scale2"] = scale
+    box = adapter._attempt(
+        lambda: list(_early_bound(view, "IModelView").GetVisibleBox() or []), default=None
+    )
+    if box and len(box) >= 6:
+        numbers = [float(value) for value in box[:6]]
+        geometry["visible_box_mm"] = [round(value * 1000.0, 3) for value in numbers]
+        geometry["visible_width_mm"] = round(abs(numbers[3] - numbers[0]) * 1000.0, 3)
+        geometry["visible_height_mm"] = round(abs(numbers[4] - numbers[1]) * 1000.0, 3)
+        if width_px and geometry["visible_width_mm"]:
+            geometry["px_per_mm_from_box"] = round(
+                width_px / geometry["visible_width_mm"], 3
+            )
+    geometry.update(_projected_px_per_mm(adapter, view))
+    return geometry
+
+
+def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
+    """Publish the authoring-time seat state for a SUCCESSFUL build too.
+
+    A failure-only capture cannot answer "what was different about the run that
+    worked?", which is the question that actually identifies a seat-state cause.
+    So the same three state bags a failure captures -- the screen-space geometry,
+    ``ISketchManager``'s sticky session state, and the sketch-authoring
+    preferences -- are recorded once per part build, on the success path, as a
+    span event plus one INFO record carrying the whole snapshot as JSON.
+    """
+    context = {
+        "label": label,
+        "seat": seat_provenance(adapter),
+        "display": display_geometry(adapter),
+        "sketch_manager": sketch_manager_state(adapter),
+        "preferences": sketch_authoring_preferences(adapter),
+    }
+    display = context["display"]
+    summary = (
+        f"authoring {label}: px/mm={display.get('px_per_mm', 'unknown')} "
+        f"snap_floor={display.get('snap_floor_mm', 'unknown')}mm "
+        f"view_scale2={display.get('view_scale2', 'unknown')} "
+        f"frame={display.get('frame_client_px', 'unknown')} "
+        f"AddToDB={context['sketch_manager'].get('AddToDB', 'unknown')}"
+    )
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "seat.authoring_context",
+            label=label,
+            **{key: _scalar(value) for key, value in display.items()},
+        )
+        _telemetry.info(summary, label=label, authoring=json.dumps(context, default=str))
+    return context
+
+
+_SAVE_AS_CURRENT_VERSION = 0  # swSaveAsVersion_e.swSaveAsCurrentVersion
+# swSaveAsOptions_e.swSaveAsOptions_Silent | swSaveAsOptions_Copy: silent so a
+# headless leaf can never block on a save dialog, and a COPY so the live document
+# keeps its own path -- a rename would repoint the session at cad/out/reports and
+# lie to run_build's teardown scan of resident cad/out documents.
+_SAVE_AS_SILENT_COPY = 1 | 2
+_DOC_SUFFIX = {1: ".SLDPRT", 2: ".SLDASM", 3: ".SLDDRW"}
+# swConstrainedStatus_e, for the captured sketch's solve state.
+_CONSTRAINED_STATUS = {
+    1: "unknown",
+    2: "under-constrained",
+    3: "fully-constrained",
+    4: "over-constrained",
+    5: "no-solution",
+    6: "invalid-solution",
+    7: "autosolve-off",
+}
+# Two endpoints at the same place within a nanometre are the same point: far
+# below any modelling tolerance in this project (dimensions are millimetres) and
+# far above float noise on coordinates computed in metres.
+_COINCIDENT_TOL_M = 1e-9
+
+
+def _slug(label: str) -> str:
+    """Filesystem-safe directory name for a failure label."""
+    return re.sub(r"[^a-z0-9._-]+", "-", label.strip().lower()).strip("-.") or "failure"
+
+
+def _scalar(value: Any) -> Any:
+    """An OTel-safe attribute value: scalars pass through, anything else is JSON."""
+    if isinstance(value, (bool, int, float, str)):
+        return value
+    return json.dumps(value, default=str, sort_keys=True)
+
+
+# Keyword names the telemetry helpers own: a captured key of the same name would
+# bind to the helper's own parameter (``_telemetry.event(name, **attributes)``
+# takes ``name``; ``error(message, *, exc_info)`` takes both) and raise
+# TypeError. Captured data is RENAMED rather than dropped -- a sketch's ``name``
+# is exactly the field a reader looks for first.
+_TELEMETRY_OWNED_KEYS = frozenset({"name", "message", "service", "exc_info"})
+
+
+def _attributes_of(values: Mapping[str, Any]) -> dict[str, Any]:
+    """Captured values as telemetry attributes: scalars, no shadowed keywords."""
+    return {
+        (f"captured_{key}" if key in _TELEMETRY_OWNED_KEYS else key): _scalar(value)
+        for key, value in values.items()
+    }
+
+
+def _capture_step(report: dict[str, Any], name: str, probe: Callable[[], Any]) -> None:
+    """Run ONE capture: record its result -- or its own failure -- in ``report``
+    and as a single ``com.failure.<name>`` span event.
+
+    Individually guarded, and one event per STEP rather than per captured item:
+    a step that cannot read the seat must not stop the steps that can, and a
+    census of a 40-segment sketch must not arrive as 40 span events. The
+    REPORTING is guarded too: the value is already in ``report``, so a telemetry
+    failure must not cost the artefact (it did, for one round of this change: a
+    captured ``name`` key collided with ``event``'s own parameter and aborted the
+    whole capture before it could write capture.json).
+    """
+    try:
+        value = probe()
+    except Exception as exc:  # noqa: BLE001 - forensics never raise (see above)
+        error = f"{type(exc).__name__}: {exc}"
+        report[name] = {"capture_error": error}
+        with contextlib.suppress(Exception):
+            _telemetry.event(f"com.failure.{name}", capture_error=error)
+        return
+    report[name] = value
+    attributes = value if isinstance(value, dict) else {"value": value}
+    with contextlib.suppress(Exception):
+        _telemetry.event(f"com.failure.{name}", **_attributes_of(attributes))
+
+
+def _seat_error_state(adapter: Any) -> dict[str, Any]:
+    """SolidWorks' own error surface: the What's Wrong table and the session
+    message stack.
+
+    Both take ``[out]`` params that ride the RETURN TUPLE under early binding --
+    call them bare and unpack (a byref VARIANT stays unwritten and reads as "no
+    errors"; see ``_early_bound`` and ``test_out_param_binding``).
+    ``GetErrorMessages`` is read-AND-CLEAR and keeps only the last 20 messages,
+    which is safe exactly here: this is the failure path, and draining the stack
+    into the capture is strictly better than leaving it to be discarded with the
+    session.
+    """
+    state: dict[str, Any] = {}
+    sw = adapter.swApp
+    messages = adapter._attempt(
+        lambda: _early_bound(sw, "ISldWorks").GetErrorMessages(), default=None
+    )
+    if isinstance(messages, (list, tuple)) and len(messages) >= 2:
+        state["error_messages"] = [str(text) for text in (messages[1] or [])]
+    model = adapter.currentModel
+    extension = _read_member(model, "Extension") if model is not None else None
+    if extension is None:
+        return state
+    state["whats_wrong_count"] = adapter._attempt(
+        lambda: int(_early_bound(extension, "IModelDocExtension").GetWhatsWrongCount()),
+        default=None,
+    )
+    faults = adapter._attempt(
+        lambda: _early_bound(extension, "IModelDocExtension").GetWhatsWrong(),
+        default=None,
+    )
+    if isinstance(faults, (list, tuple)) and len(faults) >= 4:
+        _retval, features, codes, warnings = faults[:4]
+        state["whats_wrong"] = [
+            {
+                "feature": str(_read_member(feature, "Name")),
+                "code": int(code or 0),
+                "error": _FEATURE_ERROR.get(int(code or 0), "unknown"),
+                "warning": bool(warning),
+            }
+            for feature, code, warning in zip(
+                list(features or []),
+                list(codes or []),
+                list(warnings or []),
+                strict=False,
+            )
+        ]
+    return state
+
+
+def _document_state(adapter: Any) -> dict[str, Any]:
+    """Which document was active, whether a sketch was open for edit, and how
+    much of it had been built when the call failed."""
+    model = adapter.currentModel
+    if model is None:
+        return {"active_document": None}
+    active_sketch = adapter._attempt(
+        lambda: _read_member(model, "GetActiveSketch2"), default=None
+    )
+    probes: dict[str, Callable[[], Any]] = {
+        "title": lambda: str(_read_member(model, "GetTitle") or ""),
+        "path": lambda: str(_read_member(model, "GetPathName") or ""),
+        "doc_type": lambda: int(_read_member(model, "GetType") or 0),
+        "feature_count": lambda: int(_read_member(model, "GetFeatureCount") or 0),
+        "needs_save": lambda: bool(_read_member(model, "GetSaveFlag")),
+        "configuration": lambda: active_configuration_name(adapter, model),
+    }
+    state: dict[str, Any] = {
+        key: adapter._attempt(probe, default=None) for key, probe in probes.items()
+    }
+    # A feature created while a sketch is still open for edit is the classic
+    # cause of a None return, so the edit state is as important as the geometry.
+    state["in_sketch_edit"] = active_sketch is not None
+    return state
+
+
+def _resolve_sketch(adapter: Any, sketch: Any | None) -> Any | None:
+    """The sketch to inspect: a caller-supplied dispatch, a named feature's
+    sketch, or (default) the last profile sketch the document exited."""
+    if sketch is not None and not isinstance(sketch, str):
+        return sketch
+    model = adapter.currentModel
+    if model is None:
+        return None
+    name = sketch or feature_name_by_type(adapter, "ProfileFeature")
+    if not name:
+        return adapter._attempt(
+            lambda: _read_member(model, "GetActiveSketch2"), default=None
+        )
+    feature = adapter._attempt(lambda: _feature_by_name(adapter, str(name)), default=None)
+    if feature is None:
+        return None
+    return adapter._attempt(
+        lambda: _read_member(feature, "GetSpecificFeature2"), default=None
+    )
+
+
+def _point_census(sketch: Any) -> dict[str, Any]:
+    """Sketch points vs DISTINCT sketch-point positions.
+
+    This is the inference fingerprint. A closed N-segment chain whose
+    exactly-coincident endpoints MERGED keeps N sketch points, all at distinct
+    places; the same chain authored with inference off keeps 2N points sitting in
+    coincident pairs, no contour closes, and a boss-extrude of it returns
+    ``None``. ``coincident_point_pairs > 0`` therefore reads "the endpoints did
+    not merge" straight off the artefact, with no re-run.
+    """
+    points = list(sketch.GetSketchPoints2() or [])
+    places: list[tuple[float, float, float]] = []
+    for point in points:
+        coords = tuple(_read_member(point, axis) for axis in ("X", "Y", "Z"))
+        if all(isinstance(value, (int, float)) for value in coords):
+            quantum = _COINCIDENT_TOL_M
+            places.append(
+                tuple(round(float(value) / quantum) * quantum for value in coords)
+            )
+    census: dict[str, Any] = {"point_count": len(points)}
+    if places:
+        census["distinct_point_positions"] = len(set(places))
+        census["coincident_point_pairs"] = len(places) - len(set(places))
+    return census
+
+
+def _sketch_state(
+    adapter: Any, sketch: Any | None, expected_points: int | None = None
+) -> dict[str, Any]:
+    """Contour/region/point census of the sketch a failing feature consumed.
+
+    ``contour_count``/``region_count`` are the direct answer to "did this profile
+    close?" -- an open loop yields neither -- and the point census
+    (:func:`_point_census`) says whether the endpoints merged, which is WHY.
+    This is the EARLIEST detectable symptom: ``exit_sketch`` accepts an open
+    profile silently and the failure only surfaces a whole feature later, as
+    ``FeatureExtrusion3`` returning ``None`` with no record of which endpoint
+    failed to merge.
+    """
+    resolved = _resolve_sketch(adapter, sketch)
+    if resolved is None:
+        return {"sketch": None}
+    probes: dict[str, Callable[[], Any]] = {
+        "name": lambda: str(_read_member(resolved, "Name") or ""),
+        "contour_count": lambda: int(resolved.GetSketchContourCount()),
+        "region_count": lambda: int(resolved.GetSketchRegionCount()),
+        "segment_count": lambda: len(list(resolved.GetSketchSegments() or [])),
+        "line_count": lambda: int(resolved.GetLineCount()),
+        "arc_count": lambda: int(resolved.GetArcCount()),
+        "automatic_solve": lambda: bool(resolved.GetAutomaticSolve()),
+    }
+    state: dict[str, Any] = {
+        key: adapter._attempt(probe, default=None) for key, probe in probes.items()
+    }
+    status = adapter._attempt(lambda: int(resolved.GetConstrainedStatus()), default=None)
+    state["constrained_status"] = status
+    state["constrained"] = _CONSTRAINED_STATUS.get(status, "unknown")
+    state.update(adapter._attempt(lambda: _point_census(resolved), default={}) or {})
+    if expected_points is not None:
+        state["expected_distinct_points"] = expected_points
+        distinct = state.get("distinct_point_positions")
+        if isinstance(distinct, int):
+            # >0 means merges that the author declared MUST happen did not.
+            state["missing_merges"] = distinct - expected_points
+    return state
+
+
+def _save_failure_document(adapter: Any, out_dir: Path, slug: str) -> dict[str, Any]:
+    """Save a COPY of the failing document into the failure directory.
+
+    The document is the evidence: with it, the profile can be opened and the
+    failing feature retried on any seat. Saved as a silent copy in the live
+    document's own format (the extension comes from the document, so a part,
+    assembly and drawing each land native).
+    """
+    model = adapter.currentModel
+    if model is None:
+        return {"document_copy": None}
+    suffix = Path(str(_read_member(model, "GetPathName") or "")).suffix
+    if not suffix:
+        doc_type = _read_member(model, "GetType")
+        suffix = _DOC_SUFFIX.get(
+            doc_type if isinstance(doc_type, int) else 0, ".SLDPRT"
+        )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / f"{slug}{suffix}"
+    target.unlink(missing_ok=True)
+    rc = adapter._attempt(
+        lambda: model.SaveAs3(
+            str(target), _SAVE_AS_CURRENT_VERSION, _SAVE_AS_SILENT_COPY
+        ),
+        default=None,
+    )
+    saved = target.exists()
+    return {
+        "document_copy": str(target) if saved else None,
+        "document_copy_bytes": target.stat().st_size if saved else None,
+        "save_rc": _scalar(rc),
+    }
+
+
+def _save_seat_image(adapter: Any, out_dir: Path, slug: str) -> dict[str, Any]:
+    """Capture the seat's current viewport with ``IModelDoc2.SaveBMP``.
+
+    No dialog, no camera move and no zoom-to-fit, so the image shows the seat
+    exactly as it sat when the call failed -- and shows a modal box parked over
+    the graphics area, which is invisible to every COM read. (``export_image``
+    would have re-oriented the view and destroyed that evidence.)
+    """
+    model = adapter.currentModel
+    if model is None:
+        return {"seat_image": None}
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / f"{slug}.bmp"
+    target.unlink(missing_ok=True)
+    adapter._attempt(lambda: model.SaveBMP(str(target), 1600, 1000), default=None)
+    saved = target.exists()
+    return {
+        "seat_image": str(target) if saved else None,
+        "seat_image_bytes": target.stat().st_size if saved else None,
+    }
+
+
+def _write_failure_report(out_dir: Path, report: dict[str, Any]) -> dict[str, Any]:
+    """Write ``capture.json`` -- the index of everything captured."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / "capture.json"
+    target.write_text(
+        json.dumps(report, indent=2, default=str, sort_keys=True), encoding="utf-8"
+    )
+    return {"report": str(target)}
+
+
+
+
+def capture_com_failure(
+    adapter: Any,
+    label: str,
+    message: str,
+    *,
+    api: str | None = None,
+    sketch: Any | None = None,
+    expected_points: int | None = None,
+    exc_type: type[BaseException] = RuntimeError,
+    **context: Any,
+) -> NoReturn:
+    """Capture the seat's state behind a COM call that returned ``None``, then raise.
+
+    A feature-creation API that hands back ``None`` says only "no feature". The
+    state that decides WHY -- which seat, which document, whether the profile
+    closed, what the seat's sketch-authoring preferences were -- lives in a
+    session that is about to be torn down, so a bare ``raise`` throws the
+    diagnosis away and leaves "transient" as the only available verdict. Use this
+    instead of ``raise`` at such a site::
+
+        if feat is None:
+            capture_com_failure(
+                adapter,
+                "logo-ring-extrude",
+                "logo ring extrude failed",
+                api="IFeatureManager.FeatureExtrusion3",
+                sketch="LogoProfile",
+            )
+
+    Three guarantees, in order of importance:
+
+    1. It ALWAYS raises ``exc_type(message)``, with ``message`` unchanged. Every
+       capture step is guarded individually and the capture as a whole is guarded
+       again, so forensics can neither mask the failure's message nor convert a
+       clear geometry failure into an unrelated crash.
+    2. Everything captured lands as ``com.failure.<step>`` span events on a
+       ``com.failure <label>`` span AND in exactly ONE ERROR log record (the
+       whole capture as JSON), so the evidence reaches App Insights and
+       ``logs.jsonl`` -- not just a disposable worker's disk.
+    3. The artefacts (a copy of the failing document, a BMP of the seat,
+       ``capture.json``) land under
+       ``cad/out/reports/failures/<label>/<UTC timestamp>/``. The timestamp
+       directory is not cosmetic: on 2026-09-17 the successful RETRY overwrote
+       the failing attempt's leaf log, and the whole diagnosis had to be
+       reconstructed from traces. A retry must never erase the evidence of the
+       failure it is retrying.
+
+    Captured, in this order: the seat (:func:`seat_provenance`), the
+    sketch-authoring and modal-hazard preferences with their per-document bucket,
+    ``ISketchManager``'s sticky session state (which OVERRIDES those
+    preferences), the screen-space view geometry that decides whether a snap can
+    resolve at all (:func:`display_geometry`), SolidWorks' own error surface, the
+    document, the sketch census, then the artefacts.
+
+    ``sketch`` selects the sketch to census: a name, a live dispatch, or omitted
+    for the document's last profile sketch. ``expected_points`` is the number of
+    DISTINCT sketch points the author expects when every coincident endpoint
+    merged (9 for the 91247A720 logo ring, 18 if nothing merged); passing it lets
+    the artefact state the discrepancy instead of leaving the reader to count.
+    Extra keyword arguments are recorded as attributes on the span, the events
+    and the log record.
+    """
+    slug = _slug(label)
+    stamp = datetime.now(UTC)
+    out_dir = OUT_FAILURES / slug / stamp.strftime("%Y%m%dT%H%M%SZ")
+    # Caller context, with any key the telemetry helpers own renamed rather than
+    # dropped (see _attributes_of).
+    extra = _attributes_of(context)
+    report: dict[str, Any] = {
+        "label": label,
+        "message": message,
+        "api": api,
+        "captured_at": stamp.isoformat(timespec="seconds"),
+        "failure_dir": str(out_dir),
+        "context": extra,
+    }
+    try:
+        with _telemetry.span(
+            f"com.failure {label}", label=label, api=api or "unknown", **extra
+        ):
+            _capture_step(report, "seat", lambda: seat_provenance(adapter))
+            _capture_step(
+                report, "preferences", lambda: sketch_authoring_preferences(adapter)
+            )
+            # Read BEFORE the document/sketch probes touch anything: these two
+            # bags are what a preference-only snapshot misses entirely.
+            _capture_step(
+                report, "sketch_manager", lambda: sketch_manager_state(adapter)
+            )
+            _capture_step(report, "display", lambda: display_geometry(adapter))
+            _capture_step(report, "error_state", lambda: _seat_error_state(adapter))
+            _capture_step(report, "document", lambda: _document_state(adapter))
+            _capture_step(
+                report, "sketch", lambda: _sketch_state(adapter, sketch, expected_points)
+            )
+            _capture_step(
+                report, "document_copy", lambda: _save_failure_document(adapter, out_dir, slug)
+            )
+            _capture_step(
+                report, "seat_image", lambda: _save_seat_image(adapter, out_dir, slug)
+            )
+            _capture_step(report, "artefacts", lambda: _write_failure_report(out_dir, report))
+    except Exception as exc:  # noqa: BLE001 - see guarantee 1
+        report["capture_aborted"] = f"{type(exc).__name__}: {exc}"
+    with contextlib.suppress(Exception):
+        _telemetry.error(
+            f"[forensics] {label}: {message}",
+            **{
+                **extra,
+                "label": label,
+                "api": api or "unknown",
+                "failure_dir": str(out_dir),
+                "capture": json.dumps(report, default=str, sort_keys=True),
+            },
+        )
+    raise exc_type(message)
+
+
 def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
     """Connect, run ``build(adapter)``, disconnect; return a process exit code."""
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
@@ -2237,8 +3552,17 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
         try:
             async with _telemetry.aspan("sw.connect"):
                 _telemetry.info("connecting to SolidWorks")
+                # Sample the seats already running BEFORE connecting: COM starts
+                # SolidWorks when none is running, so this is the only moment at
+                # which "did this build start the seat, or attach to one someone
+                # left?" can still be answered (see note_seats_before_connect).
+                note_seats_before_connect()
                 await adapter.connect()
                 _telemetry.success("connected")
+                # WHICH sldworks.exe is about to build this target, how old it is
+                # and how big: the attribution a "failed once, passed on retry"
+                # leaf needs, recorded before any build work can fail.
+                provenance = record_seat_provenance(adapter)
                 # Re-runnable: a previous (possibly failed) build — or a human
                 # inspecting an artefact in the UI — leaves documents open, and
                 # saving over (or deleting) an open path fails. Verified, not
@@ -2270,7 +3594,9 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
             # Non-build entries (verify/export/probes) keep their operations flat.
             if kind is None:
                 return await build(adapter)
-            async with _telemetry.aspan(f"{kind}.build", target=target):
+            # The provenance rides the phase span, so every operation of this
+            # build hangs under a span that names the seat that ran it.
+            async with _telemetry.aspan(f"{kind}.build", target=target, **provenance):
                 return await build(adapter)
         finally:
             # Teardown is its own span so a disconnect failure is attributable
