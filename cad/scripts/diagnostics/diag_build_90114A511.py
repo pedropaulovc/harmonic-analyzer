@@ -67,9 +67,10 @@ async def build_90114A511(adapter, truth=None):
 
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
-    if sk_mgr.CreateCenterLine(0.0, apex_y / 1000.0, 0.0,
-                               0.0, -BF_LEN / 1000.0, 0.0) is None:
-        raise RuntimeError("90114 profile: CreateCenterLine failed")
+    with no_sketch_inference(adapter):
+        if sk_mgr.CreateCenterLine(0.0, apex_y / 1000.0, 0.0,
+                                   0.0, -BF_LEN / 1000.0, 0.0) is None:
+            raise RuntimeError("90114 profile: CreateCenterLine failed")
     yc = apex_y - cap_R
     ang_mid = (math.pi / 2.0 + math.atan2(band - yc, head_r)) / 2.0
     with no_sketch_inference(adapter):
@@ -143,9 +144,10 @@ async def build_90114A511(adapter, truth=None):
     # whose sweep end slivers read +0.0575 mm^3 across every phase).
     offset_plane(adapter, "TipPlane", -BF_LEN)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0) is None:
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0) is None:
+            raise RuntimeError("helix seed circle failed")
     insert_helix(adapter, pitch, BF_LEN / pitch + 1.0, clockwise=False,
                  reversed_dir=False, start_angle_rad=math.pi / 2.0,
                  feature_name="ThreadHelix")
@@ -171,10 +173,10 @@ async def build_90114A511(adapter, truth=None):
     taper_h = major_r - root_r  # 45 deg
     check("create_sketch runout", await adapter.create_sketch("Front"))
     sk2 = adapter.currentSketchManager
-    if sk2.CreateCenterLine(0.0, 0.0, 0.0,
-                            0.0, -taper_h / 1000.0, 0.0) is None:
-        raise RuntimeError("runout: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if sk2.CreateCenterLine(0.0, 0.0, 0.0,
+                                0.0, -taper_h / 1000.0, 0.0) is None:
+            raise RuntimeError("runout: CreateCenterLine failed")
         await add_line_chain(adapter, [
             (0.0, 0.0),
             (major_r, 0.0),

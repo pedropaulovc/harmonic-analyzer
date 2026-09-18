@@ -95,19 +95,19 @@ async def build_92240A539(adapter, truth=None):
     # exact final cylinder, cone, and tip-plane faces deterministically.
     check("create_sketch shank", await adapter.create_sketch("Front"))
     sketch = adapter.currentSketchManager
-    if (
-        sketch.CreateCenterLine(
-            0.0,
-            UNDERSIDE_MM / 1000.0,
-            0.0,
-            0.0,
-            TIP_MM / 1000.0,
-            0.0,
-        )
-        is None
-    ):
-        raise RuntimeError("92240A539 shank: CreateCenterLine failed")
     with no_sketch_inference(adapter):
+        if (
+            sketch.CreateCenterLine(
+                0.0,
+                UNDERSIDE_MM / 1000.0,
+                0.0,
+                0.0,
+                TIP_MM / 1000.0,
+                0.0,
+            )
+            is None
+        ):
+            raise RuntimeError("92240A539 shank: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
@@ -259,13 +259,14 @@ async def build_92240A539(adapter, truth=None):
     # read-back as the equivalent false+false pair while growing toward +Y.
     offset_plane(adapter, "TipPlane", TIP_MM)
     check("create_sketch helix seed", await adapter.create_sketch("TipPlane"))
-    if (
-        adapter.currentSketchManager.CreateCircleByRadius(
-            0.0, 0.0, 0.0, major_r / 1000.0
-        )
-        is None
-    ):
-        raise RuntimeError("helix seed circle failed")
+    with no_sketch_inference(adapter):
+        if (
+            adapter.currentSketchManager.CreateCircleByRadius(
+                0.0, 0.0, 0.0, major_r / 1000.0
+            )
+            is None
+        ):
+            raise RuntimeError("helix seed circle failed")
     insert_helix(
         adapter,
         PITCH_MM,
