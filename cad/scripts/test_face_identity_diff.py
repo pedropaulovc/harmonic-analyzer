@@ -261,14 +261,26 @@ def test_identical_bodies_are_paired_by_their_face_references() -> None:
     assert diff_census(before, after) == []
 
 
-def _row(state, *, area: float = 12.5, resolved_area: float | None = None):
+_OWN_BODY = [0.0, 0.0, 0.0, 5.0, 5.0, 5.0]
+_OTHER_BODY = [9.0, 0.0, 0.0, 14.0, 5.0, 5.0]
+
+
+def _row(
+    state,
+    *,
+    area: float = 12.5,
+    resolved_area: float | None = None,
+    owner: list[float] | None = _OWN_BODY,
+):
     """One replayed reference: what was stored, what came back."""
     stored = _face(area, (0, 0, 0, 5, 5, 0), "cGVyc2lzdA==")
-    row: dict = {"stored": stored, "body": "Body1"}
+    row: dict = {"stored": stored, "body": "Body1", "body_box_mm": _OWN_BODY}
     if state is not None:
         row["state"] = state
     if resolved_area is not None:
         row["resolved"] = _face(resolved_area, (0, 0, 0, 5, 5, 0), "")
+        if owner is not None:
+            row["resolved_body_box_mm"] = owner
     return row
 
 
@@ -341,3 +353,57 @@ def test_rebuild_noise_in_the_resolved_face_is_tolerated() -> None:
     rows = [_row(0, area=12.5, resolved_area=12.5 + 5e-5)]
 
     assert diff_resolution(rows) == []
+
+
+def test_a_reference_that_lands_in_another_body_is_reported() -> None:
+    """Congruent bodies make a drifted reference look perfect.
+
+    91247A720's three raised grade marks are congruent separate bodies, so a
+    reference that now finds another mark's corresponding face matches on
+    area, box and surface type. Only the OWNING body tells them apart, and
+    without that check the probe would certify a broken reference.
+    """
+    problems = diff_resolution(
+        [_row(0, area=12.5, resolved_area=12.5, owner=_OTHER_BODY)]
+    )
+
+    assert len(problems) == 1
+    assert problems[0].startswith("identity:")
+    assert "DIFFERENT body" in problems[0]
+
+
+def test_a_resolved_face_with_no_owning_body_recorded_proves_nothing() -> None:
+    """``IFace2.GetBody`` returning nothing is a gap, not a pass."""
+    problems = diff_resolution([_row(0, area=12.5, resolved_area=12.5, owner=None)])
+
+    assert len(problems) == 1
+    assert "owning body of one side was not recorded" in problems[0]
+
+
+def test_congruent_bodies_whose_faces_differ_are_paired_by_their_faces() -> None:
+    """Equal extents are not enough to pair two bodies.
+
+    A box tie is common -- congruent marks, a mirrored pair -- and the
+    reference bytes cannot break it, because they are allowed to change on
+    rebuild. Pairing such bodies by enumeration order would report both of
+    them as having swapped faces, out of nothing.
+    """
+    ribbed = {
+        "name": "Ribbed",
+        "box_mm": [0.0, 0.0, 0.0, 5.0, 5.0, 5.0],
+        "faces": [_face(4.0, (0, 0, 0, 2, 2, 0), "r1")],
+    }
+    smooth = {
+        "name": "Smooth",
+        "box_mm": [0.0, 0.0, 0.0, 5.0, 5.0, 5.0],
+        "faces": [_face(9.0, (0, 0, 0, 3, 3, 0), "s1")],
+    }
+    renumbered = [
+        {**smooth, "faces": [_face(9.0, (0, 0, 0, 3, 3, 0), "s2")]},
+        {**ribbed, "faces": [_face(4.0, (0, 0, 0, 2, 2, 0), "r2")]},
+    ]
+
+    before = {"part": "p", "bodies": [ribbed, smooth]}
+    after = {"part": "p", "bodies": renumbered}
+
+    assert diff_census(before, after) == []

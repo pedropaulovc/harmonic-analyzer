@@ -79,6 +79,9 @@ GUARD_CONTEXTMANAGERS = frozenset({"no_sketch_inference", "preference_override"}
 # -- and both draw a single hard-coded circle into an EMPTY throwaway part, so
 # there is no model geometry and no second sketch entity for inference to snap
 # to.  They exist to reproduce COM/assembly semantics, not to build parts.
+# Keyed by path RELATIVE to the diagnostics directory, because the audit walks
+# the tree: a bare file name would also exempt a same-named file dropped into
+# any subdirectory, which is an exemption nobody wrote and nobody would see.
 AUDIT_EXEMPT = {
     "diag_cwm_min.py": "raw swApp probe; one circle in an empty throwaway part",
     "diag_cwm_gear_min.py": "raw swApp probe; circles in an empty throwaway part",
@@ -493,7 +496,7 @@ def test_every_raw_sketch_primitive_is_authored_under_a_guard() -> None:
     audited = [
         path
         for path in sorted(DIAGNOSTICS_DIR.rglob("*.py"))
-        if path.name not in AUDIT_EXEMPT
+        if str(path.relative_to(DIAGNOSTICS_DIR).as_posix()) not in AUDIT_EXEMPT
     ]
     assert len(audited) > 20, (
         f"the audit inspected {len(audited)} files under {DIAGNOSTICS_DIR}; "
@@ -520,13 +523,13 @@ def test_the_audit_exemptions_still_exist_and_are_still_raw_com_probes() -> None
     If one of these grows an ``adapter`` it is a recipe, not a probe, and it
     belongs in the audit.
     """
-    for name, reason in AUDIT_EXEMPT.items():
-        path = DIAGNOSTICS_DIR / name
-        assert path.exists(), f"exemption for a file that no longer exists: {name}"
+    for relative, reason in AUDIT_EXEMPT.items():
+        path = DIAGNOSTICS_DIR / relative
+        assert path.exists(), f"exemption for a file that no longer exists: {relative}"
         assert reason
         source = path.read_text(encoding="utf-8")
         assert "no_sketch_inference" not in source
-        assert _unguarded_raw_calls(path), f"{name} no longer needs an exemption"
+        assert _unguarded_raw_calls(path), f"{relative} no longer needs an exemption"
 
 
 def test_the_audit_detects_an_unguarded_primitive(tmp_path: Path) -> None:

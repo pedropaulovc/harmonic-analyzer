@@ -140,8 +140,16 @@ def _same_body(left: dict, right: dict, *, box_tol_mm: float, **_: float):
     return delta is not None and delta <= box_tol_mm
 
 
-def _persist_multiset(body: dict) -> list[str]:
-    return sorted(str(face.get("persist") or "") for face in body.get("faces") or ())
+def _face_geometry_multiset(body: dict) -> list[tuple]:
+    """A body's faces as a sorted list of geometry keys.
+
+    This, not the reference bytes, is what disambiguates bodies whose extents
+    tie.  References are allowed to change from rebuild to rebuild, so using
+    them here would routinely find no exact partner and drop back to pairing
+    congruent-but-not-identical bodies by enumeration order -- which then
+    reports face differences that are really just a mispairing.
+    """
+    return sorted(face_key(face) for face in body.get("faces") or ())
 
 
 def _pair(left: list[dict], right: list[dict], same, exact) -> tuple[list, list, list]:
@@ -263,7 +271,7 @@ def diff_census(
         left,
         right,
         lambda a, b: _same_body(a, b, **tolerances),
-        lambda a, b: _persist_multiset(a) == _persist_multiset(b),
+        lambda a, b: _face_geometry_multiset(a) == _face_geometry_multiset(b),
     )
     for index, (body_a, body_b) in enumerate(pairs):
         problems.extend(
@@ -313,9 +321,17 @@ def diff_resolution(
     "are the bytes the same" but "does my saved handle still find my face".
 
     An empty result means every stored reference still resolves to the face it
-    was taken from.  A row with no state at all is refused rather than
-    ignored: a resolve pass that failed to record its outcome has proven
-    nothing, and reading it as a pass is how a probe becomes decoration.
+    was taken from -- and to the face IN ITS OWN BODY.  That last part is not
+    pedantry on 91247A720: its three raised grade marks are congruent
+    separate bodies, so a reference that drifted to another mark's
+    corresponding face would match on area, box and surface type alone.  The
+    bodies are compared by EXTENTS rather than by name, because a body name
+    is derived from the feature that made it and is not something this
+    rewrite promises to preserve.
+
+    A row with no state at all is refused rather than ignored: a resolve pass
+    that failed to record its outcome has proven nothing, and reading it as a
+    pass is how a probe becomes decoration.
     """
     tolerances = {"area_tol_mm2": area_tol_mm2, "box_tol_mm": box_tol_mm}
     problems: list[str] = []
@@ -346,6 +362,22 @@ def diff_resolution(
                 f"identity: {label} still resolves, but to a DIFFERENT face "
                 f"({_describe(resolved)}) -- a stored reference would now point "
                 "at the wrong geometry"
+            )
+            continue
+        owner_delta = _box_delta(
+            {"box_mm": row.get("body_box_mm") or ()},
+            {"box_mm": row.get("resolved_body_box_mm") or ()},
+        )
+        if owner_delta is None:
+            problems.append(
+                f"identity: {label} resolved, but the owning body of one side was "
+                "not recorded -- the face could belong to another body"
+            )
+        elif owner_delta > box_tol_mm:
+            problems.append(
+                f"identity: {label} resolves to a matching face in a DIFFERENT "
+                f"body (extents differ by {owner_delta:.9f} mm) -- on this part "
+                "the congruent grade marks make that look identical"
             )
     return problems
 
@@ -449,7 +481,11 @@ async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
     rows: list[dict] = []
     for body in canonical(census):
         for face in body["faces"]:
-            row: dict = {"stored": face, "body": body.get("name")}
+            row: dict = {
+                "stored": face,
+                "body": body.get("name"),
+                "body_box_mm": list(body.get("box_mm") or ()),
+            }
             # The out parameter comes back as the second element of a tuple
             # under pywin32; anything else is recorded as-is rather than
             # guessed at, so an unexpected shape reads as "proves nothing".
@@ -460,9 +496,19 @@ async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
                 obj, state = answer
                 row["state"] = int(state)
                 if obj is not None:
-                    row["resolved"] = _face_geometry(
-                        _early_bound(obj, "IFace2"), f"resolved {_describe(face)}"
-                    )
+                    what = f"resolved {_describe(face)}"
+                    resolved_face = _early_bound(obj, "IFace2")
+                    row["resolved"] = _face_geometry(resolved_face, what)
+                    # WHICH body it landed in is half the verdict: the three
+                    # grade marks are congruent, so a reference that drifted
+                    # to another mark matches on geometry alone.
+                    owner = _read_member(resolved_face, "GetBody")
+                    if owner is not None:
+                        row["resolved_body_box_mm"] = _box_mm(
+                            _early_bound(owner, "IBody2"),
+                            "GetBodyBox",
+                            f"owner of {what}",
+                        )
             else:
                 row["answer_shape"] = repr(type(answer))
             rows.append(row)
