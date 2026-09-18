@@ -1380,5 +1380,52 @@ def test_an_exploding_log_sink_does_not_replace_the_task_failure(dodo_failures):
         logger.removeHandler(sink)
 
 
+def test_a_failure_that_captured_nothing_says_so(dodo_failures, capture_telemetry):
+    """Most failures capture nothing, and silence read as "forensics broke".
+
+    ``capture_com_failure`` fires at COM-failure sites, so an ordinary recipe
+    rejection (``_common.check`` raising on a sketch relation the seat refused)
+    leaves ``failures/`` empty. Emitting no line at all made that
+    indistinguishable from a capture path that never ran, and the submitter's
+    message still advertised a ``failures/*`` download -- which fetched zero
+    blobs on ``part:pen_set_screw`` in the 2026-09-18 gate build. The absence
+    has to be STATED, because it is the thing the download instruction is
+    conditional on.
+    """
+    dodo = dodo_failures
+    _spans, logs = capture_telemetry
+
+    with pytest.raises(RuntimeError, match=r"^part:pen_set_screw failed \(exit 1\)$"):
+        dodo._fail_task("part:pen_set_screw", 1, started=0.0)
+
+    (record,) = [
+        r.log_record
+        for r in logs.get_finished_logs()
+        if dodo._NO_ARTEFACTS in str(r.log_record.body)
+    ]
+    assert record.attributes["exit_code"] == 1
+    assert record.attributes["artefacts"] == ""
+
+
+def test_the_download_instruction_names_the_marker_the_log_prints(dodo_failures):
+    """The instruction and the emission must agree on one string.
+
+    The submitter cannot see whether a bundle exists: the worker's workspace is
+    gone and ``LeafResult`` carries no artefact count, so the hint can only
+    point at the leaf log and say what to look for. If the two sides drift, the
+    operator is told to check for a phrase the log never prints and is back to
+    running a download that resolves to nothing.
+    """
+    dodo = dodo_failures
+    hint = dodo._failure_artefact_hint(
+        "results/leaf/part__pen_set_screw/fcc38181/1/task.log"
+    )
+
+    assert dodo._NO_ARTEFACTS in hint
+    # Still names the right prefix -- BESIDE the log, not under it.
+    assert "'leaf/part__pen_set_screw/fcc38181/1/failures/*'" in hint
+    assert "--source results" in hint
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))

@@ -1053,6 +1053,12 @@ LOGS = CAD_OUT / "logs"
 # path: the manifest goes to the process the pool captures into the leaf's
 # ``task.log``, which is the one channel that always reaches the submitter.
 FAILURES = REPORTS / "failures"
+# The exact phrase a failure that captured nothing prints, shared between the
+# emission (``_fail_task``) and the instruction that tells an operator to look
+# for it (``_failure_artefact_hint``). One constant because the two must agree:
+# an instruction naming a string the log does not contain is how the reader
+# ends up running a download that fetches zero blobs.
+_NO_ARTEFACTS = "no forensic artefacts captured"
 
 
 def _failure_artefacts(since: float) -> list[Path]:
@@ -1151,6 +1157,18 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
     them: a ``NameError`` or a bad f-string here must stay loud, or this path
     becomes undebuggable. Same split as ``_common.capture_com_failure``, which
     wraps its final ERROR record and nothing else.
+
+    A failure that captured NOTHING says so on its own line. Most failures
+    capture nothing: ``capture_com_failure`` fires at COM-failure sites, so an
+    ordinary recipe rejection (``_common.check`` raising on a refused sketch
+    relation, say) leaves ``failures/`` empty and there is no bundle to fetch.
+    Emitting nothing at all made that indistinguishable from "the forensics
+    never ran", and the submitter's message advertised a ``failures/*``
+    download that resolved to zero blobs -- an absent artefact presented as a
+    retrievable one, which is the same lie as a field reported blank when no
+    read could have answered it. ``_failure_artefact_hint`` sends the reader to
+    THIS line, so it has to exist in both outcomes (measured on
+    ``part:pen_set_screw``, gate build 2026-09-18).
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
@@ -1184,6 +1202,16 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
                 failure_dir=str(FAILURES),
                 artefacts=" ".join(records),
             )
+    else:
+        with contextlib.suppress(Exception):
+            _telemetry.error(
+                f"[forensics] {label}: {_NO_ARTEFACTS} -- nothing was uploaded "
+                f"under 'failures/', so this failure is diagnosed from this log",
+                label=label,
+                exit_code=rc,
+                failure_dir=str(FAILURES),
+                artefacts="",
+            )
     raise RuntimeError(f"{label} failed (exit {rc})")
 
 
@@ -1195,14 +1223,32 @@ def _failure_artefact_hint(log_blob: str | None) -> str:
     artefacts to the ``failures/`` prefix BESIDE it, so the submitter needs no
     extra protocol field to find them -- the log blob it already gets is the
     anchor.
+
+    The bundle is CONDITIONAL and this side cannot see it: only failures whose
+    recipe called ``capture_com_failure`` leave artefacts, the worker's
+    workspace is gone by now, and ``LeafResult`` carries no artefact count. An
+    unconditional download instruction therefore sent operators to a prefix
+    with zero blobs (``part:pen_set_screw``, gate build 2026-09-18) -- worse
+    than silence, because the pause before the failure implies something was
+    captured. Probing the container from here is the wrong fix: it would put a
+    network call on the path whose one job is to deliver the exit code.
+
+    So the hint names the authority that always exists -- the leaf log's own
+    ``[forensics]`` line, which :func:`_fail_task` now emits in BOTH outcomes --
+    and marks the download as conditional on it. ``_NO_ARTEFACTS`` is shared
+    with that emission so the string an operator is told to look for is the
+    string the log actually contains.
     """
     if not log_blob or "/" not in log_blob:
         return "no leaf log blob was reported, so no failure artefacts either"
     container, _, blob = log_blob.partition("/")
     prefix = f"{blob.rsplit('/', 1)[0]}/failures/"
     return (
-        f"forensics: az storage blob download-batch --source {container} "
-        f"--pattern '{prefix}*' --destination cad/out/reports/failures"
+        f"forensics: the leaf log's '[forensics]' line says whether this "
+        f"failure captured anything; if it says '{_NO_ARTEFACTS}' there is no "
+        f"bundle, otherwise fetch it with: az storage blob download-batch "
+        f"--source {container} --pattern '{prefix}*' "
+        f"--destination cad/out/reports/failures"
     )
 
 
