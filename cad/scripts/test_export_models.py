@@ -273,7 +273,10 @@ def test_neutral_save_is_silent_and_suppresses_stl_info(tmp_path: Path) -> None:
     output = tmp_path / "sample.STL"
     assert export_models._save_as(_Doc(), output) == 1
     assert calls == [(str(output), 0, 1 | 8)]
-    assert export_models.TOGGLES[export_models.TOGGLE_STL_SHOW_INFO] is False
+    assert (
+        export_models.EXPORT_PREFERENCES.toggles[export_models.TOGGLE_STL_SHOW_INFO]
+        is False
+    )
 
 
 def test_saved_active_and_configuration_exports_share_one_part_open(
@@ -372,8 +375,9 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
         export_models, "src_digest",
         lambda path: "asm-v1" if path.suffix == ".SLDASM" else "part-v1",
     )
-    monkeypatch.setattr(export_models, "set_export_prefs", lambda _adapter: {})
-    monkeypatch.setattr(export_models, "restore_export_prefs", lambda *_args: None)
+    # The export preferences are enforced on the seat (no save/restore pair any
+    # more); this offline run has no seat to enforce them on.
+    monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: {})
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
 
