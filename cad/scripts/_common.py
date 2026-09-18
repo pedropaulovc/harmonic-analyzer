@@ -56,6 +56,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -2406,6 +2407,65 @@ def _resident_output_documents(adapter: Any) -> list[str]:
     return paths
 
 
+def _normal_path(path: str | Path) -> Path:
+    """``path`` comparable to another Windows path (case-folded, links resolved)."""
+
+    return Path(os.path.normcase(os.path.realpath(path)))
+
+
+def _within(path: str | Path, root: Path) -> bool:
+    candidate = _normal_path(path)
+    return candidate == root or root in candidate.parents
+
+
+def release_seat_working_directory(sw: Any) -> str | None:
+    """Move the seat's working directory OUT of this checkout; return where it went.
+
+    SolidWorks follows the documents it opens: after a build that saved into
+    ``cad/out/sldprt``, the seat's own PROCESS current directory IS that
+    directory, and Windows refuses to remove a directory that is any process's
+    current directory. Closing documents does not release it -- the directory
+    is the process's, not a document's -- so only a re-point clears it.
+
+    Off the farm that is invisible (the checkout outlives the seat). On a farm
+    worker the checkout is a disposable source root the agent removes between
+    leaves and evicts to bound the disk, so a seat parked inside one makes an
+    UNRELATED leaf's housekeeping fail: observed 2026-09-18 on swmaker000006,
+    where ``sldworks.exe`` held
+    ``C:\\harmonic\\work\\sources\\6621e07a...\\workspace\\cad\\out\\sldprt``
+    from an earlier drawing leaf and the release's first farm ``export`` leaf
+    failed three times with ``WinError 32`` before it ran a line.
+
+    Teardown, not connect: the seat drifts back into the workspace on the next
+    open/save, so a session that re-points only at startup ends parked again.
+
+    Takes the raw ``ISldWorks`` (``adapter.swApp``, or ``package_native``'s
+    comtypes pointer), so both COM entrypoints share this one implementation.
+
+    Returns the directory the seat was left in, or ``None`` when it was already
+    outside this checkout. Raises when the seat will not move -- the caller
+    decides what that is worth (both callers warn: it is the NEXT leaf's
+    hazard, not this build's failure).
+    """
+
+    checkout = _normal_path(CAD_ROOT.parent)
+    before = sw.GetCurrentWorkingDirectory()
+    if type(before) is not str or not before:
+        raise RuntimeError(f"seat working directory unreadable: {before!r}")
+    if not _within(before, checkout):
+        return None
+    target = Path(tempfile.gettempdir())
+    if sw.SetCurrentWorkingDirectory(str(target)) is not True:
+        raise RuntimeError(f"seat refused working directory {target}")
+    after = sw.GetCurrentWorkingDirectory()
+    if type(after) is not str or not after or _within(after, checkout):
+        raise RuntimeError(
+            f"seat working directory still inside the checkout after the move: "
+            f"{after!r}"
+        )
+    return after
+
+
 def discard_open_documents(adapter: Any) -> None:
     """Close every open document WITHOUT a "Save Modified Documents" prompt.
 
@@ -3873,6 +3933,19 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                             _telemetry.success("all documents closed (seat left clean)")
                     except Exception as exc:  # noqa: BLE001
                         _telemetry.warn(f"teardown close failed: {exc}")
+                    # ... and holding NO directory of this checkout either. The
+                    # seat's own current directory follows the documents it
+                    # opened, and on a farm worker this checkout is a source
+                    # root the agent removes between leaves: a seat parked in
+                    # cad/out makes an unrelated leaf's cleanup fail with
+                    # WinError 32 (see release_seat_working_directory). Same
+                    # warn-only reasoning as the close above.
+                    try:
+                        left = release_seat_working_directory(adapter.swApp)
+                        if left is not None:
+                            _telemetry.success(f"seat working directory moved to {left}")
+                    except Exception as exc:  # noqa: BLE001
+                        _telemetry.warn(f"seat working directory re-point failed: {exc}")
                     try:
                         await adapter.disconnect()
                         _telemetry.success("disconnected")
