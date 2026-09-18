@@ -66,52 +66,6 @@ issue #249.
 `finalize_drawing` requires the `TOL_*` set on the linked model, so a stale
 source part fails before it can save blank tolerance cells.
 
-#### The PART name is fitted to its cell at build time
-
-The PART note is authored with a text box narrower than the cell it sits in
-(measured at 68.83–69.67 mm against a 106.62 mm cell), so a long `Title`
-wrapped onto a second line — and because a note grows downward from its
-anchor, that line landed under the cell's lower rule, on the `DWG. NO.`
-caption. `harmonic-analyzer-assembly` (MHA-A08) shipped that way in v36, along
-with 17 other sheets.
-
-`finalize_drawing` now fits the name instead: `_title_block_text.fit_part_name`
-picks the largest integer point size (16 pt down to a 9 pt floor) at which the
-name fits the cell's real usable width, and
-`_drawing_common.fit_title_block_part_name` applies it to that sheet's own
-template note through `EditTemplate` → `ITextFormat.LineLength` /
-`CharHeightInPts` → `EditSheet`, then re-reads `INote::GetExtent` to prove
-the result is one line inside the cell. **Only the points property is
-written.** `ITextFormat` also carries `CharHeight`, in system units, and it
-is *not* the same number in metres: it is the CHARACTER height, so writing
-the em size into it renders the note 1.2053× too big — measured on the farm
-across four names at 12/15/16 pt on three workers (extent 2.4850–2.4856 em,
-size-independent), and on the same sheet twice: slotted_screw's 15 pt note
-measured 13.15 mm with the write and 10.91 mm without it. (An earlier
-revision of this note said 1.381×. That was the inflated extent divided by
-a one-line constant of 1.8 em that had itself been back-derived from 1.381;
-one correct line measures 1.91–2.06 em.)
-A note that declares its height in system units (`IsHeightSpecifiedInPts`,
-a read-only **method**, returns false) is therefore refused with that
-message rather than converted, on every sheet: the em-to-character ratio is
-an inference from one campaign, not a measured font constant. The fleet's
-templates author in points. The DRWDOT binary is never written; the edit
-lives in the SLDDRW. A name that already fits the note's authored box keeps
-its ink: the note is read, but no format is written.
-
-The width model is the template font's own glyph advances, taken from the
-Century Gothic CID subset embedded in the released PDFs. **If the title block
-moves, the cell is resized, or its font changes, re-measure**: the field
-geometry lives in `_drawing_registry.DRAWING_TEMPLATES[...].part_name_field`
-and the glyph table in `_title_block_text.GLYPH_ADVANCE_PER_MILLE`, both with
-their provenance recorded in comments. Re-authoring the note fails the build
-loudly rather than mis-fitting, because the applier checks the whole format
-the model assumes — family, weight, style and point size, which
-`ITextFormat` carries independently — on **every** sheet before it trusts the
-model, including the sheets it decides to leave alone, since "this name fits
-unwrapped at 16 pt" is itself a verdict of the model and a wider face or a
-larger size would break it.
-
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
 the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The

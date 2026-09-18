@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from _title_block_text import PartNameField
-
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_ROOT = SCRIPTS_DIR.parent
@@ -34,12 +32,6 @@ class DrawingTemplateSpec:
     pixel_size: tuple[int, int]
     title_block_left_m: float
     title_block_top_m: float
-    # The title block's PART field, measured off this template's own released
-    # sheets (see _title_block_text). Owned here for the same reason the
-    # title-block keep-out is: it is per-template measured geometry, and
-    # cad/templates/README.md already tells you to re-measure this entry when
-    # the block moves or grows.
-    part_name_field: PartNameField
 
 
 # Hand-made in SolidWorks (title block, tolerance block, embedded ASME B sheet
@@ -54,19 +46,6 @@ DRAWING_TEMPLATES = {
         pixel_size=(5100, 3300),
         title_block_left_m=0.216,
         title_block_top_m=0.066,
-        # Measured on the v36 landscape renders: cell x 310.59..419.06, y
-        # 35.88..47.48; value anchored at x 312.44, baseline y 38.3648, 16 pt;
-        # PART caption baseline y 44.03, 9.6 pt.
-        part_name_field=PartNameField(
-            cell_left_mm=310.59,
-            cell_right_mm=419.06,
-            cell_bottom_mm=35.88,
-            cell_top_mm=47.48,
-            text_left_mm=312.44,
-            baseline_mm=38.3648,
-            label_baseline_mm=44.03,
-            label_point_size=9.6,
-        ),
     ),
     DrawingLayout.PORTRAIT: DrawingTemplateSpec(
         path=TEMPLATES_DIR / "harmonic-analyzer-portrait.DRWDOT",
@@ -76,25 +55,6 @@ DRAWING_TEMPLATES = {
         pixel_size=(3300, 5100),
         title_block_left_m=0.0636,
         title_block_top_m=0.066,
-        # Measured on the v36 portrait renders (tube-frame, cylinder-gear):
-        # cell x 163.16..266.66, y 35.52..47.66; value anchored at x 165.20,
-        # baseline y 38.58, 16 pt; PART caption baseline y 44.25, 9.6 pt.
-        # proven_line_length_mm is the LANDSCAPE bracket carried over: no
-        # portrait name has ever been long enough to wrap, so the portrait
-        # note's own wrap width cannot be bracketed from a render. Carrying the
-        # landscape value over is the safe direction -- it can only make the
-        # fit engage on a portrait sheet that did not need it, and the fit is
-        # invisible on a name that already fits (the note is left-justified).
-        part_name_field=PartNameField(
-            cell_left_mm=163.16,
-            cell_right_mm=266.66,
-            cell_bottom_mm=35.52,
-            cell_top_mm=47.66,
-            text_left_mm=165.20,
-            baseline_mm=38.58,
-            label_baseline_mm=44.25,
-            label_point_size=9.6,
-        ),
     ),
 }
 

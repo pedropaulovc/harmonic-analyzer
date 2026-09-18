@@ -2762,11 +2762,6 @@ def task_check():
         SCRIPTS_DIR / "test_logo_profile_closure.py",
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
-        # The title-block PART-name fit: measured font model vs the wrap
-        # evidence from the released renders, and every registered drawing's
-        # printed name held to one legible line inside its field. Named for the
-        # title block, not a drawing, so the glob above does not reach it.
-        SCRIPTS_DIR / "test_title_block_fit.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
