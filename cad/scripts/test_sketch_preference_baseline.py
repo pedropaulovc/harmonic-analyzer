@@ -256,21 +256,49 @@ def _is_guard_call(expr: ast.expr) -> bool:
     return isinstance(func, ast.Attribute) and func.attr in GUARD_CONTEXTMANAGERS
 
 
-def _assigns_add_to_db(node: ast.AST, *, value: bool | None) -> bool:
-    """Is ``node`` an ``*.AddToDB = <value>`` assignment?
+def _add_to_db_assignment(node: ast.AST) -> tuple[str, ast.expr] | None:
+    """``(receiver source, assigned value)`` for an ``*.AddToDB = ...`` assign.
 
-    ``value=True`` matches only the literal enable; ``value=None`` matches any
-    assignment, which is what a restore of the saved previous value looks like.
+    The RECEIVER matters: ``sk1.AddToDB = True`` says nothing about what
+    ``sk2`` will do with the primitives drawn through it.
     """
     if not isinstance(node, ast.Assign):
-        return False
-    if not any(
-        isinstance(t, ast.Attribute) and t.attr == "AddToDB" for t in node.targets
-    ):
-        return False
-    if value is None:
-        return True
-    return isinstance(node.value, ast.Constant) and node.value.value is True
+        return None
+    for target in node.targets:
+        if isinstance(target, ast.Attribute) and target.attr == "AddToDB":
+            return ast.unparse(target.value), node.value
+    return None
+
+
+def _receivers_enabled_before(suite: list[ast.stmt], index: int) -> set[str]:
+    """Receivers whose LATEST ``AddToDB`` assignment before ``index`` is ``True``.
+
+    Latest, not any: an intervening ``sk.AddToDB = False`` puts the sketch
+    manager back through the inference engine, and an earlier enable does not
+    undo that.
+    """
+    latest: dict[str, bool] = {}
+    for stmt in suite[:index]:
+        found = _add_to_db_assignment(stmt)
+        if found is not None:
+            receiver, value = found
+            latest[receiver] = (
+                isinstance(value, ast.Constant) and value.value is True
+            )
+    return {receiver for receiver, enabled in latest.items() if enabled}
+
+
+def _suite_positions(tree: ast.Module) -> dict[ast.stmt, tuple[list[ast.stmt], int]]:
+    """Every statement's enclosing suite and its index in it."""
+    positions: dict[ast.stmt, tuple[list[ast.stmt], int]] = {}
+    for node in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody"):
+            suite = getattr(node, field, None)
+            if isinstance(suite, list):
+                for index, stmt in enumerate(suite):
+                    if isinstance(stmt, ast.stmt):
+                        positions[stmt] = (suite, index)
+    return positions
 
 
 def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
@@ -283,45 +311,40 @@ def _guarded_line_ranges(tree: ast.Module) -> list[tuple[int, int]]:
     view-dependent -- never runs at all.  Either is sufficient; both are
     accepted here because the fleet legitimately uses both.
 
-    The ``AddToDB`` form is matched STRUCTURALLY, and it must be the whole
-    shape: ``AddToDB = True`` assigned before the ``try``, and some
-    ``AddToDB`` assignment in the ``finally`` that puts it back.  Merely
-    mentioning ``AddToDB`` in a ``finally`` is not a guard -- a block that only
-    ever assigns ``AddToDB = False`` restores a value it never enabled, so its
-    primitives went through inference after all.  Accepting that shape would
-    make the audit's teeth cosmetic.
+    The ``AddToDB`` form is matched STRUCTURALLY, and the whole shape is
+    required: for ONE receiver, its latest assignment before the ``try`` is
+    literal ``True``, and the ``finally`` restores THAT SAME receiver.  Each
+    part of that carries a failure this audit would otherwise wave through:
+
+    * a ``finally`` that only assigns ``AddToDB = False`` restores a value it
+      never enabled, so its primitives went through inference after all;
+    * an intervening ``sk.AddToDB = False`` puts the manager back through the
+      inference engine, and an earlier enable does not undo that;
+    * ``sk1.AddToDB = True`` guarantees nothing about primitives drawn through
+      ``sk2``.
+
+    A guard the audit only believes it saw is worse than no guard, because it
+    is the thing that makes this whole PR's regression gate meaningless.
     """
     spans: list[tuple[int, int]] = []
+    positions = _suite_positions(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
                 if _is_guard_call(item.context_expr):
                     spans.append((node.lineno, node.end_lineno))
         elif isinstance(node, ast.Try) and node.finalbody:
-            if not any(
-                _assigns_add_to_db(stmt, value=None) for stmt in node.finalbody
-            ):
+            restored = {
+                found[0]
+                for stmt in node.finalbody
+                if (found := _add_to_db_assignment(stmt)) is not None
+            }
+            if not restored:
                 continue
-            # The enable must PRECEDE the try, in the same suite.
-            enabled = any(
-                _assigns_add_to_db(sibling, value=True)
-                for parent in ast.walk(tree)
-                for suite in _suites(parent)
-                if node in suite
-                for sibling in suite[: suite.index(node)]
-            )
-            if enabled:
+            suite, index = positions.get(node, ([], 0))
+            if restored & _receivers_enabled_before(suite, index):
                 spans.append((node.lineno, node.end_lineno))
     return spans
-
-
-def _suites(node: ast.AST) -> list[list[ast.stmt]]:
-    return [
-        value
-        for value in (getattr(node, field, None) for field in ("body", "orelse",
-                                                               "finalbody"))
-        if isinstance(value, list)
-    ]
 
 
 def _unguarded_raw_calls(path: Path) -> list[tuple[int, str]]:
@@ -422,6 +445,52 @@ def test_a_real_add_to_db_block_counts_as_a_guard(tmp_path: Path) -> None:
     )
 
     assert _unguarded_raw_calls(good) == []
+
+
+def test_an_intervening_disable_cancels_the_guard(tmp_path: Path) -> None:
+    """``AddToDB = False`` puts the manager back through the inference engine.
+
+    An earlier enable does not undo it, so the primitive inside the ``try``
+    really does run with inference on -- and its result really does depend on
+    the seat's window pixel geometry.
+    """
+    offender = tmp_path / "diag_build_disabled.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk = adapter.currentSketchManager\n"
+        "    sk.AddToDB = True\n"
+        "    sk.AddToDB = False\n"
+        "    try:\n"
+        "        sk.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk.AddToDB = True\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
+
+
+def test_an_enable_on_a_different_receiver_is_not_a_guard(tmp_path: Path) -> None:
+    """``sk1.AddToDB = True`` says nothing about primitives drawn through ``sk2``.
+
+    Two sketch managers is the realistic shape: a recipe that opens a second
+    document, or an assembly recipe holding both the part's manager and the
+    assembly's.
+    """
+    offender = tmp_path / "diag_build_two_managers.py"
+    offender.write_text(
+        "async def build(adapter):\n"
+        "    sk1 = adapter.currentSketchManager\n"
+        "    sk2 = adapter.otherSketchManager\n"
+        "    sk1.AddToDB = True\n"
+        "    try:\n"
+        "        sk2.CreateLine(0.0, 0.0, 0.0, 1.0, 1.0, 0.0)\n"
+        "    finally:\n"
+        "        sk2.AddToDB = False\n",
+        encoding="utf-8",
+    )
+
+    assert _unguarded_raw_calls(offender) == [(6, "CreateLine")]
 
 
 def test_a_qualified_guard_call_is_recognised(tmp_path: Path) -> None:
