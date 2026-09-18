@@ -949,9 +949,74 @@ def test_a_fleet_whose_every_report_aged_out_is_not_called_silent(monkeypatch, c
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
 
     assert capsys.readouterr().out.splitlines()[0] == (
-        f"farm: agent {AGENT_TAG}; 2 worker(s) last reported more than 14d ago, "
-        "too old to prove anything"
+        f"farm: agent {AGENT_TAG}; 2 worker(s) last reported more than 14d ago "
+        "on this same build, too old to prove the fleet is up but not "
+        "contradicting it"
     )
+
+
+def test_an_aged_out_report_naming_another_build_still_stops_the_run(monkeypatch):
+    """Too old to CONFIRM is not too old to CONTRADICT.
+
+    The agent tree lives on the worker's OS disk, so an old report names the
+    build that worker comes back on -- a fleet idle past the horizon whose
+    pool checkout moved without a deploy is exactly the package_download
+    failure this preflight exists to stop, and treating its one piece of
+    evidence as silence would let the build proceed into it.
+    """
+    _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            verdict="unverified",
+            workers=[],
+            listed=2,
+            ignored=[
+                {
+                    "worker_id": "swmaker000004@4",
+                    "agent_version": "0000000000000000",
+                    "observed_at": "2026-09-01T10:39:07Z",
+                    "age_s": 1555200,
+                    "written_age_s": None,
+                    "fresh": False,
+                },
+                {
+                    "worker_id": "swmaker000005@5",
+                    "agent_version": AGENT_TAG,
+                    "observed_at": "2026-09-01T10:39:07Z",
+                    "age_s": 1555200,
+                    "written_age_s": None,
+                    "fresh": False,
+                },
+            ],
+        ),
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+    assert _FakeDoit.seen == []
+
+
+def test_an_aged_out_dissent_names_the_worker_and_the_remedy():
+    """The operator must see WHICH worker disagrees, not a count."""
+    named = build._dissenting_workers(
+        [
+            {
+                "worker_id": "swmaker000004@4",
+                "agent_version": "0000000000000000",
+                "age_s": 1555200,
+                "written_age_s": None,
+            },
+            {"worker_id": "swmaker000005@5", "agent_version": AGENT_TAG},
+            {"worker_id": "swmaker000006@6", "agent_version": None},
+            "not a report",
+        ],
+        AGENT_TAG,
+    )
+
+    # Only the disagreeing report, with its build and its age; agreement at
+    # any age proves nothing and must not be reported as dissent.
+    assert named == ["swmaker000004@4 (0000000000000000, last seen 18d ago)"]
 
 
 @pytest.mark.parametrize(

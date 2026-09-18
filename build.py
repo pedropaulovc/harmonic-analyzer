@@ -181,6 +181,32 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         ) from None
 
 
+def _dissenting_workers(reports: object, version: str) -> list[str]:
+    """``worker (agent build, last seen)`` for each report naming another build.
+
+    A report the pool ignored as stale is still evidence AGAINST a match: the
+    agent tree it names lives on that worker's own disk, so a worker idle for
+    a month comes back on exactly the build its last report published. Only
+    reports that disagree are returned -- agreement at any age proves nothing
+    and blocks nothing.
+    """
+    if not isinstance(reports, list):
+        return []
+    named = []
+    for report in reports:
+        if not isinstance(report, dict):
+            continue
+        other = report.get("agent_version")
+        if not isinstance(other, str) or not other or other == version:
+            continue
+        age = report.get("age_s")
+        if not isinstance(age, int):
+            age = report.get("written_age_s")
+        seen = f", last seen {age // 86400}d ago" if isinstance(age, int) else ""
+        named.append(f"{report.get('worker_id') or '?'} ({other}{seen})")
+    return sorted(named)
+
+
 def _require_fleet_agent(pool: Path) -> str:
     """Stop unless the fleet runs the agent this pool checkout would publish for.
 
@@ -197,6 +223,16 @@ def _require_fleet_agent(pool: Path) -> str:
     There is deliberately no override on this side. ``farm.py publish`` has one,
     because a publish mid-rollout is legitimate; a farm build is not -- it hands
     every COM task to those same workers, and a mismatch fails all of them.
+
+    This read is not the only enforcement, and is not the last one: the pool's
+    ``publish_source`` calls ``require_fleet_agent(allow_mismatch=False)``
+    before it uploads anything, so a mismatch that appears between this read
+    and the publish still stops the build -- with the pool's own wording,
+    which does mention the override. Two reads means two Azure round-trips and
+    a window in which they can disagree; the window is worth it, because this
+    one runs before doit is even constructed, so the operator sees the fleet's
+    agent build in the first line of output rather than after a preflight's
+    worth of work.
     """
     result = _pool_farm(pool, "agents", "--json")
     lines = [line for line in result.stdout.splitlines() if line.strip()]
@@ -235,9 +271,26 @@ def _require_fleet_agent(pool: Path) -> str:
         # difference between a fleet nobody has ever seen and one whose
         # instances were renumbered or idle for a fortnight.
         days = summary["evidence_horizon_s"] // 86400
+        dissent = _dissenting_workers(summary["ignored"], version)
+        if dissent:
+            # Too old to CONFIRM is not too old to CONTRADICT. The agent tree
+            # lives on the worker's OS disk, so an old report still names the
+            # build that worker will come back on; a horizon that discards
+            # that turns the one piece of evidence we have into silence, and
+            # silence here publishes to a prefix nobody reads -- the
+            # package_download failure this preflight exists to stop.
+            raise FarmPreflightError(
+                f"this pool checkout's agent is {version}, and no worker has "
+                f"reported within {days}d, but the last report of "
+                + ", ".join(dissent)
+                + " names another build. Deploy this agent to the fleet "
+                "(farm.py agent-release publish, then deploy), or delete the "
+                "seat report of an instance that will never come back."
+            )
         print(
             f"farm: agent {version}; {len(summary['ignored'])} worker(s) last "
-            f"reported more than {days}d ago, too old to prove anything"
+            f"reported more than {days}d ago on this same build, too old to "
+            "prove the fleet is up but not contradicting it"
         )
     else:
         print(
