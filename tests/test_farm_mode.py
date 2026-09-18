@@ -122,10 +122,14 @@ def test_failed_leaf_fails_the_task_with_the_farm_diagnosis(farm_part, monkeypat
     with pytest.raises(RuntimeError) as failure:
         dodo._cached_part_action("pen_rod", script)
 
-    assert str(failure.value) == (
+    # The diagnosis and the forensics hint are authored by two different
+    # changes, so this pins each half rather than one exact string that the
+    # other half silently invalidates on merge.
+    assert str(failure.value).startswith(
         "part:pen_rod failed on sw-01@3 [task_failed] exit 87: SolidWorks connect "
         "timed out (log: results/leaf/part__pen_rod/" + "k" * 64 + "/1/task.log)"
     )
+    assert "failures/*" in str(failure.value)
     assert calls["stamp"] == []
     assert calls["store"] == []
 
