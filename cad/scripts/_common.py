@@ -56,6 +56,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -2406,6 +2407,111 @@ def _resident_output_documents(adapter: Any) -> list[str]:
     return paths
 
 
+def _normal_path(path: str | Path) -> Path:
+    """``path`` comparable to another Windows path (case-folded, links resolved)."""
+
+    return Path(os.path.normcase(os.path.realpath(path)))
+
+
+def _seat_park_directory() -> Path:
+    """An existing directory no build owns, for the seat to sit in.
+
+    The system temp directory is the intent, but ``tempfile.gettempdir()`` is
+    not a constant: it takes ``TMPDIR``/``TEMP``/``TMP`` from the environment
+    and, with none of them usable, falls back to the PROCESS CURRENT DIRECTORY
+    -- which under the farm helper IS the workspace being torn down. Parking
+    there would make this helper a silent no-op for exactly the bug it guards,
+    so every candidate is checked and a drive root, which no checkout can be,
+    is the last resort.
+
+    Disposable means this checkout AND every sibling checkout: a farm worker
+    keeps several source roots under one work root and removes them with the
+    same housekeeping, so parking in a sibling only moves which leaf fails.
+    ``FARM_WORK_ROOT`` is the worker's own name for that tree and reaches the
+    helper in its environment.
+    """
+
+    checkout = _normal_path(CAD_ROOT.parent)
+    disposable = [checkout]
+    work_root = os.environ.get("FARM_WORK_ROOT")
+    if work_root:
+        disposable.append(_normal_path(work_root))
+    windows = os.environ.get("SystemRoot") or os.environ.get("windir")
+    candidates = [Path(tempfile.gettempdir())]
+    if windows:
+        candidates.append(Path(windows) / "Temp")
+    candidates.append(Path(_normal_path(CAD_ROOT).anchor))
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        resolved = _normal_path(candidate)
+        if any(root == resolved or root in resolved.parents for root in disposable):
+            continue
+        return candidate
+    raise RuntimeError(
+        f"no seat working directory outside {disposable}: tried {candidates}"
+    )
+
+
+def release_seat_working_directory(sw: Any) -> str | None:
+    """Park the seat's working directory where nothing is disposable; return it.
+
+    SolidWorks follows the documents it opens: after a build that saved into
+    ``cad/out/sldprt``, the seat's own PROCESS current directory IS that
+    directory, and Windows refuses to remove a directory that is any process's
+    current directory. Closing documents does not release it -- the directory
+    is the process's, not a document's -- so only a re-point clears it.
+
+    Off the farm that is invisible (the checkout outlives the seat). On a farm
+    worker the checkout is a disposable source root the agent removes between
+    leaves and evicts to bound the disk, so a seat parked inside one makes an
+    UNRELATED leaf's housekeeping fail: observed 2026-09-18 on swmaker000006,
+    where ``sldworks.exe`` held
+    ``C:\\harmonic\\work\\sources\\6621e07a...\\workspace\\cad\\out\\sldprt``
+    from an earlier drawing leaf and the release's first farm ``export`` leaf
+    failed three times with ``WinError 32`` before it ran a line.
+
+    Parked UNCONDITIONALLY, not only when the seat sits in *this* checkout: a
+    worker keeps several source roots, and the seat this session inherited may
+    still be parked in a SIBLING root whose own leaf died before its teardown
+    (that is exactly the shape above -- the failing leaf's root was not the
+    pinned one). Re-pointing only out of our own checkout would leave that root
+    pinned until the seat itself died; re-pointing always heals it.
+
+    Teardown, not connect: the seat drifts back into a workspace on the next
+    open/save, so a session that re-points only at startup ends parked again.
+
+    Takes the raw ``ISldWorks`` (``adapter.swApp``, or ``package_native``'s
+    comtypes pointer), so both COM entrypoints share this one implementation.
+
+    Returns the directory the seat was left in, or ``None`` when it was already
+    there. Raises when the seat will not move -- the caller decides what that is
+    worth (both callers warn: it is the NEXT leaf's hazard, not this build's
+    failure).
+    """
+
+    target = _seat_park_directory()
+    before = sw.GetCurrentWorkingDirectory()
+    if type(before) is not str or not before:
+        raise RuntimeError(f"seat working directory unreadable: {before!r}")
+    if _normal_path(before) == _normal_path(target):
+        return None
+    if sw.SetCurrentWorkingDirectory(str(target)) is not True:
+        raise RuntimeError(f"seat refused working directory {target}")
+    # A True answer is not evidence: the readback is. Anything else and the
+    # caller must not report a directory the seat never took. Emptiness is
+    # refused BEFORE normalizing, because ``os.path.realpath("")`` is the
+    # PROCESS current directory -- so a seat that answers nothing would
+    # normalize onto ``target`` itself whenever this helper runs from there,
+    # and an unreadable seat would be reported as parked.
+    after = sw.GetCurrentWorkingDirectory()
+    if type(after) is not str or not after:
+        raise RuntimeError(f"seat working directory unreadable after move: {after!r}")
+    if _normal_path(after) != _normal_path(target):
+        raise RuntimeError(f"seat working directory did not move: {after!r}")
+    return after
+
+
 def discard_open_documents(adapter: Any) -> None:
     """Close every open document WITHOUT a "Save Modified Documents" prompt.
 
@@ -3873,6 +3979,30 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                             _telemetry.success("all documents closed (seat left clean)")
                     except Exception as exc:  # noqa: BLE001
                         _telemetry.warn(f"teardown close failed: {exc}")
+                    # ... and holding NO directory of this checkout either. The
+                    # seat's own current directory follows the documents it
+                    # opened, and on a farm worker this checkout is a source
+                    # root the agent removes between leaves: a seat parked in
+                    # cad/out makes an unrelated leaf's cleanup fail with
+                    # WinError 32 (see release_seat_working_directory). Same
+                    # warn-only reasoning as the close above.
+                    #
+                    # The readback is emitted under the same
+                    # ``seat_working_directory`` key ``_telemetry``'s seat
+                    # provenance uses, which samples at CONNECT: one query then
+                    # reads both ends -- where a leaf left the seat, and where
+                    # the next leaf found it.
+                    try:
+                        left = release_seat_working_directory(adapter.swApp)
+                        if left is not None:
+                            _telemetry.success(
+                                f"seat working directory moved to {left}",
+                                seat_working_directory=left,
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        _telemetry.warn(
+                            f"seat working directory re-point failed: {exc}"
+                        )
                     try:
                         await adapter.disconnect()
                         _telemetry.success("disconnected")
