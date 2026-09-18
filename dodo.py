@@ -624,7 +624,7 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
     rc = _run_subprocess(cmd, label, log_stem)
     if rc:
-        raise RuntimeError(f"{label} failed (exit {rc})")
+        _fail_task(label, rc)
 
 
 _EXTERNAL_LOG_LEVELS = {
@@ -882,7 +882,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             return
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
         if not sw_broke or attempt == last:
-            raise RuntimeError(f"{label} failed (exit {rc})")
+            _fail_task(label, rc)
         delay = backoff[attempt]
         _telemetry.warn(
             f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
@@ -1041,6 +1041,87 @@ REPORTS = CAD_OUT / "reports"
 # log_stem is passed; cut_release.py folds these into the release bundle so a
 # release ships the logs that produced it. Gitignored (cad/out/logs/).
 LOGS = CAD_OUT / "logs"
+# Forensic artefacts a failing COM build step leaves behind: the saved copy of
+# the failing document, the BMP of the seat and capture.json
+# (``_common.capture_com_failure`` / ``OUT_FAILURES``). A farm worker's
+# workspace is DISPOSABLE, so the doit parent enumerates them on every failure
+# path: the manifest goes to the process the pool captures into the leaf's
+# ``task.log``, which is the one channel that always reaches the submitter.
+FAILURES = REPORTS / "failures"
+
+
+def _failure_artefacts() -> list[Path]:
+    return (
+        sorted(path for path in FAILURES.rglob("*") if path.is_file())
+        if FAILURES.is_dir()
+        else []
+    )
+
+
+def _fail_task(label: str, rc: int) -> None:
+    """Fail a task loud -- after publishing whatever forensics it left behind.
+
+    Always raises. The manifest (path, size, sha256 of each artefact) is emitted
+    from the doit PARENT, after the subprocess's own log has closed, so it lands
+    in the leaf log the pool uploads even when the child died too hard to report
+    anything itself. The digest is what lets the submitter verify the blob it
+    downloads is the artefact the worker wrote.
+
+    The seat's commit charge against the configured preflight budget goes out on
+    its own record whenever a seat is running. "It was not memory pressure" was a
+    hypothesis that had to be ruled out by hand on 2026-09-17 with no recorded
+    number to rule it out with; both values come from the live helpers
+    (:func:`_sw_commit_gb`, :func:`_sw_max_commit_gb`), never from a remembered
+    figure. No seat (an offline task, or off-Windows) means no record rather than
+    an "unknown GB" line on every pytest failure.
+    """
+    commit_gb = _sw_commit_gb()
+    if commit_gb is not None:
+        _telemetry.error(
+            f"[forensics] {label} failed (exit {rc}) with the seat at "
+            f"{commit_gb:.1f} GB of its {_sw_max_commit_gb():.1f} GB budget",
+            label=label,
+            exit_code=rc,
+            seat_commit_gb=round(commit_gb, 2),
+            seat_commit_budget_gb=_sw_max_commit_gb(),
+        )
+    artefacts = _failure_artefacts()
+    if artefacts:
+        _telemetry.error(
+            f"[forensics] {label}: {len(artefacts)} artefact(s) under "
+            f"{FAILURES} -- upload prefix 'failures/' beside the leaf log",
+            label=label,
+            exit_code=rc,
+            failure_dir=str(FAILURES),
+            artefacts=" ".join(
+                f"{path.relative_to(FAILURES).as_posix()}"
+                f":{path.stat().st_size}"
+                f":{hashlib.sha256(path.read_bytes()).hexdigest()[:16]}"
+                for path in artefacts
+            ),
+        )
+    raise RuntimeError(f"{label} failed (exit {rc})")
+
+
+def _failure_artefact_hint(log_blob: str | None) -> str:
+    """Where a farm leaf's forensic artefacts sit, derived from its log blob.
+
+    The pool uploads the leaf's console log to
+    ``<container>/leaf/<task>/<key>/<attempt>/task.log`` and its failure
+    artefacts to the ``failures/`` prefix BESIDE it, so the submitter needs no
+    extra protocol field to find them -- the log blob it already gets is the
+    anchor.
+    """
+    if not log_blob or "/" not in log_blob:
+        return "no leaf log blob was reported, so no failure artefacts either"
+    container, _, blob = log_blob.partition("/")
+    prefix = f"{blob.rsplit('/', 1)[0]}/failures/"
+    return (
+        f"forensics: az storage blob download-batch --source {container} "
+        f"--pattern '{prefix}*' --destination cad/out/reports/failures"
+    )
+
+
 VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify/preflight gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
@@ -1875,7 +1956,12 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
         raise RuntimeError(
             f"{label} failed on {result.worker_id} [{result.failure_category}] "
             f"exit {result.exit_code}: {result.failure_message} "
-            f"(log: {result.log_blob})"
+            f"(log: {result.log_blob}) -- "
+            # The worker's workspace is disposable, so a leaf's forensic
+            # artefacts (failing document, seat BMP, capture.json) only exist as
+            # blobs; name the command that fetches them, or the submitter has
+            # nothing but this one-line message to diagnose from.
+            f"{_failure_artefact_hint(result.log_blob)}"
         )
     with _telemetry.span(
         f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
@@ -2492,6 +2578,22 @@ def task_check():
         # dispatch. Mixing the two conventions returns a wrong answer that looks
         # like a clean result, so a comment alone decays into folklore.
         SCRIPTS_DIR / "test_out_param_binding.py",
+        # COM failure forensics: a null COM return must still raise its own
+        # message (forensics can never mask the failure), and every capture step
+        # must survive its own failure. Both are pure-Python contracts of
+        # _common.capture_com_failure, so they gate offline.
+        SCRIPTS_DIR / "test_failure_forensics.py",
+        # The 91247A720/99607A213 profile arithmetic: every endpoint that must
+        # coincide is EXACTLY equal (== on the float, not isclose), the profiles
+        # pair into the expected closed loops, and a 1-ULP-perturbed endpoint is
+        # rejected. Runs against the production geometry, not a reimplementation.
+        SCRIPTS_DIR / "test_logo_profile_closure.py",
+        # The seat-poisoning latch itself: a seat whose toggles start at the
+        # poisoned value must come out at the DECLARED baseline (never at the
+        # observed-previous value), and a nested suppression must not restore
+        # mid-draw. This is the test that would have caught the 2026-09-17
+        # mechanism.
+        SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
