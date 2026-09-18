@@ -9,12 +9,17 @@ window only WARNS, throttled -- per the 2026-07-18 decision that
 ``Responding == False`` is too noisy to kill on (SolidWorks legitimately stops
 pumping messages while resolving complex geometry). Also pins the heartbeat:
 spans and log records must advance ``_telemetry.last_activity()``, since the
-idle timeout is only as good as the instrumentation poking it.
+idle timeout is only as good as the instrumentation poking it. And the session
+contract ``run_build`` owes the NEXT leaf: the teardown leaves the seat holding
+no ``cad/out`` document AND no directory of this checkout (SolidWorks parks its
+own process current directory in the last directory it opened, which on a farm
+worker blocks the agent from removing the source root).
 """
 
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -332,6 +337,309 @@ def test_run_build_cleans_up_when_session_setup_fails(
     ]
     _common._watchdog.start.assert_called_once_with()
     _common._watchdog.stop.assert_called_once_with()
+
+
+def _seat(
+    start: str, *, moved: object = True
+) -> tuple[SimpleNamespace, SimpleNamespace]:
+    """A seat whose working directory is STATE, not a fixed answer sequence.
+
+    The seat is read more than once per session -- connect samples it for the
+    provenance attributes, teardown reads it before and after the re-point --
+    and a fake keyed to call ORDER silently mis-answers (and then raises
+    ``StopIteration``) the moment a caller adds a reading. So the fake owns a
+    directory and the setter moves it.
+
+    ``moved`` is what ``SetCurrentWorkingDirectory`` does: ``True`` accepts the
+    move, ``False`` refuses it, ``"ignored"`` answers True without moving --
+    the case that proves the readback, not the return value, is the evidence --
+    and ``"blank"`` answers True and leaves the seat unable to say where it is.
+    Each is a property of the SEAT, so it holds for every read, however many
+    readings a caller takes.
+    """
+
+    seat = SimpleNamespace(cwd=start)
+
+    def _set(target: str) -> object:
+        if moved is True:
+            seat.cwd = target
+        elif moved == "blank":
+            seat.cwd = ""
+        return True if moved in ("ignored", "blank") else moved
+
+    app = SimpleNamespace(
+        CloseAllDocuments=Mock(),
+        GetCurrentWorkingDirectory=Mock(side_effect=lambda: seat.cwd),
+        SetCurrentWorkingDirectory=Mock(side_effect=_set),
+    )
+    adapter = SimpleNamespace(
+        connect=AsyncMock(),
+        disconnect=AsyncMock(),
+        swApp=app,
+        _attempt=lambda call, default=None: call(),
+    )
+    return adapter, app
+
+
+def _session(
+    monkeypatch: pytest.MonkeyPatch, adapter: SimpleNamespace
+) -> SimpleNamespace:
+    """Run one clean ``run_build`` session; return its warnings and success fields."""
+
+    monkeypatch.setitem(
+        sys.modules,
+        "solidworks_mcp.adapters.pywin32_adapter",
+        SimpleNamespace(PyWin32Adapter=Mock(return_value=adapter)),
+    )
+    monkeypatch.setattr(_common._watchdog, "start", Mock())
+    monkeypatch.setattr(_common._watchdog, "stop", Mock())
+    monkeypatch.setattr(_common, "discard_open_documents", Mock())
+    monkeypatch.setattr(_common, "_resident_output_documents", lambda _adapter: [])
+    monkeypatch.setattr(_common, "_pin_default_part_template", Mock())
+    # Seat provenance is resolved once per PROCESS and cached in a module
+    # global, so one session's reading (or its failure) would otherwise leak
+    # into every later test in the same pytest run.
+    monkeypatch.setattr(_common, "_seat_identity", {})
+    monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
+    monkeypatch.setattr(sys, "argv", ["build_probe.py"])
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    session = SimpleNamespace(warnings=[], fields={})
+    monkeypatch.setattr(
+        _common._telemetry,
+        "warn",
+        lambda message, **_f: session.warnings.append(message),
+    )
+    monkeypatch.setattr(
+        _common._telemetry,
+        "success",
+        lambda _message, **fields: session.fields.update(fields),
+    )
+    assert _common.run_build(AsyncMock(return_value={})) == 0
+    return session
+
+
+def test_teardown_moves_the_seat_out_of_the_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # SolidWorks' own process current directory follows the documents it opens,
+    # and Windows will not remove a directory that is any process's cwd. On a
+    # farm worker this checkout is a source root the agent removes between
+    # leaves, so a seat left parked in cad/out fails an unrelated leaf's cleanup
+    # with WinError 32 (2026-09-18, swmaker000006). Closing documents does not
+    # release it: the cwd belongs to the process, not to a document.
+    # The helper's own answer, not tempfile.gettempdir(): on a worker whose
+    # TEMP sits under FARM_WORK_ROOT the two differ, and check:watchdog runs
+    # on workers. Hard-coding gettempdir() would fail for an environmental
+    # reason rather than a behavioural one.
+    temp = str(_common._seat_park_directory())
+    parked = str(_common.CAD_ROOT / "out" / "sldprt")
+    adapter, app = _seat(parked)
+
+    session = _session(monkeypatch, adapter)
+
+    assert session.warnings == []
+    app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
+    # Emitted under the same key the seat provenance samples at CONNECT, so one
+    # query reads both ends: where a leaf left the seat, and where the next leaf
+    # found it. A connect-time reading under the farm work root means some leaf
+    # skipped or failed this teardown.
+    assert session.fields["seat_working_directory"] == temp
+
+
+def test_a_seat_left_in_a_sibling_source_root_is_unparked_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A worker keeps several source roots, and the one that failed was pinned by
+    # a leaf OTHER than the running one (2026-09-18: the export leaf's root was
+    # fa07428b, the pinned root 6621e07a). A teardown that only left its own
+    # checkout would leave that root pinned until the seat died, so the seat is
+    # parked unconditionally.
+    temp = str(_common._seat_park_directory())
+    sibling = r"C:\harmonic\work\sources\6621e07aabfb412916eeae68\workspace\cad\out"
+    adapter, app = _seat(sibling)
+
+    assert _session(monkeypatch, adapter).warnings == []
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
+
+
+def test_a_seat_already_parked_there_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter, app = _seat(str(_common._seat_park_directory()))
+
+    assert _session(monkeypatch, adapter).warnings == []
+
+    app.SetCurrentWorkingDirectory.assert_not_called()
+
+
+def test_a_seat_that_refuses_to_move_warns_instead_of_failing_the_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Same standing as the teardown close: a directory this session cannot
+    # release is the NEXT leaf's hazard, not a failure of work already done.
+    adapter, _app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved=False)
+
+    warnings = _session(monkeypatch, adapter).warnings
+
+    assert [w for w in warnings if "seat working directory" in w]
+
+
+def test_a_move_the_seat_ignored_is_not_reported_as_released(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # SetCurrentWorkingDirectory answering True is not evidence: the readback is.
+    parked = str(_common.CAD_ROOT / "out" / "sldprt")
+    adapter, _app = _seat(parked, moved="ignored")
+
+    session = _session(monkeypatch, adapter)
+
+    assert [w for w in session.warnings if "did not move" in w]
+    assert "seat_working_directory" not in session.fields
+
+
+def test_an_unreadable_working_directory_is_not_papered_over() -> None:
+    app = SimpleNamespace(
+        GetCurrentWorkingDirectory=Mock(return_value=None),
+        SetCurrentWorkingDirectory=Mock(),
+    )
+    with pytest.raises(RuntimeError, match="unreadable"):
+        _common.release_seat_working_directory(app)
+    app.SetCurrentWorkingDirectory.assert_not_called()
+
+
+def test_an_empty_readback_from_the_park_directory_is_not_a_move(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # ``os.path.realpath("")`` is the PROCESS current directory, so an empty
+    # readback normalizes onto the park target itself whenever the helper runs
+    # from there -- and a seat that cannot say where it is would be reported as
+    # parked. Reachable off the farm: gettempdir() falls back to the process
+    # directory with TMPDIR/TEMP/TMP unusable, which makes target == cwd.
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    # The precondition that makes the hole reachable, asserted so this test
+    # cannot quietly stop exercising it.
+    assert _common._normal_path("") == _common._normal_path(
+        _common._seat_park_directory()
+    )
+    _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved="blank")
+
+    with pytest.raises(RuntimeError, match="unreadable after move"):
+        _common.release_seat_working_directory(app)
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(str(tmp_path))
+
+
+def test_an_empty_reading_before_the_move_is_not_already_parked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The BEFORE side of the same ``realpath("")`` hole, and the worse half:
+    # the after-side failure at least warns, while an empty reading accepted
+    # here normalizes onto the park target, returns None as "already there",
+    # and moves nothing -- no warning, no seat_working_directory row, and the
+    # seat still pinned in a disposable source root for the next leaf's
+    # cleanup to die on with nothing in the log naming the cause.
+    #
+    # Passing None would only exercise the ``type(before) is not str`` clause;
+    # this pins ``not before``, so deleting it fails here instead of silently
+    # skipping the move.
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    assert _common._normal_path("") == _common._normal_path(
+        _common._seat_park_directory()
+    )
+    _adapter, app = _seat("")
+
+    with pytest.raises(RuntimeError, match="unreadable"):
+        _common.release_seat_working_directory(app)
+
+    app.SetCurrentWorkingDirectory.assert_not_called()
+
+
+def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # tempfile.gettempdir() is not a constant: it takes TMPDIR/TEMP/TMP from
+    # the environment and, with none usable, falls back to the PROCESS CURRENT
+    # DIRECTORY -- which under the farm helper is the workspace being torn
+    # down. Parking there would make the whole re-point a silent no-op.
+    #
+    # The checkout is SYNTHESIZED rather than pointed at the real ``cad/out``,
+    # which is gitignored and carries no tracked file. On a fresh source root
+    # it does not exist, and ``_seat_park_directory`` skips a candidate that is
+    # not a directory BEFORE it asks whether the candidate is disposable -- so
+    # against the real path this passed for the wrong reason and could not
+    # distinguish the guard's presence from its absence. A farm source root IS
+    # a fresh extraction and check:watchdog runs there, so the fleet ran the
+    # vacuous variant. Same ``mkdir`` the sibling-root test below already does.
+    checkout = tmp_path / "workspace"
+    inside = checkout / "cad" / "out"
+    inside.mkdir(parents=True)
+    monkeypatch.setattr(_common, "CAD_ROOT", checkout / "cad")
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(inside))
+    # Without this the candidate is skipped as a non-directory and the
+    # disposable filter never runs at all.
+    assert inside.is_dir()
+
+    target = _common._seat_park_directory()
+
+    assert target.is_dir()
+    assert _common._normal_path(target) != _common._normal_path(inside)
+    assert (
+        _common._normal_path(checkout) not in _common._normal_path(target).parents
+    )
+    adapter, app = _seat(str(inside / "sldprt"))
+    assert _session(monkeypatch, adapter).warnings == []
+    app.SetCurrentWorkingDirectory.assert_called_once_with(str(target))
+
+
+def test_a_sibling_source_root_is_not_a_park_target_either(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A worker keeps several source roots under one work root and removes them
+    # with the same housekeeping, so "outside MY checkout" is not enough:
+    # parking in a sibling root just moves which leaf fails. FARM_WORK_ROOT is
+    # the worker's own name for that tree, and job_environment passes it on.
+    work_root = tmp_path / "harmonic" / "work"
+    mine = work_root / "sources" / "aaa" / "workspace"
+    sibling = work_root / "sources" / "bbb" / "workspace"
+    (mine / "cad").mkdir(parents=True)
+    sibling.mkdir(parents=True)
+    monkeypatch.setattr(_common, "CAD_ROOT", mine / "cad")
+    monkeypatch.setenv("FARM_WORK_ROOT", str(work_root))
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(sibling))
+
+    target = _common._normal_path(_common._seat_park_directory())
+
+    assert _common._normal_path(work_root) not in target.parents
+
+
+def test_a_close_that_fails_still_moves_the_seat_out_of_the_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # package_native's release: an exit that dies mid-teardown is exactly the
+    # one that leaves a seat parked in a disposable source root, so the
+    # re-point cannot sit behind a close that raises.
+    import package_native
+
+    # The state-based seat, not a ``side_effect`` list: an answer sequence
+    # keyed to call ORDER passes for the wrong reason the moment the
+    # implementation reorders or adds a read, and then fails as a
+    # ``StopIteration`` that ``_release_seat``'s ``except Exception`` turns
+    # into a warning -- surfacing as a confusing assert on the setter.
+    target = str(_common._seat_park_directory())
+    _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldasm"))
+    monkeypatch.setattr(
+        package_native,
+        "_discard_open_documents",
+        Mock(side_effect=RuntimeError("modal")),
+    )
+
+    with pytest.raises(RuntimeError, match="modal"):
+        package_native._release_seat(app)
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(target)
 
 
 def test_span_boundaries_poke_the_heartbeat() -> None:

@@ -33,6 +33,11 @@ The seat is left EMPTY on every exit path (``_release_seat``): a document still
 resident here share-locks its ``cad/out`` file past this COM session, and the NEXT
 task's remote-cache restore runs OUTSIDE the seat -- it would fail with
 ``PermissionError(13)`` (AGENTS.md, "the holder leaves the seat EMPTY").
+And the seat's own WORKING DIRECTORY is parked outside every checkout: Pack-and-Go
+opens documents from ``cad/out``, SolidWorks parks its process current directory
+in the directory it last opened, and Windows refuses to remove a directory that
+is any process's cwd -- which on a farm worker is how an unrelated leaf's source
+root cleanup fails with ``WinError 32``.
 
 Requires SolidWorks already open (3DEXPERIENCE Platform shortcut) and NOTHING
 else driving it -- single STA COM server.
@@ -50,7 +55,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from _common import CAD_ROOT, OUT_SLDASM, log
+from _common import CAD_ROOT, OUT_SLDASM, log, release_seat_working_directory
 from _drawing_registry import DRAWINGS
 
 import _telemetry
@@ -142,9 +147,27 @@ def _release_seat(sw: Any) -> None:
     Called on EVERY exit path: a document left resident here share-locks its
     ``cad/out`` file past this COM session, and the next task's remote-cache
     restore runs outside the seat.
+
+    Empty of DIRECTORIES too: Pack-and-Go opens documents from ``cad/out``, so
+    the seat's own current directory ends up inside this checkout -- which, on a
+    farm worker, is a source root the agent later removes. Warn-only, unlike the
+    close above: a `cwd` this session cannot move is the next leaf's hazard, and
+    failing a finished release over it would be worse than reporting it.
     """
-    _discard_open_documents(sw)
-    log("seat released: no document left open")
+    try:
+        _discard_open_documents(sw)
+        log("seat released: no document left open")
+    finally:
+        # In a ``finally``, so a close that RAISES still re-points: an exit that
+        # dies mid-teardown is exactly the one that leaves a seat parked in a
+        # source root, and the raising close propagates either way.
+        try:
+            left = release_seat_working_directory(sw)
+        except Exception as error:  # noqa: BLE001
+            _telemetry.warn(f"seat working directory re-point failed: {error}")
+        else:
+            if left is not None:
+                log(f"seat working directory moved to {left}")
 
 
 def attach_solidworks() -> tuple[Any, str]:
