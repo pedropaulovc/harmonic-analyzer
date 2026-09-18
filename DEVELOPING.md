@@ -3,6 +3,12 @@
 Practical, machine-local development notes that don't belong in `AGENTS.md`
 (orientation) or the per-topic policy docs. Right now: the remote build cache.
 
+Running ONE SolidWorks operation by hand (this checkout has no local seat, so it
+goes to the farm)? Read
+[`cad/docs/one-off-com-operations.md`](cad/docs/one-off-com-operations.md) first
+— it is the decision tree, the seat/cache invariants and the evidence trail for
+an ad-hoc COM operation, and it links back here for cache detail.
+
 ## Remote build-artifact cache
 
 Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,
