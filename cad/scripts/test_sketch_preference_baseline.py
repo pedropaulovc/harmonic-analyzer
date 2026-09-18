@@ -92,6 +92,12 @@ class _Adapter:
     def __init__(self, initial: dict[int, bool]) -> None:
         self.swApp = _SwApp(initial)
 
+    def _attempt(self, thunk, default=None):
+        try:
+            return thunk()
+        except Exception:
+            return default
+
 
 def _ids() -> list[int]:
     return [toggle for toggle, _ in diag.SEAT_SKETCH_BASELINE.values()]
@@ -415,3 +421,55 @@ def test_an_unreadable_check_result_is_unknown_not_failure(
 
     assert len(warnings) == 1
     assert evidence == "points=9, check=unreadable"
+
+
+def test_the_snap_family_is_recorded_and_never_written(monkeypatch) -> None:
+    """The evidence the failing leaf did not have -- and it must stay read-only.
+
+    The 2026-09-17 log contains no record of any seat preference, which is why
+    the failure could only be diagnosed by argument.  Two of these govern the
+    competitor that most plausibly broke the logo ring: CenterPoints (the inner
+    triangle's vertices ARE the outer corner arcs' centres, so every outer arc
+    endpoint has a snap competitor at exactly 0.400 mm) and Nearest (an
+    effectively unbounded screen-space radius).  Writing them is NOT the fix --
+    ``swSketchInference`` is the family's master switch and the drawing state
+    already forces it off -- so a write here would be restore surface for no
+    gain.
+    """
+    logged: list[str] = []
+    monkeypatch.setattr(diag._telemetry, "info", logged.append)
+    adapter = _Adapter(dict.fromkeys(diag.SKETCH_SNAP_AUDIT.values(), True))
+
+    state = diag.audit_sketch_snaps(adapter, "91247A720")
+
+    assert state == dict.fromkeys(diag.SKETCH_SNAP_AUDIT, True)
+    assert adapter.swApp.writes == []
+    assert "CenterPoints=True" in logged[0] and "Nearest=True" in logged[0]
+
+
+def test_a_snap_member_this_build_does_not_expose_reads_as_unknown(
+    monkeypatch,
+) -> None:
+    """A refused read must be None, not a crash and not a silent False.
+
+    False would read as "that snap is off", which is the opposite of unknown.
+    """
+    monkeypatch.setattr(diag._telemetry, "info", lambda _msg: None)
+    ids = dict.fromkeys(diag.SKETCH_SNAP_AUDIT.values(), True)
+    del ids[diag.SKETCH_SNAP_AUDIT["swSketchSnapsNearest"]]
+
+    state = diag.audit_sketch_snaps(_Adapter(ids), "91247A720")
+
+    assert state["swSketchSnapsNearest"] is None
+    assert state["swSketchSnapsCenterPoints"] is True
+
+
+def test_the_snap_audit_ids_do_not_collide_with_the_asserted_toggles() -> None:
+    """Audit-only and applied sets must stay disjoint.
+
+    An id in both would be written by ``apply_sketch_preferences`` while
+    claiming to be read-only.
+    """
+    applied = {toggle for toggle, _ in diag.SEAT_SKETCH_BASELINE.values()}
+    assert applied.isdisjoint(diag.SKETCH_SNAP_AUDIT.values())
+    assert len(set(diag.SKETCH_SNAP_AUDIT.values())) == len(diag.SKETCH_SNAP_AUDIT)

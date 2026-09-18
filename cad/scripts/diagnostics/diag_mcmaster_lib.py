@@ -190,6 +190,64 @@ SEAT_SKETCH_BASELINE: dict[str, tuple[int, bool]] = {
     "swSketchInference": (_SW_SKETCH_INFERENCE, True),
 }
 
+# The snap family, RECORDED and never written.
+#
+# ids read off this install's ``swconst.tlb`` (SOLIDWORKS 3DEXPERIENCE R2026x,
+# ``swUserPreferenceToggle_e``), the same walk that confirms 9/95/249 above.
+#
+# These are not asserted, for two reasons.  They are ON by default, so "on" is
+# not drift; and :data:`SKETCH_DRAWING_STATE` turns off ``swSketchInference``,
+# which SOLIDWORKS documents as "Enable snapping" -- the master switch for the
+# whole family -- so a recipe that draws under the guard is already immune to
+# every one of them.  Authoring straight to the sketch database
+# (:func:`draw_closed_profile`) has no snap stage at all.
+#
+# They are recorded because the failing 2026-09-17 leaf's log contains NO
+# record of any of them, and two govern the specific competitor that most
+# plausibly broke the logo ring: ``swSketchSnapsCenterPoints`` (the inner
+# triangle's vertices sit exactly ON the outer corner arcs' centres, so every
+# outer arc endpoint has a snap competitor at exactly 0.400 mm) and
+# ``swSketchSnapsNearest``, documented as "your pointer does not need to be in
+# the immediate vicinity of another sketch entity to show inference or snap to
+# that point" -- i.e. an effectively unbounded screen-space snap radius.  One
+# line per leaf costs nothing and makes the next failure diagnosable.
+SKETCH_SNAP_AUDIT: dict[str, int] = {
+    "swSketchSnapsPoints": 266,
+    "swSketchSnapsCenterPoints": 267,
+    "swSketchSnapsMidPoints": 268,
+    "swSketchSnapsQuadrantPoints": 269,
+    "swSketchSnapsIntersections": 270,
+    "swSketchSnapsNearest": 271,
+    "swSketchSnapsTangent": 272,
+    "swSketchSnapsPerpendicular": 273,
+    "swSketchSnapsParallel": 274,
+    "swSketchSnapsHVLines": 275,
+    "swSketchSnapsHVPoints": 276,
+    "swSketchSnapsLength": 277,
+    "swSketchSnapsGrid": 278,
+    "swSketchSnapsAngle": 280,
+}
+
+
+def audit_sketch_snaps(adapter, label: str) -> dict[str, bool | None]:
+    """Record the seat's snap family.  Reads only -- never writes, never raises.
+
+    ``None`` for a member this build does not expose.  The return is the
+    evidence the 2026-09-17 leaf did not have.
+    """
+    app = adapter.swApp
+    state: dict[str, bool | None] = {}
+    for name, toggle in SKETCH_SNAP_AUDIT.items():
+        raw = adapter._attempt(
+            lambda toggle=toggle: app.GetUserPreferenceToggle(toggle), default=None
+        )
+        state[name] = None if raw is None else bool(raw)
+    _telemetry.info(
+        f"{label}: sketch snaps "
+        + ", ".join(f"{n[len('swSketchSnaps'):]}={v}" for n, v in state.items())
+    )
+    return state
+
 
 def apply_sketch_preferences(
     adapter, state: dict[str, tuple[int, bool]]
@@ -219,6 +277,10 @@ def assert_seat_sketch_baseline(adapter, label: str) -> list[str]:
     application state and a seat poisoned by an earlier crashed leaf is
     repaired by the next one.  Drift is warned about by name: it is evidence a
     previous leaf on this seat did not unwind.
+
+    The snap family is RECORDED at the same time (:func:`audit_sketch_snaps`),
+    because the leaf that failed on 2026-09-17 logged nothing about any seat
+    preference and so could only be diagnosed by argument.
     """
     drifted = apply_sketch_preferences(adapter, SEAT_SKETCH_BASELINE)
     if drifted:
@@ -227,6 +289,7 @@ def assert_seat_sketch_baseline(adapter, label: str) -> list[str]:
             f"reset: {', '.join(drifted)} (a previous leaf on this seat did not "
             "unwind its suppression block)"
         )
+    audit_sketch_snaps(adapter, label)
     return drifted
 
 
