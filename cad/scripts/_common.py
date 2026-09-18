@@ -3068,18 +3068,30 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
 
     A failure-only capture cannot answer "what was different about the run that
     worked?", which is the question that actually identifies a seat-state cause.
-    So the same three state bags a failure captures -- the screen-space geometry,
+    So the same state bags a failure captures -- the screen-space geometry,
     ``ISketchManager``'s sticky session state, and the sketch-authoring
     preferences -- are recorded once per part build, on the success path, as a
     span event plus one INFO record carrying the whole snapshot as JSON.
+
+    EVERY probe is guarded individually, because this runs on the path where
+    nothing is wrong: ``save_part_and_images`` calls it before ``save_file``, and
+    these probes reach ``_early_bound`` (raises when no generated wrapper binds)
+    and raw ``user32`` calls. A diagnostic that fails a good part export is worse
+    than no diagnostic, so a bag that cannot be read is recorded as its own error
+    string and the build continues.
     """
-    context = {
-        "label": label,
-        "seat": seat_provenance(adapter),
-        "display": display_geometry(adapter),
-        "sketch_manager": sketch_manager_state(adapter),
-        "preferences": sketch_authoring_preferences(adapter),
+    bags: dict[str, Callable[[], Any]] = {
+        "seat": lambda: seat_provenance(adapter),
+        "display": lambda: display_geometry(adapter),
+        "sketch_manager": lambda: sketch_manager_state(adapter),
+        "preferences": lambda: sketch_authoring_preferences(adapter),
     }
+    context: dict[str, Any] = {"label": label}
+    for name, probe in bags.items():
+        try:
+            context[name] = probe()
+        except Exception as exc:  # noqa: BLE001 - see above: never fail a good build
+            context[name] = {"capture_error": f"{type(exc).__name__}: {exc}"}
     display = context["display"]
     summary = (
         f"authoring {label}: px/mm={display.get('px_per_mm', 'unknown')} "
@@ -3094,7 +3106,7 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
         _telemetry.event(
             "seat.authoring_context",
             label=label,
-            **{key: _scalar(value) for key, value in display.items()},
+            **_attributes_of(display),
         )
         _telemetry.info(summary, label=label, authoring=json.dumps(context, default=str))
     return context

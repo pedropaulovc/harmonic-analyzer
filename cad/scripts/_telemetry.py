@@ -1090,7 +1090,13 @@ def _use_utc_in_loguru() -> None:
                 "{time:YYYY-MM-DDTHH:mm:ss.SSS!UTC}Z | {level: <8} | "
                 "{name}:{function}:{line} - {message}"
             ),
-            level=os.environ.get("HARMONIC_LOGURU_LEVEL", "INFO"),
+            # dodo already sets LOGURU_LEVEL in every COM child from
+            # HARMONIC_VERBOSITY (warning by default), and loguru's own default
+            # sink honoured it. Re-registering the sink must not quietly restore
+            # connector INFO chatter to a warning-only leaf log, so the
+            # established variable is what governs; the level is normalised
+            # because loguru rejects a lowercase name.
+            level=(os.environ.get("LOGURU_LEVEL") or "INFO").strip().upper(),
         )
 
 

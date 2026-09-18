@@ -622,9 +622,10 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     it, output is inherited straight to the terminal -- the cheap path for the
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
+    started = time.time()
     rc = _run_subprocess(cmd, label, log_stem)
     if rc:
-        _fail_task(label, rc)
+        _fail_task(label, rc, started=started)
 
 
 _EXTERNAL_LOG_LEVELS = {
@@ -877,12 +878,16 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     backoff = _com_retry_backoff()
     last = len(backoff)
     for attempt in range(last + 1):
+        # Per ATTEMPT, not per task: a retry that fails must name its own
+        # capture, not the previous attempt's (they differ by exactly the seat
+        # state this evidence exists to compare).
+        started = time.time()
         rc = _run_subprocess(cmd, label, log_stem)
         if rc == 0:
             return
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
         if not sw_broke or attempt == last:
-            _fail_task(label, rc)
+            _fail_task(label, rc, started=started)
         delay = backoff[attempt]
         _telemetry.warn(
             f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
@@ -1050,15 +1055,34 @@ LOGS = CAD_OUT / "logs"
 FAILURES = REPORTS / "failures"
 
 
-def _failure_artefacts() -> list[Path]:
-    return (
-        sorted(path for path in FAILURES.rglob("*") if path.is_file())
-        if FAILURES.is_dir()
-        else []
+def _failure_artefacts(since: float) -> list[Path]:
+    """Artefacts THIS attempt wrote, newest-first by path.
+
+    Scoped by mtime rather than by listing the whole tree: a local run keeps
+    ``cad/out/reports/failures/`` across invocations (it is not a declared target,
+    so no task's ``clean`` removes it), and a manifest that also names last
+    week's captures sends the reader to the wrong evidence.
+    """
+    if not FAILURES.is_dir():
+        return []
+    return sorted(
+        path
+        for path in FAILURES.rglob("*")
+        if path.is_file() and path.stat().st_mtime >= since
     )
 
 
-def _fail_task(label: str, rc: int) -> None:
+def _artefact_digest(path: Path) -> str:
+    """SHA-256 of an artefact, read in chunks: a saved SLDPRT is tens of MB and
+    this runs on the failure path, where the process is already in trouble."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _fail_task(label: str, rc: int, *, started: float) -> None:
     """Fail a task loud -- after publishing whatever forensics it left behind.
 
     Always raises. The manifest (path, size, sha256 of each artefact) is emitted
@@ -1073,7 +1097,8 @@ def _fail_task(label: str, rc: int) -> None:
     number to rule it out with; both values come from the live helpers
     (:func:`_sw_commit_gb`, :func:`_sw_max_commit_gb`), never from a remembered
     figure. No seat (an offline task, or off-Windows) means no record rather than
-    an "unknown GB" line on every pytest failure.
+    an "unknown GB" line on every pytest failure. ``started`` bounds the manifest
+    to the artefacts THIS attempt wrote (see :func:`_failure_artefacts`).
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
@@ -1085,7 +1110,7 @@ def _fail_task(label: str, rc: int) -> None:
             seat_commit_gb=round(commit_gb, 2),
             seat_commit_budget_gb=_sw_max_commit_gb(),
         )
-    artefacts = _failure_artefacts()
+    artefacts = _failure_artefacts(started)
     if artefacts:
         _telemetry.error(
             f"[forensics] {label}: {len(artefacts)} artefact(s) under "
@@ -1096,7 +1121,7 @@ def _fail_task(label: str, rc: int) -> None:
             artefacts=" ".join(
                 f"{path.relative_to(FAILURES).as_posix()}"
                 f":{path.stat().st_size}"
-                f":{hashlib.sha256(path.read_bytes()).hexdigest()[:16]}"
+                f":{_artefact_digest(path)[:16]}"
                 for path in artefacts
             ),
         )

@@ -1113,5 +1113,28 @@ def test_the_anchor_banner_is_printed_once_per_process(monkeypatch):
     assert stream.stream.getvalue().count("log anchor") == 1
 
 
+def test_success_path_context_never_fails_a_good_build(tmp_path, monkeypatch):
+    """The forensics' own worst failure mode: aborting a build that WORKED.
+
+    record_authoring_context runs before save_file on every part, and its probes
+    reach _early_bound (which raises when no generated wrapper binds) and raw
+    user32 calls. A diagnostic that fails a good part export is worse than no
+    diagnostic, so each bag records its own error and the part still saves.
+    """
+
+    def explode(_adapter):
+        raise RuntimeError("no IModelView wrapper bound")
+
+    monkeypatch.setattr(_common, "display_geometry", explode)
+    monkeypatch.setattr(_common, "sketch_authoring_preferences", explode)
+
+    context = _common.record_authoring_context(_unmerged_profile(tmp_path), "logo")
+
+    assert "no IModelView wrapper bound" in context["display"]["capture_error"]
+    assert "no IModelView wrapper bound" in context["preferences"]["capture_error"]
+    # The bags that CAN be read are still read: a broken probe is not a blackout.
+    assert context["sketch_manager"]["AddToDB"] is True
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-q"]))
