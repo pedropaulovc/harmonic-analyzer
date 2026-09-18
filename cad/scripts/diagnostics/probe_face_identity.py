@@ -6,36 +6,60 @@ The 91247A720 / 99607A213 rewrites changed how the profiles are authored
 SOLID moves -- volume, surface area, centre of mass, face count and, for parts
 at or under ``FACE_MULTISET_LIMIT`` faces, the exact sorted face-area multiset,
 all against the vendor ground truth.  What that gate cannot see is a solid that
-is geometrically identical while its FACES are different faces: same areas,
-same boxes, different persistent references.  Downstream work that resolves a
-face and remembers it -- a stored annotation attachment, a mate, a face-level
-appearance -- would then attach to nothing, and would surface days later as a
-drawing or assembly defect rather than as a build failure.
+is geometrically identical while its FACES are different faces.  Downstream
+work that resolves a face and remembers it -- a stored annotation attachment,
+a mate, a face-level appearance -- would then attach to nothing, and would
+surface days later as a drawing or assembly defect rather than as a build
+failure.
 
-This probe reduces that question to a diff.  Capture a census from each saved
-replica and compare them::
+That question has two halves, and they are deliberately not mixed:
 
-    # No seat.  Pure comparison of two captured censuses.
+* **Geometry** -- are the faces the same size, in the same place, of the same
+  surface type?  Offline, from two captured censuses.
+* **Identity** -- does a reference STORED against the old part still resolve,
+  in the new part, to the face it was taken from?  This one cannot be answered
+  by comparing stored bytes.  ``GetPersistReference3`` documents its own
+  representation as unstable: "The internal representations of the return
+  value array may change, possibly from rebuild to rebuild ... but their usage
+  in finding the correct entity will be consistent across rebuilds."  So
+  equal bytes are not proof and differing bytes are not a defect; the only
+  honest test is to feed the stored reference back through
+  ``GetObjectByPersistReference3`` against the new part and see what comes
+  out.  That needs a seat and the two parts, so it is its own mode.
+
+Three modes::
+
+    # Needs the COM seat.  Read-only: OPENS a saved replica and reads it; it
+    # does not rebuild anything and it does not run doit.
+    uv run python cad/scripts/diagnostics/probe_face_identity.py \
+        --capture cad/out/reference/91247A720-replica.SLDPRT \
+        --output cad/out/reports/91247A720-faces-before.json
+
+    # No seat.  Geometry equivalence of two captures.
     uv run python cad/scripts/diagnostics/probe_face_identity.py \
         --diff before.json after.json
 
-    # Needs the COM seat.  Read-only: it OPENS a saved replica and reads it,
-    # it does not rebuild anything and it does not run doit.
+    # Needs the COM seat.  Replays every reference captured from the old part
+    # against the new one and writes the verdict rows next to the answer.
     uv run python cad/scripts/diagnostics/probe_face_identity.py \
-        --capture cad/out/reference/91247A720-replica.SLDPRT \
-        --output cad/out/reports/91247A720-faces-after.json
+        --resolve before.json --into cad/out/reference/91247A720-replica.SLDPRT \
+        --output cad/out/reports/91247A720-resolve.json
+
+    # No seat.  Re-read verdict rows captured earlier.
+    uv run python cad/scripts/diagnostics/probe_face_identity.py \
+        --verdicts cad/out/reports/91247A720-resolve.json
 
 The "before" census does not require building the old code: any replica saved
 by a pre-change build is a valid subject, including one already published by a
 release build.
 
-Exit code 1 and one line per difference if the two censuses disagree.
+Exit code 1 and one line per difference.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
+import base64
 import json
 from pathlib import Path
 import sys
@@ -49,12 +73,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 AREA_TOL_MM2 = 1e-4
 BOX_TOL_MM = 1e-6
 
+# swPersistReferencedObjectStates_e, a BITMASK: 0 is the only healthy answer.
+PERSIST_STATES = {1: "invalid", 2: "suppressed", 4: "deleted"}
+
 
 def face_key(face: dict) -> tuple:
     """Canonical order for faces: geometry only, never the stored reference.
 
-    Ordering by the persistent reference would make a renumbering look like a
-    reordering and hide exactly what this probe is for.
+    Ordering by the reference would be ordering by bytes SOLIDWORKS is free to
+    renumber, which is noise, and it would hide the geometry it is meant to
+    line up.
     """
     return (
         round(float(face["area_mm2"]), 6),
@@ -124,15 +152,15 @@ def _pair(left: list[dict], right: list[dict], same, exact) -> tuple[list, list,
     carries three identical raised grade marks and a great many identical
     fillet faces, so ties are the rule here, not an edge case: sorted
     position among equals is enumeration order, which is not a contract, so
-    the comparison would pair one mark's face against another's and report a
-    renumbering that never happened.  And a tolerated difference that crosses
-    a rounding boundary reverses the sort, which mispairs everything after
-    it.
+    the comparison would pair one mark's face against another's.  And a
+    tolerated difference that crosses a rounding boundary reverses the sort,
+    which mispairs everything after it.
 
-    The exact pass is what makes ties behave: among geometrically
-    indistinguishable candidates it takes the one whose reference also
-    matches, so an identity difference is reported only when the multiset of
-    references really changed.
+    ``exact`` only DISAMBIGUATES ties -- among candidates that are already
+    geometrically indistinguishable it prefers the one whose stored reference
+    also matches.  It never produces a verdict on its own, because reference
+    bytes are allowed to change from rebuild to rebuild; the worst a wrong
+    guess here can do is pair one identical face with another identical one.
     """
     unclaimed = list(range(len(right)))
     pairs: list[tuple[dict, dict]] = []
@@ -165,25 +193,13 @@ def _describe(face: dict) -> str:
 def _diff_faces(
     label: str, before: list[dict], after: list[dict], tolerances: dict
 ) -> list[str]:
-    problems: list[str] = []
-    pairs, lost, gained = _pair(
+    _pairs, lost, gained = _pair(
         before,
         after,
         lambda a, b: _same_face(a, b, **tolerances),
         lambda a, b: bool(a.get("persist")) and a.get("persist") == b.get("persist"),
     )
-    for face_a, face_b in pairs:
-        if not face_a.get("persist") or not face_b.get("persist"):
-            problems.append(
-                f"identity: {label} face ({_describe(face_a)}) has no persistent "
-                "reference in one of the censuses -- nothing was compared for it"
-            )
-        elif face_a["persist"] != face_b["persist"]:
-            problems.append(
-                f"identity: {label} face ({_describe(face_a)}) is the same face "
-                "geometrically but its persistent reference changed "
-                f"({face_a['persist']} -> {face_b['persist']})"
-            )
+    problems: list[str] = []
     # Leftovers in equal number are the same face reported twice, so they are
     # paired up to say HOW it moved; that is the diagnosis worth having.
     if len(lost) == len(gained):
@@ -226,18 +242,15 @@ def diff_census(
     area_tol_mm2: float = AREA_TOL_MM2,
     box_tol_mm: float = BOX_TOL_MM,
 ) -> list[str]:
-    """Every difference between two censuses, as one line each.
+    """Every GEOMETRY difference between two censuses, as one line each.
 
-    Two KINDS of difference, deliberately worded apart:
+    This answers "is it the same solid, face for face" and nothing more.  It
+    deliberately does NOT compare stored references: ``GetPersistReference3``
+    may renumber them from one rebuild to the next, so a byte difference here
+    would be a false alarm and byte equality would be a false reassurance.
+    Identity is ``diff_resolution``'s question, and answering it needs a seat.
 
-    * ``geometry`` -- a face moved, changed size, or stopped existing.  The
-      solid is not the same solid, which the vendor gate in
-      ``gate_and_save`` would also have failed.
-    * ``identity`` -- the geometry matches face for face but a persistent
-      reference changed.  Nothing in a build notices, and nothing in this repo
-      consumes it today; a stored downstream reference would.
-
-    Bodies and faces are matched by GEOMETRY within the tolerances, never by
+    Bodies and faces are matched by geometry within the tolerances, never by
     position in either census: SolidWorks does not promise an enumeration
     order, and this part has identical bodies and identical faces.
     """
@@ -280,6 +293,77 @@ def diff_census(
     return problems
 
 
+def _state_names(state: int) -> str:
+    named = [name for bit, name in PERSIST_STATES.items() if state & bit]
+    return ", ".join(named) or f"state {state}"
+
+
+def diff_resolution(
+    rows: list[dict],
+    *,
+    area_tol_mm2: float = AREA_TOL_MM2,
+    box_tol_mm: float = BOX_TOL_MM,
+) -> list[str]:
+    """Verdicts for references captured from the old part, replayed on the new.
+
+    Each row is one face of the OLD part: the geometry it had, the state
+    ``GetObjectByPersistReference3`` returned for its stored reference against
+    the NEW part, and the geometry of whatever came back.  This is the check
+    that matters, because it is what a stored downstream reference does: not
+    "are the bytes the same" but "does my saved handle still find my face".
+
+    An empty result means every stored reference still resolves to the face it
+    was taken from.  A row with no state at all is refused rather than
+    ignored: a resolve pass that failed to record its outcome has proven
+    nothing, and reading it as a pass is how a probe becomes decoration.
+    """
+    tolerances = {"area_tol_mm2": area_tol_mm2, "box_tol_mm": box_tol_mm}
+    problems: list[str] = []
+    for index, row in enumerate(rows):
+        stored = row.get("stored") or {}
+        label = f"face {index} ({_describe(stored)})" if stored else f"face {index}"
+        state = row.get("state")
+        if not isinstance(state, int):
+            problems.append(
+                f"identity: {label} has no recorded resolution state -- this row "
+                "proves nothing either way"
+            )
+            continue
+        if state != 0:
+            problems.append(
+                f"identity: {label} no longer resolves: {_state_names(state)}"
+            )
+            continue
+        resolved = row.get("resolved")
+        if not resolved:
+            problems.append(
+                f"identity: {label} reported a healthy state but resolved to no "
+                "object at all"
+            )
+            continue
+        if not _same_face(stored, resolved, **tolerances):
+            problems.append(
+                f"identity: {label} still resolves, but to a DIFFERENT face "
+                f"({_describe(resolved)}) -- a stored reference would now point "
+                "at the wrong geometry"
+            )
+    return problems
+
+
+def _persist_encode(reference) -> str:
+    """The FULL reference, base64.  Never a digest.
+
+    A digest cannot be fed back to ``GetObjectByPersistReference3``, which is
+    the only thing that can actually answer the identity question.  The bytes
+    arrive as an array of small ints that may be signed, hence the mask.
+    """
+    return base64.b64encode(bytes((int(v) & 0xFF) for v in reference)).decode("ascii")
+
+
+def _persist_decode(encoded: str) -> list[int]:
+    return list(base64.b64decode(encoded.encode("ascii")))
+
+
 def _box_mm(owner, member: str, what: str) -> list[float]:
     """A six-corner box in millimetres, or a refusal.
 
@@ -293,6 +377,17 @@ def _box_mm(owner, member: str, what: str) -> list[float]:
     if len(box) != 6:
         raise RuntimeError(f"{member} returned {len(box)} corners for {what}, not 6")
     return box
+
+
+def _face_geometry(face, what: str) -> dict:
+    from _common import _read_member
+
+    surface = _read_member(face, "GetSurface")
+    return {
+        "area_mm2": round(float(_read_member(face, "GetArea")) * 1e6, 6),
+        "box_mm": _box_mm(face, "GetBox", what),
+        "surface": int(_read_member(surface, "Identity") or -1) if surface else -1,
+    }
 
 
 async def capture_census(adapter, part_path: Path) -> dict:
@@ -310,26 +405,14 @@ async def capture_census(adapter, part_path: Path) -> dict:
         for face_index, raw_face in enumerate(body.GetFaces() or ()):
             what = f"body {body_index} face {face_index} of {part_path.name}"
             face = _early_bound(raw_face, "IFace2")
-            surface = _read_member(face, "GetSurface")
-            # GetPersistReference3 is the handle a saved downstream reference
-            # actually stores.  Opaque bytes, and its LENGTH is informative
-            # too, so it is hashed whole rather than truncated.  A missing one
-            # is refused rather than hashed: sha256(b"") on both sides would
-            # read as "same reference" and turn this probe into decoration.
+            # A missing reference is refused rather than stored empty: an
+            # empty one cannot be replayed, and two empty ones would compare
+            # equal, which is how a probe turns into decoration.
             reference = extension.GetPersistReference3(raw_face)
             if not reference:
                 raise RuntimeError(f"GetPersistReference3 returned nothing for {what}")
             faces.append(
-                {
-                    "area_mm2": round(float(_read_member(face, "GetArea")) * 1e6, 6),
-                    "box_mm": _box_mm(face, "GetBox", what),
-                    "surface": (
-                        int(_read_member(surface, "Identity") or -1) if surface else -1
-                    ),
-                    "persist": hashlib.sha256(bytes(bytearray(reference))).hexdigest()[
-                        :16
-                    ],
-                }
+                {**_face_geometry(face, what), "persist": _persist_encode(reference)}
             )
         if not faces:
             raise RuntimeError(
@@ -350,30 +433,80 @@ async def capture_census(adapter, part_path: Path) -> dict:
     return {"part": part_path.name, "bodies": bodies}
 
 
-def _capture(part_path: Path, output: Path) -> int:
+async def resolve_census(adapter, census: dict, part_path: Path) -> list[dict]:
+    """Replay every reference captured from the old part against ``part_path``.
+
+    One row per stored face, in canonical order, recording the state
+    ``GetObjectByPersistReference3`` returned and the geometry of whatever
+    came back.  ``diff_resolution`` turns the rows into verdicts; keeping the
+    rows means the evidence survives the run.
+    """
+    from _common import _early_bound, _read_member, check
+
+    check(f"open {part_path.name}", await adapter.open_model(str(part_path)))
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(_read_member(model, "Extension"), "IModelDocExtension")
+    rows: list[dict] = []
+    for body in canonical(census):
+        for face in body["faces"]:
+            row: dict = {"stored": face, "body": body.get("name")}
+            # The out parameter comes back as the second element of a tuple
+            # under pywin32; anything else is recorded as-is rather than
+            # guessed at, so an unexpected shape reads as "proves nothing".
+            answer = extension.GetObjectByPersistReference3(
+                _persist_decode(face["persist"])
+            )
+            if isinstance(answer, (tuple, list)) and len(answer) == 2:
+                obj, state = answer
+                row["state"] = int(state)
+                if obj is not None:
+                    row["resolved"] = _face_geometry(
+                        _early_bound(obj, "IFace2"), f"resolved {_describe(face)}"
+                    )
+            else:
+                row["answer_shape"] = repr(type(answer))
+            rows.append(row)
+    return rows
+
+
+def _seat(label: str, work) -> int:
+    """Run ``work(adapter)`` under the single-seat lock and the build watchdog."""
     import dodo
     from _common import discard_open_documents, run_build
 
     async def build(adapter):
         try:
-            census = await capture_census(adapter, part_path)
+            return await work(adapter)
         finally:
             # A replica left resident holds a document lock, and the next leaf
             # to open the same part on this seat would fail on it.
             discard_open_documents(adapter)
             adapter.currentModel = None
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(census, indent=2), encoding="utf-8")
-        return {"census": str(output)}
 
-    with dodo._com_seat(f"face-identity-{part_path.stem}"):
+    with dodo._com_seat(label):
         return run_build(build)
+
+
+def _write(output: Path, payload) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _report(problems: list[str], clean: str) -> int:
+    for problem in problems:
+        print(problem)
+    if not problems:
+        print(clean)
+    return 1 if problems else 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--capture", type=Path, help="saved part to census")
-    parser.add_argument("--output", type=Path, help="where to write the census")
+    parser.add_argument("--resolve", type=Path, help="census whose refs to replay")
+    parser.add_argument("--into", type=Path, help="part to replay them against")
+    parser.add_argument("--verdicts", type=Path, help="resolve rows to re-read")
+    parser.add_argument("--output", type=Path, help="where to write the JSON")
     parser.add_argument(
         "--diff", type=Path, nargs=2, metavar=("BEFORE", "AFTER"), help="compare"
     )
@@ -382,17 +515,44 @@ def main() -> int:
         before, after = (
             json.loads(path.read_text(encoding="utf-8")) for path in args.diff
         )
-        problems = diff_census(before, after)
-        for problem in problems:
-            print(problem)
-        if not problems:
-            print(f"{len(canonical(after))} bodies: same faces, same references")
-        return 1 if problems else 0
+        return _report(
+            diff_census(before, after),
+            f"{len(canonical(after))} bodies: same geometry, face for face",
+        )
+    if args.verdicts:
+        rows = json.loads(args.verdicts.read_text(encoding="utf-8"))
+        return _report(
+            diff_resolution(rows),
+            f"{len(rows)} stored references all resolve to their own face",
+        )
     if args.capture:
         if not args.output:
             parser.error("--capture needs --output")
-        return _capture(args.capture, args.output)
-    parser.error("pass --capture or --diff")
+        part, output = args.capture, args.output
+
+        async def capture(adapter):
+            _write(output, await capture_census(adapter, part))
+            return {"census": str(output)}
+
+        return _seat(f"face-identity-{part.stem}", capture)
+    if args.resolve:
+        if not args.into or not args.output:
+            parser.error("--resolve needs --into and --output")
+        census = json.loads(args.resolve.read_text(encoding="utf-8"))
+        part, output = args.into, args.output
+
+        async def replay(adapter):
+            rows = await resolve_census(adapter, census, part)
+            _write(output, rows)
+            problems = diff_resolution(rows)
+            for problem in problems:
+                print(problem)
+            if problems:
+                raise RuntimeError(f"{len(problems)} stored references did not survive")
+            return {"resolved": str(output)}
+
+        return _seat(f"face-resolve-{part.stem}", replay)
+    parser.error("pass --capture, --diff, --resolve or --verdicts")
     return 2
 
 
