@@ -3921,10 +3921,19 @@ def run_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
                     # cad/out makes an unrelated leaf's cleanup fail with
                     # WinError 32 (see release_seat_working_directory). Same
                     # warn-only reasoning as the close above.
+                    #
+                    # The readback is emitted under the same
+                    # ``seat_working_directory`` key ``_telemetry``'s seat
+                    # provenance uses, which samples at CONNECT: one query then
+                    # reads both ends -- where a leaf left the seat, and where
+                    # the next leaf found it.
                     try:
                         left = release_seat_working_directory(adapter.swApp)
                         if left is not None:
-                            _telemetry.success(f"seat working directory moved to {left}")
+                            _telemetry.success(
+                                f"seat working directory moved to {left}",
+                                seat_working_directory=left,
+                            )
                     except Exception as exc:  # noqa: BLE001
                         _telemetry.warn(f"seat working directory re-point failed: {exc}")
                     try:

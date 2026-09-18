@@ -358,8 +358,10 @@ def _seat(
     return adapter, app
 
 
-def _session(monkeypatch: pytest.MonkeyPatch, adapter: SimpleNamespace) -> list[str]:
-    """Run one clean ``run_build`` session on ``adapter``; return its warnings."""
+def _session(
+    monkeypatch: pytest.MonkeyPatch, adapter: SimpleNamespace
+) -> SimpleNamespace:
+    """Run one clean ``run_build`` session; return its warnings and success fields."""
 
     monkeypatch.setitem(
         sys.modules,
@@ -374,12 +376,19 @@ def _session(monkeypatch: pytest.MonkeyPatch, adapter: SimpleNamespace) -> list[
     monkeypatch.setattr(_common._telemetry, "shutdown", Mock())
     monkeypatch.setattr(sys, "argv", ["build_probe.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
-    warnings: list[str] = []
+    session = SimpleNamespace(warnings=[], fields={})
     monkeypatch.setattr(
-        _common._telemetry, "warn", lambda message, **_f: warnings.append(message)
+        _common._telemetry,
+        "warn",
+        lambda message, **_f: session.warnings.append(message),
+    )
+    monkeypatch.setattr(
+        _common._telemetry,
+        "success",
+        lambda _message, **fields: session.fields.update(fields),
     )
     assert _common.run_build(AsyncMock(return_value={})) == 0
-    return warnings
+    return session
 
 
 def test_teardown_moves_the_seat_out_of_the_checkout(
@@ -395,9 +404,15 @@ def test_teardown_moves_the_seat_out_of_the_checkout(
     parked = str(_common.CAD_ROOT / "out" / "sldprt")
     adapter, app = _seat([parked, temp])
 
-    assert _session(monkeypatch, adapter) == []
+    session = _session(monkeypatch, adapter)
 
+    assert session.warnings == []
     app.SetCurrentWorkingDirectory.assert_called_once_with(temp)
+    # Emitted under the same key the seat provenance samples at CONNECT, so one
+    # query reads both ends: where a leaf left the seat, and where the next leaf
+    # found it. A connect-time reading under the farm work root means some leaf
+    # skipped or failed this teardown.
+    assert session.fields["seat_working_directory"] == temp
 
 
 def test_teardown_leaves_a_seat_that_is_already_outside_alone(
@@ -405,7 +420,7 @@ def test_teardown_leaves_a_seat_that_is_already_outside_alone(
 ) -> None:
     adapter, app = _seat([tempfile.gettempdir()])
 
-    assert _session(monkeypatch, adapter) == []
+    assert _session(monkeypatch, adapter).warnings == []
 
     app.SetCurrentWorkingDirectory.assert_not_called()
 
@@ -417,7 +432,7 @@ def test_a_seat_that_refuses_to_move_warns_instead_of_failing_the_build(
     # release is the NEXT leaf's hazard, not a failure of work already done.
     adapter, _app = _seat([str(_common.CAD_ROOT / "out" / "sldprt")], moved=False)
 
-    warnings = _session(monkeypatch, adapter)
+    warnings = _session(monkeypatch, adapter).warnings
 
     assert [w for w in warnings if "seat working directory" in w]
 
@@ -429,9 +444,10 @@ def test_a_move_the_seat_ignored_is_not_reported_as_released(
     parked = str(_common.CAD_ROOT / "out" / "sldprt")
     adapter, _app = _seat([parked, parked])
 
-    warnings = _session(monkeypatch, adapter)
+    session = _session(monkeypatch, adapter)
 
-    assert [w for w in warnings if "still inside the checkout" in w]
+    assert [w for w in session.warnings if "still inside the checkout" in w]
+    assert "seat_working_directory" not in session.fields
 
 
 def test_an_unreadable_working_directory_is_not_papered_over() -> None:
