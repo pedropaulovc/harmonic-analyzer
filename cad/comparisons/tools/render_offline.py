@@ -96,9 +96,73 @@ def resolve_blender(override: str | None = None) -> str:
 STL_DIR = CAD_OUT / "stl"
 
 
-def _stale(path: Path, src: Path, what: str) -> None:
+_EXPORTER_KEY = "__exporter__"
+
+
+def _recorded_digests() -> dict[str, str]:
+    """The exporter's own recorded source digests, keyed by output stem/mesh.
+
+    ``export_models.py`` writes ``cad/out/stl/export-src.json``: for every mesh it
+    exported, the churn-immune RECIPE digest of the ``.SLDPRT``/``.SLDASM`` it was
+    exported from (``dodo._stable_artefact_digest``). Unreadable/foreign-exporter
+    sidecars yield {} so the caller falls back to mtime, mirroring
+    ``export_models.load_src_digests``.
+    """
+    path = STL_DIR / "export-src.json"
+    if not path.exists():
+        return {}
+    try:
+        data = dict(json.loads(path.read_text(encoding="utf-8")))
+    except Exception:
+        return {}
+    data.pop(_EXPORTER_KEY, None)
+    return {k: v for k, v in data.items() if isinstance(v, str)}
+
+
+def _artefact_digest(src: Path) -> str | None:
+    """Recipe digest of a built artefact, or None when it is not a declared target.
+
+    Same chokepoint the exporter and verify.py use, so "is this export current?"
+    answers identically in all three.
+    """
+    try:
+        repo = str(REPO)
+        if repo not in sys.path:
+            sys.path.insert(0, repo)
+        import dodo  # noqa: PLC0415
+
+        return dodo._stable_artefact_digest(str(src.resolve()))
+    except Exception:
+        return None
+
+
+def _stale(path: Path, src: Path, what: str, key: str | None = None) -> None:
+    """Refuse to render an output older than the model it came from.
+
+    Compare RECORDED source digests, not mtimes: every COM task's outputs can be
+    RESTORED from the remote build cache, which writes them in arbitrary order with
+    the archive's timestamps, so an STL restored moments before its own .SLDPRT
+    legitimately reads "older" and mtime reports a stale export that is in fact
+    current. This is the same churn `export_models.src_digest` exists to defeat --
+    the gallery was the one consumer still comparing timestamps, and it failed the
+    first release whose `export` ran on the farm.
+
+    Fall back to mtime only when the digest cannot decide: an undeclared target
+    (generated mesh, `_artefact_digest` -> None) or an output the exporter recorded
+    no digest for.
+    """
     if not path.exists():
         raise FileNotFoundError(f"{path} missing — run cad/scripts/export_models.py")
+    recorded = _recorded_digests().get(key or path.stem)
+    current = _artefact_digest(src)
+    if recorded is not None and current is not None:
+        if recorded != current:
+            raise RuntimeError(
+                f"{what} was exported from a different {src.name} "
+                f"(recorded {recorded[:12]}, current {current[:12]}) "
+                f"— re-run export_models.py"
+            )
+        return
     if path.stat().st_mtime < src.stat().st_mtime:
         raise RuntimeError(f"{what} older than {src.name} — re-run export_models.py")
 
