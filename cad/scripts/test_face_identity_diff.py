@@ -1,16 +1,24 @@
-"""The face-identity comparison, offline.
+"""The face-identity comparisons, offline.
 
 ``diag_mcmaster_lib.gate_and_save`` already fails a build whose SOLID moved:
 volume, surface area, centre of mass, face count and (at or under
 ``FACE_MULTISET_LIMIT`` faces) the exact sorted face-area multiset, all against
 the vendor ground truth.  What it cannot see is a solid that is geometrically
-identical while its FACES are different faces -- same areas, same boxes, new
-persistent references.  A build never notices; a stored downstream reference
-would, days later, as a drawing or assembly defect.
+identical while its FACES are different faces.  A build never notices; a
+stored downstream reference would, days later, as a drawing or assembly
+defect.
 
-``probe_face_identity`` exists to reduce that to a diff, and the comparison
-itself is pure, so it is tested here rather than on a seat.  What needs the
-seat is only the capture.
+``probe_face_identity`` splits that into two questions, and so does this file:
+
+* ``diff_census`` -- geometry, face for face, from two captures.  It must NOT
+  compare stored references: ``GetPersistReference3`` documents its own
+  representation as changing "possibly from rebuild to rebuild ... but their
+  usage in finding the correct entity will be consistent", so a byte
+  difference is not a defect and byte equality is not a proof.
+* ``diff_resolution`` -- whether a reference captured from the old part still
+  resolves, in the new part, to the face it was taken from.  Replaying it
+  needs a seat; turning the outcome into a verdict does not, and that is the
+  half tested here.
 """
 
 from __future__ import annotations
@@ -20,7 +28,11 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from diagnostics.probe_face_identity import canonical, diff_census  # noqa: E402
+from diagnostics.probe_face_identity import (  # noqa: E402
+    canonical,
+    diff_census,
+    diff_resolution,
+)
 
 
 def _face(area: float, box: tuple[float, ...], persist: str, surface: int = 4001):
@@ -60,22 +72,21 @@ def test_face_enumeration_order_is_not_a_contract() -> None:
     assert diff_census(_census(first, second), _census(second, first)) == []
 
 
-def test_a_renumbered_face_is_reported_as_identity_not_geometry() -> None:
-    """The failure this probe exists for: same solid, different faces.
+def test_a_changed_reference_alone_is_not_a_difference() -> None:
+    """Reference BYTES are not the contract, and this is the trap.
 
-    Wording them apart matters. A geometry line means the rewrite changed the
-    part and the vendor gate would have caught it too; an identity line means
-    the part is right and only a stored reference moved, which nothing in a
-    build can see.
+    ``GetPersistReference3`` documents its own representation as changing
+    "possibly from rebuild to rebuild ... but their usage in finding the
+    correct entity will be consistent across rebuilds".  So a byte comparison
+    reports failures that are not failures -- and a probe that cries wolf on
+    an ordinary rebuild gets switched off, which costs the check as well.
+    Whether a stored reference still finds its face is ``diff_resolution``'s
+    question, and it has to be asked on a seat.
     """
     before = _census(_face(12.5, (0, 0, 0, 5, 5, 0), "aaaa"))
     after = _census(_face(12.5, (0, 0, 0, 5, 5, 0), "cccc"))
 
-    problems = diff_census(before, after)
-
-    assert len(problems) == 1
-    assert problems[0].startswith("identity:")
-    assert "aaaa -> cccc" in problems[0]
+    assert diff_census(before, after) == []
 
 
 def test_a_lost_face_is_reported_as_geometry() -> None:
@@ -123,24 +134,6 @@ def test_a_surface_type_change_is_geometry() -> None:
     assert len(problems) == 1
     assert problems[0].startswith("geometry:")
     assert "surface type" in problems[0]
-
-
-def test_a_census_with_no_persistent_reference_is_not_a_match() -> None:
-    """Two failed reads must not compare equal.
-
-    A probe that reports "same references" because neither side read one is
-    worse than no probe: it produces the evidence without the check. The
-    capture refuses an empty ``GetPersistReference3`` for the same reason, so
-    this can only arrive from a hand-written or truncated census file.
-    """
-    before = _census(_face(12.5, (0, 0, 0, 5, 5, 0), ""))
-    after = _census(_face(12.5, (0, 0, 0, 5, 5, 0), ""))
-
-    problems = diff_census(before, after)
-
-    assert len(problems) == 1
-    assert problems[0].startswith("identity:")
-    assert "nothing was compared" in problems[0]
 
 
 def test_a_truncated_box_is_reported_rather_than_zipped_away() -> None:
@@ -210,8 +203,14 @@ def test_identical_faces_are_paired_by_reference_not_by_order() -> None:
     assert diff_census(_census(*faces), _census(faces[2], faces[0], faces[1])) == []
 
 
-def test_one_changed_reference_among_identical_faces_is_reported_once() -> None:
-    """The tie tolerance must not swallow a real renumbering."""
+def test_a_changed_reference_among_identical_faces_still_pairs_cleanly() -> None:
+    """References only DISAMBIGUATE ties; they never produce a verdict.
+
+    Three congruent faces and one changed reference is exactly the shape an
+    ordinary rebuild is allowed to take, so the geometry comparison has to
+    stay quiet: the worst a mispaired tie can do here is compare one
+    identical face against another identical one.
+    """
     before = _census(
         _face(1.0, (0, 0, 0, 1, 1, 0), "p1"),
         _face(1.0, (0, 0, 0, 1, 1, 0), "p2"),
@@ -223,12 +222,7 @@ def test_one_changed_reference_among_identical_faces_is_reported_once() -> None:
         _face(1.0, (0, 0, 0, 1, 1, 0), "zzz"),
     )
 
-    problems = diff_census(before, after)
-
-    assert problems == [
-        "identity: body 0 face (area 1.0 mm^2) is the same face geometrically "
-        "but its persistent reference changed (p3 -> zzz)"
-    ]
+    assert diff_census(before, after) == []
 
 
 def test_tolerated_noise_that_reverses_the_sort_order_is_not_a_difference() -> None:
@@ -265,3 +259,85 @@ def test_identical_bodies_are_paired_by_their_face_references() -> None:
     after = {"part": "p", "bodies": [marks[1], marks[2], marks[0]]}
 
     assert diff_census(before, after) == []
+
+
+def _row(state, *, area: float = 12.5, resolved_area: float | None = None):
+    """One replayed reference: what was stored, what came back."""
+    stored = _face(area, (0, 0, 0, 5, 5, 0), "cGVyc2lzdA==")
+    row: dict = {"stored": stored, "body": "Body1"}
+    if state is not None:
+        row["state"] = state
+    if resolved_area is not None:
+        row["resolved"] = _face(resolved_area, (0, 0, 0, 5, 5, 0), "")
+    return row
+
+
+def test_references_that_all_find_their_own_face_report_nothing() -> None:
+    """The verdict this whole exercise is trying to earn."""
+    rows = [
+        _row(0, area=12.5, resolved_area=12.5),
+        _row(0, area=3.25, resolved_area=3.25),
+    ]
+
+    assert diff_resolution(rows) == []
+
+
+def test_a_deleted_reference_is_reported_by_name() -> None:
+    """swPersistReferencedObjectStates_e is a bitmask; 0 is the only pass.
+
+    This is the real failure: the face the rewrite produced is a different
+    face, so a stored annotation attachment or mate now points at nothing.
+    """
+    problems = diff_resolution([_row(4)])
+
+    assert problems == ["identity: face 0 (area 12.5 mm^2) no longer resolves: deleted"]
+
+
+def test_several_state_bits_are_all_named() -> None:
+    problems = diff_resolution([_row(6)])
+
+    assert problems == [
+        "identity: face 0 (area 12.5 mm^2) no longer resolves: suppressed, deleted"
+    ]
+
+
+def test_a_reference_that_finds_the_wrong_face_is_reported() -> None:
+    """A healthy state is not enough; WHAT it found has to be the same face.
+
+    This is the shape a renumbering takes when the handle happens to stay
+    valid -- it resolves, so a naive check passes, and the annotation quietly
+    lands on the neighbouring face.
+    """
+    problems = diff_resolution([_row(0, area=12.5, resolved_area=3.25)])
+
+    assert len(problems) == 1
+    assert problems[0].startswith("identity:")
+    assert "DIFFERENT face (area 3.25 mm^2)" in problems[0]
+
+
+def test_a_healthy_state_with_no_object_is_reported() -> None:
+    """State 0 and nothing returned is not a pass, it is a contradiction."""
+    problems = diff_resolution([_row(0)])
+
+    assert len(problems) == 1
+    assert "resolved to no object at all" in problems[0]
+
+
+def test_a_row_with_no_recorded_state_proves_nothing() -> None:
+    """A resolve pass that lost its outcome must not read as a pass.
+
+    The probe writes a row per face whatever happens, including when the COM
+    call came back in a shape it could not read; treating that as success is
+    how a probe becomes decoration.
+    """
+    problems = diff_resolution([_row(None, resolved_area=12.5)])
+
+    assert len(problems) == 1
+    assert "no recorded resolution state" in problems[0]
+
+
+def test_rebuild_noise_in_the_resolved_face_is_tolerated() -> None:
+    """The resolved face is measured, so it gets the same tolerance."""
+    rows = [_row(0, area=12.5, resolved_area=12.5 + 5e-5)]
+
+    assert diff_resolution(rows) == []
