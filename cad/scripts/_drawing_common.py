@@ -38,6 +38,17 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _title_block_text import (
+    MM_PER_POINT,
+    TITLE_BLOCK_BOLD,
+    TITLE_BLOCK_ITALIC,
+    TITLE_BLOCK_TYPEFACE,
+    PartNameField,
+    PartNameFit,
+    fit_part_name,
+    fit_is_contained,
+    fitted_text_box_mm,
+)
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -5625,6 +5636,379 @@ def check_drawing_layout(
         )
 
 
+# swSummInfoField_e.swSumInfoTitle -- the linked model's document Title, which
+# is the string the template's PART cell prints through its $PRPSHEET link.
+_SUM_INFO_TITLE = 0
+# swAnnotationOwner_e.swAnnotationOwner_DrawingTemplate
+_ANNOT_OWNER_TEMPLATE = 2
+
+
+def _iter_template_notes(adapter: Any, ddoc: Any):
+    """Yield ``(INote, IAnnotation)`` for each note owned by the sheet format.
+
+    The sheet format's notes hang off the SHEET view (``IDrawingDoc::
+    GetFirstView``), not off any drawing view, and are walked with ``INote::
+    GetNext`` -- the route the SolidWorks "Get All Notes in Drawing Template"
+    example uses. ``IAnnotation::OwnerType`` then separates the title block's
+    ink from free sheet notes without trusting generated annotation names.
+    """
+    sheet_view = adapter._attempt(lambda: ddoc.GetFirstView())
+    if sheet_view is None:
+        return
+    sheet_view = _sw_type_info.early_bound_or_flag(
+        sheet_view, "IView", "GetFirstNote2"
+    )
+    note = adapter._attempt(lambda: sheet_view.GetFirstNote2())
+    while note is not None:
+        note = _sw_type_info.early_bound_or_flag(
+            note, "INote", "GetText", "GetExtent", "GetAnnotation", "GetNext"
+        )
+        annotation = adapter._attempt(
+            lambda n=note: adapter._get_attr_or_call(n, "GetAnnotation")
+        )
+        if annotation is not None:
+            annotation = _sw_type_info.early_bound_or_flag(
+                annotation,
+                "IAnnotation",
+                "GetPosition",
+                "GetTextFormat",
+                "SetTextFormat",
+                "OwnerType",
+            )
+            owner = int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
+                    default=-1,
+                )
+                or -1
+            )
+            if owner == _ANNOT_OWNER_TEMPLATE:
+                yield note, annotation
+        note = adapter._attempt(lambda n=note: n.GetNext())
+
+
+def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> float:
+    """The size ``text_format`` actually prints at, in points.
+
+    ``CharHeightInPts`` is only authoritative when the format says its height
+    is specified in points; otherwise the authored value is ``CharHeight``, a
+    height in METRES, and ``CharHeightInPts`` is stale. Reading the wrong one
+    would compare 16 pt against a leftover and refuse every sheet on a
+    millimetre-authored template.
+
+    ``IsHeightSpecifiedInPts`` is a METHOD, not a property: dispid 11,
+    invkind 1, retval ``VT_BOOL``, present in neither ``_prop_map_get_`` nor
+    ``_prop_map_put_`` of the generated wrapper -- SolidWorks documents it as
+    "IsHeightSpecifiedInPts Method" and calls it with parentheses in its own
+    sample. Reading it as an attribute off the early-bound wrapper yields a
+    BOUND METHOD, which is truthy forever, so the points branch would be taken
+    unconditionally and the check above would silently invert into the bug it
+    exists to prevent. ``_get_attr_or_call`` is the repo's method-or-property
+    idiom and is already used for ``GetEditSheet`` in this module.
+    """
+    in_points = adapter._attempt(
+        lambda: adapter._get_attr_or_call(text_format, "IsHeightSpecifiedInPts")
+    )
+    if in_points is None:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note will not say whether its height is "
+            "in points, so the size the width model assumes cannot be checked"
+        )
+    attribute = "CharHeightInPts" if in_points else "CharHeight"
+    raw = adapter._attempt(lambda: getattr(text_format, attribute))
+    if raw is None:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note reports no {attribute} to check "
+            "against the size the width model is computed at"
+        )
+    if in_points:
+        return float(raw)
+    # ITextFormat.CharHeight is in metres.
+    return float(raw) * 1000.0 / MM_PER_POINT
+
+
+def _assert_width_model_applies(
+    adapter: Any, text_format: Any, *, sheet_name: str, field: PartNameField
+) -> None:
+    """Fail unless the note prints in the FACE and SIZE the model measured.
+
+    A rendered advance is a function of family AND weight AND size, and
+    ``ITextFormat`` carries all three independently -- so checking the family
+    alone leaves the likelier edit unguarded: a template nudged to bold keeps
+    answering "Century Gothic" while every glyph widens, and one nudged to
+    18 pt keeps the family and the weight while the whole line grows 12.5%.
+    Either re-wraps the names this rule deliberately leaves alone, which is
+    the failure the all-sheets inspection exists to prevent.
+
+    The numbers, measured rather than asserted (see
+    :mod:`_title_block_text`): bold moves "Brass Fillister Head Slotted" --
+    the line PROVEN to render unwrapped at 68.834 mm -- to 69.765 mm, past the
+    bracket; 18 pt moves the fleet's widest untouched name,
+    "channel-spring-installed", from 64.82 mm to 72.92 mm, likewise past it.
+    """
+    typeface = str(adapter._attempt(lambda: text_format.TypeFaceName, default="") or "")
+    # The width model IS this face's own glyph table, so a template that
+    # changed font must fail here rather than be fitted -- or cleared -- with
+    # the wrong metrics.
+    if (
+        typeface.replace(" ", "").casefold()
+        != TITLE_BLOCK_TYPEFACE.replace(" ", "").casefold()
+    ):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note prints in {typeface!r}, but the "
+            f"title-block width model is measured for {TITLE_BLOCK_TYPEFACE!r}; "
+            "re-measure _title_block_text.GLYPH_ADVANCE_PER_MILLE"
+        )
+    for attribute, expected in (
+        ("Bold", TITLE_BLOCK_BOLD),
+        ("Italic", TITLE_BLOCK_ITALIC),
+    ):
+        value = adapter._attempt(lambda a=attribute: getattr(text_format, a))
+        if value is None:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} PART note reports no {attribute}, so the "
+                "face the width model is measured for cannot be confirmed"
+            )
+        if bool(value) is not expected:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} PART note prints {typeface!r} with "
+                f"{attribute}={bool(value)}, but the title-block width model is "
+                f"measured for {attribute}={expected}; re-measure "
+                "_title_block_text.GLYPH_ADVANCE_PER_MILLE"
+            )
+    point_size = _note_point_size(adapter, text_format, sheet_name=sheet_name)
+    # A COM VARIANT round trip can hand back 15.999..., so this compares at the
+    # resolution that changes a wrap decision: a quarter point is 0.09 mm of
+    # character height, two orders below the 8 mm bold/size shifts above.
+    if abs(point_size - field.nominal_point_size) > 0.25:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note prints at {point_size:.2f} pt, but "
+            f"the title-block field is measured at {field.nominal_point_size} pt "
+            "(every width in _title_block_text scales with it); re-measure the "
+            "field in _drawing_registry.DRAWING_TEMPLATES"
+        )
+
+
+def _part_name_note(
+    adapter: Any,
+    ddoc: Any,
+    *,
+    sheet_name: str,
+    expected_name: str,
+    field: PartNameField,
+) -> tuple[Any, Any, Any]:
+    """Find this sheet's PART note and prove the width model describes it.
+
+    Returns ``(INote, IAnnotation, ITextFormat)``. The caller must already be
+    in edit-sheet-format mode: the sheet format's notes are only reachable
+    through ``IDrawingDoc::EditTemplate``.
+
+    This runs for EVERY sheet, including the ones that are left untouched.
+    Leaving a name alone is itself a verdict of the width model -- "this name
+    is narrower than the note's authored box at the template's own size" --
+    and that verdict is only sound while the note still prints in the FACE and
+    SIZE those glyph advances were measured from -- family, weight, style and
+    point size, all of which ``ITextFormat`` carries independently. Validating
+    only the sheets that get fitted, or only the family, would let a template
+    re-authored in a wider face silently wrap exactly the names nothing checks
+    afterwards (see :func:`_assert_width_model_applies`).
+    """
+    candidates = [
+        (note, annotation)
+        for note, annotation in _iter_template_notes(adapter, ddoc)
+        if str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
+        == expected_name
+    ]
+    if len(candidates) != 1:
+        seen = [
+            str(adapter._attempt(lambda n=note: n.GetText(), default="") or "")
+            for note, _ in _iter_template_notes(adapter, ddoc)
+        ]
+        raise RuntimeError(
+            f"sheet {sheet_name!r} title block has {len(candidates)} "
+            f"template notes reading {expected_name!r}, expected exactly 1; "
+            f"template notes: {seen!r}"
+        )
+    note, annotation = candidates[0]
+    text_format = adapter._attempt(lambda: annotation.GetTextFormat(0))
+    if text_format is None:
+        raise RuntimeError(f"sheet {sheet_name!r} PART note has no ITextFormat to fit")
+    text_format = _early_bound(text_format, "ITextFormat")
+    _assert_width_model_applies(
+        adapter, text_format, sheet_name=sheet_name, field=field
+    )
+    return note, annotation, text_format
+
+
+def fit_title_block_part_name(
+    adapter: Any,
+    ddoc: Any,
+    *,
+    layout: DrawingLayout,
+    sheet_name: str,
+    expected_name: str,
+) -> PartNameFit:
+    """Fit this sheet's title-block PART name onto ONE line inside its field.
+
+    The PART cell is template ink: a sheet-format note that prints the linked
+    model's document Title through ``$PRPSHEET``. Its authored text box is
+    68.83..69.67 mm wide -- 37 mm narrower than the 106.62 mm cell it sits in
+    (measured; see :mod:`_title_block_text`) -- so a long name wraps, and
+    because a note grows DOWNWARD from its anchor the second line lands below
+    the cell's lower rule, on top of the ``DWG. NO.`` caption. 18 of the 96
+    released v36 sheets do this.
+
+    So the note is told the width it actually has, and the name is stepped down
+    to the largest integer point size that fits it (see
+    :func:`_title_block_text.fit_part_name`). A name that already fits the
+    note's PROVEN authored width keeps its ink: no template edit, no format
+    override, byte-identical output. That is the path 78 of the 96 sheets take.
+
+    Every sheet is still INSPECTED, though, fitted or not. "This name fits the
+    authored box at 16 pt" is a verdict of the width model, so it is only
+    sound while the note still prints in the face and at the size that model
+    was measured from -- family, weight, style and point size; see
+    :func:`_part_name_note` and :func:`_assert_width_model_applies`.
+
+    Editing sheet-format ink needs ``IDrawingDoc::EditTemplate``; the edit is
+    per sheet and in-document, so neither the checked-in DRWDOT nor any other
+    sheet is touched (no ``ISheet::SaveFormat``, no ``ReloadTemplate``).
+
+    The applied fit is then VERIFIED off the note's own geometry rather than
+    assumed, because a silently-ignored ``LineLength`` would otherwise ship a
+    wrapped title block: ``INote::GetExtent`` must report a single line's
+    height and must not cross the cell's lower rule.
+    """
+    field = DRAWING_TEMPLATES[layout].part_name_field
+    fit = fit_part_name(expected_name, field)
+    if fit.adjust and not fit_is_contained(fit, field):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART name {expected_name!r} fitted to "
+            f"{fit.point_size} pt still leaves its field: "
+            f"box={fitted_text_box_mm(fit, field)}"
+        )
+
+    ddoc.EditTemplate()
+    if bool(adapter._get_attr_or_call(ddoc, "GetEditSheet")):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} stayed in edit-sheet mode after EditTemplate; "
+            "the title block's note is not editable"
+        )
+    try:
+        note, annotation, text_format = _part_name_note(
+            adapter,
+            ddoc,
+            sheet_name=sheet_name,
+            expected_name=expected_name,
+            field=field,
+        )
+        if fit.adjust:
+            text_format.LineLength = fit.line_length_mm / 1000.0
+            # The unit the height is read in is NOT ours to choose:
+            # IsHeightSpecifiedInPts is a read-only METHOD (dispid 11, no
+            # entry in the wrapper's _prop_map_put_), so assigning to it
+            # raises AttributeError rather than switching the format to
+            # points. Both HEIGHT properties are settable, though, so the
+            # applier writes the same physical size through both and lets the
+            # format keep whichever unit it already declares authoritative.
+            # That is stronger than depending on an undocumented
+            # flip-on-write: the rendered height is right either way.
+            text_format.CharHeightInPts = int(fit.point_size)
+            text_format.CharHeight = fit.point_size * MM_PER_POINT / 1000.0
+            if not annotation.SetTextFormat(0, False, text_format):
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} PART note rejected the fitted text "
+                    "format (IAnnotation::SetTextFormat returned False -- an "
+                    "embedded rich-text run does this)"
+                )
+            applied = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+            # This readback exists to catch an IGNORED format, so it compares
+            # at the resolution that changes the rendered result and no finer.
+            # A character height is integral by contract, but it arrives
+            # through a COM VARIANT, so 16 pt coming back as 15.999... must
+            # read as 16 and not abort a sheet that was fitted correctly.
+            # Likewise the line length is compared at 0.05 mm: ten times
+            # tighter than the 0.5 mm the fit keeps in hand, so no difference
+            # this check tolerates can move a wrap decision.
+            #
+            # The size is read back through the property the format DECLARES
+            # authoritative, not through CharHeightInPts, which is a leftover
+            # on a millimetre-authored note and would then verify the write
+            # against a value the renderer never consults.
+            applied_pts = round(
+                _note_point_size(adapter, applied, sheet_name=sheet_name)
+            )
+            applied_line_mm = float(applied.LineLength or 0.0) * 1000.0
+            if (
+                applied_pts != fit.point_size
+                or abs(applied_line_mm - fit.line_length_mm) > 0.05
+            ):
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} PART note did not keep the fitted "
+                    f"format: {applied_pts} pt / {applied_line_mm:.3f} mm line "
+                    f"length, expected {fit.point_size} pt / "
+                    f"{fit.line_length_mm:.3f} mm"
+                )
+    finally:
+        ddoc.EditSheet()
+    if not bool(adapter._get_attr_or_call(ddoc, "GetEditSheet")):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} is stuck in edit-sheet-format mode after the "
+            "PART name fit"
+        )
+    if not fit.adjust:
+        # Nothing was written, so there is no applied fit to verify: the name
+        # is narrower than the width the note is PROVEN to render unwrapped
+        # at, and its ink is exactly what v36 shipped.
+        _telemetry.info(
+            f"{sheet_name}: PART name {expected_name!r} is {fit.width_mm:.2f} mm "
+            f"at the template's own {fit.point_size} pt, inside the note's "
+            f"proven {fit.line_length_mm:.2f} mm box; left untouched"
+        )
+        return fit
+
+    # SetTextFormat's effect reaches the note's geometry only after a redraw.
+    adapter._attempt(lambda: adapter.currentModel.GraphicsRedraw2())
+    extent = adapter._attempt(lambda: adapter._get_attr_or_call(note, "GetExtent"))
+    if not extent:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note reports no extent to verify the fit"
+        )
+    x0, y0, _z0, x1, y1, _z1 = (float(value) * 1000.0 for value in extent)
+    bottom, top = min(y0, y1), max(y0, y1)
+    em_mm = fit.point_size * MM_PER_POINT
+    # Line spacing is exactly 1 em (measured), so a wrapped note's extent spans
+    # at least 2 em while one line -- glyph box 1.025 em, plus whatever padding
+    # SolidWorks adds -- cannot reach 1.8 em.
+    if top - bottom > 1.8 * em_mm:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART name {expected_name!r} still renders on "
+            f"more than one line: note extent is {top - bottom:.2f} mm tall at "
+            f"{fit.point_size} pt (one line is at most {1.8 * em_mm:.2f} mm)"
+        )
+    if bottom < field.cell_bottom_mm - 0.5:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART name {expected_name!r} hangs below its "
+            f"cell: note extent bottom {bottom:.2f} mm < rule at "
+            f"{field.cell_bottom_mm:.2f} mm (this is what collides with DWG. NO.)"
+        )
+    # Only the note's POSITION and HEIGHT are measured geometry; SolidWorks
+    # ESTIMATES a note's extent WIDTH (see cad/docs/solidworks-drawing-layout-
+    # tuning.md), so an overhanging right edge is reported, not enforced.
+    right = max(x0, x1)
+    if right > field.cell_right_mm:
+        _telemetry.info(
+            f"{sheet_name}: fitted PART name estimated {right - field.cell_right_mm:.2f} "
+            f"mm past the cell's right rule (note extent width is an estimate)"
+        )
+    _telemetry.success(
+        f"{sheet_name}: fitted PART name {expected_name!r} to one line at "
+        f"{fit.point_size} pt ({fit.width_mm:.2f} mm in a "
+        f"{fit.line_length_mm:.2f} mm field)"
+    )
+    return fit
+
+
 @_telemetry.traced("drawing.finalize")
 async def finalize_drawing(
     adapter: Any,
@@ -5776,7 +6160,7 @@ async def finalize_drawing(
                 f"view {first_name!r} has no referenced document to validate"
             )
         linked_model = _sw_type_info.early_bound_or_flag(
-            linked_model, "IModelDoc2", "GetCustomInfoValue"
+            linked_model, "IModelDoc2", "GetCustomInfoValue", "SummaryInfo"
         )
         read_required_properties(
             linked_model,
@@ -5790,6 +6174,27 @@ async def finalize_drawing(
                 TITLE_BLOCK_REVISION_PROPERTY,
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
+        )
+        # The title block's PART cell prints THIS model's document Title. Read
+        # it from the drawing's own link target -- not from an argument -- and
+        # make it fit the cell it is printed in.
+        part_name = str(
+            adapter._attempt(
+                lambda m=linked_model: m.SummaryInfo(_SUM_INFO_TITLE), default=""
+            )
+            or ""
+        )
+        if not part_name:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} links model {first_name!r} with an empty "
+                "document Title, so its title block prints no PART name"
+            )
+        fit_title_block_part_name(
+            adapter,
+            ddoc,
+            layout=resolved_layouts[sheet_name],
+            sheet_name=sheet_name,
+            expected_name=part_name,
         )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
