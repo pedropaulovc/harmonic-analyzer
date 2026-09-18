@@ -43,9 +43,12 @@ class _FakeBackend:
 
 @pytest.fixture
 def fake(tmp_path, monkeypatch):
-    """rw cache wired to an in-memory backend with all sinks under tmp_path.
-    _unpack is a no-op (we test event/drift bookkeeping, not tar extraction)."""
+    """rw cache on a LOCAL-executor seat, wired to an in-memory backend with all
+    sinks under tmp_path -- i.e. the role that both builds and publishes, so a HIT
+    under an unpublished key is real drift. _unpack is a no-op (we test
+    event/drift bookkeeping, not tar extraction)."""
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
     monkeypatch.delenv("HARMONIC_CACHE_DEBUG", raising=False)
     monkeypatch.setattr(cache, "_REPORTS", tmp_path)
     monkeypatch.setattr(cache, "_EVENTS_LOG", tmp_path / "cache.jsonl")
@@ -225,8 +228,23 @@ def test_store_nothing_on_disk_logs_empty(tmp_path, fake):
     assert cache.last_stored_key("part:x") is None            # nothing published
 
 
+def _telemetry_logger(caplog, monkeypatch):
+    """The telemetry logger, wired so caplog sees its records."""
+    logger = _telemetry.get_logger()
+    monkeypatch.setattr(logger, "propagate", True)
+    caplog.clear()
+    return logger
+
+
+def _records(caplog, logger, level):
+    return [r.getMessage() for r in caplog.records
+            if r.name == logger.name and r.levelno == level]
+
+
 # --------------------------------------------------------------------------- #
-# THE issue-#73 case: store-skip-on-hit drift is surfaced on a HIT
+# THE issue-#73 case: store-skip-on-hit drift is surfaced on a HIT -- loudly for
+# a seat that publishes what it builds, quietly (but still recorded) for one that
+# structurally cannot have published the key it hit.
 # --------------------------------------------------------------------------- #
 def test_hit_under_new_key_warns_drift(tmp_path, fake, caplog, monkeypatch):
     out = tmp_path / "out.bin"
@@ -236,23 +254,70 @@ def test_hit_under_new_key_warns_drift(tmp_path, fake, caplog, monkeypatch):
 
     cache.store(k_old, [out], "part:x")          # this seat publishes k_old
     fake.blobs[k_new] = b"built-elsewhere"        # another seat publishes k_new
-    logger = _telemetry.get_logger()
-    monkeypatch.setattr(logger, "propagate", True)
-    caplog.clear()
+    logger = _telemetry_logger(caplog, monkeypatch)
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
         assert cache.restore(k_new, [out], "part:x") is True
-    assert any(
-        record.name == logger.name and record.levelno == logging.WARNING
-        for record in caplog.records
-    )
+    assert _records(caplog, logger, logging.WARNING)
     event = _events(tmp_path)[-1]
     assert event["event"] == "restore_hit_drift"
     assert event["label"] == "part:x"
     assert event["key"] == k_new
     assert event["previous_key"] == k_old
+    assert event["drift_expected"] is False
     # A HIT does NOT re-stamp the sidecar -- the seat still only ever published k_old.
     assert cache.last_stored_key("part:x") == k_old
+
+
+def test_farm_submitter_hit_on_worker_published_key_does_not_warn(
+    tmp_path, fake, caplog, monkeypatch
+):
+    """Under ``--executor farm`` the submitter dispatches every cache-missing leaf
+    and never reaches ``store``, so EVERY hit is under a key the worker published.
+    Warning there fires on the correct path and trains the operator to ignore the
+    signal -- it must stay off the console while cache.jsonl keeps the event."""
+    out = tmp_path / "out.bin"
+    out.write_text("v0", encoding="utf-8")
+    k_old = "1" * 64
+    k_new = "2" * 64
+
+    cache.store(k_old, [out], "part:x")          # published back when it built locally
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
+    fake.blobs[k_new] = b"built-by-a-worker"
+    logger = _telemetry_logger(caplog, monkeypatch)
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        assert cache.restore(k_new, [out], "part:x") is True
+    assert _records(caplog, logger, logging.WARNING) == []
+    assert any("expected" in msg for msg in _records(caplog, logger, logging.DEBUG))
+    event = _events(tmp_path)[-1]
+    assert event["event"] == "restore_hit_drift"      # the record stays complete
+    assert event["previous_key"] == k_old
+    assert event["drift_expected"] is True
+    assert event["drift_reason"] == "executor=farm"
+
+
+def test_read_only_seat_hit_on_foreign_key_does_not_warn(
+    tmp_path, fake, caplog, monkeypatch
+):
+    """Same reasoning by role rather than executor: a ``ro`` seat declines to
+    publish, so it cannot have stored the key it hits."""
+    out = tmp_path / "out.bin"
+    out.write_text("v0", encoding="utf-8")
+    k_old = "1" * 64
+    k_new = "2" * 64
+
+    cache.store(k_old, [out], "part:x")          # published while still rw
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "ro")
+    fake.blobs[k_new] = b"built-elsewhere"
+    logger = _telemetry_logger(caplog, monkeypatch)
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        assert cache.restore(k_new, [out], "part:x") is True
+    assert _records(caplog, logger, logging.WARNING) == []
+    event = _events(tmp_path)[-1]
+    assert event["drift_expected"] is True
+    assert event["drift_reason"] == "cache_mode=ro"
 
 
 def test_hit_under_same_key_is_not_drift(tmp_path, fake):

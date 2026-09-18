@@ -116,6 +116,16 @@ successful `store` stamps `cad/out/reports/cache-keys/<label>.key` with the key 
 seat published; on a later HIT under a *different* key, `restore` logs a `WARN` and
 a `restore_hit_drift` event — and `cache_status` shows the `DRIFT(...)` flag.
 
+The `WARN` is for a seat that **publishes what it builds**, because only there does
+a foreign key mean something went wrong. A submitter under `--executor farm` never
+reaches `store` (the worker builds and publishes every cache-missing leaf), and a
+`ro` seat declines to publish, so for those *every* hit is under a key they could
+not have published: warning would fire on the correct path and teach you to ignore
+the flag. They log it at debug instead and still append the `restore_hit_drift`
+event with `"drift_expected": true` and a `"drift_reason"` of `executor=farm` or
+`cache_mode=ro` — so `jq 'select(.event=="restore_hit_drift" and
+.drift_expected==false)' cache.jsonl` is the post-hoc list of *real* drift.
+
 ### Backend: Azure Blob over HTTPS (443)
 
 One content-addressed `<key>.tar.gz` blob per task in container `buildcache` on

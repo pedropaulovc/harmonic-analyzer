@@ -64,8 +64,14 @@ Design notes / invariants:
   ``cad/out/reports/cache-keys/<label>.key`` sidecar records the last key and input
   provenance THIS seat published, so on a HIT under a different key we WARN. This
   surfaces store-skip-on-hit drift (a HIT returns early and never re-stores, so the
-  seat can serve a key it never published) directly. ``cache_status`` (a doit task)
-  prints all of the above per part/assembly in one command.
+  seat can serve a key it never published) directly -- but the WARN is reserved for
+  a seat that PUBLISHES what it builds. A submitter under ``--executor farm`` (and
+  a ``ro`` seat) never reaches ``store`` at all, so EVERY key it hits is one it
+  structurally cannot have published; warning there fires on the normal path and
+  teaches the operator to ignore the very signal it exists for. Those hits still
+  emit the ``restore_hit_drift`` event, tagged ``drift_expected`` with the reason,
+  at debug severity. ``cache_status`` (a doit task) prints all of the above per
+  part/assembly in one command.
 
 Backend: an **Azure Blob container** reached over HTTPS (443). Speaks plain object
 storage, so it works from anywhere -- including networks (e.g. residential ISPs)
@@ -362,6 +368,39 @@ def writable() -> bool:
     return _mode() == "rw"
 
 
+def _farm_executor() -> bool:
+    """Are this run's cache-missing leaves dispatched to the build farm (rather
+    than executed on this box)? Read through ``_farm`` -- the one definition of
+    what ``--executor farm`` means -- and imported locally, like ``_telemetry``,
+    so the cache stays importable wherever the farm module is not in play."""
+    import _farm
+
+    return _farm.enabled()
+
+
+def _cannot_publish_reason() -> str | None:
+    """Why this process structurally CANNOT publish the artefacts it consumes --
+    or ``None`` when it can, and a HIT under an unpublished key is real drift.
+
+    The store-skip-on-hit warning only carries information for a seat that builds
+    its own leaves AND publishes them: there, a HIT under a key its sidecar never
+    recorded means the seat is trusting an artefact it should have produced itself
+    (the v0.9.0 bug). Two roles can never have published the key they hit:
+
+    * ``executor=farm`` -- the submitter hands every cache-missing leaf to a
+      worker, which builds and publishes the key; ``dodo._farm_build`` returns
+      before the ``cache.store`` phase, so this process never stores anything and
+      EVERY hit is under a worker-published key.
+    * ``cache_mode=ro`` -- a pull-only seat declines to publish by configuration.
+
+    For those the condition is the normal path, so it is logged, not warned."""
+    if _farm_executor():
+        return "executor=farm"
+    if not writable():
+        return f"cache_mode={_mode()}"
+    return None
+
+
 def config_summary() -> dict:
     """Effective cache config, for the cache_status header (issue #73)."""
     return {
@@ -378,10 +417,14 @@ def config_summary() -> dict:
 # Every helper here is BEST-EFFORT: a logging failure must never break a build,
 # so each swallows OSError and returns a benign default.
 # --------------------------------------------------------------------------- #
-def _record(event: str, label: str, key: str) -> None:
+def _record(event: str, label: str, key: str, **extra) -> None:
     """Append one cache event to cache.jsonl, including readable provenance for
     miss/drift outcomes so a historical key shift remains explainable even after
-    the last-published sidecar advances to the newly built key (issue #255)."""
+    the last-published sidecar advances to the newly built key (issue #255).
+
+    ``extra`` fields are written verbatim alongside the base record: cache.jsonl is
+    the post-hoc record, so an outcome whose CONSOLE severity was demoted still
+    lands here in full, carrying why it was demoted."""
     try:
         _REPORTS.mkdir(parents=True, exist_ok=True)
         rec = {"ts": round(time.time(), 3), "event": event, "label": label,
@@ -397,6 +440,7 @@ def _record(event: str, label: str, key: str) -> None:
                     {"path": path, "digest": digest}
                     for path, digest in previous["inputs"]
                 ]
+        rec.update(extra)
         with _EVENTS_LOG.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec) + "\n")
     except OSError:
@@ -544,9 +588,14 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
     :class:`RestoreLocked` -- the ONE non-swallowed failure -- when the HIT's
     extraction is refused by a share lock on an output (see the class).
 
-    On a HIT, if this seat last PUBLISHED a different key for ``label`` (its sidecar
-    differs), WARN: the seat is serving a key it never stored -- the
-    store-skip-on-hit drift from issue #73. Every outcome is appended to cache.jsonl."""
+    On a HIT under a key this seat never PUBLISHED (its sidecar holds a different
+    one), WARN -- the seat is serving an artefact it should have stored itself: the
+    store-skip-on-hit drift from issue #73. A process that structurally cannot
+    publish (a ``--executor farm`` submitter, a ``ro`` seat; see
+    :func:`_cannot_publish_reason`) hits foreign keys as its NORMAL path, so there
+    the same condition is logged at debug instead of warned. Only the console
+    severity moves: every outcome, demoted drift included (tagged
+    ``drift_expected`` plus the reason), is appended to cache.jsonl."""
     if not enabled():
         return False
     try:
@@ -574,11 +623,20 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         _event("cache.hit", label, key)
         prev = last_stored_key(label)
         if prev and prev != key:
-            _warn(f"{label}: HIT under {key[:12]} but this seat last published "
-                  f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
-                  f"re-published from here")
-            _event("cache.hit_drift", label, key, prev_key=prev[:12])
-            _record("restore_hit_drift", label, key)
+            expected = _cannot_publish_reason()
+            if expected:
+                _debug_log(f"{label}: HIT under {key[:12]}; last published here was "
+                           f"{prev[:12]}, but this process never publishes "
+                           f"({expected}) -- expected, not store-skip-on-hit drift")
+            else:
+                _warn(f"{label}: HIT under {key[:12]} but this seat last published "
+                      f"{prev[:12]} -- store-skip-on-hit drift; {key[:12]} is NOT being "
+                      f"re-published from here")
+            tags: dict[str, bool | str] = {"drift_expected": bool(expected)}
+            if expected:
+                tags["drift_reason"] = expected
+            _event("cache.hit_drift", label, key, prev_key=prev[:12], **tags)
+            _record("restore_hit_drift", label, key, **tags)
         else:
             _record("restore_hit", label, key)
         return True
