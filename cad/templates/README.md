@@ -84,9 +84,13 @@ template note through `EditTemplate` → `ITextFormat.LineLength` /
 the result is one line inside the cell. **Only the points property is
 written.** `ITextFormat` also carries `CharHeight`, in system units, and it
 is *not* the same number in metres: it is the CHARACTER height, so writing
-the em size into it renders the note 1.381× too big — measured on the farm
-across four names at 12/15/16 pt on three workers, including two sheets
-whose size did not change and so could only have been inflated by the write.
+the em size into it renders the note 1.2053× too big — measured on the farm
+across four names at 12/15/16 pt on three workers (extent 2.4850–2.4856 em,
+size-independent), and on the same sheet twice: slotted_screw's 15 pt note
+measured 13.15 mm with the write and 10.91 mm without it. (An earlier
+revision of this note said 1.381×. That was the inflated extent divided by
+a one-line constant of 1.8 em that had itself been back-derived from 1.381;
+one correct line measures 1.91–2.06 em.)
 A note that declares its height in system units (`IsHeightSpecifiedInPts`,
 a read-only **method**, returns false) is therefore refused with that
 message rather than converted, on every sheet: the em-to-character ratio is

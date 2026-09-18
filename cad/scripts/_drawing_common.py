@@ -5708,17 +5708,23 @@ def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> floa
 
     A system-units note is REFUSED rather than converted. ``CharHeight`` is
     not the em size in metres: writing the em into it made the note render
-    1.381x taller than one line, measured across four names at 12, 15 and
-    16 pt on three workers (spread 1.3806-1.3813). The interpretation that
-    fits -- 1/1.381 = 0.7241 against Century Gothic's 0.718 cap height -- is
-    that the system-units height is the CHARACTER height, but that is an
-    inference from one campaign, not a measured font constant, and this
-    module's width model is keyed to the em. Converting with it would be
-    guessing in exactly the place that just cost a build, so the rule names
-    the gap instead. The fleet's templates author in points (the 96-sheet
-    size guard passes at 16 pt, which it could not if this branch were
-    live), so this refusal is unreachable today and exists to stay
-    unreachable loudly.
+    1.2053x taller than one line. That factor is the SAME sheet measured
+    twice -- slotted_screw's 15 pt note measured 13.15 mm with the write,
+    10.91 mm without it (c99e0026, worker 5) -- and the write's extent was
+    uniform across four names at 12, 15 and 16 pt (2.4850-2.4856 em), which
+    is what makes it a size-independent scale factor rather than per-sheet
+    noise. The 1.381 this comment used to quote was NOT the inflation: it
+    was 2.4850 em divided by the old ONE_LINE_EXTENT_EM of 1.8, a constant
+    that was itself derived from 1.381 (see _title_block_text). Its apparent
+    confirmation -- 1/1.381 = 0.7241 against Century Gothic's 0.718 cap
+    height -- was manufactured by that circle; 1/1.2053 = 0.830 lands on no
+    metric this module has measured. So what the system-units height means
+    remains an inference, and this module's width model is keyed to the em.
+    Converting with it would be guessing in exactly the place that just cost
+    a build, so the rule names the gap instead. The fleet's templates author
+    in points (the 96-sheet size guard passes at 16 pt, which it could not
+    if this branch were live), so this refusal is unreachable today and
+    exists to stay unreachable loudly.
     """
     in_points = adapter._attempt(
         lambda: adapter._get_attr_or_call(text_format, "IsHeightSpecifiedInPts")
@@ -5733,7 +5739,7 @@ def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> floa
             f"sheet {sheet_name!r} PART note authors its height in system units "
             "(IsHeightSpecifiedInPts is false), and ITextFormat.CharHeight is a "
             "CHARACTER height, not the em the title-block width model is keyed "
-            "to -- the two differ by a measured factor of about 1.381. Re-author "
+            "to -- the two differ by a measured factor of about 1.205. Re-author "
             "the template's PART note in points, or measure the ratio and teach "
             "_title_block_text about it"
         )
@@ -5932,11 +5938,13 @@ def fit_title_block_part_name(
             #
             # CharHeight is NOT the same number in metres: SolidWorks' system
             # -units height is the CHARACTER height, so writing the em size
-            # into it renders every glyph 1/0.724 too big. Measured on the
-            # farm, not reasoned about -- four names at 12, 15 and 16 pt on
-            # three workers all came back with an extent exactly 1.381x the
-            # single-line bound, including two that needed no size change at
-            # all and so could only have been inflated by the write itself.
+            # into it renders every glyph too big. Measured on the farm, not
+            # reasoned about -- four names at 12, 15 and 16 pt on three
+            # workers all came back with an extent of 2.4850-2.4856 em,
+            # size-independent and 1.2053x the same sheet's extent without
+            # the write (slotted_screw at 15 pt: 13.15 mm with, 10.91 mm
+            # without), including two names that needed no size change at all
+            # and so could only have been inflated by the write itself.
             # Writing "the same height through both properties" was therefore
             # writing two DIFFERENT heights, and the wider one won.
             #
@@ -6006,20 +6014,61 @@ def fit_title_block_part_name(
     # the size we asked for: the two diverge in exactly the failure this
     # check exists to catch.
     em_mm = applied_pts * MM_PER_POINT
-    # One line measures ONE_LINE_EXTENT_EM tall, with a tolerance that is an
-    # order of magnitude below either defect this separates (a second line,
-    # or the whole note scaled by a unit factor).
     one_line_mm = ONE_LINE_EXTENT_EM * em_mm
     height_mm = top - bottom
+    extent_em = height_mm / em_mm
+    # Record the measurement on EVERY sheet that reaches here, not only the
+    # ones refused below. ONE_LINE_EXTENT_EM is an envelope over a measured
+    # distribution, and the only reason the sample behind it is 15 sheets is
+    # that a REFUSAL used to be the sole thing that ever printed the number
+    # -- so the sample was exactly the set that failed, and a taller sheet
+    # that happened to pass would have been invisible. With this line every
+    # fitted sheet reports its extent, in the log and as a span event, so
+    # the next build widens the sample and the constant is re-measured
+    # instead of re-argued.
+    #
+    # The LAYOUT is part of the record because it is the discriminating
+    # variable: the extent is a function of the size and the template, not
+    # of the name (harmonic-analyzer assembly and fillister_screw are
+    # different names of different lengths on different parts and both
+    # measured 10.96 mm at 16 pt), so what this enumerates is one factor per
+    # template, not one per sheet.
+    _telemetry.info(
+        f"{sheet_name}: PART note extent {height_mm:.2f} mm at "
+        f"{applied_pts:g} pt = {extent_em:.4f} em "
+        f"({height_mm / one_line_mm:.3f} of the {ONE_LINE_EXTENT_EM:g} em "
+        f"one-line model, {layout.value} template)"
+    )
+    _telemetry.event(
+        "title_block.extent",
+        sheet=sheet_name,
+        layout=layout.value,
+        part_name=expected_name,
+        applied_pts=applied_pts,
+        requested_pts=float(fit.point_size),
+        extent_mm=height_mm,
+        extent_em=extent_em,
+        one_line_em=ONE_LINE_EXTENT_EM,
+        tolerance=ONE_LINE_EXTENT_TOLERANCE,
+    )
+    # One line measures ONE_LINE_EXTENT_EM tall. The tolerance is NOT
+    # comfortable and must not be treated as slack: it splits an 11.8% gap,
+    # because a unit-inflated extent scales with the same unknown per-sheet
+    # factor the legitimate one does (the arithmetic is in _title_block_text,
+    # next to the constant).
     if height_mm > one_line_mm * (1.0 + ONE_LINE_EXTENT_TOLERANCE):
         # Say WHAT WAS MEASURED. An earlier version of this check reported
         # "still renders on more than one line", which is an inference, and
         # a wrong one: the farm produced byte-identical 14.03 mm extents for
         # a 30-character and a 34-character name at the same size, which no
-        # wrap can do. The ratio is the diagnostic -- a small integer-ish
-        # ratio (2.0, 3.0) is a wrap, while a constant non-integer one
-        # (1.38 was a height written in the wrong unit) is the whole note
-        # scaled, and it is identical for names that do and do not wrap.
+        # wrap can do. The ratio is the diagnostic -- but NOT as an integer
+        # count of lines, because the extent already carries a line of
+        # leading: a wrap adds one LINE_SPACING_EM, which reads as 1.49x on
+        # the tallest measured sheet and 1.54x on the one that actually
+        # wrapped (cone_tip_adjuster), never 2x. A ratio near 1.205 with no
+        # wrap in sight is the whole note scaled by a height written in the
+        # wrong unit, and that one is identical for names that do and do not
+        # wrap.
         raise RuntimeError(
             f"sheet {sheet_name!r} PART name {expected_name!r} renders "
             f"{height_mm / one_line_mm:.3f}x taller than one line: note extent "

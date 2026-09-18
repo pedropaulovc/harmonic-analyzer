@@ -83,20 +83,103 @@ DESCENDER_EM = 0.307
 # Measured: two-line sheets place consecutive baselines exactly one em apart.
 LINE_SPACING_EM = 1.0
 
-# What IAnnotation::GetExtent reports for a note that occupies ONE line, in
-# ems of the size the note reports back. Measured on the farm: a 16 pt note
-# whose height was written correctly extents 10.16 mm = 1.800 em. The glyph
-# box itself is only 1.025 em (CAP_HEIGHT_EM + DESCENDER_EM); the rest is
-# padding SolidWorks adds around the line, and it scales with the size, not
-# with the string. A second line adds LINE_SPACING_EM on top.
-ONE_LINE_EXTENT_EM = 1.8
+# What INote::GetExtent reports for a note that occupies ONE line, in ems of
+# the size the note reports back.
+#
+# The extent is NOT the glyph box. SolidWorks anchors a note's extent on the
+# descender and reserves a full line pitch of leading above the line it
+# draws, so one line measures the glyph box (1.025 em = CAP_HEIGHT_EM +
+# DESCENDER_EM) plus about one LINE_SPACING_EM -- close to 2 em -- and a
+# second line adds another LINE_SPACING_EM on top of that.
+#
+# MEASURED, on the 15 landscape sheets whose fitted notes reported an extent
+# in the farm build of integration head c99e0026 -- every sheet the fit step
+# touched, all 15 refused by the 1.8 bound this value replaces -- after
+# 6d3704a6 removed the system-units height write
+# (em = extent_mm / (pt * MM_PER_POINT)):
+#
+#   10.91 mm @ 15 pt  2.0617 em  slotted_screw, frame_side_screw
+#   10.52 mm @ 15 pt  1.9880 em  foot_screw, gooseneck_set_screw,
+#                                clamp_screw, swing_stop_screw,
+#                                bracket_screw, cone_lock_knob
+#    8.33 mm @ 12 pt  1.9677 em  hex_bolt, hanger_screw
+#   10.96 mm @ 16 pt  1.9417 em  fillister_screw, lag_screw,
+#                                harmonic_analyzer_assembly
+#    7.45 mm @ 11 pt  1.9198 em  cone_pivot_screw
+#    8.77 mm @ 13 pt  1.9123 em  cone_tip_adjuster
+#
+# This constant is the MAXIMUM of that distribution, not its mean: the check
+# is one-sided, so the bound has to clear the tallest legitimate sheet.
+#
+# The extent is NOT a function of the name. 'harmonic-analyzer assembly' and
+# 'Brass Fillister Head Slotted Screw' are different strings of different
+# lengths on different parts, and both measured 10.96 mm at 16 pt; while two
+# sheets carrying the SAME name ('Steel Narrow Fillister Head Slotted Screw'
+# on slotted_screw and swing_stop_screw) measured 10.91 and 10.52 mm at the
+# same 15 pt. What varies is the SHEET; what the extent depends on is the
+# size and the template. That is also why shrinking the font can never
+# rescue a refused sheet: the ratio this bound is compared against is
+# scale-invariant, so the fit step's step-down loop moves the width and
+# leaves the height ratio exactly where it was.
+#
+# Six discrete values, each shared to the last digit by every sheet that
+# reports it, spanning 7.8%, and the sample stopped producing new values as
+# it grew past 14 sheets -- a quantised distribution, not a continuous
+# spread. The quantising variable is not identified: the repo ships exactly
+# two sheet formats (cad/templates/harmonic-analyzer-{landscape,portrait}
+# .DRWDOT) and all 15 sheets use the landscape one, so it is not a template
+# revision; and GetExtent is proven to report unscaled sheet millimetres
+# (_purchased_fastener_drawing checks its own notes' extents against
+# absolute cell geometry on these very sheets), so it is not sheet scale.
+# Which is why every sheet now logs its extent WITH its layout (see
+# _drawing_common.fit_title_block_part_name): one build then enumerates the
+# whole space, and the next person to touch this number gets the
+# distribution instead of a two-point sample.
+#
+# The portrait template is NOT in that sample, and cannot be: 18 of the 96
+# fleet names need fitting and all 18 are on landscape sheets (both portrait
+# sheets print at the template's authored size, so they never reach this
+# check). If a portrait name ever does grow long enough, its measurement
+# arrives in the info line the check now logs -- whether it passes or is
+# refused -- and this constant is where it gets recorded.
+#
+# The earlier value was 1.8, which was never a measurement of anything. It
+# was the threshold 37e961c4 placed between the glyph box (1.025 em) and what
+# it ASSUMED a second line would measure (2.025 em), on the reasoning that
+# "one line -- glyph box 1.025 em, plus whatever padding SolidWorks adds --
+# cannot reach 1.8 em". One line reaches 1.91..2.06 em, so the bound sat
+# BELOW the quantity it bounds and refused every sheet the fit touched.
+# 6d3704a6 then re-labelled it as measured -- "a 16 pt note extents 10.16 mm
+# = 1.800 em" -- from 14.03/1.381, where 1.381 was itself 14.03/(1.8 em):
+# the same error used to confirm itself.
+ONE_LINE_EXTENT_EM = 2.062
 
 # How far above ONE_LINE_EXTENT_EM a measured extent may sit before the sheet
-# is refused. The two real defects this discriminates are far away from it: a
-# second line adds LINE_SPACING_EM (+56% of one line) and a height written
-# through the system-units property inflated the whole note by 38%. The
-# tolerance therefore only has to absorb rounding through the metre round trip
-# and whatever the renderer's padding does at the last digit.
+# is refused. This is NOT slack for rounding, and the margin it leaves is NOT
+# an order of magnitude -- an earlier version of this comment claimed that,
+# and the claim was part of the defect.
+#
+# Both the legitimate value and the defect value scale with the same unknown
+# per-sheet factor, so the two populations are close:
+#
+#   legitimate                     1.9123 .. 2.0617 em  (measured, above)
+#   x1.2053 system-units inflation 2.3049 .. 2.4854 em
+#
+# The gap between the highest legitimate sheet (2.0617) and the LOWEST sheet
+# a unit-bugged write could produce (2.3049) is 11.8%, and this tolerance
+# splits it: the refusal starts at 2.1651 em, 5.0% above the tallest measured
+# one-line sheet and 6.1% below the shortest possible inflated one. A second
+# line is much further out -- one line plus LINE_SPACING_EM, i.e. 1.539x this
+# bound on the one sheet that actually wrapped (cone_tip_adjuster measured
+# 3.173 em de-inflated) and 1.485x on the tallest.
+#
+# Widening this past ~0.058 therefore does not buy headroom, it buys the
+# 2.3049 em sheet. And it may not be TIGHTENED below ~0.032 without a second
+# change: the applier's format readback (see _drawing_common) accepts a note
+# reporting up to 0.5 pt away from the size it was asked for (a COM VARIANT
+# round trip), so below that the difference between the requested and the
+# reported size starts to decide verdicts, and every sheet's ratio has to be
+# re-measured against the size it reports.
 ONE_LINE_EXTENT_TOLERANCE = 0.05
 
 # Glyph advances in 1/1000 em, from the ``/W`` array of the Century Gothic CID
