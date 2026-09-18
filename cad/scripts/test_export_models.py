@@ -893,44 +893,94 @@ def test_canonical_file_bytes_cleans_text_but_never_binary(tmp_path: Path) -> No
     assert dodo._canonical_file_bytes(str(binary)) == payload
 
 
-def _gallery_manifest() -> dict:
-    return json.loads(
-        (export_models.COMPARISONS_DIR / "manifest.json").read_text(encoding="utf-8")
+_FIXTURE_DIGEST = "a" * 32
+
+
+class _Ledger(dict):
+    """An exporter ledger that answers ``_FIXTURE_DIGEST`` for every unlisted key.
+
+    The gate SKIPS a key it cannot decide, so a ledger that answers `None` makes
+    both directions of the test vacuous: nothing compares, nothing raises. This
+    answers every key, and the entries passed in are the ones that MOVED.
+    """
+
+    def get(self, key, default=None):  # type: ignore[override]
+        return dict.get(self, key, _FIXTURE_DIGEST)
+
+
+def _gallery_fixture(tmp_path: Path, monkeypatch) -> dict:
+    """Build a two-model gallery tree (one assembly scene, one bare part).
+
+    The gate walks `cad/out` and the comparisons manifest, so a test that reads
+    the real ones asserts on THIS checkout's build state: it passes or fails with
+    whatever the last build/restore left behind, and any recipe-input change (a
+    `_artifact_cache.py` edit moved 130 source digests on 2026-09-18) turns the
+    suite red without a defect. Construct the tree instead.
+    """
+    for name in ("sldasm", "sldprt", "boxes"):
+        (tmp_path / name).mkdir()
+    (tmp_path / "sldasm" / "demo-asm.SLDASM").write_bytes(b"asm")
+    (tmp_path / "sldprt" / "demo-part.SLDPRT").write_bytes(b"part")
+    (tmp_path / "sldprt" / "cone-gear.SLDPRT").write_bytes(b"cone")
+    (tmp_path / "boxes" / "demo-asm.json").write_text(
+        json.dumps(
+            {
+                "unit": "mm",
+                "components": [
+                    {"part": "cone-gear", "cfg": "t102", "mesh": "cone-gear--t102"},
+                    {"part": "demo-part", "cfg": "", "mesh": "demo-part"},
+                ],
+            }
+        ),
+        encoding="utf-8",
     )
+    monkeypatch.setattr(export_models, "OUT_SLDASM", tmp_path / "sldasm")
+    monkeypatch.setattr(export_models, "OUT_SLDPRT", tmp_path / "sldprt")
+    monkeypatch.setattr(export_models, "OUT_BOXES", tmp_path / "boxes")
+    monkeypatch.setattr(export_models, "src_digest", lambda src: _FIXTURE_DIGEST)
+    monkeypatch.setattr(export_models, "load_src_digests", _Ledger)
+    return {"pairs": [{"model": "demo_asm"}, {"model": "demo_part"}]}
 
 
-def test_gallery_gate_rejects_inputs_exported_from_another_model(monkeypatch) -> None:
+def test_gallery_gate_rejects_inputs_exported_from_another_model(
+    monkeypatch, tmp_path: Path
+) -> None:
     """The gallery must refuse an STL whose recorded source digest moved.
 
     This is the check the renderer cannot make (pillow-only ephemeral env), so it
     lives here, in the project env, and is what stops a release bundling a gallery
     rendered from a previous build's meshes.
     """
-    manifest = _gallery_manifest()
-    export_models.assert_gallery_inputs_current(manifest)  # current tree passes
+    manifest = _gallery_fixture(tmp_path, monkeypatch)
+    export_models.assert_gallery_inputs_current(manifest)  # positive control
 
-    real = export_models.load_src_digests
     monkeypatch.setattr(
-        export_models, "load_src_digests",
-        lambda: {**real(), "cone-gear--t102": "0" * 32},
+        export_models,
+        "load_src_digests",
+        lambda: _Ledger({"cone-gear--t102": "0" * 32}),
     )
-    with pytest.raises(RuntimeError, match="exported from"):
+    with pytest.raises(RuntimeError, match="cone-gear--t102: exported from"):
         export_models.assert_gallery_inputs_current(manifest)
 
 
-def test_gallery_gate_skips_keys_the_exporter_never_recorded(monkeypatch) -> None:
+def test_gallery_gate_skips_keys_the_exporter_never_recorded(
+    monkeypatch, tmp_path: Path
+) -> None:
     """An unrecorded key cannot decide staleness and must not fail the gallery.
 
     A foreign ledger (`__exporter__` sentinel mismatch) yields {} and already
     forces a full re-export; turning "unknown" into a failure here would make every
     exporter-source change fail the release instead of re-rendering it.
     """
+    manifest = _gallery_fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(export_models, "load_src_digests", dict)
 
-    export_models.assert_gallery_inputs_current(_gallery_manifest())
+    export_models.assert_gallery_inputs_current(manifest)
 
 
-def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(monkeypatch, tmp_path: Path) -> None:
+def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
+    monkeypatch, tmp_path: Path
+) -> None:
     """A recipe digest matches even when the .SLDPRT is gone — reject the orphan.
 
     `_stable_artefact_digest` keys on the producing task's recipe, not the file's
@@ -938,10 +988,8 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(monkeypatch, tmp_path:
     longer stats the source, so nothing else would stop the release rendering and
     certifying an STL with no model behind it.
     """
-    manifest = _gallery_manifest()
-    missing = tmp_path / "sldprt"
-    missing.mkdir()
-    monkeypatch.setattr(export_models, "OUT_SLDPRT", missing)
+    manifest = _gallery_fixture(tmp_path, monkeypatch)
+    (tmp_path / "sldprt" / "cone-gear.SLDPRT").unlink()
 
-    with pytest.raises(FileNotFoundError, match="is missing but"):
+    with pytest.raises(FileNotFoundError, match="is missing but cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)
