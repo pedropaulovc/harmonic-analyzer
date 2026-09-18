@@ -352,8 +352,11 @@ def _seat(
     directory and the setter moves it.
 
     ``moved`` is what ``SetCurrentWorkingDirectory`` does: ``True`` accepts the
-    move, ``False`` refuses it, and ``"ignored"`` answers True without moving --
-    the case that proves the readback, not the return value, is the evidence.
+    move, ``False`` refuses it, ``"ignored"`` answers True without moving --
+    the case that proves the readback, not the return value, is the evidence --
+    and ``"blank"`` answers True and leaves the seat unable to say where it is.
+    Each is a property of the SEAT, so it holds for every read, however many
+    readings a caller takes.
     """
 
     seat = SimpleNamespace(cwd=start)
@@ -361,7 +364,9 @@ def _seat(
     def _set(target: str) -> object:
         if moved is True:
             seat.cwd = target
-        return True if moved == "ignored" else moved
+        elif moved == "blank":
+            seat.cwd = ""
+        return True if moved in ("ignored", "blank") else moved
 
     app = SimpleNamespace(
         CloseAllDocuments=Mock(),
@@ -498,6 +503,29 @@ def test_an_unreadable_working_directory_is_not_papered_over() -> None:
     with pytest.raises(RuntimeError, match="unreadable"):
         _common.release_seat_working_directory(app)
     app.SetCurrentWorkingDirectory.assert_not_called()
+
+
+def test_an_empty_readback_from_the_park_directory_is_not_a_move(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # ``os.path.realpath("")`` is the PROCESS current directory, so an empty
+    # readback normalizes onto the park target itself whenever the helper runs
+    # from there -- and a seat that cannot say where it is would be reported as
+    # parked. Reachable off the farm: gettempdir() falls back to the process
+    # directory with TMPDIR/TEMP/TMP unusable, which makes target == cwd.
+    monkeypatch.setattr(_common.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    # The precondition that makes the hole reachable, asserted so this test
+    # cannot quietly stop exercising it.
+    assert _common._normal_path("") == _common._normal_path(
+        _common._seat_park_directory()
+    )
+    _adapter, app = _seat(str(_common.CAD_ROOT / "out" / "sldprt"), moved="blank")
+
+    with pytest.raises(RuntimeError, match="unreadable after move"):
+        _common.release_seat_working_directory(app)
+
+    app.SetCurrentWorkingDirectory.assert_called_once_with(str(tmp_path))
 
 
 def test_a_temp_directory_inside_this_checkout_is_never_the_park_target(

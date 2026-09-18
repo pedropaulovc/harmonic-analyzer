@@ -2499,9 +2499,15 @@ def release_seat_working_directory(sw: Any) -> str | None:
     if sw.SetCurrentWorkingDirectory(str(target)) is not True:
         raise RuntimeError(f"seat refused working directory {target}")
     # A True answer is not evidence: the readback is. Anything else and the
-    # caller must not report a directory the seat never took.
+    # caller must not report a directory the seat never took. Emptiness is
+    # refused BEFORE normalizing, because ``os.path.realpath("")`` is the
+    # PROCESS current directory -- so a seat that answers nothing would
+    # normalize onto ``target`` itself whenever this helper runs from there,
+    # and an unreadable seat would be reported as parked.
     after = sw.GetCurrentWorkingDirectory()
-    if type(after) is not str or _normal_path(after) != _normal_path(target):
+    if type(after) is not str or not after:
+        raise RuntimeError(f"seat working directory unreadable after move: {after!r}")
+    if _normal_path(after) != _normal_path(target):
         raise RuntimeError(f"seat working directory did not move: {after!r}")
     return after
 
