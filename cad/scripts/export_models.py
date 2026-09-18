@@ -67,9 +67,11 @@ from _common import (  # noqa: E402
     TOGGLE_STL_NO_TRANSLATE,
     TOGGLE_STL_ONE_FILE,
     TOGGLE_STL_SHOW_INFO,
+    PreferenceSpec,
     _early_bound,
     _read_member,
     check,
+    enforce_preferences,
     log,
     run_build,
     set_isometric_view,
@@ -129,9 +131,30 @@ MATERIAL_RGB = {
 }
 DEFAULT_RGB = (0.55, 0.55, 0.55)
 
-INT_PREFS = {PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0}
-TOGGLES = {TOGGLE_STL_BINARY: True, TOGGLE_STL_ONE_FILE: True, TOGGLE_STL_NO_TRANSLATE: True}
-TOGGLES[TOGGLE_STL_SHOW_INFO] = False
+# Declared baseline for every neutral export this module writes: a fine BINARY
+# STL in millimetres at the model origin (byte-identical to the part build's own
+# STL, which _common.export_part_stl enforces from the same ids) and STEP AP214
+# so the .step carries colours. SHOW_INFO -> False because every export would
+# otherwise block an unattended run on the per-file "Save <name>.STL?" modal.
+#
+# ENFORCED, never saved-and-restored: the old set_export_prefs/
+# restore_export_prefs pair captured the seat's OBSERVED values and handed them
+# back in a ``finally``, so a leaf dying inside the export (crash, COM
+# disconnect, or one of our own watchdog os._exit paths, which skip ``finally``
+# by construction) stranded the mutated values on a seat that lives on -- and the
+# next run captured the stranded value as "the original" and restored it forever.
+# Nothing downstream wants any other value, so the state is asserted at the start
+# of the export and deliberately left in place. See _common.enforce_preferences.
+EXPORT_PREFERENCES = PreferenceSpec(
+    label="neutral-export",
+    integers={PREF_STL_QUALITY: 2, PREF_STEP_AP: 214, PREF_STL_UNITS: 0},
+    toggles={
+        TOGGLE_STL_BINARY: True,
+        TOGGLE_STL_ONE_FILE: True,
+        TOGGLE_STL_NO_TRANSLATE: True,
+        TOGGLE_STL_SHOW_INFO: False,
+    },
+)
 SW_SAVE_OPTS = 1 | 8  # swSaveAsOptions_Silent | AvoidRebuildOnSave
 
 
@@ -213,28 +236,6 @@ def manifest_models() -> list[str]:
         (CAD_ROOT / "comparisons" / "manifest.json").read_text(encoding="utf-8")
     )
     return sorted({p["model"] for p in manifest["pairs"]})
-
-
-def set_export_prefs(adapter: Any) -> dict:
-    sw = adapter.swApp
-    old = {
-        "ints": {k: int(sw.GetUserPreferenceIntegerValue(k)) for k in INT_PREFS},
-        "toggles": {k: bool(sw.GetUserPreferenceToggle(k)) for k in TOGGLES},
-    }
-    for k, v in INT_PREFS.items():
-        sw.SetUserPreferenceIntegerValue(k, v)
-    for k, v in TOGGLES.items():
-        sw.SetUserPreferenceToggle(k, v)
-    log(f"export prefs set (were {old})")
-    return old
-
-
-def restore_export_prefs(adapter: Any, old: dict) -> None:
-    sw = adapter.swApp
-    for k, v in old["ints"].items():
-        sw.SetUserPreferenceIntegerValue(k, v)
-    for k, v in old["toggles"].items():
-        sw.SetUserPreferenceToggle(k, v)
 
 
 def _valid_rgb(values: Any) -> tuple[float, float, float] | None:
@@ -1541,7 +1542,7 @@ def main() -> int:
         d.mkdir(parents=True, exist_ok=True)
 
     async def build(adapter: Any) -> dict[str, str]:
-        old = set_export_prefs(adapter)
+        enforce_preferences(adapter, EXPORT_PREFERENCES)
         done: dict[str, str] = {}
 
         def active_cfg(doc: Any) -> str:
@@ -1700,7 +1701,6 @@ def main() -> int:
             return done
         finally:
             save_colors(colors)
-            restore_export_prefs(adapter, old)
 
     rc = run_build(build)
     if rc == 0:
