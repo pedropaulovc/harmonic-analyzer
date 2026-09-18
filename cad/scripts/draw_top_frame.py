@@ -501,8 +501,24 @@ def _cut_face_edge(
             continue
         candidates.append((item.length_mm, item.edge, midpoint))
     if not candidates:
+        # Name what IS there: the five lines closest to the pinned axes, so a
+        # seat that shows different cut geometry (worker 6, 2026-09-18:
+        # D-D outer rail face absent) is diagnosable from the leaf log.
+        def deviation(item: Any) -> float:
+            start, end = item.line
+            return max(
+                max(abs(start[axis]-value), abs(end[axis]-value))
+                for axis, value in fixed.items()
+            )
+        nearest = sorted(edges.lines, key=deviation)[:5]
+        seen = "; ".join(
+            f"{tuple(round(v, 3) for v in item.line[0])}->"
+            f"{tuple(round(v, 3) for v in item.line[1])} dev={deviation(item):.3g}"
+            for item in nearest
+        )
         raise RuntimeError(
-            f"{label}: no visible cut-face line at {fixed} (near={near})"
+            f"{label}: no visible cut-face line at {fixed} (near={near}); "
+            f"{len(edges.lines)} visible lines, nearest: {seen}"
         )
     _span, edge, midpoint = max(candidates, key=lambda item: item[0])
     return edge, midpoint
