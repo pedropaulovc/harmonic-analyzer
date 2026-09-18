@@ -169,11 +169,31 @@ def _one_line_extent(point_size: int, *, width_mm: float = 60.0):
 
 
 class _FakeTextFormat:
-    def __init__(self, typeface: str):
+    """The template's authored PART format, as ``ITextFormat`` reports it.
+
+    Every property the width model depends on is separately settable, because
+    SolidWorks carries them separately: a note can be bold Century Gothic, or
+    Century Gothic at 18 pt, with ``TypeFaceName`` unchanged either way.
+    ``height_in_points`` chooses which of the two height properties the
+    template authored, since ``CharHeightInPts`` is stale when it did not.
+    """
+
+    def __init__(
+        self,
+        typeface: str = TITLE_BLOCK_TYPEFACE,
+        *,
+        bold: bool = False,
+        italic: bool = False,
+        point_size: float = LANDSCAPE.nominal_point_size,
+        height_in_points: bool = True,
+    ):
         self.TypeFaceName = typeface
-        self.CharHeightInPts = LANDSCAPE.nominal_point_size
+        self.Bold = bold
+        self.Italic = italic
         self.LineLength = 0.0
-        self.IsHeightSpecifiedInPts = False
+        self.IsHeightSpecifiedInPts = height_in_points
+        self.CharHeightInPts = point_size if height_in_points else 0
+        self.CharHeight = point_size * MM_PER_POINT / 1000.0
 
 
 class _FakeAnnotation:
@@ -256,8 +276,8 @@ def seat(monkeypatch):
         lambda value, *_args, **_kwargs: value,
     )
 
-    def build(name: str, *, typeface: str = TITLE_BLOCK_TYPEFACE):
-        annotation = _FakeAnnotation(_FakeTextFormat(typeface))
+    def build(name: str, **format_kwargs):
+        annotation = _FakeAnnotation(_FakeTextFormat(**format_kwargs))
         point_size = fit_part_name(name, LANDSCAPE).point_size
         note = _FakeNote(name, annotation, _one_line_extent(point_size))
         return _FakeDrawingDoc(note), annotation
@@ -270,20 +290,39 @@ def seat(monkeypatch):
     [("channel-spring-installed", False), ("harmonic-analyzer assembly", True)],
     ids=["untouched-sheet", "fitted-sheet"],
 )
-def test_a_retypefaced_template_fails_every_sheet(seat, name, adjust):
-    """A changed template font must fail the sheets it does NOT fit too.
+@pytest.mark.parametrize(
+    "authored,match",
+    [
+        ({"typeface": "Arial"}, "prints in 'Arial'"),
+        ({"bold": True}, "Bold=True"),
+        ({"italic": True}, "Italic=True"),
+        ({"point_size": 18}, r"prints at 18\.00 pt"),
+    ],
+    ids=["family", "weight", "style", "size"],
+)
+def test_a_reauthored_template_fails_every_sheet(seat, name, adjust, authored, match):
+    """A note that is not the FACE and SIZE the model measured fails the sheet.
 
-    The width model is Century Gothic's own glyph table, so ``adjust=False``
-    -- "this name renders unwrapped at 16 pt" -- is a verdict of that model,
-    not an observation. Re-author the template in a wider font and those are
-    precisely the names that would start wrapping, with no fit applied
-    afterwards to catch it. Validating the typeface only on the fitted sheets
-    left that hole open.
+    The width model is one face's own glyph table read at one size, so
+    ``adjust=False`` -- "this name renders unwrapped at 16 pt" -- is a verdict
+    of that model, never an observation. Those are precisely the sheets that
+    would start wrapping under a re-authored template, with no fit applied and
+    no extent check afterwards to catch it.
+
+    Family is not enough, because ``ITextFormat`` carries weight, style and
+    size independently of ``TypeFaceName``. Measured against the Windows
+    Century Gothic faces: bold differs from regular on 79 of the table's 81
+    glyphs and pushes the line PROVEN to render unwrapped (68.834 mm) to
+    69.765 mm, past the bracket; 18 pt pushes the widest untouched fleet name
+    from 64.82 mm to 72.92 mm, likewise past it. Italic is metrically
+    identical to regular so it cannot move a wrap, but it slants ink past the
+    advance box the containment arithmetic uses, and the model's provenance is
+    the upright face.
     """
     assert fit_part_name(name, LANDSCAPE).adjust is adjust
-    ddoc, annotation = seat(name, typeface="Arial")
+    ddoc, annotation = seat(name, **authored)
 
-    with pytest.raises(RuntimeError, match="prints in 'Arial'"):
+    with pytest.raises(RuntimeError, match=match):
         drawing_common.fit_title_block_part_name(
             _FakeAdapter(),
             ddoc,
@@ -292,8 +331,33 @@ def test_a_retypefaced_template_fails_every_sheet(seat, name, adjust):
             expected_name=name,
         )
 
+    # Nothing is written on the way to the refusal, on either sheet class.
     assert annotation.writes == 0
     assert ddoc.GetEditSheet is True
+
+
+def test_a_template_authoring_its_height_in_millimetres_is_read_correctly(seat):
+    """``CharHeightInPts`` is stale unless the format says it is authoritative.
+
+    A note authored in millimetres reports its size through ``CharHeight``
+    (metres) while ``CharHeightInPts`` holds a leftover, so a size check that
+    always read the points property would refuse the whole fleet. This is the
+    case that discriminates: the same 16 pt note, authored the other way.
+    """
+    name = "channel-spring-installed"
+    ddoc, annotation = seat(name, height_in_points=False)
+    assert annotation.text_format.CharHeightInPts == 0
+
+    fit = drawing_common.fit_title_block_part_name(
+        _FakeAdapter(),
+        ddoc,
+        layout=DrawingLayout.LANDSCAPE,
+        sheet_name="Sheet1",
+        expected_name=name,
+    )
+
+    assert fit.adjust is False
+    assert annotation.writes == 0
 
 
 def test_an_untouched_sheets_ink_is_never_written(seat):

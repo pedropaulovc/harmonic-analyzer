@@ -40,7 +40,10 @@ from _drawing_layout_check import (
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _title_block_text import (
     MM_PER_POINT,
+    TITLE_BLOCK_BOLD,
+    TITLE_BLOCK_ITALIC,
     TITLE_BLOCK_TYPEFACE,
+    PartNameField,
     PartNameFit,
     fit_part_name,
     fit_is_contained,
@@ -5684,12 +5687,103 @@ def _iter_template_notes(adapter: Any, ddoc: Any):
         note = adapter._attempt(lambda n=note: n.GetNext())
 
 
+def _note_point_size(adapter: Any, text_format: Any, *, sheet_name: str) -> float:
+    """The size ``text_format`` actually prints at, in points.
+
+    ``CharHeightInPts`` is only authoritative when the format says its height
+    is specified in points; otherwise the authored value is ``CharHeight``, a
+    height in METRES, and ``CharHeightInPts`` is stale (this is the same
+    ``IsHeightSpecifiedInPts`` rule the fit applier honours when it writes).
+    Reading the wrong one would compare 16 pt against a leftover.
+    """
+    in_points = adapter._attempt(lambda: text_format.IsHeightSpecifiedInPts)
+    if in_points is None:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note will not say whether its height is "
+            "in points, so the size the width model assumes cannot be checked"
+        )
+    attribute = "CharHeightInPts" if in_points else "CharHeight"
+    raw = adapter._attempt(lambda: getattr(text_format, attribute))
+    if raw is None:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note reports no {attribute} to check "
+            "against the size the width model is computed at"
+        )
+    if in_points:
+        return float(raw)
+    # ITextFormat.CharHeight is in metres.
+    return float(raw) * 1000.0 / MM_PER_POINT
+
+
+def _assert_width_model_applies(
+    adapter: Any, text_format: Any, *, sheet_name: str, field: PartNameField
+) -> None:
+    """Fail unless the note prints in the FACE and SIZE the model measured.
+
+    A rendered advance is a function of family AND weight AND size, and
+    ``ITextFormat`` carries all three independently -- so checking the family
+    alone leaves the likelier edit unguarded: a template nudged to bold keeps
+    answering "Century Gothic" while every glyph widens, and one nudged to
+    18 pt keeps the family and the weight while the whole line grows 12.5%.
+    Either re-wraps the names this rule deliberately leaves alone, which is
+    the failure the all-sheets inspection exists to prevent.
+
+    The numbers, measured rather than asserted (see
+    :mod:`_title_block_text`): bold moves "Brass Fillister Head Slotted" --
+    the line PROVEN to render unwrapped at 68.834 mm -- to 69.765 mm, past the
+    bracket; 18 pt moves the fleet's widest untouched name,
+    "channel-spring-installed", from 64.82 mm to 72.92 mm, likewise past it.
+    """
+    typeface = str(adapter._attempt(lambda: text_format.TypeFaceName, default="") or "")
+    # The width model IS this face's own glyph table, so a template that
+    # changed font must fail here rather than be fitted -- or cleared -- with
+    # the wrong metrics.
+    if (
+        typeface.replace(" ", "").casefold()
+        != TITLE_BLOCK_TYPEFACE.replace(" ", "").casefold()
+    ):
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note prints in {typeface!r}, but the "
+            f"title-block width model is measured for {TITLE_BLOCK_TYPEFACE!r}; "
+            "re-measure _title_block_text.GLYPH_ADVANCE_PER_MILLE"
+        )
+    for attribute, expected in (
+        ("Bold", TITLE_BLOCK_BOLD),
+        ("Italic", TITLE_BLOCK_ITALIC),
+    ):
+        value = adapter._attempt(lambda a=attribute: getattr(text_format, a))
+        if value is None:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} PART note reports no {attribute}, so the "
+                "face the width model is measured for cannot be confirmed"
+            )
+        if bool(value) is not expected:
+            raise RuntimeError(
+                f"sheet {sheet_name!r} PART note prints {typeface!r} with "
+                f"{attribute}={bool(value)}, but the title-block width model is "
+                f"measured for {attribute}={expected}; re-measure "
+                "_title_block_text.GLYPH_ADVANCE_PER_MILLE"
+            )
+    point_size = _note_point_size(adapter, text_format, sheet_name=sheet_name)
+    # A COM VARIANT round trip can hand back 15.999..., so this compares at the
+    # resolution that changes a wrap decision: a quarter point is 0.09 mm of
+    # character height, two orders below the 8 mm bold/size shifts above.
+    if abs(point_size - field.nominal_point_size) > 0.25:
+        raise RuntimeError(
+            f"sheet {sheet_name!r} PART note prints at {point_size:.2f} pt, but "
+            f"the title-block field is measured at {field.nominal_point_size} pt "
+            "(every width in _title_block_text scales with it); re-measure the "
+            "field in _drawing_registry.DRAWING_TEMPLATES"
+        )
+
+
 def _part_name_note(
     adapter: Any,
     ddoc: Any,
     *,
     sheet_name: str,
     expected_name: str,
+    field: PartNameField,
 ) -> tuple[Any, Any, Any]:
     """Find this sheet's PART note and prove the width model describes it.
 
@@ -5700,10 +5794,12 @@ def _part_name_note(
     This runs for EVERY sheet, including the ones that are left untouched.
     Leaving a name alone is itself a verdict of the width model -- "this name
     is narrower than the note's authored box at the template's own size" --
-    and that verdict is only sound while the note still prints in the typeface
-    those glyph advances were measured from. Validating the typeface only on
-    the sheets that get fitted would let a template re-authored in a wider
-    font silently wrap exactly the names nothing checks afterwards.
+    and that verdict is only sound while the note still prints in the FACE and
+    SIZE those glyph advances were measured from -- family, weight, style and
+    point size, all of which ``ITextFormat`` carries independently. Validating
+    only the sheets that get fitted, or only the family, would let a template
+    re-authored in a wider face silently wrap exactly the names nothing checks
+    afterwards (see :func:`_assert_width_model_applies`).
     """
     candidates = [
         (note, annotation)
@@ -5726,19 +5822,9 @@ def _part_name_note(
     if text_format is None:
         raise RuntimeError(f"sheet {sheet_name!r} PART note has no ITextFormat to fit")
     text_format = _early_bound(text_format, "ITextFormat")
-    typeface = str(adapter._attempt(lambda: text_format.TypeFaceName, default="") or "")
-    # The width model IS this typeface's own glyph table, so a template that
-    # changed font must fail here rather than be fitted -- or cleared -- with
-    # the wrong metrics.
-    if (
-        typeface.replace(" ", "").casefold()
-        != TITLE_BLOCK_TYPEFACE.replace(" ", "").casefold()
-    ):
-        raise RuntimeError(
-            f"sheet {sheet_name!r} PART note prints in {typeface!r}, but the "
-            f"title-block width model is measured for {TITLE_BLOCK_TYPEFACE!r}; "
-            "re-measure _title_block_text.GLYPH_ADVANCE_PER_MILLE"
-        )
+    _assert_width_model_applies(
+        adapter, text_format, sheet_name=sheet_name, field=field
+    )
     return note, annotation, text_format
 
 
@@ -5768,8 +5854,9 @@ def fit_title_block_part_name(
 
     Every sheet is still INSPECTED, though, fitted or not. "This name fits the
     authored box at 16 pt" is a verdict of the width model, so it is only
-    sound while the note prints in the typeface that model was measured from;
-    see :func:`_part_name_note`.
+    sound while the note still prints in the face and at the size that model
+    was measured from -- family, weight, style and point size; see
+    :func:`_part_name_note` and :func:`_assert_width_model_applies`.
 
     Editing sheet-format ink needs ``IDrawingDoc::EditTemplate``; the edit is
     per sheet and in-document, so neither the checked-in DRWDOT nor any other
@@ -5797,7 +5884,11 @@ def fit_title_block_part_name(
         )
     try:
         note, annotation, text_format = _part_name_note(
-            adapter, ddoc, sheet_name=sheet_name, expected_name=expected_name
+            adapter,
+            ddoc,
+            sheet_name=sheet_name,
+            expected_name=expected_name,
+            field=field,
         )
         if fit.adjust:
             text_format.LineLength = fit.line_length_mm / 1000.0

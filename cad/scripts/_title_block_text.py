@@ -55,6 +55,25 @@ from dataclasses import dataclass
 
 TITLE_BLOCK_TYPEFACE = "Century Gothic"
 
+# The FACE the glyph table was measured from, not just the family. A family
+# name does not determine advance widths: ``ITextFormat`` carries Bold and
+# Italic independently of ``TypeFaceName``, so a template re-authored in bold
+# Century Gothic keeps reporting "Century Gothic" while every advance moves.
+#
+# Checked against the Windows-shipped Century Gothic faces by decoding their
+# ``hmtx``/``cmap`` and scaling to 1/1000 em: GLYPH_ADVANCE_PER_MILLE matches
+# GOTHIC.TTF (regular) on all 81 glyphs and differs from GOTHICB.TTF (bold) on
+# 79 of them (ratio 0.83..1.28, mean 1.019). Bold is enough to re-wrap the
+# fleet: "Brass Fillister Head Slotted" -- the line PROVEN to render unwrapped
+# at 68.834 mm -- measures 69.765 mm bold, past the wrap bracket.
+TITLE_BLOCK_BOLD = False
+# Century Gothic Italic is metrically compatible: its advances are identical
+# to regular on all 81 glyphs, so italic cannot move a WRAP decision. It is
+# still pinned, because the slant puts ink to the right of the advance box
+# that :func:`fitted_text_box_mm` and the cell's right rule are compared in,
+# and because the model's provenance is the upright face.
+TITLE_BLOCK_ITALIC = False
+
 MM_PER_POINT = 25.4 / 72.0
 
 # /FontDescriptor of the embedded Century Gothic subset, per em.

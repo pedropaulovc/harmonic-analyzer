@@ -90,11 +90,13 @@ Century Gothic CID subset embedded in the released PDFs. **If the title block
 moves, the cell is resized, or its font changes, re-measure**: the field
 geometry lives in `_drawing_registry.DRAWING_TEMPLATES[...].part_name_field`
 and the glyph table in `_title_block_text.GLYPH_ADVANCE_PER_MILLE`, both with
-their provenance recorded in comments. A font change fails the build loudly
-rather than mis-fitting, because the applier checks `ITextFormat.TypeFaceName`
-on **every** sheet before it trusts the model — including the sheets it
-decides to leave alone, since "this name fits unwrapped at 16 pt" is itself a
-verdict of the model and a wider font would break it.
+their provenance recorded in comments. Re-authoring the note fails the build
+loudly rather than mis-fitting, because the applier checks the whole format
+the model assumes — family, weight, style and point size, which
+`ITextFormat` carries independently — on **every** sheet before it trusts the
+model, including the sheets it decides to leave alone, since "this name fits
+unwrapped at 16 pt" is itself a verdict of the model and a wider face or a
+larger size would break it.
 
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
