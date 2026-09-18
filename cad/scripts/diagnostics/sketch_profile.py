@@ -165,13 +165,30 @@ def endpoint_merges(segments: tuple[Segment, ...]) -> tuple[Merge, ...]:
     bridge the gap.
 
     Raises:
-        OpenProfileError: when any vertex is not shared by exactly two segment
-            ends -- a dangling end, or three segments meeting at a point.
+        OpenProfileError: when a segment's two ends are the SAME vertex, or
+            when any vertex is not shared by exactly two segment ends -- a
+            dangling end, or three segments meeting at a point.
     """
     groups: dict[Vertex, list[EndpointRef]] = {}
     for index, segment in enumerate(segments):
-        for end in ENDS:
-            groups.setdefault(getattr(segment, end), []).append((index, end))
+        ends = tuple(getattr(segment, end) for end in ENDS)
+        # A zero-length segment contributes BOTH of its ends to one vertex, so
+        # it satisfies the degree-two test below by pairing with ITSELF, and
+        # closed_loops then counts it as a loop of its own -- a "closed"
+        # profile with no area, authored straight into add_line/add_arc.  It is
+        # the one shape that passes the pairing while being unextrudable, and
+        # it is exactly what a snap that collapses a segment produces, so it is
+        # refused here beside the dangling-end case.  (minor_arc already
+        # refuses the arc form at construction; this covers a Line, and an Arc
+        # built without going through minor_arc.)
+        if ends[0] == ends[1]:
+            raise OpenProfileError(
+                f"segment {index} starts and ends at {ends[0]}: a zero-length "
+                "segment pairs with itself, so it would pass the degree-two "
+                "test and be authored as a loop enclosing nothing"
+            )
+        for end, vertex in zip(ENDS, ends, strict=True):
+            groups.setdefault(vertex, []).append((index, end))
     merges: list[Merge] = []
     for vertex, refs in groups.items():
         if len(refs) != 2:

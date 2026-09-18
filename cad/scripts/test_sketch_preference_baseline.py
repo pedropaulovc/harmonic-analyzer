@@ -89,23 +89,43 @@ AUDIT_EXEMPT = {
 
 
 class _SwApp:
-    """Records every preference write, so restore ORDER and VALUES are visible."""
+    """Records every preference write, so restore ORDER and VALUES are visible.
 
-    def __init__(self, initial: dict[int, bool]) -> None:
+    ``refuse`` models the real API's SILENT failure mode: ISldWorks
+    .SetUserPreferenceToggle returns False and leaves the preference at its old
+    value rather than raising, so a seat that will not take a write is
+    indistinguishable from one that took it unless the return is read.  Each
+    member is a ``(toggle, value)`` pair, so a fake can refuse the suppression
+    write while still accepting the baseline restore that follows it.
+    """
+
+    def __init__(
+        self,
+        initial: dict[int, bool],
+        refuse: frozenset[tuple[int, bool]] = frozenset(),
+    ) -> None:
         self.toggles = dict(initial)
         self.writes: list[tuple[int, bool]] = []
+        self.refuse = frozenset(refuse)
 
     def GetUserPreferenceToggle(self, toggle: int) -> bool:
         return self.toggles[toggle]
 
-    def SetUserPreferenceToggle(self, toggle: int, value: bool) -> None:
+    def SetUserPreferenceToggle(self, toggle: int, value: bool) -> bool:
+        if (toggle, bool(value)) in self.refuse:
+            return False
         self.toggles[toggle] = bool(value)
         self.writes.append((toggle, bool(value)))
+        return True
 
 
 class _Adapter:
-    def __init__(self, initial: dict[int, bool]) -> None:
-        self.swApp = _SwApp(initial)
+    def __init__(
+        self,
+        initial: dict[int, bool],
+        refuse: frozenset[tuple[int, bool]] = frozenset(),
+    ) -> None:
+        self.swApp = _SwApp(initial, refuse)
 
     def _attempt(self, thunk, default=None):
         try:
@@ -122,8 +142,10 @@ def _state(value: bool) -> dict[int, bool]:
     return dict.fromkeys(_ids(), value)
 
 
-def _adapter_at(value: bool) -> _Adapter:
-    return _Adapter(_state(value))
+def _adapter_at(
+    value: bool, refuse: frozenset[tuple[int, bool]] = frozenset()
+) -> _Adapter:
+    return _Adapter(_state(value), refuse)
 
 
 def test_the_two_declared_states_are_opposites_over_the_same_keys() -> None:
@@ -257,11 +279,12 @@ def test_a_failed_entry_does_not_pin_the_depth_counter() -> None:
     failing = adapter.swApp
     calls: list[int] = []
 
-    def _set(toggle: int, value: bool) -> None:
+    def _set(toggle: int, value: bool) -> bool:
         calls.append(toggle)
         if value is False:
             raise OSError("the seat dropped the connection")
         failing.toggles[toggle] = bool(value)
+        return True
 
     adapter.swApp.SetUserPreferenceToggle = _set
 
@@ -279,6 +302,49 @@ def test_a_failed_entry_does_not_pin_the_depth_counter() -> None:
     with diag.no_sketch_inference(adapter):
         assert adapter.swApp.toggles == _state(False)
     assert adapter.swApp.writes, "a later block stopped applying preferences"
+
+
+def test_a_refused_suppression_write_is_not_reported_as_applied() -> None:
+    """``SetUserPreferenceToggle`` returning False is a REFUSED write.
+
+    The API does not raise for a preference it will not change: it returns
+    False and leaves the old value in place.  If the return is discarded, the
+    guard enters its body with inference still LIVE on a seat that never took
+    the suppression -- the exact per-seat divergence this module exists to
+    remove, now hidden behind a guard that claims to have removed it.  So the
+    refusal must propagate, the body must never run, and the seat must be left
+    at the declared baseline rather than half-suppressed.
+    """
+    inference = diag.SKETCH_DRAWING_STATE["swSketchInference"][0]
+    adapter = _adapter_at(True, refuse=frozenset({(inference, False)}))
+
+    with pytest.raises(RuntimeError, match="refused to set swSketchInference"):
+        with diag.no_sketch_inference(adapter):
+            raise AssertionError("the block must never run under a refused write")
+
+    assert adapter.swApp.toggles == _state(True), "the baseline was not restored"
+    assert getattr(adapter, "_sketch_drawing_depth", 0) == 0
+
+
+def test_a_refused_baseline_write_is_not_reported_as_a_repair(monkeypatch) -> None:
+    """A repair that did not happen must not be announced as one.
+
+    ``assert_seat_sketch_baseline`` decides "drifted" from a read taken BEFORE
+    the write.  On a seat that refuses the write, that read is still evidence
+    of drift but the write did not fix it, so returning the name (and warning
+    that it "has been reset") would tell the pool's leaf-admission audit the
+    seat was repaired while it is still poisoned.
+    """
+    warnings: list[str] = []
+    monkeypatch.setattr(diag._telemetry, "warn", warnings.append)
+    inference = diag.SEAT_SKETCH_BASELINE["swSketchInference"][0]
+    adapter = _adapter_at(False, refuse=frozenset({(inference, True)}))
+
+    with pytest.raises(RuntimeError, match="refused to set swSketchInference"):
+        diag.assert_seat_sketch_baseline(adapter, "91247A720")
+
+    assert adapter.swApp.toggles[inference] is False
+    assert warnings == [], "a refused write was announced as a completed repair"
 
 
 def _is_guard_call(expr: ast.expr) -> bool:

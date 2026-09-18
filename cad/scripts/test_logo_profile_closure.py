@@ -219,3 +219,38 @@ def test_an_endpoint_that_reached_the_arc_centre_is_refused() -> None:
         minor_arc(centre, centre, (centre[0] + LOGO_OUTER_R, centre[1]))
     with pytest.raises(OpenProfileError, match="IS the centre"):
         minor_arc(centre, (centre[0] + LOGO_OUTER_R, centre[1]), centre)
+
+
+def test_a_collapsed_segment_is_refused_instead_of_pairing_with_itself() -> None:
+    """The one degenerate shape that SATISFIES the degree-two pairing.
+
+    A zero-length segment puts both of its own ends on a single vertex, so that
+    vertex has degree two and the dangling-end check passes it; ``closed_loops``
+    then reports it as a loop in its own right.  A collapsed segment would
+    therefore be counted toward the asserted loop total and authored straight
+    into ``add_line``/``add_arc`` as a line (or arc) with identical endpoints --
+    which is exactly the residue of the snap these gates exist to catch.  Both
+    segment kinds are covered because ``Arc`` is constructible without going
+    through ``minor_arc``, whose own zero-radius/zero-sweep refusals do not
+    apply to a directly built arc.
+    """
+    collapsed = (3.0, 4.0)
+    square = (
+        Line((0.0, 0.0), (1.0, 0.0)),
+        Line((1.0, 0.0), (1.0, 1.0)),
+        Line((1.0, 1.0), (0.0, 1.0)),
+        Line((0.0, 1.0), (0.0, 0.0)),
+    )
+    assert endpoint_merges(square), "the control profile must be accepted"
+
+    for degenerate in (
+        Line(collapsed, collapsed),
+        Arc((0.0, 0.0), collapsed, collapsed),
+    ):
+        segments = (*square, degenerate)
+        # Degree two, by self-reference: the check it must NOT slip past.
+        assert len(closed_loops(segments)) == 2
+        with pytest.raises(OpenProfileError, match="starts and ends at") as raised:
+            endpoint_merges(segments)
+        assert "pairs with itself" in str(raised.value)
+        assert str(collapsed) in str(raised.value)

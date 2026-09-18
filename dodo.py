@@ -2703,6 +2703,16 @@ def task_check():
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
         SCRIPTS_DIR / "test_machinist_review.py",
+        # The settings-independence contracts this PR adds.  Both are pure
+        # Python (no COM), and unenrolled they would be exactly the "green gate
+        # that checks nothing" the comments above warn about: the offline
+        # closure invariant (endpoint_merges/minor_arc refusing the shapes an
+        # inference snap produces) and the seat-preference contract (declared
+        # baseline vs observed restore, depth counting, refused writes) are the
+        # whole mechanism by which a recipe stops depending on a seat's
+        # inference settings, so they must fail a gate, not just a local run.
+        SCRIPTS_DIR / "test_logo_profile_closure.py",
+        SCRIPTS_DIR / "test_sketch_preference_baseline.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun

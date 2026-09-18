@@ -261,13 +261,28 @@ def apply_sketch_preferences(
     first run on a poisoned seat records the poisoned value as "the original"
     and faithfully writes it back forever.  Every write target here is a
     declared constant, so nothing can latch.
+
+    ``ISldWorks.SetUserPreferenceToggle`` reports refusal by RETURNING False,
+    not by raising: a preference the seat will not change is left at its old
+    value and the call otherwise looks like a success.  Discarding that return
+    would let the two silent lies this module exists to prevent straight
+    through -- :func:`no_sketch_inference` drawing with inference still live,
+    and :func:`assert_seat_sketch_baseline` announcing a repair that never
+    happened -- so every write is checked and a refusal raises.  Raising is
+    what routes a refused SUPPRESSION into ``no_sketch_inference``'s failed-
+    ENTRY path, which puts the declared baseline back before propagating.
     """
     app = adapter.swApp
     changed: list[str] = []
     for name, (toggle, required) in state.items():
         if bool(app.GetUserPreferenceToggle(toggle)) != required:
             changed.append(name)
-        app.SetUserPreferenceToggle(toggle, required)
+        if not app.SetUserPreferenceToggle(toggle, required):
+            raise RuntimeError(
+                f"the seat refused to set {name} (toggle {toggle}) to "
+                f"{required}: SetUserPreferenceToggle returned False, so the "
+                "preference still holds its previous value"
+            )
     return changed
 
 
@@ -322,8 +337,10 @@ def no_sketch_inference(adapter):
 
     The counter is raised only AFTER the suppression write succeeds.  Raising
     it first would pin it forever if ``apply_sketch_preferences`` threw --
-    ``SetUserPreferenceToggle`` is a COM call on a seat that may be dying --
-    because the ``finally`` that lowers it would never have been entered.
+    ``SetUserPreferenceToggle`` is a COM call on a seat that may be dying, and
+    it also RETURNS False for a write the seat refuses, which
+    ``apply_sketch_preferences`` turns into a raise -- because the ``finally``
+    that lowers it would never have been entered.
     Every later block on that adapter would then see a nonzero depth and
     quietly become a no-op: suppression never applied, baseline never
     restored, for the life of the process.  That is the silent-disable this
