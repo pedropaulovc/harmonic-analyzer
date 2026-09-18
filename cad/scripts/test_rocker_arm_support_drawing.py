@@ -194,16 +194,41 @@ def test_support_keeps_original_world_placement_and_hold_down_pattern() -> None:
     }
 
 
-@pytest.mark.parametrize("scale", [0.5, 1.0])
-def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
-    """A centre cut must stay centred on a translated, scaled parent view.
+class _FakeSketchManager:
+    """Records the ``CreateLine`` call and can snap the segment like inference."""
 
-    Native CreateLine interprets sheet coordinates a second time: the old
-    helper cut x=42.5 mm off centre at 1:2 and left an unsectioned taper.
-    """
+    def __init__(self, snap: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> None:
+        self.AddToDB = False
+        self.add_to_db_when_created: bool | None = None
+        self.calls: list[tuple[float, ...]] = []
+        self._snap = snap
+
+    def CreateLine(self, *args: float) -> SimpleNamespace:
+        self.add_to_db_when_created = self.AddToDB
+        self.calls.append(args)
+        start = tuple(args[0:3])
+        end = tuple(value + shift for value, shift in zip(args[3:6], self._snap))
+        return SimpleNamespace(
+            GetStartPoint2=lambda: SimpleNamespace(X=start[0], Y=start[1], Z=start[2]),
+            GetEndPoint2=lambda: SimpleNamespace(X=end[0], Y=end[1], Z=end[2]),
+            Select4=lambda append, data: True,
+        )
+
+
+def _member(obj, name):
+    """Stand in for the adapter's method-or-property COM read."""
+    value = getattr(obj, name)
+    return value() if callable(value) else value
+
+
+def _section_doubles(
+    monkeypatch,
+    scale: float,
+    snap: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> SimpleNamespace:
     origin = drawing.FRONT_CENTER
     transform = object()
-    points = []
+    points: list[tuple[float, ...]] = []
 
     def make_point(values):
         points.append(tuple(values))
@@ -228,12 +253,19 @@ def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
     section = Mock()
     section.GetSection.return_value = section_definition
     section.SetViewPosition.return_value = True
+    sketch_manager = _FakeSketchManager(snap)
     model = Mock()
     model.ActivateView.return_value = True
+    model.SketchManager = sketch_manager
+    model.SelectionManager = SimpleNamespace(
+        CreateSelectData=lambda: SimpleNamespace(View=None),
+        GetSelectedObjectCount2=lambda mark: 1,
+    )
     model.CreateSectionViewAt5.return_value = section
     adapter = SimpleNamespace(
         currentModel=model,
         swApp=SimpleNamespace(GetMathUtility=lambda: math_utility),
+        _get_attr_or_call=lambda obj, name: _member(obj, name),
     )
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _: obj)
     monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Front")
@@ -241,22 +273,67 @@ def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    start = (origin[0], origin[1] - 0.050)
-    end = (origin[0], origin[1] + 0.050)
+    return SimpleNamespace(
+        adapter=adapter,
+        parent=parent,
+        model=model,
+        section=section,
+        section_definition=section_definition,
+        sketch_manager=sketch_manager,
+        points=points,
+        start=(origin[0], origin[1] - 0.050),
+        end=(origin[0], origin[1] + 0.050),
+    )
+
+
+@pytest.mark.parametrize("scale", [0.5, 1.0])
+def test_section_cut_uses_parent_sketch_coordinates(monkeypatch, scale) -> None:
+    """A centre cut must stay centred on a translated, scaled parent view.
+
+    Native CreateLine interprets sheet coordinates a second time: the old
+    helper cut x=42.5 mm off centre at 1:2 and left an unsectioned taper.
+    """
+    doubles = _section_doubles(monkeypatch, scale)
     result = _drawing_common.create_section_view(
-        adapter,
-        parent,
-        line_start=start,
-        line_end=end,
+        doubles.adapter,
+        doubles.parent,
+        line_start=doubles.start,
+        line_end=doubles.end,
         view_xy=drawing.RIGHT_CENTER,
         section_label="A",
         scale=(1, 2),
         label="centre cut regression",
     )
-    assert result is section
-    assert points == [(*start, 0.0), (*end, 0.0)]
-    assert model.SketchManager.CreateLine.call_args.args == pytest.approx(
+    assert result is doubles.section
+    assert doubles.points == [(*doubles.start, 0.0), (*doubles.end, 0.0)]
+    assert doubles.sketch_manager.calls[0] == pytest.approx(
         (0.0, -0.050 / scale, 0.0, 0.0, 0.050 / scale, 0.0)
     )
-    section_definition.SetAutoHatch.assert_called_once_with(True)
-    section_definition.SetLabel2.assert_called_once_with("A")
+    # The cutting line is authored direct-to-DB, out of sketch inference's
+    # reach, and the seat's own mode is left as it was found.
+    assert doubles.sketch_manager.add_to_db_when_created is True
+    assert doubles.sketch_manager.AddToDB is False
+    doubles.section_definition.SetAutoHatch.assert_called_once_with(True)
+    doubles.section_definition.SetLabel2.assert_called_once_with("A")
+
+
+def test_section_cut_refuses_a_cutting_line_inference_moved(monkeypatch) -> None:
+    """A snapped endpoint tilts the cut plane; no section may be created.
+
+    top_frame's D-D was cut 4.29 degrees oblique this way (0.674 mm off
+    station at the rail face), and the tilt only surfaced much later, as a
+    missing cut-face line in a different recipe's dimension pick.
+    """
+    doubles = _section_doubles(monkeypatch, 1.0, snap=(0.0, 0.000674, 0.0))
+    with pytest.raises(RuntimeError, match=r"end point sits 0\.674 mm"):
+        _drawing_common.create_section_view(
+            doubles.adapter,
+            doubles.parent,
+            line_start=doubles.start,
+            line_end=doubles.end,
+            view_xy=drawing.RIGHT_CENTER,
+            section_label="A",
+            scale=(1, 2),
+            label="snap regression",
+        )
+    doubles.model.CreateSectionViewAt5.assert_not_called()
