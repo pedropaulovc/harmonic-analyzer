@@ -3288,25 +3288,39 @@ def _document_state(adapter: Any) -> dict[str, Any]:
     return state
 
 
-def _resolve_sketch(adapter: Any, sketch: Any | None) -> Any | None:
-    """The sketch to inspect: a caller-supplied dispatch, a named feature's
-    sketch, or (default) the last profile sketch the document exited."""
+def _resolve_sketch(adapter: Any, sketch: Any | None) -> tuple[Any | None, str]:
+    """The sketch to inspect and its NAME: a caller-supplied dispatch, a named
+    feature's sketch, or (default) the last profile sketch the document exited.
+
+    The name is RETURNED rather than read off the sketch, because ``ISketch``
+    does not declare ``Name``: it is an ``IFeature`` property (dispid 1,
+    ``(8, 0)`` VT_BSTR) and appears in neither ``ISketch``'s ``_prop_map_get_``
+    nor any of its 103 methods, so a ``Name`` read on a sketch yields nothing
+    on a real seat however it is spelled. Same rule ``diag_dump_part``'s entity
+    walk already follows ("a face has no Name and goes the GetFeature route").
+    ``ISketch`` offers no route back to its feature either, so the identity has
+    to come from the side that resolved it; when nothing resolved it by name (a
+    caller's live dispatch, or ``GetActiveSketch2``) the name is genuinely
+    unknown and :func:`_sketch_state` omits it rather than reporting blank.
+    """
     if sketch is not None and not isinstance(sketch, str):
-        return sketch
+        return sketch, ""
     model = adapter.currentModel
     if model is None:
-        return None
+        return None, ""
     name = sketch or feature_name_by_type(adapter, "ProfileFeature")
     if not name:
-        return adapter._attempt(
+        active = adapter._attempt(
             lambda: _read_member(model, "GetActiveSketch2"), default=None
         )
+        return active, ""
     feature = adapter._attempt(lambda: _feature_by_name(adapter, str(name)), default=None)
     if feature is None:
-        return None
-    return adapter._attempt(
+        return None, str(name)
+    resolved = adapter._attempt(
         lambda: _read_member(feature, "GetSpecificFeature2"), default=None
     )
+    return resolved, str(name)
 
 
 def _point_census(sketch: Any) -> dict[str, Any]:
@@ -3348,11 +3362,10 @@ def _sketch_state(
     ``FeatureExtrusion3`` returning ``None`` with no record of which endpoint
     failed to merge.
     """
-    resolved = _resolve_sketch(adapter, sketch)
+    resolved, name = _resolve_sketch(adapter, sketch)
     if resolved is None:
         return {"sketch": None}
     probes: dict[str, Callable[[], Any]] = {
-        "name": lambda: str(_read_member(resolved, "Name") or ""),
         "contour_count": lambda: int(resolved.GetSketchContourCount()),
         "region_count": lambda: int(resolved.GetSketchRegionCount()),
         "segment_count": lambda: len(list(resolved.GetSketchSegments() or [])),
@@ -3363,6 +3376,12 @@ def _sketch_state(
     state: dict[str, Any] = {
         key: adapter._attempt(probe, default=None) for key, probe in probes.items()
     }
+    if name:
+        # Absent, not blank, when nothing resolved the sketch by name: a "name"
+        # that is always "" reads in the artefact as "the seat would not tell
+        # us", a claim no read was ever made to support. Same rule the point
+        # census follows -- a number nobody measured is omitted, not defaulted.
+        state["name"] = name
     status = adapter._attempt(lambda: int(resolved.GetConstrainedStatus()), default=None)
     state["constrained_status"] = status
     state["constrained"] = _CONSTRAINED_STATUS.get(status, "unknown")

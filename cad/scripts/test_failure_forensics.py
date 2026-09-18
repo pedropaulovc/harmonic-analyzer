@@ -69,12 +69,19 @@ import _watchdog  # noqa: E402
 
 
 class _Sketch:
-    """An ``ISketch`` whose census is whatever the test dictates."""
+    """An ``ISketch`` whose census is whatever the test dictates.
+
+    NO ``Name``, because ``ISketch`` declares none: the typelib puts ``Name``
+    on ``IFeature`` (dispid 1, ``(8, 0)`` VT_BSTR) and nowhere in ``ISketch``'s
+    ``_prop_map_get_`` or its 103 methods, so a real sketch dispatch answers
+    that read with nothing. A fake that carried a ``Name`` would be more
+    permissive than COM and would green-light a census field that is blank on
+    every seat.
+    """
 
     def __init__(self, *, contours: int, points: list[tuple[float, float, float]]):
         self._contours = contours
         self._points = points
-        self.Name = "LogoProfile"
 
     def GetSketchContourCount(self) -> int:
         return self._contours
@@ -1055,6 +1062,54 @@ def test_a_closure_verdict_that_cannot_be_read_never_raises(capture_telemetry):
     verdict = _common.record_sketch_closure(_Adapter(sw=_Seat()), "logo", _Hostile())
 
     assert verdict["closure"] == "unknown"
+
+
+def test_the_census_names_the_sketch_from_its_feature(monkeypatch):
+    """``ISketch`` has no ``Name``: the identity comes from the FEATURE.
+
+    ``Name`` is declared on ``IFeature`` (dispid 1, ``(8, 0)`` VT_BSTR) and is
+    absent from ``ISketch``'s property maps and all 103 of its methods, so the
+    old ``_read_member(sketch, "Name")`` returned nothing on every seat and the
+    capture carried ``"name": ""`` forever -- a field that reads as "the seat
+    would not say" when in fact nothing was ever asked. ``ISketch`` offers no
+    route back to its feature either, so the name has to come from the side
+    that resolved the sketch.
+    """
+    sketch = _Sketch(contours=2, points=[(0.001 * n, 0.0, 0.0) for n in range(9)])
+
+    class _Feature:
+        """An ``IFeature``: this one really does have ``Name``."""
+
+        Name = "LogoProfile"
+
+        def GetSpecificFeature2(self) -> object:
+            return sketch
+
+    adapter = _Adapter(sw=_Seat(), model=object())
+    monkeypatch.setattr(_common, "_feature_by_name", lambda _a, _n: _Feature())
+
+    state = _common._sketch_state(adapter, "LogoProfile")
+
+    assert state["name"] == "LogoProfile"
+    assert state["contour_count"] == 2
+
+
+def test_a_sketch_nothing_named_reports_no_name_rather_than_a_blank_one(monkeypatch):
+    """A caller's live dispatch cannot be named -- so the field is ABSENT.
+
+    Blank would be a claim ("asked, got nothing") that no read supports, and it
+    is indistinguishable in the artefact from a seat that refused the read. The
+    same rule the point census follows: a number nobody measured is omitted,
+    not defaulted.
+    """
+    adapter = _Adapter(sw=_Seat(), model=object())
+
+    state = _common._sketch_state(
+        adapter, _Sketch(contours=1, points=[(0.0, 0.0, 0.0)])
+    )
+
+    assert "name" not in state
+    assert state["contour_count"] == 1
 
 
 def test_authored_profile_geometry_is_logged_for_every_profile(capture_telemetry):
