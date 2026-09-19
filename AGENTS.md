@@ -238,6 +238,82 @@ farm (`--executor farm`, which is how a seatless machine runs them).
   advances it after a successful publish and leaves a tracked merge bump;
   the release agent MUST commit and merge that bump before the next release.
 
+## Running on the farm — preflight, debug leaves, and the pool underneath
+
+`--executor farm` dispatches COM leaves to the
+[`solidworks-pool`](https://github.com/pedropaulovc/solidworks-pool) farm. That pool is
+a separate repository with its own deploy cycle, and **a build submitted from a
+mismatched submitter fails every leaf** — so two checks come before anything expensive.
+
+**1. Does the pool checkout match the deployed fleet?** A package is published under
+`sources/<source-identity>-<agent-identity>/`, and each worker rebuilds that prefix from
+the agent *it* is running. A submitter whose pool checkout is ahead of the fleet publishes
+where no worker looks, and every leaf fails `package_download: no package blobs under …`:
+
+```powershell
+cd <solidworks-pool checkout>
+uv run --frozen python farm.py agents             # local agent identity vs what each worker reports
+```
+
+It exits 0 either way — the verdict is the caller's to act on. On a mismatch, either deploy
+the agent (`farm.py agent-release publish`, a ~110 KB blob write that costs no seat) or
+submit from a pool checkout at the deployed commit. Do not read a worktree that claims to be
+pinned to "the deployed commit": ask the fleet with `farm.py agent-release status`.
+
+Two traps make a *false* mismatch look real. The agent identity hashes working-tree bytes,
+so it differs between a CRLF and an LF checkout of the same commit
+([pool #88](https://github.com/pedropaulovc/solidworks-pool/issues/88)); and the same guard
+intermittently refuses a tree `git status` calls clean, after anything that touches mtimes.
+
+**2. Is this branch current?** A stale branch risks a green farm build that still conflicts,
+and config or digest changes on `main` invalidate what you just built. `git fetch origin main
+&& git log HEAD..origin/main` before dispatching, not after a gate fails.
+
+### Dispatching one task instead of a build
+
+Any farm-dispatchable task is a valid target, so a debug run is just a narrower closure:
+
+```
+./build part:fulcrum_keeper --leaf-timeout 90     # one leaf, cold-safe budget
+./build assembly:drive_train
+```
+
+Watch and steer it from the pool checkout:
+
+```powershell
+uv run --frozen python farm.py workers                 # pollers, idle/busy, queue depth
+uv run --frozen python farm.py status <workflow-id>
+uv run --frozen python farm.py logs   <workflow-id>    # that leaf's published log
+uv run --frozen python farm.py capture <worker-id>     # desktop frame + recent log lines
+uv run --frozen python farm.py cancel <workflow-id>
+```
+
+Concurrent submitters of the same cache key **and budget** attach to the same workflow run,
+which is why the budget is part of the workflow id: Temporal cannot widen a running
+execution's timeout. Re-dispatching the same target with a different `--leaf-timeout`
+therefore starts a new run rather than joining the one already in flight.
+
+`cache_status` answers "why did this miss?" without a seat, a worker or a `.doit.db` lock,
+and it is the right first move on an unexpected dispatch — a leaf that should have been a
+cache hit usually means one dep digest moved, not that the farm misbehaved.
+
+### What the farm cannot run
+
+`gallery` needs Blender and no worker has it; `cache_status` is a local diagnostic. Both are
+refused by the pool's admission list, not merely skipped by the recipe. The SolidWorks-free
+`check:*` gates are admissible on a worker but are **never dispatched** — they route through
+`_run_stamped`/`_run`, not `_cached_com_action`, so they always run on the submitter.
+
+### Debugging a leaf that failed on a worker
+
+A leaf's log is published to the results container and is the primary evidence; read it with
+`farm.py logs` rather than inferring from the submitter's console. `farm.py capture` pairs a
+desktop frame with recent log lines in one directory, which is what a modal dialog or a
+wedged seat looks like from outside. If the worker needs to be held for inspection, drain it
+(`farm.py drain <worker-id> --reason '…'`) — that stops new leaves while letting the one in
+flight finish, instead of racing the scheduler for the machine.
+
+
 ## The COM seat lock (do not break this)
 
 One SolidWorks STA seat ⇒ COM tasks must never run concurrently. Serialization is
