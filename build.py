@@ -24,8 +24,10 @@ whose agent build is the one the fleet runs (``farm.py agents``: a package
 published for any other agent lands under a prefix no worker reads), and the
 commit's sources published to the pool (``farm.py publish``) before doit starts.
 That preflight runs for every doit command that executes task actions
-(``Command.execute_tasks``: ``run``, explicit or implicit, and ``strace``); the
-others (``list``, ``info``, ``clean``, ...) and ``--help``/``--version`` skip it.
+(``Command.execute_tasks``: ``run``, explicit or implicit, and ``strace``) whose
+argv the command's own parser accepts; the others (``list``, ``info``, ``clean``,
+...), ``--help``/``--version`` and an argv doit would reject (``run --help``: doit
+has no per-command help and exits 3) skip it and pass through untouched.
 ``-n`` is added for ``run`` only. A release therefore needs no local SolidWorks;
 only the Blender-bound ``gallery`` task and the publishing half of ``release``
 run here.
@@ -43,6 +45,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
+from doit.cmd_base import get_loader
+from doit.cmdparse import CmdParseError
 from doit.doit_cmd import DoitMain
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -75,8 +79,8 @@ farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
                 measured 61.5 min, so raise it for anything cold
   preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
                 matching the pool checkout, sources published -- only before a
-                command that executes tasks (run, strace); --help, list, info,
-                clean, ... never reach it
+                command that executes tasks (run, strace) with an argv doit
+                accepts; --help, list, info, clean, ... never reach it
 
 doit's own help follows. `build.py help run` shows the run options (-n, -a,
 -c, -v ...), `build.py help <task>` a task's own parameters."""
@@ -139,7 +143,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if options.leaf_timeout is not None:
         os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
     if options.executor == "farm":
-        executing = _executing_command(doit_args, doit.get_cmds())
+        executing = _executing_command(doit_args, doit)
         if executing is not None:
             try:
                 _farm_preflight()
@@ -528,35 +532,21 @@ def _publish_summary(line: str, sha: str) -> dict:
     return summary
 
 
-def _doit_head(doit_args: list[str]) -> tuple[bool, int, int | None]:
-    """How ``DoitMain.run`` reads argv before it picks a subcommand.
+def _loader_parse(doit_args: list[str]) -> tuple[list[tuple[str, str]], list[str], bool]:
+    """doit's leading loader-option parse (``DoitMain.run``): ``(opts, rest, help)``.
 
-    Returns ``(help, loader_end, head)``. doit hands the leading loader options
-    to ``getopt`` (``f:d:k`` / ``file= dir= seek-file``: grouped shorts, attached
-    or separate values, unique long prefixes) and, when that parse fails, gives
-    the whole argv to ``run`` instead, so ``loader_end`` is then 0. Every
-    remaining ``name=value`` token is a command-line variable, dropped before the
-    subcommand is read, so ``head`` is the first token that is not one (``None``
-    when nothing but variables follows). ``-h``/``--help`` are the wrapper's
-    (doit only knows a bare leading ``--help``): ``help`` is true when getopt
-    meets one among the loader options (even malformed, ``--help=x``) or when
-    it is the head.
+    doit hands the leading loader options to ``getopt`` (``f:d:k`` / ``file=
+    dir= seek-file``: grouped shorts, attached or separate values, unique long
+    prefixes) and, when that parse fails, gives the whole argv to ``run``
+    instead. ``-h``/``--help`` are the wrapper's (doit only knows a bare leading
+    ``--help``): ``help`` is true when getopt meets one among the loader
+    options, even malformed (``--help=x``).
     """
     try:
         opts, rest = getopt.getopt(doit_args, _LOADER_SHORT, _LOADER_LONG)
     except getopt.GetoptError as error:
-        if error.opt in ("h", "help"):
-            return True, 0, None
-        opts, rest = [], doit_args
-    loader_end = len(doit_args) - len(rest)
-    head = next(
-        (loader_end + j for j, arg in enumerate(rest) if not _is_variable(arg)),
-        None,
-    )
-    asked = any(opt in _HELP for opt, _value in opts) or (
-        head is not None and doit_args[head] in _HELP
-    )
-    return asked, loader_end, head
+        return [], doit_args, error.opt in ("h", "help")
+    return opts, rest, any(opt in _HELP for opt, _value in opts)
 
 
 def _is_variable(arg: str) -> bool:
@@ -565,34 +555,53 @@ def _is_variable(arg: str) -> bool:
 
 
 def _asks_for_help(doit_args: list[str]) -> bool:
-    """A leading ``--help``/``-h`` is the wrapper's; ``build.py help <x>`` and a
-    per-command ``--help`` stay doit's."""
-    return _doit_head(doit_args)[0]
+    """A leading ``--help``/``-h`` (past loader options and command-line
+    variables) is the wrapper's; ``build.py help <x>`` stays doit's."""
+    opts, rest, asked = _loader_parse(doit_args)
+    head = next((arg for arg in rest if not _is_variable(arg)), None)
+    return asked or head in _HELP
 
 
-def _executing_command(doit_args: list[str], commands) -> tuple[str, int] | None:
-    """The doit subcommand that would execute task actions and where its own
-    arguments start; ``None`` when doit executes no task.
+def _executing_command(doit_args: list[str], doit: DoitMain) -> tuple[str, int] | None:
+    """The doit subcommand that would execute task actions and where ``-n`` goes;
+    ``None`` when doit executes no task.
 
-    doit's ``Command.execute_tasks`` is the verdict: ``run`` (explicit, or
-    implicit when the head is a task name or nothing) and ``strace`` (a ``Run``
-    subclass) execute actions, so a farm run needs the preflight; ``--help``/
-    ``-h``/``--version`` and ``list``, ``info``, ``clean``, ``forget``, ...
-    execute nothing and never reach it.
+    Mirrors ``DoitMain.run``: past the loader options and the ``name=value``
+    variables, the head names a subcommand or is a task of the implicit ``run``.
+    doit's ``Command.execute_tasks`` is the verdict (``run`` and ``strace``, a
+    ``Run`` subclass, execute actions; ``list``, ``info``, ``clean``, ... and
+    ``--help``/``-h``/``--version`` do not), and the command's own option parser
+    has the last word: an argv it rejects (``run --help``, ``-n abc``) makes doit
+    print its parse error and exit 3 before any task, so the preflight is
+    skipped and the argv passed through untouched. ``-n`` goes right after the
+    loader options for an implicit run, right after ``run`` for an explicit one.
     """
-    asked, loader_end, head = _doit_head(doit_args)
+    opts, rest, asked = _loader_parse(doit_args)
     if asked:
         return None
-    if head is None:
-        return "run", loader_end  # implicit run of the default tasks
-    name = doit_args[head]
-    if name == "--version":
+    args = [arg for arg in rest if not _is_variable(arg)]
+    commands = doit.get_cmds()
+    options_end = len(doit_args) - len(rest)
+    if options_end and doit_args[options_end - 1] == "--" and all(
+        value != "--" for _opt, value in opts
+    ):
+        options_end -= 1  # getopt swallowed the terminator; -n must precede it
+    if not args or args[0] not in commands:
+        name, at = "run", options_end  # implicit run: default or named tasks
+    else:
+        name = args.pop(0)
+        if not commands.get_plugin(name).execute_tasks:
+            return None
+        at = doit_args.index(name, len(doit_args) - len(rest)) + 1
+    loader = get_loader(doit.config, doit.task_loader, commands)
+    command = commands.get_plugin(name)(
+        task_loader=loader, config=doit.config, bin_name=doit.BIN_NAME, cmds=commands
+    )
+    try:
+        command.cmdparser.parse(args)
+    except CmdParseError:
         return None
-    if name not in commands:
-        return "run", head  # implicit run of the named tasks
-    if not commands.get_plugin(name).execute_tasks:
-        return None
-    return name, head + 1
+    return name, at
 
 
 def _with_farm_parallelism(doit_args: list[str], command: str, at: int) -> list[str]:
