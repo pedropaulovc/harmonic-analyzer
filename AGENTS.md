@@ -281,9 +281,14 @@ a tracked in-repo directory of vendored DXF/vendor models, and `cut_release.py`
 only *string-matches* the `references/` prefix when it rewrites doc links (it
 reads no file there — and `release` runs on the submitter anyway).
 
-**If a future task starts needing it**, the leaf fails loudly on the worker
-(the submodule is simply absent — and the worker's `git submodule status`
-check names it), never silently: it cannot pass on a worker and fail locally.
+**If a future task starts needing it**, what catches you is the **submitter-side
+gate**, not the worker: `agent/job_runner.export_graph` fails the publish when any
+packaged task's `file_dep` or target resolves under an excluded submodule, naming
+the task and the path. Do not expect the worker's `git submodule status` check to
+notice — it *requires* the excluded path to read `-`, so an absent submodule is
+exactly what it is asserting, and it passes. An **undeclared runtime read** (a path
+the task opens without declaring it a `file_dep`) escapes both, and surfaces only
+inside the leaf as `Dependent file … does not exist` / `FileNotFoundError`.
 Fix it by making that task submitter-only like `gallery`, or by removing the
 exclusion — never by teaching the task to tolerate a missing reference.
 
