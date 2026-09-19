@@ -1,3 +1,4 @@
+# Validation-only cache identity: three-worker E2E 2026-09-19 pen-rod.
 r"""Reproduction script: pen square rod (book ch. 24, pp. 64-65).
 
 The square brass rod that carries the v-block; the wire from the
