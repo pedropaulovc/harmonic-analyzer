@@ -502,6 +502,16 @@ def _preflight_fakes(monkeypatch, *, publish=None, agents=None, git=None):
     subprocess's stdout (default: a valid summary) or an exception to raise at
     launch.
     """
+    # The preflight now reads the cache environment, so a seat with a scratch
+    # cache exported would otherwise fail 25 tests that have nothing to do
+    # with it. A test that wants a divergence sets it AFTER calling this.
+    for name in (
+        "HARMONIC_CACHE_SALT",
+        "HARMONIC_CACHE_ACCOUNT",
+        "HARMONIC_CACHE_CONTAINER",
+        "HARMONIC_FARM_CACHE_ENV_ON_WORKERS",
+    ):
+        monkeypatch.delenv(name, raising=False)
     summary = {
         "source_identity_sha256": IDENTITY,
         "agent_identity_sha256": AGENT,
@@ -712,6 +722,118 @@ def test_a_repo_declaring_no_exclusions_keeps_refusing_every_submodule(
 
     assert build.main(["--executor", "farm", "part:x"]) == 2
     assert "references" in capsys.readouterr().err
+
+
+def test_a_local_cache_salt_stops_the_run_it_could_never_satisfy(
+    monkeypatch, capsys
+):
+    # 2026-09-19: a salt set here to force one cold leaf left part:cone_gear
+    # waiting on a key the worker -- which receives no environment -- never
+    # computes. It built and republished its own key twice and failed
+    # cache_missing after 60 s. The run cannot succeed, so it cannot start.
+    launched = _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "probe-2026-09-19-a")
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    err = capsys.readouterr().err
+    assert "HARMONIC_CACHE_SALT=probe-2026-09-19-a" in err
+    assert "sw2024-sp3" in err, "the shipped default is named, not just ours"
+    assert not any(_published(argv) for argv in launched), "no publish subprocess"
+
+
+@pytest.mark.parametrize(
+    "name, value, default",
+    [
+        ("HARMONIC_CACHE_ACCOUNT", "stsomeotheraccount", "stswbuildcache07aba2"),
+        ("HARMONIC_CACHE_CONTAINER", "scratchcache", "buildcache"),
+    ],
+)
+def test_a_cache_the_worker_cannot_reach_stops_the_run(
+    monkeypatch, capsys, name, value, default
+):
+    # Salt moves the key; account and container move which store is asked.
+    # Either way the submitter waits on a lookup the worker never performs.
+    # Each row asserts ITS OWN default: a guard that pairs a variable with
+    # the wrong shipped value would refuse a seat that pinned the right one.
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setenv(name, value)
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    assert f"{name}={value} (shipped default: {default})" in capsys.readouterr().err
+
+
+def test_every_moved_setting_is_named_not_just_the_first(monkeypatch, capsys):
+    # An operator who fixes only the variable the message named would re-run
+    # into the same refusal, so the refusal must name all of them at once.
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "acceptance-2026-09-19")
+    monkeypatch.setenv("HARMONIC_CACHE_ACCOUNT", "stsomeotheraccount")
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    err = capsys.readouterr().err
+    assert "HARMONIC_CACHE_SALT=acceptance-2026-09-19" in err
+    assert "HARMONIC_CACHE_ACCOUNT=stsomeotheraccount" in err
+
+
+def test_a_salt_that_only_looks_like_the_default_still_stops_the_run(
+    monkeypatch, capsys
+):
+    # `set HARMONIC_CACHE_SALT=sw2024-sp3 ` in a .cmd keeps the trailing
+    # blank, and the key is hashed from the raw value -- so a guard that
+    # strips before comparing reports nothing while every key moves. The
+    # guard must read what the hash reads.
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "sw2024-sp3 ")
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    assert "HARMONIC_CACHE_SALT=sw2024-sp3 " in capsys.readouterr().err
+
+
+def test_a_cache_setting_equal_to_the_default_is_not_a_divergence(monkeypatch):
+    # Refusing on mere presence would break every seat that pins the shipped
+    # values explicitly; what matters is whether the worker would disagree.
+    launched = _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "sw2024-sp3")
+    monkeypatch.setenv("HARMONIC_CACHE_ACCOUNT", "stswbuildcache07aba2")
+    monkeypatch.setenv("HARMONIC_CACHE_CONTAINER", "buildcache")
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 0
+    assert any(_published(argv) for argv in launched), "the package was published"
+
+
+def test_a_run_that_says_the_workers_carry_the_salt_is_dispatched(
+    monkeypatch, capsys
+):
+    # The acceptance cold run sets the same salt Machine-scope on every
+    # worker and bounces the worker task, so both sides move together. This
+    # process cannot verify that, so the operator asserts it -- and the run
+    # proceeds, with the asserted settings echoed for the record.
+    launched = _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "acceptance-2026-09-19")
+    monkeypatch.setenv("HARMONIC_FARM_CACHE_ENV_ON_WORKERS", "1")
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 0
+    assert any(_published(argv) for argv in launched), "the package was published"
+    assert "HARMONIC_CACHE_SALT=acceptance-2026-09-19" in capsys.readouterr().err
+
+
+def test_the_worker_assertion_off_or_absent_still_refuses(monkeypatch):
+    # "0" is the operator saying the workers do NOT carry it; that is the
+    # refusing case, not a second way of switching the guard off.
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "acceptance-2026-09-19")
+    monkeypatch.setenv("HARMONIC_FARM_CACHE_ENV_ON_WORKERS", "0")
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
 
 
 def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch):

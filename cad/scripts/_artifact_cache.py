@@ -38,7 +38,10 @@ Design notes / invariants:
 * **Zero-config defaults.** The account/container/salt are committed constants
   (``_DEFAULT_*``), so a machine never has to be told where the cache lives -- it
   only declares a ROLE. Each is still overridable by the matching
-  ``HARMONIC_CACHE_*`` env var (CI, tests, an unlanded salt bump).
+  ``HARMONIC_CACHE_*`` env var (CI, tests, an unlanded salt bump) -- but only
+  for work this process runs. A farm leaf request carries no environment, so
+  ``build.py --executor farm`` refuses a moved value rather than wait on a key
+  no worker computes; see ``environment_overrides``.
 
 * **Read/write roles.** The role is ``ro`` (pull only), ``rw`` (pull + push), or
   ``off`` (disabled). It comes from ``HARMONIC_REMOTE_CACHE_MODE`` or, failing
@@ -204,6 +207,35 @@ def _account() -> str:
 
 def _container() -> str:
     return os.environ.get("HARMONIC_CACHE_CONTAINER") or _DEFAULT_CONTAINER
+
+
+def environment_overrides() -> dict[str, tuple[str, str]]:
+    """``{VAR: (default, override)}`` for every env var that moves a lookup.
+
+    Salt feeds the key; account and container decide which cache is asked. A
+    caller that hands work to another machine needs to know it has moved any
+    of them, because only THIS process's environment is moved -- which is
+    what makes this a query rather than three private accessors read from
+    outside.
+
+    Read through the ACCESSORS, never through ``os.environ`` again: a second
+    reader is a second normalisation rule, and the value that reaches the
+    hash is the only one that matters. Stripping here would have reported
+    nothing for ``HARMONIC_CACHE_SALT="sw2024-sp3 "`` -- which a ``.cmd``
+    ``set`` leaves trailing-blank -- while ``_salt()`` fed the raw value in
+    and moved every key.
+    """
+
+    moved = {}
+    for name, read, default in (
+        ("HARMONIC_CACHE_SALT", _salt, _DEFAULT_SALT),
+        ("HARMONIC_CACHE_ACCOUNT", _account, _DEFAULT_ACCOUNT),
+        ("HARMONIC_CACHE_CONTAINER", _container, _DEFAULT_CONTAINER),
+    ):
+        value = read()
+        if value != default:
+            moved[name] = (default, value)
+    return moved
 
 
 # --------------------------------------------------------------------------- #
