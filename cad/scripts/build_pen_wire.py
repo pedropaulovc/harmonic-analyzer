@@ -1,3 +1,4 @@
+# E2E protocol-4 cancellation-isolation canary 20260919; never merge this probe.
 r"""Reproduction script: pen wire -- WIRE 2 of the amplification chain (book
 ch. 21/24, pp. 50-53 / 60-61).
 
