@@ -1,12 +1,17 @@
-"""Run the doit graph with a human-facing console verbosity flag and an executor.
+"""Run the doit graph with a console verbosity flag, an executor and a leaf budget.
 
 Examples:
+    uv run python build.py --help
     uv run python build.py --verbosity warning -n 4
     uv run python build.py --verbosity debug check:math
-    uv run python build.py --executor farm assembly:harmonic_analyzer
+    uv run python build.py --executor farm --leaf-timeout 90 assembly:harmonic_analyzer
 
-The wrapper only consumes ``--verbosity`` and ``--executor``; every other argument
-is passed to ``doit`` unchanged. Structured telemetry capture remains full-fidelity.
+The wrapper consumes ``--verbosity``, ``--executor`` and ``--leaf-timeout``; every
+other argument is passed to ``doit`` unchanged. A leading ``--help``/``-h`` (after
+doit's loader options, as ``DoitMain.run`` reads them) prints the wrapper's own
+options and farm defaults and then doit's command list, whose ``build.py help
+<command>``/``build.py help <task>`` lines are the route to doit's own help.
+Structured telemetry capture remains full-fidelity.
 
 ``--executor farm`` (the ``build`` / ``build.cmd`` entry points) keeps doit as the
 local dependency scheduler but runs every cache-missing COM task -- parts,
@@ -47,30 +52,85 @@ _PUBLISH_STATES = ("published", "exists")
 _LOADER_SEPARATE_VALUE = ("-f", "-d", "--file", "--dir")
 _LOADER_ONE_TOKEN = ("-k", "--seek-file")
 _LOADER_ATTACHED_VALUE = ("-f", "-d", "--file=", "--dir=")
-_NO_RUN = ("--help", "-h", "--version")
+_HELP = ("--help", "-h")
+_NO_RUN = (*_HELP, "--version")
+
+_USAGE = (
+    "build.py [--verbosity LEVEL] [--executor {local,farm}] "
+    "[--leaf-timeout MINUTES] [doit arguments ...]"
+)
+_DESCRIPTION = """\
+Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
+other argument goes to doit unchanged, so `build.py part:cone_gear`, `build.py
+-n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
+_EPILOG = f"""\
+farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
+  parallelism   -n {_DEFAULT_FARM_PARALLELISM} (HARMONIC_FARM_PARALLELISM) unless you pass -n/--process
+  leaf timeout  15 min per attempt (the control plane's default), clamped to
+                1 min - 3 h; a cold leaf measured 61.5 min, so pass
+                --leaf-timeout for anything cold
+  preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
+                matching the pool checkout, sources published -- only before a
+                run; --help, list, info, clean, ... never reach it
+
+doit's own help follows. `build.py help run` shows the run options (-n, -a,
+-c, -v ...), `build.py help <task>` a task's own parameters."""
 
 
 class FarmPreflightError(Exception):
     """Why a farm run must stop before doit starts; printed as ``farm: <reason>``."""
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--verbosity", choices=_LEVELS, default="warning")
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="build.py",
+        usage=_USAGE,
+        description=_DESCRIPTION,
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    parser.add_argument(
+        "--verbosity",
+        choices=_LEVELS,
+        default="warning",
+        metavar="LEVEL",
+        help="console level for the build's own logging, one of %(choices)s "
+        "(default: %(default)s; sets HARMONIC_VERBOSITY). doit's run "
+        "verbosity stays `-v N`.",
+    )
     parser.add_argument(
         "--executor",
         choices=_EXECUTORS,
         default=os.environ.get("HARMONIC_EXECUTOR", "local"),
+        help="where cache-missing SolidWorks tasks build: local = a seat on this "
+        "machine, farm = the SolidWorks build farm (default: HARMONIC_EXECUTOR "
+        "if set, else local)",
     )
     # A cold leaf (source sync plus a cold SOLIDWORKS start) measured 61.5 min on
     # the farm, well past the control plane's 15 min default, so a run that knows
     # it is cold raises the per-attempt budget for the leaves it dispatches.
-    parser.add_argument("--leaf-timeout", type=int, metavar="MINUTES")
+    parser.add_argument(
+        "--leaf-timeout",
+        type=int,
+        metavar="MINUTES",
+        help="per-attempt budget for each farm leaf, in minutes (sets "
+        "HARMONIC_FARM_LEAF_TIMEOUT_S; the farm clamps it to 1-180)",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
     options, doit_args = parser.parse_known_args(argv)
+    doit_args = list(doit_args)
+    if _asks_for_help(doit_args):
+        parser.print_help()
+        print()
+        return DoitMain().run(["--help"])
     if options.verbosity is not None:
         os.environ["HARMONIC_VERBOSITY"] = options.verbosity
     doit = DoitMain()
-    doit_args = list(doit_args)
     if options.leaf_timeout is not None:
         os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
     if options.executor == "farm":
@@ -463,14 +523,9 @@ def _publish_summary(line: str, sha: str) -> dict:
     return summary
 
 
-def _run_insertion_point(doit_args: list[str], commands) -> int | None:
-    """Where ``-n`` goes for a run invocation; ``None`` when doit runs no task.
-
-    Skips doit's leading loader options the way ``DoitMain.run`` does before it
-    reads the subcommand. ``--help``/``-h``/``--version`` and every subcommand
-    but ``run`` (``list``, ``info``, ``clean``, ``forget``, ...) run nothing, so
-    they neither take ``-n`` nor need the farm preflight.
-    """
+def _past_loader_options(doit_args: list[str]) -> int:
+    """Index of doit's subcommand (or first task), skipping the leading loader
+    options the way ``DoitMain.run`` does before it reads the subcommand."""
     i = 0
     while i < len(doit_args):
         arg = doit_args[i]
@@ -480,6 +535,24 @@ def _run_insertion_point(doit_args: list[str], commands) -> int | None:
             i += 1
         else:
             break
+    return i
+
+
+def _asks_for_help(doit_args: list[str]) -> bool:
+    """A leading ``--help``/``-h`` is the wrapper's; ``build.py help <x>`` and a
+    per-command ``--help`` stay doit's."""
+    i = _past_loader_options(doit_args)
+    return i < len(doit_args) and doit_args[i] in _HELP
+
+
+def _run_insertion_point(doit_args: list[str], commands) -> int | None:
+    """Where ``-n`` goes for a run invocation; ``None`` when doit runs no task.
+
+    ``--help``/``-h``/``--version`` and every subcommand but ``run`` (``list``,
+    ``info``, ``clean``, ``forget``, ...) run nothing, so they neither take
+    ``-n`` nor need the farm preflight.
+    """
+    i = _past_loader_options(doit_args)
     if i >= len(doit_args):
         return i  # implicit run of the default tasks
     head = doit_args[i]

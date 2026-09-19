@@ -41,6 +41,7 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
 ### Route A — dispatch an existing task
 
 ```powershell
+.\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
 .\build.cmd part:cone_gear            # one leaf on the farm
 .\build.cmd --leaf-timeout 90 build   # whole closure, 90 min per attempt
 ```

@@ -404,7 +404,7 @@ class _NoDoit:
     """A ``DoitMain`` stand-in for runs that must stop before doit starts."""
 
     def get_cmds(self):
-        return {"run": None, "list": None}
+        return {"run": None, "list": None, "help": None}
 
     def run(self, args):
         pytest.fail(f"doit ran {args}")
@@ -1174,7 +1174,7 @@ def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkey
     assert result == expected
 
 
-def test_help_and_non_run_commands_skip_the_preflight(monkeypatch):
+def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
     def no_git(argv, **kwargs):
         pytest.fail(f"preflight launched {argv}")
 
@@ -1183,8 +1183,23 @@ def test_help_and_non_run_commands_skip_the_preflight(monkeypatch):
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "--help"]) == 0
+    assert build.main(["--executor", "farm", "-f", "dodo.py", "-h"]) == 0
+    assert build.main(["--executor", "farm", "help", "run"]) == 0
     assert build.main(["--executor", "farm", "-f", "dodo.py", "list"]) == 0
-    assert [args for args, _env in _FakeDoit.seen] == [["--help"], ["-f", "dodo.py", "list"]]
+
+    # A leading --help/-h is the wrapper's (doit itself rejects ``-h``): its
+    # own options and the farm defaults, then doit's command list. The
+    # doit-owned routes (``help run``, ``list``) pass through unchanged.
+    assert [args for args, _env in _FakeDoit.seen] == [
+        ["--help"],
+        ["--help"],
+        ["help", "run"],
+        ["-f", "dodo.py", "list"],
+    ]
+    out = capsys.readouterr().out
+    for flag in ("--verbosity", "--executor", "--leaf-timeout"):
+        assert flag in out
+    assert "HARMONIC_FARM_PARALLELISM" in out
 
 
 # --- _farm: config and the Temporal boundary ---------------------------------
