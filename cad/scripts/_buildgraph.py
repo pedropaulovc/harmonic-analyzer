@@ -21,6 +21,7 @@ import re
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
+from typing import NamedTuple
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
@@ -905,6 +906,12 @@ def _local_modules() -> dict[str, Path]:
             else relative.with_suffix("").parts
         )
         if module_parts:
+            # Deliberately the LEXICAL path, not ``path.resolve()``. Callers that
+            # need the canonical path resolve at the point of use: resolving here
+            # would both freeze a symlink's target for the process and rewrite
+            # ``Path.name``, so a symlinked ``pkg/__init__.py`` would stop
+            # matching the package test in ``_direct_local_imports`` and silently
+            # drop the package initialiser from a closure.
             out[".".join(module_parts)] = path
     return out
 
@@ -913,6 +920,84 @@ def _local_modules() -> dict[str, Path]:
 def _module_by_path() -> dict[Path, str]:
     """Reverse of :func:`_local_modules`, keyed by resolved path."""
     return {path.resolve(): name for name, path in _local_modules().items()}
+
+
+class _ModuleSyntax(NamedTuple):
+    """Syntax facts of ONE source text: what it imports, and what each top-level
+    function calls.
+
+    Deliberately holds nothing that depends on WHERE the text came from, so the
+    import-closure analysis and the stamping call graph can share a single parse
+    (see :func:`_module_syntax`). Aliases are kept verbatim and in source order:
+    both consumers replay them into dicts where the last binding wins.
+    """
+
+    imports: tuple[tuple[str, str | None], ...]
+    from_imports: tuple[
+        tuple[int, str | None, tuple[tuple[str, str | None], ...]], ...
+    ]
+    functions: tuple[tuple[str, frozenset[str], frozenset[tuple[str, str]]], ...]
+
+
+def _function_call_names(
+    node: ast.AST,
+) -> tuple[frozenset[str], frozenset[tuple[str, str]]]:
+    """Within ``node`` (a function or module), the names it calls: bare-name calls
+    ``f(...)`` -> ``{"f"}`` and attribute calls ``m.f(...)`` -> ``{("m", "f")}``."""
+    simple: set[str] = set()
+    attrs: set[tuple[str, str]] = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Call):
+            fn = n.func
+            if isinstance(fn, ast.Name):
+                simple.add(fn.id)
+            elif isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
+                attrs.add((fn.value.id, fn.attr))
+    return frozenset(simple), frozenset(attrs)
+
+
+@functools.lru_cache(maxsize=1024)
+def _module_syntax(text: str) -> _ModuleSyntax:
+    """Parse one source CONTENT once, for every syntax consumer of it.
+
+    ``_direct_local_imports`` and the stamping call graph each used to parse the
+    same ~570 local modules, and the call graph re-parsed all of them once per
+    stamping contract -- three full-repo parses per ``doit`` graph load. They now
+    share this one.
+
+    Keyed by CONTENT, never by path or file time: a same-size/same-mtime rewrite
+    produces a different key and is re-analyzed, and two files that happen to
+    hold identical text share the work. The parsed tree is DROPPED on return --
+    retaining every module's AST measured ~195 MB, these facts a few hundred kB
+    -- and every path-dependent decision (relative-import anchoring, local-module
+    membership, which stamping primitive counts) stays with the caller, so
+    identical text in two different packages can still resolve differently.
+    """
+    tree = ast.parse(text)
+    imports: list[tuple[str, str | None]] = []
+    from_imports: list[
+        tuple[int, str | None, tuple[tuple[str, str | None], ...]]
+    ] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.extend((alias.name, alias.asname) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            from_imports.append(
+                (
+                    node.level,
+                    node.module,
+                    tuple((alias.name, alias.asname) for alias in node.names),
+                )
+            )
+    return _ModuleSyntax(
+        tuple(imports),
+        tuple(from_imports),
+        tuple(
+            (node.name, *_function_call_names(node))
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ),
+    )
 
 
 @functools.lru_cache(maxsize=None)
@@ -953,36 +1038,34 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
             parent = parent.rpartition(".")[0]
 
     current_module = _module_by_path().get(path.resolve())
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                add(alias.name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.level == 0:
-                base = node.module
-            elif current_module is not None:
-                package = (
-                    current_module.split(".")
-                    if path.name == "__init__.py"
-                    else current_module.split(".")[:-1]
-                )
-                keep = len(package) - node.level + 1
-                if keep < 1:
-                    continue
-                base_parts = package[:keep]
-                if node.module:
-                    base_parts.extend(node.module.split("."))
-                base = ".".join(base_parts)
-            else:
+    syntax = _module_syntax(path.read_text(encoding="utf-8"))
+    for name, _asname in syntax.imports:
+        add(name)
+    for level, module, names in syntax.from_imports:
+        if level == 0:
+            base = module
+        elif current_module is not None:
+            package = (
+                current_module.split(".")
+                if path.name == "__init__.py"
+                else current_module.split(".")[:-1]
+            )
+            keep = len(package) - level + 1
+            if keep < 1:
                 continue
+            base_parts = package[:keep]
+            if module:
+                base_parts.extend(module.split("."))
+            base = ".".join(base_parts)
+        else:
+            continue
 
-            if not base:
-                continue
-            add(base)
-            for alias in node.names:
-                if alias.name != "*":
-                    add(f"{base}.{alias.name}")
+        if not base:
+            continue
+        add(base)
+        for name, _asname in names:
+            if name != "*":
+                add(f"{base}.{name}")
     return frozenset(found)
 
 
@@ -1507,19 +1590,77 @@ _TITLE_BLOCK_STAMP_PRIMITIVES = frozenset(
 )
 
 
-def _function_call_names(node: ast.AST) -> tuple[set[str], set[tuple[str, str]]]:
-    """Within ``node`` (a function or module), the names it calls: bare-name calls
-    ``f(...)`` -> ``{"f"}`` and attribute calls ``m.f(...)`` -> ``{("m", "f")}``."""
-    simple: set[str] = set()
-    attrs: set[tuple[str, str]] = set()
-    for n in ast.walk(node):
-        if isinstance(n, ast.Call):
-            fn = n.func
-            if isinstance(fn, ast.Name):
-                simple.add(fn.id)
-            elif isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
-                attrs.add((fn.value.id, fn.attr))
-    return simple, attrs
+def _module_sources() -> tuple[tuple[str, str | None], ...]:
+    """Every local module stem paired with its source text, READ FRESH -- ``None``
+    where the file cannot be read.
+
+    Deliberately NOT cached. The original scan re-read every file on each
+    :func:`_stamping_modules` cache miss, so a source rewritten in-process
+    between the part and the title-block classification was visible to the
+    second one. This snapshot is the key of :func:`_module_call_graph`, which
+    keeps exactly that miss semantics: identical text reuses the previous scan,
+    changed text cannot be answered from it. Unreadable modules are kept in the
+    snapshot so they still count as local import TARGETS, as before.
+    """
+    sources: list[tuple[str, str | None]] = []
+    for stem, path in _local_modules().items():
+        try:
+            sources.append((stem, path.read_text(encoding="utf-8")))
+        except OSError:
+            sources.append((stem, None))
+    return tuple(sources)
+
+
+@functools.lru_cache(maxsize=1)
+def _module_call_graph(
+    sources: tuple[tuple[str, str | None], ...],
+) -> tuple[
+    dict[tuple[str, str], tuple[frozenset[str], frozenset[tuple[str, str]]]],
+    dict[str, dict[str, tuple[str, str]]],
+    dict[str, dict[str, str]],
+]:
+    """The whole-program, function-level call graph of every local module:
+    ``(stem, function) -> called names``, plus each module's local import
+    bindings (``name -> (module, original)`` and ``alias -> module``).
+
+    Split out of :func:`_stamping_modules` because the scan does not depend on
+    the property contract being classified: part and title-block stamping differ
+    only in the fixpoint's primitive set, yet each used to re-parse and re-walk
+    all ~570 local modules. ``sources`` is the CONTENT snapshot from
+    :func:`_module_sources`, so neither a rebuilt module set (a monkeypatched
+    scripts root) nor an in-process source rewrite can be answered from the
+    previous scan; ``maxsize=1`` retains exactly the live one.
+
+    The returned mappings are shared, not copied -- read them, never mutate them.
+    A module that fails to read or parse contributes nothing (as before), so the
+    fixpoint never indexes an import map for it.
+    """
+    local_names = frozenset(stem for stem, _ in sources)
+    func_calls: dict[
+        tuple[str, str], tuple[frozenset[str], frozenset[tuple[str, str]]]
+    ] = {}
+    imp_name: dict[str, dict[str, tuple[str, str]]] = {}  # stem -> name -> (mod, orig)
+    imp_alias: dict[str, dict[str, str]] = {}  # stem -> alias -> mod
+    for stem, text in sources:
+        if text is None:
+            continue
+        try:
+            syntax = _module_syntax(text)
+        except SyntaxError:
+            continue
+        n2q: dict[str, tuple[str, str]] = {}
+        a2m: dict[str, str] = {}
+        for level, module, names in syntax.from_imports:
+            if level == 0 and module in local_names:
+                for name, asname in names:
+                    n2q[asname or name] = (module, name)
+        for name, asname in syntax.imports:
+            if name in local_names:
+                a2m[asname or name] = name
+        imp_name[stem], imp_alias[stem] = n2q, a2m
+        for function, simple, attrs in syntax.functions:
+            func_calls[(stem, function)] = (simple, attrs)
+    return func_calls, imp_name, imp_alias
 
 
 @functools.lru_cache(maxsize=None)
@@ -1539,35 +1680,7 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
     part (``build_channel_assembly`` -> ``_spring.build_spring`` ->
     ``save_part_and_images``) IS a stamper. Stamping is always a by-name call, so
     name-based edges capture every real path (no under-detection)."""
-    mods = _local_modules()
-    local_names = frozenset(mods)
-    # Per module: each top-level function's call names, plus import resolution.
-    func_calls: dict[tuple[str, str], tuple[set[str], set[tuple[str, str]]]] = {}
-    imp_name: dict[str, dict[str, tuple[str, str]]] = {}  # stem -> name -> (mod, orig)
-    imp_alias: dict[str, dict[str, str]] = {}  # stem -> alias -> mod
-    for stem, path in mods.items():
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except (SyntaxError, OSError):
-            continue
-        n2q: dict[str, tuple[str, str]] = {}
-        a2m: dict[str, str] = {}
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.ImportFrom)
-                and node.level == 0
-                and node.module in local_names
-            ):
-                for a in node.names:
-                    n2q[a.asname or a.name] = (node.module, a.name)
-            elif isinstance(node, ast.Import):
-                for a in node.names:
-                    if a.name in local_names:
-                        a2m[a.asname or a.name] = a.name
-        imp_name[stem], imp_alias[stem] = n2q, a2m
-        for fn in tree.body:
-            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                func_calls[(stem, fn.name)] = _function_call_names(fn)
+    func_calls, imp_name, imp_alias = _module_call_graph(_module_sources())
 
     # Fixpoint: a function stamps if it calls a primitive, a stamping function in
     # its own module, or an imported name that resolves to a stamping function.
@@ -1595,6 +1708,24 @@ def _stamping_modules(primitives: frozenset[str]) -> frozenset[str]:
                 stamping.add(key)
                 changed = True
     return frozenset(stem for stem, _ in stamping)
+
+
+def _clear_stamping_caches(
+    _fixpoint=_stamping_modules.cache_clear,
+    _scan=_module_call_graph.cache_clear,
+) -> None:
+    """Clearing the classification also drops the SHARED scan behind it.
+
+    Freshness does not depend on this -- the scan is keyed on a fresh content
+    snapshot, so it cannot answer for changed sources. It is here so that an
+    explicit clear really releases the memory (the retained snapshot holds every
+    module's source text), and so callers keep the single existing entry point.
+    """
+    _fixpoint()
+    _scan()
+
+
+_stamping_modules.cache_clear = _clear_stamping_caches
 
 
 def stamps_part_properties(script: Path) -> bool:
