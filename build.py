@@ -189,6 +189,16 @@ def _farm_preflight() -> None:
         raise FarmPreflightError(
             "working tree is dirty:\n" + "\n".join(f"  {p}" for p in dirty)
         )
+
+    sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
+    import _artifact_cache
+
+    if not _artifact_cache.enabled():
+        raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
+    # Two environment reads, ahead of the fetch below: a run that cannot
+    # succeed should not first spend a network round-trip discovering it.
+    _refuse_unsendable_cache_environment(_artifact_cache.environment_overrides())
+
     sha = _git("rev-parse", "HEAD").strip()
     # Prune first and ask only origin: the farm clones from origin, so a commit
     # reachable from another remote or a deleted-upstream branch is not on it.
@@ -197,13 +207,6 @@ def _farm_preflight() -> None:
         raise FarmPreflightError(
             f"HEAD {sha} is not on origin; push it to any branch first"
         )
-
-    sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
-    import _artifact_cache
-
-    if not _artifact_cache.enabled():
-        raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
-    _refuse_unsendable_cache_environment(_artifact_cache.environment_overrides())
 
     pool = _pool_home()
     agent = _require_fleet_agent(pool)
@@ -214,35 +217,59 @@ def _farm_preflight() -> None:
 
 
 def _refuse_unsendable_cache_environment(moved: dict[str, tuple[str, str]]) -> None:
-    """Stop a run whose cache settings cannot reach the worker that builds.
+    """Stop a run whose cache settings this submitter cannot send to a worker.
 
-    A leaf request carries a task, a cache key, a commit and a source identity
-    -- no environment. The pool rebuilds the helper's environment from the
-    WORKER's own (``agent/protocol.py::job_environment``), so a salt set here
-    moves only the key this submitter waits for, and an account or container
-    set here moves only where this submitter looks.
+    A leaf request carries a task, a cache key, a commit and a source
+    identity -- no environment. The pool rebuilds the helper's environment
+    from the WORKER's own (``agent/protocol.py::job_environment``), so a salt
+    set here moves only the key this submitter waits for, and an account or
+    container set here moves only where this submitter looks.
 
-    Measured, 2026-09-19: ``HARMONIC_CACHE_SALT`` set locally to force one cold
-    leaf left ``part:cone_gear`` waiting on ``3152887639dd...`` while worker
-    swmaker000006 hit and republished ``0274d8f4f5f2...`` twice -- the helper's
-    force re-run cannot change a key -- and the leaf failed ``cache_missing``
-    after 60 s of work that could never have satisfied it. Refusing costs
-    nothing; a cold leaf is forced by changing source, which the key follows.
+    Measured, 2026-09-19: ``HARMONIC_CACHE_SALT`` set locally to force one
+    cold leaf left ``part:cone_gear`` waiting on ``3152887639dd...`` while
+    worker swmaker000006 hit and republished ``0274d8f4f5f2...`` twice -- the
+    helper's force re-run cannot change a key -- and the leaf failed
+    ``cache_missing`` after 60 s of work that could never have satisfied it.
+
+    Refused rather than warned, because the run cannot succeed from here --
+    but there IS a legitimate salted run: the acceptance procedure sets the
+    same salt Machine-scope on every worker and bounces the worker task, so
+    both sides move together (``skill://force-cold-farm-build``). That run
+    says so with ``HARMONIC_FARM_CACHE_ENV_ON_WORKERS=1``; the flag is an
+    assertion about the fleet this process cannot check, which is exactly why
+    it must be stated rather than inferred.
     """
 
     if not moved:
         return
     lines = [
-        f"  {name}={override} (worker builds with {default})"
-        for name, (default, override) in sorted(moved.items())
+        f"  {name}={override} (shipped default: {default})"
+        for name, (default, override) in moved.items()
     ]
+    if _cache_environment_is_on_workers():
+        print(
+            "farm: dispatching with cache settings this run asserts are also set "
+            "Machine-scope on every worker:\n" + "\n".join(lines),
+            file=sys.stderr,
+        )
+        return
     raise FarmPreflightError(
         "these cache settings cannot reach the farm; a leaf request carries no "
-        "environment, so the worker would build under its own defaults and the "
-        "key this run waits for could never appear:\n"
+        "environment, so each worker builds under whatever ITS environment "
+        "says and the key this run waits for need never appear:\n"
         + "\n".join(lines)
-        + "\nunset them, or force a cold build by changing source instead"
+        + "\nunset them; or, for a single cold leaf, change the source the task"
+        "\nreads (the key follows it); or, for a cold run of the whole build,"
+        "\nset the same values Machine-scope on every worker, bounce"
+        "\nSolidWorksPool-FarmWorker (skill://force-cold-farm-build) and re-run"
+        "\nwith HARMONIC_FARM_CACHE_ENV_ON_WORKERS=1"
     )
+
+
+def _cache_environment_is_on_workers() -> bool:
+    """The operator's assertion that the fleet carries the same settings."""
+    declared = os.environ.get("HARMONIC_FARM_CACHE_ENV_ON_WORKERS", "")
+    return declared.strip().lower() not in ("", "0", "false")
 
 
 def _pool_home() -> Path:
