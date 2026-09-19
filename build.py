@@ -22,9 +22,13 @@ needs a clean tree whose HEAD is on ``origin`` (the farm clones from there), the
 remote cache enabled (the farm hands results back through it), a pool checkout
 whose agent build is the one the fleet runs (``farm.py agents``: a package
 published for any other agent lands under a prefix no worker reads), and the
-commit's sources published to the pool (``farm.py publish``) before doit starts. A
-release therefore needs no local SolidWorks; only the Blender-bound ``gallery``
-task and the publishing half of ``release`` run here.
+commit's sources published to the pool (``farm.py publish``) before doit starts.
+That preflight runs for every doit command that executes task actions
+(``Command.execute_tasks``: ``run``, explicit or implicit, and ``strace``); the
+others (``list``, ``info``, ``clean``, ...) and ``--help``/``--version`` skip it.
+``-n`` is added for ``run`` only. A release therefore needs no local SolidWorks;
+only the Blender-bound ``gallery`` task and the publishing half of ``release``
+run here.
 """
 
 from __future__ import annotations
@@ -71,7 +75,8 @@ farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
                 measured 61.5 min, so raise it for anything cold
   preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
                 matching the pool checkout, sources published -- only before a
-                run; --help, list, info, clean, ... never reach it
+                command that executes tasks (run, strace); --help, list, info,
+                clean, ... never reach it
 
 doit's own help follows. `build.py help run` shows the run options (-n, -a,
 -c, -v ...), `build.py help <task>` a task's own parameters."""
@@ -134,8 +139,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if options.leaf_timeout is not None:
         os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
     if options.executor == "farm":
-        run_at = _run_insertion_point(doit_args, doit.get_cmds())
-        if run_at is not None:
+        executing = _executing_command(doit_args, doit.get_cmds())
+        if executing is not None:
             try:
                 _farm_preflight()
             except FarmPreflightError as problem:
@@ -145,7 +150,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "farm: every SolidWorks task runs on the farm (parts, assemblies, "
                 "drawings, verify:*, preflight, export, package:release)"
             )
-            doit_args = _with_farm_parallelism(doit_args, run_at)
+            doit_args = _with_farm_parallelism(doit_args, *executing)
     # dodo reads the executor from the environment; an explicit --executor must
     # win over an inherited HARMONIC_EXECUTOR.
     os.environ["HARMONIC_EXECUTOR"] = options.executor
@@ -565,38 +570,44 @@ def _asks_for_help(doit_args: list[str]) -> bool:
     return _doit_head(doit_args)[0]
 
 
-def _run_insertion_point(doit_args: list[str], commands) -> int | None:
-    """Where ``-n`` goes for a run invocation; ``None`` when doit runs no task.
+def _executing_command(doit_args: list[str], commands) -> tuple[str, int] | None:
+    """The doit subcommand that would execute task actions and where its own
+    arguments start; ``None`` when doit executes no task.
 
-    ``--help``/``-h``/``--version`` and every subcommand but ``run`` (``list``,
-    ``info``, ``clean``, ``forget``, ...) run nothing, so they neither take
-    ``-n`` nor need the farm preflight.
+    doit's ``Command.execute_tasks`` is the verdict: ``run`` (explicit, or
+    implicit when the head is a task name or nothing) and ``strace`` (a ``Run``
+    subclass) execute actions, so a farm run needs the preflight; ``--help``/
+    ``-h``/``--version`` and ``list``, ``info``, ``clean``, ``forget``, ...
+    execute nothing and never reach it.
     """
     asked, loader_end, head = _doit_head(doit_args)
     if asked:
         return None
     if head is None:
-        return loader_end  # implicit run of the default tasks
+        return "run", loader_end  # implicit run of the default tasks
     name = doit_args[head]
     if name == "--version":
         return None
     if name not in commands:
-        return head  # implicit run of the named tasks
-    if name != "run":
+        return "run", head  # implicit run of the named tasks
+    if not commands.get_plugin(name).execute_tasks:
         return None
-    return head + 1
+    return name, head + 1
 
 
-def _with_farm_parallelism(doit_args: list[str], run_at: int) -> list[str]:
+def _with_farm_parallelism(doit_args: list[str], command: str, at: int) -> list[str]:
     """Keep up to ``HARMONIC_FARM_PARALLELISM`` (8) leaves in flight on the farm.
 
-    ``-n`` goes at ``run_at`` (see ``_run_insertion_point``) unless the caller
-    already chose ``-n``/``--process``.
+    Only ``run`` takes ``-n``, at ``at`` (see ``_executing_command``), unless the
+    caller already chose ``-n``/``--process``; ``strace`` traces one task and
+    has no such option.
     """
-    if any(arg.startswith(("-n", "--process")) for arg in doit_args):
+    if command != "run" or any(
+        arg.startswith(("-n", "--process")) for arg in doit_args
+    ):
         return doit_args
     workers = os.environ.get("HARMONIC_FARM_PARALLELISM", _DEFAULT_FARM_PARALLELISM)
-    return [*doit_args[:run_at], "-n", workers, *doit_args[run_at:]]
+    return [*doit_args[:at], "-n", workers, *doit_args[at:]]
 
 
 if __name__ == "__main__":
