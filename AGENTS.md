@@ -194,6 +194,8 @@ uv run python -m doit             # = `build`: everything + every gate
 uv run python -m doit -n 4        # same, check:* fanned out in parallel
 uv run python -m doit build_bare  # quick: parts + assemblies only
 uv run python -m doit check:math  # one SolidWorks-free gate (no SW needed)
+uv run python build.py --help     # the wrapper's options (--executor, --leaf-timeout,
+                                  # --verbosity), the farm defaults, then doit's commands
 ```
 
 The SolidWorks-free `check:*` gates and the comparison/diff tooling run from this

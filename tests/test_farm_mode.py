@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from doit.doit_cmd import DoitMain as _RealDoitMain
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
@@ -400,11 +401,10 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
-class _NoDoit:
-    """A ``DoitMain`` stand-in for runs that must stop before doit starts."""
-
-    def get_cmds(self):
-        return {"run": None, "list": None}
+class _NoDoit(_RealDoitMain):
+    """A ``DoitMain`` that must never start: commands, ``execute_tasks`` and
+    each command's option parser are doit's own, so the routing verdict is
+    doit's, not the test's; only ``run`` is replaced."""
 
     def run(self, args):
         pytest.fail(f"doit ran {args}")
@@ -1163,18 +1163,74 @@ def test_an_aged_out_dissent_names_the_worker_and_the_remedy():
         (["-fdodo.py", "run", "part:x"], ["-fdodo.py", "run", "-n", "8", "part:x"], True),
         (["--file=dodo.py", "-k", "--help"], ["--file=dodo.py", "-k", "--help"], False),
         (["-d", ".", "clean"], ["-d", ".", "clean"], False),
+        # doit's loader options are getopt: grouped shorts, unique long prefixes
+        (["-kf", "dodo.py", "-h"], ["-kf", "dodo.py", "-h"], False),
+        (["-kf", "dodo.py", "part:x"], ["-kf", "dodo.py", "-n", "8", "part:x"], True),
+        (["--fi=dodo.py", "list"], ["--fi=dodo.py", "list"], False),
+        # a loader parse error hands the whole argv to run, as doit does
+        (["-f", "dodo.py", "-a", "x"], ["-n", "8", "-f", "dodo.py", "-a", "x"], True),
+        # ``name=value`` command-line variables are dropped before the subcommand
+        (["profile=ci", "list"], ["profile=ci", "list"], False),
+        (["profile=ci", "run", "x"], ["profile=ci", "run", "-n", "8", "x"], True),
+        (["profile=ci", "part:x"], ["-n", "8", "profile=ci", "part:x"], True),
+        (["profile=ci", "-h"], ["profile=ci", "-h"], False),
+        # a ``--`` the loader getopt swallowed still has to follow ``-n``
+        (["--", "part:x"], ["-n", "8", "--", "part:x"], True),
+        (["-f", "--", "x"], ["-f", "--", "-n", "8", "x"], True),
+        # doit has no per-command help: its parser rejects these and exits 3
+        # before any task, so no preflight and the argv passes untouched
+        (["run", "--help"], ["run", "--help"], False),
+        (["run", "-h"], ["run", "-h"], False),
+        (["strace", "--help"], ["strace", "--help"], False),
+        (["-f", "dodo.py", "--version"], ["-f", "dodo.py", "--version"], False),
+        (["-n", "abc", "x"], ["-n", "abc", "x"], False),
+        # ...and only its parser knows a help-looking token from an option
+        # value (``-r --help`` is an unknown reporter; ``-o --help`` a file
+        # name) or a task name after ``--``
+        (["run", "-r", "--help", "x"], ["run", "-r", "--help", "x"], False),
+        (["run", "-o", "--help", "x"], ["run", "-n", "8", "-o", "--help", "x"], True),
+        (["run", "--", "--help"], ["run", "-n", "8", "--", "--help"], True),
     ],
 )
 def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    commands = {"run": object(), "list": object(), "clean": object()}
-    run_at = build._run_insertion_point(list(given), commands)
-    assert (run_at is not None) is runs
-    result = given if run_at is None else build._with_farm_parallelism(list(given), run_at)
+    executing = build._executing_command(list(given), _RealDoitMain())
+    assert (executing is not None) is runs
+    result = (
+        given
+        if executing is None
+        else build._with_farm_parallelism(list(given), *executing)
+    )
     assert result == expected
 
 
-def test_help_and_non_run_commands_skip_the_preflight(monkeypatch):
+def test_every_task_executing_command_gets_the_preflight_and_only_run_fans_out(
+    monkeypatch,
+):
+    """``strace`` is a ``Run`` subclass (``execute_tasks``): its task action runs,
+    so a farm dispatch under it must be published first. It traces one task
+    and has no ``-n``, so the fan-out stays run-only. ``list`` executes nothing."""
+    preflights = []
+    monkeypatch.setattr(build, "_farm_preflight", lambda: preflights.append(1))
+    monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "strace", "part:x"]) == 0
+    assert len(preflights) == 1
+    assert build.main(["--executor", "farm", "list"]) == 0
+    assert len(preflights) == 1
+    assert build.main(["--executor", "farm", "run", "part:x"]) == 0
+    assert len(preflights) == 2
+
+    assert [args for args, _env in _FakeDoit.seen] == [
+        ["strace", "part:x"],
+        ["list"],
+        ["run", "-n", "8", "part:x"],
+    ]
+
+
+def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
     def no_git(argv, **kwargs):
         pytest.fail(f"preflight launched {argv}")
 
@@ -1183,8 +1239,29 @@ def test_help_and_non_run_commands_skip_the_preflight(monkeypatch):
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "--help"]) == 0
-    assert build.main(["--executor", "farm", "-f", "dodo.py", "list"]) == 0
-    assert [args for args, _env in _FakeDoit.seen] == [["--help"], ["-f", "dodo.py", "list"]]
+    assert build.main(["--executor", "farm", "-kf", "dodo.py", "-h"]) == 0
+    assert build.main(["--executor", "farm", "help", "run"]) == 0
+    assert build.main(["--executor", "farm", "profile=ci", "list"]) == 0
+    assert build.main(["--executor", "farm", "run", "--help"]) == 0
+
+    # A leading --help/-h, grouped loader options included, is the wrapper's
+    # (doit itself rejects ``-h``): its own options and the farm defaults, then
+    # doit's command list. The doit-owned routes (``help run``, ``list``, with
+    # or without a command-line variable) pass through unchanged, and so does
+    # ``run --help``, which doit's own parser rejects before any task.
+    assert [args for args, _env in _FakeDoit.seen] == [
+        ["--help"],
+        ["--help"],
+        ["help", "run"],
+        ["profile=ci", "list"],
+        ["run", "--help"],
+    ]
+    out = capsys.readouterr().out
+    for flag in ("--verbosity", "--executor", "--leaf-timeout"):
+        assert flag in out
+    # Both knobs a no-flag farm run would silently inherit are named.
+    assert "HARMONIC_FARM_PARALLELISM" in out
+    assert "HARMONIC_FARM_LEAF_TIMEOUT_S" in out
 
 
 # --- _farm: config and the Temporal boundary ---------------------------------

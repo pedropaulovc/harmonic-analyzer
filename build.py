@@ -1,12 +1,17 @@
-"""Run the doit graph with a human-facing console verbosity flag and an executor.
+"""Run the doit graph with a console verbosity flag, an executor and a leaf budget.
 
 Examples:
+    uv run python build.py --help
     uv run python build.py --verbosity warning -n 4
     uv run python build.py --verbosity debug check:math
-    uv run python build.py --executor farm assembly:harmonic_analyzer
+    uv run python build.py --executor farm --leaf-timeout 90 assembly:harmonic_analyzer
 
-The wrapper only consumes ``--verbosity`` and ``--executor``; every other argument
-is passed to ``doit`` unchanged. Structured telemetry capture remains full-fidelity.
+The wrapper consumes ``--verbosity``, ``--executor`` and ``--leaf-timeout``; every
+other argument is passed to ``doit`` unchanged. A leading ``--help``/``-h`` (after
+doit's loader options, as ``DoitMain.run`` reads them) prints the wrapper's own
+options and farm defaults and then doit's command list, whose ``build.py help
+<command>``/``build.py help <task>`` lines are the route to doit's own help.
+Structured telemetry capture remains full-fidelity.
 
 ``--executor farm`` (the ``build`` / ``build.cmd`` entry points) keeps doit as the
 local dependency scheduler but runs every cache-missing COM task -- parts,
@@ -17,14 +22,21 @@ needs a clean tree whose HEAD is on ``origin`` (the farm clones from there), the
 remote cache enabled (the farm hands results back through it), a pool checkout
 whose agent build is the one the fleet runs (``farm.py agents``: a package
 published for any other agent lands under a prefix no worker reads), and the
-commit's sources published to the pool (``farm.py publish``) before doit starts. A
-release therefore needs no local SolidWorks; only the Blender-bound ``gallery``
-task and the publishing half of ``release`` run here.
+commit's sources published to the pool (``farm.py publish``) before doit starts.
+That preflight runs for every doit command that executes task actions
+(``Command.execute_tasks``: ``run``, explicit or implicit, and ``strace``) whose
+argv the command's own parser accepts; the others (``list``, ``info``, ``clean``,
+...), ``--help``/``--version`` and an argv doit would reject (``run --help``: doit
+has no per-command help and exits 3) skip it and pass through untouched.
+``-n`` is added for ``run`` only. A release therefore needs no local SolidWorks;
+only the Blender-bound ``gallery`` task and the publishing half of ``release``
+run here.
 """
 
 from __future__ import annotations
 
 import argparse
+import getopt
 import json
 import os
 import re
@@ -33,6 +45,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
+from doit.cmd_base import get_loader
+from doit.cmdparse import CmdParseError
 from doit.doit_cmd import DoitMain
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -41,41 +55,96 @@ _EXECUTORS = ("local", "farm")
 _DEFAULT_FARM_PARALLELISM = "8"
 _PUBLISH_STATES = ("published", "exists")
 
-# doit's task-loader options may precede the subcommand (``DoitMain.run`` parses
-# them first). ``-f``/``-d`` take a value, attached (``-fdodo.py``, ``--file=x``)
-# or as the next token; ``-k``/``--seek-file`` is a flag.
-_LOADER_SEPARATE_VALUE = ("-f", "-d", "--file", "--dir")
-_LOADER_ONE_TOKEN = ("-k", "--seek-file")
-_LOADER_ATTACHED_VALUE = ("-f", "-d", "--file=", "--dir=")
-_NO_RUN = ("--help", "-h", "--version")
+# doit hands the leading task-loader options to ``getopt`` before it reads the
+# subcommand (``DoitMain.run``); the wrapper's ``-h``/``--help`` ride along so a
+# help request after them is seen where it stands.
+_LOADER_SHORT = "f:d:kh"
+_LOADER_LONG = ("file=", "dir=", "seek-file", "help")
+_HELP = ("--help", "-h")
+
+_USAGE = (
+    "build.py [--verbosity LEVEL] [--executor {local,farm}] "
+    "[--leaf-timeout MINUTES] [doit arguments ...]"
+)
+_DESCRIPTION = """\
+Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
+other argument goes to doit unchanged, so `build.py part:cone_gear`, `build.py
+-n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
+_EPILOG = f"""\
+farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
+  parallelism   -n {_DEFAULT_FARM_PARALLELISM} unless you pass -n/--process or set HARMONIC_FARM_PARALLELISM
+  leaf timeout  15 min per attempt (the control plane's default) unless you pass
+                --leaf-timeout or HARMONIC_FARM_LEAF_TIMEOUT_S (seconds) is
+                already set; the farm clamps either to 1 min - 3 h. A cold leaf
+                measured 61.5 min, so raise it for anything cold
+  preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
+                matching the pool checkout, sources published -- only before a
+                command that executes tasks (run, strace) with an argv doit
+                accepts; --help, list, info, clean, ... never reach it
+
+doit's own help follows. `build.py help run` shows the run options (-n, -a,
+-c, -v ...), `build.py help <task>` a task's own parameters."""
 
 
 class FarmPreflightError(Exception):
     """Why a farm run must stop before doit starts; printed as ``farm: <reason>``."""
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--verbosity", choices=_LEVELS, default="warning")
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="build.py",
+        usage=_USAGE,
+        description=_DESCRIPTION,
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    parser.add_argument(
+        "--verbosity",
+        choices=_LEVELS,
+        default="warning",
+        metavar="LEVEL",
+        help="console level for the build's own logging, one of %(choices)s "
+        "(default: %(default)s; sets HARMONIC_VERBOSITY). doit's run "
+        "verbosity stays `-v N`.",
+    )
     parser.add_argument(
         "--executor",
         choices=_EXECUTORS,
         default=os.environ.get("HARMONIC_EXECUTOR", "local"),
+        help="where cache-missing SolidWorks tasks build: local = a seat on this "
+        "machine, farm = the SolidWorks build farm (default: HARMONIC_EXECUTOR "
+        "if set, else local)",
     )
     # A cold leaf (source sync plus a cold SOLIDWORKS start) measured 61.5 min on
     # the farm, well past the control plane's 15 min default, so a run that knows
     # it is cold raises the per-attempt budget for the leaves it dispatches.
-    parser.add_argument("--leaf-timeout", type=int, metavar="MINUTES")
+    parser.add_argument(
+        "--leaf-timeout",
+        type=int,
+        metavar="MINUTES",
+        help="per-attempt budget for each farm leaf, in minutes (overrides an "
+        "inherited HARMONIC_FARM_LEAF_TIMEOUT_S; the farm clamps it to 1-180)",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
     options, doit_args = parser.parse_known_args(argv)
+    doit_args = list(doit_args)
+    if _asks_for_help(doit_args):
+        parser.print_help()
+        print()
+        return DoitMain().run(["--help"])
     if options.verbosity is not None:
         os.environ["HARMONIC_VERBOSITY"] = options.verbosity
     doit = DoitMain()
-    doit_args = list(doit_args)
     if options.leaf_timeout is not None:
         os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
     if options.executor == "farm":
-        run_at = _run_insertion_point(doit_args, doit.get_cmds())
-        if run_at is not None:
+        executing = _executing_command(doit_args, doit)
+        if executing is not None:
             try:
                 _farm_preflight()
             except FarmPreflightError as problem:
@@ -85,7 +154,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "farm: every SolidWorks task runs on the farm (parts, assemblies, "
                 "drawings, verify:*, preflight, export, package:release)"
             )
-            doit_args = _with_farm_parallelism(doit_args, run_at)
+            doit_args = _with_farm_parallelism(doit_args, *executing)
     # dodo reads the executor from the environment; an explicit --executor must
     # win over an inherited HARMONIC_EXECUTOR.
     os.environ["HARMONIC_EXECUTOR"] = options.executor
@@ -222,7 +291,10 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run one ``farm.py`` subcommand from the pool checkout, capturing stdout.
 
     stderr is inherited so the pool's own progress and diagnostics reach the
-    console as they happen; stdout is the machine-readable result.
+    console as they happen; stdout is the machine-readable result. The nested
+    ``uv`` targets the pool's own environment (``--project``); the
+    ``VIRTUAL_ENV`` this process inherited from the outer ``uv run`` names
+    ours, which uv would (correctly) ignore with a warning on every call.
     """
     argv = [
         "uv",
@@ -234,8 +306,11 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         str(pool / "farm.py"),
         *args,
     ]
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     try:
-        return subprocess.run(argv, cwd=REPO_ROOT, stdout=subprocess.PIPE, text=True)
+        return subprocess.run(
+            argv, cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, text=True
+        )
     except OSError as exc:
         raise FarmPreflightError(
             f"{args[0]} could not start ({argv[0]}): {exc}"
@@ -463,45 +538,91 @@ def _publish_summary(line: str, sha: str) -> dict:
     return summary
 
 
-def _run_insertion_point(doit_args: list[str], commands) -> int | None:
-    """Where ``-n`` goes for a run invocation; ``None`` when doit runs no task.
+def _loader_parse(doit_args: list[str]) -> tuple[list[tuple[str, str]], list[str], bool]:
+    """doit's leading loader-option parse (``DoitMain.run``): ``(opts, rest, help)``.
 
-    Skips doit's leading loader options the way ``DoitMain.run`` does before it
-    reads the subcommand. ``--help``/``-h``/``--version`` and every subcommand
-    but ``run`` (``list``, ``info``, ``clean``, ``forget``, ...) run nothing, so
-    they neither take ``-n`` nor need the farm preflight.
+    doit hands the leading loader options to ``getopt`` (``f:d:k`` / ``file=
+    dir= seek-file``: grouped shorts, attached or separate values, unique long
+    prefixes) and, when that parse fails, gives the whole argv to ``run``
+    instead. ``-h``/``--help`` are the wrapper's (doit only knows a bare leading
+    ``--help``): ``help`` is true when getopt meets one among the loader
+    options, even malformed (``--help=x``).
     """
-    i = 0
-    while i < len(doit_args):
-        arg = doit_args[i]
-        if arg in _LOADER_SEPARATE_VALUE:
-            i += 2
-        elif arg in _LOADER_ONE_TOKEN or arg.startswith(_LOADER_ATTACHED_VALUE):
-            i += 1
-        else:
-            break
-    if i >= len(doit_args):
-        return i  # implicit run of the default tasks
-    head = doit_args[i]
-    if head in _NO_RUN:
-        return None
-    if head not in commands:
-        return i  # implicit run of the named tasks
-    if head != "run":
-        return None
-    return i + 1
+    try:
+        opts, rest = getopt.getopt(doit_args, _LOADER_SHORT, _LOADER_LONG)
+    except getopt.GetoptError as error:
+        return [], doit_args, error.opt in ("h", "help")
+    return opts, rest, any(opt in _HELP for opt, _value in opts)
 
 
-def _with_farm_parallelism(doit_args: list[str], run_at: int) -> list[str]:
+def _is_variable(arg: str) -> bool:
+    """``DoitMain.process_args``'s test for a ``name=value`` command-line variable."""
+    return not arg.startswith("-") and "=" in arg
+
+
+def _asks_for_help(doit_args: list[str]) -> bool:
+    """A leading ``--help``/``-h`` (past loader options and command-line
+    variables) is the wrapper's; ``build.py help <x>`` stays doit's."""
+    opts, rest, asked = _loader_parse(doit_args)
+    head = next((arg for arg in rest if not _is_variable(arg)), None)
+    return asked or head in _HELP
+
+
+def _executing_command(doit_args: list[str], doit: DoitMain) -> tuple[str, int] | None:
+    """The doit subcommand that would execute task actions and where ``-n`` goes;
+    ``None`` when doit executes no task.
+
+    Mirrors ``DoitMain.run``: past the loader options and the ``name=value``
+    variables, the head names a subcommand or is a task of the implicit ``run``.
+    doit's ``Command.execute_tasks`` is the verdict (``run`` and ``strace``, a
+    ``Run`` subclass, execute actions; ``list``, ``info``, ``clean``, ... and
+    ``--help``/``-h``/``--version`` do not), and the command's own option parser
+    has the last word: an argv it rejects (``run --help``, ``-n abc``) makes doit
+    print its parse error and exit 3 before any task, so the preflight is
+    skipped and the argv passed through untouched. ``-n`` goes right after the
+    loader options for an implicit run, right after ``run`` for an explicit one.
+    """
+    opts, rest, asked = _loader_parse(doit_args)
+    if asked:
+        return None
+    args = [arg for arg in rest if not _is_variable(arg)]
+    commands = doit.get_cmds()
+    options_end = len(doit_args) - len(rest)
+    if options_end and doit_args[options_end - 1] == "--" and all(
+        value != "--" for _opt, value in opts
+    ):
+        options_end -= 1  # getopt swallowed the terminator; -n must precede it
+    if not args or args[0] not in commands:
+        name, at = "run", options_end  # implicit run: default or named tasks
+    else:
+        name = args.pop(0)
+        if not commands.get_plugin(name).execute_tasks:
+            return None
+        at = doit_args.index(name, len(doit_args) - len(rest)) + 1
+    loader = get_loader(doit.config, doit.task_loader, commands)
+    command = commands.get_plugin(name)(
+        task_loader=loader, config=doit.config, bin_name=doit.BIN_NAME, cmds=commands
+    )
+    try:
+        command.cmdparser.parse(args)
+    except CmdParseError:
+        return None
+    return name, at
+
+
+def _with_farm_parallelism(doit_args: list[str], command: str, at: int) -> list[str]:
     """Keep up to ``HARMONIC_FARM_PARALLELISM`` (8) leaves in flight on the farm.
 
-    ``-n`` goes at ``run_at`` (see ``_run_insertion_point``) unless the caller
-    already chose ``-n``/``--process``.
+    Only ``run`` takes ``-n``, at ``at`` (see ``_executing_command``), unless the
+    caller already chose ``-n``/``--process``; ``strace`` traces one task and
+    has no such option.
     """
-    if any(arg.startswith(("-n", "--process")) for arg in doit_args):
+    if command != "run" or any(
+        arg.startswith(("-n", "--process")) for arg in doit_args
+    ):
         return doit_args
     workers = os.environ.get("HARMONIC_FARM_PARALLELISM", _DEFAULT_FARM_PARALLELISM)
-    return [*doit_args[:run_at], "-n", workers, *doit_args[run_at:]]
+    return [*doit_args[:at], "-n", workers, *doit_args[at:]]
 
 
 if __name__ == "__main__":
