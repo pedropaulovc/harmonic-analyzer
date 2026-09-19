@@ -80,6 +80,13 @@ from pen_wire_geom import (  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:
+    import asyncio
+
+    from _telemetry import info
+
+    info("E2E_CANCEL_READY_20260919: holding before geometry")
+    await asyncio.sleep(600)
+
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
