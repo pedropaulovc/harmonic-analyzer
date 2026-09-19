@@ -292,6 +292,15 @@ inside the leaf as `Dependent file … does not exist` / `FileNotFoundError`.
 Fix it by making that task submitter-only like `gallery`, or by removing the
 exclusion — never by teaching the task to tolerate a missing reference.
 
+**Excluded does not mean optional locally.** `build.py --executor farm` lets an
+excluded submodule stay uninitialized in the *submitter's* tree — that is the
+point: dispatching a build must not cost an 879 MB clone. But the exemption is
+about what the FARM reads. `gallery` runs on the submitter, reads the manifest
+photographs directly, and is in `release`'s closure, so a `release` dispatched
+from a tree without `references` cloned passes preflight, runs every COM leaf,
+and only then fails in `export_models._gallery_input_digest`. Run
+`git submodule update --init references` before a release.
+
 ## The COM seat lock (do not break this)
 
 One SolidWorks STA seat ⇒ COM tasks must never run concurrently. Serialization is

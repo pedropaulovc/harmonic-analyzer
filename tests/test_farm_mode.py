@@ -605,7 +605,7 @@ def test_an_uninitialized_excluded_submodule_does_not_block_a_dispatch(
 ):
     # The exclusion exists so no worker downloads 878 MB of photographs. If
     # the submitter must clone them anyway to get past the preflight, the
-    # feature cannot be used at all (measured 2026-09-19 on this branch).
+    # feature cannot be used at all (measured 2026-09-18 on this branch).
     _sources_root(tmp_path, monkeypatch, ["references"])
     launched = _preflight_fakes(
         monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
@@ -638,12 +638,69 @@ def test_a_modified_excluded_submodule_still_blocks(tmp_path, monkeypatch, capsy
     # ``+`` is a different claim from ``-``: someone has left work in that
     # checkout. The farm would never see it, but neither would they, and
     # exempting it needs evidence this exemption does not have.
+    # The row carries git's real trailing description, so the reported path
+    # is the path and not whatever the line happens to end with.
     _sources_root(tmp_path, monkeypatch, ["references"])
-    _preflight_fakes(monkeypatch, git={"submodule": "+" + "b" * 40 + " references\n"})
+    _preflight_fakes(
+        monkeypatch,
+        git={"submodule": "+" + "b" * 40 + " references (heads/main)\n"},
+    )
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    assert capsys.readouterr().err == "farm: working tree is dirty:\n  references\n"
+
+
+def test_the_exemption_follows_the_declaration_not_the_submodule(
+    tmp_path, monkeypatch, capsys
+):
+    # The declaration is data: a repo excluding something else does not get
+    # ``references`` exempted because a previous repo did.
+    _sources_root(tmp_path, monkeypatch, ["SolidworksMCP-python"])
+    launched = _preflight_fakes(
+        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
+    )
     monkeypatch.setattr(build, "DoitMain", _NoDoit)
 
     assert build.main(["--executor", "farm", "part:x"]) == 2
     assert "references" in capsys.readouterr().err
+    assert not any(_published(argv) for argv in launched), "no publish subprocess"
+
+
+def test_a_trailing_slash_declares_the_same_submodule(tmp_path, monkeypatch):
+    # The publisher normalizes before matching ``.gitmodules``; a preflight
+    # that did not would refuse a declaration the publisher accepts.
+    _sources_root(tmp_path, monkeypatch, ["references/"])
+    launched = _preflight_fakes(
+        monkeypatch, git={"submodule": "-" + "b" * 40 + " references\n"}
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 0
+    assert any(_published(argv) for argv in launched), "the package was published"
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["{not json", '["references"]', '{"exclude_submodules": "references"}',
+     '{"exclude_submodules": [3]}'],
+)
+def test_a_malformed_declaration_stops_the_run_here(
+    tmp_path, monkeypatch, capsys, content
+):
+    # Degrading to "exclude nothing" would report the excluded submodule as
+    # a dirty tree, send the operator to clone 878 MB, and then have the
+    # publisher -- reading this same file, inside this same preflight --
+    # refuse it anyway.
+    root = _sources_root(tmp_path, monkeypatch, [])
+    (root / ".farm-sources.json").write_text(content, encoding="utf-8")
+    launched = _preflight_fakes(monkeypatch)
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    assert ".farm-sources.json" in capsys.readouterr().err
+    assert not any(_published(argv) for argv in launched), "no publish subprocess"
 
 
 def test_a_repo_declaring_no_exclusions_keeps_refusing_every_submodule(
