@@ -224,12 +224,13 @@ farm (`--executor farm`, which is how a seatless machine runs them).
   cache-keyed leaf, so `--executor farm` (`./build`) runs the whole thing without a
   local seat.
 - Under `--executor farm` each leaf gets 15 min on the worker by default. A cold
-  run (nothing in the remote cache, workers that must sync the source package
-  and start SolidWorks) needs more — the slowest measured leaf was
-  `part:fulcrum_keeper` at 61.5 min — so pass
-  `--leaf-timeout <minutes>` (or set `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm
-  clamps the request to 60 s–3 h. Leaving it at the default on a cold run costs
-  one retry and then a `platform`-style failure per slow leaf.
+  run (nothing in the remote cache, workers that must shallow-fetch the exact
+  commit and synchronize the locked external environment, and a cold SolidWorks
+  start) needs more — the slowest measured leaf was `part:fulcrum_keeper` at
+  61.5 min — so pass `--leaf-timeout <minutes>` (or set
+  `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm clamps the request to 60 s–3 h.
+  Leaving it at the default on a cold run costs one retry and then a
+  `platform`-style failure per slow leaf.
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
@@ -240,16 +241,17 @@ farm (`--executor farm`, which is how a seatless machine runs them).
   advances it after a successful publish and leaves a tracked merge bump;
   the release agent MUST commit and merge that bump before the next release.
 
-## `.farm-sources.json` — the submodules the farm does not ship
+## `.farm-sources.json` — submodules the farm does not acquire
 
-A farm submission bundles this checkout and every **initialized** submodule, and
-each worker downloads and extracts the lot before it runs one leaf. Shipping a
-submodule no farm-dispatchable task reads is pure per-leaf tax: measured on the
-2026-09-18 submission the bundles were `.` 212.9 MB, `SolidworksMCP-python`
-19.9 MB and `references` **878.9 MB** — 79% of 1.11 GB that every worker pulled
-and no worker used.
+Each leaf names one committed `HEAD`. The worker initializes its own disposable
+workspace, fetches that exact SHA from the approved repository with depth one and
+no tags, checks it out detached, then runs `reset --hard` and `clean -fdx`.
+Required submodules are fetched shallowly and reset/cleaned at the gitlink SHAs
+recorded by that commit. There is no submitter-built source bundle and no shared
+submitter-side origin ref to update, so concurrent worktrees cannot race source
+selection.
 
-`.farm-sources.json` at the repo root declares what to leave out:
+`.farm-sources.json` at the repo root declares submodules to leave uninitialized:
 
 ```json
 {
@@ -258,17 +260,17 @@ and no worker used.
 ```
 
 - It is a property of the **commit being built**, never of the submitter's
-  command line — two submitters of the same commit must derive the same source
-  identity, or leaves die with `package_download: no package blobs under
-  <source>-<agent>/`. No file = exclude nothing.
-- An entry naming no submodule in `.gitmodules` is a **hard error at publish**,
-  so a typo cannot silently re-ship 879 MB.
-- Excluded paths drop out of the bundles, out of `request.json`'s `submodules`
-  array and therefore out of the source identity; `request.json` carries a
-  sorted `excluded_submodules` so a worker (and a forensic reader) can see what
-  was deliberately left out. The worker then *verifies* it: in the restored
-  workspace `git submodule status --recursive` must show every excluded path
-  uninitialized (`-`) and every other submodule at its pinned commit.
+  command line. No file means exclude nothing.
+- An entry naming no submodule in the committed `.gitmodules` is a hard
+  preparation error, so a typo cannot silently fetch an unwanted repository.
+- Worker-local `metadata/request.json` records sorted required and excluded
+  submodules. The worker verifies every required submodule is at its pinned
+  gitlink and clean, and every excluded path remains uninitialized (`-`).
+- The project environment lives outside the cleaned checkout at the source
+  root's `environment/`. Every preparation synchronizes `uv.lock` into that
+  environment and exports `UV_PROJECT_ENVIRONMENT`; `workspace/.venv` is never
+  created, and repeat `clean -fdx` cannot erase the environment running the
+  build.
 
 **Why `references` qualifies.** The reference photographs are read only by the
 comparison gallery: `cad/comparisons/manifest.json` pairs point at
@@ -283,24 +285,24 @@ a tracked in-repo directory of vendored DXF/vendor models, and `cut_release.py`
 only *string-matches* the `references/` prefix when it rewrites doc links (it
 reads no file there — and `release` runs on the submitter anyway).
 
-**If a future task starts needing it**, what catches you is the **submitter-side
-gate**, not the worker: `agent/job_runner.export_graph` fails the publish when any
-packaged task's `file_dep` or target resolves under an excluded submodule, naming
-the task and the path. Do not expect the worker's `git submodule status` check to
-notice — it *requires* the excluded path to read `-`, so an absent submodule is
-exactly what it is asserting, and it passes. An **undeclared runtime read** (a path
-the task opens without declaring it a `file_dep`) escapes both, and surfaces only
-inside the leaf as `Dependent file … does not exist` / `FileNotFoundError`.
-Fix it by making that task submitter-only like `gallery`, or by removing the
-exclusion — never by teaching the task to tolerate a missing reference.
+**If a future task starts needing it**, worker graph preparation fails when any
+admitted task's `file_dep` or target resolves under an excluded submodule,
+naming the task and path. Do not expect `git submodule status` to notice: it
+*requires* the excluded path to read `-`, so absence is exactly what it asserts.
+An **undeclared runtime read** (a path the task opens without declaring it as a
+`file_dep`) escapes that gate and surfaces inside the leaf as `Dependent file …
+does not exist` / `FileNotFoundError`. Fix it by making that task submitter-only
+like `gallery`, or by removing the exclusion — never by teaching the task to
+tolerate a missing reference.
 
-**Excluded does not mean optional locally.** `build.py --executor farm` lets an
-excluded submodule stay uninitialized in the *submitter's* tree — that is the
-point: dispatching a build must not cost an 879 MB clone. But the exemption is
-about what the FARM reads. `gallery` runs on the submitter, reads the manifest
-photographs directly, and is in `release`'s closure, so a `release` dispatched
-from a tree without `references` cloned passes preflight, runs every COM leaf,
-and only then fails in `export_models._gallery_input_digest`. Run
+**Excluded does not mean optional locally.** The submitter still computes the
+doit graph and cache keys from its local project inputs, so farm preflight
+requires those inputs and initialized non-excluded submodules to be clean. It
+allows an excluded submodule to stay uninitialized; it does not claim dirty
+local inputs will be rebuilt from committed `HEAD`. `gallery` runs on the
+submitter, reads the manifest photographs directly, and is in `release`'s
+closure, so a release without `references` cloned passes farm preflight, runs
+every COM leaf, and then fails in `export_models._gallery_input_digest`. Run
 `git submodule update --init references` before a release.
 
 ## The COM seat lock (do not break this)

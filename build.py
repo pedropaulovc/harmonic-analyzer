@@ -18,11 +18,11 @@ local dependency scheduler but runs every cache-missing COM task -- parts,
 assemblies, drawings, the ``verify:*`` gates, ``preflight``, the neutral ``export``
 and the release Pack-and-Go (``package:release``) -- on the SolidWorks build farm
 instead of a local seat (``dodo._cached_com_action`` -> ``dodo._farm_build``). It
-needs a clean tree whose HEAD is on ``origin`` (the farm clones from there), the
-remote cache enabled (the farm hands results back through it), a pool checkout
-whose agent build is the one the fleet runs (``farm.py agents``: a package
-published for any other agent lands under a prefix no worker reads), and the
-commit's sources published to the pool (``farm.py publish``) before doit starts.
+needs a clean project tree, the remote cache enabled, and a fleet that advertises
+this client's farm protocol. The worker shallow-fetches the requested committed
+HEAD directly from the approved repository into its disposable workspace, resets
+and cleans that workspace, checks out pinned required submodules, and keeps its
+locked Python environment outside the cleaned checkout.
 That preflight runs for every doit command that executes task actions
 (``Command.execute_tasks``: ``run``, explicit or implicit, and ``strace``) whose
 argv the command's own parser accepts; the others (``list``, ``info``, ``clean``,
@@ -39,7 +39,6 @@ import argparse
 import getopt
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -53,7 +52,6 @@ REPO_ROOT = Path(__file__).resolve().parent
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
 _EXECUTORS = ("local", "farm")
 _DEFAULT_FARM_PARALLELISM = "8"
-_PUBLISH_STATES = ("published", "exists")
 
 # doit hands the leading task-loader options to ``getopt`` before it reads the
 # subcommand (``DoitMain.run``); the wrapper's ``-h``/``--help`` ride along so a
@@ -77,10 +75,10 @@ farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
                 --leaf-timeout or HARMONIC_FARM_LEAF_TIMEOUT_S (seconds) is
                 already set; the farm clamps either to 1 min - 3 h. A cold leaf
                 measured 61.5 min, so raise it for anything cold
-  preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
-                matching the pool checkout, sources published -- only before a
-                command that executes tasks (run, strace) with an argv doit
-                accepts; --help, list, info, clean, ... never reach it
+  preflight     clean local project inputs, remote cache ro/rw, fleet protocol
+                compatible -- only before a command that executes tasks (run,
+                strace) with an argv doit accepts; --help, list, info, clean, ...
+                never reach it
 
 doit's own help follows. `build.py help run` shows the run options (-n, -a,
 -c, -v ...), `build.py help <task>` a task's own parameters."""
@@ -187,15 +185,12 @@ def _tail(text: str | None, lines: int = 20) -> str:
 def _excluded_submodules() -> frozenset[str]:
     """Submodule paths ``.farm-sources.json`` declares the farm never reads.
 
-    The same file the pool's publisher reads off the checked-out commit, read
-    here for one purpose only: deciding whether a submodule's local state can
-    affect the build. A missing file declares nothing. A file that is PRESENT
-    and malformed is refused right here rather than read as "exclude
-    nothing": degrading would report the excluded submodule as a dirty tree,
-    send the operator to clone 878 MB, and only then have ``farm.py publish``
-    -- which runs inside this same preflight, off the same file -- refuse it
-    anyway. Paths are normalized the way the publisher normalizes them, so
-    ``references/`` and ``./references`` mean here what they mean there.
+    The declaration belongs to the commit and is read here only to decide
+    whether a submodule's local state can affect doit's local graph and cache
+    keys. A missing file declares nothing. A present malformed file is refused
+    rather than degraded to "exclude nothing". Paths are normalized exactly as
+    the worker normalizes them, so ``references/`` and ``./references`` mean
+    the same thing.
     """
     source = REPO_ROOT / ".farm-sources.json"
     try:
@@ -219,24 +214,19 @@ def _excluded_submodules() -> frozenset[str]:
 
 
 def _dirty_submodules() -> list[str]:
-    """Submodule paths whose local state the farm would not reproduce.
+    """Submodule paths whose local state can change the local graph or cache keys.
 
-    ``git submodule status`` marks an UNINITIALIZED submodule ``-`` alongside
-    the ``+`` of a checked-out commit that differs from the index. Those are
-    not the same claim: a submodule that was never cloned holds exactly the
-    pin the commit records, so there is nothing local for the farm to miss.
-    It still refuses by default, because the local doit graph reads those
-    files -- but NOT for a submodule this commit declares the farm never
-    reads. Without the exemption, dispatching a build requires cloning the
-    878 MB of photographs ``.farm-sources.json`` exists to keep off every
-    worker (measured 2026-09-18: the exclusion could not be exercised at all).
+    ``git submodule status`` marks an uninitialized submodule ``-`` alongside
+    the ``+`` of a checkout at another commit. The local doit graph reads
+    required submodule files, so required paths must be initialized at the
+    committed pin. A submodule this commit explicitly excludes from every farm
+    leaf may remain uninitialized; a modified checkout still blocks.
 
     The exemption covers every farm leaf and both ``build`` and
-    ``build_bare``. It does NOT make the submodule optional for the whole
-    repo: ``gallery`` -- a submitter-side task in ``release``'s closure --
-    reads the manifest photographs directly and fails in
-    ``export_models._gallery_input_digest`` if they were never cloned, so a
-    release still needs ``git submodule update --init references``.
+    ``build_bare``. It does not make the submodule optional for the whole repo:
+    ``gallery`` is submitter-side, belongs to ``release``'s closure, and reads
+    the manifest photographs directly. A release still needs
+    ``git submodule update --init references``.
     """
     excluded = _excluded_submodules()
     dirty = []
@@ -251,7 +241,7 @@ def _dirty_submodules() -> list[str]:
 
 
 def _farm_preflight() -> None:
-    """Publish HEAD to the farm and stamp the environment; raises to stop."""
+    """Validate local graph inputs, fleet protocol, and stamp committed HEAD."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
     dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
@@ -259,24 +249,15 @@ def _farm_preflight() -> None:
             "working tree is dirty:\n" + "\n".join(f"  {p}" for p in dirty)
         )
     sha = _git("rev-parse", "HEAD").strip()
-    # Prune first and ask only origin: the farm clones from origin, so a commit
-    # reachable from another remote or a deleted-upstream branch is not on it.
-    _git("fetch", "--quiet", "--prune", "origin")
-    if not _git("branch", "-r", "--contains", "HEAD", "--list", "origin/*").strip():
-        raise FarmPreflightError(
-            f"HEAD {sha} is not on origin; push it to any branch first"
-        )
 
     sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
     import _artifact_cache
+    import _farm
 
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
 
-    pool = _pool_home()
-    agent = _require_fleet_agent(pool)
-    identity = _publish(pool, sha, agent)
-    os.environ["HARMONIC_FARM_SOURCE_IDENTITY"] = identity
+    _require_fleet_protocol(_pool_home(), _farm.FARM_PROTOCOL_VERSION)
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
 
@@ -317,67 +298,41 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         ) from None
 
 
-def _dissenting_workers(reports: object, version: str) -> list[str]:
-    """``worker (agent build, last seen)`` for each report naming another build.
-
-    A report the pool ignored as stale is still evidence AGAINST a match: the
-    agent tree it names lives on that worker's own disk, so a worker idle for
-    a month comes back on exactly the build its last report published. Only
-    reports that disagree are returned -- agreement at any age proves nothing
-    and blocks nothing.
-    """
+def _dissenting_workers(reports: object, protocol: int) -> list[str]:
+    """``worker (protocol N, last seen)`` for stale incompatible reports."""
     if not isinstance(reports, list):
         return []
     named = []
     for report in reports:
         if not isinstance(report, dict):
             continue
-        other = report.get("agent_version")
-        if not isinstance(other, str) or not other or other == version:
+        other = report.get("farm_protocol_version")
+        if (
+            not isinstance(other, int)
+            or isinstance(other, bool)
+            or other == protocol
+        ):
             continue
         age = report.get("age_s")
         if not isinstance(age, int):
             age = report.get("written_age_s")
         seen = f", last seen {age // 86400}d ago" if isinstance(age, int) else ""
-        named.append(f"{report.get('worker_id') or '?'} ({other}{seen})")
+        named.append(
+            f"{report.get('worker_id') or '?'} (protocol {other}{seen})"
+        )
     return sorted(named)
 
 
-def _require_fleet_agent(pool: Path) -> str:
-    """Stop unless the fleet runs the agent this pool checkout would publish for.
-
-    A package is published under ``<source identity>-<agent identity>`` and every
-    worker rebuilds that prefix from the agent deployed on it, so a pool checkout
-    ahead of (or behind) the fleet publishes where no worker ever looks. On
-    2026-09-18 that cost a farm build 8.5 min and failed every COM leaf with an
-    unexplained ``package_download``. Each worker publishes its agent build in
-    its seat report, and that build lives on the worker's own disk -- so even a
-    worker that has been asleep for hours still names the build it will come
-    back on, and ``farm.py agents`` can answer before a leaf is dispatched.
-    Returns the agent build ``pool`` would publish for.
-
-    There is deliberately no override on this side. ``farm.py publish`` has one,
-    because a publish mid-rollout is legitimate; a farm build is not -- it hands
-    every COM task to those same workers, and a mismatch fails all of them.
-
-    This read is not the only enforcement, and is not the last one: the pool's
-    ``publish_source`` calls ``require_fleet_agent(allow_mismatch=False)``
-    before it uploads anything, so a mismatch that appears between this read
-    and the publish still stops the build -- with the pool's own wording,
-    which does mention the override. Two reads means two Azure round-trips and
-    a window in which they can disagree; the window is worth it, because this
-    one runs before doit is even constructed, so the operator sees the fleet's
-    agent build in the first line of output rather than after a preflight's
-    worth of work.
-    """
+def _require_fleet_protocol(pool: Path, protocol: int) -> None:
+    """Stop unless the pool CLI and every known worker support ``protocol``."""
     result = _pool_farm(pool, "agents", "--json")
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if result.returncode != 0 or not lines:
         raise FarmPreflightError(
             f"agents failed (exit {result.returncode}){_tail(result.stdout)}"
         )
-    summary = _agents_summary(lines[-1])
-    if summary["verdict"] in _AGENT_VERDICT_BLOCKS:
+    summary = _agents_summary(lines[-1], protocol)
+    if summary["verdict"] in _PROTOCOL_VERDICT_BLOCKS:
         report = summary.get("report")
         if not isinstance(report, str) or not report:
             raise FarmPreflightError(
@@ -389,62 +344,44 @@ def _require_fleet_agent(pool: Path) -> str:
     fresh = sum(
         1 for worker in workers if isinstance(worker, dict) and worker.get("fresh")
     )
-    version = summary["agent_version"]
     if fresh:
-        print(f"farm: agent {version} on {fresh} worker(s)")
+        print(f"farm: protocol {protocol} on {fresh} worker(s)")
     elif workers:
-        # The fleet is asleep, not unknown: an agent tree lives on the worker's
-        # own disk, so the last report of each worker still names the build it
-        # will come back on, and the pool has already checked them.
         print(
-            f"farm: agent {version}; no worker has reported within "
+            f"farm: protocol {protocol}; no worker has reported within "
             f"{summary['fresh_within_s']}s, but the last report of "
-            f"{len(workers)} worker(s) names this build"
+            f"{len(workers)} worker(s) supports it"
         )
     elif summary["ignored"]:
-        # "Nothing reported" would be false with these in hand. The pool
-        # believes no report past its evidence horizon, and saying so is the
-        # difference between a fleet nobody has ever seen and one whose
-        # instances were renumbered or idle for a fortnight.
         days = summary["evidence_horizon_s"] // 86400
-        dissent = _dissenting_workers(summary["ignored"], version)
+        dissent = _dissenting_workers(summary["ignored"], protocol)
         if dissent:
-            # Too old to CONFIRM is not too old to CONTRADICT. The agent tree
-            # lives on the worker's OS disk, so an old report still names the
-            # build that worker will come back on; a horizon that discards
-            # that turns the one piece of evidence we have into silence, and
-            # silence here publishes to a prefix nobody reads -- the
-            # package_download failure this preflight exists to stop.
             raise FarmPreflightError(
-                f"this pool checkout's agent is {version}, and no worker has "
+                f"farm protocol {protocol} is required, and no worker has "
                 f"reported within {days}d, but the last report of "
                 + ", ".join(dissent)
-                + " names another build. Deploy this agent to the fleet "
-                "(farm.py agent-release publish, then deploy), or delete the "
-                "seat report of an instance that will never come back."
+                + " advertises another protocol. Deploy a protocol-compatible "
+                "agent, or delete the seat report of an instance that will "
+                "never come back."
             )
         print(
-            f"farm: agent {version}; {len(summary['ignored'])} worker(s) last "
-            f"reported more than {days}d ago on this same build, too old to "
-            "prove the fleet is up but not contradicting it"
+            f"farm: protocol {protocol}; {len(summary['ignored'])} worker(s) last "
+            f"reported more than {days}d ago supporting it, too old to prove "
+            "the fleet is up but not contradicting it"
         )
     else:
         print(
-            f"farm: agent {version}; no worker has ever reported, so nothing "
-            "confirms which agent build the fleet will run"
+            f"farm: protocol {protocol}; no worker has ever reported, so "
+            "compatibility is unconfirmed"
         )
-    return version
 
 
-# Verdicts that mean a leaf would look for a package under a prefix nobody wrote:
-# a readable report naming another build, at any age, or a fleet whose reports the
-# pool cannot read at all (a SeatReport contract skew is itself a mismatch).
-_AGENT_VERDICT_BLOCKS = ("mismatch", "unreadable")
-_AGENT_VERDICTS = (*_AGENT_VERDICT_BLOCKS, "matched", "unverified")
+_PROTOCOL_VERDICT_BLOCKS = ("mismatch", "unreadable")
+_PROTOCOL_VERDICTS = (*_PROTOCOL_VERDICT_BLOCKS, "matched", "unverified")
 
 
-def _agents_summary(line: str) -> dict:
-    """The parsed and validated last stdout line of ``farm.py agents --json``."""
+def _agents_summary(line: str, expected_protocol: int) -> dict:
+    """Parse and validate the last stdout line of ``farm.py agents --json``."""
     try:
         summary = json.loads(line)
     except json.JSONDecodeError:
@@ -453,14 +390,20 @@ def _agents_summary(line: str) -> dict:
         ) from None
     if not isinstance(summary, dict):
         raise FarmPreflightError(f"agents summary is not an object: {line[:200]}")
-    version = summary.get("agent_version")
-    if not isinstance(version, str) or not re.fullmatch(r"[0-9a-f]{16}", version):
+    protocol = summary.get("farm_protocol_version")
+    if not isinstance(protocol, int) or isinstance(protocol, bool):
         raise FarmPreflightError(
-            f"agents summary agent_version is not 16 hex: {version!r}"
+            "agents summary farm_protocol_version is not an integer: "
+            f"{protocol!r}"
         )
-    if summary.get("verdict") not in _AGENT_VERDICTS:
+    if protocol != expected_protocol:
         raise FarmPreflightError(
-            f"agents summary verdict is not one of {_AGENT_VERDICTS}: "
+            f"pool CLI supports farm protocol {protocol}, but this client requires "
+            f"{expected_protocol}"
+        )
+    if summary.get("verdict") not in _PROTOCOL_VERDICTS:
+        raise FarmPreflightError(
+            f"agents summary verdict is not one of {_PROTOCOL_VERDICTS}: "
             f"{summary.get('verdict')!r}"
         )
     for key in ("workers", "ignored"):
@@ -468,73 +411,12 @@ def _agents_summary(line: str) -> dict:
             raise FarmPreflightError(
                 f"agents summary {key} is not a list: {line[:200]}"
             )
-    # Both windows are printed back to the operator, and the pool emits them as
-    # second counts. A strict check keeps a silent type change on that side from
-    # arriving here as a sentence with "120.0s" in it.
     for key in ("fresh_within_s", "evidence_horizon_s"):
         value = summary.get(key)
         if not isinstance(value, int) or isinstance(value, bool):
             raise FarmPreflightError(
                 f"agents summary {key} is not an integer: {value!r}"
             )
-    return summary
-
-
-def _publish(pool: Path, sha: str, agent: str) -> str:
-    """Run ``farm.py publish`` for ``sha`` and return the source identity.
-
-    ``agent`` is the agent build the preflight checked the fleet against; the
-    package the workers will look for is named after the agent the publish
-    actually ran with, so the two have to be the same one.
-    """
-    publish = _pool_farm(pool, "publish", "--commit", sha, "--json")
-    lines = [line for line in publish.stdout.splitlines() if line.strip()]
-    if publish.returncode != 0 or not lines:
-        raise FarmPreflightError(
-            f"publish failed (exit {publish.returncode}){_tail(publish.stdout)}"
-        )
-    summary = _publish_summary(lines[-1], sha)
-    published_agent = summary["agent_identity_sha256"][: len(agent)]
-    if published_agent != agent:
-        raise FarmPreflightError(
-            f"publish used agent {published_agent}, but the fleet was checked "
-            f"against {agent}; the pool checkout changed mid-preflight"
-        )
-    identity = summary["source_identity_sha256"]
-    print(f"farm: sources {identity[:16]} @ {sha[:12]} {summary['state']}")
-    return identity
-
-
-def _publish_summary(line: str, sha: str) -> dict:
-    """The parsed and validated last stdout line of ``farm.py publish --json``."""
-    try:
-        summary = json.loads(line)
-    except json.JSONDecodeError:
-        raise FarmPreflightError(
-            f"publish printed no JSON summary; last line: {line[:200]}"
-        ) from None
-    if not isinstance(summary, dict):
-        raise FarmPreflightError(f"publish summary is not an object: {line[:200]}")
-    state = summary.get("state")
-    if state not in _PUBLISH_STATES:
-        raise FarmPreflightError(
-            f"publish summary state {state!r} is not one of {_PUBLISH_STATES}"
-        )
-    identity = summary.get("source_identity_sha256")
-    if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
-        raise FarmPreflightError(
-            f"publish summary source_identity_sha256 is not 64 hex: {identity!r}"
-        )
-    agent = summary.get("agent_identity_sha256")
-    if not isinstance(agent, str) or not re.fullmatch(r"[0-9a-f]{64}", agent):
-        raise FarmPreflightError(
-            f"publish summary agent_identity_sha256 is not 64 hex: {agent!r}"
-        )
-    commit = summary.get("commit")
-    if commit != sha:
-        raise FarmPreflightError(
-            f"publish summary is for commit {commit!r}, expected {sha}"
-        )
     return summary
 
 

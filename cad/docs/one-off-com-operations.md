@@ -48,19 +48,29 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
 
 `build.py`'s farm preflight (`_farm_preflight`) refuses to start unless:
 
-- the tree is clean, **including submodules** (`git status --porcelain=v1
-  --untracked-files=all` plus `git submodule status --recursive`);
-- `HEAD` is reachable from `origin/*` after a pruning fetch — the farm clones
-  from `origin`, so push first (any branch will do);
+- the local project inputs are clean, **including submodules** (`git status
+  --porcelain=v1 --untracked-files=all` plus `git submodule status
+  --recursive`), because the submitter's doit graph and cache keys come from
+  those local files;
 - the remote cache is `ro` or `rw` (`_artifact_cache.enabled()`) — the farm
   hands results back **through the cache**, so `off` cannot work;
-- `farm.py publish --commit <sha>` succeeds (run for you, from
-  `$SOLIDWORKS_POOL_HOME`, default `../solidworks-pool`). The worker
-  independently re-verifies that the commit is served by the approved
-  repository, or fails the leaf `source_unapproved`.
+- `farm.py agents --json` reports farm protocol 4 and no known worker reports
+  an incompatible or unreadable protocol.
 
-It then sets `HARMONIC_SW_AUTOSTART=0` locally (no local SolidWorks is touched)
-and, unless you passed `-n`/`--process` yourself, adds `-n 8`
+The preflight stamps only the committed local `HEAD`; it does not fetch or
+update a shared `origin/*` ref and does not publish source files. Each worker
+fetches that exact SHA with depth one from the fixed approved repository,
+checks it out detached, runs `reset --hard` and `clean -fdx`, and checks out
+required submodules at their pinned gitlinks. Source availability is therefore
+proved by the worker's exact fetch, not by mutating a submitter-side shared ref.
+Dirty local project inputs are refused; they are not silently replaced with
+the committed versions.
+
+The worker synchronizes `uv.lock` into a source-root `environment/` outside the
+cleaned checkout and sets `UV_PROJECT_ENVIRONMENT` for preparation and build
+descendants, so `workspace/.venv` is never created or erased by `clean -fdx`.
+The wrapper sets `HARMONIC_SW_AUTOSTART=0` locally (no local SolidWorks is
+touched) and, unless you passed `-n`/`--process` yourself, adds `-n 8`
 (`HARMONIC_FARM_PARALLELISM`) so leaves overlap.
 
 Leaf budget: 15 min per attempt by default, clamped to 60 s–3 h
@@ -84,9 +94,9 @@ throw away afterwards. Non-negotiable shape:
 2. **Name it under an admitted prefix.** The worker rejects anything else
    (`execute_rejected`): `part:`, `assembly:`, `drawing:`, `verify:`,
    `verify_soundness:`, `check:`, `package:`, or the bare names `export` /
-   `preflight`. `build` and `release` may be *packaged* but never *executed* as
-   a leaf. Widening that set changes the pool's `agent_identity` and needs a
-   fleet redeploy — so pick a name inside it instead.
+   `preflight`. `build` and `release` may exist in the prepared graph but are
+   never admitted as leaf actions. Widening that set requires a worker-agent
+   rollout — pick a name inside it instead.
 3. **Declare machine-stable `file_dep`s and put every output under
    `cad/out/`.** The cache refuses to extract anything else, and an absolute
    local path or a timestamp in the dep list makes the submitter and the worker
@@ -95,9 +105,9 @@ throw away afterwards. Non-negotiable shape:
 4. **Produce something cacheable.** A verdict-only task passes `stamp=` and
    that stamp IS the cached artefact. A leaf that stores nothing under its key
    fails `cache_missing` even when the COM work succeeded.
-5. Commit, push to `origin`, dispatch (`./build <your:task>`), then delete the
-   branch. The published source package is keyed by commit + submodule pins,
-   so a fixup means a new commit and a new publish.
+5. Commit, push the commit to the approved repository, dispatch
+   (`./build <your:task>`), then delete the branch. A fixup means a new commit;
+   every worker fetches exactly the SHA the new leaf request names.
 
 ## 2. Invariants an ad-hoc COM operation must not break
 
@@ -196,8 +206,8 @@ throw away afterwards. Non-negotiable shape:
 **Farm half.** The failure message `_farm_build` raises already names worker,
 category, exit code and log blob. The workflow id is
 `leaf:<task>:<64-hex cache key>:<clamped timeout>s`
-(`_farm.workflow_id`; for a `check:` leaf the key slot is the first 16 chars of
-the source identity). From the pool checkout:
+(`_farm.workflow_id`; for a keyless `check:` leaf the key slot is the first 16
+characters of the requested commit). From the pool checkout:
 
 ```powershell
 uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status "leaf:part:cone_gear:<64hex>:900s"
@@ -206,9 +216,9 @@ uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py l
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs
 `log_blob`, and the worker only publishes one once it has actually run the
-build helper. Everything earlier or elsewhere — admission
-(`source_unapproved`, `invalid_request`, `incompatible`), package validation,
-an exhausted drain handoff, or any control-plane fault — comes back through
+build helper. Everything earlier or elsewhere — admission (`invalid_request`,
+`incompatible`), exact-commit acquisition/environment/graph preparation, an
+exhausted drain handoff, or any control-plane fault — comes back through
 `control.failed_result`, which sets `log_blob=None` (and `exit_code=None`,
 `attempt=0`). `farm.py logs` then reports "published no log": that is not a
 missing log, it is the answer. Read the control-plane result instead
@@ -224,9 +234,13 @@ Failure categories, and what they mean for you:
 | `task_failed` | no | your recipe failed with a working seat — a real bug |
 | `cache_missing` | no | the leaf succeeded but your key is absent (§3) |
 | `execute_rejected` | no | the task name/graph/key was refused (route B rules) |
-| `restore_mismatch` | no | the worker's restored workspace is not the requested commit/submodule pins, or is not clean |
-| `incompatible`, `invalid_request` | no | protocol/schema/budget disagreement between this checkout and the fleet |
-| `source_unapproved` | no | the commit is not served by the approved repository — push it there |
+| `restore_mismatch` | no | prepared HEAD/clean/submodule/exclusion state or metadata commit does not match the request |
+| `source_unavailable` | yes | the exact-SHA depth-one fetch from the approved repository failed — push it there or fix repository access |
+| `source_declaration` | no | the commit's `.farm-sources.json` is malformed |
+| `environment_sync` | yes | synchronizing the locked external environment failed or created a forbidden workspace `.venv` |
+| `environment_missing`, `graph_export` | no | the external interpreter is absent after sync, or graph preparation failed |
+| `incompatible` | no | protocol/schema drift or the committed Python/lock/toolchain contract is unusable |
+| `invalid_request` | no | the requested task is absent from the prepared graph |
 | `platform_unavailable` | yes | the seat, not the recipe: SolidWorks gone after a failed leaf, or present but owning a blocking dialog |
 | `cache_unreachable` | yes | the worker could not probe the cache |
 | `infrastructure` | yes | not one of the named categories — the control plane retried (3 attempts) and the last one still failed |
