@@ -1,4 +1,4 @@
-# E2E post-update recovery 20260919: fresh part recipe, geometry unchanged.
+# E2E protocol-4 shallow-source canary 20260919: part recipe, geometry unchanged.
 r"""Reproduction script: magnifying-wheel axle nut (book ch. 21, p. 51).
 
 The small hex nut on the wheel axle's stud tip that, with the O9 washer
