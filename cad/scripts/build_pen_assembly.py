@@ -1,4 +1,4 @@
-# E2E multi-submitter 20260919: independent assembly recipe, geometry unchanged.
+# E2E protocol-4 shallow-source canary 20260919: assembly recipe, geometry unchanged.
 r"""Reproduction script: pen subassembly (book ch. 24).
 
 The machine's output transducer: the pen carriage that writes the Fourier sum
