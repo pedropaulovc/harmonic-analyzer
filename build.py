@@ -30,6 +30,7 @@ task and the publishing half of ``release`` run here.
 from __future__ import annotations
 
 import argparse
+import getopt
 import json
 import os
 import re
@@ -46,14 +47,12 @@ _EXECUTORS = ("local", "farm")
 _DEFAULT_FARM_PARALLELISM = "8"
 _PUBLISH_STATES = ("published", "exists")
 
-# doit's task-loader options may precede the subcommand (``DoitMain.run`` parses
-# them first). ``-f``/``-d`` take a value, attached (``-fdodo.py``, ``--file=x``)
-# or as the next token; ``-k``/``--seek-file`` is a flag.
-_LOADER_SEPARATE_VALUE = ("-f", "-d", "--file", "--dir")
-_LOADER_ONE_TOKEN = ("-k", "--seek-file")
-_LOADER_ATTACHED_VALUE = ("-f", "-d", "--file=", "--dir=")
+# doit hands the leading task-loader options to ``getopt`` before it reads the
+# subcommand (``DoitMain.run``); the wrapper's ``-h``/``--help`` ride along so a
+# help request after them is seen where it stands.
+_LOADER_SHORT = "f:d:kh"
+_LOADER_LONG = ("file=", "dir=", "seek-file", "help")
 _HELP = ("--help", "-h")
-_NO_RUN = (*_HELP, "--version")
 
 _USAGE = (
     "build.py [--verbosity LEVEL] [--executor {local,farm}] "
@@ -65,10 +64,11 @@ other argument goes to doit unchanged, so `build.py part:cone_gear`, `build.py
 -n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
 _EPILOG = f"""\
 farm defaults (--executor farm; `build` / `build.cmd` pass it for you):
-  parallelism   -n {_DEFAULT_FARM_PARALLELISM} (HARMONIC_FARM_PARALLELISM) unless you pass -n/--process
-  leaf timeout  15 min per attempt (the control plane's default), clamped to
-                1 min - 3 h; a cold leaf measured 61.5 min, so pass
-                --leaf-timeout for anything cold
+  parallelism   -n {_DEFAULT_FARM_PARALLELISM} unless you pass -n/--process or set HARMONIC_FARM_PARALLELISM
+  leaf timeout  15 min per attempt (the control plane's default) unless you pass
+                --leaf-timeout or HARMONIC_FARM_LEAF_TIMEOUT_S (seconds) is
+                already set; the farm clamps either to 1 min - 3 h. A cold leaf
+                measured 61.5 min, so raise it for anything cold
   preflight     clean tree, HEAD on origin, remote cache ro/rw, fleet agent
                 matching the pool checkout, sources published -- only before a
                 run; --help, list, info, clean, ... never reach it
@@ -114,8 +114,8 @@ def _parser() -> argparse.ArgumentParser:
         "--leaf-timeout",
         type=int,
         metavar="MINUTES",
-        help="per-attempt budget for each farm leaf, in minutes (sets "
-        "HARMONIC_FARM_LEAF_TIMEOUT_S; the farm clamps it to 1-180)",
+        help="per-attempt budget for each farm leaf, in minutes (overrides an "
+        "inherited HARMONIC_FARM_LEAF_TIMEOUT_S; the farm clamps it to 1-180)",
     )
     return parser
 
@@ -523,26 +523,46 @@ def _publish_summary(line: str, sha: str) -> dict:
     return summary
 
 
-def _past_loader_options(doit_args: list[str]) -> int:
-    """Index of doit's subcommand (or first task), skipping the leading loader
-    options the way ``DoitMain.run`` does before it reads the subcommand."""
-    i = 0
-    while i < len(doit_args):
-        arg = doit_args[i]
-        if arg in _LOADER_SEPARATE_VALUE:
-            i += 2
-        elif arg in _LOADER_ONE_TOKEN or arg.startswith(_LOADER_ATTACHED_VALUE):
-            i += 1
-        else:
-            break
-    return i
+def _doit_head(doit_args: list[str]) -> tuple[bool, int, int | None]:
+    """How ``DoitMain.run`` reads argv before it picks a subcommand.
+
+    Returns ``(help, loader_end, head)``. doit hands the leading loader options
+    to ``getopt`` (``f:d:k`` / ``file= dir= seek-file``: grouped shorts, attached
+    or separate values, unique long prefixes) and, when that parse fails, gives
+    the whole argv to ``run`` instead, so ``loader_end`` is then 0. Every
+    remaining ``name=value`` token is a command-line variable, dropped before the
+    subcommand is read, so ``head`` is the first token that is not one (``None``
+    when nothing but variables follows). ``-h``/``--help`` are the wrapper's
+    (doit only knows a bare leading ``--help``): ``help`` is true when getopt
+    meets one among the loader options (even malformed, ``--help=x``) or when
+    it is the head.
+    """
+    try:
+        opts, rest = getopt.getopt(doit_args, _LOADER_SHORT, _LOADER_LONG)
+    except getopt.GetoptError as error:
+        if error.opt in ("h", "help"):
+            return True, 0, None
+        opts, rest = [], doit_args
+    loader_end = len(doit_args) - len(rest)
+    head = next(
+        (loader_end + j for j, arg in enumerate(rest) if not _is_variable(arg)),
+        None,
+    )
+    asked = any(opt in _HELP for opt, _value in opts) or (
+        head is not None and doit_args[head] in _HELP
+    )
+    return asked, loader_end, head
+
+
+def _is_variable(arg: str) -> bool:
+    """``DoitMain.process_args``'s test for a ``name=value`` command-line variable."""
+    return not arg.startswith("-") and "=" in arg
 
 
 def _asks_for_help(doit_args: list[str]) -> bool:
     """A leading ``--help``/``-h`` is the wrapper's; ``build.py help <x>`` and a
     per-command ``--help`` stay doit's."""
-    i = _past_loader_options(doit_args)
-    return i < len(doit_args) and doit_args[i] in _HELP
+    return _doit_head(doit_args)[0]
 
 
 def _run_insertion_point(doit_args: list[str], commands) -> int | None:
@@ -552,17 +572,19 @@ def _run_insertion_point(doit_args: list[str], commands) -> int | None:
     ``info``, ``clean``, ``forget``, ...) run nothing, so they neither take
     ``-n`` nor need the farm preflight.
     """
-    i = _past_loader_options(doit_args)
-    if i >= len(doit_args):
-        return i  # implicit run of the default tasks
-    head = doit_args[i]
-    if head in _NO_RUN:
+    asked, loader_end, head = _doit_head(doit_args)
+    if asked:
         return None
-    if head not in commands:
-        return i  # implicit run of the named tasks
-    if head != "run":
+    if head is None:
+        return loader_end  # implicit run of the default tasks
+    name = doit_args[head]
+    if name == "--version":
         return None
-    return i + 1
+    if name not in commands:
+        return head  # implicit run of the named tasks
+    if name != "run":
+        return None
+    return head + 1
 
 
 def _with_farm_parallelism(doit_args: list[str], run_at: int) -> list[str]:

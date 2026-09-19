@@ -1163,6 +1163,17 @@ def test_an_aged_out_dissent_names_the_worker_and_the_remedy():
         (["-fdodo.py", "run", "part:x"], ["-fdodo.py", "run", "-n", "8", "part:x"], True),
         (["--file=dodo.py", "-k", "--help"], ["--file=dodo.py", "-k", "--help"], False),
         (["-d", ".", "clean"], ["-d", ".", "clean"], False),
+        # doit's loader options are getopt: grouped shorts, unique long prefixes
+        (["-kf", "dodo.py", "-h"], ["-kf", "dodo.py", "-h"], False),
+        (["-kf", "dodo.py", "part:x"], ["-kf", "dodo.py", "-n", "8", "part:x"], True),
+        (["--fi=dodo.py", "list"], ["--fi=dodo.py", "list"], False),
+        # a loader parse error hands the whole argv to run, as doit does
+        (["-f", "dodo.py", "-a", "x"], ["-n", "8", "-f", "dodo.py", "-a", "x"], True),
+        # ``name=value`` command-line variables are dropped before the subcommand
+        (["profile=ci", "list"], ["profile=ci", "list"], False),
+        (["profile=ci", "run", "x"], ["profile=ci", "run", "-n", "8", "x"], True),
+        (["profile=ci", "part:x"], ["profile=ci", "-n", "8", "part:x"], True),
+        (["profile=ci", "-h"], ["profile=ci", "-h"], False),
     ],
 )
 def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkeypatch):
@@ -1183,23 +1194,26 @@ def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "--help"]) == 0
-    assert build.main(["--executor", "farm", "-f", "dodo.py", "-h"]) == 0
+    assert build.main(["--executor", "farm", "-kf", "dodo.py", "-h"]) == 0
     assert build.main(["--executor", "farm", "help", "run"]) == 0
-    assert build.main(["--executor", "farm", "-f", "dodo.py", "list"]) == 0
+    assert build.main(["--executor", "farm", "profile=ci", "list"]) == 0
 
-    # A leading --help/-h is the wrapper's (doit itself rejects ``-h``): its
-    # own options and the farm defaults, then doit's command list. The
-    # doit-owned routes (``help run``, ``list``) pass through unchanged.
+    # A leading --help/-h, grouped loader options included, is the wrapper's
+    # (doit itself rejects ``-h``): its own options and the farm defaults, then
+    # doit's command list. The doit-owned routes (``help run``, ``list``, with
+    # or without a command-line variable) pass through unchanged.
     assert [args for args, _env in _FakeDoit.seen] == [
         ["--help"],
         ["--help"],
         ["help", "run"],
-        ["-f", "dodo.py", "list"],
+        ["profile=ci", "list"],
     ]
     out = capsys.readouterr().out
     for flag in ("--verbosity", "--executor", "--leaf-timeout"):
         assert flag in out
+    # Both knobs a no-flag farm run would silently inherit are named.
     assert "HARMONIC_FARM_PARALLELISM" in out
+    assert "HARMONIC_FARM_LEAF_TIMEOUT_S" in out
 
 
 # --- _farm: config and the Temporal boundary ---------------------------------
