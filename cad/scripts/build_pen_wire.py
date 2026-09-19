@@ -1,3 +1,4 @@
+# Validation-only cache identity: three-worker E2E 2026-09-19 pen-wire.
 r"""Reproduction script: pen wire -- WIRE 2 of the amplification chain (book
 ch. 21/24, pp. 50-53 / 60-61).
 

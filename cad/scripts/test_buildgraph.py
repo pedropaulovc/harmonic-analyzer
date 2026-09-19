@@ -1662,6 +1662,81 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
     assert all(path.is_relative_to(scripts) for path in deps)
 
 
+def test_identical_module_text_resolves_against_its_own_package(tmp_path, monkeypatch):
+    """Source SYNTAX is reused by content, but a relative import is anchored to
+    the importing module's own package.
+
+    Two packages whose entry modules hold byte-identical source -- the same
+    ``from . import helper`` -- must each pull in THEIR OWN helper.  Reusing a
+    RESOLVED closure by text (rather than only the unresolved syntax) would
+    collapse the two onto whichever package was analysed first and silently drop
+    a real recipe edge from the other, leaving that part reported up to date
+    after its helper changed.
+    """
+    scripts = tmp_path / "scripts"
+    shared = "from . import helper\n"
+    for package in ("alpha", "beta"):
+        directory = scripts / package
+        directory.mkdir(parents=True)
+        (directory / "__init__.py").write_text("", encoding="utf-8")
+        (directory / "entry.py").write_text(shared, encoding="utf-8")
+        (directory / "helper.py").write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    bg._local_modules.cache_clear()
+    bg._module_by_path.cache_clear()
+    bg._direct_local_imports.cache_clear()
+    try:
+        closures = {
+            package: {
+                Path(dep)
+                for dep in module_deps_of(scripts / package / "entry.py")
+            }
+            for package in ("alpha", "beta")
+        }
+    finally:
+        bg._direct_local_imports.cache_clear()
+        bg._module_by_path.cache_clear()
+        bg._local_modules.cache_clear()
+
+    for package, other in (("alpha", "beta"), ("beta", "alpha")):
+        assert (scripts / package / "helper.py").resolve() in closures[package]
+        assert (scripts / package / "__init__.py").resolve() in closures[package]
+        assert (scripts / other / "helper.py").resolve() not in closures[package]
+
+
+def test_stamping_classification_rereads_sources_between_contracts(
+    tmp_path, monkeypatch
+):
+    """Each stamping CONTRACT classifies against the sources as they are NOW.
+
+    Part and title-block classification share one whole-program scan, but they
+    are separate cache entries: the second contract to be asked is a miss, and a
+    miss has always re-read the tree.  A source rewritten in-process between the
+    two -- a generated module, a test fixture, an edit during a long ``doit``
+    session -- must therefore be visible to the second, or a module that started
+    stamping would be classified from the first contract's stale reading and its
+    registry dependency would go missing.
+    """
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    module = scripts / "widget.py"
+    module.write_text("def go():\n    pass\n", encoding="utf-8")
+
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    bg._local_modules.cache_clear()
+    bg._module_by_path.cache_clear()
+    bg._stamping_modules.cache_clear()
+    try:
+        assert bg._stamping_modules(bg._PART_STAMP_PRIMITIVES) == frozenset()
+        module.write_text("def go():\n    part_properties()\n", encoding="utf-8")
+        assert "widget" in bg._stamping_modules(bg._TITLE_BLOCK_STAMP_PRIMITIVES)
+    finally:
+        bg._stamping_modules.cache_clear()
+        bg._module_by_path.cache_clear()
+        bg._local_modules.cache_clear()
+
+
 def test_part_and_title_property_stampers_are_distinct():
     """Assembly identity must not masquerade as in-script part generation."""
     title_stampers = {

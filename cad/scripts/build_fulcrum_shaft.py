@@ -1,3 +1,4 @@
+# Validation-only cache identity: three-worker E2E 2026-09-19 fulcrum-shaft.
 r"""Reproduction script: lever fulcrum shaft (book ch. 17; 1 used).
 
 Plain Ø6.35 (1/4") x 182 steel shaft: the top levers' common fulcrum at
