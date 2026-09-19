@@ -299,27 +299,31 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _dissenting_workers(reports: object, protocol: int) -> list[str]:
-    """``worker (protocol N, last seen)`` for stale incompatible reports."""
+    """Stale reports that are incompatible with or unreadable under ``protocol``."""
     if not isinstance(reports, list):
         return []
     named = []
     for report in reports:
         if not isinstance(report, dict):
+            named.append("? (protocol unreadable)")
             continue
         other = report.get("farm_protocol_version")
         if (
-            not isinstance(other, int)
-            or isinstance(other, bool)
-            or other == protocol
+            isinstance(other, int)
+            and not isinstance(other, bool)
+            and other == protocol
         ):
             continue
+        advertised = (
+            f"protocol {other}"
+            if isinstance(other, int) and not isinstance(other, bool)
+            else "protocol unreadable"
+        )
         age = report.get("age_s")
         if not isinstance(age, int):
             age = report.get("written_age_s")
         seen = f", last seen {age // 86400}d ago" if isinstance(age, int) else ""
-        named.append(
-            f"{report.get('worker_id') or '?'} (protocol {other}{seen})"
-        )
+        named.append(f"{report.get('worker_id') or '?'} ({advertised}{seen})")
     return sorted(named)
 
 
@@ -360,7 +364,7 @@ def _require_fleet_protocol(pool: Path, protocol: int) -> None:
                 f"farm protocol {protocol} is required, and no worker has "
                 f"reported within {days}d, but the last report of "
                 + ", ".join(dissent)
-                + " advertises another protocol. Deploy a protocol-compatible "
+                + " is incompatible or unreadable. Deploy a protocol-compatible "
                 "agent, or delete the seat report of an instance that will "
                 "never come back."
             )

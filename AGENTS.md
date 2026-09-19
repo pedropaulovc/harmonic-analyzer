@@ -245,7 +245,10 @@ farm (`--executor farm`, which is how a seatless machine runs them).
 
 Each leaf names one committed `HEAD`. The worker initializes its own disposable
 workspace, fetches that exact SHA from the approved repository with depth one and
-no tags, checks it out detached, then runs `reset --hard` and `clean -fdx`.
+no tags, checks it out detached, then runs `reset --hard` and `clean -ffdx`.
+The second force removes untracked nested Git repositories; `-x` covers ignored
+files. These destructive commands run only after the source root is proven to
+be an ownership-validated disposable worker root.
 Required submodules are fetched shallowly and reset/cleaned at the gitlink SHAs
 recorded by that commit. There is no submitter-built source bundle and no shared
 submitter-side origin ref to update, so concurrent worktrees cannot race source
@@ -261,15 +264,16 @@ selection.
 
 - It is a property of the **commit being built**, never of the submitter's
   command line. No file means exclude nothing.
-- An entry naming no submodule in the committed `.gitmodules` is a hard
-  preparation error, so a typo cannot silently fetch an unwanted repository.
-- Worker-local `metadata/request.json` records sorted required and excluded
-  submodules. The worker verifies every required submodule is at its pinned
-  gitlink and clean, and every excluded path remains uninitialized (`-`).
+- An entry naming no submodule gitlink in the commit fails preparation as
+  `restore_mismatch`, so a typo cannot silently fetch an unwanted repository.
+- Worker-local `metadata/request.json` records required and excluded submodules
+  sorted by normalized path. The worker verifies every required submodule is at
+  its pinned gitlink and clean, and every excluded path remains uninitialized
+  (`-`).
 - The project environment lives outside the cleaned checkout at the source
   root's `environment/`. Every preparation synchronizes `uv.lock` into that
   environment and exports `UV_PROJECT_ENVIRONMENT`; `workspace/.venv` is never
-  created, and repeat `clean -fdx` cannot erase the environment running the
+  created, and repeat `clean -ffdx` cannot erase the environment running the
   build.
 
 **Why `references` qualifies.** The reference photographs are read only by the

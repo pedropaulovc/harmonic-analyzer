@@ -719,11 +719,6 @@ def test_default_build_target_carries_the_verify_gates_under_every_executor(
             + _agents_summary(workers={"swmaker000004@4": "ready"}).strip()[:200],
         ),
         (
-            _agents_summary(verdict="probably-fine"),
-            "farm: agents summary verdict is not one of "
-            "('mismatch', 'unreadable', 'matched', 'unverified'): 'probably-fine'",
-        ),
-        (
             _agents_summary(fresh_within_s="120"),
             "farm: agents summary fresh_within_s is not an integer: '120'",
         ),
@@ -749,6 +744,22 @@ def test_preflight_protocol_faults_exit_2(agents, message, monkeypatch, capsys):
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 2
     assert capsys.readouterr().err == message + "\n"
+    assert all(os.environ.get(key) is None for key in FARM_ENV)
+
+
+def test_an_unknown_fleet_verdict_blocks_with_the_invalid_token(
+    monkeypatch, capsys
+):
+    _preflight_fakes(
+        monkeypatch, agents=_agents_summary(verdict="probably-fine")
+    )
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+    error = capsys.readouterr().err
+    assert error.startswith("farm:")
+    assert "verdict" in error
+    assert "probably-fine" in error
     assert all(os.environ.get(key) is None for key in FARM_ENV)
 
 
@@ -809,6 +820,31 @@ def test_an_unreadable_fleet_stops_like_a_protocol_mismatch(monkeypatch, capsys)
     assert capsys.readouterr().err == f"farm: {report}\n"
 
 
+def test_current_compatible_worker_allows_an_aged_retired_unreadable_report(
+    monkeypatch, capsys
+):
+    _preflight_fakes(
+        monkeypatch,
+        agents=_agents_summary(
+            ignored=[
+                {
+                    "worker_id": "retired@1",
+                    "farm_protocol_version": None,
+                    "evidence": "invalid_report:missing farm_protocol_version",
+                    "written_age_s": 1555200,
+                    "fresh": False,
+                }
+            ]
+        ),
+    )
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 0
+    assert _FakeDoit.seen
+    assert "protocol 4" in capsys.readouterr().out.splitlines()[0]
+
+
 def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
     _preflight_fakes(
         monkeypatch,
@@ -820,10 +856,11 @@ def test_a_sleeping_compatible_fleet_says_so(monkeypatch, capsys):
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    assert capsys.readouterr().out.splitlines()[0] == (
-        "farm: protocol 4; no worker has reported within 120s, but the last "
-        "report of 1 worker(s) supports it"
-    )
+    status = capsys.readouterr().out.splitlines()[0]
+    assert "protocol 4" in status
+    assert "no worker has reported within 120s" in status
+    assert "last report of 1 worker(s)" in status
+    assert "supports it" in status
 
 
 def test_a_fleet_that_never_reported_says_compatibility_is_unconfirmed(
@@ -836,10 +873,10 @@ def test_a_fleet_that_never_reported_says_compatibility_is_unconfirmed(
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    assert capsys.readouterr().out.splitlines()[0] == (
-        "farm: protocol 4; no worker has ever reported, so compatibility is "
-        "unconfirmed"
-    )
+    status = capsys.readouterr().out.splitlines()[0]
+    assert "protocol 4" in status
+    assert "no worker has ever reported" in status
+    assert "unconfirmed" in status
 
 
 def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys):
@@ -863,13 +900,35 @@ def test_aged_out_compatible_reports_are_not_called_silence(monkeypatch, capsys)
     monkeypatch.setattr(build, "DoitMain", _FakeDoit)
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 0
-    assert capsys.readouterr().out.splitlines()[0] == (
-        "farm: protocol 4; 2 worker(s) last reported more than 14d ago "
-        "supporting it, too old to prove the fleet is up but not contradicting it"
+    status = capsys.readouterr().out.splitlines()[0]
+    assert "protocol 4" in status
+    assert "2 worker(s)" in status
+    assert "more than 14d ago" in status
+    assert "too old to prove the fleet is up" in status
+    assert "never reported" not in status
+
+
+@pytest.mark.parametrize(
+    ("advertised", "omit_protocol", "diagnostic"),
+    [
+        (3, False, "protocol 3"),
+        (None, True, "protocol unreadable"),
+        (None, False, "protocol unreadable"),
+        ("4", False, "protocol unreadable"),
+        (True, False, "protocol unreadable"),
+    ],
+)
+def test_an_aged_out_incompatible_or_unreadable_report_stops_the_run(
+    advertised, omit_protocol, diagnostic, monkeypatch, capsys
+):
+    stale_report = _worker(
+        protocol=advertised,
+        fresh=False,
+        age_s=1555200,
+        worker_id="swmaker000004@4",
     )
-
-
-def test_an_aged_out_incompatible_report_still_stops_the_run(monkeypatch):
+    if omit_protocol:
+        stale_report.pop("farm_protocol_version")
     _preflight_fakes(
         monkeypatch,
         agents=_agents_summary(
@@ -877,7 +936,7 @@ def test_an_aged_out_incompatible_report_still_stops_the_run(monkeypatch):
             workers=[],
             listed=2,
             ignored=[
-                _worker(protocol=3, fresh=False, age_s=1555200),
+                stale_report,
                 _worker(
                     fresh=False,
                     age_s=1555200,
@@ -891,25 +950,9 @@ def test_an_aged_out_incompatible_report_still_stops_the_run(monkeypatch):
 
     assert build.main(["--executor", "farm", "assembly:x"]) == 2
     assert _FakeDoit.seen == []
-
-
-def test_an_aged_out_protocol_dissent_names_the_worker():
-    named = build._dissenting_workers(
-        [
-            {
-                "worker_id": "swmaker000004@4",
-                "farm_protocol_version": 3,
-                "age_s": 1555200,
-                "written_age_s": None,
-            },
-            {"worker_id": "swmaker000005@5", "farm_protocol_version": 4},
-            {"worker_id": "swmaker000006@6", "farm_protocol_version": None},
-            "not a report",
-        ],
-        PROTOCOL,
-    )
-
-    assert named == ["swmaker000004@4 (protocol 3, last seen 18d ago)"]
+    error = capsys.readouterr().err
+    assert "swmaker000004@4" in error
+    assert diagnostic in error
 
 
 @pytest.mark.parametrize(

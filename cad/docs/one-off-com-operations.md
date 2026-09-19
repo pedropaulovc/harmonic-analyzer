@@ -60,15 +60,17 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker
 fetches that exact SHA with depth one from the fixed approved repository,
-checks it out detached, runs `reset --hard` and `clean -fdx`, and checks out
-required submodules at their pinned gitlinks. Source availability is therefore
+checks it out detached, runs `reset --hard` and `clean -ffdx`, and checks out
+required submodules at their pinned gitlinks. The second force removes untracked
+nested Git repositories; `-x` covers ignored files. It is used only inside an
+ownership-validated disposable worker root. Source availability is therefore
 proved by the worker's exact fetch, not by mutating a submitter-side shared ref.
 Dirty local project inputs are refused; they are not silently replaced with
-the committed versions.
+committed versions.
 
 The worker synchronizes `uv.lock` into a source-root `environment/` outside the
 cleaned checkout and sets `UV_PROJECT_ENVIRONMENT` for preparation and build
-descendants, so `workspace/.venv` is never created or erased by `clean -fdx`.
+descendants, so `workspace/.venv` is never created or erased by `clean -ffdx`.
 The wrapper sets `HARMONIC_SW_AUTOSTART=0` locally (no local SolidWorks is
 touched) and, unless you passed `-n`/`--process` yourself, adds `-n 8`
 (`HARMONIC_FARM_PARALLELISM`) so leaves overlap.
@@ -234,9 +236,9 @@ Failure categories, and what they mean for you:
 | `task_failed` | no | your recipe failed with a working seat — a real bug |
 | `cache_missing` | no | the leaf succeeded but your key is absent (§3) |
 | `execute_rejected` | no | the task name/graph/key was refused (route B rules) |
-| `restore_mismatch` | no | prepared HEAD/clean/submodule/exclusion state or metadata commit does not match the request |
+| `restore_mismatch` | no | prepared HEAD/clean/submodule/exclusion state or metadata commit does not match the request; this includes an exclusion naming no submodule gitlink in the commit |
 | `source_unavailable` | yes | the exact-SHA depth-one fetch from the approved repository failed — push it there or fix repository access |
-| `source_declaration` | no | the commit's `.farm-sources.json` is malformed |
+| `source_declaration` | no | committed `.farm-sources.json` is unreadable, invalid JSON, or has the wrong data shape |
 | `environment_sync` | yes | synchronizing the locked external environment failed or created a forbidden workspace `.venv` |
 | `environment_missing`, `graph_export` | no | the external interpreter is absent after sync, or graph preparation failed |
 | `incompatible` | no | protocol/schema drift or the committed Python/lock/toolchain contract is unusable |
