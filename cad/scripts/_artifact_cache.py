@@ -206,6 +206,28 @@ def _container() -> str:
     return os.environ.get("HARMONIC_CACHE_CONTAINER") or _DEFAULT_CONTAINER
 
 
+def environment_overrides() -> dict[str, tuple[str, str]]:
+    """``{VAR: (default, override)}`` for every env var that moves a lookup.
+
+    Salt feeds the key; account and container decide which cache is asked. A
+    caller that hands work to another machine needs to know it has moved any
+    of them, because only THIS process's environment is moved -- which is what
+    makes this a query rather than three private accessors read from outside.
+    """
+
+    defaults = {
+        "HARMONIC_CACHE_SALT": _DEFAULT_SALT,
+        "HARMONIC_CACHE_ACCOUNT": _DEFAULT_ACCOUNT,
+        "HARMONIC_CACHE_CONTAINER": _DEFAULT_CONTAINER,
+    }
+    moved = {}
+    for name, default in defaults.items():
+        value = os.environ.get(name, "").strip()
+        if value and value != default:
+            moved[name] = (default, value)
+    return moved
+
+
 # --------------------------------------------------------------------------- #
 # Key derivation
 # --------------------------------------------------------------------------- #

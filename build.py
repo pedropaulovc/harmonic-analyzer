@@ -203,6 +203,7 @@ def _farm_preflight() -> None:
 
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
+    _refuse_unsendable_cache_environment(_artifact_cache.environment_overrides())
 
     pool = _pool_home()
     agent = _require_fleet_agent(pool)
@@ -210,6 +211,38 @@ def _farm_preflight() -> None:
     os.environ["HARMONIC_FARM_SOURCE_IDENTITY"] = identity
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
+
+
+def _refuse_unsendable_cache_environment(moved: dict[str, tuple[str, str]]) -> None:
+    """Stop a run whose cache settings cannot reach the worker that builds.
+
+    A leaf request carries a task, a cache key, a commit and a source identity
+    -- no environment. The pool rebuilds the helper's environment from the
+    WORKER's own (``agent/protocol.py::job_environment``), so a salt set here
+    moves only the key this submitter waits for, and an account or container
+    set here moves only where this submitter looks.
+
+    Measured, 2026-09-19: ``HARMONIC_CACHE_SALT`` set locally to force one cold
+    leaf left ``part:cone_gear`` waiting on ``3152887639dd...`` while worker
+    swmaker000006 hit and republished ``0274d8f4f5f2...`` twice -- the helper's
+    force re-run cannot change a key -- and the leaf failed ``cache_missing``
+    after 60 s of work that could never have satisfied it. Refusing costs
+    nothing; a cold leaf is forced by changing source, which the key follows.
+    """
+
+    if not moved:
+        return
+    lines = [
+        f"  {name}={override} (worker builds with {default})"
+        for name, (default, override) in sorted(moved.items())
+    ]
+    raise FarmPreflightError(
+        "these cache settings cannot reach the farm; a leaf request carries no "
+        "environment, so the worker would build under its own defaults and the "
+        "key this run waits for could never appear:\n"
+        + "\n".join(lines)
+        + "\nunset them, or force a cold build by changing source instead"
+    )
 
 
 def _pool_home() -> Path:

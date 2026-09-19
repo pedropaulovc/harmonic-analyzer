@@ -714,6 +714,57 @@ def test_a_repo_declaring_no_exclusions_keeps_refusing_every_submodule(
     assert "references" in capsys.readouterr().err
 
 
+def test_a_local_cache_salt_stops_the_run_it_could_never_satisfy(
+    monkeypatch, capsys
+):
+    # 2026-09-19: a salt set here to force one cold leaf left part:cone_gear
+    # waiting on a key the worker -- which receives no environment -- never
+    # computes. It built and republished its own key twice and failed
+    # cache_missing after 60 s. The run cannot succeed, so it cannot start.
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "probe-2026-09-19-a")
+    launched = _preflight_fakes(monkeypatch)
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    err = capsys.readouterr().err
+    assert "HARMONIC_CACHE_SALT=probe-2026-09-19-a" in err
+    assert "sw2024-sp3" in err, "the worker's value is named, not just ours"
+    assert not any(_published(argv) for argv in launched), "no publish subprocess"
+
+
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("HARMONIC_CACHE_ACCOUNT", "stsomeotheraccount"),
+        ("HARMONIC_CACHE_CONTAINER", "scratchcache"),
+    ],
+)
+def test_a_cache_the_worker_cannot_reach_stops_the_run(
+    monkeypatch, capsys, name, value
+):
+    # Salt moves the key; account and container move which store is asked.
+    # Either way the submitter waits on a lookup the worker never performs.
+    monkeypatch.setenv(name, value)
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setattr(build, "DoitMain", _NoDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 2
+    assert f"{name}={value}" in capsys.readouterr().err
+
+
+def test_a_cache_setting_equal_to_the_default_is_not_a_divergence(monkeypatch):
+    # Refusing on mere presence would break every seat that pins the shipped
+    # values explicitly; what matters is whether the worker would disagree.
+    monkeypatch.setenv("HARMONIC_CACHE_SALT", "sw2024-sp3")
+    monkeypatch.setenv("HARMONIC_CACHE_CONTAINER", "buildcache")
+    launched = _preflight_fakes(monkeypatch)
+    _FakeDoit.seen = []
+    monkeypatch.setattr(build, "DoitMain", _FakeDoit)
+
+    assert build.main(["--executor", "farm", "part:x"]) == 0
+    assert any(_published(argv) for argv in launched), "the package was published"
+
+
 def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch):
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
     monkeypatch.setattr(
