@@ -68,6 +68,10 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 
 
 async def build(adapter) -> dict[str, str]:
+    raise RuntimeError(
+        "E2E_EXPECTED_FAILURE_20260919: isolated worker failure probe before geometry"
+    )
+
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     check("create_part", await adapter.create_part())
