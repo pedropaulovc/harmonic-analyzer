@@ -115,15 +115,54 @@ def _tail(text: str | None, lines: int = 20) -> str:
     return "\n" + "\n".join(f"  {line}" for line in kept)
 
 
+def _excluded_submodules() -> frozenset[str]:
+    """Submodule paths ``.farm-sources.json`` declares the farm never reads.
+
+    The same file the pool's publisher reads off the checked-out commit, read
+    here for one purpose only: deciding whether a submodule's local state can
+    affect the build. A malformed file is not this function's error to raise --
+    the publisher validates it, and refusing here would turn a packaging
+    question into a preflight crash.
+    """
+    try:
+        declared = json.loads((REPO_ROOT / ".farm-sources.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return frozenset()
+    paths = declared.get("exclude_submodules") if isinstance(declared, dict) else None
+    if not isinstance(paths, list):
+        return frozenset()
+    return frozenset(path for path in paths if isinstance(path, str))
+
+
+def _dirty_submodules() -> list[str]:
+    """Submodule paths whose local state the farm would not reproduce.
+
+    ``git submodule status`` marks an UNINITIALIZED submodule ``-`` alongside
+    the ``+`` of a checked-out commit that differs from the index. Those are
+    not the same claim: a submodule that was never cloned holds exactly the
+    pin the commit records, so there is nothing local for the farm to miss.
+    It still refuses by default, because the local doit graph reads those
+    files -- but NOT for a submodule this commit declares the farm never
+    reads. Without the exemption, dispatching a build requires cloning the
+    878 MB of photographs ``.farm-sources.json`` exists to keep off every
+    worker (measured 2026-09-19: the exclusion could not be exercised at all).
+    """
+    excluded = _excluded_submodules()
+    dirty = []
+    for line in _git("submodule", "status", "--recursive").splitlines():
+        if not line or line.startswith(" "):
+            continue
+        path = line.split()[1]
+        if line.startswith("-") and path in excluded:
+            continue
+        dirty.append(path)
+    return dirty
+
+
 def _farm_preflight() -> None:
     """Publish HEAD to the farm and stamp the environment; raises to stop."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
-    dirty = [line[3:] for line in status.splitlines()]
-    dirty += [
-        line.split()[1]
-        for line in _git("submodule", "status", "--recursive").splitlines()
-        if line and not line.startswith(" ")
-    ]
+    dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
         raise FarmPreflightError(
             "working tree is dirty:\n" + "\n".join(f"  {p}" for p in dirty)
