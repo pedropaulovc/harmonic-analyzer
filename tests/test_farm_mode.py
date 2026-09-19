@@ -401,15 +401,10 @@ def _git(repo: Path, *args: str) -> None:
     )
 
 
-class _NoDoit:
-    """A ``DoitMain`` stand-in for runs that must stop before doit starts.
-
-    The command registry is doit's own, so which commands execute tasks
-    (``Command.execute_tasks``) is doit's verdict, not the test's.
-    """
-
-    def get_cmds(self):
-        return _RealDoitMain().get_cmds()
+class _NoDoit(_RealDoitMain):
+    """A ``DoitMain`` that must never start: commands, ``execute_tasks`` and
+    each command's option parser are doit's own, so the routing verdict is
+    doit's, not the test's; only ``run`` is replaced."""
 
     def run(self, args):
         pytest.fail(f"doit ran {args}")
@@ -1177,13 +1172,29 @@ def test_an_aged_out_dissent_names_the_worker_and_the_remedy():
         # ``name=value`` command-line variables are dropped before the subcommand
         (["profile=ci", "list"], ["profile=ci", "list"], False),
         (["profile=ci", "run", "x"], ["profile=ci", "run", "-n", "8", "x"], True),
-        (["profile=ci", "part:x"], ["profile=ci", "-n", "8", "part:x"], True),
+        (["profile=ci", "part:x"], ["-n", "8", "profile=ci", "part:x"], True),
         (["profile=ci", "-h"], ["profile=ci", "-h"], False),
+        # a ``--`` the loader getopt swallowed still has to follow ``-n``
+        (["--", "part:x"], ["-n", "8", "--", "part:x"], True),
+        (["-f", "--", "x"], ["-f", "--", "-n", "8", "x"], True),
+        # doit has no per-command help: its parser rejects these and exits 3
+        # before any task, so no preflight and the argv passes untouched
+        (["run", "--help"], ["run", "--help"], False),
+        (["run", "-h"], ["run", "-h"], False),
+        (["strace", "--help"], ["strace", "--help"], False),
+        (["-f", "dodo.py", "--version"], ["-f", "dodo.py", "--version"], False),
+        (["-n", "abc", "x"], ["-n", "abc", "x"], False),
+        # ...and only its parser knows a help-looking token from an option
+        # value (``-r --help`` is an unknown reporter; ``-o --help`` a file
+        # name) or a task name after ``--``
+        (["run", "-r", "--help", "x"], ["run", "-r", "--help", "x"], False),
+        (["run", "-o", "--help", "x"], ["run", "-n", "8", "-o", "--help", "x"], True),
+        (["run", "--", "--help"], ["run", "-n", "8", "--", "--help"], True),
     ],
 )
 def test_farm_runs_fan_out_unless_the_caller_chose(given, expected, runs, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_PARALLELISM", raising=False)
-    executing = build._executing_command(list(given), _RealDoitMain().get_cmds())
+    executing = build._executing_command(list(given), _RealDoitMain())
     assert (executing is not None) is runs
     result = (
         given
@@ -1231,16 +1242,19 @@ def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
     assert build.main(["--executor", "farm", "-kf", "dodo.py", "-h"]) == 0
     assert build.main(["--executor", "farm", "help", "run"]) == 0
     assert build.main(["--executor", "farm", "profile=ci", "list"]) == 0
+    assert build.main(["--executor", "farm", "run", "--help"]) == 0
 
     # A leading --help/-h, grouped loader options included, is the wrapper's
     # (doit itself rejects ``-h``): its own options and the farm defaults, then
     # doit's command list. The doit-owned routes (``help run``, ``list``, with
-    # or without a command-line variable) pass through unchanged.
+    # or without a command-line variable) pass through unchanged, and so does
+    # ``run --help``, which doit's own parser rejects before any task.
     assert [args for args, _env in _FakeDoit.seen] == [
         ["--help"],
         ["--help"],
         ["help", "run"],
         ["profile=ci", "list"],
+        ["run", "--help"],
     ]
     out = capsys.readouterr().out
     for flag in ("--verbosity", "--executor", "--leaf-timeout"):
