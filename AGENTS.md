@@ -238,6 +238,55 @@ farm (`--executor farm`, which is how a seatless machine runs them).
   advances it after a successful publish and leaves a tracked merge bump;
   the release agent MUST commit and merge that bump before the next release.
 
+## `.farm-sources.json` — the submodules the farm does not ship
+
+A farm submission bundles this checkout and every **initialized** submodule, and
+each worker downloads and extracts the lot before it runs one leaf. Shipping a
+submodule no farm-dispatchable task reads is pure per-leaf tax: measured on the
+2026-09-18 submission the bundles were `.` 212.9 MB, `SolidworksMCP-python`
+19.9 MB and `references` **878.9 MB** — 79% of 1.11 GB that every worker pulled
+and no worker used.
+
+`.farm-sources.json` at the repo root declares what to leave out:
+
+```json
+{
+  "exclude_submodules": ["references"]
+}
+```
+
+- It is a property of the **commit being built**, never of the submitter's
+  command line — two submitters of the same commit must derive the same source
+  identity, or leaves die with `package_download: no package blobs under
+  <source>-<agent>/`. No file = exclude nothing.
+- An entry naming no submodule in `.gitmodules` is a **hard error at publish**,
+  so a typo cannot silently re-ship 879 MB.
+- Excluded paths drop out of the bundles, out of `request.json`'s `submodules`
+  array and therefore out of the source identity; `request.json` carries a
+  sorted `excluded_submodules` so a worker (and a forensic reader) can see what
+  was deliberately left out. The worker then *verifies* it: in the restored
+  workspace `git submodule status --recursive` must show every excluded path
+  uninitialized (`-`) and every other submodule at its pinned commit.
+
+**Why `references` qualifies.** The reference photographs are read only by the
+comparison gallery: `cad/comparisons/manifest.json` pairs point at
+`references/albert-michelsons-harmonic-analyzer/...`, and the only runtime
+reader is `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`),
+reachable solely from `refresh_comparison_gallery` — i.e. `export_models.py
+--comparisons`, the `gallery` task, which is Blender+GPU-bound and deliberately
+NOT farm-dispatchable (see the table above and "Comparison gallery"). No
+farm-dispatchable task's `file_dep` or action touches the submodule: the
+`REFERENCES_DIR` every build script imports is `cad/references` (`_common.py`),
+a tracked in-repo directory of vendored DXF/vendor models, and `cut_release.py`
+only *string-matches* the `references/` prefix when it rewrites doc links (it
+reads no file there — and `release` runs on the submitter anyway).
+
+**If a future task starts needing it**, the leaf fails loudly on the worker
+(the submodule is simply absent — and the worker's `git submodule status`
+check names it), never silently: it cannot pass on a worker and fail locally.
+Fix it by making that task submitter-only like `gallery`, or by removing the
+exclusion — never by teaching the task to tolerate a missing reference.
+
 ## The COM seat lock (do not break this)
 
 One SolidWorks STA seat ⇒ COM tasks must never run concurrently. Serialization is
