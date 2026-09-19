@@ -1,4 +1,4 @@
-# E2E multi-submitter 20260919: independent part recipe, geometry unchanged.
+# E2E post-update recovery 20260919: fresh part recipe, geometry unchanged.
 r"""Reproduction script: magnifying-wheel axle nut (book ch. 21, p. 51).
 
 The small hex nut on the wheel axle's stud tip that, with the O9 washer
