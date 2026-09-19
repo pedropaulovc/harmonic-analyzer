@@ -1,3 +1,4 @@
+# E2E protocol-4 failure-isolation canary 20260919; never merge this probe.
 r"""Reproduction script: pen square rod (book ch. 24, pp. 64-65).
 
 The square brass rod that carries the v-block; the wire from the
