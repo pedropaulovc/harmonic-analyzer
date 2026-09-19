@@ -25,7 +25,7 @@ from pathlib import Path
 
 import _telemetry
 
-FARM_PROTOCOL_VERSION = 3
+FARM_PROTOCOL_VERSION = 4
 
 TASK_QUEUE_CONTROL = "solidworks-control"  # BuildLeaf workflow tasks
 TASK_QUEUE_COM = "solidworks-com"  # build_leaf activity tasks
@@ -44,7 +44,6 @@ LEAF_TIMEOUT_MAX_S = 3 * 3600
 @dataclass(frozen=True)
 class LeafRequest:
     farm_protocol_version: int  # must equal FARM_PROTOCOL_VERSION
-    source_identity_sha256: str  # published package id
     commit: str
     task: str  # exact doit task name, e.g. "part:fulcrum_keeper"
     cache_key: str | None  # 64-hex expected buildcache key; None only for check:*
@@ -78,10 +77,8 @@ def clamp_leaf_timeout_s(requested: int | None) -> int:
     return max(LEAF_TIMEOUT_MIN_S, min(LEAF_TIMEOUT_MAX_S, requested))
 
 
-def workflow_id(
-    task: str, cache_key: str | None, source_identity: str, timeout_s: int
-) -> str:
-    return f"leaf:{task}:{cache_key or source_identity[:16]}:{timeout_s}s"
+def workflow_id(task: str, cache_key: str | None, commit: str, timeout_s: int) -> str:
+    return f"leaf:{task}:{cache_key or commit[:16]}:{timeout_s}s"
 
 
 def enabled() -> bool:
@@ -187,7 +184,6 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
     ) as sp:
         request = LeafRequest(
             farm_protocol_version=FARM_PROTOCOL_VERSION,
-            source_identity_sha256=os.environ["HARMONIC_FARM_SOURCE_IDENTITY"],
             commit=os.environ["HARMONIC_FARM_COMMIT"],
             task=task,
             cache_key=cache_key,
@@ -196,7 +192,7 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
             leaf_timeout_s=leaf_timeout_s(),
         )
         budget = clamp_leaf_timeout_s(request.leaf_timeout_s)
-        wf_id = workflow_id(task, cache_key, request.source_identity_sha256, budget)
+        wf_id = workflow_id(task, cache_key, request.commit, budget)
         sp.set_attribute("workflow_id", wf_id)
         sp.set_attribute("leaf_timeout_s", budget)
         result = asyncio.run(_dispatch(request, wf_id))
