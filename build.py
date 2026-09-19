@@ -31,7 +31,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from doit.doit_cmd import DoitMain
 
@@ -115,15 +115,76 @@ def _tail(text: str | None, lines: int = 20) -> str:
     return "\n" + "\n".join(f"  {line}" for line in kept)
 
 
+def _excluded_submodules() -> frozenset[str]:
+    """Submodule paths ``.farm-sources.json`` declares the farm never reads.
+
+    The same file the pool's publisher reads off the checked-out commit, read
+    here for one purpose only: deciding whether a submodule's local state can
+    affect the build. A missing file declares nothing. A file that is PRESENT
+    and malformed is refused right here rather than read as "exclude
+    nothing": degrading would report the excluded submodule as a dirty tree,
+    send the operator to clone 878 MB, and only then have ``farm.py publish``
+    -- which runs inside this same preflight, off the same file -- refuse it
+    anyway. Paths are normalized the way the publisher normalizes them, so
+    ``references/`` and ``./references`` mean here what they mean there.
+    """
+    source = REPO_ROOT / ".farm-sources.json"
+    try:
+        text = source.read_text("utf-8")
+    except FileNotFoundError:
+        return frozenset()
+    except (OSError, UnicodeError) as exc:
+        raise FarmPreflightError(f".farm-sources.json is unreadable: {exc}")
+    try:
+        declared = json.loads(text)
+    except ValueError as exc:
+        raise FarmPreflightError(f".farm-sources.json is not valid JSON: {exc}")
+    if not isinstance(declared, dict):
+        raise FarmPreflightError(".farm-sources.json must be a JSON object")
+    paths = declared.get("exclude_submodules", [])
+    if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+        raise FarmPreflightError(
+            ".farm-sources.json: exclude_submodules must be a list of strings"
+        )
+    return frozenset(PurePosixPath(path).as_posix() for path in paths)
+
+
+def _dirty_submodules() -> list[str]:
+    """Submodule paths whose local state the farm would not reproduce.
+
+    ``git submodule status`` marks an UNINITIALIZED submodule ``-`` alongside
+    the ``+`` of a checked-out commit that differs from the index. Those are
+    not the same claim: a submodule that was never cloned holds exactly the
+    pin the commit records, so there is nothing local for the farm to miss.
+    It still refuses by default, because the local doit graph reads those
+    files -- but NOT for a submodule this commit declares the farm never
+    reads. Without the exemption, dispatching a build requires cloning the
+    878 MB of photographs ``.farm-sources.json`` exists to keep off every
+    worker (measured 2026-09-18: the exclusion could not be exercised at all).
+
+    The exemption covers every farm leaf and both ``build`` and
+    ``build_bare``. It does NOT make the submodule optional for the whole
+    repo: ``gallery`` -- a submitter-side task in ``release``'s closure --
+    reads the manifest photographs directly and fails in
+    ``export_models._gallery_input_digest`` if they were never cloned, so a
+    release still needs ``git submodule update --init references``.
+    """
+    excluded = _excluded_submodules()
+    dirty = []
+    for line in _git("submodule", "status", "--recursive").splitlines():
+        if not line or line.startswith(" "):
+            continue
+        path = line.split()[1]
+        if line.startswith("-") and path in excluded:
+            continue
+        dirty.append(path)
+    return dirty
+
+
 def _farm_preflight() -> None:
     """Publish HEAD to the farm and stamp the environment; raises to stop."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
-    dirty = [line[3:] for line in status.splitlines()]
-    dirty += [
-        line.split()[1]
-        for line in _git("submodule", "status", "--recursive").splitlines()
-        if line and not line.startswith(" ")
-    ]
+    dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
         raise FarmPreflightError(
             "working tree is dirty:\n" + "\n".join(f"  {p}" for p in dirty)
