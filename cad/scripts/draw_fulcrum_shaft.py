@@ -1,3 +1,4 @@
+# E2E multi-submitter 20260919: independent drawing recipe, geometry unchanged.
 r"""Create the curated machinist drawing for the lever fulcrum shaft."""
 
 from __future__ import annotations
