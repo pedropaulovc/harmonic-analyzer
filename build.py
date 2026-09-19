@@ -291,7 +291,10 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run one ``farm.py`` subcommand from the pool checkout, capturing stdout.
 
     stderr is inherited so the pool's own progress and diagnostics reach the
-    console as they happen; stdout is the machine-readable result.
+    console as they happen; stdout is the machine-readable result. The nested
+    ``uv`` targets the pool's own environment (``--project``); the
+    ``VIRTUAL_ENV`` this process inherited from the outer ``uv run`` names
+    ours, which uv would (correctly) ignore with a warning on every call.
     """
     argv = [
         "uv",
@@ -303,8 +306,11 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         str(pool / "farm.py"),
         *args,
     ]
+    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     try:
-        return subprocess.run(argv, cwd=REPO_ROOT, stdout=subprocess.PIPE, text=True)
+        return subprocess.run(
+            argv, cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, text=True
+        )
     except OSError as exc:
         raise FarmPreflightError(
             f"{args[0]} could not start ({argv[0]}): {exc}"
