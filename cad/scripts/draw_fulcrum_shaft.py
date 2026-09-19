@@ -1,4 +1,4 @@
-# E2E multi-submitter 20260919: independent drawing recipe, geometry unchanged.
+# E2E protocol-4 shallow-source canary 20260919: drawing recipe, geometry unchanged.
 r"""Create the curated machinist drawing for the lever fulcrum shaft."""
 
 from __future__ import annotations
