@@ -29,13 +29,13 @@ gear faces (stations below quoted from the legacy pivot end):
 * 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 143.2599 -- T006 tip journal contacts the exact McMaster
-  94025A150 conical cup apex at 6 mm thread engagement.  Its 20.675 mm
-  terminal stub still spans the 4 mm tip bushing.  WARNING: the 0.79 mm
-  steel tip journal is mechanically marginal (it follows from the 62.2 OD
-  anchor, low confidence) -- flagged for Phase 3 rebuild validation; a real
-  builder would more likely keep the tip gears larger (i.e. the 62.2 reading
-  may be low).
+* 1/16 in x 143.2599 -- T006 seat and tip journal; contacts the exact
+  McMaster 94025A150 conical cup apex at 6 mm thread engagement.  Its
+  20.675 mm terminal land also carries the 4 mm tip bushing.  It was
+  1/32 in while the bore rule was read literally off the gear seat; at
+  L/D 26 that land could not be turned in steel.  1/16 in is the largest
+  step the T006 rim tolerates (0.543 mm under the as-cut base-chord root)
+  and leaves L/D 13 -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat
@@ -118,9 +118,8 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # faces (T024 north 141.72 | 141.9 | T018 south 142.11, and so on). Diameters
 # mirror build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much
 # finer than the old DP 30 shaft because the tip gears shrank: T006 OD is now
-# 4.08 mm. WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal --
-# it follows from the 62.2 OD anchor (ch13, low confidence) and is flagged
-# for Phase 3 rebuild validation.
+# 4.08 mm.  The terminal land stops at 1/16": below that the T006 rim gains
+# little and the journal becomes unturnable (L/D 26 at 1/32").
 
 
 async def build(adapter) -> dict[str, str]:

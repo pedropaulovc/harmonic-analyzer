@@ -153,19 +153,27 @@ def bore_dia_in(teeth: int) -> float:
     M6.7; the M6.6 canted-vertical experiment is retired: it met the
     interference checker but visibly deformed the cone). At the finer
     module DP 49.82 (ch13 OD 62.2) the tip gears are tiny -- T006 OD is
-    only 4.08 mm with a 0.89 mm root radius -- so the shaft steps down
-    much further (`build_cone_gear_shaft.py`) and each bore matches its
+    only 4.08 mm -- so the shaft steps down much further
+    (`build_cone_gear_shaft.py`) and each bore matches its
     section AND stays inside the gear's root circle:
-      3/8" T024..T120, 1/4" T018, 1/8" T012, 1/32" T006.
+      3/8" T024..T120, 1/4" T018, 1/8" T012, 1/16" T006.
     The four tip gears (T006..T024, more yellow + harder in the book, p.21)
     are a harder high-zinc yellow metal (Muntz/manganese bronze) cut from
     drawn rod and SOLDERED to the shaft (p.21 macro shows solder blobs) --
-    no keyway. WARNING: the 1/32" (0.79 mm) tip journal carrying T006 is
-    mechanically marginal; it follows directly from the 62.2 OD anchor
-    (low confidence) and is flagged for Phase 3 rebuild validation.
+    no keyway.
+
+    T006's bore is 1/16", not the 1/32" a literal "bore = shaft section"
+    first produced.  The wall figures below quote the STANDARD full-depth
+    root (2.157/DP under the OD), but these teeth are through-cut from this
+    module's own DXF profile, whose gap floor is the chord across the base
+    circle -- at 6 teeth the involute cannot reach below it.  T006's
+    as-cut minimum-material radius is therefore 1.3365 mm (not 0.939) and
+    its as-cut tooth depth 0.703 mm, so a 1/16" bore leaves a 0.543 mm rim,
+    0.77x that depth, on a soldered keyless gear carrying almost no torque.
+    That buys the shaft's terminal journal L/D 13 instead of 26.
     """
     if teeth <= 6:
-        return 0.03125  # 0.79 mm -- T006 root r 0.89 mm leaves a 0.49 mm wall (marginal)
+        return 0.0625  # 1.59 mm -- T006 as-cut root r 1.3365 mm, 0.54 mm wall
     if teeth <= 12:
         return 0.125  # 3.18 mm -- T012 root r 2.42 mm, 0.83 mm wall
     if teeth <= 18:
