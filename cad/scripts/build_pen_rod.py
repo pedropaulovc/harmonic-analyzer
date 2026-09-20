@@ -20,7 +20,11 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
+
 from _common import (
+    _early_bound,
+    _preference_id,
     SketchDims,
     add_line_chain,
     apply_material,
@@ -66,9 +70,238 @@ from pen_rod_spec import (
 PART_NAME = "pen-rod"
 MATERIAL = "Brass"  # see _common.apply_material docstring
 
+# NONSHIPPING preference diagnostic.  Keep this block bounded so the probe can
+# be removed without touching the pen-rod recipe below.
+_PREFERENCE_WRITES = (
+    ("swWarnStartingSketchInContextAssembly", False),
+    ("swExtRefNoPromptOrSave", True),
+)
+_POSITIVE_CONTROL = "swSaveReminderEnable"
+
+
+def _resolved_toggle_ids(adapter) -> dict[str, int]:
+    """Resolve this seat's swUserPreferenceToggle_e names, never numeric literals."""
+    ids: dict[str, int] = {}
+    for name in (*[item[0] for item in _PREFERENCE_WRITES], _POSITIVE_CONTROL):
+        preference_id = _preference_id(adapter, name)
+        if preference_id is None:
+            raise RuntimeError(
+                f"live swUserPreferenceToggle_e has no member {name!r}"
+            )
+        ids[name] = preference_id
+    return ids
+
+
+def _read_toggle(sw, name: str, preference_id: int) -> bool:
+    value = sw.GetUserPreferenceToggle(preference_id)
+    if type(value) is not bool:
+        raise RuntimeError(
+            f"{name} (id {preference_id}) returned non-Boolean {value!r}"
+        )
+    return value
+
+
+def _telemetry_readback(
+    event: str,
+    *,
+    context: str,
+    name: str,
+    preference_id: int,
+    before: bool,
+    requested: bool,
+    after: bool,
+    setter_return_type: str,
+) -> None:
+    fields = {
+        "context": context,
+        "name": name,
+        "id": preference_id,
+        "before": before,
+        "requested": requested,
+        "after": after,
+        "setter_return_type": setter_return_type,
+    }
+    # ``event`` owns its ``name`` keyword, so the event attribute is explicit;
+    # the correlated structured log and enclosing span carry the requested
+    # literal ``name`` field.
+    event_fields = {k: v for k, v in fields.items() if k != "name"}
+    _telemetry.event(event, preference_name=name, **event_fields)
+    _telemetry.info(event, **fields)
+
+
+def _probe_toggle(
+    sw,
+    *,
+    context: str,
+    name: str,
+    preference_id: int,
+    requested: bool | None,
+) -> None:
+    before = _read_toggle(sw, name, preference_id)
+    requested_value = not before if requested is None else requested
+    after = before
+    try:
+        with _telemetry.span(
+            "seat.preference_probe.write",
+            context=context,
+            name=name,
+            id=preference_id,
+            before=before,
+            requested=requested_value,
+        ) as span:
+            setter_result = sw.SetUserPreferenceToggle(
+                preference_id, requested_value
+            )
+            after = _read_toggle(sw, name, preference_id)
+            setter_return_type = type(setter_result).__name__
+            span.set_attribute("after", after)
+            span.set_attribute("setter_return_type", setter_return_type)
+            _telemetry_readback(
+                "seat.preference_probe.readback",
+                context=context,
+                name=name,
+                preference_id=preference_id,
+                before=before,
+                requested=requested_value,
+                after=after,
+                setter_return_type=setter_return_type,
+            )
+    finally:
+        # SetUserPreferenceToggle is VT_VOID: None is the successful native
+        # return.  Only readback says whether the application moved.  Restore
+        # every value that did move, including the opposite-value control.
+        current = _read_toggle(sw, name, preference_id)
+        if current != before:
+            with _telemetry.span(
+                "seat.preference_probe.restore",
+                context=context,
+                name=name,
+                id=preference_id,
+                before=current,
+                requested=before,
+            ) as span:
+                setter_result = sw.SetUserPreferenceToggle(preference_id, before)
+                restored = _read_toggle(sw, name, preference_id)
+                setter_return_type = type(setter_result).__name__
+                span.set_attribute("after", restored)
+                span.set_attribute("setter_return_type", setter_return_type)
+                _telemetry_readback(
+                    "seat.preference_probe.restored",
+                    context=context,
+                    name=name,
+                    preference_id=preference_id,
+                    before=current,
+                    requested=before,
+                    after=restored,
+                    setter_return_type=setter_return_type,
+                )
+                if restored != before:
+                    raise RuntimeError(
+                        f"{context}: failed to restore {name} (id {preference_id}) "
+                        f"to {before!r}; read back {restored!r}"
+                    )
+
+
+def _probe_context(adapter, context: str, ids: dict[str, int]) -> None:
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    with _telemetry.span("seat.preference_probe.context", context=context):
+        for name, requested in _PREFERENCE_WRITES:
+            _probe_toggle(
+                sw,
+                context=context,
+                name=name,
+                preference_id=ids[name],
+                requested=requested,
+            )
+        _probe_toggle(
+            sw,
+            context=context,
+            name=_POSITIVE_CONTROL,
+            preference_id=ids[_POSITIVE_CONTROL],
+            requested=None,
+        )
+
+
+def _assert_empty_probe_session(sw, context: str) -> None:
+    count = sw.GetDocumentCount()
+    active = sw.IActiveDoc2
+    if type(count) is not int or isinstance(count, bool):
+        raise RuntimeError(f"{context}: invalid document count {count!r}")
+    if count != 0 or active is not None:
+        raise RuntimeError(
+            f"{context}: preference probe requires an empty session "
+            f"(document_count={count}, active_document={active is not None})"
+        )
+
+
+async def _probe_blank_document(
+    adapter, context: str, creator, ids: dict[str, int]
+) -> None:
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    previous_context = (
+        adapter.currentModel,
+        adapter.currentSketch,
+        adapter.currentSketchManager,
+    )
+    title: str | None = None
+    try:
+        create_result = await creator()
+        if adapter.currentModel is not previous_context[0]:
+            model = _early_bound(adapter.currentModel, "IModelDoc2")
+            title = str(model.GetTitle() or "")
+        check(f"preference probe create {context}", create_result)
+        if not title:
+            raise RuntimeError(f"{context}: created document has no closable title")
+        count = sw.GetDocumentCount()
+        active = sw.IActiveDoc2
+        active_title = (
+            ""
+            if active is None
+            else str(_early_bound(active, "IModelDoc2").GetTitle() or "")
+        )
+        if count != 1 or active_title != title:
+            raise RuntimeError(
+                f"{context}: created document is not the sole active document "
+                f"(document_count={count!r}, created={title!r}, active={active_title!r})"
+            )
+        _probe_context(adapter, context, ids)
+    finally:
+        try:
+            if title:
+                sw.CloseDoc(title)
+                _assert_empty_probe_session(sw, f"{context} cleanup")
+        finally:
+            (
+                adapter.currentModel,
+                adapter.currentSketch,
+                adapter.currentSketchManager,
+            ) = previous_context
+
+
+async def _run_preference_probe(adapter) -> None:
+    sw = _early_bound(adapter.swApp, "ISldWorks")
+    ids = _resolved_toggle_ids(adapter)
+    with _telemetry.span("seat.preference_probe"):
+        _assert_empty_probe_session(sw, "empty_before")
+        _probe_context(adapter, "empty_before", ids)
+        await _probe_blank_document(
+            adapter, "blank_part", adapter.create_part, ids
+        )
+        await _probe_blank_document(
+            adapter, "blank_assembly", adapter.create_assembly, ids
+        )
+        _assert_empty_probe_session(sw, "empty_after")
+        _probe_context(adapter, "empty_after", ids)
+
+
+# END NONSHIPPING preference diagnostic.
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    await _run_preference_probe(adapter)
+
 
     check("create_part", await adapter.create_part())
 
