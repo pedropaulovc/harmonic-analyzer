@@ -107,6 +107,16 @@ SURFACE_FINISHES = (
     ),
 )
 
+# The one thing the native dimensions cannot say: WHY three shoulder stations
+# print three places (drawing-simplicity policy rule 2: a location requirement
+# names its mate and states its acceptance).  No digits, no method words.
+DRAWING_NOTES = "\n".join(
+    (
+        "GEAR SEAT SHOULDERS MUST FALL BETWEEN THE SOLDERED CONE GEAR FACES;",
+        "HOLD THE THREE-PLACE STATIONS.",
+    )
+)
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec0Profile": {"Sec0Dia"},
     "Sec1Profile": {"Sec1Dia"},
@@ -138,24 +148,24 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # could not pass the land to reach its pitch station.  The R0.10 root radius
 # eats a further 0.10 of the outboard margin, which a bore edge break covers.
 #
-# Journal length Sec0End and overall length Sec4End: two places.  The journal
-# is 1.0 mm proud of the post front face, the post bore ends a millimetre
-# short of its shoulder, and the 64T crank-drive gear beside that shoulder
-# is soldered with ~1 mm of air to the step, so +-0.51 on the length touches
-# nothing; the tip end meets an adjustable cup-point screw that takes up any
-# length error.  Shoulder radius: two places; nothing depends on it beyond
-# clearing the gear faces.
+# Journal length Sec0End and overall length Sec4End: one place, the routine
+# grade the fleet's plain lengths print.  The journal is 1.0 mm proud of the
+# post front face, the post bore ends flush with its shoulder, and the 64T
+# crank-drive gear beside that shoulder is soldered with ~1.7 mm of air to the
+# step, so +-0.8 on the length touches nothing; the tip end meets an
+# adjustable cup-point screw that takes up any length error.  Shoulder
+# radius: two places; nothing depends on it beyond clearing the gear faces.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": 3},
     "Sec1Profile": {"Sec1Dia": 3},
     "Sec2Profile": {"Sec2Dia": 3},
     "Sec3Profile": {"Sec3Dia": 3},
     "Sec4Profile": {"Sec4Dia": 3},
-    "Sec0": {"Sec0End": 2},
+    "Sec0": {"Sec0End": 1},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
-    "Sec4": {"Sec4End": 2},
+    "Sec4": {"Sec4End": 1},
     "ShoulderFillets": {"ShoulderR": 2},
 }
 
