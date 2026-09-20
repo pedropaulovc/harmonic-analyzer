@@ -52,6 +52,41 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPinBossProjection": {"BossProjection"},
 }
 
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_pinion_cam applies this map to the .SLDPRT
+# and draw_pinion_cam only reads it back.  Two places on the critical trio --
+# the reamed running bore (its band rides the dimension), the cam OD and the
+# bore-to-OD eccentricity that IS the lift; one place everywhere else, so the
+# title block's .X row governs the collar length, the set-screw boss and its
+# station (cad/docs/tolerance-policy.md).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "CollarProfile": {"CollarOd": 2, "CollarCy": 2},
+    "BoreProfile": {"BoreDia": 2},
+    "Collar": {"Depth": 1},
+    "BossProfile": {"BossDia": 1, "BossCz": 1},
+    "SetPinBossProjection": {"BossProjection": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
 # drawing-simplicity-policy rule 6: four short lines of facts the views cannot
 # show.  The eccentricity itself is DIMENSIONED on the sheet, so the note only
 # says what a single dimension cannot -- that it is the same, and in the same
