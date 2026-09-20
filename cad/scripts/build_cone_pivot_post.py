@@ -45,15 +45,20 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
+    add_angular_reference_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
+from _part_pmi import author_part_pmi
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
@@ -68,18 +73,23 @@ from cone_pivot_post_spec import (
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    CRANK_BORE_TOLERANCE_MM,
     CRANK_BOSS_DIA,
+    CRANK_BOSS_END_Z,
     CRANK_BOSS_LENGTH,
+    CRANK_BOSS_NEAR_Z,
     CRANK_BOSS_START_Z,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     HARVESTED_VOLUME_MM3,
     HEAD_BASE_Y,
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
-    TURNED_DIAMETER_TOLERANCE_MM,
+    JOURNAL_REFERENCE_X,
+    JOURNAL_REFERENCE_Z,
+    RUNNING_BORE_BAND,
+    SURFACE_FINISHES,
 )
 
 PART_NAME = "cone-pivot-post"
@@ -283,6 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "CrankSprocketBoss")
+    name_dimensions(adapter, "CrankSprocketBoss", ["CrankBossLen"])
 
     crank_bore = SketchDims()
     check(
@@ -372,6 +383,104 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     name_last_feature(adapter, "ConeShaftBore")
 
+    # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
+    # crank axis and the cone-journal axis is the casting's defining
+    # relationship, but it lives in ConeShaftNormal's plane angle and no FACE
+    # projects it into a view.  Two Top-plane construction centrelines carry
+    # the two axis directions, a driven angular reference dimension reports the
+    # angle, and the crank line's near end states where the boss face starts --
+    # so both plan values the shop needs are model-owned, not sheet text
+    # (drawing-simplicity-policy.md rule 2).  All geometry is construction and
+    # the sketch stays unblanked: a blanked sketch's dimensions never reach
+    # InsertModelAnnotations3.
+    plan = SketchDims()
+    check(
+        "create sketch JournalPlanReference",
+        await adapter.create_sketch("Top"),
+    )
+    set_sketch_direct_db(adapter, True)
+    # Top-plane sketch X is model +X; sketch Y is model -Z, so the crank boss
+    # (model -21.3753..+50.6591 along +Z) runs from sketch +Y down to -Y.
+    crank_axis_line = check(
+        "crank axis reference line",
+        await adapter.add_centerline(
+            0.0, CRANK_BOSS_NEAR_Z, 0.0, -CRANK_BOSS_END_Z
+        ),
+    )
+    journal_axis_line = check(
+        "journal axis reference line",
+        await adapter.add_centerline(
+            0.0, 0.0, JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "crank axis line vertical",
+        await adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
+    )
+    check(
+        "crank axis line on the body axis",
+        await adapter.add_sketch_constraint(
+            f"{crank_axis_line}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "journal axis line through the body axis",
+        await adapter.add_sketch_constraint(
+            f"{journal_axis_line}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "crank boss near face station",
+        await adapter.add_sketch_dimension(
+            f"{crank_axis_line}.start",
+            "origin",
+            "vertical_distance",
+            CRANK_BOSS_NEAR_Z,
+        ),
+    )
+    plan.record("CrankBossStartZ")
+    check(
+        "crank boss far face station",
+        await adapter.add_sketch_dimension(
+            f"{crank_axis_line}.end", "origin", "vertical_distance", CRANK_BOSS_END_Z
+        ),
+    )
+    plan.record("CrankBossFarZ")
+    check(
+        "journal reference offset x",
+        await adapter.add_sketch_dimension(
+            f"{journal_axis_line}.end",
+            "origin",
+            "horizontal_distance",
+            JOURNAL_REFERENCE_X,
+        ),
+    )
+    plan.record("JournalRefX")
+    check(
+        "journal reference offset z",
+        await adapter.add_sketch_dimension(
+            f"{journal_axis_line}.end",
+            "origin",
+            "vertical_distance",
+            JOURNAL_REFERENCE_Z,
+        ),
+    )
+    plan.record("JournalRefZ")
+    await add_angular_reference_dimension(
+        adapter,
+        crank_axis_line,
+        journal_axis_line,
+        (JOURNAL_REFERENCE_X + 12.0, -JOURNAL_REFERENCE_Z / 2.0),
+        "journal plan angle",
+        expected_degrees=INCLINE_DEG,
+    )
+    plan.record("JournalAngle")
+    await ensure_fully_defined(adapter, "JournalPlanReference")
+    check("exit sketch JournalPlanReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "JournalPlanReference")
+    drive_jobs += plan.apply(adapter, "JournalPlanReference")
+
     # Apply all neutral equations only after every referenced dimension exists.
     await force_rebuild(adapter)
     for dimension, expression in drive_jobs:
@@ -383,29 +492,19 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "MainBodyProfile",
-        "MainBodyDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
+    # The two running bores are the only accuracy features on this casting, and
+    # they carry the ONE band that closes the `shaft_in_bushing` fit class
+    # against their turned shafts (cad/docs/tolerance-policy.md).  Everything
+    # else -- cast body and collar diameters, boss diameters, boss extents,
+    # mounting-hole stations -- runs at the title block's general grade.
+    set_dimension_bilateral_tolerance(
+        adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
     )
-    set_dimension_symmetric_tolerance(
+    set_dimension_bilateral_tolerance(
         adapter,
-        "HeadProfile",
-        "HeadDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CrankBossProfile",
-        "CrankBossDia",
-        TURNED_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "CrankBoreProfile",
-        "CrankBoreDia",
-        CRANK_BORE_TOLERANCE_MM,
+        "JournalBoreProfile",
+        "JournalBoreDia",
+        *deviations(RUNNING_BORE_BAND),
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken
@@ -429,6 +528,10 @@ async def build(adapter: Any) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Decimal places select the title-block general band, so they are product
+    # definition the PART owns; the sheet only reads them back.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,

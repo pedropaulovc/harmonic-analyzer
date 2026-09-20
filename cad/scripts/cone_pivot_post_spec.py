@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import math
 
+from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+
 
 MM_PER_IN = 25.4
 
@@ -31,8 +34,6 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # initial derivation.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
-TURNED_DIAMETER_TOLERANCE_MM = 0.05
-CRANK_BORE_TOLERANCE_MM = 0.025
 CRANK_BORE_HEIGHT = 72.7
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
@@ -63,59 +64,110 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 HARVESTED_VOLUME_MM3 = 112_302.9406
 HARVESTED_MASS_KG = 0.808581173
 
-# Datum-coordinate definition of the inclined journal axis.  The bore passes
-# through the body axis at y=BORE_HEIGHT and points toward +X/+Z.
-_JOURNAL_SIN = math.sin(math.radians(INCLINE_DEG))
-_JOURNAL_COS = math.cos(math.radians(INCLINE_DEG))
-JOURNAL_AXIS_SECOND_POINT_DISTANCE = 100.0
-JOURNAL_AXIS_POINTS = (
-    ("P", 0.0, BORE_HEIGHT, 0.0),
-    (
-        "Q",
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_SIN,
-        BORE_HEIGHT,
-        JOURNAL_AXIS_SECOND_POINT_DISTANCE * _JOURNAL_COS,
+# Both bores are running journals, so both carry the SAME size band -- the one
+# the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
+# "How a critical-feature tolerance is decided", step 6b).  Each mating shaft
+# is turned to (bore nominal - 0.05) with the fleet's `SHAFT_H` (0/-0.020)
+# band, so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075
+# mm diametral clearance:
+#
+#   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
+#   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
+#
+# Nothing else on this casting is an accuracy feature, so nothing else carries
+# a band: the title block's general grades govern.
+RUNNING_BORE_BAND = (0.005, -0.025)
+
+# Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
+# plan angle between the crank axis and the cone-journal axis is REAL model
+# geometry -- ConeShaftNormal's angle -- but no face carries it into a view, so
+# a construction sketch holds the two axis directions and a driven angular
+# reference dimension reports the angle the print has to state.
+JOURNAL_REFERENCE_LENGTH = 40.0
+JOURNAL_REFERENCE_X = JOURNAL_REFERENCE_LENGTH * math.sin(math.radians(INCLINE_DEG))
+JOURNAL_REFERENCE_Z = JOURNAL_REFERENCE_LENGTH * math.cos(math.radians(INCLINE_DEG))
+CRANK_BOSS_NEAR_Z = abs(CRANK_BOSS_START_Z)
+
+SURFACE_FINISHES = (
+    # The post is a casting that may be left as-cast everywhere else; the three
+    # faces that MUST be cut say so on the face (the title block's surface row
+    # is the process statement "CAST/MACHINED", not a grade).
+    SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
+    SurfaceFinishControl(
+        "crank_bore",
+        MACHINED_UM,
+        CylinderFace(CRANK_BORE_DIA, contains_y_mm=CRANK_BORE_HEIGHT),
     ),
-)
-JOURNAL_AXIS_ORIENTATION_NOTE = "\n".join(
-    (
-        "O = A/B INTERSECTION; +Y ALONG B AWAY FROM A",
-        "+X RIGHT; +Z DOWN IN UPPER PLAN",
-    )
+    SurfaceFinishControl(
+        "journal_bore",
+        MACHINED_UM,
+        CylinderFace(BORE_DIA, contains_y_mm=BORE_HEIGHT),
+    ),
 )
 
 # Only dimensions that exist natively on the authored model are marked for the
-# curated print.  Boss, journal and counterbore callouts are sourced from these
-# same constants as attached notes, so the drawing cannot drift from the part.
+# curated print, so the drawing cannot drift from the part.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MainBodyProfile": {"MainBodyDia"},
     "MainBody": {"MainBodyHt"},
     "HeadProfile": {"HeadDia"},
     "Head": {"HeadHt"},
+    "AttachmentScrewHoles": {"MountWestX", "MountEastX"},
     "CrankBossProfile": {"CrankAxisY", "CrankBossDia"},
+    "CrankSprocketBoss": {"CrankBossLen"},
     "CrankBoreProfile": {"CrankBoreDia"},
+    "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
+    "JournalBoreProfile": {"JournalBoreDia"},
+    "JournalPlanReference": {"CrankBossStartZ", "JournalAngle"},
 }
 
+# Decimal places are product definition: they select the title-block general
+# band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
+# sheet only proves they survived the import (drawing-simplicity-policy rule 2).
+# Cast body/boss sizes and the boss extents take one place -- nothing mates on
+# them.  The two bearing-axis heights and the two mounting-hole stations take
+# two.  Only the two running bores take three, and only because their size
+# limits are what deliver the `shaft_in_bushing` clearance band.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "MainBodyProfile": {"MainBodyDia": 1},
+    "MainBody": {"MainBodyHt": 1},
+    "HeadProfile": {"HeadDia": 1},
+    "Head": {"HeadHt": 1},
+    "AttachmentScrewHoles": {"MountWestX": 2, "MountEastX": 2},
+    "CrankBossProfile": {"CrankAxisY": 2, "CrankBossDia": 1},
+    "CrankSprocketBoss": {"CrankBossLen": 1},
+    "CrankBoreProfile": {"CrankBoreDia": 3},
+    "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
+    "JournalBoreProfile": {"JournalBoreDia": 3},
+    "JournalPlanReference": {"CrankBossStartZ": 1, "JournalAngle": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# Notes identify the mating parts the two journals and the foot serve; every
+# size, band and finish on this sheet is carried by a dimension or a native
+# symbol instead (drawing-simplicity-policy rules 1 and 6).
 DRAWING_NOTES = "\n".join(
     (
-        "MACHINE FOOT, BOSSES, BORES AND MOUNTING HOLES.",
-        "DATUM A IS FOOT SEAT; B IS MAIN-BODY OD; C IS INCLINED JOURNAL AXIS.",
-        f"CONE BOSS DIA {CONE_BOSS_DIA:.3f}; JOURNAL BORE DIA {BORE_DIA:.4f} THRU.",
-        f"JOURNAL AXIS INTERSECTS B AT BASIC {BORE_HEIGHT:.3f} ABOVE A; "
-        f"ANGLE {INCLINE_DEG:.4f} DEG ABOUT +Y.",
-        f"CRANK BOSS DIA {CRANK_BOSS_DIA:.3f}; BORE DIA {CRANK_BORE_DIA:.3f} THRU "
-        f"AT BASIC {CRANK_BORE_HEIGHT:.3f} ABOVE A.",
-        f"2X 1/4 FILLISTER C'BORE DIA {ATTACHMENT_CBORE_DIA:.5f} X "
-        f"{ATTACHMENT_CBORE_DEPTH:.4f} DEEP; THRU DIA {ATTACHMENT_THRU_DIA:.5f}; "
-        f"C-C {ATTACHMENT_SPACING:.5f}.",
+        "CRANK BORE CARRIES CRANKSHAFT MHA-026.",
+        "CONE BORE CARRIES CONE GEAR SHAFT MHA-014.",
+        "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
     )
 )
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "datum-A seat flatness": "0.05",
-    "datum-B outside-diameter form": "0.05",
-    "journal-axis true position": "0.05",
-    "crank-bore true position": "0.10",
-}
+# The post carries no datums or feature-control frames under the drawing
+# simplicity policy: nothing on it is the cam/follower mate, and its two
+# running fits are held by size limits, not by position frames.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}
