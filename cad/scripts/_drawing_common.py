@@ -8,6 +8,8 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 
 from __future__ import annotations
 
+import contextlib
+import json
 import math
 import os
 import sys
@@ -15,7 +17,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Literal, Mapping, Sequence
+from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
 
 
 import _config
@@ -25,6 +27,7 @@ from _common import (
     _early_bound,
     _visible_document_paths,
     apply_custom_properties,
+    capture_com_failure,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
@@ -275,6 +278,195 @@ def _select_view_entity(
     if entity is None:
         raise RuntimeError(f"selected {label} {entity_type.lower()} has no entity")
     return entity
+
+
+# swSelectType_e names for the kinds a drawing-view pick can resolve to; an
+# unlisted code is reported as its number, never mapped to a guess.
+_SELECT_TYPE_NAMES = {
+    0: "NOTHING",
+    1: "EDGE",
+    2: "FACE",
+    3: "VERTEX",
+    9: "SKETCH",
+    10: "SKETCHSEGMENT",
+    11: "SKETCHPOINT",
+    12: "DRAWINGVIEW",
+    13: "GTOL",
+    14: "DIMENSION",
+    15: "NOTE",
+    20: "COMPONENT",
+    24: "EXTSKETCHSEGMENT",
+    25: "EXTSKETCHPOINT",
+    28: "CENTERMARKS",
+    35: "SFSYMBOL",
+    46: "SILHOUETTE",
+    103: "CENTERLINE",
+}
+
+
+def _probe(
+    bag: dict[str, Any], key: str, read: Callable[[], Any], *, record: bool = True
+) -> Any:
+    """Record ONE forensic read in ``bag`` -- its value, or its own failure.
+
+    A description that cannot be read must say so under ``<key>_error`` and
+    let the next read run: this executes on the success path of every hole
+    callout (the BEFORE snapshot) and on the failure path after a refusal,
+    and a diagnostic that raises there either fails a good sheet or masks the
+    real failure.
+    ``record=False`` keeps only the failure (for wrapper bindings, whose value
+    is a COM object no telemetry channel can carry).
+    """
+    try:
+        value = read()
+    except Exception as exc:  # noqa: BLE001 - forensics never raise (see above)
+        bag[f"{key}_error"] = f"{type(exc).__name__}: {exc}"
+        return None
+    if record:
+        bag[key] = value
+    return value
+
+
+def _feature_identity(face: Any) -> str:
+    """``<feature name>(<feature type>)`` of the feature that owns ``face``."""
+    feature = _early_bound(face, "IFace2").GetFeature()
+    if feature is None:
+        return "<no feature>"
+    feature = _early_bound(feature, "IFeature")
+    return f"{feature.Name}({feature.GetTypeName2()})"
+
+
+def describe_selected_entity(
+    adapter: Any,
+    view: Any,
+    entity: Any,
+    *,
+    entity_type: str,
+    requested_xy: tuple[float, float] | None,
+    label: str,
+) -> dict[str, Any]:
+    """What a drawing-view pick actually resolved to, as scalar telemetry fields.
+
+    The failure this exists for: ``AddHoleCallout2`` answered ``None`` to a
+    coordinate pick that had succeeded (drawing:rocker_arm, worker5,
+    2026-09-20) and the leaf log could not say whether the selected EDGE was
+    the hole rim, the strap arc 2.3 sheet-mm below it, or the hidden back-face
+    rim under it. Recorded: the view (name, scale, position, outline), the
+    requested sheet point, the selection set (count and every entry's
+    ``swSelectType_e``), and for an edge its curve (circle centre/radius or
+    line endpoints, model mm), its vertices and the feature owning each
+    adjacent face -- which names the hole feature, or does not.
+
+    Called only at the hole-callout boundary (:func:`add_native_hole_callout`),
+    not on every pick: it is ~10 COM reads per call, and a generic pick has
+    nothing to compare them against. Every read is guarded (:func:`_probe`);
+    a value that could not be read is reported as ``<key>_error`` rather than
+    raising. Values are scalars or JSON strings so they ride a span event, a
+    log record and ``capture.json`` unchanged.
+    """
+    bag: dict[str, Any] = {
+        "label": label,
+        "entity_type": entity_type,
+        "pick": "coordinate" if requested_xy is not None else "entity",
+    }
+    if requested_xy is not None:
+        bag["requested_x"] = float(requested_xy[0])
+        bag["requested_y"] = float(requested_xy[1])
+    _probe(bag, "view_name", lambda: view_name(adapter, view))
+    bound_view = _probe(bag, "view", lambda: _early_bound(view, "IView"), record=False)
+    if bound_view is not None:
+        _probe(bag, "view_scale", lambda: float(bound_view.ScaleDecimal))
+        _probe(
+            bag,
+            "view_position",
+            lambda: json.dumps([float(v) for v in bound_view.Position]),
+        )
+        _probe(
+            bag,
+            "view_outline",
+            lambda: json.dumps([float(v) for v in bound_view.GetOutline()]),
+        )
+    selection_manager = _probe(
+        bag,
+        "selection_manager",
+        lambda: _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr"),
+        record=False,
+    )
+    count = None
+    if selection_manager is not None:
+        count = _probe(
+            bag,
+            "selected_count",
+            lambda: int(selection_manager.GetSelectedObjectCount2(-1)),
+        )
+    if count:
+        _probe(
+            bag,
+            "selected_types",
+            lambda: json.dumps(
+                [
+                    _SELECT_TYPE_NAMES.get(code, code)
+                    for code in (
+                        int(selection_manager.GetSelectedObjectType3(index, -1))
+                        for index in range(1, count + 1)
+                    )
+                ]
+            ),
+        )
+    kind = entity_type.upper()
+    if kind == "SILHOUETTE":
+        _probe(
+            bag,
+            "face_feature",
+            lambda: _feature_identity(_early_bound(entity, "ISilhouetteEdge").GetFace()),
+        )
+        return bag
+    if kind != "EDGE":
+        return bag
+    edge = _probe(bag, "edge", lambda: _early_bound(entity, "IEdge"), record=False)
+    if edge is None:
+        return bag
+    curve = _probe(
+        bag, "curve", lambda: _early_bound(edge.GetCurve(), "ICurve"), record=False
+    )
+    if curve is not None:
+        if _probe(bag, "is_circle", lambda: bool(curve.IsCircle())):
+            # CircleParams = (centre xyz, axis xyz, radius), metres -- ONE
+            # property read, then sliced.
+            def circle_mm() -> str:
+                params = [float(v) for v in curve.CircleParams]
+                return json.dumps(
+                    [round(v * 1000.0, 4) for v in params[:3]]
+                    + [round(params[6] * 1000.0, 4)]
+                )
+
+            _probe(bag, "circle_mm", circle_mm)
+        elif _probe(bag, "is_line", lambda: bool(curve.IsLine())):
+            _probe(
+                bag,
+                "line_mm",
+                lambda: json.dumps(
+                    [
+                        [
+                            round(float(v) * 1000.0, 4)
+                            for v in _early_bound(vertex, "IVertex").GetPoint()
+                        ]
+                        for vertex in (edge.GetStartVertex(), edge.GetEndVertex())
+                    ]
+                ),
+            )
+    _probe(
+        bag,
+        "adjacent_features",
+        lambda: json.dumps(
+            [
+                _feature_identity(face)
+                for face in (edge.GetTwoAdjacentFaces2() or ())
+                if face is not None
+            ]
+        ),
+    )
+    return bag
 
 
 def _select_annotation_entity(
@@ -1361,14 +1553,65 @@ def add_native_hole_callout(
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
     """
-    _select_view_entity(adapter, view, "EDGE", edge_xy, label=label, entity=edge)
+    selected = _select_view_entity(
+        adapter, view, "EDGE", edge_xy, label=label, entity=edge
+    )
+    # Snapshot what AddHoleCallout2 is about to be handed, BEFORE the call: the
+    # API may clear the selection or invalidate the entity, and on a passing
+    # leaf this line is the positive control the failing one is read against.
+    # DEBUG plus the span event: every record reaches OTLP/App Insights
+    # regardless of console verbosity (the OTel handler sits at DEBUG; the
+    # verbosity flag filters only stderr), so this is not a task.log line by
+    # default. One record per callout. Emission is guarded: telemetry must
+    # never fail a sheet (the console formatter prints only the message, hence
+    # the JSON in it).
+    before = describe_selected_entity(
+        adapter, view, selected, entity_type="EDGE", requested_xy=edge_xy, label=label
+    )
+    with contextlib.suppress(Exception):
+        _telemetry.event("drawing.hole_callout_selection", **before)
+        _telemetry.debug(
+            f"hole callout {label}: selected edge before AddHoleCallout2: "
+            + json.dumps(before, default=str, sort_keys=True)
+        )
     draw = adapter.currentModel
     ddoc = _early_bound(
         draw, "IDrawingDoc"
     )  # IDrawingDoc view for drawing-only methods (same dispatch)
     display = ddoc.AddHoleCallout2(callout_xy[0], callout_xy[1], 0.0)
     if display is None:
-        raise RuntimeError(f"failed to insert native hole callout ({label})")
+        # A None here says only "no callout": the seat is about to be torn down
+        # with the drawing unsaved and the selection undescribed (rocker_arm,
+        # worker5, 2026-09-20 -- "no forensic artefacts captured"). Describe the
+        # selection again AFTER the refusal -- kept apart from the BEFORE
+        # snapshot, never overwriting it, so a cleared selection or an
+        # invalidated entity reads as what the API DID, not as what it was
+        # given -- then let the capture save the sheet, the seat image,
+        # SolidWorks' own error stack and the screen-space pick geometry
+        # before raising. Only capture_com_failure raises; the console line
+        # is guarded so a failed sink can neither replace the failure nor
+        # prevent the capture.
+        after = describe_selected_entity(
+            adapter, view, selected, entity_type="EDGE", requested_xy=edge_xy, label=label
+        )
+        with contextlib.suppress(Exception):
+            _telemetry.error(
+                f"hole callout {label}: AddHoleCallout2 returned None at sheet "
+                f"({callout_xy[0]:g}, {callout_xy[1]:g}); selection "
+                + json.dumps(
+                    {"before": before, "after": after}, default=str, sort_keys=True
+                )
+            )
+        capture_com_failure(
+            adapter,
+            f"hole-callout {label}",
+            f"failed to insert native hole callout ({label})",
+            api="IDrawingDoc.AddHoleCallout2",
+            callout_x=callout_xy[0],
+            callout_y=callout_xy[1],
+            **{f"before_{key}": value for key, value in before.items()},
+            **{f"after_{key}": value for key, value in after.items()},
+        )
     # AddHoleCallout2 leaves its PropertyManager page open.  Accept it through
     # the documented swCommands_PmOK command so doit remains unattended.
     if not adapter.swApp.RunCommand(-2, ""):  # swCommands_e.swCommands_PmOK
