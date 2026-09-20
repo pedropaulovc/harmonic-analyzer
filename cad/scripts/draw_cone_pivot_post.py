@@ -135,10 +135,14 @@ SECTION_KEEP = {
     "JournalBoreDia": (0.288, 0.163),
 }
 # Non-preferred finished sizes, so the shop is told to BORE rather than left to
-# hunt for a reamer that does not exist; the size limits are the part's.
+# hunt for a reamer that does not exist; the size limits are the part's.  The
+# boss's near face is the one place a process word IS the requirement: on an
+# as-cast collar the shop has to know that face is machined back to a station,
+# not left as cast.
 DIMENSION_CALLOUTS = {
     "CrankBoreDia": "BORE THRU",
     "JournalBoreDia": "BORE THRU",
+    "CrankBossStartZ": "SPOT FACE",
 }
 
 

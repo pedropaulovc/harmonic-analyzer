@@ -28,7 +28,7 @@ def test_required_drawing_paths() -> None:
 def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert (spec.BLOCK_DIA, spec.BLOCK_HEIGHT) == (42.011, 86.0)
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT, spec.HEAD_BASE_Y) == (
-        42.7506,
+        44.0,
         26.6,
         59.4,
     )
@@ -40,7 +40,10 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     ) == (21.93, 11.438, 72.7, 0.0)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
     assert round(spec.CRANK_BOSS_LENGTH, 4) == 72.0344
+    # The spot face is stationed from the post axis, NOT from the cast collar.
+    assert spec.CRANK_BOSS_NORTH_FACE == 21.3753
     assert round(spec.CRANK_BOSS_START_Z, 4) == -21.3753
+    assert spec.CRANK_BOSS_START_Z != -spec.HEAD_DIA / 2.0
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
         17.2,
@@ -54,8 +57,8 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
     ) == (26.88704, 7.14248, 11.50874, 6.0198)
-    assert spec.HARVESTED_VOLUME_MM3 == 112_302.9406
-    assert spec.HARVESTED_MASS_KG == 0.808581173
+    assert spec.HARVESTED_VOLUME_MM3 == 114_171.7672
+    assert spec.HARVESTED_MASS_KG == 0.822036724
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
