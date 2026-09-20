@@ -472,17 +472,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # same ``ConeIncline`` global that builds ConeShaftNormal, so the value the
     # print carries and the value the geometry is built from cannot drift.
     #
-    # It is authored between the journal ray and the DOWNWARD crank ray, whose
-    # enclosed wedge is the acute 12.52 deg: a driving dimension fixes the
-    # quadrant at authoring time, so nothing downstream can flip it to the
-    # 167.48 deg supplement.  (The driven-reference route cannot express this
-    # angle at all -- SOLIDWORKS returns the obtuse member for a line pair
-    # regardless of ray direction, selection order or text position.)
-    check(
+    # It is authored between the journal ray and the DOWNWARD crank ray.  Two
+    # lines admit four angle regions and ``AddSpecificDimension`` picks the one
+    # containing its text point, so the text goes on the bisector INSIDE the
+    # acute wedge, expressed as a full model-space point (Top-plane sketch y
+    # is model -Z): a point with z=0 lands on the sketch x-axis, outside the
+    # wedge, which is why the driven-reference route only ever read the
+    # 167.48 deg supplement.  A driving dimension then fixes that quadrant at
+    # authoring time, so nothing downstream can flip it.
+    _add_driving_plan_incline(
+        adapter,
+        journal_axis_line,
+        crank_axis_line,
         "journal plan incline",
-        await adapter.add_sketch_dimension(
-            journal_axis_line, crank_axis_line, "angular", INCLINE_DEG
-        ),
+        expected_degrees=INCLINE_DEG,
     )
     plan.record("InclineAngle", '"ConeIncline"')
     await ensure_fully_defined(adapter, "JournalPlanReference")
@@ -561,6 +564,67 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     return await save_part_and_images(adapter, PART_NAME)
+
+
+@_telemetry.traced("dim.driving_plan_incline", label_param="label")
+def _add_driving_plan_incline(
+    adapter: Any,
+    journal_line: str,
+    crank_line: str,
+    label: str,
+    *,
+    expected_degrees: float,
+) -> None:
+    """Author the acute plan angle between two origin-rooted rays as DRIVING.
+
+    Both rays are selected as segments (Smart Dimension on one segment plus
+    its vertex, the adapter's angular route, never yields an angular control:
+    see ``diag_mcmaster_lib``).  The rays are the journal direction
+    ``(sin i, -cos i)`` and the downward crank axis ``(0, -1)`` in Top-plane
+    sketch axes, so the text point sits on their bisector, ``TEXT_RADIUS``
+    from the origin, inside the acute wedge.  It is passed with sketch y in
+    BOTH the y and the -z slots so it lands in that wedge whether SOLIDWORKS
+    reads the point in sketch or in model space (the off-plane component
+    projects away).  The value is verified acute BEFORE the dimension is
+    made driving: a supplement here would swing the journal ray, not print
+    it wrong.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    text_radius_m = 0.020
+    half = math.radians(expected_degrees / 2.0)
+    text_x = text_radius_m * math.sin(half)
+    text_y = -text_radius_m * math.cos(half)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [journal_line, crank_line], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        text_x,
+        text_y,
+        -text_y,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    expected_rad = math.radians(expected_degrees)
+    actual_rad = abs(float(dimension.SystemValue))
+    if abs(actual_rad - expected_rad) > 1e-8:
+        raise RuntimeError(
+            f"{label}: angular dimension measured {math.degrees(actual_rad):.6f} "
+            f"deg, expected {expected_degrees:.6f} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError(f"{label}: angular dimension did not become driving")
+    _telemetry.success(f"driving plan incline {label}: {expected_degrees:.4f} deg")
 
 
 @_telemetry.traced("reference.axis_from_feature_cylinder", label_param="label")

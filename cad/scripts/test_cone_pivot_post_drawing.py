@@ -187,7 +187,6 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
     assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'journal_axis_line, crank_axis_line, "angular", INCLINE_DEG' in source
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
     # A blanked sketch's dimensions never reach InsertModelAnnotations3.
