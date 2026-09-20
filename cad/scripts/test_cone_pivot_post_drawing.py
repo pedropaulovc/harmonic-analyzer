@@ -83,7 +83,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "ConeBossDia",
         "JournalBoreDia",
         "CrankBossStartZ",
-        "JournalAngle",
+        "InclineAngle",
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
@@ -172,15 +172,24 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
 
 
 def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
-    """The 12.5182 deg plan angle is carried by a driven model dimension."""
-    assert "JournalAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
+    """The 12.5182 deg plan incline is a DRIVING model dimension.
+
+    A driven reference angle cannot express it: SOLIDWORKS returns the
+    obtuse member of a line pair whatever the ray directions, the selection
+    order or the text position.  A driving dimension fixes the quadrant when
+    the sketch is authored, and driving it from the same ``ConeIncline``
+    global that builds ConeShaftNormal is what stops the printed value and
+    the built geometry from drifting apart.
+    """
+    assert "InclineAngle" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
     assert "CrankBossStartZ" in spec.DRAWING_DIMENSIONS["JournalPlanReference"]
     assert round(spec.CRANK_BOSS_NEAR_Z, 4) == 21.3753
     assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
     assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "add_angular_reference_dimension(" in source
-    assert "expected_degrees=INCLINE_DEG" in source
+    assert 'journal_axis_line, crank_axis_line, "angular", INCLINE_DEG' in source
+    assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
+    assert "add_angular_reference_dimension" not in source
     # A blanked sketch's dimensions never reach InsertModelAnnotations3.
     assert "JournalPlanReference" not in source.split(
         "_blank_reference_geometry(\n        adapter,"
