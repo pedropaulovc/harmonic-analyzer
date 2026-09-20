@@ -467,11 +467,16 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     plan.record("JournalRefZ")
+    # SolidWorks picks WHICH of the two angles an angular dimension measures
+    # from the quadrant the text lands in, so the text has to sit inside the
+    # narrow wedge between the two downward rays -- put it outside and the
+    # dimension comes back as the 167.48 deg supplement.
+    _wedge_z = -JOURNAL_REFERENCE_Z * 0.75
     await add_angular_reference_dimension(
         adapter,
         crank_axis_line,
         journal_axis_line,
-        (JOURNAL_REFERENCE_X + 12.0, -JOURNAL_REFERENCE_Z / 2.0),
+        (abs(_wedge_z) * math.tan(math.radians(INCLINE_DEG)) / 2.0, _wedge_z),
         "journal plan angle",
         expected_degrees=INCLINE_DEG,
     )
