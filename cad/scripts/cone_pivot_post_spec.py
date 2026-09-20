@@ -19,11 +19,16 @@ from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
-# Main casting: the upper 26.6 mm is a very slightly larger collar around the
-# main body.  Both cylinders share the vertical body/swing axis.
+# Main casting: the upper 26.6 mm is an integral AS-CAST collar around the
+# turned body, and it is a real step, not a rounding artefact.  Four sharp
+# manual frames (ch11 page002_img04/05/06, ch30 page003_img01) show the seam
+# 59.4-60.5 mm above the foot with a 0.8-1.27 mm radial step, orange-peel cast
+# skin above it and a turned surface below, giving a collar of 44.0 +/- 0.4.
+# The collar is therefore a one-place as-cast reference size; the body below
+# it is the locating/bore cylinder and keeps its turned size.
 BLOCK_DIA = 42.011
 BLOCK_HEIGHT = 86.0
-HEAD_DIA = 42.7506
+HEAD_DIA = 44.0
 HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 
@@ -36,7 +41,12 @@ CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
 CRANK_BORE_HEIGHT = 72.7
 CRANK_BORE_OFFSET = 0.0
-CRANK_BOSS_START_Z = -HEAD_DIA / 2.0
+# The boss's near face is a MACHINED SPOT FACE, not the rim of the cast
+# collar: it is stationed from the post axis and the print dimensions it that
+# way, so it does not follow the collar diameter.  Decoupling it also keeps
+# the assembly's 0.25 mm north and 10.255 mm south crank-sprocket gaps.
+CRANK_BOSS_NORTH_FACE = 21.3753
+CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
 CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
@@ -59,10 +69,12 @@ ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
-# V2 B-rep ground truth cascaded through Pedro's boss-length correction.  The
-# correction removes a uniform annular segment beyond the main casting.
-HARVESTED_VOLUME_MM3 = 112_302.9406
-HARVESTED_MASS_KG = 0.808581173
+# V2 B-rep ground truth cascaded through Pedro's boss-length correction and
+# the as-cast collar re-read.  The collar step adds a 21.3753..22.0 mm radius
+# annulus over the head's 26.6 mm, less the part of it the crank boss already
+# occupies.
+HARVESTED_VOLUME_MM3 = 114_171.7672
+HARVESTED_MASS_KG = 0.822036724
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -124,10 +136,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places are product definition: they select the title-block general
 # band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
 # sheet only proves they survived the import (drawing-simplicity-policy rule 2).
-# Cast body/boss sizes and the boss extents take one place -- nothing mates on
-# them.  The two bearing-axis heights and the two mounting-hole stations take
-# two.  Only the two running bores take three, and only because their size
-# limits are what deliver the `shaft_in_bushing` clearance band.
+# The as-cast collar diameter and the cast body/boss sizes take one place --
+# nothing mates on them.  The two bearing-axis heights, the two mounting-hole
+# stations and the machined spot-face station take two.  Only the two running
+# bores take three, and only because their size limits are what deliver the
+# `shaft_in_bushing` clearance band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 1},
     "MainBody": {"MainBodyHt": 1},
@@ -139,7 +152,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankBoreProfile": {"CrankBoreDia": 3},
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
-    "JournalPlanReference": {"CrankBossStartZ": 1, "JournalAngle": 2},
+    "JournalPlanReference": {"CrankBossStartZ": 2, "JournalAngle": 2},
 }
 
 _PRECISION_NAMES = [
