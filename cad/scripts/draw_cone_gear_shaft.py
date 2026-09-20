@@ -24,6 +24,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
     curate_view_dimensions,
@@ -74,9 +75,12 @@ ISO_SCALE = (1, 2)
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
 # y < ~0.066).  The 205.17 mm shaft at 1:1 spans 0.0474..0.2526 about
-# SIDE_CENTER, leaving the right third for the pictorial.
-SIDE_CENTER = (0.150, 0.200)
-ISO_CENTER = (0.345, 0.210)
+# SIDE_CENTER, leaving the right third for the pictorial; the group sits
+# mid-height so the baseline stack below and the diameters above share the
+# field evenly, with the note block in the lower left.
+SIDE_CENTER = (0.150, 0.170)
+ISO_CENTER = (0.345, 0.185)
+NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
 # circles.  They are imported here, dragged onto the shoulder each one
@@ -85,14 +89,16 @@ DONOR_CENTER = (0.360, 0.090)
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning below the shaft, shortest
-# nearest the part.  The one radius rides above, over the long land.
+# nearest the part.  The one radius rides above the journal shoulder it
+# attaches to (the fillet feature's first edge), its leader dropping straight
+# to that corner, right of the Ø9.525 text and left of the pivot finish.
 SIDE_KEEP = {
-    "Sec0End": (0.2311, 0.1855),
-    "Sec1End": (0.1672, 0.1765),
-    "Sec2End": (0.1638, 0.1675),
-    "Sec3End": (0.1603, 0.1585),
-    "Sec4End": (0.1499, 0.1495),
-    "ShoulderR": (0.2220, 0.2380),
+    "Sec0End": (0.2311, 0.1555),
+    "Sec1End": (0.1672, 0.1465),
+    "Sec2End": (0.1638, 0.1375),
+    "Sec3End": (0.1603, 0.1285),
+    "Sec4End": (0.1499, 0.1195),
+    "ShoulderR": (0.2000, 0.2120),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x, so each x lies INSIDE the land
@@ -102,11 +108,11 @@ SIDE_KEEP = {
 # apart, so their texts step up towards the big end: every line then rises
 # past the LEFT of the lower texts and through none of them.
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2700, 0.2120),
-    "Sec1Dia": (0.1900, 0.2230),
-    "Sec2Dia": (0.0810, 0.2520),
-    "Sec3Dia": (0.0690, 0.2340),
-    "Sec4Dia": (0.0520, 0.2160),
+    "Sec0Dia": (0.2700, 0.1820),
+    "Sec1Dia": (0.1400, 0.1930),
+    "Sec2Dia": (0.0810, 0.2220),
+    "Sec3Dia": (0.0690, 0.2040),
+    "Sec4Dia": (0.0520, 0.1860),
 }
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
@@ -192,8 +198,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
@@ -262,7 +275,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.2400, 0.2300),
+        symbol_xy=(0.2400, 0.2000),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         entity_type="FACE",
@@ -272,13 +285,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.0570, 0.1710),
+        symbol_xy=(0.0570, 0.1410),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,
         leader_attach_xy=tip_bottom,
     )
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(
         adapter,
