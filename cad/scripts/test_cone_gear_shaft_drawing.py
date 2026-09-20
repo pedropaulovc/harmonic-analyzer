@@ -47,7 +47,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
     # Every diameter carries the shared band, so its places are only spelling.
     # The stations carry no band, so their places ARE the grade they are held
     # to: three for the gear-seat shoulders that must land in the air gap
-    # between two gear faces, two for the journal length and overall length,
+    # between two gear faces, one for the journal length and overall length,
     # which nothing seats against.
     by_name = cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
@@ -56,11 +56,11 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec2Dia": 3,
         "Sec3Dia": 3,
         "Sec4Dia": 3,
-        "Sec0End": 2,
+        "Sec0End": 1,
         "Sec1End": 3,
         "Sec2End": 3,
         "Sec3End": 3,
-        "Sec4End": 2,
+        "Sec4End": 1,
         "ShoulderR": 2,
     }
 
@@ -241,9 +241,21 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
     # One feature, one dimension, one quantity prefix -- not four dimensions.
     assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
-    assert not hasattr(cone_gear_shaft_spec, "DRAWING_NOTES")
-    assert "add_property_linked_note" not in Path(drawing.__file__).read_text(
-        encoding="utf-8"
+    # The old "SHOULDER ROOTS R0.10 MAX" note is gone; the one note left
+    # names the requirement behind the three-place stations (rule 2) and
+    # carries no number, tolerance, datum or method word.
+    notes = cone_gear_shaft_spec.DRAWING_NOTES
+    assert 1 <= len(notes.splitlines()) <= 4
+    assert not any(character.isdigit() for character in notes)
+    for forbidden in ("R0.", "MAX", "DATUM", "BASIC", "FINISH", "TURN", "GRIND"):
+        assert forbidden not in notes.upper()
+    assert "SOLDERED CONE GEAR FACES" in notes
+    assert (
+        'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
+        in source
+    )
+    assert 'add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)' in (
+        Path(drawing.__file__).read_text(encoding="utf-8")
     )
 
 

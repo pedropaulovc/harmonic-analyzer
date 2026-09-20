@@ -91,6 +91,7 @@ from _gear import volume_check
 from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
     SECTION_DIA_BAND,
@@ -257,7 +258,7 @@ async def build(adapter) -> dict[str, str]:
     # The two lands that RUN carry a roughness symbol.  No datums and no
     # feature-control frames (drawing-simplicity policy rule 3).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 
