@@ -189,16 +189,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Resolve GTol attachments once per stable view display state.  Datum tags
-    # retain a sheet-point pick: edge-object attachment ignores SetPosition2
-    # (see the layout-tuning refusal catalogue and the native fulcrum probe).
-    front_edges = scan_view_edges(front, label="fulcrum shaft front PMI")
+    # The side view's end rims are edge-on: select their native entities rather
+    # than hit-test a sheet point.  Front-view annotations retain their proven
+    # point picks, which also establish the datum and curved leader placement.
     right_edges = scan_view_edges(right, label="fulcrum shaft right PMI")
-    front_rim = _unique_shaft_rim(
-        front_edges,
-        SHAFT_LENGTH / 2.0,
-        label="fulcrum shaft front +Z rim",
-    )
     plus_z_end_rim = _unique_shaft_rim(
         right_edges,
         SHAFT_LENGTH / 2.0,
@@ -240,8 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=front,
                 position=(0.065, 0.250),
-                edge_entity=front_rim,
-                leader_attachment_xy=end_upper,
+                attachment_xy=end_upper,
             ),
             "plus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
