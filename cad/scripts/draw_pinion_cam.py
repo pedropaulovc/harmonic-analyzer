@@ -14,43 +14,34 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
-from pinion_cam_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
+    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _named_views import octant_view_name
 from _surface_finish import surface_finish_by_key
 from pinion_cam_spec import (
     BORE,
-    BOSS_DIA,
     BOSS_PROUD,
-    BOSS_Z,
-    CAM_LEN,
     CAM_OD,
     ECC,
-    TAP_DRILL_DIA,
+    LIFT_ROD_NUMBER,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -78,8 +69,10 @@ SHEET_SCALE = (3.0, 1.0)
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
-TOP_CENTER = (0.100, 0.232)
-ISO_CENTER = (0.230, 0.185)
+# Third angle: the length view sits directly above the circular view, so the
+# body and bore axes project vertically between them (machinist round 2).
+TOP_CENTER = (0.105, 0.232)
+ISO_CENTER = (0.350, 0.185)
 BOTTOM_CENTER = (0.270, 0.195)
 
 
@@ -92,53 +85,34 @@ def _front_y(model_y_mm: float) -> float:
 
 
 BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
-CAM_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
+_SQRT_HALF = 0.5**0.5
 
+# Diameters go on the view that shows them as a SOLID edge: the OD as the
+# length view's width, the boss on the boss end view, the bore on the circular
+# view where it is the only diagonal (its and the OD's diagonals both pass
+# through nearly the same centre, so the two cannot share a view without
+# crossing -- machinist round 2).
 FRONT_KEEP = {
-    "BoreDia": (0.045, 0.165),
-    "BossProjection": (0.190, 0.120),
-    "CollarOd": (0.035, 0.120),
-    "CollarCy": (0.170, 0.135),
+    "BoreDia": (0.055, 0.186),
+    "CollarCy": (0.172, 0.172),
+    "BossProjection": (0.180, 0.122),
 }
 TOP_KEEP = {
-    "Depth": (0.100, 0.195),
-    "BossDia": (0.180, 0.225),
-    "BossCz": (0.155, 0.200),
+    "Depth": (0.062, 0.232),
+    "CollarOd": (0.105, 0.205),
+    "BossCz": (0.165, 0.226),
 }
+BOTTOM_KEEP = {"BossDia": (0.312, 0.228)}
 DIMENSION_CALLOUTS = {
-    "BoreDia": "FINAL REAM; THRU",
-    "CollarCy": "BOTH END FACES",
+    "BoreDia": f"FINAL REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
+    "CollarCy": "BORE TO OD, BOTH END FACES",
     "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
-    "BossCz": "A TO BOSS / TAP AXIS",
+    "BossCz": "FRONT FACE TO BOSS AXIS",
 }
-
-
-@_telemetry.traced("drawing.pinion_cam_front_end_scan")
-def _front_end_edge(view: Any) -> Any:
-    """Return the collar's real front circular edge at model Z=0."""
-    candidates: list[tuple[float, float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label="pinion-cam top edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        candidates.append((params[2], params[6], edge))
-    matches = [
-        edge
-        for center_z, radius, edge in candidates
-        if abs(center_z) <= 0.01 and abs(radius - CAM_OD / 2.0) <= 0.01
-    ]
-    if len(matches) != 1:
-        seen = [(round(z, 4), round(r, 4)) for z, r, _edge in candidates]
-        raise RuntimeError(
-            "pinion-cam top view expected one front OD edge at "
-            f"z=0 r={CAM_OD / 2.0:.3f} mm; found {len(matches)} from {seen}"
-        )
-    return matches[0]
+# Only the two critical features -- the reamed running bore and the cam OD it
+# lifts through -- print more than the general grade; everything else takes one
+# place under the title block's .X row (cad/docs/tolerance-policy.md).
+DIMENSION_PRECISION = {"Depth": 1, "BossDia": 1, "BossProjection": 1}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -184,134 +158,51 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", 0.350, 0.185, scale=(2, 1))
+    # The built-in isometric looks from +Y, which hides the set-screw boss --
+    # the part's one additional feature -- behind the collar, because the boss
+    # points at -Y.  The FRONT-BOTTOM-RIGHT octant the PART names shows the
+    # boss and its tapped opening (machinist round 2).
+    iso = place_view(
+        adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=(2, 1)
+    )
     set_hidden_lines_removed(adapter, iso)
     for view in (front, top, bottom):
         set_hidden_lines_visible(adapter, view)
 
+    # The boss end view is curated FIRST so the boss diameter settles on the
+    # view where the boss is a SOLID circle; imported into the length view it
+    # can only attach to a hidden edge (machinist round 2).
+    bottom_annotations = curate_view_dimensions(
+        adapter, bottom, keep=BOTTOM_KEEP, view_label="boss end"
+    )
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     top_annotations = curate_view_dimensions(
         adapter, top, keep=TOP_KEEP, view_label="top"
     )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
-    )
-    top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
-    boss_station = top_by_name["BossCz"]
-    boss_station_display = adapter._attempt(
-        lambda: boss_station.GetSpecificAnnotation()
-    )
-    if boss_station_display is None:
-        raise RuntimeError("BossCz has no display dimension to box")
-    set_basic_dimension(adapter, boss_station_display, label="boss/tap axial station")
+    annotations = [*bottom_annotations, *front_annotations, *top_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to boss end view")
 
+    # Bore roughness: picked on the bore's upper-right rim and carried up-right
+    # -- the one quadrant of the circular view no other annotation uses, now
+    # that the OD is dimensioned on the length view and the bore diameter's
+    # diagonal runs up-left.
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
-    bore_symbol = (0.085, 0.105)
-    bore_leader_dx = bore_symbol[0] - bore_center[0]
-    bore_leader_dy = bore_symbol[1] - bore_center[1]
-    bore_leader_length = math.hypot(bore_leader_dx, bore_leader_dy)
-    bore_datum_edge = (
-        bore_center[0] + BORE_R_SHEET * bore_leader_dx / bore_leader_length,
-        bore_center[1] + BORE_R_SHEET * bore_leader_dy / bore_leader_length,
-    )
-    bore_right = (bore_center[0] + BORE_R_SHEET, bore_center[1])
-    front_face_x = TOP_CENTER[0] - CAM_LEN * SHEET_SCALE[0] / 2000.0
-    bottom_boss_center = (
-        BOTTOM_CENTER[0],
-        BOTTOM_CENTER[1] + (BOSS_Z - CAM_LEN / 2.0) * 2.0 / 1000.0,
-    )
-    bottom_boss_right = (
-        bottom_boss_center[0] + BOSS_DIA / 1000.0,
-        bottom_boss_center[1],
-    )
-    bottom_boss_left = (
-        bottom_boss_center[0] - BOSS_DIA / 1000.0,
-        bottom_boss_center[1],
-    )
-    bottom_tap_right = (
-        bottom_boss_center[0] + TAP_DRILL_DIA / 1000.0,
-        bottom_boss_center[1],
-    )
-    od_center = (FRONT_CENTER[0], _front_y(-ECC))
-    od_bottom = (od_center[0], od_center[1] - CAM_R_SHEET)
-    add_datum_feature(
-        adapter,
-        top,
-        edge_entity=_front_end_edge(top),
-        symbol_xy=(front_face_x - 0.018, TOP_CENTER[1] + 0.018),
-        datum="A",
-        label="cam front end face",
-    )
-    # Select the bore on the ray to B's symbol, not at six o'clock. The diagonal
-    # leader otherwise starts on a different circle normal and its first move
-    # retains a 3.066 mm reorientation offset. The radial pick preserves the
-    # intended symbol location and bore attachment without relaxing its bound.
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_datum_edge,
-        symbol_xy=bore_symbol,
-        datum="B",
-        label="cam final bore axis",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=od_bottom,
-        symbol_xy=(0.155, 0.105),
-        datum="C",
-        label="cam OD datum axis",
-    )
-    # Datum D attaches on the boss's LEFT flank, opposite the two position
-    # frames on the right, so its leader unambiguously lands on the boss OD
-    # rather than the tap/axis region (machinist round 1). The symbol sits on
-    # the SAME horizontal ray, 35 mm out: the earlier down-left request
-    # (0.192, 0.170) gave the tag a 77 mm angled leader that SolidWorks
-    # re-solved 41-51 mm off (seat-dependent) and drove across the BOSS OD
-    # AXIS frame's leader (farm workers 4 and 6, 2026-09-17, sheet inspected).
-    add_datum_feature(
-        adapter,
-        bottom,
-        edge_xy=bottom_boss_left,
-        symbol_xy=(0.232, bottom_boss_center[1]),
-        datum="D",
-        label="cam boss OD axis",
-    )
-    add_feature_control_frame(
-        adapter,
-        bottom,
-        edge_xy=bottom_boss_right,
-        frame_xy=(0.285, 0.240),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cam boss axis position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        quantity="BOSS OD AXIS",
-        label="cam boss axis position",
-    )
-    add_feature_control_frame(
-        adapter,
-        bottom,
-        edge_xy=bottom_tap_right,
-        frame_xy=(0.315, 0.215),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cam tap pitch axis position"],
-        datums=("D",),
-        diameter=True,
-        quantity="M2.5 TAP PITCH AXIS",
-        label="cam tap pitch axis position",
+    bore_finish_edge = (
+        bore_center[0] + BORE_R_SHEET * _SQRT_HALF,
+        bore_center[1] + BORE_R_SHEET * _SQRT_HALF,
     )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_right,
-        symbol_xy=(0.155, 0.175),
+        edge_xy=bore_finish_edge,
+        symbol_xy=(0.150, 0.190),
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
     )
