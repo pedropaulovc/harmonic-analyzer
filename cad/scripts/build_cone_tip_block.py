@@ -195,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
     # Non-bearing shaft-tip passage, coaxial with the adjuster. The external
-    # brass bushing supports the Ø0.794 tip; this opening only admits the tip
+    # brass bushing supports the Ø1.588 tip; this opening only admits the tip
     # to the exact 94025A150 conical cup apex. It is cut first so the later
     # blind-tap volume subtracts only material not already removed here.
     passage = SketchDims()

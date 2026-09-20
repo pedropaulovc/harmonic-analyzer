@@ -8,7 +8,7 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   seated perpendicular to the stepped shaft (p.18/p.20 photos), the
   shaft inclined in PLAN and carried at BOTH ends ON the cone swing
   platform (p.18: the wedge plate labelled "pivot" at its tip): big end
-  journaled in the green pivot post, thin 1/32" tip end-play located by the
+  journaled in the green pivot post, thin 1/16" tip end-play located by the
   external spacer and cup-ended adjuster carried in the black tip block (the GT tip post at world
   (-81, 105, +102), realized at station
   185). The plate pivots about a vertical axis at its TIP end, so the
@@ -958,7 +958,7 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The adjusted 1/32-in shaft terminal
+# | the 94025A150 adjuster's conical cup. The adjusted 1/16-in shaft terminal
 # meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
 # the block; the top slit and 90280A108 pinch screw lock that setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
@@ -969,7 +969,7 @@ _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
 if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/32in stub section")
+    raise AssertionError("tip bushing rides off the 1/16in tip journal")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)

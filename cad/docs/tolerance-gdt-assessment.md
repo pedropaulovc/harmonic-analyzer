@@ -172,8 +172,8 @@ tolerance.**
    a single unified DP would force distinct non-meshing systems to the wrong pitch. (My earlier draft
    had the cone/cylinder train at DP 30 — that was backwards; the rack is the DP-30 system.)
 
-4. **The Ø6-tooth gear is marginal by construction.** `build_cone_gear.py` leaves a **0.49 mm wall**
-   between the T006 root and its bore (root r 0.89). That is a real machining hazard, not a CAD
+4. **The Ø6-tooth gear is marginal by construction.** `build_cone_gear.py` leaves a **0.54 mm wall**
+   between the T006 as-cut root and its 1/16 in bore (as-cut root r 1.3365). That is a real machining hazard, not a CAD
    artifact — call it out as the hardest part to make, and note the period-correct mitigation: the
    four tip gears were a **harder yellow metal** (Muntz/manganese bronze), which is why they show
    the most wear yet survived.
@@ -332,7 +332,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 |---|---|---|
 | **Summing lever** `summing-lever`, `knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
 | **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
-| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.49 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.54 mm wall** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
 | **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
 | **Rocker arms** `rocker-arm`, `rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |

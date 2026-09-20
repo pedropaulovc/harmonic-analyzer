@@ -66,7 +66,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.JOURNAL_CLEARANCE == pytest.approx(0.05)
     assert cone_gear_shaft_spec.JOURNAL_DIA == pytest.approx(12.2308)
     assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
-    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 0.79375))
+    assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 1.5875))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
     assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
         147.27232594770454
@@ -81,7 +81,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
     # The journal and all preceding gear-seat endpoints stay put; only the
-    # terminal 1/32-in endpoint follows the stock cup apex.
+    # terminal 1/16-in endpoint follows the stock cup apex.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
     assert ends[1:-1] == pytest.approx(
         tuple(
