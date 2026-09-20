@@ -481,11 +481,15 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     plan.record("JournalRefZ")
-    # The two rays share the origin vertex, so there is exactly one wedge
-    # between them and the reported angle is the plan incline itself.
+    # Measured against the UPWARD crank-axis ray.  Both rays lie on the crank
+    # axis, so either states the same geometry, but SOLIDWORKS reports the
+    # angle between the two lines' canonical directions rather than the wedge
+    # the rays enclose: against the downward ray it returns the 167.48 deg
+    # supplement, and no text position can steer it (AddSpecificDimension
+    # places text in MODEL space, which a Top-plane sketch cannot reach).
     await add_angular_reference_dimension(
         adapter,
-        crank_axis_line,
+        spot_face_line,
         journal_axis_line,
         (JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z / 2.0),
         "journal plan angle",
