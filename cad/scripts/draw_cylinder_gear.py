@@ -20,6 +20,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -27,7 +28,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_visible,
     set_reference_dimension,
     set_reference_dimensions,
@@ -42,6 +42,8 @@ from cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
     CAM_THICKNESS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     ECCENTRICITY,
     FACE_WIDTH,
     NOTCH_CENTER_X,
@@ -100,15 +102,8 @@ DIMENSION_CALLOUTS = {
     "NotchDepth": "FROM OD",
     "NotchPhase": "NOTCH CCW FROM CAM LOBE",
 }
-DIMENSION_PRECISION = {
-    "BoreDia": 3,
-    "CamDia": 2,
-    "FaceWidth": 2,
-    "CamCy": 3,
-    "CamThickness": 1,
-    "NotchWidth": 2,
-    "NotchDepth": 1,
-}
+# Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
+# applied by build_cylinder_gear); the sheet only reads them back.
 
 
 def _project_mm(
@@ -288,10 +283,16 @@ def _checked_edge_dimension(
     text_xy: tuple[float, float],
     label: str,
     expected_mm: float,
-    precision: int,
     orientation: str,
 ) -> Any:
-    """Add one source-geometry dimension and verify its value and precision."""
+    """Add one SHEET-derived reference dimension and verify its value and places.
+
+    Every controlling dimension is a model dimension whose places the part
+    authored and ``assert_imported_precision`` reads back; the one dimension
+    built here is the parenthesised end-to-end stack, a read-only sum with no
+    model dimension to import, so its places come from the spec's
+    ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a literal.
+    """
     display = add_edge_dimension(
         adapter,
         view,
@@ -308,10 +309,14 @@ def _checked_edge_dimension(
         raise RuntimeError(
             f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
-    display.SetPrecision3(precision, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != precision:
+    places = DRAWING_REFERENCE_PRECISION[label]
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places.  The subscript is written out again because
+    # _drawing_contract only accepts a spec lookup here.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
         raise RuntimeError(
-            f"{label}: precision {display.GetPrimaryPrecision2()} != {precision}"
+            f"{label}: precision {display.GetPrimaryPrecision2()} != {places}"
         )
     return display
 
@@ -389,7 +394,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*front_annotations, *right_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    # Every place the part authored (policy rule 2) must have survived the
+    # import: a dimension that fell back to the sheet default would print a
+    # band nobody specified.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
     cam_thickness_annotations = [
         annotation
@@ -431,7 +439,6 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(RIGHT_CENTER[0] + 0.020, 0.200),
         label="overall axial thickness",
         expected_mm=OVERALL_THICKNESS,
-        precision=1,
         orientation="horizontal",
     )
     overall.ShowParenthesis = True
