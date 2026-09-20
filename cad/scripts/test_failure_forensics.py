@@ -160,11 +160,10 @@ class _View:
         # Metres: a 100 mm x 80 mm visible region centred on the origin.
         return [-0.05, -0.04, -0.01, 0.05, 0.04, 0.01]
 
-    def ProjectModelPoint(
-        self, x: float, y: float, z: float
-    ) -> tuple[int, float, float, float]:
-        # [out] params ride the return tuple under early binding.
-        return 0, x * 1000.0 * self._px, y * 1000.0 * self._px, 0.0
+    def ProjectModelPoint(self, x: float, y: float, z: float) -> tuple[float, float, float]:
+        # VT_VOID with three R8 [out] params: under early binding pywin32 returns
+        # exactly the out tuple (XOut, YOut, ZOut) -- no leading status item.
+        return x * 1000.0 * self._px, y * 1000.0 * self._px, 0.0
 
 
 class _SketchManager:
@@ -178,7 +177,10 @@ class _SketchManager:
 
 
 class _Frame:
-    def GetHWnd(self) -> int:
+    """``IFrame``: ``GetHWndx64`` (dispid 16, VT_I8) is the handle the probes
+    read; ``GetHWnd`` (VT_I4) is the 32-bit form and deliberately absent."""
+
+    def GetHWndx64(self) -> int:
         return 0x1234
 
 
@@ -645,6 +647,7 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
 
     assert geometry["px_per_mm"] == 20.0
     assert geometry["px_per_mm_x"] == 20.0
+    assert geometry["px_per_mm_y"] == 20.0
     assert geometry["snap_floor_mm"] == 0.4
     assert geometry["snap_tolerance_px"] == 8
     # The raw inputs behind it are kept: neither is interpretable alone.
@@ -1425,6 +1428,258 @@ def test_the_download_instruction_names_the_marker_the_log_prints(dodo_failures)
     # Still names the right prefix -- BESIDE the log, not under it.
     assert "'leaf/part__pen_set_screw/fcc38181/1/failures/*'" in hint
     assert "--source results" in hint
+
+
+# --- Drawing picks: what an annotation API was handed ----------------------
+# The 2026-09-20 drawing:rocker_arm leaf: ``AddHoleCallout2`` answered None to
+# a coordinate pick that had succeeded, and the leaf log could not say WHICH
+# edge was selected, nor did any artefact survive teardown. The pick chokepoint
+# now describes what resolved, and the None return captures before raising.
+
+
+class _Feature:
+    def __init__(self, name: str, kind: str):
+        self.Name = name
+        self._kind = kind
+
+    def GetTypeName2(self) -> str:
+        return self._kind
+
+
+class _Face:
+    def __init__(self, feature: _Feature):
+        self._feature = feature
+
+    def GetFeature(self) -> _Feature:
+        return self._feature
+
+
+class _Circle:
+    """An ``ICurve`` for a hole rim: ``CircleParams`` is a PROPERTY (dispid 2,
+    propget) -- (centre xyz, axis xyz, radius) in metres."""
+
+    def IsCircle(self) -> bool:
+        return True
+
+    def IsLine(self) -> bool:
+        return False
+
+    @property
+    def CircleParams(self) -> tuple[float, ...]:
+        return (0.1215, 0.0153, 0.00125, 0.0, 0.0, 1.0, 0.00099695)
+
+
+class _RimEdge:
+    """A hole rim edge that the refusing API INVALIDATES: after the call every
+    read raises, the way a dead COM dispatch does."""
+
+    def __init__(self):
+        self.alive = True
+
+    def _live(self) -> None:
+        if not self.alive:
+            raise OSError("entity invalidated by AddHoleCallout2")
+
+    def GetCurve(self) -> _Circle:
+        self._live()
+        return _Circle()
+
+    def GetTwoAdjacentFaces2(self) -> list[_Face]:
+        self._live()
+        return [_Face(_Feature("RodHole", "HoleWzd")), _Face(_Feature("Strap", "Extrusion"))]
+
+
+class _SelectionManager:
+    def __init__(self, entity: Any):
+        self._entity = entity
+        self.count = 1
+
+    def GetSelectedObjectCount2(self, mark: int) -> int:
+        return self.count
+
+    def GetSelectedObjectType3(self, index: int, mark: int) -> int:
+        return 1  # swSelEDGES
+
+    def GetSelectedObject6(self, index: int, mark: int) -> Any:
+        return self._entity
+
+
+class _DrawingView:
+    """An ``IView``: ``ScaleDecimal``/``Position`` are propget, the rest methods."""
+
+    ScaleDecimal = 0.5
+    Position = (0.18, 0.175)
+
+    def GetName2(self) -> str:
+        return "Drawing View1"
+
+    def GetOutline(self) -> tuple[float, ...]:
+        return (0.1, 0.15, 0.26, 0.2)
+
+    def UpdateViewDisplayGeometry(self) -> None:
+        pass
+
+
+class _Drawing(_Model):
+    """An unsaved ``IDrawingDoc`` whose ``AddHoleCallout2`` refuses -- and, as
+    the real API may, clears the selection and invalidates the edge on the way
+    out, so only a snapshot taken BEFORE the call can say what it was given."""
+
+    def __init__(self, tmp_path: Path, entity: _RimEdge):
+        super().__init__(tmp_path)
+        self._entity = entity
+        self.SelectionManager = _SelectionManager(entity)
+        self.Extension = type("_Ext", (), {"SelectByID2": lambda self, *a: True})()
+
+    def GetPathName(self) -> str:
+        return ""
+
+    def GetType(self) -> int:
+        return 3  # swDocDRAWING
+
+    def ActivateView(self, name: str) -> bool:
+        return True
+
+    def ClearSelection2(self, all_: bool) -> None:
+        pass
+
+    def AddHoleCallout2(self, x: float, y: float, z: float) -> None:
+        self.SelectionManager.count = 0
+        self._entity.alive = False
+        return None
+
+
+class _DrawingAdapter(_Adapter):
+    def _get_attr_or_call(self, obj: Any, name: str) -> Any:
+        return _common._read_member(obj, name)
+
+
+def _refuse_rod_pin_callout(tmp_path: Path) -> None:
+    import _drawing_common
+
+    adapter = _DrawingAdapter(sw=_Seat(), model=_Drawing(tmp_path, _RimEdge()))
+    with pytest.raises(
+        RuntimeError, match=r"^failed to insert native hole callout \(rod-pin hole\)$"
+    ):
+        _drawing_common.add_native_hole_callout(
+            adapter,
+            _DrawingView(),
+            edge_xy=(0.3, 0.1),
+            callout_xy=(0.3, 0.128),
+            label="rod-pin hole",
+        )
+
+
+def test_hole_callout_refusal_keeps_the_before_snapshot_apart_from_after(
+    tmp_path, capture_telemetry
+):
+    """A None from ``AddHoleCallout2`` raises the same message as before. The
+    capture carries what the API was HANDED (``before_*``: curve, owning
+    features, selection set, view, requested point) and, separately, what it
+    left behind (``after_*``: the selection cleared, the entity unreadable) --
+    the before snapshot is never overwritten by the after state."""
+    spans, logs = capture_telemetry
+
+    with _telemetry.span("test"):
+        _refuse_rod_pin_callout(tmp_path)
+
+    report = json.loads(
+        (_failure_dir(tmp_path, "hole-callout-rod-pin-hole") / "capture.json").read_text()
+    )
+    assert report["api"] == "IDrawingDoc.AddHoleCallout2"
+    context = report["context"]
+    assert json.loads(context["before_adjacent_features"]) == [
+        "RodHole(HoleWzd)",
+        "Strap(Extrusion)",
+    ]
+    assert json.loads(context["before_circle_mm"]) == [121.5, 15.3, 1.25, 0.9969]
+    assert json.loads(context["before_selected_types"]) == ["EDGE"]
+    assert context["before_selected_count"] == 1
+    assert (context["before_requested_x"], context["before_requested_y"]) == (0.3, 0.1)
+    assert (context["before_view_name"], context["before_view_scale"]) == ("Drawing View1", 0.5)
+    assert (context["callout_x"], context["callout_y"]) == (0.3, 0.128)
+    # What the API did: cleared the selection, killed the entity.
+    assert context["after_selected_count"] == 0
+    assert "after_selected_types" not in context
+    assert context["after_curve_error"].startswith("OSError")
+    assert "after_circle_mm" not in context
+    assert report["document_copy"]["document_copy"].endswith(".SLDDRW")
+    # The before snapshot was also published on the span, ahead of the call.
+    (event,) = [
+        e for s in spans.get_finished_spans() for e in s.events
+        if e.name == "drawing.hole_callout_selection"
+    ]
+    assert event.attributes["selected_count"] == 1
+    assert json.loads(event.attributes["adjacent_features"])[0] == "RodHole(HoleWzd)"
+    # The DEBUG before-snapshot and the ERROR refusal both carry the snapshot in
+    # the MESSAGE (all the console formatter prints); both are read here off the
+    # OTel log records, which export at DEBUG regardless of console verbosity.
+    # The ERROR line carries both states.
+    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
+    (selected,) = [b for b in bodies if "selected edge before AddHoleCallout2" in b]
+    assert "RodHole(HoleWzd)" in selected
+    (refusal,) = [b for b in bodies if "AddHoleCallout2 returned None" in b]
+    states = json.loads(refusal.split("; selection ", 1)[1])
+    assert states["before"]["selected_count"] == 1
+    assert states["after"]["selected_count"] == 0
+    assert states["after"]["curve_error"].startswith("OSError")
+
+
+def test_hole_callout_refusal_survives_an_exploding_telemetry_sink(tmp_path, monkeypatch):
+    """The emissions around the refusal are guarded: a sink that raises on the
+    callout site's own ``debug``/``error`` calls can neither replace the
+    original failure nor stop the capture from landing with its before
+    snapshot. The span event is let through so the ``debug`` call after it is
+    actually reached (the two share one guarded block); the sink records which
+    names it blew up on, so the test proves both sites were exercised. Scoped to
+    the drawing module's telemetry handle -- the span machinery and
+    ``capture_com_failure``'s own guarded record keep working."""
+    import _drawing_common
+
+    exploded: list[str] = []
+
+    class _ExplodingSink:
+        def __getattr__(self, name):
+            if name in {"debug", "error"}:
+
+                def explode(*args, _name=name, **kwargs):
+                    exploded.append(_name)
+                    raise RuntimeError("telemetry sink down")
+
+                return explode
+            return getattr(_telemetry, name)
+
+    monkeypatch.setattr(_drawing_common, "_telemetry", _ExplodingSink())
+
+    _refuse_rod_pin_callout(tmp_path)
+
+    assert exploded == ["debug", "error"]
+
+    report = json.loads(
+        (_failure_dir(tmp_path, "hole-callout-rod-pin-hole") / "capture.json").read_text()
+    )
+    assert json.loads(report["context"]["before_adjacent_features"])[0] == "RodHole(HoleWzd)"
+    assert report["context"]["after_selected_count"] == 0
+
+
+def test_selection_description_never_raises_for_an_unreadable_entity():
+    """Every read is guarded: an entity no probe can read reports each failure
+    by key and still returns, because the before snapshot runs on the success
+    path of every hole callout."""
+    import _drawing_common
+
+    bag = _drawing_common.describe_selected_entity(
+        _DrawingAdapter(model=object()),
+        object(),
+        object(),
+        entity_type="EDGE",
+        requested_xy=(0.3, 0.1),
+        label="bare",
+    )
+    assert bag["pick"] == "coordinate"
+    assert bag["curve_error"].startswith("AttributeError")
+    assert bag["selection_manager_error"].startswith("AttributeError")
+    assert all(isinstance(v, (str, bool, int, float)) for v in bag.values())
 
 
 if __name__ == "__main__":

@@ -49,6 +49,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ctypes
+from ctypes import wintypes
 import functools
 import json
 import math
@@ -3020,6 +3021,35 @@ _SM_CXSCREEN, _SM_CYSCREEN, _SM_CMONITORS = 0, 1, 80
 # ring) to decide whether that geometry could author correctly at all.
 _SNAP_TOLERANCE_PX = 8
 
+# Win32 prototypes for the display probes. An undeclared ``argtypes`` marshals a
+# Python int as a 32-bit C int, which on win64 truncates the HWND before
+# ``GetWindowRect`` ever sees it; an undeclared ``restype`` defaults to
+# ``c_int`` -- harmless for these BOOL/int returns, declared anyway so the
+# contract is explicit (audit-native-binding-contracts). ``GetSystemMetrics``
+# is int(int).
+_USER32_PROTOTYPES: tuple[tuple[str, tuple[Any, ...], Any], ...] = (
+    ("GetWindowRect", (wintypes.HWND, ctypes.POINTER(_Rect)), wintypes.BOOL),
+    ("GetClientRect", (wintypes.HWND, ctypes.POINTER(_Rect)), wintypes.BOOL),
+    ("IsIconic", (wintypes.HWND,), wintypes.BOOL),
+    ("IsZoomed", (wintypes.HWND,), wintypes.BOOL),
+    ("GetSystemMetrics", (ctypes.c_int,), ctypes.c_int),
+)
+
+
+def _user32() -> Any:
+    """``user32`` with every function the display probes call prototyped.
+
+    Resolved through ``ctypes.windll`` each call (the function objects are
+    cached on the loaded DLL, so re-declaring is idempotent) rather than a
+    module-level ``WinDLL``: the probes' tests substitute ``windll.user32``.
+    """
+    user32 = ctypes.windll.user32
+    for name, argtypes, restype in _USER32_PROTOTYPES:
+        function = getattr(user32, name)
+        function.argtypes = argtypes
+        function.restype = restype
+    return user32
+
 
 def _frame_geometry(adapter: Any) -> dict[str, Any]:
     """The SolidWorks main window's pixel rect -- the term the 2026-09-17
@@ -3044,14 +3074,16 @@ def _frame_geometry(adapter: Any) -> dict[str, Any]:
     """
     sw = adapter.swApp
     frame = adapter._attempt(lambda: _read_member(sw, "Frame"), default=None)
+    # ``IFrame::GetHWndx64`` (dispid 16, VT_I8) is the handle; ``GetHWnd``
+    # (dispid 11, VT_I4) is the 32-bit form and truncates on win64.
     hwnd = (
-        adapter._attempt(lambda: int(frame.GetHWnd()), default=None)
+        adapter._attempt(lambda: int(_early_bound(frame, "IFrame").GetHWndx64()), default=None)
         if frame is not None
         else None
     )
     if not hwnd:
         return {"frame_hwnd": None}
-    user32 = ctypes.windll.user32
+    user32 = _user32()
     geometry: dict[str, Any] = {"frame_hwnd": hwnd}
     window = _Rect()
     if user32.GetWindowRect(hwnd, ctypes.byref(window)):
@@ -3143,12 +3175,13 @@ def display_geometry(adapter: Any) -> dict[str, Any]:
     metrics.
     """
     geometry: dict[str, Any] = dict(_frame_geometry(adapter))
-    screen_w = int(ctypes.windll.user32.GetSystemMetrics(_SM_CXSCREEN))
-    screen_h = int(ctypes.windll.user32.GetSystemMetrics(_SM_CYSCREEN))
+    user32 = _user32()
+    screen_w = int(user32.GetSystemMetrics(_SM_CXSCREEN))
+    screen_h = int(user32.GetSystemMetrics(_SM_CYSCREEN))
     geometry["screen_width_px"] = screen_w
     geometry["screen_height_px"] = screen_h
     geometry["screen_px"] = f"{screen_w}x{screen_h}"
-    geometry["monitors"] = int(ctypes.windll.user32.GetSystemMetrics(_SM_CMONITORS))
+    geometry["monitors"] = int(user32.GetSystemMetrics(_SM_CMONITORS))
     # 0x0 with no monitors is a session whose RDP client disconnected: screen
     # capture stops and the seat's view geometry stops meaning anything.
     geometry["session_has_display"] = geometry["screen_px"] != "0x0"
