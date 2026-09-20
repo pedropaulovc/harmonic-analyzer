@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import _config
 import _fit_limits
 import build_cone_gear_shaft as part
+import build_drive_train_assembly as drive
 import cone_gear_shaft_spec
+import cone_pivot_post_installation
 import draw_cone_gear_shaft as drawing
 import pytest
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -41,10 +44,11 @@ def test_display_precision_is_owned_by_the_part() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
         Path(part.__file__).read_text(encoding="utf-8")
     )
-    # Every diameter carries the shared band, so its places are only spelling;
-    # the stations carry no band, so their places ARE the grade they are held
-    # to, and the .XXX grade is what keeps a 6.900 land longer than the
-    # 6.5-wide gear face that has to sit between its two shoulders.
+    # Every diameter carries the shared band, so its places are only spelling.
+    # The stations carry no band, so their places ARE the grade they are held
+    # to: three for the gear-seat shoulders that must land in the air gap
+    # between two gear faces, two for the journal length and overall length,
+    # which nothing seats against.
     by_name = cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
         "Sec0Dia": 3,
@@ -52,16 +56,51 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec2Dia": 3,
         "Sec3Dia": 3,
         "Sec4Dia": 3,
-        "Sec0End": 3,
+        "Sec0End": 2,
         "Sec1End": 3,
         "Sec2End": 3,
         "Sec3End": 3,
-        "Sec4End": 3,
+        "Sec4End": 2,
         "ShoulderR": 2,
     }
+
+
+def test_gear_seat_shoulders_are_held_inside_the_air_gap() -> None:
+    """The .XXX grade is a location requirement, not a spelling choice.
+
+    Gears are soldered at the seat pitch with 6.5 faces, so each seat step
+    has to fall in the ~0.39 air gap between two neighbouring gear faces;
+    otherwise the small-bore gear cannot pass the larger land to reach its
+    station.  The title-block .XXX grade keeps every step in its gap and the
+    .XX grade does not -- which is why Sec1End..Sec3End print three places.
+    """
+    grade = {
+        places: _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
+        for places in (2, 3)
+    }
     ends = cone_gear_shaft_spec.SECTION_ENDS
-    land_lengths = [b - a for a, b in zip(ends, ends[1:])]
-    assert min(land_lengths) - 2 * 0.13 > 6.5
+    seat0 = (
+        cone_gear_shaft_spec.FRONT_STUB
+        + cone_pivot_post_installation.GEAR_AXIS_SHIFT
+        + drive.SHAFT_T120_STATION
+    )
+    faces = [
+        (
+            seat0 + j * drive.SEAT_PITCH - drive.CONE_FACE / 2.0,
+            seat0 + j * drive.SEAT_PITCH + drive.CONE_FACE / 2.0,
+        )
+        for j in range(20)
+    ]
+    for name, station in zip(("Sec1End", "Sec2End", "Sec3End"), ends[1:4]):
+        north_of_inboard = max(north for _south, north in faces if north < station)
+        south_of_outboard = min(south for south, _north in faces if south > station)
+        held = grade[cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME[name]]
+        assert station - held > north_of_inboard, name
+        assert station + held < south_of_outboard, name
+        assert station + grade[2] > south_of_outboard, name
+    # The last seat's north face and the tip journal end share the terminal
+    # land: the overall length locates nothing but an adjustable cup point.
+    assert ends[4] > faces[19][1]
 
 
 def test_required_drawing_paths() -> None:
@@ -76,30 +115,26 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is cone_gear_shaft_spec.DRAWING_DIMENSIONS
     marked = set().union(*cone_gear_shaft_spec.DRAWING_DIMENSIONS.values())
-    kept = (
-        set(drawing.SIDE_KEEP)
-        | set(drawing.SIDE_DIAMETERS)
-        | set(drawing.DETAIL_DIAMETERS)
-    )
-    assert kept == marked
+    assert set(drawing.SIDE_KEEP) | set(drawing.SIDE_DIAMETERS) == marked
     # Nothing is imported twice, and the donor hands over exactly the five
     # diameters it was placed for.
-    assert set(drawing.DONOR_KEEP) == set(drawing.SIDE_DIAMETERS) | set(
-        drawing.DETAIL_DIAMETERS
-    )
+    assert set(drawing.DONOR_KEEP) == set(drawing.SIDE_DIAMETERS)
     assert not set(drawing.SIDE_KEEP) & set(drawing.DONOR_KEEP)
     assert part.SECTIONS is cone_gear_shaft_spec.SECTIONS
     assert drawing.SHAFT_LENGTH == cone_gear_shaft_spec.SHAFT_LENGTH
     assert drawing.SECTION_DIAS == cone_gear_shaft_spec.SECTION_DIAS
 
 
-def test_every_diameter_stands_on_its_own_shoulder() -> None:
-    """A diameter may only be dragged to the station its profile sketch is on.
+def test_every_diameter_stands_on_its_own_land() -> None:
+    """A diameter may only be dragged to the land its profile sketch measures.
 
     Land 0's circle is the large-end face; every other land is sketched on an
     offset plane at its END station and extruded back to that face, so the
     dimension lands on the shoulder it measures instead of piling up with the
-    other four at z=0 (which is what forced the old leadered end view).
+    other four at z=0 (which is what forced the old leadered end view).  On
+    the sheet a vertical linear dimension's line sits at its text x, so that
+    x must fall inside the land: outside it the extension lines would run
+    through a bigger neighbour and across its shoulder.
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert 'mode="offset", base_plane="Front Plane", offset=end_z' in source
@@ -107,15 +142,37 @@ def test_every_diameter_stands_on_its_own_shoulder() -> None:
     assert "await adapter.create_sketch(plane_name)" in source
 
     ends = cone_gear_shaft_spec.SECTION_ENDS
-    sheet = drawing.SIDE_CENTER[0] + cone_gear_shaft_spec.SHAFT_LENGTH / 2000.0
-    # Sec1Dia's text sits on the Ø9.525 shoulder; the three tip diameters live
-    # in the detail, whose fence covers every station they attach to.
-    assert drawing.SIDE_DIAMETERS["Sec1Dia"][0] == pytest.approx(
-        sheet - ends[1] / 1000.0, abs=5e-4
-    )
-    fence_lo = drawing.DETAIL_MODEL_Z - drawing.DETAIL_RADIUS_MM
-    fence_hi = drawing.DETAIL_MODEL_Z + drawing.DETAIL_RADIUS_MM
-    assert fence_lo < ends[1] and ends[-1] < fence_hi
+    big_end = drawing.SIDE_CENTER[0] + cone_gear_shaft_spec.SHAFT_LENGTH / 2000.0
+    starts = (0.0, *ends[:-1])
+    for index, (start, end) in enumerate(zip(starts, ends)):
+        x, y = drawing.SIDE_DIAMETERS[f"Sec{index}Dia"]
+        land = (big_end - end / 1000.0, big_end - start / 1000.0)
+        if index == 0:
+            # The faced end is the one place a line may stand off the part.
+            assert land[0] < x < big_end + 0.025
+        else:
+            assert land[0] < x < land[1], index
+        assert (
+            y > drawing.SIDE_CENTER[1] + cone_gear_shaft_spec.SECTION_DIAS[0] / 2000.0
+        )
+
+
+def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
+    """Three lands 6.9 mm apart carry three texts; each line clears the others.
+
+    A line at x rises from the shaft to its own text, so it passes every text
+    that sits lower than it; those texts must lie clear of x by half a text
+    width.  Texts at the same height would collide outright.
+    """
+    half_text_width = 0.0075
+    items = list(drawing.SIDE_DIAMETERS.values())
+    for x_a, y_a in items:
+        for x_b, y_b in items:
+            if (x_a, y_a) == (x_b, y_b):
+                continue
+            assert abs(y_a - y_b) > 0.004 or abs(x_a - x_b) > 2 * half_text_width
+            if y_b < y_a:
+                assert abs(x_a - x_b) > half_text_width, (x_a, x_b)
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
@@ -214,12 +271,15 @@ def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
 def test_view_scales_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
     assert drawing.SIDE_SCALE == (1, 1)  # full length, no reduction
-    assert drawing.DETAIL_SCALE == (3, 1)  # the Ø1.588 tip cluster
     assert drawing.ISO_SCALE == (1, 2)  # reduced pictorial
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # The end view is gone: its only content was a pile of leadered diameters.
+    # The tip detail is gone too: DragModelDimension refuses to re-home a
+    # model dimension into a detail view, so the five diameters share the
+    # side view.
     assert '"*Front"' in source  # the donor, and only as a donor
     assert "delete_view(adapter, donor)" in source
+    assert "CreateDetailViewAt4" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
