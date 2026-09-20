@@ -481,16 +481,17 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     plan.record("JournalRefZ")
-    # Measured against the UPWARD crank-axis ray.  Both rays lie on the crank
-    # axis, so either states the same geometry, but SOLIDWORKS reports the
-    # angle between the two lines' canonical directions rather than the wedge
-    # the rays enclose: against the downward ray it returns the 167.48 deg
-    # supplement, and no text position can steer it (AddSpecificDimension
-    # places text in MODEL space, which a Top-plane sketch cannot reach).
+    # Journal ray FIRST.  SOLIDWORKS measures an angular dimension as the
+    # sweep from the first selected line to the second, so the selection
+    # ORDER -- not the rays' drawn direction and not the text position -- is
+    # what decides whether the print reads 12.52 deg or its 167.48 deg
+    # supplement.  Reversing either ray leaves the reading unchanged
+    # (measured on the farm, twice); reversing the order is what selects the
+    # acute plan incline.
     await add_angular_reference_dimension(
         adapter,
-        spot_face_line,
         journal_axis_line,
+        spot_face_line,
         (JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z / 2.0),
         "journal plan angle",
         expected_degrees=INCLINE_DEG,
