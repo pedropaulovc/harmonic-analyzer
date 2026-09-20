@@ -80,6 +80,7 @@ from _common import (
     set_global,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -90,10 +91,8 @@ from _gear import volume_check
 from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    END_VIEW_NOTE,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    DRAWING_PRECISION,
+    FILLET_RADIUS,
     SECTION_DIA_BAND,
     SECTIONS,
     SURFACE_FINISHES,
@@ -123,7 +122,7 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -145,10 +144,36 @@ async def build(adapter) -> dict[str, str]:
     prev_end = 0.0
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         label = f"section d{dia_in:g}in to z={end_z:g}"
+        # Each land is a cylinder from the large-end face to its own end
+        # station, so every smaller land is contained in its larger neighbour
+        # and the running volume stays exact per section.
+        #
+        # WHERE the profile circle sits is a drawing decision: a diameter
+        # dimension can only be dragged into the side view at the station its
+        # sketch occupies.  Sketching all five circles on the Front plane put
+        # all five diameters at the large-end face, which is why the sheet
+        # used to pile them as leadered callouts beside an end view.  Land 0
+        # is sketched on the Front plane (its circle IS the large-end face);
+        # every other land is sketched on an offset plane AT ITS END STATION
+        # and extruded BACK to that face, which leaves each diameter on its
+        # own shoulder while the extrude depth is still the station itself.
+        if i == 0:
+            plane_name = "Front"
+        else:
+            check(
+                f"create_plane end of {label}",
+                await adapter.create_plane(
+                    CreatePlaneParameters(
+                        mode="offset", base_plane="Front Plane", offset=end_z
+                    )
+                ),
+            )
+            plane_name = f"Sec{i}EndPlane"
+            name_last_feature(adapter, plane_name)
         # On-axis circle (centre at the origin): define_circle records ONLY the
         # diameter dim (the X/Z centre slots are relations, not display dims).
         sec = SketchDims()
-        check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+        check(f"create_sketch {label}", await adapter.create_sketch(plane_name))
         await define_circle(
             adapter,
             0.0,
@@ -165,14 +190,38 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs += sec.apply(adapter, f"Sec{i}Profile")
         check(
             f"extrude {label}",
-            await adapter.create_extrusion(ExtrusionParameters(depth=end_z)),
+            await adapter.create_extrusion(
+                ExtrusionParameters(depth=end_z, reverse_direction=i > 0)
+            ),
         )
         name_last_feature(adapter, f"Sec{i}")
         depth_dim = name_dimensions(adapter, f"Sec{i}", [f"Sec{i}End"])
         drive_jobs += [(depth_dim[0], f'"SecEnd{i}"')]
         volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
+        # A land extruded the wrong way lands inside its larger neighbour or
+        # off the end of the shaft, so the running volume is the direction
+        # check as well as the size check.
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
+
+    # Shoulder roots.  ONE constant-radius fillet over all four internal step
+    # edges, each picked by a point on the SMALLER land's circle at that
+    # station; the nearest other edge is 0.79 mm away radially and 6.9 mm
+    # axially.  Tangent propagation is off: every seed is already a complete
+    # closed circle.
+    fillet_edges = [
+        [SECTIONS[i + 1][0] * IN / 2.0, 0.0, end_z]
+        for i, (_dia_in, end_z) in enumerate(SECTIONS[:-1])
+    ]
+    check(
+        "fillet shoulder roots",
+        await adapter.add_fillet(FILLET_RADIUS, fillet_edges, propagate=False),
+    )
+    name_last_feature(adapter, "ShoulderFillets")
+    name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
+    # Four R0.10 rounds add ~0.15 mm^3 to a ~13000 mm^3 shaft: this checks
+    # that the fillet did not eat a land, not that it moved the number.
+    await volume_check(adapter, "shoulder fillets", volume, 0.005 * volume)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -200,24 +249,15 @@ async def build(adapter) -> dict[str, str]:
             f"Sec{section}Dia",
             *deviations(SECTION_DIA_BAND),
         )
+    # Display precision is model-owned too (drawing-simplicity policy rule 2).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-        },
-    )
+    # The two lands that RUN carry a roughness symbol.  No datums and no
+    # feature-control frames (drawing-simplicity policy rule 3).
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

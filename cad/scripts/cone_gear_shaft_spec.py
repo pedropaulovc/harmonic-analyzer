@@ -3,7 +3,7 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum
+from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
@@ -84,31 +84,22 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # "+0.00/-0.02" typed as sheet callout text.
 SECTION_DIA_BAND = SHAFT_H
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The shaft is five distinct-diameter lands, so each
-# control's face resolves by diameter alone; the Ø0.79375 tip needs the
-# tightened match tolerance to stay unique against nothing else that small.
-PART_DATUMS = (
-    # The integral v2-post bearing journal the tip runout is measured against.
-    PartDatum("A", CylinderFace(JOURNAL_DIA)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "journal_cylindricity", "cylindricity", "0.01", CylinderFace(JOURNAL_DIA)
-    ),
-    GeometricControl(
-        "tip_runout",
-        "circular_runout",
-        "0.05",
-        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
-        datums=("A",),
-    ),
-)
+# Shoulder root radius.  Each step sits in the ~0.39 mm axial air gap between
+# two neighbouring gear faces (~0.19 mm per side), so the root can be neither
+# a sharp corner (a stress riser at the smallest section of a slender shaft)
+# nor a radius big enough to touch a gear face: R0.10 is the largest standard
+# tool nose radius that clears.  Modelled as geometry and dimensioned once,
+# not written as a process note.
+FILLET_RADIUS = 0.10
+# Four identical shoulder roots, one fillet feature, one radius dimension.
+FILLET_CALLOUT = "4X"
+
+# Surface texture, on the two lands that RUN: the Ø12.2308 journal turns in
+# the pivot post bore and the terminal land turns in the cone tip bushing.
+# The three intermediate lands only carry soldered gears, so they are left to
+# the title-block process row.
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)
-    ),
+    SurfaceFinishControl("pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)),
     SurfaceFinishControl(
         "tip_journal",
         MACHINED_UM,
@@ -127,30 +118,43 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2": {"Sec2End"},
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
+    "ShoulderFillets": {"ShoulderR"},
 }
 
-# Kept to short lines so the block sits clear of the bottom-right title block
-# (a single ~130-char line reached x~0.33 m and overlapped it -- Codex/layout
-# audit). Substrings the test pins (CENTRE MARKS / LARGE-END FACE / FOLLOWER-REST
-# / FRAGILE BY DESIGN) each stay intact on one line.
-DRAWING_NOTES = "\n".join(
-    (
-        "ALL AXIAL STATION DIMENSIONS +/-0.25.",
-        "STEP STATIONS ARE MEASURED FROM THE LARGE-END FACE.",
-        f"DIA {JOURNAL_DIA:.4f} BEARING JOURNAL IS DATUM A.",
-        f"RUNNING FIT IN DIA {JOURNAL_BORE_DIA:.4f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        f"DIA {SECTION_DIAS[1]:.3f}, {SECTION_DIAS[2]:.3f}, "
-        f"{SECTION_DIAS[3]:.3f}, AND {SECTION_DIAS[4]:.3f}",
-        "GEAR-SEAT CYLINDERS HAVE CIRCULAR RUNOUT 0.05 MAX TO A",
-        "AT EVERY CROSS SECTION.",
-        "SHOULDER ROOTS R0.10 MAX OR RELIEF 0.20 WIDE X 0.20 DEEP MAX.",
-        "START FROM DIA 12.5 MIN ROUND BAR; TURN BETWEEN TEMPORARY",
-        "CENTRE EXTENSIONS, THEN REMOVE THEM TO FINISHED LENGTH.",
-        "NO CENTRE HOLE MAY REMAIN ON EITHER FINISHED END.",
-        f"FINISH-TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST "
-        "WITH FOLLOWER-REST SUPPORT --",
-        "SECTION IS FRAGILE BY DESIGN.",
-    )
-)
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# Display precision is a MODEL property (drawing-simplicity policy rule 2):
+# the part build stamps it and the sheet only reads it back.
+#
+# Diameters: three places.  All five carry the shared h band, so their places
+# are only the number's spelling.  Axial stations: three places, which is the
+# title-block .XXX general grade and no explicit band -- that grade is what
+# the part needs, because the three short lands are 6.900 long and each takes
+# a 6.5-wide gear face between its two shoulders, leaving 0.4 mm for the two
+# stations to stack up in.  Shoulder radius: two places; nothing depends on
+# it beyond clearing the gear faces.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "Sec0Profile": {"Sec0Dia": 3},
+    "Sec1Profile": {"Sec1Dia": 3},
+    "Sec2Profile": {"Sec2Dia": 3},
+    "Sec3Profile": {"Sec3Dia": 3},
+    "Sec4Profile": {"Sec4Dia": 3},
+    "Sec0": {"Sec0End": 3},
+    "Sec1": {"Sec1End": 3},
+    "Sec2": {"Sec2End": 3},
+    "Sec3": {"Sec3End": 3},
+    "Sec4": {"Sec4End": 3},
+    "ShoulderFillets": {"ShoulderR": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
