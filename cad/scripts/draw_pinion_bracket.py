@@ -1,12 +1,25 @@
 r"""Create the curated machinist drawing for the pinion swing bracket.
 
 The SLDPRT remains authoritative.  This recipe supplies only the strap's
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+views and its dimension/callout placement; every shared sheet/template,
+import, curation and export behaviour lives in ``_drawing_common``, and every
+nominal, decimal place and tolerance band is imported from the model.
 
-The sheet runs at 2:1 (the strap is 61 mm end to end); the isometric carries an
-explicit 1:1 override so it stays clear of the title block.
+The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): a
+bracket carries no datums and no feature-control frames, and it carries no
+manufacturing-note block either -- the outline, the four hole/scallop
+callouts, two roughness symbols and the title block say everything.  Three
+bands survive, one per fitted bore, each from a named fit class.
+
+Three views at the 2:1 sheet scale plus a 4:1 section:
+
+* FRONT -- the strap face: both bores, both end radii, the two cam-relief
+  scallops and the follower-seat height.
+* LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
+  its size, its station through the bar and the bar thickness.
+* SECTION A-A -- cut on the seat axis, the only place the seat's blind depth
+  and flat bottom are solid lines.  Hidden lines are removed everywhere, so
+  no dimension attaches to a dashed edge.
 
 Run with SolidWorks open::
 
@@ -19,35 +32,38 @@ import argparse
 import sys
 from typing import Any
 
-from pinion_bracket_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
-    add_property_linked_note,
+    add_edge_dimension,
     add_surface_finish,
+    assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
-    C2C as C2C,
+    C2C,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
+    PIN_DROP,
     PIVOT_BORE,
     R_END,
     SURFACE_FINISHES,
-    THICKNESS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -68,21 +84,21 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
+SECTION_SCALE = (4, 1)
 
 # Sheet layout (meters).  The strap runs UP the sheet: the front view's model
-# bbox is +/-9 in X and -9..52 in Y (61 tall); at 2:1 the view is 36 x 122 mm.
-# The front view carries the face (both bores + the width caps); the right view
-# is the 5-thick section carrying the pin-seat bore.  A top view is omitted --
-# the strap's top face is a plain 18 x 5 rectangle with no feature to document,
-# so it would render as an empty box.
-FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END  # 21.5: (52 + -9) / 2
-FRONT_CENTER = (0.110, 0.150)
-RIGHT_CENTER = (0.225, 0.150)
-ISO_CENTER = (0.330, 0.205)
+# bbox is +/-7.5 in X and -7.5..35.5 in Y, so at 2:1 it is 30 x 86 mm and the
+# left flank view beside it is 16 x 86.  The section is a 15 x 8 slice, too
+# small to read at the sheet scale, so it runs at 4:1 in its own lane.
+FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END
+FRONT_CENTER = (0.100, 0.150)
+LEFT_CENTER = (0.180, 0.150)
+SECTION_CENTER = (0.250, 0.090)
+ISO_CENTER = (0.345, 0.195)
 
 
 def _front_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the front/top views (2:1, bbox-centred)."""
+    """Sheet X of a model-X point in the front view (2:1, bbox-centred)."""
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
 
 
@@ -93,37 +109,37 @@ def _front_y(model_y_mm: float) -> float:
 
 PIVOT_R_SHEET = PIVOT_BORE * SHEET_SCALE[0] / 2000.0
 ARBOR_R_SHEET = ARBOR_BORE * SHEET_SCALE[0] / 2000.0
-HALF_THICK_SHEET = THICKNESS * SHEET_SCALE[0] / 2000.0
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  The bore-to-bore centre distance runs vertically LEFT of the view;
-# the leadered diameters land in the clear sheet RIGHT of the strap; the pin
-# seat's size + section carry on the right view.
+# position.  The face features and their locations stay on the front view; the
+# scallop pair is dimensioned on the open (left) side it is cut from, the two
+# bore diameters and the end radii on the closed right side.
 FRONT_KEEP = {
-    "ArborBoreCz": (0.070, 0.150),
-    "ArborBoreDia": (0.156, 0.196),
-    "PivotBoreDia": (0.162, 0.130),
-    "BottomCapRadius": (0.098, 0.076),
-    "PinSeatCy": (0.058, 0.128),
-    "PinSeatDepth": (0.170, 0.105),
+    "PivotBoreDia": (0.152, 0.112),
+    "ArborBoreDia": (0.152, 0.192),
+    "ArborBoreCz": (0.124, 0.152),
+    "BottomCapRadius": (0.126, 0.092),
+    "TopCapRadius": (0.126, 0.212),
+    "PinSeatCy": (0.076, 0.146),
+    "CamReliefParkR": (0.036, 0.178),
+    "CamReliefParkY": (0.064, 0.133),
+    "CamReliefParkX": (0.087, 0.101),
+    "CamReliefEngagedR": (0.036, 0.074),
+    "CamReliefEngagedY": (0.048, 0.110),
+    "CamReliefEngagedX": (0.087, 0.089),
 }
-RIGHT_KEEP = {
-    "Depth": (0.190, 0.068),
-    "PinSeatDia": (0.282, 0.132),
-    # Locates the pin seat through the thickness (mid-plane) in the section view.
-    "PinSeatCz": (0.245, 0.190),
+# The seat's own plane: its mouth circle is solid here, so its size and its
+# station through the bar are dimensioned on real geometry.
+LEFT_KEEP = {
+    "Depth": (0.180, 0.206),
+    "PinSeatCz": (0.180, 0.100),
+    "PinSeatDia": (0.216, 0.140),
 }
+SECTION_KEEP = {"PinSeatDepth": (0.250, 0.118)}
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "PIVOT BORE; THRU - REAM",
-    "ArborBoreDia": "ARBOR BORE; THRU - REAM",
-    "PinSeatCy": "PIN-SEAT AXIS ABOVE PIVOT-BORE AXIS",
-    "Depth": "ONE STRAP THICKNESS",
-    "PinSeatDia": (
-        "H7; BLIND; FLAT BOTTOM\nENTRY ON THE STRAIGHT EDGE FACE\n"
-        "NEAREST THE PIVOT BORE"
-    ),
-    "PinSeatCz": "FROM DATUM C",
-    "PinSeatDepth": "FULL-DIAMETER DEPTH",
+    "PivotBoreDia": "REAM THRU",
+    "ArborBoreDia": "REAM THRU",
+    "PinSeatDia": "REAM",
 }
 
 
@@ -141,19 +157,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
-            "Isometric View Note",
         ),
     )
-    drawing_model, sheet = new_project_drawing(
+    drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     stamp_drawing_summary(
@@ -170,101 +182,113 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    # The front view carries both bores as true circles; the right view shows
-    # the pin-seat bore edge-on as a circle at mid-thickness.  HLV keeps the
-    # blind pin seat's hidden circle readable.
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(2, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    # Nothing on this part is communicated by a dashed edge: both bores and
+    # both scallops are open profiles on the face, the seat mouth is a solid
+    # circle on the flank, and the seat's depth is a section.
+    for view in (front, left, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    # A-A is taken ON the follower-seat axis, so the seat's blind bottom and
+    # its 4 mm depth are cut geometry rather than a hidden outline.  The line
+    # runs past both flanks so the whole 15 mm width is sectioned.
+    seat_y = -PIN_DROP
+    cut_left = model_point_in_view(
+        adapter, front, (-12.0, seat_y, 0.0), label="section A-A start"
+    )
+    cut_right = model_point_in_view(
+        adapter, front, (12.0, seat_y, 0.0), label="section A-A end"
+    )
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=cut_left,
+        line_end=cut_right,
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SECTION_SCALE,
+        label="follower-seat axial section",
+    )
+    set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
-    set_dimension_callouts(
         adapter,
-        [*front_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
+        front,
+        keep=FRONT_KEEP,
+        view_label="strap face",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # The seat profile is authored on a Right-parallel plane, so its three
+    # dimensions are native to this flank view; the face import above rejects
+    # the two it does not place, which returns them to the import pool.
+    left_annotations = curate_view_dimensions(
+        adapter,
+        left,
+        keep=LEFT_KEEP,
+        view_label="seat flank",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="seat section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *left_annotations, *section_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    # Decimal places are the tolerance statement and the part owns them; this
+    # sheet only proves the import kept them (policy rule 2).
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
-    for view, label in ((front, "front"), (right, "right")):
+    for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    pivot_bore_edge = (_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET)
-    arbor_bore_edge = (_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET)
-    add_datum_feature(
+    # The overall: a read-only sum of the bore centre distance and the two end
+    # radii, so nobody saws the bar short.  Picked on the cap arcs' outer
+    # extremes so the tangent-arc condition measures end to end.
+    overall = add_edge_dimension(
         adapter,
         front,
-        edge_xy=pivot_bore_edge,
-        symbol_xy=(pivot_bore_edge[0] + 0.026, pivot_bore_edge[1] - 0.009),
-        datum="A",
-        label="pivot bore axis",
+        p0=(_front_x(0.0), _front_y(-R_END)),
+        p1=(_front_x(0.0), _front_y(C2C + R_END)),
+        text_xy=(0.140, 0.152),
+        label="overall length reference",
+        orientation="vertical",
     )
-    add_datum_feature(
+    set_arc_endpoints_to_max(adapter, overall, label="overall length reference")
+    # add_edge_dimension hands back the IDisplayDimension late-bound; bind it
+    # before reading the IAnnotation the reference helper wants.
+    overall_display = _early_bound(overall, "IDisplayDimension")
+    set_reference_dimension(
         adapter,
-        front,
-        edge_xy=arbor_bore_edge,
-        symbol_xy=(arbor_bore_edge[0] + 0.020, arbor_bore_edge[1] + 0.017),
-        datum="B",
-        label="arbor bore axis",
+        overall_display.GetAnnotation(),
+        label="overall length reference",
     )
+    overall_display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(overall_display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("overall length reference precision did not persist")
+
+    # Both bores run: the torque shaft in the lower one, the pinion arbor in
+    # the upper one.  Nothing else on the strap slides, seats or locates.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=pivot_bore_edge,
-        # Keep the lower-bore finish below the pin-seat-axis callout.  The
-        # former Y=0.110 placement let SolidWorks' symbol text collide with
-        # the imported PinSeatCy dimension text in the rendered print.
-        symbol_xy=(0.040, 0.087),
+        edge_xy=(_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET),
+        symbol_xy=(0.152, 0.094),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=arbor_bore_edge,
-        symbol_xy=(0.040, 0.195),
+        edge_xy=(_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET),
+        symbol_xy=(0.152, 0.210),
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
     )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] - HALF_THICK_SHEET, RIGHT_CENTER[1]),
-        symbol_xy=(RIGHT_CENTER[0] - HALF_THICK_SHEET - 0.020, RIGHT_CENTER[1]),
-        datum="C",
-        label="left broad face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0), _front_y(-R_END)),
-        frame_xy=(0.048, 0.082),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lower end-arc profile"],
-        datums=("A",),
-        quantity=f"LOWER R{R_END:.2f} ARC",
-        label="lower end-arc profile",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=(_front_x(0.0), _front_y(C2C + R_END)),
-        frame_xy=(0.060, 0.224),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["upper end-arc profile"],
-        datums=("B",),
-        quantity=f"UPPER R{R_END:.2f} ARC",
-        label="upper end-arc profile",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.178)
 
     return await finalize_drawing(
         adapter,

@@ -5,7 +5,7 @@ drum (p. 68 close-ups, shot from the BACK side): a short rounded-end
 flat bar with a O6.35 pivot bore below (the torque shaft,
 build_pinion_pivot_shaft.py) and a O8 arbor bore above (the steel
 arbor, build_pinion_arbor.py) -- plus a BLIND O4 bore in the WEST EDGE
-just below the pivot (PR8, page001_img01): it seats the cam-follower
+just above the pivot (PR8, page001_img01): it seats the cam-follower
 pin (build_pinion_cam_pin.py) that rests ON the lift rod's eccentric
 cam collar (build_pinion_cam.py) from above, so turning the lever
 raises the collar under the pin and swings the drum east into mesh.
@@ -14,12 +14,14 @@ fatter pin near pivot height, and only a blind edge seat clears the
 pivot bore there -- a through bore at drop 2 would cut into it.)
 
 Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
-thickness z 0..5; pin bore along X into the -X edge at (y -PIN_DROP,
-z mid), PIN_SEAT deep from the x -9 tangent plane -- its mouth is
-already on the r9 cap arc (the edge at y -2 sits at x -8.775). The
+thickness z 0..THICKNESS; the blind follower seat runs along X into the
+-X edge at (y -PIN_DROP, z mid), PIN_SEAT deep from a tangent plane at
+x -R_END.  PIN_DROP is negative, so the seat sits ABOVE the pivot on the
+STRAIGHT flank -- clear of both cap arcs, and clear of the cam-relief
+scallops, which open that flank only between y -4.5 and y +4.7.  The
 assembly composes a Ry(180) into the strap's lean pose, so local -x (the
-pin-bore edge) reads machine WEST and the origin lands at the strap's
-NORTH face.
+seat edge) reads machine WEST and the origin lands at the strap's NORTH
+face.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -36,6 +38,7 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -54,11 +57,11 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -80,16 +83,10 @@ from pinion_bracket_geometry import (
 )
 from pinion_bracket_spec import (
     ARBOR_BORE_BAND,
-    ARBOR_BORE_CZ_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
-    PIN_SEAT_AXIS_TOLERANCE_MM,
-    PIN_SEAT_CZ_TOLERANCE_MM,
-    PIN_SEAT_DEPTH_BAND,
+    DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
     PIVOT_BORE_BAND,
-    THICKNESS_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -102,8 +99,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
-    "Isometric View Note",
 )
 
 
@@ -221,7 +216,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
     await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
-    await set_global(adapter, "CamReliefDia", f"{2.0 * CAM_RELIEF_RADIUS}mm")
+    await set_global(adapter, "CamReliefRadius", f"{CAM_RELIEF_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -330,10 +325,15 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
     # Full-spin cam-envelope relief at the parked and engaged strap poses.
-    # Each open circle is cut through the 5-mm strap; their union covers the
-    # intervening centre arc with >=0.25 air while retaining >2.5 mm around the
-    # pivot bore. The follower stud is silver-brazed after pressing because the
-    # open scallop deliberately exposes part of its old blind-seat mouth.
+    # Each open circle is cut through the strap; their union covers the
+    # intervening centre arc with >=0.25 air while retaining >2.5 mm around
+    # the pivot bore.  Dimensioned the way it is cut -- two plunges of ONE
+    # cutter -- so each scallop records its centre from the pivot-bore axis
+    # plus a RADIUS, and both radii are driven by the one cutter global.
+    # Hand-authored rather than via define_circle because that helper always
+    # emits a DIAMETER, and a diameter on an arc that never closes on the
+    # part is not a callout a machinist can pick up (policy rule 7: arcs are
+    # dimensioned to their radius centres).
     relief_centers = (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
     previous_area = 0.0
     for label, centre, centers in (
@@ -342,16 +342,32 @@ async def build(adapter) -> dict[str, str]:
     ):
         relief = SketchDims()
         check(f"create_sketch cam relief {label}", await adapter.create_sketch("Front"))
-        await define_circle(
+        sketch_mgr = adapter.currentSketchManager
+        previous_add_to_db = bool(sketch_mgr.AddToDB)
+        sketch_mgr.AddToDB = True
+        try:
+            circle = await adapter.add_circle(centre[0], centre[1], CAM_RELIEF_RADIUS)
+            check(f"add_circle cam relief {label}", circle)
+        finally:
+            sketch_mgr.AddToDB = previous_add_to_db
+        await anchor_point_to_origin(
             adapter,
+            f"{circle.data}.center",
             centre[0],
             centre[1],
-            CAM_RELIEF_RADIUS,
-            f"cam relief {label}",
-            dims=relief,
-            names=(f"CamRelief{label}X", f"CamRelief{label}Y", f"CamRelief{label}Dia"),
-            drives=(None, None, '"CamReliefDia"'),
+            f"cam relief {label} centre",
         )
+        # Both coordinates are non-zero, so the anchor emits exactly two
+        # distance dims, horizontal then vertical (see anchor_point_to_origin).
+        relief.record(f"CamRelief{label}X")
+        relief.record(f"CamRelief{label}Y")
+        check(
+            f"dimension cam relief {label} radius",
+            await adapter.add_sketch_dimension(
+                circle.data, None, "radial", CAM_RELIEF_RADIUS
+            ),
+        )
+        relief.record(f"CamRelief{label}R", '"CamReliefRadius"')
         await ensure_fully_defined(adapter, f"cam relief {label} sketch")
         check(f"exit_sketch cam relief {label}", await adapter.exit_sketch())
         name_last_feature(adapter, f"CamRelief{label}Profile")
@@ -377,13 +393,13 @@ async def build(adapter) -> dict[str, str]:
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
     # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Both signs are
     # computed UP FRONT, not probed by exception-retry (#194): the seat is on
-    # the -X edge, so the offset plane sits at Right - R_END (global x = -9);
+    # the -X edge, so the offset plane sits at Right - R_END (global x -7.5);
     # and the sketch rides that Right-parallel plane, whose local +u maps to
     # global -Z (SolidWorks' standard Right-plane orientation), so the circle
     # centre sits at u = -THICKNESS/2 to land at global z = +THICKNESS/2 --
     # mid-thickness, INSIDE the 0..THICKNESS body. The mirror combo
-    # (u = +THICKNESS/2 -> z = -2.5) lands outside the body, so FeatureCut3
-    # rejects the empty profile ("Parameter not optional") -- exactly the
+    # (u = +THICKNESS/2 -> z = -THICKNESS/2) lands outside the body, so
+    # FeatureCut3 rejects the empty profile ("Parameter not optional") -- the
     # self-correcting retry #194 removed. The centre-u dim is an UNSIGNED
     # distance from the origin, so it displays as its magnitude and the drive
     # '"StrapThickness" / 2' is positive on the flipped side (unit-safe). Two
@@ -480,45 +496,31 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
-    # and stamp the make-critical title-block properties.
-    set_dimension_symmetric_tolerance(
-        adapter, "StrapProfile", "ArborBoreCz", ARBOR_BORE_CZ_TOLERANCE_MM
-    )
+    # author their decimal places ON THE MODEL, and stamp the make-critical
+    # title-block properties.  Only the three fitted bores carry a band, and
+    # each one comes from a named fit class; every other feature is governed
+    # by its decimal places against the title block's general grades.
     set_dimension_bilateral_tolerance(
         adapter, "StrapProfile", "PivotBoreDia", *deviations(PIVOT_BORE_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "StrapProfile", "ArborBoreDia", *deviations(ARBOR_BORE_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Strap", "Depth", THICKNESS_TOLERANCE_MM)
-    set_dimension_symmetric_tolerance(
-        adapter, "PinSeatProfile", "PinSeatCy", PIN_SEAT_AXIS_TOLERANCE_MM
-    )
     set_dimension_bilateral_tolerance(
         adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "PinSeatProfile", "PinSeatCz", PIN_SEAT_CZ_TOLERANCE_MM
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "PinSeat", "PinSeatDepth", *deviations(PIN_SEAT_DEPTH_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    # Decimal places are the tolerance statement, so the part authors them and
+    # the drawing only reads them back (policy rule 2).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     blank_reference_geometry(
         adapter,
         (

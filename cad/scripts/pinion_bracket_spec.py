@@ -2,18 +2,16 @@ r"""Pinion-swing-bracket dimensional contract -- the single source of truth shar
 by the part build (``build_pinion_bracket.py``) and its manufacturing drawing
 (``draw_pinion_bracket.py``).
 
-PURE DATA, no SolidWorks/COM imports: the nominal geometry (the "editable
-knobs"), the derived spans the drawing needs for its view math, and the
-marked-dimension -> kept-dimension NAME map.  Keeping this in ONE module means
-a rename or a nominal change is a single edit that reaches both scripts, so the
-part-side ``mark_dimensions_for_drawing`` set and the drawing-side ``keep``
-maps cannot silently drift apart.
+PURE DATA, no SolidWorks/COM imports: the marked-dimension -> kept-dimension
+NAME map, the decimal places the MODEL authors for each of those dimensions,
+the three fitted-bore bands and the roughness controls.  Keeping this in ONE
+module means a rename or a nominal change is a single edit that reaches both
+scripts, so the part-side ``mark_dimensions_for_drawing`` set and the
+drawing-side ``keep`` maps cannot silently drift apart.
 
 Build-graph consequence (intended): geometry lives in
 ``pinion_bracket_geometry`` so the drive-train assembly can consume it without
-also depending on this module's drawing-only notes and annotation contract.
-The part and drawing import this file, so note edits still rebuild the source
-part whose custom properties carry them and then regenerate the drawing.
+also depending on this module's drawing-only annotation contract.
 
 The offline lockstep test (``test_pinion_bracket_drawing.py``) asserts the part
 marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
@@ -39,14 +37,16 @@ from pinion_bracket_geometry import (
     WIDTH as WIDTH,
 )
 
-ARBOR_BORE_CZ_TOLERANCE_MM = 0.10
-PIVOT_BORE_BAND = REAM_SLIDE
-ARBOR_BORE_BAND = REAM_SLIDE
-PIN_SEAT_AXIS_TOLERANCE_MM = 0.05
-THICKNESS_TOLERANCE_MM = 0.05
-PIN_SEAT_DIA_BAND = REAM_H7
-PIN_SEAT_DEPTH_BAND = (0.10, 0.00)
-PIN_SEAT_CZ_TOLERANCE_MM = 0.05
+# --- Tolerance bands.  Only the three fitted bores carry one, and each traces
+# to a NAMED fit class in ``_fit_limits``; every other feature is governed by
+# its decimal places against the title block's general grades.  The strap's
+# former per-part numbers (a +/-0.10 bore centre distance, +/-0.05 on the seat
+# axis and through-thickness station, +/-0.05 on the bar thickness and a
+# +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
+# were habit, not specification, and are gone. ---
+PIVOT_BORE_BAND = REAM_SLIDE  # torque shaft turns in it
+ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
+PIN_SEAT_DIA_BAND = REAM_H7  # follower stud is pressed into it
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_bracket`` marks exactly these; ``draw_pinion_bracket``
@@ -54,17 +54,85 @@ PIN_SEAT_CZ_TOLERANCE_MM = 0.05
 # enforces ``union(marks) == union(keeps)``. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {
-        "ArborBoreCz",
         "PivotBoreDia",
         "ArborBoreDia",
+        "ArborBoreCz",
         "BottomCapRadius",
+        "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # PinSeatCz locates the blind pin seat THROUGH the 5 mm thickness (mid-
-    # thickness), so the seat is fully located, not just drawn centred.
+    # The cam-clearance scallops are two plunges of one cutter: each centre
+    # from the pivot-bore axis, each carrying the cutter radius (both radii
+    # are driven by one equation global, so they cannot drift apart).
+    "CamReliefParkProfile": {"CamReliefParkX", "CamReliefParkY", "CamReliefParkR"},
+    "CamReliefEngagedProfile": {
+        "CamReliefEngagedX",
+        "CamReliefEngagedY",
+        "CamReliefEngagedR",
+    },
+    # PinSeatCz locates the blind follower seat THROUGH the bar thickness, so
+    # the seat is fully located rather than merely drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
     "PinSeat": {"PinSeatDepth"},
 }
+
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_pinion_bracket applies this map to the
+# .SLDPRT and draw_pinion_bracket only reads it back.
+#
+# Three places (title-block .XXX, +/-0.13) on PinSeatCy alone: the follower
+# stud's height above the pivot axis sets how far the drum swings for a given
+# cam lift, and the engaged pose is budgeted with 0.25 of air -- half a
+# millimetre there is twice the whole clearance.  Everything else is two
+# places (.XX, +/-0.51): the bore centre distance and the bar thickness are
+# routine link geometry, the scallops are clearance, and the two running
+# bores plus the pressed seat carry their own bands on top.  One place (.X)
+# on the two end radii and the seat depth: the ends are profiled to the bar's
+# own width and the seat bottoms out on a flat-bottom reamer.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "StrapProfile": {
+        "PivotBoreDia": 2,
+        "ArborBoreDia": 2,
+        "ArborBoreCz": 2,
+        "BottomCapRadius": 1,
+        "TopCapRadius": 1,
+    },
+    "Strap": {"Depth": 2},
+    "CamReliefParkProfile": {
+        "CamReliefParkX": 2,
+        "CamReliefParkY": 2,
+        "CamReliefParkR": 2,
+    },
+    "CamReliefEngagedProfile": {
+        "CamReliefEngagedX": 2,
+        "CamReliefEngagedY": 2,
+        "CamReliefEngagedR": 2,
+    },
+    "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
+    "PinSeat": {"PinSeatDepth": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# The one dimension the SHEET creates: the overall length, a read-only sum of
+# the bore centre distance and the two end radii.  It has no model dimension
+# to import and carries no band, so its places are stated here (rule 2's
+# single precision exception).
+DRAWING_REFERENCE_PRECISION = 1
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -79,29 +147,14 @@ SURFACE_FINISHES = (
     ),
 )
 
-# True free-text instructions only. Geometry, datum structure, form/orientation
-# live in native dimensions / datum tags / FCFs / surface symbols. The part
-# build stamps these strings into the SLDPRT; the drawing displays only
-# $PRPSHEET links, so the print cannot silently diverge from its source model.
-DRAWING_NOTES = "\n".join(
-    (
-        f"STRAIGHT SIDES TANGENT TO R{R_END:.2f} END ARCS; R{R_END:.2f} IS BASIC",
-        "  FOR THE END-ARC PROFILE ZONES.",
-        "MACHINE TWO PARTS CLAMPED FACE-TO-FACE IN ONE SETUP; REAM BOTH",
-        "  PIVOT BORES TOGETHER AND BOTH ARBOR BORES TOGETHER.",
-        "PARTS ARE INTERCHANGEABLE; PAIRED MACHINING IS PROCESS",
-        "  GUIDANCE, NOT A MATCHED-PAIR REQUIREMENT.",
-        f"CAM CLEARANCE: 2X OPEN R{CAM_RELIEF_RADIUS:.2f} SCALLOPS PER MODEL;",
-        "  MAINTAIN 2.50 MIN LIGAMENT FROM THE PIVOT BORE.",
-        "PRESS FOLLOWER STUD TO SEAT BOTTOM, THEN SILVER-BRAZE AROUND THE",
-        "  EXPOSED MOUTH; THE SCALLOP OPENS PART OF THE ORIGINAL EDGE SEAT.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
+# No manufacturing-note block.  Everything this strap needs is a dimension, a
+# hole callout, a roughness symbol or a title-block field (drawing-simplicity
+# policy rule 6); the retired block restated the profile the outline already
+# draws, prescribed a fixturing method, and repeated the ligament the
+# dimensioned scallop centres already guarantee.
+DRAWING_NOTES = ""
 
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lower end-arc profile": "0.05",
-    "upper end-arc profile": "0.05",
-}
+# Brackets carry no datums and no feature-control frames (policy rule 3): the
+# end-arc profile frames this sheet used to print were form control on a
+# clearance outline, which no +/- on a dimension was failing to express.
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}

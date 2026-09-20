@@ -23,7 +23,16 @@ from pinion_cam_geometry import CAM_OD, ECC
 # pivot on the lift-rod side, resting on the cam collar (the p.68 arrow).
 WIDTH = 15.0
 C2C = 28.0
-THICKNESS = 5.0
+# THICKNESS re-derived 2026-10 from ch25 page001_img01, which frames BOTH straps
+# (the follower stud pokes out of the front strap, lower right).  The O22.433
+# pinion drum spans 174 px there, so the photo runs 7.76 px/mm.  Each strap shows
+# a foreshortened broad face plus its edge: front 61 + 62 px, back 86 + 40 px.
+# Solving 15*cos(t) + T*sin(t) = (face + edge)/7.76 for each end's own view angle
+# (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  8.0 is the stock flat
+# thickness inside that band, and it leaves (8 - 4)/2 = 2.0 mm of web each side of
+# the O4 blind follower-stud seat -- the old 5.0 left 0.50 mm, which no shop can
+# hold over a 4-deep reamed seat.
+THICKNESS = 8.0
 PIVOT_BORE = 6.35
 ARBOR_BORE = 8.0
 PIN_BORE = 4.0

@@ -1415,7 +1415,18 @@ if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.2
 # check below is the one exception -- it relies on the gated east side.
 SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
-SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 106.365: back strap
+# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
+# the 2026-10 thickness re-derive (5.0 -> 8.0) grows the strap OUTBOARD from
+# there.  The 4.0-wide leaf therefore stays referenced to that inner face --
+# SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
+# keeps its authored z (and with it the base's foot-screw hole), and riding the
+# strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
+STRAP_Z_INNER = (
+    APINION_Z_FRONT - STRAP_AIR,  # -40.085
+    APINION_Z_BACK + STRAP_AIR,  # +103.865
+)
+SPRING_BLADE_INSET = 0.5  # blade inner edge, in from the strap's inner face
+SPRING_Z = STRAP_Z_INNER[1] + SPRING_BLADE_INSET + SPRING_W / 2.0  # 106.365
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
 _SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
@@ -1433,7 +1444,7 @@ if abs(SPR_BLADE_TILT_DEG - STRAP_LEAN_DEG) > 0.01:
     raise AssertionError("spring blade is not parallel to the parked strap")
 if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
     raise AssertionError("spring blade touches the parked strap flank")
-if SPRING_W / 2.0 > STRAP_T / 2.0:
+if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
 if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
     raise AssertionError("spring blade fouls the lift rod")  # perpendicular
@@ -1522,11 +1533,15 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # and (back cam) the spring foot crossing beneath, at EVERY azimuth of the
 # free cam spin (codex review 2026-07-05: a mid-mounted collar put the boss
 # 0.8 into the pin's band on the engaged side, invisible to the parked gate).
-_STRAP_MID_Z = (
-    APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -42.335
-    APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +106.365
-)
-CAM_PIN_STATION = 7.0  # pin plane, from the collar front face
+_STRAP_MID_Z = tuple(
+    z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
+)  # -44.085, +107.865
+# 7.5 (was 7.0 at the 5.0 strap): the 2026-10 thickness re-derive pushed each
+# strap's mid-plane 1.5 OUTBOARD while the leaf spring stayed put, so the back
+# collar had to come 0.5 further forward to keep its boss band clear of the
+# spring foot (the binding constraint: boss top <= spring band - 0.25 needs
+# station >= 7.05).  CAM_LEN - 1 = 8.0 still leaves the pin on the collar.
+CAM_PIN_STATION = 7.5  # pin plane, from the collar front face
 CAM_Z0 = tuple(z - CAM_PIN_STATION for z in _STRAP_MID_Z)
 for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
