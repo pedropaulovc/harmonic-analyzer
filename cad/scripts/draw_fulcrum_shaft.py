@@ -16,8 +16,9 @@ from _drawing_common import (
     add_surface_finish,
     curate_view_dimensions,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
+    project_part_pmi,
+    scan_view_edges,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -82,6 +83,51 @@ RIGHT_KEEP = {
 # The shaft fit lives on the source-model dimension.
 DIMENSION_CALLOUTS: dict[str, str] = {}
 
+_RIM_CENTER_TOL_MM = 1e-4
+_RIM_RADIUS_TOL_MM = 1e-4
+_SHAFT_AXIS = (0.0, 0.0, 1.0)
+
+
+def _unique_shaft_rim(edges: Any, station_z_mm: float, *, label: str) -> Any:
+    """Resolve exactly one circular shaft rim from model-space geometry."""
+    center = (0.0, 0.0, station_z_mm)
+    radius = SHAFT_DIA / 2.0
+    rim = edges.circle_at(
+        center,
+        radius,
+        axis=_SHAFT_AXIS,
+        label=label,
+        center_tol_mm=_RIM_CENTER_TOL_MM,
+        radius_tol_mm=_RIM_RADIUS_TOL_MM,
+    )
+    matches = []
+    for item in edges.circles:
+        circle = item.circle
+        center_error = sum(
+            abs(actual - expected) for actual, expected in zip(circle[:3], center)
+        )
+        radius_error = abs(circle[6] - radius)
+        axis_dot = sum(
+            actual * expected for actual, expected in zip(circle[3:6], _SHAFT_AXIS)
+        )
+        if (
+            center_error <= _RIM_CENTER_TOL_MM
+            and radius_error <= _RIM_RADIUS_TOL_MM
+            and 1.0 - abs(axis_dot) <= 1e-6
+        ):
+            matches.append(item)
+    if len(matches) != 1:
+        signatures = tuple(
+            tuple(round(value, 6) for value in item.circle)
+            for item in edges.circles[:5]
+        )
+        raise RuntimeError(
+            f"{label}: expected one visible circle at {center} r={radius:g} mm, "
+            f"matched {len(matches)} of {len(edges.circles)}; "
+            f"first five circles={signatures!r}"
+        )
+    return rim.edge
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -143,6 +189,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
+    # Resolve model edges once per stable view display state.  These drawing-
+    # context entities are selected with ISelectData.View by project_part_pmi;
+    # sheet-coordinate hit testing is deliberately not part of the PMI path.
+    front_edges = scan_view_edges(front, label="fulcrum shaft front PMI")
+    right_edges = scan_view_edges(right, label="fulcrum shaft right PMI")
+    front_rim = _unique_shaft_rim(
+        front_edges,
+        SHAFT_LENGTH / 2.0,
+        label="fulcrum shaft front +Z rim",
+    )
+    plus_z_end_rim = _unique_shaft_rim(
+        right_edges,
+        SHAFT_LENGTH / 2.0,
+        label="fulcrum shaft right-view +Z rim",
+    )
+    minus_z_end_rim = _unique_shaft_rim(
+        right_edges,
+        -SHAFT_LENGTH / 2.0,
+        label="fulcrum shaft right-view -Z rim",
+    )
+
     end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
     end_circle = (
         FRONT_CENTER[0] + end_radius,
@@ -150,14 +217,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     left_end = (RIGHT_CENTER[0] - SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
     right_end = (RIGHT_CENTER[0] + SHAFT_LENGTH / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
-    )
-    end_upper = (
-        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
-        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
-    )
     # GD&T is model PMI (fulcrum_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
     # authored by build_fulcrum_shaft) — project it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
@@ -171,20 +230,20 @@ async def build(adapter: Any) -> dict[str, str]:
             "datum:A": PmiDrawingPlacement(
                 view=front,
                 position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
+                edge_entity=front_rim,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
-                view=front, position=(0.065, 0.250), attachment_xy=end_upper
+                view=front, position=(0.065, 0.250), edge_entity=front_rim
             ),
             "plus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(left_end[0] - 0.042, 0.180),
-                attachment_xy=left_end,
+                edge_entity=plus_z_end_rim,
             ),
             "minus_z_end_perpendicularity": PmiDrawingPlacement(
                 view=right,
                 position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
+                edge_entity=minus_z_end_rim,
             ),
         },
         datums=PART_DATUMS,

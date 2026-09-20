@@ -1435,15 +1435,17 @@ def _git_sha() -> str:
 
 
 def _build_id() -> str:
-    """``<next release>-b<N>[-dirty]`` -- N = commits since the last release tag.
+    """``<next release>[-dirty]`` -- the release designator, marked when dirty.
 
-    The title block's REV cell stays the formal release designator
-    (``release.yaml``); this is the between-releases build identifier a sheet
-    stamps on itself (``$PRP:{BUILD_ID}``) so two prints of the same part can be
-    told apart by eye.  Source-derived like :func:`_git_sha` (no wall clock):
-    the count is deterministic per commit, monotonic between releases, and the
-    release commit is simply the last candidate.  Stamped only when a drawing
-    task actually runs -- git state is in no cache key or file_dep, so a commit
+    The title block's REV cell is the formal release designator
+    (``release.yaml``); a sheet also stamps this on itself
+    (``$PRP:{BUILD_ID}``) so a print made from an uncommitted working tree can
+    be told from a clean release print by eye.  Source-derived like
+    :func:`_git_sha` (no wall clock) and deliberately history-free: only the
+    working-tree state is read, never a tag, a commit count or a sha, so a
+    shallow checkout -- what every farm leaf clones -- stamps exactly what the
+    same commit stamps in a full clone.  Stamped only when a drawing task
+    actually runs -- git state is in no cache key or file_dep, so a commit
     never rebuilds anything; a restored sheet keeps the id of the build that
     made it.
     """
@@ -1451,33 +1453,19 @@ def _build_id() -> str:
 
     import _config
 
-    def _git(*args: str) -> str:
-        return subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
-            [_git_executable(), *args],
+    try:
+        dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
+            [_git_executable(), "status", "--porcelain"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
             check=True,
         ).stdout.strip()
-
-    try:
-        shallow = _git("rev-parse", "--is-shallow-repository").lower()
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(
-            "cannot determine Git repository depth for the build id"
+            "cannot determine Git working-tree state for the build id"
         ) from exc
-    if shallow != "false":
-        raise RuntimeError(
-            "cannot compute a release-relative build id from a shallow Git "
-            f"repository (git reported {shallow!r}); fetch the full history"
-        )
-    try:
-        last_tag = _git("describe", "--tags", "--abbrev=0", "--match", "v*")
-        count = _git("rev-list", f"{last_tag}..HEAD", "--count")
-    except subprocess.CalledProcessError:  # no release tag reachable
-        count = _git("rev-list", "HEAD", "--count")
-    dirty = "-dirty" if _git("status", "--porcelain") else ""
-    return f"{_config.release_revision()}-b{int(count)}{dirty}"
+    return f"{_config.release_revision()}{'-dirty' if dirty else ''}"
 
 
 def _git_commit_year() -> str:

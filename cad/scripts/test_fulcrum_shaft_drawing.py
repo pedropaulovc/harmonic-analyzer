@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+import pytest
 
 import build_fulcrum_shaft as part
 import draw_fulcrum_shaft as drawing
 import fulcrum_shaft_spec
 import _fit_limits
+from _drawing_common import ViewEdge, ViewEdges
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -86,6 +88,34 @@ def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     assert "add_feature_control_frame(" not in source
     assert "add_datum_feature(" not in source
     assert source.count("add_surface_finish(") == 1
+
+
+def test_pmi_rim_resolution_requires_unique_model_geometry() -> None:
+    target = object()
+    opposite_end = object()
+    station = drawing.SHAFT_LENGTH / 2.0
+    radius = drawing.SHAFT_DIA / 2.0
+    target_circle = (0.0, 0.0, station, 0.0, 0.0, 1.0, radius)
+    edges = ViewEdges(
+        label="shaft profile",
+        edges=(
+            ViewEdge(target, None, target_circle, None),
+            ViewEdge(
+                opposite_end,
+                None,
+                (0.0, 0.0, -station, 0.0, 0.0, 1.0, radius),
+                None,
+            ),
+        ),
+    )
+    assert drawing._unique_shaft_rim(edges, station, label="plus-Z rim") is target
+
+    ambiguous = ViewEdges(
+        label="ambiguous shaft profile",
+        edges=(*edges.edges, ViewEdge(object(), None, target_circle, None)),
+    )
+    with pytest.raises(RuntimeError, match="expected one visible circle"):
+        drawing._unique_shaft_rim(ambiguous, station, label="plus-Z rim")
 
 
 def test_view_scales_are_explicit() -> None:
