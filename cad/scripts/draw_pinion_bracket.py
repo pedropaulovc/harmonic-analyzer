@@ -106,9 +106,6 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
-PIVOT_R_SHEET = PIVOT_BORE * SHEET_SCALE[0] / 2000.0
-ARBOR_R_SHEET = ARBOR_BORE * SHEET_SCALE[0] / 2000.0
-
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  The face features and their locations stay on the front view; the
 # scallop pair is dimensioned on the open (left) side it is cut from, the two
@@ -117,10 +114,10 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.156, 0.110),
     "ArborBoreDia": (0.156, 0.194),
     "ArborBoreCz": (0.122, 0.151),
-    "BottomCapRadius": (0.104, 0.082),
-    "TopCapRadius": (0.104, 0.220),
+    "BottomCapRadius": (0.118, 0.086),
+    "TopCapRadius": (0.118, 0.216),
     "PinSeatCy": (0.058, 0.134),
-    "PinSeatDepth": (0.058, 0.152),
+    "PinSeatDepth": (0.052, 0.156),
     "CamReliefParkR": (0.026, 0.190),
     "CamReliefParkY": (0.044, 0.112),
     "CamReliefParkX": (0.082, 0.092),
@@ -135,8 +132,13 @@ LEFT_KEEP = {
     "PinSeatCz": (0.180, 0.090),
     "PinSeatDia": (0.230, 0.140),
 }
-PIVOT_FINISH_XY = (0.116, 0.056)
-ARBOR_FINISH_XY = (0.138, 0.228)
+# Both roughness symbols hang off the FLANK view, where each bore shows as a
+# plain horizontal edge with open sheet beside it.  On the face view they had
+# to lead out through the corner the end-radius leader already uses.
+PIVOT_FINISH_EDGE = (LEFT_CENTER[0], _front_y(-PIVOT_BORE / 2.0))
+PIVOT_FINISH_XY = (0.232, 0.104)
+ARBOR_FINISH_EDGE = (LEFT_CENTER[0], _front_y(C2C + ARBOR_BORE / 2.0))
+ARBOR_FINISH_XY = (0.232, 0.196)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.
@@ -255,16 +257,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # the upper one.  Nothing else on the strap slides, seats or locates.
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET),
+        left,
+        edge_xy=PIVOT_FINISH_EDGE,
         symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET),
+        left,
+        edge_xy=ARBOR_FINISH_EDGE,
         symbol_xy=ARBOR_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
