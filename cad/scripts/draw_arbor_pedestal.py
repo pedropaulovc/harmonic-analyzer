@@ -492,11 +492,16 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_reference_precision(hold_down_dimension, "hold-down hole location")
     _set_reference_precision(strap_dimension, "strap depth")
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
+    # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
+    # wide at 2:1, so anchoring it near the view buried its left half in the
+    # plan outline and the foot-width dimension. Centred a view-width to the
+    # right it lands in open sheet between the plan and the isometric, and
+    # its leader leaves the hole below the width witness lines.
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + _screw_r, _top_y(SCREW_Z)),
-        callout_xy=(TOP_CENTER[0] + 0.055, _top_y(SCREW_Z) + 0.012),
+        callout_xy=(TOP_CENTER[0] + 0.120, _top_y(SCREW_Z) + 0.012),
         label="flange hold-down hole",
         process="FLANGE HOLE ON PART C/L: DRILL",
     )

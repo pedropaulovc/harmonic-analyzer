@@ -91,7 +91,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # overall height.  Those places are still specification, so the PART owns the
 # digit and the sheet passes it through instead of writing a literal.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    "overall height": 1,
+    # Two places, like the axis height it is the sum of: a one-place (49.7)
+    # next to 39.72 + R10.0 reads as an arithmetic error on the print.
+    "overall height": 2,
     "crown radius": 1,
     "strap depth": 1,
     "hold-down hole location": 1,
