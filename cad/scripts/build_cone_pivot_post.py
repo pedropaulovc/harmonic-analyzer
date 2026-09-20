@@ -49,7 +49,6 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
-    add_angular_reference_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -86,6 +85,7 @@ from cone_pivot_post_spec import (
     HEAD_DIA,
     HEAD_HEIGHT,
     INCLINE_DEG,
+    JOURNAL_REFERENCE_LENGTH,
     JOURNAL_REFERENCE_X,
     JOURNAL_REFERENCE_Z,
     RUNNING_BORE_BAND,
@@ -462,41 +462,29 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     plan.record("CrankBossFarZ")
     check(
-        "journal reference offset x",
+        "journal reference ray length",
         await adapter.add_sketch_dimension(
-            f"{journal_axis_line}.end",
-            "origin",
-            "horizontal_distance",
-            JOURNAL_REFERENCE_X,
+            journal_axis_line, None, "linear", JOURNAL_REFERENCE_LENGTH
         ),
     )
-    plan.record("JournalRefX")
+    plan.record("JournalRefLen")
+    # The plan incline is a DRIVING sketch dimension, driven in turn by the
+    # same ``ConeIncline`` global that builds ConeShaftNormal, so the value the
+    # print carries and the value the geometry is built from cannot drift.
+    #
+    # It is authored between the journal ray and the DOWNWARD crank ray, whose
+    # enclosed wedge is the acute 12.52 deg: a driving dimension fixes the
+    # quadrant at authoring time, so nothing downstream can flip it to the
+    # 167.48 deg supplement.  (The driven-reference route cannot express this
+    # angle at all -- SOLIDWORKS returns the obtuse member for a line pair
+    # regardless of ray direction, selection order or text position.)
     check(
-        "journal reference offset z",
+        "journal plan incline",
         await adapter.add_sketch_dimension(
-            f"{journal_axis_line}.end",
-            "origin",
-            "vertical_distance",
-            JOURNAL_REFERENCE_Z,
+            journal_axis_line, crank_axis_line, "angular", INCLINE_DEG
         ),
     )
-    plan.record("JournalRefZ")
-    # Journal ray FIRST.  SOLIDWORKS measures an angular dimension as the
-    # sweep from the first selected line to the second, so the selection
-    # ORDER -- not the rays' drawn direction and not the text position -- is
-    # what decides whether the print reads 12.52 deg or its 167.48 deg
-    # supplement.  Reversing either ray leaves the reading unchanged
-    # (measured on the farm, twice); reversing the order is what selects the
-    # acute plan incline.
-    await add_angular_reference_dimension(
-        adapter,
-        journal_axis_line,
-        spot_face_line,
-        (JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z / 2.0),
-        "journal plan angle",
-        expected_degrees=INCLINE_DEG,
-    )
-    plan.record("JournalAngle")
+    plan.record("InclineAngle", '"ConeIncline"')
     await ensure_fully_defined(adapter, "JournalPlanReference")
     check("exit sketch JournalPlanReference", await adapter.exit_sketch())
     name_last_feature(adapter, "JournalPlanReference")

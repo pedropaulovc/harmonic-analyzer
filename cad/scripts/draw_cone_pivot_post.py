@@ -127,7 +127,7 @@ TOP_KEEP = {
     "MountEastX": (_top_x(-6.7), 0.2525),
     "MountWestX": (_top_x(6.7), 0.2525),
     "HeadDia": (0.158, _top_y(0.0)),
-    "JournalAngle": (0.136, _top_y(28.0)),
+    "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
     "JournalAxisY": (0.202, 0.150),

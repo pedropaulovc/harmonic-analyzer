@@ -130,7 +130,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankBoreProfile": {"CrankBoreDia"},
     "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
     "JournalBoreProfile": {"JournalBoreDia"},
-    "JournalPlanReference": {"CrankBossStartZ", "JournalAngle"},
+    "JournalPlanReference": {"CrankBossStartZ", "InclineAngle"},
 }
 
 # Decimal places are product definition: they select the title-block general
@@ -152,7 +152,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankBoreProfile": {"CrankBoreDia": 3},
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
-    "JournalPlanReference": {"CrankBossStartZ": 2, "JournalAngle": 2},
+    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 2},
 }
 
 _PRECISION_NAMES = [
