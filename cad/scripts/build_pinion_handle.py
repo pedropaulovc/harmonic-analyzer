@@ -43,10 +43,8 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
     set_dimension_prefix,
 )
-from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_handle_spec import (
@@ -62,9 +60,7 @@ from pinion_handle_spec import (
     ROD_UP,
     SURFACE_FINISHES,
     TUBE_ID,
-    TUBE_ID_BAND,
     TUBE_LEN,
-    TUBE_LENGTH_BAND,
     TUBE_OD,
     WALL_T,
 )
@@ -354,14 +350,10 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
-    set_dimension_bilateral_tolerance(
-        adapter, "TubeProfile", "TubeId", *deviations(TUBE_ID_BAND)
-    )
+    # stamp the make-critical title-block properties.  No local size bands:
+    # the socket and its seating depth take the title-block general grade
+    # (cad/docs/tolerance-policy.md).
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
-    set_dimension_bilateral_tolerance(
-        adapter, "Tube", "TubeLen", *deviations(TUBE_LENGTH_BAND)
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -49,8 +49,11 @@ ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
-SHAFT_BORE_BAND = (0.05, 0.00)  # (upper, lower) deviations
-# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
+# rounding left the bore 0.025 smaller than the shaft (caught in M6.2).  Three
+# DISPLAYED places because the nominal is an exact inch conversion the callout
+# cites, not because the bore is held tighter than the title block: the arm is
+# PINNED to its shaft, so this is no running fit and it carries no local band
+# (cad/docs/tolerance-policy.md -- the drilled-hole row, +0.10/0, governs).
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#14")
 HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
@@ -96,18 +99,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DimpleProfile": {"DimpleX", "DimpleDia"},
 }
 
-# Notes: part-specific process and exceptional feature-tolerance facts only,
-# never a duplicate of the title block (drawing-simplicity-policy.md rule 6).
+# Notes: at most four short lines of part-specific facts a machinist cannot
+# read off the views, never a dimension and never a method
+# (drawing-simplicity-policy.md rule 6).  The anchor tap's thread and drill
+# depths are on its hole callout, and both hole positions are dimensioned on
+# the print, so neither needs a line here.
 DRAWING_NOTES = "\n".join(
     (
-        "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "CROSS-HOLE AXIS INTERSECTS SHAFT AXIS.",
-        "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
-        "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
-        f"ANCHOR TAP: {ANCHOR_HOLE_SPEC.size} UNC-{ANCHOR_HOLE_SPEC.thread_class}"
-        f" X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
-        f"ANCHOR DRILL: {ANCHOR_HOLE_SPEC.depth_mm:.1f} DEEP (DO NOT BREAK THROUGH).",
+        "SHAFT BORE, DIMPLE AND PIVOT HOLE ARE CENTRED ACROSS THE 16 WIDTH.",
+        "CROSS-HOLE AXIS INTERSECTS SHAFT BORE AXIS.",
+        "DIMPLE AND ANCHOR TAP ARE CUT IN THE HANDLE-SIDE FACE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -10,7 +10,6 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 
 from __future__ import annotations
 
-from _fit_limits import REAM_SLIDE
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -27,10 +26,12 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
-# Match the cross rod to its body for a light press fit. Only the arbor socket
-# and its seating depth require native size tolerances.
-TUBE_ID_BAND = REAM_SLIDE
-TUBE_LENGTH_BAND = (0.10, 0.00)
+# No local size bands. The socket is a slip clearance over the arbor stub and
+# the seating depth is a turned shoulder: neither is a running fit, a gear
+# feature nor a locating seat, so both take the title-block general grade
+# (drilled holes +0.10/0, linear by decimal place) -- cad/docs/tolerance-policy.md
+# "How a critical-feature tolerance is decided" and drawing-simplicity-policy
+# rule 2. A band that cannot cite a fit class or the error budget is a habit.
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GripProfile": {"GripDia"},

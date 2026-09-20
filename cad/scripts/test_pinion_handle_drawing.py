@@ -78,6 +78,11 @@ def rendered_recipe(monkeypatch, tmp_path):
         lambda _a, view: setattr(view, "hidden", True),
     )
     monkeypatch.setattr(
+        drawing,
+        "set_hidden_lines_removed",
+        lambda _a, view: setattr(view, "hidden", False),
+    )
+    monkeypatch.setattr(
         drawing, "_point", lambda _a, _v, xyz: (xyz[0] / 1000, xyz[1] / 1000)
     )
 
@@ -166,11 +171,12 @@ def rendered_recipe(monkeypatch, tmp_path):
 def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     package = rendered_recipe
     orthographic = [view for view in package.views if view.orientation != "*Isometric"]
-    assert all(view.hidden for view in orthographic)
     (iso,) = [view for view in package.views if view.orientation == "*Isometric"]
     assert iso.body is None and iso.Angle == 0.0
     assert package.result["layout"] == DrawingLayout.LANDSCAPE
     (section,) = [view for view in package.views if view.section]
+    # Sections are always hidden-lines-removed (policy rule 7).
+    assert not section.hidden
     assert section.body == section.parent.body == "body"
     hole = package.dimensions["RodHoleDia"]
     assert hole.view.body == "body" and hole.view.orientation == "*Top"
@@ -183,6 +189,9 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     rod = package.dimensions["RodDia"]
     assert rod.view is package.dimensions["RodSpan"].view
     assert abs(rod.view.Angle) == pytest.approx(1.5707963267948966)
+    # Rule 7: one hidden-line view only -- the assembled cross-rod view, the
+    # only place the pressed rod's engagement inside the grip is shown.
+    assert [view for view in orthographic if view.hidden] == [rod.view]
     for name in ("GripDia", "TubeOd"):
         assert package.dimensions[name].view.orientation == "*Right"
     front = section.parent
@@ -229,11 +238,17 @@ def test_body_dimensions_are_direct_baselines_not_note_substitutes(rendered_reci
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
-def test_socket_fit_limits_remain_native():
-    assert (
-        spec.TUBE_ID + spec.TUBE_ID_BAND[1],
-        spec.TUBE_ID + spec.TUBE_ID_BAND[0],
-    ) == pytest.approx((8.010, 8.025))
+def test_socket_takes_the_title_block_grade_and_names_its_mate():
+    """No local size band on a part with no running fit, gear or locating seat.
+
+    A band that cannot cite a fit class or the error budget is an
+    over-specification (cad/docs/tolerance-policy.md); the socket is a slip
+    clearance over the arbor, so the title block's drilled-hole row governs it
+    and the callout says which arbor it has to slip over.
+    """
+    assert not [name for name in vars(spec) if name.endswith("_BAND")]
+    socket = drawing.DIMENSION_CALLOUTS["TubeId"]
+    assert "REAM" in socket and "MHA-102" in socket
 
 
 def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
@@ -242,7 +257,8 @@ def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
     dims = rendered_recipe.dimensions
     assert dims["RodDia"].precision == 1
     assert dims["RodDia"].reference
-    assert dims["TubeId"].precision == 3
+    assert dims["TubeId"].precision == 2
+    assert dims["TubeLen"].precision == 1
     assert dims["RodHoleDia"].precision == 1
     assert dims["GripDia"].precision == dims["TubeOd"].precision == 1
     assert dims["CapR"].precision == 1

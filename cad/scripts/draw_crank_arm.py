@@ -45,6 +45,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hole_callout_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_arc_endpoints_to_center,
@@ -54,10 +55,14 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
+    ANCHOR_HOLE_SPEC,
+    ANCHOR_SCREW_X,
+    ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
     ARM_THICKNESS,
     DIMPLE_X,
+    DRAWING_DIMENSIONS,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     PIN_HOLE_SPEC,
@@ -103,25 +108,64 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
 
+def _set_primary_precision(
+    adapter: Any, display: Any, digits: int, *, label: str
+) -> None:
+    """Set the primary decimals of a dimension BUILT FROM PICKS, not imported.
+
+    ``set_dimension_precision`` keys on the parametric name a model dimension
+    carries; a dimension added from two picked entities has none, so the one
+    place a noncritical length needs is set on its display annotation here.
+    ``SetPrecision3`` reports rejection through its return status rather than
+    by raising, so the side effect is read back the way the shared helper does.
+    """
+    do_not_change = -1  # swDoNotChangePrecisionSetting: primary only
+    display = _early_bound(display, "IDisplayDimension")
+    adapter._attempt(
+        lambda: display.SetPrecision3(
+            digits, do_not_change, do_not_change, do_not_change
+        )
+    )
+    applied = adapter._attempt(display.GetPrimaryPrecision2)
+    if applied != digits:
+        raise RuntimeError(
+            f"precision override on {label} did not take: requested {digits} "
+            f"decimals, dimension reports {applied}"
+        )
+
+
+
+_ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
+
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
-# the linear chain stacks below the view, smallest span nearest the geometry.
+# the linear chain stacks below the view from the shaft-bore axis, smallest
+# span nearest the geometry (anchor 20, dimple 30, pivot 75, end 85, ref 93).
 FRONT_KEEP = {
-    "ArmEndX": (0.190, 0.086),
-    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
+    "ArmEndX": (0.190, 0.085),
+    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
     # Left of the boss so its leader and the bore's (above) never cross.
-    "BossRadius": (0.052, 0.104),
-    "ShaftBoreDia": (_sheet_x(0.0), 0.172),
-    "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
+    "BossRadius": (0.046, 0.100),
+    "ShaftBoreDia": (0.060, 0.166),
+    "DimpleDia": (0.150, 0.166),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "REAM THRU (3/8 IN)",
-    # Two decimals so the block's .XX tolerance governs the depth.
-    "DimpleDia": "FLAT-BOTTOM 0.50 DEEP",
+    "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
 }
-DIMENSION_PRECISION = {"ShaftBoreDia": 3}
+# Three places on the bore only because 9.525 is the exact 3/8 in conversion
+# the callout cites; every other feature here is noncritical, so it carries one
+# place and the title block's .X row governs it instead of the tighter .XX row
+# (cad/docs/tolerance-policy.md, drawing-simplicity-policy rule 2).
+DIMENSION_PRECISION = {
+    "ShaftBoreDia": 3,
+    "ArmEndX": 1,
+    "Depth": 1,
+    "DimpleX": 1,
+    "DimpleDia": 1,
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -171,23 +215,38 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton):
-    # the top view shows the #14 cross-drill meeting the shaft bore, the side
-    # view the bore and pivot hole through the 16 x 8 section.
-    for view in (front, top, right):
+    # Hidden lines earn their place in the front and top views: the top view
+    # shows the #14 cross-drill meeting the shaft bore, the front the blind
+    # floors of the dimple and the anchor drill.  The 16 x 8 side view carries
+    # one dimension (thickness) and would only repeat already-called-out holes
+    # as overlapping dashed arcs, so it is drawn hidden-lines-removed.
+    for view in (front, top):
         set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, right)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Right view: the 16 x 8 stock section.  Thickness is the model Depth dim;
     # the 16 width is added as an explicit overall across the view's extremes.
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Top view: cross-drill geometry is visible; its size is a native hole callout.
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(
         adapter,
@@ -207,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # standing right of the boss.  (In the 16 x 8 side view every pick on the
     # outer faces lands on a hidden arc once hidden lines are shown -- it came
     # back as a diameter dimension.)
-    add_edge_dimension(
+    arm_width = add_edge_dimension(
         adapter,
         front,
         p0=(_sheet_x(ARM_C2C * 0.2), FRONT_CENTER[1] - 0.016),
@@ -216,6 +275,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arm-width overall",
         orientation="vertical",
     )
+    _set_primary_precision(adapter, arm_width, 1, label="arm-width overall")
 
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -232,8 +292,60 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=(_sheet_x(0.0), FRONT_CENTER[1] + SHAFT_BORE_DIA / 1000.0),
         p1=(_sheet_x(ARM_C2C), FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA / 1000.0),
-        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.102),
+        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.095),
         label="shaft-to-handle-pivot location",
+    )
+    # Anchor tap: size and both depths on a native Hole Wizard callout; its
+    # horizontal station in the baseline chain below the view and its vertical
+    # station off the top long edge, both picked on the two FEATURES so no
+    # dimension grows out of a centre line (drawing-simplicity-policy rule 7).
+    anchor_edge = (
+        _sheet_x(ANCHOR_SCREW_X),
+        FRONT_CENTER[1]
+        + (ANCHOR_SCREW_Y + _ANCHOR_HOLE_DIA / 2.0) * SHEET_SCALE[0] / 1000.0,
+    )
+    anchor_callout = add_native_hole_callout(
+        adapter,
+        front,
+        edge_xy=anchor_edge,
+        callout_xy=(0.100, 0.184),
+        label="anchor tap",
+        process=drill_process(ANCHOR_HOLE_SPEC),
+    )
+    set_hole_callout_precision(
+        anchor_callout,
+        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+        label="anchor tap depths",
+    )
+    anchor_station = add_edge_dimension(
+        adapter,
+        front,
+        p0=(_sheet_x(0.0), FRONT_CENTER[1] + SHAFT_BORE_DIA / 1000.0),
+        p1=anchor_edge,
+        text_xy=(_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
+        label="anchor tap station from the bore axis",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(
+        adapter, anchor_station, label="anchor tap station from the bore axis"
+    )
+    _set_primary_precision(
+        adapter, anchor_station, 1, label="anchor tap station from the bore axis"
+    )
+    anchor_offset = add_edge_dimension(
+        adapter,
+        front,
+        p0=(_sheet_x(45.0), FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0),
+        p1=anchor_edge,
+        text_xy=(0.093, 0.155),
+        label="anchor tap offset from the top edge",
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_center(
+        adapter, anchor_offset, label="anchor tap offset from the top edge"
+    )
+    _set_primary_precision(
+        adapter, anchor_offset, 1, label="anchor tap offset from the top edge"
     )
     # The true overall (boss extreme to arm end), as a reference below the
     # 85.00 centre-to-end chain so nobody saws the stock 8 mm short
@@ -244,7 +356,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=(_sheet_x(-HALF_WIDTH), FRONT_CENTER[1]),
         p1=(_sheet_x(ARM_END_X), FRONT_CENTER[1] - 0.004),
-        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.072),
+        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.073),
         label="overall length reference",
         orientation="horizontal",
     )
