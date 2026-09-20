@@ -76,11 +76,10 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
+from crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
 from crank_drive_gear_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
-    GEAR_DATA,
     OUTSIDE_DIA,
     SURFACE_FINISHES,
 )

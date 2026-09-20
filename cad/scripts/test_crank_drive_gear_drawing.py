@@ -17,6 +17,7 @@ import pytest
 import _config
 import build_crank_drive_gear as part
 import cone_gear_shaft_spec
+import crank_drive_gear_notes as notes
 import crank_drive_gear_spec as spec
 import crank_pinion_spec as pinion_spec
 import draw_crank_drive_gear as drawing
@@ -67,8 +68,8 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
         (part.TEETH + 2) / part.DP * spec.MM_PER_IN
     )
     # ... and therefore never as text beside the generating data.
-    assert "OUTSIDE DIAMETER" not in spec.GEAR_DATA
-    assert "FACE WIDTH" not in spec.GEAR_DATA
+    assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
+    assert "FACE WIDTH" not in notes.GEAR_DATA
 
 
 def test_the_face_width_is_a_named_driven_blank_dimension() -> None:
@@ -191,7 +192,7 @@ def test_print_carries_no_gdt_or_basic_dimensions() -> None:
 
 
 def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
-    data = spec.GEAR_DATA
+    data = notes.GEAR_DATA
     for field in (
         "GEAR DATA",
         "NUMBER OF TEETH",
@@ -202,25 +203,23 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "ROOT DIAMETER (mm, REF)",
         "WHOLE DEPTH (mm, REF)",
         "HELIX ANGLE AT PITCH DIAMETER",
-        "CIRCULAR TOOTH THICKNESS, TRANSVERSE (mm, REF)",
-        "TOOTH THINNING FOR BACKLASH (mm, REF)",
+        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm)",
+        "TRANSVERSE BACKLASH ASSEMBLED WITH MHA-025 (mm)",
         "TOOTH FORM",
         "MATES WITH",
     ):
         assert field in data, field
-    # Generating data only: no acceptance number lives here, so no row may
-    # carry a tolerance of its own (rule 6), and the retired pair-commissioning
-    # protocol (oil volumes, torque limits, fixture runout) may not return.
-    assert "+/-" not in data
-    assert "+0" not in data
+    # The retired pair-commissioning protocol (oil volumes, torque limits,
+    # fixture runout, an ISO accuracy class no hobby shop can verify) may not
+    # return with the thickness requirement.
     for banned in (
         "ISO 1328",
         "BASE-TANGENT SPAN",
-        "PAIR",
         "TORQUE",
         "C2C",
         "NONCONJUGATE",
         "X.XX",
+        "RUNOUT",
     ):
         assert banned not in data, banned
     source = _source()
@@ -228,12 +227,42 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert 'adapter, "Manufacturing Notes"' in source
 
 
-def test_gear_data_states_the_helix_its_hand_and_the_backlash_allowance() -> None:
-    # The three tooth-system facts no view of this gear can settle and a
-    # mirrored or straight-cut part would get wrong.
-    data = spec.GEAR_DATA
+def test_tooth_thickness_is_a_toleranced_requirement_not_a_ref_consequence() -> None:
+    # The generating numbers are REF because the cutter produces them, but the
+    # tooth THICKNESS is the pair's one tooth-system acceptance size: the 16T it
+    # runs against is cut to full thickness, so all of the mesh's backlash comes
+    # off this gear's flanks. Its band is the named fit class read backwards,
+    # which is why it is asymmetric about the nominal the model is cut to.
+    low, high = _config.fit("gear_mesh", "backlash_mm")
+    assert notes.BACKLASH_MM == [low, high]
+    assert notes.TOOTH_THICKNESS_DEVIATIONS == (
+        pytest.approx(spec.BACKLASH_MM - low),
+        pytest.approx(-(high - spec.BACKLASH_MM)),
+    )
+    thickest = (
+        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + (notes.TOOTH_THICKNESS_DEVIATIONS[0])
+    )
+    thinnest = (
+        spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS + (notes.TOOTH_THICKNESS_DEVIATIONS[1])
+    )
+    # Over the whole band the assembled pair still meshes inside the fit class:
+    # the thickest tooth leaves the minimum backlash, the thinnest the maximum.
+    assert notes.STANDARD_TOOTH_THICKNESS - thickest == pytest.approx(low)
+    assert notes.STANDARD_TOOTH_THICKNESS - thinnest == pytest.approx(high)
+    data = notes.GEAR_DATA
+    assert f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} +0.100 / -0.050" in data
+    assert f"{low:.2f} TO {high:.2f}" in data
+    # The fit-class read stays out of the SPEC for the same reason the bore band
+    # does: the assemblies import the spec's tip circle, and a fit class must not
+    # become a rebuild dependency of the frame.
+    assert "gear_mesh" not in Path(spec.__file__).read_text(encoding="utf-8")
+
+
+def test_gear_data_states_the_helix_and_its_hand() -> None:
+    # The two tooth-system facts no view of this gear can settle and a mirrored
+    # or straight-cut part would get wrong.
+    data = notes.GEAR_DATA
     assert f"{spec.HELIX_ANGLE_DEG:.1f} DEG RIGHT HAND" in data
-    assert f"{spec.BACKLASH_MM:.3f}" in data
     assert "HELICAL INVOLUTE" in data
     # The hand follows the recipe's twist sense: the tooth azimuth advances
     # counter-clockwise about +z with increasing z (_gear._TWIST_CCW = +1).
@@ -265,13 +294,13 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
 
 
 def test_notes_carry_one_part_specific_fact_and_never_the_title_block() -> None:
-    notes = spec.DRAWING_NOTES
+    text = notes.DRAWING_NOTES
     # The title block orders every sharp edge broken R0.25 / 0.25 chamfer max.
     # On a 2.13 whole-depth tooth that is more than a tenth of the tooth, so
     # the print states the exception -- the only thing this part's notes have
     # to say.
-    assert notes == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-    assert "\n" not in notes
+    assert text == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+    assert "\n" not in text
     # Retired with the migration: the general-tolerance restatements, the
     # method instructions, the heat-treatment negative, the duplicate of the
     # bore fit, the hand-of-helix narration the data block now states, and the
@@ -290,7 +319,7 @@ def test_notes_carry_one_part_specific_fact_and_never_the_title_block() -> None:
         "RPM",
         "+/-",
     ):
-        assert banned not in notes, banned
+        assert banned not in text, banned
 
 
 def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
