@@ -11,8 +11,9 @@ in lockstep (``test_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
+from _fit_limits import REAM_SLIDE
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import CylinderFace
 from pinion_cam_geometry import (
     BORE as BORE,
     BOSS_DIA as BOSS_DIA,
@@ -24,15 +25,22 @@ from pinion_cam_geometry import (
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
-# Ream band about the 6.37 mid nominal: 6.375 MAX / 6.360 MIN (running fit
-# on the Ø6.35 lift rod). Asymmetric because BORE is the model's as-cut
-# nominal, not the band midpoint.
-BORE_BAND = (0.005, -0.010)
+# The bore is a RUNNING fit on the Ø6.35 lift rod (MHA-060), which is exactly
+# what the shared REAM_SLIDE class is for; BORE is the model's as-cut nominal
+# rather than the rod's, so the band is that fit class re-expressed about it
+# and can never drift from the class (cad/docs/tolerance-policy.md).
+LIFT_ROD_DIA = 6.35
+LIFT_ROD_NUMBER = "MHA-060"
+BORE_BAND = (
+    round(LIFT_ROD_DIA + REAM_SLIDE[0] - BORE, 6),
+    round(LIFT_ROD_DIA + REAM_SLIDE[1] - BORE, 6),
+)
+# The cam OD is the working surface the follower rides, and the bore-to-OD
+# offset IS the lift: both are on the drive train's critical list.  Nothing
+# else on this collar mates with anything, so nothing else carries a band --
+# the title block's general grade governs it (tolerance-policy rule 11).
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
-COLLAR_DEPTH_TOLERANCE_MM = 0.05
-BOSS_DIA_TOLERANCE_MM = 0.05
-BOSS_PROJECTION_TOLERANCE_MM = 0.05
 
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
 
@@ -44,26 +52,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPinBossProjection": {"BossProjection"},
 }
 
+# drawing-simplicity-policy rule 6: four short lines of facts the views cannot
+# show.  The eccentricity itself is DIMENSIONED on the sheet, so the note only
+# says what a single dimension cannot -- that it is the same, and in the same
+# direction, at both ends.
 DRAWING_NOTES = "\n".join(
     (
-        f"BORE AND OD ARE NOT CONCENTRIC; {ECC:.2f} ECCENTRICITY APPLIES AT BOTH ENDS.",
-        "AXIS C IS PARALLEL TO AXIS B WITHIN 0.03; THE OFFSET DIRECTION IS",
-        "  COMMON TO BOTH ENDS (B AND C ARE COPLANAR WITH THE BOSS AXIS PLANE).",
-        "DATUM A IS THE FRONT END FACE; B IS THE FINAL REAMED BORE AXIS;",
-        f"  C IS THE <MOD-DIAM>{CAM_OD:.2f} OD AXIS; D IS THE BOSS OD AXIS.",
-        "THE SET-SCREW BOSS IS INTEGRAL WITH THE CAM BODY.",
-        "BASIC BOSS/TAP AXES EACH INTERSECT B PERPENDICULAR TO IT AND LIE IN",
-        "  THE PLANE CONTAINING B AND C.",
-        "POSITION BOSS OD AXIS TO A|B|C; POSITION TAP PITCH AXIS TO DATUM D.",
-        "DRILL/TAP M2.5 X 0.45-6H THROUGH BOSS TO BORE; 2.00 MIN FULL THREAD.",
-        "  SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
+        "BORE AND OD ARE NOT CONCENTRIC; THE ECCENTRICITY IS THE SAME",
+        "  AND IN THE SAME DIRECTION AT BOTH ENDS.",
+        "DRILL/TAP M2.5 X 0.45-6H THROUGH THE BOSS INTO THE BORE.",
+        "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cam boss axis position": "0.03",
-    "cam tap pitch axis position": "0.03",
-}
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

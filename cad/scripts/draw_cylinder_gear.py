@@ -439,10 +439,14 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("overall axial thickness was not shown as reference")
 
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
+    # Leader attaches at the bore's 225-degree point and runs down-left. The
+    # 135-degree route crossed the <MOD-DIAM>30.60 cam diameter line (its lower
+    # end sits at sheet (0.085, 0.271)); everything below the bore axis is clear
+    # of that dimension and of the eccentricity dimension to its right.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.030, 0.310),
+        symbol_xy=(0.030, 0.240),
         control=surface_finish_by_key(SURFACE_FINISHES, "cylinder_gear_bore"),
         label="cylinder gear bore finish",
         entity=bore_edge,
@@ -451,7 +455,7 @@ async def build(adapter: Any) -> dict[str, str]:
             front,
             (
                 -BORE_DIA / (2.0 * math.sqrt(2.0)),
-                BORE_DIA / (2.0 * math.sqrt(2.0)),
+                -BORE_DIA / (2.0 * math.sqrt(2.0)),
                 0.0,
             ),
             label="bore finish leader attachment",
