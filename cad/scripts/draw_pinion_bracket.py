@@ -119,13 +119,13 @@ FRONT_KEEP = {
     "ArborBoreCz": (0.122, 0.151),
     "BottomCapRadius": (0.104, 0.082),
     "TopCapRadius": (0.104, 0.220),
-    "PinSeatCy": (0.070, 0.126),
-    "PinSeatDepth": (0.078, 0.145),
-    "CamReliefParkR": (0.030, 0.186),
-    "CamReliefParkY": (0.058, 0.114),
+    "PinSeatCy": (0.058, 0.134),
+    "PinSeatDepth": (0.058, 0.152),
+    "CamReliefParkR": (0.026, 0.190),
+    "CamReliefParkY": (0.044, 0.112),
     "CamReliefParkX": (0.082, 0.092),
-    "CamReliefEngagedR": (0.030, 0.062),
-    "CamReliefEngagedY": (0.046, 0.100),
+    "CamReliefEngagedR": (0.026, 0.058),
+    "CamReliefEngagedY": (0.032, 0.096),
     "CamReliefEngagedX": (0.082, 0.080),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
@@ -135,7 +135,7 @@ LEFT_KEEP = {
     "PinSeatCz": (0.180, 0.090),
     "PinSeatDia": (0.230, 0.140),
 }
-PIVOT_FINISH_XY = (0.138, 0.076)
+PIVOT_FINISH_XY = (0.116, 0.056)
 ARBOR_FINISH_XY = (0.138, 0.228)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
@@ -145,7 +145,7 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "REAM; FLAT-BOTTOM BLIND",
     "PinSeatDepth": "DEPTH FROM ENTRY FACE",
-    "PinSeatCy": "FOLLOWER STATION - SETS CAM CLEARANCE",
+    "PinSeatCy": "CAM CLEARANCE",
 }
 
 

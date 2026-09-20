@@ -108,7 +108,7 @@ def test_callouts_state_processes_and_never_restate_numbers() -> None:
     # the number alone cannot: where the depth is measured from, and why the
     # station is held tighter than the title block's general grade.
     assert callouts["PinSeatDepth"] == "DEPTH FROM ENTRY FACE"
-    assert "CAM" in callouts["PinSeatCy"]
+    assert callouts["PinSeatCy"] == "CAM CLEARANCE"
     joined = "\n".join(callouts.values())
     assert "+/-" not in joined
     assert not any(character.isdigit() for character in joined)
