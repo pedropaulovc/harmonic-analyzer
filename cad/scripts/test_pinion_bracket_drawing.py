@@ -103,7 +103,12 @@ def test_callouts_state_processes_and_never_restate_numbers() -> None:
     # feature is made and whether it goes through.
     assert callouts["PivotBoreDia"] == "REAM THRU"
     assert callouts["ArborBoreDia"] == "REAM THRU"
-    assert callouts["PinSeatDia"] == "REAM"
+    assert callouts["PinSeatDia"] == "REAM; FLAT-BOTTOM BLIND"
+    # The blind seat's depth and the one finely-held location each say what
+    # the number alone cannot: where the depth is measured from, and why the
+    # station is held tighter than the title block's general grade.
+    assert callouts["PinSeatDepth"] == "DEPTH FROM ENTRY FACE"
+    assert "CAM" in callouts["PinSeatCy"]
     joined = "\n".join(callouts.values())
     assert "+/-" not in joined
     assert not any(character.isdigit() for character in joined)

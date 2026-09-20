@@ -86,7 +86,10 @@ SHEET_SCALE = (2.0, 1.0)
 # bbox is +/-7.5 in X and -7.5..35.5 in Y, so at 2:1 it is 30 x 86 mm and the
 # left flank view beside it is 16 x 86.  The face view keeps the clear column
 # to its LEFT for everything measured off the pivot axis and the column to its
-# RIGHT for the leadered sizes, so no two dimension lanes cross.
+# RIGHT for the leadered sizes, so no two dimension lanes cross.  Each end
+# radius is labelled almost straight below/above its own arc while that bore's
+# roughness symbol leads away to the side: the two leaders leave the same
+# crowded corner on diverging paths and never cross.
 FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END
 FRONT_CENTER = (0.100, 0.150)
 LEFT_CENTER = (0.180, 0.150)
@@ -114,10 +117,10 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.156, 0.110),
     "ArborBoreDia": (0.156, 0.194),
     "ArborBoreCz": (0.122, 0.151),
-    "BottomCapRadius": (0.126, 0.090),
-    "TopCapRadius": (0.126, 0.212),
-    "PinSeatCy": (0.072, 0.128),
-    "PinSeatDepth": (0.070, 0.152),
+    "BottomCapRadius": (0.104, 0.082),
+    "TopCapRadius": (0.104, 0.220),
+    "PinSeatCy": (0.070, 0.126),
+    "PinSeatDepth": (0.078, 0.145),
     "CamReliefParkR": (0.030, 0.186),
     "CamReliefParkY": (0.058, 0.114),
     "CamReliefParkX": (0.082, 0.092),
@@ -132,12 +135,17 @@ LEFT_KEEP = {
     "PinSeatCz": (0.180, 0.090),
     "PinSeatDia": (0.230, 0.140),
 }
-PIVOT_FINISH_XY = (0.156, 0.082)
-ARBOR_FINISH_XY = (0.156, 0.222)
+PIVOT_FINISH_XY = (0.138, 0.076)
+ARBOR_FINISH_XY = (0.138, 0.228)
+# A callout says only what a dimension cannot: how the feature is made, where
+# it stops, and -- for the one dimension held finer than the general grade --
+# why it is held there.
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "REAM",
+    "PinSeatDia": "REAM; FLAT-BOTTOM BLIND",
+    "PinSeatDepth": "DEPTH FROM ENTRY FACE",
+    "PinSeatCy": "FOLLOWER STATION - SETS CAM CLEARANCE",
 }
 
 
@@ -226,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=(_front_x(0.0), _front_y(-R_END)),
         p1=(_front_x(0.0), _front_y(C2C + R_END)),
-        text_xy=(0.136, 0.151),
+        text_xy=(0.144, 0.151),
         label="overall length reference",
         orientation="vertical",
     )
