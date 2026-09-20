@@ -125,23 +125,37 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the part build stamps it and the sheet only reads it back.
 #
 # Diameters: three places.  All five carry the shared h band, so their places
-# are only the number's spelling.  Axial stations: three places, which is the
-# title-block .XXX general grade and no explicit band -- that grade is what
-# the part needs, because the three short lands are 6.900 long and each takes
-# a 6.5-wide gear face between its two shoulders, leaving 0.4 mm for the two
-# stations to stack up in.  Shoulder radius: two places; nothing depends on
-# it beyond clearing the gear faces.
+# are only the number's spelling.
+#
+# Gear-seat shoulders Sec1End..Sec3End: three places, which is the title-block
+# .XXX general grade (+-0.13) and no explicit band.  This is a location
+# requirement, not a spelling: gears are soldered at the 6.8889 mm seat pitch
+# with 6.5 mm faces, and each of these three steps has to fall inside the
+# ~0.39 mm air gap between two neighbouring gear faces (T024 north 141.72 |
+# step 141.9 | T018 south 142.11, and so on), 0.18..0.21 from either face.
+# +-0.13 keeps the step in the gap; the .XX grade (+-0.51) would let the
+# larger land run up to 0.3 mm under the small-bore gear's face, so that gear
+# could not pass the land to reach its pitch station.  The R0.10 root radius
+# eats a further 0.10 of the outboard margin, which a bore edge break covers.
+#
+# Journal length Sec0End and overall length Sec4End: two places.  The journal
+# is 1.0 mm proud of the post front face, the post bore ends a millimetre
+# short of its shoulder, and the 64T crank-drive gear beside that shoulder
+# is soldered with ~1 mm of air to the step, so +-0.51 on the length touches
+# nothing; the tip end meets an adjustable cup-point screw that takes up any
+# length error.  Shoulder radius: two places; nothing depends on it beyond
+# clearing the gear faces.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": 3},
     "Sec1Profile": {"Sec1Dia": 3},
     "Sec2Profile": {"Sec2Dia": 3},
     "Sec3Profile": {"Sec3Dia": 3},
     "Sec4Profile": {"Sec4Dia": 3},
-    "Sec0": {"Sec0End": 3},
+    "Sec0": {"Sec0End": 2},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
-    "Sec4": {"Sec4End": 3},
+    "Sec4": {"Sec4End": 2},
     "ShoulderFillets": {"ShoulderR": 2},
 }
 
