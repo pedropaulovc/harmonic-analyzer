@@ -91,22 +91,81 @@ HALF_WIDTH = ARM_WIDTH / 2.0  # 8.0
 # print shows. ``build_crank_arm`` marks exactly these; ``draw_crank_arm`` keeps
 # exactly their union across its per-view ``keep`` maps. The offline test enforces
 # ``union(marks) == union(keeps)`` so a rename in one script that isn't mirrored in
-# the other fails before any SolidWorks build. ---
+# the other fails before any SolidWorks build.
+#
+# ``StationReference`` and ``PinStationReference`` are hidden construction
+# sketches whose one job is to OWN the locations the sheet prints but no
+# feature dimension carries (policy rule 2): the pivot and anchor stations from
+# the shaft-bore axis, the anchor's offset from the top long edge, the stock
+# width, and the cross-hole's station from the broad face. A Hole Wizard
+# placement sketch measures from the origin and cannot start on the long edge,
+# so the print imports these instead of building them from view picks. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"ArmEndX", "BossRadius"},
     "Arm": {"Depth"},
     "ShaftBoreProfile": {"ShaftBoreDia"},
     "DimpleProfile": {"DimpleX", "DimpleDia"},
+    "StationReference": {"PivotStation", "AnchorStation", "AnchorOffset", "Width"},
+    "PinStationReference": {"PinStation"},
 }
+
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule 2),
+# so the MODEL owns them: build_crank_arm applies this map to the .SLDPRT and
+# draw_crank_arm only reads it back. Three places on the bore alone, because
+# 9.525 is the exact 3/8 in conversion its callout cites -- not because the
+# bore is held tighter than the title block (the arm is pinned to its shaft).
+# Every other feature on a hand-crank lever is noncritical and prints one
+# place, so the title block's .X row governs it (cad/docs/tolerance-policy.md).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
+    "Arm": {"Depth": 1},
+    "ShaftBoreProfile": {"ShaftBoreDia": 3},
+    "DimpleProfile": {"DimpleX": 1, "DimpleDia": 1},
+    "StationReference": {
+        "PivotStation": 1,
+        "AnchorStation": 1,
+        "AnchorOffset": 1,
+        "Width": 1,
+    },
+    "PinStationReference": {"PinStation": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# The one sheet-derived dimension: the parenthesised boss-extreme-to-arm-end
+# overall, a read-only sum of the boss radius and ArmEndX with no model
+# dimension to import. Its places are still specification, so the sheet
+# reads them here instead of typing a literal (policy rule 2).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
 # Notes: at most four short lines of part-specific facts a machinist cannot
 # read off the views, never a dimension and never a method
 # (drawing-simplicity-policy.md rule 6).  The anchor tap's thread and drill
 # depths are on its hole callout, and both hole positions are dimensioned on
-# the print, so neither needs a line here.
+# the print, so neither needs a line here.  The first line backs the drawn
+# arm centreline the bore, dimple and pivot centre marks sit on (no cross-width
+# location dimension exists for them to carry).
 DRAWING_NOTES = "\n".join(
     (
-        "SHAFT BORE, DIMPLE AND PIVOT HOLE ARE CENTRED ACROSS THE 16 WIDTH.",
+        "SHAFT BORE, DIMPLE AND PIVOT HOLE ARE ON THE ARM CENTRELINE.",
         "CROSS-HOLE AXIS INTERSECTS SHAFT BORE AXIS.",
         "DIMPLE AND ANCHOR TAP ARE CUT IN THE HANDLE-SIDE FACE.",
     )

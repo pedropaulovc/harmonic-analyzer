@@ -99,6 +99,7 @@ from _common import (
 )
 from _drawing_marks import (
     add_angular_reference_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -118,6 +119,7 @@ from cylinder_gear_spec import (
     CAM_PHASE_TOLERANCE_DEG,
     CAM_THICKNESS,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     ECCENTRICITY,
     ECCENTRICITY_TOLERANCE_MM,
     FACE_WIDTH,
@@ -613,10 +615,14 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Mark exactly the blank, fitted bore, functional cam and phase-kerf
-    # dimensions.  The drawing adds only a checked reference overall thickness.
+    # dimensions and author their decimal places on the part (policy rule 2:
+    # the places are the tolerance, so the sheet reads them back instead of
+    # rewriting them).  The drawing adds only a checked reference overall
+    # thickness.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

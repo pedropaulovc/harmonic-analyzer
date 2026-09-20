@@ -80,6 +80,46 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase"},
 }
 
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_cylinder_gear applies this map to the
+# .SLDPRT and draw_cylinder_gear only reads it back.  Three places where a
+# three-place band rides the dimension (the matched running bore's reference
+# nominal, the cam eccentricity); two where the band is a two-place one (cam
+# OD, face width, kerf width); one on the reference cam thickness and the
+# kerf depth; the notch phase is an angle read to the tenth of a degree.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "GearBlank": {"FaceWidth": 2},
+    "BoreProfile": {"BoreDia": 3},
+    "CamProfile": {"CamDia": 2, "CamCy": 3},
+    "CamBoss": {"CamThickness": 1},
+    "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# The one sheet-derived dimension: the parenthesised end-to-end axial stack
+# (face width plus cam thickness), a read-only sum with no model dimension to
+# import.  Its places are still specification, so the sheet reads them here.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall axial thickness": 1}
+
 
 def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
     """Return finished bore MIN/MAX for the measured mating MHA-028 arbor."""

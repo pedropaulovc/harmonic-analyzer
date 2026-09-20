@@ -24,6 +24,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_property_linked_note,
+    assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
     dimension_name,
@@ -32,10 +33,7 @@ from _drawing_common import (
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
-    set_arc_endpoints_to_center,
-    set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimensions,
@@ -45,10 +43,10 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_handle_spec import (
     CAP_SAG,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     GRIP_DIA,
     GRIP_LEN,
-    ROD_DOWN,
-    ROD_HOLE_DIA,
     ROD_SPAN,
     TUBE_LEN,
     TUBE_OD,
@@ -89,13 +87,24 @@ SECTION_SCALE = (3, 1)
 # Import in the actual authoring planes, then MOVE the native dimensions to
 # their manufacturing views. Importing these names directly into *Right gives
 # no dimensions: the circle sketches were authored normal to the arbor axis.
+# The axial stations (hub length, body overall, cross-hole axis, rod reach)
+# are the part's reference-sketch dims, each authored on the plane of the
+# view that prints it.
 FRONT_KEEP = {
     "GripDia": (0.035, 0.175),
     "TubeOd": (0.035, 0.155),
 }
-TOP_KEEP = {"RodHoleDia": (0.104, 0.215), "CapR": (0.048, 0.260)}
+RIGHT_KEEP = {
+    "HubLen": (RIGHT_CENTER[0], 0.188),
+    "BodyLen": (RIGHT_CENTER[0], 0.219),
+}
+TOP_KEEP = {
+    "RodHoleDia": (0.104, 0.215),
+    "CapR": (0.048, 0.260),
+    "RodHoleZ": (0.122, 0.223),
+}
 SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.250, 0.114)}
-ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032)}
+ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
@@ -105,22 +114,13 @@ DIMENSION_CALLOUTS = {
     "RodHoleDia": "REAM THRU",
     "RodSpan": "OAL",
 }
-DIMENSION_PRECISION = {
-    "GripDia": 1,
-    "TubeOd": 1,
-    "TubeId": 2,
-    "TubeLen": 1,
-    "CapR": 1,
-    "RodHoleDia": 1,
-    "RodDia": 1,
-    "RodSpan": 1,
-}
+# Decimal places are the part's (pinion_handle_spec.DRAWING_PRECISION, applied
+# by build_pinion_handle); the sheet only reads them back.
 
 HUB_END_Z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
 CROWN_ROOT_Z = -GRIP_LEN / 2.0
 CROWN_TIP_Z = CROWN_ROOT_Z - CAP_SAG
 SHOULDER_Z = GRIP_LEN / 2.0
-BODY_OVERALL = HUB_END_Z - CROWN_TIP_Z
 
 
 def _source_bodies(model: Any) -> tuple[Any, Any]:
@@ -194,7 +194,7 @@ def _point(
     )
 
 
-def _checked_dimension(
+def _checked_reference_dimension(
     adapter: Any,
     view: Any,
     *,
@@ -204,10 +204,16 @@ def _checked_dimension(
     label: str,
     expected_mm: float,
     orientation: str,
-    entity_types: tuple[str, str] = ("EDGE", "EDGE"),
-    center: bool = False,
-    maximum: bool = False,
 ) -> Any:
+    """Add the one SHEET-derived reference dimension and verify it.
+
+    Every controlling dimension is a model dimension whose places the part
+    authored and ``assert_imported_precision`` reads back.  The parenthesised
+    socket-end-to-crown-root station is the single exception: a read-only
+    difference with no model dimension to import, so its places come from
+    the spec's ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a
+    literal.
+    """
     display = add_edge_dimension(
         adapter,
         view,
@@ -216,12 +222,7 @@ def _checked_dimension(
         text_xy=text_xy,
         label=label,
         orientation=orientation,
-        entity_types=entity_types,
     )
-    if center:
-        set_arc_endpoints_to_center(adapter, display, label=label)
-    if maximum:
-        set_arc_endpoints_to_max(adapter, display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     measured_mm = (
         float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue) * 1000.0
@@ -230,10 +231,19 @@ def _checked_dimension(
         raise RuntimeError(
             f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
-    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
-    set_dimension_precision(
-        adapter, [annotation], {dimension_name(adapter, annotation): 1}
-    )
+    places = DRAWING_REFERENCE_PRECISION[label]
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places.  The subscript is written out again because
+    # _drawing_contract only accepts a spec lookup here.
+    native.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    if int(native.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(
+            f"{label}: sheet dimension prints {native.GetPrimaryPrecision2()} "
+            f"decimal places, not {places}"
+        )
+    native.ShowParenthesis = True
+    if not native.ShowParenthesis:
+        raise RuntimeError(f"{label} was not shown as reference")
     return display
 
 
@@ -407,13 +417,23 @@ async def build(adapter: Any) -> dict[str, str]:
     section_annotations = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="socket section"
     )
+    # After the section has claimed TubeLen: the body side view imports only
+    # the Right-plane reference sketch's hub length and body overall.
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="body side"
+    )
     assembled_annotations = curate_view_dimensions(
         adapter, assembled, keep=ASSEMBLED_KEEP, view_label="assembled rod"
     )
     rod_annotations = curate_view_dimensions(
         adapter, rod_end, keep=ROD_END_KEEP, view_label="rod end"
     )
-    annotations = [*top_annotations, *section_annotations, *assembled_annotations]
+    annotations = [
+        *top_annotations,
+        *section_annotations,
+        *right_annotations,
+        *assembled_annotations,
+    ]
     for annotation in front_annotations:
         name = dimension_name(adapter, annotation)
         annotations.append(
@@ -435,65 +455,25 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty rod-dimension donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    # Every place the part authored (policy rule 2) must have survived the
+    # import and the moves: a dimension that fell back to the sheet default
+    # would print a band nobody specified.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"RodDia"})
     offset_dimension_text(adapter, annotations, {"TubeLen": (0.378, 0.145)})
 
-    # Visible shoulders and crown root, all measured from the flat socket end.
-    end = (0.0, TUBE_OD / 4.0, HUB_END_Z)
-    for station, y, expected, label in (
-        (SHOULDER_Z, 0.188, HUB_END_Z - SHOULDER_Z, "hub projection"),
-        (CROWN_ROOT_Z, 0.202, HUB_END_Z - CROWN_ROOT_Z, "socket end to crown root"),
-    ):
-        baseline = _checked_dimension(
-            adapter,
-            right,
-            p0=end,
-            p1=(0.0, (TUBE_OD + GRIP_DIA) / 4.0, station),
-            text_xy=(RIGHT_CENTER[0], y),
-            label=label,
-            expected_mm=expected,
-            orientation="horizontal",
-        )
-        if station == CROWN_ROOT_Z:
-            # Overall length, sphere radius and grip diameter define this junction.
-            reference = _early_bound(baseline, "IDisplayDimension")
-            reference.ShowParenthesis = True
-            if not reference.ShowParenthesis:
-                raise RuntimeError("crown-root baseline was not shown as reference")
-    _checked_dimension(
+    # The crown root, measured from the flat socket end like the imported hub
+    # length and body overall it sits between: overall length, sphere radius
+    # and grip diameter already define this junction, so it is reference.
+    _checked_reference_dimension(
         adapter,
         right,
-        p0=end,
-        p1=(0.0, 0.0, CROWN_TIP_Z),
-        text_xy=(RIGHT_CENTER[0], 0.219),
-        label="body overall length",
-        expected_mm=BODY_OVERALL,
+        p0=(0.0, TUBE_OD / 4.0, HUB_END_Z),
+        p1=(0.0, (TUBE_OD + GRIP_DIA) / 4.0, CROWN_ROOT_Z),
+        text_xy=(RIGHT_CENTER[0], 0.202),
+        label="socket end to crown root",
+        expected_mm=HUB_END_Z - CROWN_ROOT_Z,
         orientation="horizontal",
-        entity_types=("EDGE", "SILHOUETTE"),
-        maximum=True,
-    )
-    _checked_dimension(
-        adapter,
-        top,
-        p0=(TUBE_OD / 4.0, 0.0, HUB_END_Z),
-        p1=(0.0, 0.0, ROD_HOLE_DIA / 2.0),
-        text_xy=(0.122, 0.223),
-        label="socket end to cross-hole axis",
-        expected_mm=HUB_END_Z,
-        orientation="vertical",
-        center=True,
-    )
-    _checked_dimension(
-        adapter,
-        assembled,
-        p0=(GRIP_DIA / 2.0, 0.0, CROWN_ROOT_Z),
-        p1=(0.0, -ROD_DOWN, 0.0),
-        text_xy=(0.080, 0.125),
-        label="rod placement from body axis",
-        expected_mm=ROD_DOWN,
-        orientation="horizontal",
-        center=True,
     )
 
     for view, label in ((front, "body end"), (top, "cross-hole")):

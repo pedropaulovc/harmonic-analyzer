@@ -23,12 +23,12 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -40,6 +40,7 @@ from pinion_cam_spec import (
     BORE,
     BOSS_PROUD,
     CAM_OD,
+    DRAWING_PRECISION_BY_NAME,
     ECC,
     LIFT_ROD_NUMBER,
     SURFACE_FINISHES,
@@ -106,13 +107,12 @@ BOTTOM_KEEP = {"BossDia": (0.312, 0.228)}
 DIMENSION_CALLOUTS = {
     "BoreDia": f"FINAL REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
     "CollarCy": "BORE TO OD, BOTH END FACES",
-    "BossProjection": f"BEYOND DIA {CAM_OD:.2f} OD",
+    "BossProjection": "BEYOND CAM OD",
     "BossCz": "FRONT FACE TO BOSS AXIS",
 }
-# Only the two critical features -- the reamed running bore and the cam OD it
-# lifts through -- print more than the general grade; everything else takes one
-# place under the title block's .X row (cad/docs/tolerance-policy.md).
-DIMENSION_PRECISION = {"Depth": 1, "BossDia": 1, "BossProjection": 1}
+# Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
+# by build_pinion_cam): two on the critical bore, OD and eccentricity, one
+# everywhere else.  The sheet only reads them back.
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -183,7 +183,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*bottom_annotations, *front_annotations, *top_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):

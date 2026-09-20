@@ -51,6 +51,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -78,6 +79,7 @@ from pinion_cam_spec import (
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     SURFACE_FINISHES,
 )
@@ -327,8 +329,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven cam (equations neutral)", volume, 0.01 * V_COLLAR
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the bands and decimal places live on the
+    # model dimensions (policy rule 2 -- the places are the tolerance, so the
+    # sheet reads them back instead of rewriting them); mark exactly the
+    # print's dimensions and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_BAND)
     )
@@ -338,6 +342,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "CollarProfile", "CollarCy", COLLAR_AXIS_TOLERANCE_MM
     )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     name_octant_views(adapter, label=PART_NAME)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

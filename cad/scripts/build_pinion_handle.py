@@ -22,10 +22,13 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
+    _early_bound,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -40,6 +43,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -51,6 +55,7 @@ from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     GRIP_DIA,
     GRIP_LEN,
     ISOMETRIC_VIEW_NOTE,
@@ -111,6 +116,18 @@ def _grip_intersection(radius: float) -> float:
 
 V_ROD_HOLE = _grip_intersection(ROD_HOLE_R)
 V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE - V_ROD_HOLE + V_ROD
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set.
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -339,6 +356,141 @@ async def build(adapter) -> dict[str, str]:
     ]
     await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
 
+    # Three REFERENCE sketches (policy rule 2): the sheet prints the hub
+    # length and the body overall from the socket end, the cross-hole axis
+    # from the socket end and the rod's reach below the body axis, yet no
+    # feature dimension carries any of them (the extrudes are offset-started
+    # and the circle sketches sit on the origin).  Each value therefore gets a
+    # construction line whose driving dimension IS the value, marked for
+    # drawing like any other dimension.  Construction, not blanked: a blanked
+    # sketch's dimensions never reach InsertModelAnnotations3
+    # (build_harmonic_base measured it), while construction geometry imports
+    # normally and is never drawn in a view.  Each sketch sits on the plane of
+    # the view that prints it.  Direct-to-DB for the geometry: these lines lie
+    # on the axes and on the body's own silhouette, so creation-time inference
+    # would snap in the relations the explicit ones below add.
+    hub_end_z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
+    crown_tip_z = -(GRIP_LEN / 2.0 + CAP_SAG)
+    # Right plane, for the body side view: sketch (u, v) -> (-Z, Y).
+    hub = SketchDims()
+    check("create_sketch hub reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    hub_ref = check(
+        "hub length reference line",
+        await adapter.add_line(
+            -hub_end_z, TUBE_OD / 2.0, -GRIP_LEN / 2.0, TUBE_OD / 2.0
+        ),
+    )
+    body_ref = check(
+        "body overall reference line",
+        await adapter.add_line(-hub_end_z, 0.0, -crown_tip_z, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (hub_ref, body_ref):
+        _as_construction(adapter, line)
+        check(
+            "axial reference horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    await dimension_between(
+        adapter,
+        f"{hub_ref}.start",
+        f"{hub_ref}.end",
+        "horizontal_distance",
+        WALL_T + TUBE_LEN,
+        "hub length reference",
+    )
+    hub.record("HubLen", '"WallT" + "TubeLen"')
+    await dimension_between(
+        adapter,
+        f"{body_ref}.start",
+        f"{body_ref}.end",
+        "horizontal_distance",
+        hub_end_z - crown_tip_z,
+        "body overall reference",
+    )
+    hub.record("BodyLen", '"GripLen" + "WallT" + "TubeLen" + "CapSag"')
+    await anchor_point_to_origin(
+        adapter, f"{hub_ref}.start", -hub_end_z, TUBE_OD / 2.0, "hub length reference"
+    )
+    hub.record("HubEndZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
+    hub.record("HubRadius", '"TubeOd" / 2')
+    await anchor_point_to_origin(
+        adapter, f"{body_ref}.start", -hub_end_z, 0.0, "body overall reference"
+    )
+    hub.record("BodyEndZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
+    await ensure_fully_defined(adapter, "hub reference sketch")
+    check("exit_sketch hub reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubReference")
+    drive_jobs += hub.apply(adapter, "HubReference")
+
+    # Top plane, for the cross-hole view: sketch (u, v) -> (X, -Z), so the
+    # socket end at z = hub_end_z sits at v = -hub_end_z and the hole axis is
+    # the origin.
+    cross = SketchDims()
+    check("create_sketch cross-hole reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    cross_ref = check(
+        "cross-hole station reference line",
+        await adapter.add_line(0.0, -hub_end_z, 0.0, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, cross_ref)
+    check(
+        "cross-hole station reference vertical",
+        await adapter.add_sketch_constraint(cross_ref, None, "vertical"),
+    )
+    check(
+        "cross-hole station reference ends on the hole axis",
+        await adapter.add_sketch_constraint(f"{cross_ref}.end", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter,
+        f"{cross_ref}.start",
+        f"{cross_ref}.end",
+        "vertical_distance",
+        hub_end_z,
+        "cross-hole station reference",
+    )
+    cross.record("RodHoleZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
+    await ensure_fully_defined(adapter, "cross-hole reference sketch")
+    check("exit_sketch cross-hole reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleReference")
+    drive_jobs += cross.apply(adapter, "CrossHoleReference")
+
+    # Front plane, for the assembled cross-rod view: the rod's reach below
+    # the body axis, from the origin (the grip's centre on that view).
+    rod_reach = SketchDims()
+    check("create_sketch rod reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    rod_ref = check(
+        "rod reach reference line",
+        await adapter.add_line(0.0, 0.0, 0.0, -ROD_DOWN),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, rod_ref)
+    check(
+        "rod reach reference vertical",
+        await adapter.add_sketch_constraint(rod_ref, None, "vertical"),
+    )
+    check(
+        "rod reach reference starts on the body axis",
+        await adapter.add_sketch_constraint(f"{rod_ref}.start", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter,
+        f"{rod_ref}.start",
+        f"{rod_ref}.end",
+        "vertical_distance",
+        ROD_DOWN,
+        "rod reach reference",
+    )
+    rod_reach.record("RodDown", '"RodDown"')
+    await ensure_fully_defined(adapter, "rod reference sketch")
+    check("exit_sketch rod reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodReference")
+    drive_jobs += rod_reach.apply(adapter, "RodReference")
+
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -349,14 +501,17 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions and
-    # stamp the make-critical title-block properties.  No local size bands:
-    # the socket and its seating depth take the title-block general grade
-    # (cad/docs/tolerance-policy.md).
+    # Manufacturing drawing support: mark exactly the print's dimensions,
+    # author their decimal places on the part (policy rule 2: the places are
+    # the tolerance, so the sheet reads them back instead of rewriting them)
+    # and stamp the make-critical title-block properties.  No local size
+    # bands: the socket and its seating depth take the title-block general
+    # grade (cad/docs/tolerance-policy.md).
     set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)
