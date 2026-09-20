@@ -16,6 +16,12 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.face.diameter_mm == fulcrum_shaft_spec.SHAFT_DIA
 
 
+def test_every_marked_model_dimension_is_shown() -> None:
+    marked = set().union(*fulcrum_shaft_spec.DRAWING_DIMENSIONS.values())
+    displayed = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    assert displayed == marked
+
+
 def test_native_gdt_controls_shaft_form_orientation_and_finish() -> None:
     """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
     from fulcrum_shaft_spec import GEOMETRIC_CONTROLS, PART_DATUMS
