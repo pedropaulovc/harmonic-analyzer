@@ -19,12 +19,12 @@ from __future__ import annotations
 
 import math
 import sys
+from pathlib import Path
 
 import _telemetry
 
 from _common import (
     _early_bound,
-    _preference_id,
     SketchDims,
     add_line_chain,
     apply_material,
@@ -79,16 +79,47 @@ _PREFERENCE_WRITES = (
 _POSITIVE_CONTROL = "swSaveReminderEnable"
 
 
-def _resolved_toggle_ids(adapter) -> dict[str, int]:
-    """Resolve this seat's swUserPreferenceToggle_e names, never numeric literals."""
+def _resolved_toggle_ids() -> dict[str, int]:
+    """Resolve exact names from this install's registered swconst.tlb."""
+    import pythoncom
+    from solidworks_mcp.adapters import sw_install
+
+    executable = sw_install.resolve_com_server_path()
+    if type(executable) is not str or not executable:
+        raise RuntimeError(
+            "cannot locate live swconst.tlb: SldWorks.Application has no "
+            "registered executable"
+        )
+    source = Path(executable).parent / "swconst.tlb"
+    if not source.is_file():
+        raise RuntimeError(f"live SOLIDWORKS type library is missing: {source}")
+
+    typelib = pythoncom.LoadTypeLib(str(source))
+    members: dict[str, int] | None = None
+    for index in range(typelib.GetTypeInfoCount()):
+        if typelib.GetTypeInfoType(index) != pythoncom.TKIND_ENUM:
+            continue
+        if typelib.GetDocumentation(index)[0] != "swUserPreferenceToggle_e":
+            continue
+        info = typelib.GetTypeInfo(index)
+        members = {}
+        for position in range(info.GetTypeAttr()[7]):
+            descriptor = info.GetVarDesc(position)
+            if descriptor[4] != pythoncom.VAR_CONST:
+                continue
+            members[info.GetNames(descriptor[0])[0]] = int(descriptor[1])
+        break
+
+    if members is None:
+        raise RuntimeError(f"{source} declares no swUserPreferenceToggle_e")
     ids: dict[str, int] = {}
     for name in (*[item[0] for item in _PREFERENCE_WRITES], _POSITIVE_CONTROL):
-        preference_id = _preference_id(adapter, name)
-        if preference_id is None:
+        try:
+            ids[name] = members[name]
+        except KeyError:
             raise RuntimeError(
-                f"live swUserPreferenceToggle_e has no member {name!r}"
-            )
-        ids[name] = preference_id
+                f"swUserPreferenceToggle_e.{name} is absent from {source}"
+            ) from None
     return ids
 
 
@@ -280,7 +311,7 @@ async def _probe_blank_document(
 
 async def _run_preference_probe(adapter) -> None:
     sw = _early_bound(adapter.swApp, "ISldWorks")
-    ids = _resolved_toggle_ids(adapter)
+    ids = _resolved_toggle_ids()
     with _telemetry.span("seat.preference_probe"):
         _assert_empty_probe_session(sw, "empty_before")
         _probe_context(adapter, "empty_before", ids)
