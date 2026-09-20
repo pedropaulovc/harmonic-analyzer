@@ -97,7 +97,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BottomCapRadius": 1,
         "TopCapRadius": 1,
     },
-    "Strap": {"Depth": 2},
+    "Strap": {"Depth": 1},
     "CamReliefParkProfile": {
         "CamReliefParkX": 2,
         "CamReliefParkY": 2,
@@ -128,11 +128,6 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# The one dimension the SHEET creates: the overall length, a read-only sum of
-# the bore centre distance and the two end radii.  It has no model dimension
-# to import and carries no band, so its places are stated here (rule 2's
-# single precision exception).
-DRAWING_REFERENCE_PRECISION = 1
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(

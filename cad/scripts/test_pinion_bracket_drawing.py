@@ -45,9 +45,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(kept)
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
-    assert (drawing.C2C, drawing.OVERALL_LENGTH, drawing.R_END) == (
+    assert (drawing.C2C, drawing.R_END) == (
         pinion_bracket_spec.C2C,
-        pinion_bracket_spec.OVERALL_LENGTH,
         pinion_bracket_spec.R_END,
     )
     assert pinion_bracket_spec.C2C == pinion_bracket_geometry.C2C
@@ -108,7 +107,7 @@ def test_callouts_state_processes_and_never_restate_numbers() -> None:
     # the number alone cannot: where the depth is measured from, and why the
     # station is held tighter than the title block's general grade.
     assert callouts["PinSeatDepth"] == "DEPTH FROM ENTRY FACE"
-    assert callouts["PinSeatCy"] == "CAM CLEARANCE"
+    assert callouts["PinSeatCy"] == "CAM ENGAGE CLEARANCE - HOLD FINE GRADE"
     joined = "\n".join(callouts.values())
     assert "+/-" not in joined
     assert not any(character.isdigit() for character in joined)
@@ -140,23 +139,18 @@ def test_decimal_places_are_authored_on_the_part_and_only_read_by_the_sheet() ->
     # dimension held to the title block's finest general grade.
     assert by_name["PinSeatCy"] == 3
     assert max(by_name.values()) == 3
-    # The single sheet-created dimension is a reference, so its places come
-    # from the spec rather than a literal.
-    assert pinion_bracket_spec.DRAWING_REFERENCE_PRECISION == 1
-    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in sheet_source
 
 
-def test_overall_length_is_a_reference_of_the_dimensioned_features() -> None:
-    # It is (43) in parentheses because C2C and the two end radii already
-    # drive it; a toleranced copy would be a redundant chain.
+def test_overall_length_is_driven_and_never_redrawn() -> None:
+    # 43 is C2C plus the two end radii, so the sheet must not carry a copy of
+    # it: a second overall dimension would be a redundant chain a machinist
+    # could satisfy two ways.
     assert pinion_bracket_spec.OVERALL_LENGTH == (
         pinion_bracket_spec.C2C + 2.0 * pinion_bracket_spec.R_END
     )
+    assert "OverallLength" not in set(pinion_bracket_spec.DRAWING_PRECISION_BY_NAME)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension" in source
-    assert "OverallLength" not in set().union(
-        *pinion_bracket_spec.DRAWING_DIMENSIONS.values()
-    )
+    assert "set_reference_dimension" not in source
 
 
 def test_only_the_face_view_carries_hidden_lines() -> None:
