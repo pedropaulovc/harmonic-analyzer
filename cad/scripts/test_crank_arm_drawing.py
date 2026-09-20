@@ -53,7 +53,14 @@ def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
     assert "HANDLE PIVOT" not in notes
     assert "HANDLE PIVOT CENTRED" not in notes
-    assert "FINISHED SIZE FOR THIS PART" in notes
+    # Every hole centre a view cannot locate for itself is located in words:
+    # the three coaxial features share one longitudinal axis.
+    assert "CENTRED ACROSS THE 16 WIDTH." in notes
+    assert "DIMPLE" in notes and "PIVOT HOLE" in notes
+    # drawing-simplicity-policy rule 6: at most four short lines, and never a
+    # dimension or a tolerance among them.
+    assert len(notes.splitlines()) <= 4
+    assert "+/-" not in notes and "DEEP" not in notes
     assert "MHA-026" not in notes and "MHA-024" not in notes
     assert "OUTSIDE THIS PART DRAWING" not in notes
     assert "MATCH-REAM" not in notes
@@ -76,16 +83,17 @@ def test_hole_callouts_state_size_and_process() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
-    assert callouts["DimpleDia"] == "FLAT-BOTTOM 0.50 DEEP"  # .XX -> block tol
+    assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM 0.5 DEEP"
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
     assert drill_process(crank_arm_spec.PIN_HOLE_SPEC) == "#14 DRILL"
     assert drill_process(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == "15/64 DRILL"
     source = _source()
-    assert source.count("add_native_hole_callout(") == 2
+    assert source.count("add_native_hole_callout(") == 3
     assert 'label="crank-arm cross-hole"' in source
     assert 'label="handle pivot hole"' in source
-    assert source.count("process=drill_process(") == 2
+    assert 'label="anchor tap"' in source
+    assert source.count("process=drill_process(") == 3
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -109,20 +117,41 @@ def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
 
 
 def test_only_the_reamed_bore_prints_three_decimals() -> None:
+    # The bore's three places are the ONE exception: 9.525 is the exact 3/8 in
+    # conversion its callout cites.  Every other feature on this arm is
+    # noncritical, so it prints one place and takes the title block's .X row
+    # rather than the tighter .XX default (cad/docs/tolerance-policy.md).
+    assert drawing.DIMENSION_PRECISION == {
+        "ShaftBoreDia": 3,
+        "ArmEndX": 1,
+        "Depth": 1,
+        "DimpleX": 1,
+        "DimpleDia": 1,
+    }
+    # Dimensions built from picks carry no parametric name, so they cannot ride
+    # DIMENSION_PRECISION; each noncritical one is flattened explicitly.
     source = _source()
-    assert drawing.DIMENSION_PRECISION == {"ShaftBoreDia": 3}
-    assert source.count("set_dimension_precision(") == 1
-    assert "DIMENSION_PRECISION," in source
-    assert crank_arm_spec.SHAFT_BORE_BAND == (0.05, 0.00)
+    for label in (
+        "arm-width overall",
+        "anchor tap station from the bore axis",
+        "anchor tap offset from the top edge",
+    ):
+        assert f'label="{label}"' in source, label
+    # one definition plus one call for each of those three
+    assert source.count("_set_primary_precision(") == 4
+    # No per-part band survives on this part: a pinned lever has no running fit
+    # and nothing here traces to a named fit class (tolerance-policy rule 11).
+    assert not hasattr(crank_arm_spec, "SHAFT_BORE_BAND")
     build_source = Path(arm.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_bilateral_tolerance(" in build_source
+    assert "set_dimension_bilateral_tolerance(" not in build_source
 
 
-def test_hidden_lines_stay_on_in_every_orthographic_view() -> None:
+def test_hidden_lines_are_kept_only_where_they_show_something() -> None:
     source = _source()
-    assert (
-        "for view in (front, top, right):\n        set_hidden_lines_visible" in source
-    )
+    # Front (blind floors) and top (cross-drill meeting the bore) keep them;
+    # the 16 x 8 side view would only repeat already-called-out holes.
+    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
+    assert "set_hidden_lines_removed(adapter, right)" in source
     assert "set_hidden_lines_removed(adapter, iso)" in source
 
 

@@ -36,6 +36,7 @@ from _drawing_common import (
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimensions,
     stamp_drawing_summary,
@@ -99,7 +100,7 @@ ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM",
+    "TubeId": "REAM\nSLIP FIT ON ARBOR MHA-102",
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RodSpan": "OAL",
@@ -107,8 +108,8 @@ DIMENSION_CALLOUTS = {
 DIMENSION_PRECISION = {
     "GripDia": 1,
     "TubeOd": 1,
-    "TubeId": 3,
-    "TubeLen": 2,
+    "TubeId": 2,
+    "TubeLen": 1,
     "CapR": 1,
     "RodHoleDia": 1,
     "RodDia": 1,
@@ -343,13 +344,18 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    # Hidden lines are removed from every orthographic view: section A-A
+    # already shows the blind socket and the cross-hole in SOLID lines, so the
+    # dashed bore outlines here only repeat it (drawing-simplicity-policy rule
+    # 7).  The assembled view below keeps them -- it is the only place the
+    # pressed rod's engagement inside the grip is shown.
     for view, label in (
         (front, "body end"),
         (right, "body side"),
         (top, "body cross-hole"),
     ):
         _isolate_body(adapter, view, body, label=label)
-        set_hidden_lines_visible(adapter, view)
+        set_hidden_lines_removed(adapter, view)
 
     # The XZ section contains the arbor axis and cuts normal to the omitted
     # cross rod, exposing its circular hole as well as the blind axial socket.
@@ -364,7 +370,9 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SECTION_SCALE,
         label="turned-body axial socket section",
     )
-    set_hidden_lines_visible(adapter, section)
+    # Sections are always hidden-lines-removed: the dashed chord across the
+    # hatched cap only said the cut had been drawn through it twice.
+    set_hidden_lines_removed(adapter, section)
     assembled = place_view(
         adapter, str(SOURCE), "*Front", *ASSEMBLED_CENTER, scale=SHEET_SCALE
     )

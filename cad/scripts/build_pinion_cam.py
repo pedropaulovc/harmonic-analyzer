@@ -71,12 +71,10 @@ from pinion_cam_geometry import (
     ECC,
     TAP_DRILL_DIA,
 )
+from _named_views import name_octant_views
 from pinion_cam_spec import (
     BORE_BAND,
-    BOSS_DIA_TOLERANCE_MM,
-    BOSS_PROJECTION_TOLERANCE_MM,
     COLLAR_AXIS_TOLERANCE_MM,
-    COLLAR_DEPTH_TOLERANCE_MM,
     COLLAR_OD_TOLERANCE_MM,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -340,18 +338,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "CollarProfile", "CollarCy", COLLAR_AXIS_TOLERANCE_MM
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "Collar", "Depth", COLLAR_DEPTH_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "BossProfile", "BossDia", BOSS_DIA_TOLERANCE_MM
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "SetPinBossProjection",
-        "BossProjection",
-        BOSS_PROJECTION_TOLERANCE_MM,
-    )
+    name_octant_views(adapter, label=PART_NAME)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
