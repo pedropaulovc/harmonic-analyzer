@@ -1,55 +1,69 @@
-r"""Create the curated machinist drawing for the v2 cone pivot post."""
+r"""Create the curated machinist drawing for the v2 cone pivot post.
+
+The SLDPRT remains authoritative.  This recipe places the plan, the front
+elevation, ONE section and a pictorial isometric, and imports exactly the model
+dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared
+sheet/template, import, curation and export behaviour lives in
+``_drawing_common``.
+
+The casting has two axes and they are not parallel: the crank journal runs
+along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
+body axis.  Sketches on ``ConeShaftNormal`` are therefore not parallel to the
+front elevation, so the cone-journal sizes are imported into SECTION A-A -- a
+full section cut in the PLAN perpendicular to the journal axis, which looks
+straight down that axis and shows the pad and bore in true shape.  The
+elevation keeps the crank journal, which its own sketch plane is parallel to.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_cone_pivot_post.py cone-pivot-post
+"""
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
-
-from cone_pivot_post_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
+    add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
-    ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
-    ATTACHMENT_SPACING,
-    ATTACHMENT_THRU_DIA,
-    BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
-    BORE_HEIGHT,
-    CONE_BOSS_DIA,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
-    HEAD_HEIGHT,
-    JOURNAL_AXIS_ORIENTATION_NOTE,
-    JOURNAL_AXIS_POINTS,
+    CRANK_BOSS_END_Z,
+    CRANK_BOSS_START_Z,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    INCLINE_DEG,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -69,59 +83,74 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
 
-# Third-angle: the front elevation carries the height and crank journal; the
-# plan carries the two body diameters and mounting-hole pattern.
-FRONT_CENTER = (0.105, 0.145)
-TOP_CENTER = (0.105, 0.235)
-ISO_CENTER = (0.340, 0.145)
+# Third-angle: the plan sits above the front elevation, both at sheet scale.
+FRONT_CENTER = (0.098, 0.112)
+TOP_CENTER = (0.098, 0.209)
+SECTION_CENTER = (0.240, 0.168)
+ISO_CENTER = (0.360, 0.150)
+SECTION_LABEL = "A"
+
+# ``place_view`` centres a view on its projected bounding box, so the model
+# origin is offset from the view centre by half that box.  The elevation's box
+# runs y=0..BLOCK_HEIGHT; the plan's runs the crank boss's full z extent.
+_TOP_Z_CENTER = (CRANK_BOSS_START_Z + CRANK_BOSS_END_Z) / 2.0
 
 
 def _front_y(model_y: float) -> float:
     return FRONT_CENTER[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
 
 
+def _front_x(model_x: float) -> float:
+    return FRONT_CENTER[0] + model_x * _S
+
+
+def _top_x(model_x: float) -> float:
+    return TOP_CENTER[0] + model_x * _S
+
+
+def _top_y(model_z: float) -> float:
+    # The *Top orientation looks down -Y: model +Z runs DOWN the sheet.
+    return TOP_CENTER[1] + (_TOP_Z_CENTER - model_z) * _S
+
+
 FRONT_KEEP = {
-    "MainBodyHt": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1]),
-    "HeadHt": (FRONT_CENTER[0] + 0.055, _front_y(BLOCK_HEIGHT - HEAD_HEIGHT / 2.0)),
-    "CrankAxisY": (FRONT_CENTER[0] - 0.035, _front_y(CRANK_BORE_HEIGHT / 2.0)),
-    "CrankBossDia": (
-        FRONT_CENTER[0] + 0.050,
-        _front_y(CRANK_BORE_HEIGHT) + 0.018,
-    ),
-    "CrankBoreDia": (
-        FRONT_CENTER[0] + 0.050,
-        _front_y(CRANK_BORE_HEIGHT) - 0.012,
-    ),
+    "MainBodyHt": (0.040, FRONT_CENTER[1]),
+    "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
+    "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
+    "CrankBossDia": (0.166, _front_y(BLOCK_HEIGHT + 2.0)),
+    "CrankBoreDia": (0.166, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
-    "MainBodyDia": (TOP_CENTER[0] - 0.040, TOP_CENTER[1]),
-    "HeadDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1]),
+    "MainBodyDia": (0.040, _top_y(0.0)),
+    "CrankBossLen": (0.056, TOP_CENTER[1]),
+    "CrankBossStartZ": (0.069, _top_y(CRANK_BOSS_START_Z / 2.0)),
+    "MountEastX": (_top_x(-6.7), 0.2525),
+    "MountWestX": (_top_x(6.7), 0.2525),
+    "HeadDia": (0.158, _top_y(0.0)),
+    "JournalAngle": (0.136, _top_y(28.0)),
 }
+SECTION_KEEP = {
+    "JournalAxisY": (0.202, 0.150),
+    "ConeBossDia": (0.288, 0.180),
+    "JournalBoreDia": (0.288, 0.163),
+}
+# Non-preferred finished sizes, so the shop is told to BORE rather than left to
+# hunt for a reamer that does not exist; the size limits are the part's.
 DIMENSION_CALLOUTS = {
-    "CrankBoreDia": "THRU",
-}
-DIMENSION_PRECISION = {
-    "MainBodyDia": 3,
-    "HeadDia": 4,
-    "MainBodyHt": 3,
-    "HeadHt": 3,
-    "CrankAxisY": 3,
-    "CrankBossDia": 3,
-    "CrankBoreDia": 3,
+    "CrankBoreDia": "BORE THRU",
+    "JournalBoreDia": "BORE THRU",
 }
 
 
-def _circular_edge(
-    adapter: Any,
-    view: Any,
-    *,
-    radius_mm: float,
-    center_y_mm: float,
-) -> Any:
-    """Return a model circular edge matching radius and height."""
-    candidates: list[tuple[float, float, Any]] = []
-    for edge in visible_view_entities(view, 1, label="pivot-post circular edges"):
-        edge = _early_bound(edge, "IEdge")
+# COM edge-scan match slack; a selection aid, not product definition.
+_EDGE_MATCH_TOLERANCE_MM = 0.01
+
+
+def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
+    """Return the model circular edge matching a radius and a model-Y height."""
+    candidates: list[tuple[float, Any]] = []
+    for raw in visible_view_entities(view, 1, label="pivot-post circular edges"):
+        edge = _early_bound(raw, "IEdge")
         curve = edge.GetCurve()
         if curve is None:
             continue
@@ -129,28 +158,27 @@ def _circular_edge(
         if not curve.IsCircle():
             continue
         params = tuple(float(value) for value in curve.CircleParams)
-        candidates.append((params[6] * 1000.0, params[1] * 1000.0, edge))
+        error = abs(params[6] * 1000.0 - radius_mm) + abs(
+            params[1] * 1000.0 - center_y_mm
+        )
+        candidates.append((error, edge))
     if not candidates:
         raise RuntimeError("view has no circular model edges")
-    radius, center_y, edge = min(
-        candidates,
-        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
-    )
-    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
+    error, edge = min(candidates, key=lambda item: item[0])
+    if error > _EDGE_MATCH_TOLERANCE_MM:
         raise RuntimeError(
-            f"no circular edge matches radius {radius_mm:.4f} mm at "
-            f"height {center_y_mm:.4f} mm"
+            f"no circular edge matches radius {radius_mm:.4f} mm "
+            f"at height {center_y_mm:.4f} mm"
         )
     return edge
 
 
 @_telemetry.traced("drawing.bore_rim_scan")
-def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
+def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
     """Return a rim adjacent to the unique cylindrical bore of this diameter."""
     expected_radius_m = diameter_mm / 2000.0
-    candidates: list[Any] = []
-    for edge in visible_view_entities(view, 1, label="pivot-post bore rims"):
-        edge = _early_bound(edge, "IEdge")
+    for raw in visible_view_entities(view, 1, label="pivot-post bore rims"):
+        edge = _early_bound(raw, "IEdge")
         for face in edge.GetTwoAdjacentFaces2() or []:
             if face is None:
                 continue
@@ -160,100 +188,27 @@ def _bore_rim_edge(adapter: Any, view: Any, *, diameter_mm: float) -> Any:
                 continue
             if abs(float(surface.CylinderParams[6]) - expected_radius_m) > 1e-6:
                 continue
-            candidates.append(edge)
-            break
-    if not candidates:
-        raise RuntimeError(
-            f"view has no rim adjacent to bore diameter {diameter_mm:.5f} mm"
-        )
-    return candidates[0]
+            return edge
+    raise RuntimeError(f"view has no rim adjacent to a {diameter_mm:g} mm bore")
 
 
-def _format_table_note(note: Any, *, label: str) -> Any:
-    note = _early_bound(note, "INote")
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{label} has no text format")
-    text_format.CharHeight = 0.0025
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size {label}")
-    return note
+def _section_cut() -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet endpoints of the plan cut taken PERPENDICULAR to the cone journal.
 
-
-@_telemetry.traced("drawing.table_note", label_param="label")
-def _add_table_note(adapter: Any, text: str, x: float, y: float, *, label: str) -> Any:
-    note = add_note(adapter, text, x, y)
-    if note is None:
-        raise RuntimeError(f"failed to add {label}")
-    return _format_table_note(note, label=label)
-
-
-def _add_basic_value(adapter: Any, value: float, x: float, y: float) -> Any:
-    note = _add_table_note(
-        adapter, f"{value:.3f}", x, y, label="journal-axis BASIC coordinate"
+    The journal's plan direction is ``(sin, -cos)`` in sheet axes (model +Z
+    runs down the plan), so a cut along its perpendicular makes the section
+    look straight down the journal axis -- the only orientation in which the
+    inclined pad and bore are true shape and their ConeShaftNormal sketch
+    dimensions can be imported at all.
+    """
+    incline = math.radians(INCLINE_DEG)
+    axis = (_top_x(0.0), _top_y(0.0))
+    half = 0.032
+    step = (half * math.cos(incline), half * math.sin(incline))
+    return (
+        (axis[0] - step[0], axis[1] - step[1]),
+        (axis[0] + step[0], axis[1] + step[1]),
     )
-    note = _early_bound(note, "INote")
-    # swBS_Box=4 and swBF_Tightest=0 produce an ASME-style BASIC frame.
-    if not note.SetBalloon(4, 0):
-        raise RuntimeError("SolidWorks rejected a BASIC journal-axis coordinate")
-    if (
-        not note.HasBalloon()
-        or int(note.GetBalloonStyle()) != 4
-        or int(note.GetBalloonSize()) != 0
-    ):
-        raise RuntimeError("BASIC journal-axis coordinate box did not persist")
-    return note
-
-
-@_telemetry.traced("drawing.journal_axis_table")
-def _add_journal_axis_table(adapter: Any) -> None:
-    _add_table_note(
-        adapter,
-        "JOURNAL AXIS COORDINATES (mm)",
-        0.225,
-        0.255,
-        label="journal-axis table heading",
-    )
-    _add_table_note(
-        adapter,
-        JOURNAL_AXIS_ORIENTATION_NOTE,
-        0.225,
-        0.245,
-        label="journal-axis coordinate orientation",
-    )
-    for column, column_x in zip(
-        ("POINT", "X", "Y", "Z"),
-        (0.225, 0.253, 0.295, 0.337),
-        strict=True,
-    ):
-        _add_table_note(
-            adapter,
-            column,
-            column_x,
-            0.229,
-            label=f"journal-axis coordinate column {column}",
-        )
-    for row_y, (point, x_value, y_value, z_value) in zip(
-        (0.219, 0.207), JOURNAL_AXIS_POINTS, strict=True
-    ):
-        _add_table_note(
-            adapter, point, 0.225, row_y, label=f"journal-axis point {point}"
-        )
-        for column_x, value in zip(
-            (0.253, 0.295, 0.337),
-            (x_value, y_value, z_value),
-            strict=True,
-        ):
-            _add_basic_value(adapter, value, column_x, row_y)
-    _add_table_note(
-        adapter,
-        "AXIS = LINE THROUGH P AND Q",
-        0.285,
-        0.194,
-        label="journal-axis table definition",
-    )
-    adapter.currentModel.EditRebuild3()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -296,153 +251,110 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    set_hidden_lines_removed(adapter, front)
+    # The plan is the ONE view where hidden lines carry information the sheet
+    # needs: they are what shows the cone bore running across the casting at
+    # the 12.52 degree angle the reference dimension states.
+    set_hidden_lines_visible(adapter, top)
+
+    cut_start, cut_end = _section_cut()
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=cut_start,
+        line_end=cut_end,
+        view_xy=SECTION_CENTER,
+        section_label=SECTION_LABEL,
+        label="cone journal section",
+    )
+    set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *top_annotations]
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *top_annotations, *section_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
-    front_by_name = {
-        dimension_name(adapter, annotation): annotation
-        for annotation in front_annotations
-    }
-    axis_height_annotation = front_by_name["CrankAxisY"]
-    axis_height_display = adapter._attempt(
-        lambda: axis_height_annotation.GetSpecificAnnotation()
-    )
-    if axis_height_display is None:
-        raise RuntimeError("CrankAxisY has no display dimension to box")
-    set_basic_dimension(adapter, axis_height_display, label="crank-axis basic height")
-    for view in (front, top):
+    # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
+    # this sheet only proves they survived the import.  A silent fallback to
+    # the drawing document's two places would print the running bores without
+    # the third place their fit band is written in.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    for view, label in ((front, "front"), (top, "top"), (section, "section")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
-            raise RuntimeError("failed to add ASME center marks")
-
-    foot_entity = _circular_edge(
-        adapter, front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
-    )
-    add_datum_feature(
+            raise RuntimeError(f"failed to add ASME center marks to the {label} view")
+    add_view_centerline(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0], _front_y(0.0) - 0.012),
-        datum="A",
-        label="foot seat face",
-        entity=foot_entity,
+        face_xy=(_front_x(0.0), _front_y(20.0)),
+        label="main body axis",
     )
-    add_feature_control_frame(
+    add_view_centerline(
         adapter,
-        front,
-        frame_xy=(0.150, _front_y(0.0) + 0.012),
-        characteristic="flatness",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum-A seat flatness"],
-        label="datum-A seat flatness",
-        entity=foot_entity,
-    )
-    body_side_xy = (
-        FRONT_CENTER[0] + BLOCK_DIA / 2.0 * _S,
-        _front_y(25.0),
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=body_side_xy,
-        symbol_xy=(body_side_xy[0] + 0.018, body_side_xy[1]),
-        datum="B",
-        label="main-body outside diameter",
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=body_side_xy,
-        frame_xy=(0.190, _front_y(25.0) + 0.012),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["datum-B outside-diameter form"],
-        quantity="DATUM B OD",
-        label="datum-B outside-diameter form",
-        entity_type="SILHOUETTE",
+        top,
+        face_xy=(_top_x(0.0), _top_y(35.0)),
+        label="crank boss axis",
     )
 
-    journal_entity = _bore_rim_edge(adapter, front, diameter_mm=BORE_DIA)
-    journal_center = model_point_in_view(
+    add_native_hole_callout(
         adapter,
-        front,
-        (0.0, BORE_HEIGHT / 1000.0, 0.0),
-        label="inclined journal axis center",
-    )
-    add_attached_note(
-        adapter,
-        front,
-        text=(
-            f"CONE BOSS <MOD-DIAM>{CONE_BOSS_DIA:.3f}; "
-            f"JOURNAL <MOD-DIAM>{BORE_DIA:.4f} THRU"
+        top,
+        edge=_circular_edge(
+            top, radius_mm=ATTACHMENT_CBORE_DIA / 2.0, center_y_mm=BLOCK_HEIGHT
         ),
-        entity=journal_entity,
-        note_xy=(0.155, _front_y(BORE_HEIGHT) + 0.020),
-        label="inclined-journal size",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        # The restricted rim tag normalizes 0.867 mm radially from the
-        # projected axis center; bound that annotation behavior only.
-        symbol_xy=(journal_center[0], journal_center[1] - 0.018),
-        datum="C",
-        label="inclined journal axis",
-        entity=journal_entity,
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        frame_xy=(0.185, journal_center[1] - 0.023),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["journal-axis true position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="journal-axis true position",
-        entity=journal_entity,
+        callout_xy=(0.150, 0.246),
+        label="mounting counterbores",
+        process="DRILL",
     )
 
-    crank_entity = _bore_rim_edge(adapter, front, diameter_mm=CRANK_BORE_DIA)
-    add_feature_control_frame(
+    add_surface_finish(
         adapter,
         front,
-        frame_xy=(0.185, _front_y(CRANK_BORE_HEIGHT) + 0.012),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["crank-bore true position"],
-        datums=("A", "B", "C"),
-        diameter=True,
-        label="crank-bore true position",
-        entity=crank_entity,
+        edge_xy=(_front_x(-10.0), _front_y(0.0)),
+        symbol_xy=(_front_x(-26.0), _front_y(-8.0)),
+        control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
+        label="foot seat finish",
     )
-    _add_table_note(
+    add_surface_finish(
         adapter,
-        "UPPER PLAN SCALE 1:2 (+X RIGHT, +Z DOWN)",
-        0.070,
-        0.263,
-        label="upper-plan view label",
+        front,
+        edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
+        symbol_xy=(0.140, _front_y(56.0)),
+        control=surface_finish_by_key(SURFACE_FINISHES, "crank_bore"),
+        label="crank bore finish",
     )
-    _add_journal_axis_table(adapter)
-    _add_table_note(
+    add_surface_finish(
         adapter,
-        (
-            f"2X 1/4 FILLISTER: C'BORE <MOD-DIAM>{ATTACHMENT_CBORE_DIA:.5f} X "
-            f"{ATTACHMENT_CBORE_DEPTH:.4f} DEEP; THRU "
-            f"<MOD-DIAM>{ATTACHMENT_THRU_DIA:.5f}; C-C {ATTACHMENT_SPACING:.5f}"
-        ),
-        0.225,
-        0.090,
-        label="attachment-hole callout",
+        section,
+        edge_entity=_bore_rim_edge(section, diameter_mm=BORE_DIA),
+        symbol_xy=(0.212, 0.196),
+        control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
+        label="cone journal bore finish",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.068)
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
+
+    set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 
     return await finalize_drawing(
         adapter,
