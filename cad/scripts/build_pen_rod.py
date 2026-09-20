@@ -17,6 +17,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 from pathlib import Path
@@ -75,6 +76,7 @@ MATERIAL = "Brass"  # see _common.apply_material docstring
 _PREFERENCE_WRITES = (
     ("swWarnStartingSketchInContextAssembly", False),
     ("swExtRefNoPromptOrSave", True),
+    ("swAutoSaveEnable", False),
 )
 _POSITIVE_CONTROL = "swSaveReminderEnable"
 
@@ -157,7 +159,7 @@ def _telemetry_readback(
     # literal ``name`` field.
     event_fields = {k: v for k, v in fields.items() if k != "name"}
     _telemetry.event(event, preference_name=name, **event_fields)
-    _telemetry.info(event, **fields)
+    _telemetry.info(f"{event} {json.dumps(fields, sort_keys=True)}", **fields)
 
 
 def _probe_toggle(
@@ -255,7 +257,7 @@ def _probe_context(adapter, context: str, ids: dict[str, int]) -> None:
 
 def _assert_empty_probe_session(sw, context: str) -> None:
     count = sw.GetDocumentCount()
-    active = sw.IActiveDoc2
+    active = sw.ActiveDoc
     if type(count) is not int or isinstance(count, bool):
         raise RuntimeError(f"{context}: invalid document count {count!r}")
     if count != 0 or active is not None:
@@ -284,7 +286,7 @@ async def _probe_blank_document(
         if not title:
             raise RuntimeError(f"{context}: created document has no closable title")
         count = sw.GetDocumentCount()
-        active = sw.IActiveDoc2
+        active = sw.ActiveDoc
         active_title = (
             ""
             if active is None
