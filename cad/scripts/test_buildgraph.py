@@ -1769,55 +1769,77 @@ def test_git_executable_is_resolved_absolute(tmp_path, monkeypatch):
         _common._git_executable.cache_clear()
 
 
-def test_build_id_counts_from_release_tag_in_full_history(monkeypatch):
+def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
+    tmp_path, monkeypatch
+):
+    """Real Git checkouts of the SAME commit, one full and one depth-1.
+
+    The depth-1 clone is what a farm leaf gets: its history is truncated, so
+    anything derived from a tag, a commit count or a walk is either different
+    or unavailable there. Both must stamp the release revision, and an
+    uncommitted edit must still mark the sheet.
+    """
+    import os
     import subprocess
 
     import _common
     import _config
 
-    outputs = {
-        ("rev-parse", "--is-shallow-repository"): "false\n",
-        ("describe", "--tags", "--abbrev=0", "--match", "v*"): "v8\n",
-        ("rev-list", "v8..HEAD", "--count"): "7\n",
-        ("status", "--porcelain"): "",
-    }
-    calls = []
+    # Never execute a developer's hooks, filters, signer, or filesystem monitor.
+    for name in tuple(os.environ):
+        if name.startswith("GIT_"):
+            monkeypatch.delenv(name)
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    template = tmp_path / "empty-template"
+    template.mkdir()
+    monkeypatch.setenv("GIT_TEMPLATE_DIR", str(template))
 
-    def fake_run(command, **_kwargs):
-        args = tuple(command[1:])
-        calls.append(args)
-        return subprocess.CompletedProcess(command, 0, stdout=outputs[args])
+    def git(cwd, *args: str) -> str:
+        return subprocess.run(
+            [_common._git_executable(), *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git(origin, "init", "--quiet")
+    git(origin, "config", "user.email", "build-id@example.invalid")
+    git(origin, "config", "user.name", "build id test")
+    for revision, message in enumerate(("base", "second", "third")):
+        (origin / "part.txt").write_text(f"{revision}\n", encoding="utf-8")
+        git(origin, "add", "part.txt")
+        git(origin, "commit", "--quiet", "--no-gpg-sign", "-m", message)
+        if not revision:
+            # A reachable release tag: the history a release-relative id would
+            # have counted from, present here and absent from the leaf clone.
+            git(origin, "tag", "v8")
+
+    leaf = tmp_path / "leaf"
+    git(tmp_path, "clone", "--quiet", "--depth", "1", origin.as_uri(), str(leaf))
+    # Guard the fixture itself: a local clone silently ignores --depth unless
+    # fetched over file://, and a full clone here would prove nothing.
+    assert git(leaf, "rev-parse", "--is-shallow-repository") == "true"
+    assert git(leaf, "rev-parse", "HEAD") == git(origin, "rev-parse", "HEAD")
+
     monkeypatch.setattr(_config, "release_revision", lambda: "v9")
 
-    assert _common._build_id() == "v9-b7"
-    assert _common._build_id() == "v9-b7"
-    assert calls.count(("rev-list", "v8..HEAD", "--count")) == 2
+    monkeypatch.setattr(_common, "CAD_ROOT", origin)
+    full_id = _common._build_id()
+    monkeypatch.setattr(_common, "CAD_ROOT", leaf)
+    leaf_id = _common._build_id()
+
+    assert full_id == leaf_id == "v9"
+
+    git(leaf, "config", "status.showUntrackedFiles", "no")
+    (leaf / "uncommitted.txt").write_text("operator edit\n", encoding="utf-8")
+    assert _common._build_id() == "v9-dirty"
 
 
-def test_build_id_rejects_shallow_history_before_count(monkeypatch):
-    import subprocess
-
-    import pytest
-
-    import _common
-
-    calls = []
-
-    def fake_run(command, **_kwargs):
-        args = tuple(command[1:])
-        calls.append(args)
-        assert args == ("rev-parse", "--is-shallow-repository")
-        return subprocess.CompletedProcess(command, 0, stdout="true\n")
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    with pytest.raises(RuntimeError, match="shallow Git repository"):
-        _common._build_id()
-    assert calls == [("rev-parse", "--is-shallow-repository")]
-
-
-def test_build_id_translates_shallow_probe_failure(monkeypatch):
+def test_build_id_translates_a_failed_dirty_probe(monkeypatch):
     import subprocess
 
     import pytest
@@ -1825,11 +1847,11 @@ def test_build_id_translates_shallow_probe_failure(monkeypatch):
     import _common
 
     def fake_run(command, **_kwargs):
-        raise subprocess.CalledProcessError(129, command, stderr="unknown option")
+        raise subprocess.CalledProcessError(128, command, stderr="not a git repo")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
     with pytest.raises(
-        RuntimeError, match="cannot determine Git repository depth"
+        RuntimeError, match="cannot determine Git working-tree state"
     ) as error:
         _common._build_id()
     assert isinstance(error.value.__cause__, subprocess.CalledProcessError)
