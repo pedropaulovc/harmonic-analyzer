@@ -401,39 +401,53 @@ async def build(adapter: Any) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     # Top-plane sketch X is model +X; sketch Y is model -Z, so the crank boss
     # (model -21.3753..+50.6591 along +Z) runs from sketch +Y down to -Y.
+    #
+    # Every line here is a RAY ROOTED AT THE ORIGIN, which is the post axis:
+    # that is how the shop stations these faces, and it is also the only
+    # construction an angular dimension reads unambiguously.  Two rays that
+    # share a vertex enclose one wedge; two lines that merely cross enclose
+    # two, and SOLIDWORKS then reports whichever it likes -- for this pair it
+    # reported the 167.48 deg supplement regardless of where the text sat
+    # (``AddSpecificDimension`` places text in MODEL space, so a Top-plane
+    # sketch cannot steer the quadrant through it at all).
     crank_axis_line = check(
-        "crank axis reference line",
-        await adapter.add_centerline(
-            0.0, CRANK_BOSS_NEAR_Z, 0.0, -CRANK_BOSS_END_Z
-        ),
+        "crank axis reference ray",
+        await adapter.add_centerline(0.0, 0.0, 0.0, -CRANK_BOSS_END_Z),
     )
     journal_axis_line = check(
-        "journal axis reference line",
+        "journal axis reference ray",
         await adapter.add_centerline(
             0.0, 0.0, JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z
         ),
     )
+    spot_face_line = check(
+        "crank boss spot face reference ray",
+        await adapter.add_centerline(0.0, 0.0, 0.0, CRANK_BOSS_NEAR_Z),
+    )
     set_sketch_direct_db(adapter, False)
-    check(
-        "crank axis line vertical",
-        await adapter.add_sketch_constraint(crank_axis_line, None, "vertical"),
-    )
-    check(
-        "crank axis line on the body axis",
-        await adapter.add_sketch_constraint(
-            f"{crank_axis_line}.start", "origin", "vertical_points"
-        ),
-    )
-    check(
-        "journal axis line through the body axis",
-        await adapter.add_sketch_constraint(
-            f"{journal_axis_line}.start", "origin", "coincident"
-        ),
-    )
+    for line, label in (
+        (crank_axis_line, "crank axis ray"),
+        (spot_face_line, "spot face ray"),
+    ):
+        check(
+            f"{label} vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+    for line, label in (
+        (crank_axis_line, "crank axis ray"),
+        (journal_axis_line, "journal axis ray"),
+        (spot_face_line, "spot face ray"),
+    ):
+        check(
+            f"{label} rooted on the post axis",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", "origin", "coincident"
+            ),
+        )
     check(
         "crank boss near face station",
         await adapter.add_sketch_dimension(
-            f"{crank_axis_line}.start",
+            f"{spot_face_line}.end",
             "origin",
             "vertical_distance",
             CRANK_BOSS_NEAR_Z,
@@ -467,16 +481,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     plan.record("JournalRefZ")
-    # SolidWorks picks WHICH of the two angles an angular dimension measures
-    # from the quadrant the text lands in, so the text has to sit inside the
-    # narrow wedge between the two downward rays -- put it outside and the
-    # dimension comes back as the 167.48 deg supplement.
-    _wedge_z = -JOURNAL_REFERENCE_Z * 0.75
+    # The two rays share the origin vertex, so there is exactly one wedge
+    # between them and the reported angle is the plan incline itself.
     await add_angular_reference_dimension(
         adapter,
         crank_axis_line,
         journal_axis_line,
-        (abs(_wedge_z) * math.tan(math.radians(INCLINE_DEG)) / 2.0, _wedge_z),
+        (JOURNAL_REFERENCE_X, -JOURNAL_REFERENCE_Z / 2.0),
         "journal plan angle",
         expected_degrees=INCLINE_DEG,
     )
