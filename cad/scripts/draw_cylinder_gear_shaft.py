@@ -8,33 +8,35 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cylinder_gear_shaft_spec import (
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     SHAFT_DIA,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
+    delete_view,
+    iter_views,
     place_view,
 )
 
@@ -52,41 +54,38 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
-# The arbor is modelled axis-along-+Y (its assembly pose), so no standard side
-# view shows the shaft horizontal: the end circle comes from "*Top" and the
-# long profile from "*Front" rotated -90 deg (IView.Angle) so the turned part
-# reads axis-horizontal, machinist convention.
-END_CENTER = (0.055, 0.205)
-PROFILE_CENTER = (
-    END_CENTER[0] + SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0 + 0.045,
-    END_CENTER[1],
-)
+# One orthographic view: a plain rod is fully defined by its side view plus a
+# diameter, and policy rule 7 puts that diameter ON the side view.  The arbor is
+# modelled axis-along-+Y (its assembly pose), so the side view is "*Front"
+# rotated -90 deg (IView.Angle) -- axis horizontal, as the bar sits in the
+# lathe.  An end view would carry nothing but the diameter it is not allowed to
+# keep, so this sheet has none.
+PROFILE_CENTER = (0.140, 0.190)
 PROFILE_ROTATION = -math.pi / 2.0  # model +Y (arbor axis) -> sheet +x
-# The 187 shaft's isometric silhouette is a mostly-VERTICAL slender bar
-# (~0.076 m each side of center at 1:1 -- too tall for the band between the
-# right-end Ra symbol and the title block's 0.064 top rule), so it renders at
-# 1:2 in the empty band right of the notes block.
-ISO_CENTER = (0.355, 0.140)
+SHAFT_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
+SHAFT_LEFT_X = PROFILE_CENTER[0] - SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0
+# The 187 shaft's isometric silhouette is a mostly-VERTICAL slender bar (~0.153
+# m long at 1:1 -- taller than the drawable band), so the pictorial renders at
+# 1:2 and says so in its own note.
+ISO_CENTER = (0.330, 0.175)
 ISO_SCALE = (1, 2)
-
-# Left of the end circle, ON its centre height so the diameter line runs
-# horizontally through the centre rather than diagonally.  x=0.032, not the old
-# bbox-derived 0.022: the callout is centred on its anchor and ~22 mm wide now
-# that it renders horizontally, so it needs to start clear of the border rule
-# at ~0.0126.
-END_KEEP = {
-    "ShaftDia": (0.032, END_CENTER[1]),
-}
-PROFILE_KEEP = {
-    "Depth": (PROFILE_CENTER[0], PROFILE_CENTER[1] - 0.025),
-}
-# Size tolerances live on the source-model dimensions; the sheet renders them natively.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# 3/8 in = 9.525 exactly; the sheet default of 2 decimals would print 9.53,
-# a false contradiction of the exact inch conversion the arbor's bore mates
-# are built on.
-DIMENSION_PRECISION = {"ShaftDia": 3}
+# A circle sketch's diameter only imports into a view that FACES the circle, so
+# it arrives in a temporary "*Top" donor and is then MOVED (never copied) onto
+# the side view, which is where a turned part's diameters belong.  The donor
+# then carries no manufacturing information and is deleted.  Pattern and
+# verification from draw_pinion_handle (its grip/tube diameters make the same
+# trip); a farm leaf of draw_cone_gear_shaft re-proved it on a stepped shaft.
+DONOR_CENTER = (0.355, 0.248)
+DONOR_KEEP = {"ShaftDia": (0.392, DONOR_CENTER[1])}
+PROFILE_DIAMETERS = {"ShaftDia": (0.196, 0.222)}
+PROFILE_KEEP = {"Depth": (PROFILE_CENTER[0], 0.158)}
+# Ra on the one running surface: the O.D. the 20 cylinder gears turn on and
+# both pedestals journal.  A revolved/extruded flank is a drawing SILHOUETTE,
+# not a model edge, so the pick names that entity type.
+# A straight-up leader (same x as the pick) keeps it off the geometry, as on
+# draw_pivot_shaft's identical O.D. flank; the Ra text renders above the arm.
+FINISH_EDGE = (SHAFT_LEFT_X + 0.038, SHAFT_FLANK_Y)
+FINISH_SYMBOL = (FINISH_EDGE[0], 0.206)
 
 
 def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
@@ -100,6 +99,42 @@ def _rotate_view(adapter: Any, view: Any, angle: float, *, label: str) -> None:
         raise RuntimeError(
             f"{label} view rotation did not take: {applied:g} rad, expected {angle:g}"
         )
+
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move, never copy, a fitted model dimension and verify its new owner."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(
+            f"failed to select model dimension {name}: {selection_name!r}"
+        )
+    ddoc.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    annotations = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+    ]
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -117,8 +152,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
-            "Iso View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -126,8 +160,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
-            "Iso View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -145,116 +178,76 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    end = place_view(
-        adapter, str(SOURCE), "*Top", *END_CENTER, scale=(END_VIEW_SCALE, 1)
-    )
     profile = place_view(adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=(1, 1))
+    donor = place_view(adapter, str(SOURCE), "*Top", *DONOR_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     # Rotate BEFORE dimension import so the Depth dim lands on the displayed
     # (horizontal) geometry.
     _rotate_view(adapter, profile, PROFILE_ROTATION, label="profile")
-    for view in (end, profile, iso):
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
-    end_annotations = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="end"
+    # Donor first: its diameter must exist before it can be re-homed, and the
+    # side view's own import then answers for nothing but the length.
+    donor_annotations = curate_view_dimensions(
+        adapter,
+        donor,
+        keep=DONOR_KEEP,
+        view_label="diameter donor",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     profile_annotations = curate_view_dimensions(
-        adapter, profile, keep=PROFILE_KEEP, view_label="profile"
-    )
-    # Each call must consume every callout it is handed, so split by view.
-    set_dimension_callouts(
         adapter,
-        end_annotations,
-        {n: t for n, t in DIMENSION_CALLOUTS.items() if n in END_KEEP},
+        profile,
+        keep=PROFILE_KEEP,
+        view_label="profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter,
-        profile_annotations,
-        {n: t for n, t in DIMENSION_CALLOUTS.items() if n in PROFILE_KEEP},
-    )
-    set_dimension_precision(adapter, end_annotations, DIMENSION_PRECISION)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to arbor end view")
+    for annotation in donor_annotations:
+        name = dimension_name(adapter, annotation)
+        profile_annotations.append(
+            _move_dimension(
+                adapter,
+                annotation,
+                profile,
+                PROFILE_DIAMETERS[name],
+                source_view=donor,
+            )
+        )
+    donor_name = view_name(adapter, donor)
+    # The vendor helper currently casts void EditDelete() to false. Verify
+    # deletion against the native sheet view collection, not that return value.
+    delete_view(adapter, donor)
+    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
+        raise RuntimeError("failed to delete the empty diameter-donor view")
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(adapter, profile_annotations, DRAWING_PRECISION_BY_NAME)
 
-    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
-    end_circle = (
-        END_CENTER[0] + end_radius,
-        END_CENTER[1],
-    )
-    left_end = (PROFILE_CENTER[0] - SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
-    right_end = (PROFILE_CENTER[0] + SHAFT_LENGTH / 2000.0, PROFILE_CENTER[1])
-    end_top = (END_CENTER[0], END_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0)
-    end_upper = (
-        END_CENTER[0] + end_radius * math.cos(math.radians(55.0)),
-        END_CENTER[1] + end_radius * math.sin(math.radians(55.0)),
-    )
-    # GD&T is model PMI (cylinder_gear_shaft_spec.PART_DATUMS/
-    # GEOMETRIC_CONTROLS, authored by build_cylinder_gear_shaft) — project it
-    # and place it where the hand-authored symbols used to sit (the profile
-    # view is rotated -pi/2, so sheet-LEFT is model y=0 and the y0 squareness
-    # frame takes the left-end spot). Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch.
-    project_part_pmi(
+    # A bare rectangle does not say which pair of lines is the O.D.; the axis
+    # does, and it is what the shop indicates the bar on.  The face pick sits
+    # left of the diameter's witness line, clear of every placed annotation.
+    add_view_centerline(
         adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=end,
-                position=(END_CENTER[0], END_CENTER[1] + 0.024),
-                attachment_xy=end_top,
-            ),
-            "bearing_cylindricity": PmiDrawingPlacement(
-                view=end, position=(0.068, 0.252), attachment_xy=end_upper
-            ),
-            "y0_end_perpendicularity": PmiDrawingPlacement(
-                view=profile,
-                position=(left_end[0] - 0.042, 0.180),
-                attachment_xy=left_end,
-            ),
-            "y187_end_perpendicularity": PmiDrawingPlacement(
-                view=profile,
-                position=(right_end[0] + 0.014, 0.180),
-                attachment_xy=right_end,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="cylinder gear shaft PMI",
+        profile,
+        face_xy=(PROFILE_CENTER[0] - 0.040, PROFILE_CENTER[1]),
+        label="arbor axis centerline",
     )
-    # Up-RIGHT of the end circle, on the same side as the `end_circle` pick
-    # (the circle's RIGHTMOST point), so the leader comes in from the right and
-    # never crosses the circle.  Two constraints forced this side:
-    #   * it used to sit at PROFILE_CENTER[0] and drag a 130 mm diagonal leader
-    #     back to this circle; and
-    #   * placing it up-LEFT instead only traded that for a leader that raked
-    #     across the circle and landed on the datum A tag -- which rests ON the
-    #     circle at ~(0.051..0.058, 0.214..0.222) and cannot be moved away.
-    #     IAnnotation::SetPosition2 on a DATUM FEATURE symbol sets the "point
-    #     where the leader hits the symbol", so a tag that attaches straight to
-    #     its edge ignores the requested Y and sits against the geometry.
-    # The symbol's ARM extends left of the anchor and its TEXT renders ABOVE the
-    # arm and to the RIGHT (ASME Y14.36): ~x=0.075..0.114 / y=0.222..0.237,
-    # which clears the profile view (it tops out at y=0.210) and leaves the arm
-    # at 0.075, right of the cylindricity frame's near-vertical leader above.
     add_surface_finish(
         adapter,
-        end,
-        edge_xy=end_circle,
-        symbol_xy=(0.078, 0.222),
+        profile,
+        edge_xy=FINISH_EDGE,
+        entity_type="SILHOUETTE",
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bearing"),
         label="arbor bearing finish",
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
-    add_property_linked_note(adapter, "Iso View Note", 0.325, 0.092)
+    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border
+    # rule now matches (~0.0126); 0.020 clears both, and the audit enforces it.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
+    add_property_linked_note(adapter, "Isometric View Note", 0.298, 0.118)
 
     return await finalize_drawing(
         adapter,

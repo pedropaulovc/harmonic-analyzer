@@ -12,7 +12,7 @@ M6.2). The arbor is clamped in the pedestal supports at both ends.
 Dimensions: cad/DIMENSIONS.md "Chapter 13" - dia legacy (med), length
 derived from the stack + eight-views 8/8 pedestals (low).
 
-Layout: arbor axis along +Y from the origin, plain cylinder y 0..200.
+Layout: arbor axis along +Y from the origin, plain cylinder y 0..187.
 
 Run (SolidWorks already open)::
 
@@ -42,22 +42,19 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from cylinder_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
-    GEOMETRIC_CONTROLS,
-    ISO_VIEW_NOTE,
-    LENGTH_TOLERANCE_MM,
-    PART_DATUMS,
+    DRAWING_PRECISION,
+    ISOMETRIC_VIEW_NOTE,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LENGTH,
@@ -109,7 +106,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
-    # expected: pi * 4.7625^2 * 176 = ~12,541 mm^3
+    # expected: pi * 4.7625^2 * 187 = ~13,321 mm^3
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
@@ -131,24 +128,21 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Shaft", "Depth", LENGTH_TOLERANCE_MM)
+    # Decimal places belong to the model dimension, not to the sheet: the
+    # drawing imports these and only asserts they survived.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    # The one running surface's roughness lives on the MODEL as a plain
+    # annotation; the drawing imports the control and places the symbol.
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-            "Iso View Note": ISO_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
