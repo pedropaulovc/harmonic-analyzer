@@ -1,11 +1,11 @@
 r"""Reproduction script: cone tip bushing (item 5, v4_t00471 / 7:49).
 
-Small brass bushing on the cone shaft's 1/32" tip stub, between the
+Small brass bushing on the cone shaft's 1/16" tip journal, between the
 smallest (6T) gear and the tip block: the axial spacer the adjuster
 screw loads against, part of the end-play takeup stack (bushing ->
 partially hollow adjuster screw -> pinch-locked block).
 
-Plain sleeve: O6 x 4 long, 1/32" bore, extruded from the Top plane
+Plain sleeve: O6 x 4 long, 1/16" bore, extruded from the Top plane
 (the assembly lays it along the shaft like the gears).
 
 Run (SolidWorks already open)::

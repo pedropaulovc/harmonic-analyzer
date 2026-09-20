@@ -12,7 +12,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 OUTER_DIA = 6.0
-BORE_DIA = 0.03125 * 25.4  # 0.79375: the cone shaft's 1/32 in tip stub
+BORE_DIA = 0.0625 * 25.4  # 1.5875: the cone shaft's 1/16 in tip journal
 BORE_DIA_BAND = (0.05, 0.00)  # (upper, lower) deviations
 LENGTH = 4.0
 LENGTH_TOLERANCE_MM = 0.03
@@ -34,8 +34,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_NOTES = "\n".join(
     (
         "AVOID BORE BELL-MOUTH.",
-        "TURN OD/FACES IN ONE SETUP; DRILL 1/32 IN (0.794) BORE THRU; SLIP FIT ON TIP "
-        "STUB.",
+        "TURN OD/FACES IN ONE SETUP; DRILL 1/16 IN (1.588) BORE THRU; SLIP FIT ON "
+        "TIP STUB.",
     )
 )
 
