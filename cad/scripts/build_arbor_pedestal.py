@@ -54,6 +54,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -66,11 +67,13 @@ from arbor_pedestal_spec import (
     BORE_DIA_BAND,
     BORE_HEIGHT,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     FOOT_DEPTH,
     FOOT_HEIGHT,
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
+    SCREW_Z,
     STRAP_T,
     SURFACE_FINISHES,
     TAPER_TANGENT_X,
@@ -92,7 +95,7 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # #4 normal-clearance pass-through for the exact Ø2.8448 x 9.525 stock
 # foot screw. Its 4.525-mm pedestal engagement enters the base past this
 # 5.0-mm flange.
-SCREW_Z = -5.0  # hole centre on the exposed flange, local z (machine -95.5)
+# SCREW_Z (spec): hole centre on the exposed flange, local z (machine -95.5).
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -318,6 +321,9 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven pedestal (equations neutral)", v_final, 0.01 * v_bore
     )
+    # Decimal places are the tolerance statement, so the PART carries them
+    # (policy rule 2); the drawing reads them back instead of rewriting them.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
