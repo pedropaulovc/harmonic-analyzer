@@ -52,15 +52,26 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).
-# WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal -- it
-# follows from the 62.2 OD anchor (ch13, low confidence) and is flagged for
-# Phase 3 rebuild validation. It is drawn faithfully, not "fixed" here.
+# The terminal land is 1/16 in, not the 1/32 in a literal "bore = shaft
+# section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
+# is cut as involute flanks closed by a chord on the base circle -- the
+# project's own DXF profile, cut with a self-made form cutter -- so T006's
+# minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
+# 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
+# depth) on a soldered, keyless, near-torque-free gear, and in exchange the
+# 20.675 mm terminal journal goes from L/D 26 to 13 -- 16x the bending
+# stiffness, the difference between a land a manual lathe can turn and one
+# that whips off the tool.  It is also the largest step that keeps the shaft
+# monotonically decreasing: the cone is assembled tip-first, and every gear
+# OD exceeds the next inboard gear's bore (T006 4.08 > T012 bore 3.175;
+# T012 7.14 > T018 6.35; T018 10.20 > T024 9.525), so no single gear can be
+# made integral with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
     (0.375, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),
     (0.25, FRONT_STUB + 148.8 + GEAR_AXIS_SHIFT),
     (0.125, FRONT_STUB + 155.7 + GEAR_AXIS_SHIFT),
-    (0.03125, FRONT_STUB + T006_TIP_STATION),  # shortened tip journal
+    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T006 seat + tip journal
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
