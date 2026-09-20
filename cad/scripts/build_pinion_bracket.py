@@ -17,8 +17,11 @@ Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..THICKNESS; the blind follower seat runs along X into the
 -X edge at (y -PIN_DROP, z mid), PIN_SEAT deep from a tangent plane at
 x -R_END.  PIN_DROP is negative, so the seat sits ABOVE the pivot on the
-STRAIGHT flank -- clear of both cap arcs, and clear of the cam-relief
-scallops, which open that flank only between y -4.5 and y +4.7.  The
+STRAIGHT flank -- clear of both cap arcs.  The parked cam-relief
+scallop opens that flank up to y +4.675, so it nicks the bottom 0.68 mm
+of the seat's mouth by at most 0.53 mm; the seat axis and the whole
+upper half of the mouth are on solid metal, and the print shows the
+interruption rather than hiding it.  The
 assembly composes a Ry(180) into the strap's lean pose, so local -x (the
 seat edge) reads machine WEST and the origin lands at the strap's NORTH
 face.

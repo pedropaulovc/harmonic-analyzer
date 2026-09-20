@@ -11,15 +11,14 @@ manufacturing-note block either -- the outline, the four hole/scallop
 callouts, two roughness symbols and the title block say everything.  Three
 bands survive, one per fitted bore, each from a named fit class.
 
-Three views at the 2:1 sheet scale plus a 4:1 section:
+Two orthographic views at the 2:1 sheet scale, plus the isometric:
 
 * FRONT -- the strap face: both bores, both end radii, the two cam-relief
-  scallops and the follower-seat height.
+  scallops, the follower-seat height and the seat's blind depth.  This is
+  the only view carrying hidden lines, and the blind seat is the only
+  feature that needs them: both bores and both scallops go clean through.
 * LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
   its size, its station through the bar and the bar thickness.
-* SECTION A-A -- cut on the seat axis, the only place the seat's blind depth
-  and flat bottom are solid lines.  Hidden lines are removed everywhere, so
-  no dimension attaches to a dashed edge.
 
 Run with SolidWorks open::
 
@@ -39,15 +38,14 @@ from _drawing_common import (
     add_edge_dimension,
     add_surface_finish,
     assert_imported_precision,
-    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
-    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
@@ -60,7 +58,6 @@ from pinion_bracket_spec import (
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
-    PIN_DROP,
     PIVOT_BORE,
     R_END,
     SURFACE_FINISHES,
@@ -84,16 +81,15 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
-SECTION_SCALE = (4, 1)
 
 # Sheet layout (meters).  The strap runs UP the sheet: the front view's model
 # bbox is +/-7.5 in X and -7.5..35.5 in Y, so at 2:1 it is 30 x 86 mm and the
-# left flank view beside it is 16 x 86.  The section is a 15 x 8 slice, too
-# small to read at the sheet scale, so it runs at 4:1 in its own lane.
+# left flank view beside it is 16 x 86.  The face view keeps the clear column
+# to its LEFT for everything measured off the pivot axis and the column to its
+# RIGHT for the leadered sizes, so no two dimension lanes cross.
 FRONT_BBOX_CY = (OVERALL_LENGTH / 2.0) - R_END
 FRONT_CENTER = (0.100, 0.150)
 LEFT_CENTER = (0.180, 0.150)
-SECTION_CENTER = (0.250, 0.090)
 ISO_CENTER = (0.345, 0.195)
 
 
@@ -115,27 +111,29 @@ ARBOR_R_SHEET = ARBOR_BORE * SHEET_SCALE[0] / 2000.0
 # scallop pair is dimensioned on the open (left) side it is cut from, the two
 # bore diameters and the end radii on the closed right side.
 FRONT_KEEP = {
-    "PivotBoreDia": (0.152, 0.112),
-    "ArborBoreDia": (0.152, 0.192),
-    "ArborBoreCz": (0.124, 0.152),
-    "BottomCapRadius": (0.126, 0.092),
+    "PivotBoreDia": (0.156, 0.110),
+    "ArborBoreDia": (0.156, 0.194),
+    "ArborBoreCz": (0.122, 0.151),
+    "BottomCapRadius": (0.126, 0.090),
     "TopCapRadius": (0.126, 0.212),
-    "PinSeatCy": (0.076, 0.146),
-    "CamReliefParkR": (0.036, 0.178),
-    "CamReliefParkY": (0.064, 0.133),
-    "CamReliefParkX": (0.087, 0.101),
-    "CamReliefEngagedR": (0.036, 0.074),
-    "CamReliefEngagedY": (0.048, 0.110),
-    "CamReliefEngagedX": (0.087, 0.089),
+    "PinSeatCy": (0.072, 0.128),
+    "PinSeatDepth": (0.070, 0.152),
+    "CamReliefParkR": (0.030, 0.186),
+    "CamReliefParkY": (0.058, 0.114),
+    "CamReliefParkX": (0.082, 0.092),
+    "CamReliefEngagedR": (0.030, 0.062),
+    "CamReliefEngagedY": (0.046, 0.100),
+    "CamReliefEngagedX": (0.082, 0.080),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
-    "Depth": (0.180, 0.206),
-    "PinSeatCz": (0.180, 0.100),
-    "PinSeatDia": (0.216, 0.140),
+    "Depth": (0.180, 0.212),
+    "PinSeatCz": (0.180, 0.090),
+    "PinSeatDia": (0.230, 0.140),
 }
-SECTION_KEEP = {"PinSeatDepth": (0.250, 0.118)}
+PIVOT_FINISH_XY = (0.156, 0.082)
+ARBOR_FINISH_XY = (0.156, 0.222)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
@@ -184,33 +182,13 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    # Nothing on this part is communicated by a dashed edge: both bores and
-    # both scallops are open profiles on the face, the seat mouth is a solid
-    # circle on the flank, and the seat's depth is a section.
-    for view in (front, left, iso):
+    # Only ONE feature on this strap is invisible in outline -- the blind
+    # follower seat -- and only the face view sees it, so only the face view
+    # carries hidden lines.  Both bores and both scallops go clean through,
+    # so nothing else turns dashed and the flank view stays clean.
+    set_hidden_lines_visible(adapter, front)
+    for view in (left, iso):
         set_hidden_lines_removed(adapter, view)
-
-    # A-A is taken ON the follower-seat axis, so the seat's blind bottom and
-    # its 4 mm depth are cut geometry rather than a hidden outline.  The line
-    # runs past both flanks so the whole 15 mm width is sectioned.
-    seat_y = -PIN_DROP
-    cut_left = model_point_in_view(
-        adapter, front, (-12.0, seat_y, 0.0), label="section A-A start"
-    )
-    cut_right = model_point_in_view(
-        adapter, front, (12.0, seat_y, 0.0), label="section A-A end"
-    )
-    section = create_section_view(
-        adapter,
-        front,
-        line_start=cut_left,
-        line_end=cut_right,
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=SECTION_SCALE,
-        label="follower-seat axial section",
-    )
-    set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -219,9 +197,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="strap face",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The seat profile is authored on a Right-parallel plane, so its three
-    # dimensions are native to this flank view; the face import above rejects
-    # the two it does not place, which returns them to the import pool.
+    # The seat profile is authored on a Right-parallel plane, so its size and
+    # its station through the bar are native to this flank view; the face
+    # import above rejects the two it does not place, which returns them to
+    # the import pool.
     left_annotations = curate_view_dimensions(
         adapter,
         left,
@@ -229,14 +208,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="seat flank",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="seat section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    annotations = [*front_annotations, *left_annotations, *section_annotations]
+    annotations = [*front_annotations, *left_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Decimal places are the tolerance statement and the part owns them; this
     # sheet only proves the import kept them (policy rule 2).
@@ -254,7 +226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=(_front_x(0.0), _front_y(-R_END)),
         p1=(_front_x(0.0), _front_y(C2C + R_END)),
-        text_xy=(0.140, 0.152),
+        text_xy=(0.136, 0.151),
         label="overall length reference",
         orientation="vertical",
     )
@@ -277,7 +249,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(_front_x(0.0), _front_y(0.0) - PIVOT_R_SHEET),
-        symbol_xy=(0.152, 0.094),
+        symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
@@ -285,7 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(_front_x(0.0), _front_y(C2C) + ARBOR_R_SHEET),
-        symbol_xy=(0.152, 0.210),
+        symbol_xy=ARBOR_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
     )

@@ -24,7 +24,7 @@ def test_required_drawing_paths() -> None:
 
 
 def _kept() -> dict[str, tuple[float, float]]:
-    return {**drawing.FRONT_KEEP, **drawing.LEFT_KEEP, **drawing.SECTION_KEEP}
+    return {**drawing.FRONT_KEEP, **drawing.LEFT_KEEP}
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -41,9 +41,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert set(kept) == marked
     # Each name is shown exactly once: a dimension repeated across two views is a
     # double specification, and the second copy is what drifts.
-    assert len(kept) == len(drawing.FRONT_KEEP) + len(drawing.LEFT_KEEP) + len(
-        drawing.SECTION_KEEP
-    )
+    assert len(kept) == len(drawing.FRONT_KEEP) + len(drawing.LEFT_KEEP)
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(kept)
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
@@ -156,45 +154,57 @@ def test_overall_length_is_a_reference_of_the_dimensioned_features() -> None:
     )
 
 
-def test_blind_seat_depth_is_shown_in_a_section_not_as_a_hidden_edge() -> None:
-    # Hidden lines are removed on every view, so the seat's blind bottom has to
-    # come from cut geometry; A-A is taken on the seat axis.
+def test_only_the_face_view_carries_hidden_lines() -> None:
+    # The blind follower seat is the single feature no outline shows, and only
+    # the face view looks along its depth -- so it is the only view that may
+    # print a dashed edge. A flank or pictorial view with hidden lines turned
+    # on would dash the two through bores and both scallops for nothing.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_hidden_lines_visible" not in source
-    assert "create_section_view" in source
-    assert set(drawing.SECTION_KEEP) == {"PinSeatDepth"}
-    # The seat mouth is a solid circle only on the flank view, which is where
-    # its size and its station through the bar are dimensioned.
+    assert source.count("set_hidden_lines_visible(adapter, front)") == 1
+    assert source.count("set_hidden_lines_visible") == 2  # import + the call
+    assert "PinSeatDepth" in drawing.FRONT_KEEP
+    # Everything else on the strap goes clean through, so nothing else needs
+    # the dashed outline the face view now shows.
+    assert pinion_bracket_geometry.PIN_SEAT < pinion_bracket_geometry.WIDTH
+    # The seat mouth is a solid circle on the flank, which is where its size
+    # and its station through the bar are dimensioned.
     assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCz", "Depth"}
 
 
-def test_section_plane_misses_the_bores_and_the_scallops() -> None:
-    # A-A cuts at the seat height. If it clipped a bore or a relief scallop the
-    # section would show extra openings and the depth dimension would attach to
-    # the wrong edge.
+def test_blind_seat_entry_face_is_solid_flank_where_the_reamer_lands() -> None:
+    # The seat's mouth has to land on flat metal above the pivot bore. The
+    # parked relief scallop reaches up past the bottom tangent of that mouth,
+    # so the print shows the mouth slightly interrupted -- but the entry stays
+    # startable: the axis and the whole upper half of the circle are on solid
+    # flank, and the nick never eats more than a tenth of the seat depth.
     seat_y = -pinion_bracket_geometry.PIN_DROP
     assert seat_y > 0.0
-    assert seat_y < pinion_bracket_geometry.C2C
-    bore_clearance = min(
-        seat_y - pinion_bracket_geometry.PIVOT_BORE / 2.0,
-        pinion_bracket_geometry.C2C - seat_y - pinion_bracket_geometry.ARBOR_BORE / 2.0,
-    )
-    assert bore_clearance > 1.0
+    assert seat_y < pinion_bracket_geometry.C2C - pinion_bracket_geometry.R_END
+    assert seat_y - pinion_bracket_geometry.PIVOT_BORE / 2.0 > 1.0
     half_width = pinion_bracket_geometry.WIDTH / 2.0
     radius = pinion_bracket_geometry.CAM_RELIEF_RADIUS
+    seat_half = pinion_bracket_geometry.PIN_BORE / 2.0
+    worst = 0.0
+    interrupted = 0.0
+    steps = 64
     for centre in (
         pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
         pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
     ):
-        rise = abs(seat_y - centre[1])
-        if rise >= radius:
-            continue  # the scallop never reaches the cut height at all
-        # Where it does, its bite has to stop short of the strap's own flank.
-        bite_x = centre[0] + math.sqrt(radius**2 - rise**2)
-        assert bite_x < -half_width
-    # The seat lands on the straight flank, not on a cap arc, so its mouth is a
-    # full circle on a flat face.
-    assert seat_y < pinion_bracket_geometry.C2C - pinion_bracket_geometry.R_END
+        for step in range(steps + 1):
+            probe = seat_y - seat_half + 2.0 * seat_half * step / steps
+            rise = abs(probe - centre[1])
+            if rise >= radius:
+                continue  # the scallop never reaches this height at all
+            depth = centre[0] + math.sqrt(radius**2 - rise**2) + half_width
+            if depth <= 0.0:
+                continue  # it stops short of the flank at this height
+            worst = max(worst, depth)
+            interrupted = max(interrupted, probe - (seat_y - seat_half))
+            # Nothing may reach the axis height or above it.
+            assert probe < seat_y
+    assert worst < 0.15 * pinion_bracket_geometry.PIN_SEAT
+    assert interrupted < 0.2 * pinion_bracket_geometry.PIN_BORE
 
 
 def test_cam_scallops_are_dimensioned_the_way_they_are_cut() -> None:
@@ -238,7 +248,8 @@ def test_label_positions_are_on_the_sheet_and_do_not_collide() -> None:
     positions = {
         **{f"front:{k}": v for k, v in drawing.FRONT_KEEP.items()},
         **{f"left:{k}": v for k, v in drawing.LEFT_KEEP.items()},
-        **{f"section:{k}": v for k, v in drawing.SECTION_KEEP.items()},
+        "front:pivot-finish": drawing.PIVOT_FINISH_XY,
+        "front:arbor-finish": drawing.ARBOR_FINISH_XY,
     }
     for name, (x, y) in positions.items():
         assert 0.012 <= x <= 0.420, name
