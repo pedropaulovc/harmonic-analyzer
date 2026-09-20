@@ -287,5 +287,12 @@ def test_part_stamps_make_critical_properties() -> None:
     material = "SAE 1018 CF bar, ASTM A108-24"
     assert config["material"] == material
     assert config["material_specification"] == material
-    assert config["finish"] == "gear teeth cut, oiled"
+    # The FINISH field states the surface condition only: how the teeth are
+    # made is the PROCESS row's job, and saying it twice is the
+    # over-specification rule 4 bans (codex machinist review, 2026-09-20).
+    assert config["finish"] == "oiled"
+    assert not any(
+        word in config["finish"].lower() for word in ("cut", "hob", "shaper", "machin")
+    )
+    assert "gear cutting" in config["process"]
     assert int(config["quantity"]) == 1
