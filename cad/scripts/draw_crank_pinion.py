@@ -26,6 +26,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
@@ -36,10 +37,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
+from _surface_finish import surface_finish_by_key
 from crank_pinion_spec import (
+    BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     OUTSIDE_DIA,
+    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -158,6 +163,23 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pinion bore")
+    # The bore is the part's one fit surface, and a fit is a function of the
+    # peaks as well as the size: REAM names the operation, not the finish it
+    # leaves. The roughness is the project's general machined grade, authored
+    # on the PART and read back here (policy rule 5's "a surface that has to
+    # work" case; codex machinist review, 2026-09-20).
+    add_surface_finish(
+        adapter,
+        front,
+        symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
+        control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
+        label="crank pinion bore finish",
+        entity=visible_circle_edge(adapter, front, BORE_DIA),
+        leader_attach_xy=(
+            FRONT_CENTER[0],
+            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
+        ),
+    )
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(

@@ -149,21 +149,23 @@ def test_bore_callout_states_the_process_and_how_far_it_goes() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
 
 
-def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
-    # Rules 3-5: a removable stock pinion clamped to its crankshaft is not on
-    # the GD&T allowlist, and nothing runs on its bore or its faces.
+def test_print_carries_no_gdt_or_basic_dimensions() -> None:
+    # Rules 3-4: a removable stock pinion clamped to its crankshaft is not on
+    # the GD&T allowlist, so no datum, frame or basic dimension survives. The
+    # ONE roughness it keeps is rule 5's exception -- the bore is a
+    # size-toleranced fit, and a fit depends on the peaks as well as the size.
     source = _source()
     for helper in (
         "add_datum_feature(",
         "add_feature_control_frame(",
-        "add_surface_finish(",
         "set_basic_dimension(",
         "project_part_pmi(",
     ):
         assert helper not in source, helper
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
-    assert spec.SURFACE_FINISHES == ()
+    assert [control.key for control in spec.SURFACE_FINISHES] == ["crank_pinion_bore"]
+    assert spec.SURFACE_FINISHES[0].face.diameter_mm == spec.BORE_DIA
     assert "surface_finishes=SURFACE_FINISHES" in _build_source()
 
 

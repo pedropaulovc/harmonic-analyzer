@@ -22,7 +22,8 @@ import math
 
 import _config
 import crankshaft_spec
-from _surface_finish import SurfaceFinishControl
+from _gtol_spec import CylinderFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 MM_PER_IN = 25.4
@@ -67,10 +68,14 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
 
 FACE_WIDTH = 10.8  # spans the 64T row north of the v2 crank boss
 
-# No roughness callouts: the pinion is clamped to its crankshaft and nothing
-# runs on the bore or the faces; every surface is as the title block's process
-# row states (cad/docs/drawing-simplicity-policy.md rule 5).
-SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
+# One roughness, on the one surface whose function depends on it: the bore is
+# a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as
+# much as on the limits, so the bore carries the project's general machined
+# grade. Nothing runs on the teeth or the faces -- they are as the title
+# block's process row states (cad/docs/drawing-simplicity-policy.md rule 5).
+SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
+    SurfaceFinishControl("crank_pinion_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_crank_pinion`` marks exactly these; ``draw_crank_pinion``

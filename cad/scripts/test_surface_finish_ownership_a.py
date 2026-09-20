@@ -13,6 +13,7 @@ import build_cone_gear_shaft
 import build_cone_tip_bushing
 import build_connecting_rod
 import build_crank_drive_gear
+import build_crank_pinion
 import build_crankshaft
 import build_cylinder_gear_shaft
 import cone_gear_shaft_spec
@@ -20,6 +21,7 @@ import cone_gear_spec
 import cone_tip_bushing_spec
 import connecting_rod_spec
 import crank_drive_gear_spec
+import crank_pinion_spec
 import crankshaft_spec
 import cylinder_gear_shaft_spec
 import draw_alignment_pinion
@@ -29,6 +31,7 @@ import draw_cone_gear_shaft
 import draw_cone_tip_bushing
 import draw_connecting_rod
 import draw_crank_drive_gear
+import draw_crank_pinion
 import draw_crankshaft
 import draw_cylinder_gear_shaft
 from _gtol_spec import CylinderFace, PlanarFace
@@ -138,9 +141,18 @@ CASES = (
             ),
         ),
     ),
-    # crank_pinion left this cohort: the pinion is clamped to its crankshaft
-    # and nothing runs on its bore, so its own test pins SURFACE_FINISHES == ()
-    # (cad/docs/drawing-simplicity-policy.md rule 5).
+    (
+        crank_pinion_spec,
+        build_crank_pinion,
+        draw_crank_pinion,
+        (
+            SurfaceFinishControl(
+                "crank_pinion_bore",
+                MACHINED_UM,
+                CylinderFace(crank_pinion_spec.BORE_DIA),
+            ),
+        ),
+    ),
     (
         crankshaft_spec,
         build_crankshaft,
