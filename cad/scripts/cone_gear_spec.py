@@ -32,7 +32,12 @@ WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 FACE_WIDTH = 6.5
 FAMILY_BORES_MM = {
-    6: 0.03125 * MM_PER_IN,
+    # T006 is 1/16", not 1/32": these teeth are through-cut from this module's
+    # own DXF profile, whose gap floor is the chord across the base circle, so
+    # the as-cut root radius is 1.3365 mm (tooth depth 0.703) and a 1/16" bore
+    # still leaves a 0.543 mm rim -- while the shaft's terminal journal drops
+    # from L/D 26 to 13.  See build_cone_gear.bore_dia_in.
+    6: 0.0625 * MM_PER_IN,
     12: 0.125 * MM_PER_IN,
     18: 0.25 * MM_PER_IN,
     24: 0.375 * MM_PER_IN,
