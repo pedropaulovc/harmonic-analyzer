@@ -1834,6 +1834,7 @@ def test_build_id_is_the_release_revision_in_full_and_depth_1_checkouts(
 
     assert full_id == leaf_id == "v9"
 
+    git(leaf, "config", "status.showUntrackedFiles", "no")
     (leaf / "uncommitted.txt").write_text("operator edit\n", encoding="utf-8")
     assert _common._build_id() == "v9-dirty"
 

@@ -189,9 +189,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to shaft end view")
 
-    # Resolve model edges once per stable view display state.  These drawing-
-    # context entities are selected with ISelectData.View by project_part_pmi;
-    # sheet-coordinate hit testing is deliberately not part of the PMI path.
+    # Resolve GTol attachments once per stable view display state.  Datum tags
+    # retain a sheet-point pick: edge-object attachment ignores SetPosition2
+    # (see the layout-tuning refusal catalogue and the native fulcrum probe).
     front_edges = scan_view_edges(front, label="fulcrum shaft front PMI")
     right_edges = scan_view_edges(right, label="fulcrum shaft right PMI")
     front_rim = _unique_shaft_rim(
@@ -230,7 +230,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "datum:A": PmiDrawingPlacement(
                 view=front,
                 position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                edge_entity=front_rim,
+                attachment_xy=end_circle,
             ),
             "bearing_cylindricity": PmiDrawingPlacement(
                 view=front, position=(0.065, 0.250), edge_entity=front_rim

@@ -1455,7 +1455,7 @@ def _build_id() -> str:
 
     try:
         dirty = subprocess.run(  # noqa: S603 -- resolved Git; fixed internal argv
-            [_git_executable(), "status", "--porcelain"],
+            [_git_executable(), "status", "--porcelain", "--untracked-files=normal"],
             cwd=str(CAD_ROOT),
             capture_output=True,
             text=True,
