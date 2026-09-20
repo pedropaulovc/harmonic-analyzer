@@ -147,18 +147,14 @@ def _telemetry_readback(
 ) -> None:
     fields = {
         "context": context,
-        "name": name,
+        "preference_name": name,
         "id": preference_id,
         "before": before,
         "requested": requested,
         "after": after,
         "setter_return_type": setter_return_type,
     }
-    # ``event`` owns its ``name`` keyword, so the event attribute is explicit;
-    # the correlated structured log and enclosing span carry the requested
-    # literal ``name`` field.
-    event_fields = {k: v for k, v in fields.items() if k != "name"}
-    _telemetry.event(event, preference_name=name, **event_fields)
+    _telemetry.event(event, **fields)
     _telemetry.info(f"{event} {json.dumps(fields, sort_keys=True)}", **fields)
 
 
@@ -177,7 +173,7 @@ def _probe_toggle(
         with _telemetry.span(
             "seat.preference_probe.write",
             context=context,
-            name=name,
+            preference_name=name,
             id=preference_id,
             before=before,
             requested=requested_value,
@@ -208,7 +204,7 @@ def _probe_toggle(
             with _telemetry.span(
                 "seat.preference_probe.restore",
                 context=context,
-                name=name,
+                preference_name=name,
                 id=preference_id,
                 before=current,
                 requested=before,
