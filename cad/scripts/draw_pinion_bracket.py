@@ -86,9 +86,9 @@ SHEET_SCALE = (2.0, 1.0)
 # roughness symbol leads away to the side: the two leaders leave the same
 # crowded corner on diverging paths and never cross.
 FRONT_BBOX_CY = (C2C + 2.0 * R_END) / 2.0 - R_END
-FRONT_CENTER = (0.100, 0.150)
-LEFT_CENTER = (0.180, 0.150)
-ISO_CENTER = (0.345, 0.195)
+FRONT_CENTER = (0.150, 0.150)
+LEFT_CENTER = (0.240, 0.150)
+ISO_CENTER = (0.350, 0.215)
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -106,34 +106,34 @@ def _front_y(model_y_mm: float) -> float:
 # scallop pair is dimensioned on the open (left) side it is cut from, the two
 # bore diameters and the end radii on the closed right side.
 FRONT_KEEP = {
-    "PivotBoreDia": (0.156, 0.110),
-    "ArborBoreDia": (0.156, 0.194),
-    "ArborBoreCz": (0.130, 0.151),
-    "BottomCapRadius": (0.126, 0.062),
-    "TopCapRadius": (0.126, 0.238),
-    "PinSeatCy": (0.058, 0.134),
-    "PinSeatDepth": (0.052, 0.156),
-    "CamReliefParkR": (0.022, 0.130),
-    "CamReliefParkY": (0.044, 0.112),
-    "CamReliefParkX": (0.082, 0.070),
-    "CamReliefEngagedR": (0.022, 0.104),
-    "CamReliefEngagedY": (0.032, 0.096),
-    "CamReliefEngagedX": (0.082, 0.058),
+    "PivotBoreDia": (0.196, 0.086),
+    "ArborBoreDia": (0.196, 0.214),
+    "ArborBoreCz": (0.180, 0.151),
+    "BottomCapRadius": (0.164, 0.062),
+    "TopCapRadius": (0.164, 0.238),
+    "PinSeatCy": (0.088, 0.134),
+    "PinSeatDepth": (0.082, 0.156),
+    "CamReliefParkR": (0.052, 0.130),
+    "CamReliefParkY": (0.074, 0.112),
+    "CamReliefParkX": (0.112, 0.070),
+    "CamReliefEngagedR": (0.052, 0.104),
+    "CamReliefEngagedY": (0.062, 0.096),
+    "CamReliefEngagedX": (0.112, 0.058),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
-    "Depth": (0.180, 0.212),
-    "PinSeatCz": (0.180, 0.090),
-    "PinSeatDia": (0.230, 0.140),
+    "Depth": (0.240, 0.212),
+    "PinSeatCz": (0.240, 0.090),
+    "PinSeatDia": (0.290, 0.140),
 }
 # Each bore's end-radius label leads out to the LEFT of its arc and that same
 # bore's roughness symbol to the RIGHT, so the two leaders leaving the same
 # crowded corner diverge instead of crossing.
 PIVOT_FINISH_EDGE = (_front_x(0.0), _front_y(-PIVOT_BORE / 2.0))
-PIVOT_FINISH_XY = (0.126, 0.092)
+PIVOT_FINISH_XY = (0.126, 0.080)
 ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
-ARBOR_FINISH_XY = (0.126, 0.208)
+ARBOR_FINISH_XY = (0.126, 0.220)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.
