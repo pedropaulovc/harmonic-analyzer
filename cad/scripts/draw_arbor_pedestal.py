@@ -391,6 +391,9 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     foot_entity, bore_entity, dome_entity = _front_entities(adapter, front)
+    # Attach on the bore's 3 o'clock point and keep the symbol above that
+    # height: left to itself the leader reached into the circle and crossed
+    # the diameter dimension's line, which leaves the bore at 315 deg.
     add_surface_finish(
         adapter,
         front,
@@ -399,6 +402,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor bore finish",
         char_height=0.0025,
         entity=bore_entity,
+        leader_attach_xy=(
+            FRONT_CENTER[0] + BORE_DIA / 2.0 * _S,
+            _front_y(BORE_HEIGHT),
+        ),
     )
     # Below and right of the seat. The foot's width is dimensioned in the
     # plan, so nothing here owns a witness line the leader could cross: it
