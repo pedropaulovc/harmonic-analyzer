@@ -12,7 +12,7 @@ Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
 practice, axial alignment slack).
 
-Layout: gear axis = Z through the origin, disc z = 0..12 mm.
+Layout: gear axis = Z through the origin, disc z = 0..10.8 mm.
 
 Run (SolidWorks already open)::
 
@@ -25,9 +25,11 @@ import math
 import sys
 
 import _config
+import _telemetry
 from _common import (
     IN,
     SketchDims,
+    _feature_by_name,
     apply_material,
     name_bore_axis,
     check,
@@ -35,6 +37,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -42,6 +45,7 @@ from _common import (
     set_global,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -54,7 +58,9 @@ from crank_pinion_spec import (
     BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     GEAR_DATA,
+    OUTSIDE_DIA,
     SURFACE_FINISHES,
 )
 
@@ -77,13 +83,15 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): face width and bore diameter carry the
-    # load-bearing mm suffix (INCH document; the equation manager reads bare
-    # numbers in document units, so an unsuffixed length blows the part up 25.4x).
-    # FaceWidth is the cut-bore depth knob (a feature parameter, not a driven
-    # sketch dim). TEETH/DP stay module constants -- the gear blank/gap/pattern is
-    # built by build_fixed_gear with literal numerics, off this self-naming path.
+    # Editable knobs (Tools > Equations): every length carries the load-bearing
+    # mm suffix (INCH document; the equation manager reads bare numbers in
+    # document units, so an unsuffixed length blows the part up 25.4x).
+    # FaceWidth drives the gear blank's extrude depth, OutsideDia its tip
+    # circle: both are printed dimensions, so both are knobs. TEETH/DP stay
+    # module constants -- the tooth gap and pattern are built by
+    # build_fixed_gear with literal numerics, off this self-naming path.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -99,6 +107,29 @@ async def build(adapter) -> dict[str, str]:
     volume = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
     )
+
+    # build_fixed_gear is shared by five recipes, so it leaves the blank under
+    # the adapter's default names. Name the boss and its absorbed profile
+    # sketch here: the two sizes the turner sets before a cutter touches the
+    # part -- face width and outside diameter -- print as NATIVE model
+    # dimensions (drawing-simplicity-policy.md rule 1), which means they must
+    # be named, driven, toleranced and marked like any other. Driving both is
+    # also the guard on these default names: a rename that resolved the wrong
+    # feature would move the blank and the equation-neutral volume gate below
+    # would fail loud instead of printing a dimension of something else.
+    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
+    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    drive_jobs += [
+        (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
+    ]
+    _feature_by_name(adapter, "Sketch1").Name = "GearBlankProfile"
+    _telemetry.success("feature 'Sketch1' -> 'GearBlankProfile'")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "GearBlankProfile", ["OutsideDia"])[0],
+            '"OutsideDia"',
+        )
+    ]
 
     # On-axis bore (centre 0,0): define_circle emits only the diameter dim, so
     # only the "Dia" slot is recorded -- the X/Z names are ignored.
@@ -134,6 +165,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
+    # No band on the blank's outside diameter: the title block's .XX general
+    # grade fits inside the crossed mesh's radial room (crank_pinion_spec).
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume - v_bore, 0.01 * v_bore
     )
@@ -141,11 +174,14 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension and stamp the
+    # Mark this part's three manufacturing dimensions, author the decimal
+    # places they print with (policy rule 2: the model owns both the band and
+    # its spelling -- the drawing only reads them back), and stamp the
     # title-block + gear-data properties the curated drawing reads.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
