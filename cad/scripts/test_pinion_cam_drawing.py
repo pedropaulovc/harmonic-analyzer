@@ -10,7 +10,7 @@ import draw_pinion_cam as drawing
 import build_pinion_cam as cam
 from _buildgraph import module_deps_of
 from _fit_limits import REAM_SLIDE
-from _drawing_contract import model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -144,8 +144,40 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
     assert "BossProjection" in drawing.FRONT_KEEP
     assert "+/-0.05" not in source
-    assert "BEYOND" in drawing.DIMENSION_CALLOUTS["BossProjection"]
-    assert "{CAM_OD:.2f} OD" in source
+    # The projection callout names the surface it is measured from, never the
+    # OD's value -- that is the CollarOd dimension's job (policy rule 2).
+    assert drawing.DIMENSION_CALLOUTS["BossProjection"] == "BEYOND CAM OD"
+    assert not any(
+        character.isdigit()
+        for name, text in drawing.DIMENSION_CALLOUTS.items()
+        if name != "BoreDia"
+        for character in text
+    )
+
+
+def test_the_part_owns_every_printed_decimal_place() -> None:
+    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+
+    Two places on the critical trio only (the reamed running bore, the cam OD
+    and the eccentricity that IS the lift); one everywhere else, so the title
+    block's .X row governs the collar length and the set-screw boss.
+    """
+    by_name = pinion_cam_spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
+    assert {name for name, places in by_name.items() if places != 1} == {
+        "BoreDia",
+        "CollarOd",
+        "CollarCy",
+    }
+    assert max(by_name.values()) == 2
+    part_source = Path(cam.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The sheet reads the places back and never rewrites them.
+    assert "set_dimension_precision" not in source
+    assert "SetPrecision3" not in source
+    assert "assert_imported_precision(" in source
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_part_stamps_make_critical_drawing_properties() -> None:
