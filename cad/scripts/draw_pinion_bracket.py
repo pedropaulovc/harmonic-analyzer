@@ -114,16 +114,16 @@ FRONT_KEEP = {
     "PivotBoreDia": (0.156, 0.110),
     "ArborBoreDia": (0.156, 0.194),
     "ArborBoreCz": (0.122, 0.151),
-    "BottomCapRadius": (0.118, 0.086),
-    "TopCapRadius": (0.118, 0.216),
+    "BottomCapRadius": (0.062, 0.078),
+    "TopCapRadius": (0.062, 0.222),
     "PinSeatCy": (0.058, 0.134),
     "PinSeatDepth": (0.052, 0.156),
     "CamReliefParkR": (0.026, 0.190),
     "CamReliefParkY": (0.044, 0.112),
-    "CamReliefParkX": (0.082, 0.092),
+    "CamReliefParkX": (0.082, 0.070),
     "CamReliefEngagedR": (0.026, 0.058),
     "CamReliefEngagedY": (0.032, 0.096),
-    "CamReliefEngagedX": (0.082, 0.080),
+    "CamReliefEngagedX": (0.082, 0.058),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -132,13 +132,13 @@ LEFT_KEEP = {
     "PinSeatCz": (0.180, 0.090),
     "PinSeatDia": (0.230, 0.140),
 }
-# Both roughness symbols hang off the FLANK view, where each bore shows as a
-# plain horizontal edge with open sheet beside it.  On the face view they had
-# to lead out through the corner the end-radius leader already uses.
-PIVOT_FINISH_EDGE = (LEFT_CENTER[0], _front_y(-PIVOT_BORE / 2.0))
-PIVOT_FINISH_XY = (0.232, 0.104)
-ARBOR_FINISH_EDGE = (LEFT_CENTER[0], _front_y(C2C + ARBOR_BORE / 2.0))
-ARBOR_FINISH_XY = (0.232, 0.196)
+# Each bore's end-radius label leads out to the LEFT of its arc and that same
+# bore's roughness symbol to the RIGHT, so the two leaders leaving the same
+# crowded corner diverge instead of crossing.
+PIVOT_FINISH_EDGE = (_front_x(0.0), _front_y(-PIVOT_BORE / 2.0))
+PIVOT_FINISH_XY = (0.140, 0.070)
+ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
+ARBOR_FINISH_XY = (0.140, 0.230)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.
@@ -257,7 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the upper one.  Nothing else on the strap slides, seats or locates.
     add_surface_finish(
         adapter,
-        left,
+        front,
         edge_xy=PIVOT_FINISH_EDGE,
         symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
@@ -265,7 +265,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
-        left,
+        front,
         edge_xy=ARBOR_FINISH_EDGE,
         symbol_xy=ARBOR_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
