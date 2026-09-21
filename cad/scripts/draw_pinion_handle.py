@@ -23,7 +23,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     create_section_view,
@@ -45,7 +44,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
     GRIP_DIA,
     GRIP_LEN,
     RETENTION_HOLE_CALLOUT,
@@ -208,57 +206,6 @@ def _point(
     )
 
 
-def _checked_reference_dimension(
-    adapter: Any,
-    view: Any,
-    *,
-    p0: tuple[float, float, float],
-    p1: tuple[float, float, float],
-    text_xy: tuple[float, float],
-    label: str,
-    expected_mm: float,
-    orientation: str,
-) -> Any:
-    """Add the one SHEET-derived reference dimension and verify it.
-
-    Every controlling dimension is a model dimension whose places the part
-    authored and ``assert_imported_precision`` reads back.  The parenthesised
-    socket-end-to-crown-root station is the single exception: a read-only
-    difference with no model dimension to import, so its places come from
-    the spec's ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a
-    literal.
-    """
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=_point(adapter, view, p0),
-        p1=_point(adapter, view, p1),
-        text_xy=text_xy,
-        label=label,
-        orientation=orientation,
-    )
-    native = _early_bound(display, "IDisplayDimension")
-    measured_mm = (
-        float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    )
-    if abs(measured_mm - expected_mm) > 1e-5:
-        raise RuntimeError(
-            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
-        )
-    places = DRAWING_REFERENCE_PRECISION[label]
-    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
-    # tolerance places.  The subscript is written out again because
-    # _drawing_contract only accepts a spec lookup here.
-    native.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
-    if int(native.GetPrimaryPrecision2()) != places:
-        raise RuntimeError(
-            f"{label}: sheet dimension prints {native.GetPrimaryPrecision2()} "
-            f"decimal places, not {places}"
-        )
-    native.ShowParenthesis = True
-    if not native.ShowParenthesis:
-        raise RuntimeError(f"{label} was not shown as reference")
-    return display
 
 
 def _add_body_centerline(adapter: Any, view: Any) -> None:
@@ -510,19 +457,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_reference_dimensions(adapter, annotations, {"RodDia"})
     offset_dimension_text(adapter, annotations, {"TubeLen": SEATING_DEPTH_TEXT_XY})
 
-    # The crown root, measured from the flat socket end like the imported hub
-    # length and body overall it sits between: overall length, sphere radius
-    # and grip diameter already define this junction, so it is reference.
-    _checked_reference_dimension(
-        adapter,
-        right,
-        p0=(0.0, TUBE_OD / 4.0, HUB_END_Z),
-        p1=(0.0, (TUBE_OD + GRIP_DIA) / 4.0, CROWN_ROOT_Z),
-        text_xy=(RIGHT_CENTER[0], 0.202),
-        label="socket end to crown root",
-        expected_mm=HUB_END_Z - CROWN_ROOT_Z,
-        orientation="horizontal",
-    )
 
     for view, label in ((front, "body end"), (top, "cross-hole")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
