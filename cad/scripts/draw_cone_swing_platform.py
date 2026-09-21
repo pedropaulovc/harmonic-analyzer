@@ -88,14 +88,14 @@ PROFILE_KEEP = {
     "NorthEdgeZ": (0.105, 0.150),
     "NorthWestX": (0.050, 0.115),
     "SouthWestX": (0.045, 0.258),
-    "SouthEastX": (0.108, 0.248),
+    "SouthEastX": (0.108, 0.253),
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
     "CornerNER": (0.135, 0.130),
     "CornerNWR": (0.025, 0.130),
-    "CornerSWR": (0.118, 0.258),
-    "CornerSER": (0.030, 0.258),
+    "CornerSWR": (0.118, 0.235),
+    "CornerSER": (0.030, 0.240),
 }
 FEATURE_KEEP = {
     "PivotBearingReliefDia": (0.215, 0.130),
@@ -111,7 +111,7 @@ NOTCH_KEEP = {
 }
 SECTION_KEEP = {
     "PlateThk": (0.300, 0.120),
-    "PivotBearingReliefDepth": (0.375, 0.110),
+    "PivotBearingReliefDepth": (0.375, 0.115),
 }
 
 
