@@ -55,6 +55,8 @@ from knife_mount_spec import (
     R_BORE,
     STUD_TAP_DIA,
     STUD_TAP_SPEC,
+    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -148,6 +150,10 @@ def _check_tap_callout(display: Any) -> None:
         "hw-tapdrldepth": STUD_TAP_SPEC.depth_mm,
         "hw-threaddepth": STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
     }
+    expected_tolerances = {
+        "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+        "hw-threaddepth": STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    }
     expected_strings = {
         "hw-threaddesc": "1/2-13 UNC",
         "hw-threadclass": STUD_TAP_SPEC.thread_class,
@@ -170,14 +176,32 @@ def _check_tap_callout(display: Any) -> None:
             raise RuntimeError(f"unexpected knife-mount tap variable {name!r}")
         if int(late.Type) != 1:
             raise RuntimeError(f"knife-mount tap {name} is not a length")
-        actual_mm = (
-            float(_early_bound(raw, "ICalloutLengthVariable").Length) * 1000.0
-        )
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        actual_mm = float(length.Length) * 1000.0
         if abs(actual_mm - expected_lengths[name]) > 1e-5:
             raise RuntimeError(
                 f"knife-mount tap {name}: {actual_mm} != "
                 f"{expected_lengths[name]} mm"
             )
+        if name in expected_tolerances:
+            expected_lower_mm, expected_upper_mm = expected_tolerances[name]
+            actual_lower_mm = float(late.ToleranceMin) * 1000.0
+            actual_upper_mm = float(late.ToleranceMax) * 1000.0
+            if (
+                int(late.ToleranceType) != 2
+                or abs(actual_lower_mm - expected_lower_mm) > 1e-6
+                or abs(actual_upper_mm - expected_upper_mm) > 1e-6
+                or int(length.Precision) != 2
+                or int(length.TolerancePrecision) != 2
+            ):
+                raise RuntimeError(
+                    f"knife-mount tap {name}: native tolerance readback "
+                    f"type={int(late.ToleranceType)}, "
+                    f"lower_mm={actual_lower_mm!r}, "
+                    f"upper_mm={actual_upper_mm!r}, "
+                    f"nominal_precision={int(length.Precision)}, "
+                    f"tolerance_precision={int(length.TolerancePrecision)}"
+                )
         found.add(name)
     required = set(expected_lengths) | set(expected_strings)
     if found != required:
