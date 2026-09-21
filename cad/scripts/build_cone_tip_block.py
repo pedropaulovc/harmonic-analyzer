@@ -30,11 +30,14 @@ import sys
 from _common import (
     PANEL_BLACK,
     SketchDims,
+    _early_bound,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
     define_centered_rectangle,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -45,6 +48,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -52,6 +56,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
@@ -63,15 +68,21 @@ from cone_tip_block_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    MIN_TOP_LIGAMENT_MM,
     PINCH_CLEARANCE_DIA,
     PINCH_BORE_SPEC,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT,
+    PINCH_RISE,
+    PINCH_RISE_TOLERANCE_MM,
     SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
+    WORST_CLEARANCE_TO_ADJUSTER_MM,
+    WORST_SCREW_ENVELOPE_GAP_MM,
+    WORST_TOP_LIGAMENT_MM,
 )
 from _hole_spec import DRILL_POINT_H
 from _holes import blind_hole_volume_mm3, wizard_holes
@@ -95,12 +106,16 @@ ADJUSTER_BORE_DEPTH = ADJUSTER_BORE_SPEC.depth_mm
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
 PINCH_BORE_Y = PINCH_HEIGHT
 
-# The pinch cross-bore must land wholly in the material band between the
-# adjuster counterbore's top and the block top, and the slit must cross it.
-if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < ADJUSTER_AXIS_HEIGHT + ADJUSTER_BORE_DIA / 2.0 + 0.25:
-    raise AssertionError("pinch bore clips the adjuster counterbore")
-if PINCH_BORE_Y + PINCH_BORE_DIA / 2.0 > BLOCK_HEIGHT - 0.25:
-    raise AssertionError("pinch bore breaches the block top")
+# The print-level guards in the spec include every applicable tolerance band.
+# These nominal checks catch a model/feature drift before the native build.
+if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < ADJUSTER_AXIS_HEIGHT + ADJUSTER_BORE_DIA / 2.0:
+    raise AssertionError("pinch tap-drill clips the adjuster tap-drill")
+if BLOCK_HEIGHT - PINCH_BORE_Y - PINCH_CLEARANCE_DIA / 2.0 < MIN_TOP_LIGAMENT_MM:
+    raise AssertionError("pinch clearance leaves too little nominal top wall")
+if WORST_CLEARANCE_TO_ADJUSTER_MM < 0.15 or WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
+    raise AssertionError("approved pinch-to-adjuster envelope no longer closes")
+if WORST_TOP_LIGAMENT_MM < MIN_TOP_LIGAMENT_MM:
+    raise AssertionError("approved worst-case top ligament no longer closes")
 if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
     raise AssertionError("top slit does not cross the pinch bore")
 
@@ -150,6 +165,12 @@ def _slit_removed() -> float:
     v -= acc * dz
     return v
 
+def _as_construction(adapter, entity_id: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
@@ -168,7 +189,10 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
     # tables, not driven dims.)
     await set_global(adapter, "SlitW", f"{SLIT_W}mm")
-    await set_global(adapter, "PinchBoreY", f"{PINCH_BORE_Y}mm")
+    await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
+    await set_global(
+        adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
+    )
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -341,7 +365,56 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
+
+    # Native functional interface: a construction-only line carries the
+    # pinch-to-adjuster axis spacing the shop controls. The Hole Wizard point
+    # and this dimension consume the same PinchRise global, so the printed
+    # relative dimension cannot drift from the cut geometry.
+    check("create_sketch pinch-rise reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    pinch_rise_ref = check(
+        "pinch-rise reference line",
+        await adapter.add_line(
+            0.0, ADJUSTER_AXIS_HEIGHT, 0.0, PINCH_BORE_Y
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, pinch_rise_ref)
+    check(
+        "pinch-rise reference vertical",
+        await adapter.add_sketch_constraint(pinch_rise_ref, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{pinch_rise_ref}.start",
+        f"{pinch_rise_ref}.end",
+        "vertical_distance",
+        PINCH_RISE,
+        "pinch-to-adjuster axis spacing",
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{pinch_rise_ref}.start",
+        0.0,
+        ADJUSTER_AXIS_HEIGHT,
+        "pinch-rise reference",
+    )
+    await ensure_fully_defined(adapter, "pinch-rise reference sketch")
+    check("exit_sketch pinch-rise reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinchRiseReference")
+    pinch_rise_dim = name_dimensions(
+        adapter, "PinchRiseReference", ["PinchRise"]
+    )[0]
+    await drive_dimension(adapter, pinch_rise_dim, '"PinchRise"')
+    await force_rebuild(adapter)
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "PinchRiseReference",
+        "PinchRise",
+        PINCH_RISE_TOLERANCE_MM,
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # Model-owned places are applied only after PinchRiseReference exists.
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
