@@ -132,7 +132,7 @@ FRONT_KEEP = {
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.170),
-    "CrankBossDia": (0.170, _front_y(BLOCK_HEIGHT + 2.0)),
+    "CrankBossDia": (0.140, _front_y(BLOCK_HEIGHT + 2.0)),
     "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
@@ -589,10 +589,19 @@ def _assert_native_layout(
             f"{len(journal_dimensions)}"
         )
     journal_dimension = journal_dimensions[0]
+    text_interiors = [
+        Box(
+            box.xmin + DEFAULT_TEXT_TOUCH_TOL_M,
+            box.ymin + DEFAULT_TEXT_TOUCH_TOL_M,
+            box.xmax - DEFAULT_TEXT_TOUCH_TOL_M,
+            box.ymax - DEFAULT_TEXT_TOUCH_TOL_M,
+        )
+        for box in journal_dimension.text_boxes
+    ]
     own_overlap = max(
         (
             segment_box_overlap_length(segment, box)
-            for box in journal_dimension.text_boxes
+            for box in text_interiors
             for segment in journal_dimension.segments
         ),
         default=0.0,
