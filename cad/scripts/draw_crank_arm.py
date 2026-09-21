@@ -255,9 +255,10 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
             continue
         mapped = drawing_view.GetCorrespondingEntity(model_edge)
         if mapped is None:
-            raise RuntimeError(
-                f"top view has no corresponding drawing edge for {label}"
-            )
+            # A source rim or blind floor can project away or merge into its
+            # mate in this edge-on view.  Require a mapped edge per feature
+            # below; an individual source edge need not have a drawing peer.
+            continue
         drawing_edge = _early_bound(mapped, "IEdge")
         if any(_same_entity(app, drawing_edge, prior) for _, prior in targets):
             raise RuntimeError(f"top view mapped duplicate edge for {label}")
