@@ -97,7 +97,9 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "ISO 4026" in notes
     boss = drawing.DIMENSION_CALLOUTS["BossDia"]
-    assert "COSMETIC BOSS OPTIONAL" in boss
+    assert "COSMETIC RAISED BOSS" in boss
+    assert "SIZE/SHAPE NONCRITICAL" in boss
+    assert "OPTIONAL" not in boss
     assert "M2.5 X 0.45-6H THRU TO BORE" in boss
     assert "THROUGH THE BOSS" not in boss
 
@@ -130,7 +132,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert drawing.DIMENSION_CALLOUTS["BossCz"] == "BOSS AXIS STATION"
     assert "BossProjection" in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
-        "OPTIONAL BOSS PROJECTION (REF)"
+        "RAISED BOSS PROJECTION (REF)"
     )
 
 
