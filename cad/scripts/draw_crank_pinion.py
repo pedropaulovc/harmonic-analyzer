@@ -222,14 +222,15 @@ DIMENSION_CALLOUTS = {
     "BossChamfer": "X 45 DEG",
 }
 
-# The retention-pin cross-hole: its exit circle on the boss wall nearest the
-# viewer, at the boss mid-length. Its attached matched-fit callout hangs above
-# the side view and names every assembly acceptance criterion.
+# The retention-pin cross-hole: its upper edge on the boss wall nearest the
+# viewer, at the boss mid-length. Keep the attached matched-fit callout
+# above-left of the side view so its leader enters through the boss rather than
+# crossing the toothed body.
 PIN_HOLE_EDGE = (
     _side_x(PIN_STATION),
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
-PIN_HOLE_CALLOUT = (ISO_CENTER[0] - 0.025, RIGHT_CENTER[1] + HALF_OD + 0.056)
+PIN_HOLE_CALLOUT = (0.155, RIGHT_CENTER[1] + HALF_OD + 0.056)
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
 BORE_FIT_NOTE = (0.016, 0.174)
