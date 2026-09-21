@@ -335,9 +335,11 @@ def test_part_config_is_a_machined_casting() -> None:
     config = _config.parts("cone-pivot-post")
     assert config["material_specification"] == "LOW-CARBON STEEL OR GRAY IRON"
     assert config["material"] == "LOW-CARBON STEEL OR GRAY IRON"
-    assert "RAL 6005" in str(config["finish"])
-    assert "SSPC-SP 3" in str(config["finish"])
-    assert "50-75 um DFT" in str(config["finish"])
-    assert "boss" in str(config["finish"]).lower()
+    finish = str(config["finish"])
+    assert "RAL 6005" in finish
+    assert "SSPC-SP 3" in finish
+    assert "50-75 um DFT" in finish
+    assert "crank-boss spotface" in finish
+    assert "ISO VG 32 oil on bare machined surfaces" in finish
     assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1

@@ -38,11 +38,12 @@ from _drawing_common import (
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
@@ -51,9 +52,11 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
+    ATTACHMENT_X,
     BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
+    BORE_HEIGHT,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_END_Z,
@@ -118,22 +121,22 @@ FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
-    "CrankBossDia": (0.166, _front_y(BLOCK_HEIGHT + 2.0)),
-    "CrankBoreDia": (0.166, _front_y(CRANK_BORE_HEIGHT)),
+    "CrankBossDia": (0.170, _front_y(BLOCK_HEIGHT + 2.0)),
+    "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
     "MainBodyDia": (0.040, _top_y(0.0)),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.069, _top_y(CRANK_BOSS_START_Z / 2.0)),
+    "CrankBossStartZ": (0.057, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (_top_x(-6.7), 0.2525),
     "MountWestX": (_top_x(6.7), 0.2525),
     "HeadDia": (0.158, _top_y(0.0)),
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "JournalAxisY": (0.202, 0.150),
-    "ConeBossDia": (0.288, 0.180),
-    "JournalBoreDia": (0.288, 0.163),
+    "JournalAxisY": (0.198, 0.156),
+    "ConeBossDia": (0.292, 0.184),
+    "JournalBoreDia": (0.292, 0.163),
 }
 # Non-preferred finished sizes, so the shop is told to BORE rather than left to
 # hunt for a reamer that does not exist; the size limits are the part's.  The
@@ -141,9 +144,10 @@ SECTION_KEEP = {
 # as-cast collar the shop has to know that face is machined back to a station,
 # not left as cast.
 DIMENSION_CALLOUTS = {
+    "CrankBossDia": "SPOT FACE",
     "CrankBoreDia": "BORE THRU",
     "JournalBoreDia": "BORE THRU",
-    "CrankBossStartZ": "SPOT FACE",
+    "CrankBossStartZ": "TO SPOT FACE",
 }
 
 
@@ -151,8 +155,20 @@ DIMENSION_CALLOUTS = {
 _EDGE_MATCH_TOLERANCE_MM = 0.01
 
 
-def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
-    """Return the model circular edge matching a radius and a model-Y height."""
+def _circular_edge(
+    view: Any,
+    *,
+    radius_mm: float,
+    center_y_mm: float,
+    center_x_mm: float | None = None,
+) -> Any:
+    """Return the model circular edge matching a radius and a model-Y height.
+
+    ``center_x_mm`` breaks the tie between the two mounting counterbores,
+    which differ only in X; without it the scan returns whichever SolidWorks
+    enumerated first, and a leader routed for one hole then crosses the plan
+    to reach the other.
+    """
     candidates: list[tuple[float, Any]] = []
     for raw in visible_view_entities(view, 1, label="pivot-post circular edges"):
         edge = _early_bound(raw, "IEdge")
@@ -166,14 +182,18 @@ def _circular_edge(view: Any, *, radius_mm: float, center_y_mm: float) -> Any:
         error = abs(params[6] * 1000.0 - radius_mm) + abs(
             params[1] * 1000.0 - center_y_mm
         )
+        if center_x_mm is not None:
+            error += abs(params[0] * 1000.0 - center_x_mm)
         candidates.append((error, edge))
     if not candidates:
         raise RuntimeError("view has no circular model edges")
     error, edge = min(candidates, key=lambda item: item[0])
     if error > _EDGE_MATCH_TOLERANCE_MM:
+        where = f"at height {center_y_mm:.4f} mm"
+        if center_x_mm is not None:
+            where += f", x {center_x_mm:.4f} mm"
         raise RuntimeError(
-            f"no circular edge matches radius {radius_mm:.4f} mm "
-            f"at height {center_y_mm:.4f} mm"
+            f"no circular edge matches radius {radius_mm:.4f} mm {where}"
         )
     return edge
 
@@ -214,6 +234,74 @@ def _section_cut() -> tuple[tuple[float, float], tuple[float, float]]:
         (axis[0] - step[0], axis[1] - step[1]),
         (axis[0] + step[0], axis[1] + step[1]),
     )
+
+
+def _orient_section(adapter: Any, view: Any) -> None:
+    """Show the journal section upright, with the casting's top at the top.
+
+    The section plane contains model +Y and the plan-normal cross-axis.  Native
+    section creation can mirror either axis and inherits the oblique cutting
+    line's sheet rotation, so project both model axes, reverse the cut when
+    needed, then remove that rotation.  This keeps the mounting counterbores at
+    the same end as the front elevation instead of making the shop mentally
+    invert SECTION A-A.
+    """
+
+    section_view = _early_bound(view, "IView")
+    section = section_view.GetSection()
+    if section is None:
+        raise RuntimeError("cone journal section has no section definition")
+    section = _early_bound(section, "IDrSection")
+    incline = math.radians(INCLINE_DEG)
+    cross_axis = (0.040 * math.cos(incline), 0.0, -0.040 * math.sin(incline))
+
+    def projected_axes() -> tuple[tuple[float, float], tuple[float, float]]:
+        origin = model_point_in_view(
+            adapter, section_view, (0.0, 0.0, 0.0), label="journal section origin"
+        )
+        endpoints = (
+            model_point_in_view(
+                adapter,
+                section_view,
+                cross_axis,
+                label="journal section horizontal axis",
+            ),
+            model_point_in_view(
+                adapter,
+                section_view,
+                (0.0, 0.040, 0.0),
+                label="journal section vertical axis",
+            ),
+        )
+        return tuple(
+            tuple(endpoint[index] - origin[index] for index in range(2))
+            for endpoint in endpoints
+        )
+
+    horizontal, vertical = projected_axes()
+    if horizontal[0] * vertical[1] - horizontal[1] * vertical[0] < 0.0:
+        reversed_cut = not bool(section.GetReversedCutDirection())
+        section.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="orient cone journal section")
+        if bool(section.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("cone journal section cut reversal did not persist")
+        horizontal, vertical = projected_axes()
+
+    section_view.Angle = float(section_view.Angle) - math.atan2(
+        horizontal[1], horizontal[0]
+    )
+    rebuild_drawing(adapter, label="orient cone journal section")
+    horizontal, vertical = projected_axes()
+    if (
+        horizontal[0] <= 0.0
+        or abs(horizontal[1]) > 1e-8
+        or vertical[1] <= 0.0
+        or abs(vertical[0]) > 1e-8
+    ):
+        raise RuntimeError(
+            "cone journal section axes did not persist upright: "
+            f"{horizontal=}, {vertical=}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -259,10 +347,10 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, front)
-    # The plan is the ONE view where hidden lines carry information the sheet
-    # needs: they are what shows the cone bore running across the casting at
-    # the 12.52 degree angle the reference dimension states.
-    set_hidden_lines_visible(adapter, top)
+    # SECTION A-A defines the inclined bore and the plan's native 12.52-degree
+    # model dimension defines its direction, so dashed bore edges add no
+    # manufacturing information here and only crowd the holes and cut line.
+    set_hidden_lines_removed(adapter, top)
 
     cut_start, cut_end = _section_cut()
     section = create_section_view(
@@ -274,6 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
         section_label=SECTION_LABEL,
         label="cone journal section",
     )
+    _orient_section(adapter, section)
     set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
@@ -325,9 +414,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge=_circular_edge(
-            top, radius_mm=ATTACHMENT_CBORE_DIA / 2.0, center_y_mm=BLOCK_HEIGHT
+            top,
+            radius_mm=ATTACHMENT_CBORE_DIA / 2.0,
+            center_y_mm=BLOCK_HEIGHT,
+            center_x_mm=ATTACHMENT_X,
         ),
-        callout_xy=(0.150, 0.246),
+        callout_xy=(0.155, 0.235),
         label="mounting counterbores",
         process="DRILL",
     )
@@ -351,7 +443,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.140, _front_y(56.0)),
+        symbol_xy=(0.158, _front_y(51.0)),
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            front,
+            (
+                0.0,
+                (CRANK_BORE_HEIGHT - CRANK_BORE_DIA / 2.0) / 1000.0,
+                0.0,
+            ),
+            label="crank bore finish anchor",
+        ),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_bore"),
         label="crank bore finish",
     )
@@ -359,12 +461,28 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         edge_entity=_bore_rim_edge(section, diameter_mm=BORE_DIA),
-        symbol_xy=(0.212, 0.196),
+        symbol_xy=(0.295, 0.140),
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            section,
+            (
+                0.0,
+                (BORE_HEIGHT - BORE_DIA / 2.0) / 1000.0,
+                0.0,
+            ),
+            label="cone journal bore finish anchor",
+        ),
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
+
+    # Attaching dimensions and symbols can leave a stale hidden-line display.
+    # Reassert each manufacturing view after its final annotation.
+    set_hidden_lines_removed(adapter, front)
+    set_hidden_lines_removed(adapter, top)
+    set_hidden_lines_removed(adapter, section)
 
     set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 
