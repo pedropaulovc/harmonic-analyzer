@@ -257,7 +257,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
-        text_xy=(0.116, 0.220),
+        text_xy=(0.074, 0.220),
         attach_xy=(
             FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
             FRONT_CENTER[1],
