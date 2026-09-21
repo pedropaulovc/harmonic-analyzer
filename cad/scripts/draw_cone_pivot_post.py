@@ -757,7 +757,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.055, 0.153),
+        symbol_xy=(0.055, 0.145),
         leader_attach_xy=model_point_in_view(
             adapter,
             front,
