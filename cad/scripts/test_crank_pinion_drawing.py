@@ -18,6 +18,7 @@ import pytest
 import _config
 import build_crank_pinion as part
 import crank_pinion_spec as spec
+import crank_drive_gear_spec as mate
 import crankshaft_spec
 import draw_crank_pinion as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
@@ -112,7 +113,7 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
         "OutsideDia": 2,
         "FaceWidth": 1,
         "BoreDia": 3,
-        "BossDia": 2,
+        "BossDia": 1,
         "OverallLength": 1,
         "BossChamfer": 1,
     }
@@ -155,13 +156,17 @@ def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
     assert spec.PIN_HOLE_PROCESS.split("\n") == [
         "MATCH DRILL AT BOSS MID-LENGTH",
         f"AT ASSY WITH CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
-        f"REAM TO LIGHT DRIVE FIT WITH PIN {spec.PIN_NUMBER}",
+        f"REAM TO FIT PIN {spec.PIN_NUMBER}",
+        "SEAT BY LIGHT HAND-HAMMER TAPS",
+        "NOT REMOVABLE BY HAND",
         "FLUSH BOTH SIDES",
     ]
     assert spec.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n") == [
         f"MATCH DRILL AT ASSY WITH CRANK PINION {spec.PINION_NUMBER}",
         "AT PINION BOSS MID-LENGTH",
-        f"REAM TO LIGHT DRIVE FIT WITH PIN {spec.PIN_NUMBER}",
+        f"REAM TO FIT PIN {spec.PIN_NUMBER}",
+        "SEAT BY LIGHT HAND-HAMMER TAPS",
+        "NOT REMOVABLE BY HAND",
         "FLUSH BOTH SIDES",
     ]
     assert "DRILL" in spec.PIN_HOLE_PROCESS
@@ -242,9 +247,9 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         (
             "BORE LIMITS GOVERN",
             f"MATE SHAFT {spec.CRANKSHAFT_NUMBER}",
-            f"\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
-            f"+{shaft_upper:.3f}/{shaft_lower:.3f}",
-            f"DIA CLR {low:.3f}-{high:.3f} mm",
+            f"(\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+            f"+{shaft_upper:.3f}/{shaft_lower:.3f})",
+            f"(DIA CLR {low:.3f}-{high:.3f} mm)",
         )
     )
 
@@ -279,7 +284,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE",
         "PITCH DIAMETER (mm, REF)",
         "WHOLE DEPTH (mm, REF)",
-        "CIRCULAR TOOTH THICKNESS (mm, REF)",
+        "CIRCULAR TOOTH THICKNESS (mm)",
         "TOOTH FORM",
         "MATES WITH",
     ):
@@ -293,11 +298,35 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0
     )
-    # Generating data only: no acceptance number lives here, so no row may
-    # carry a tolerance of its own (rule 6) and no pair-commissioning protocol
-    # may return.
+    # The explicit one-sided limit reuses MHA-021's established 0.020 mm
+    # tooth-control capability instead of inheriting the title block's
+    # +/-0.13 mm. Convert the mate's normal-span lower limit to transverse
+    # thinning and prove the actual pair range. The custom crossed-mesh study
+    # proves zero collision at 0.100 mm effective thinning, so the worst
+    # max-thickness pair must retain the documented 0.050 mm margin.
+    assert "CIRCULAR TOOTH THICKNESS (mm, REF)" not in data
+    assert (
+        f"CIRCULAR TOOTH THICKNESS (mm):  "
+        f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
+        f"+{spec.TOOTH_THICKNESS_UPPER_DEVIATION:.3f}/"
+        f"{spec.TOOTH_THICKNESS_LOWER_DEVIATION:.3f}"
+    ) in data
+    mate_span_scale = math.cos(math.radians(mate.HELIX_ANGLE_DEG)) * math.cos(
+        mate.NORMAL_PRESSURE_ANGLE_RAD
+    )
+    mate_extra_thinning = 0.020 / mate_span_scale
+    pair_minimum = (
+        mate.BACKLASH_MM - spec.TOOTH_THICKNESS_UPPER_DEVIATION
+    )
+    pair_maximum = (
+        mate.BACKLASH_MM
+        - spec.TOOTH_THICKNESS_LOWER_DEVIATION
+        + mate_extra_thinning
+    )
+    assert pair_minimum == pytest.approx(0.150)
+    assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
+    assert pair_minimum - 0.100 == pytest.approx(0.050)
     assert "+/-" not in data
-    assert "+0" not in data
     assert "ISO 1328" not in data
     assert "BASE-TANGENT SPAN" not in data
     assert "PAIR" not in data
@@ -383,6 +412,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         spec.PIN_DIA * 4 / 2000.0
     )
     assert drawing.PIN_HOLE_EDGE[0] == pytest.approx(drawing._side_x(spec.PIN_STATION))
+    assert drawing.PIN_HOLE_CALLOUT[0] < drawing.PIN_HOLE_EDGE[0]
     positions = (
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),

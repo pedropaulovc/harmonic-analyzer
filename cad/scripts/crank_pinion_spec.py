@@ -12,7 +12,8 @@ machinist turns, bores and drills -- outside diameter, face width, bore, boss
 diameter, overall length, pin station -- are NATIVE model dimensions carrying
 their own decimal places and bands (rules 1, 2, 4); the tooth system that a
 cut-gear print cannot express as dimensions stays in the gear-data block rule 6
-allows, with every generating number marked REF; and nothing here restates the
+allows, with cutter inputs and derived diameters marked REF and the circular
+tooth thickness carrying its own functional limit; nothing here restates the
 title block.
 
 PURE DATA, no SolidWorks/COM imports: ``build_crank_pinion`` marks and
@@ -42,6 +43,15 @@ PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
+# The mating MHA-021 gear's accepted base-tangent span has a +0/-0.020 mm
+# band. Give this member the same one-sided tooth-control capability instead
+# of exposing the pair to the title block's +/-0.13 mm: the nominal 0.150 mm
+# tooth thinning then remains the minimum, while both members at minimum
+# thickness produce 0.191 mm after converting MHA-021's normal-span band to
+# transverse thickness. The exact-solid crossed-mesh study proves collision
+# freedom down to 0.100 mm, so this leaves at least 0.050 mm of proven margin.
+TOOTH_THICKNESS_UPPER_DEVIATION = 0.000
+TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
@@ -119,11 +129,10 @@ if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - BOSS_CHAMFER - 0.5:
     raise AssertionError("retention pin hole reaches the boss end break")
-# The hole callout on BOTH prints (the pinion's here; the crankshaft's reads
-# its twin below) carries the matched fit the way rules 2 and 6 ask: the
-# drill size and mate by number stay on the feature callout. The pinion's
-# callout also carries the assembly acceptance -- pin identity, fit and flush
-# condition -- instead of leaving that requirement in a detached general note.
+# The matched-hole callout on both part records identifies both seated parts,
+# the shared boss-mid-length operation and the actual fitted pin. It deliberately
+# omits the modeled hole nominal: reaming to a functional acceptance governs,
+# and the pin identity plus flush condition stay on the feature callout.
 CRANKSHAFT_NUMBER = _config.parts("crankshaft")["number"]
 PINION_NUMBER = _config.parts("crank-pinion")["number"]
 PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
@@ -132,16 +141,18 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
         f"MATE SHAFT {CRANKSHAFT_NUMBER}",
-        f"\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
-        f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f}",
-        f"DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
+        f"(\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+        f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f})",
+        f"(DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm)",
     )
 )
 PIN_HOLE_PROCESS = "\n".join(
     (
         "MATCH DRILL AT BOSS MID-LENGTH",
         f"AT ASSY WITH CRANKSHAFT {CRANKSHAFT_NUMBER}",
-        f"REAM TO LIGHT DRIVE FIT WITH PIN {PIN_NUMBER}",
+        f"REAM TO FIT PIN {PIN_NUMBER}",
+        "SEAT BY LIGHT HAND-HAMMER TAPS",
+        "NOT REMOVABLE BY HAND",
         "FLUSH BOTH SIDES",
     )
 )
@@ -149,7 +160,9 @@ CRANKSHAFT_PIN_HOLE_PROCESS = "\n".join(
     (
         f"MATCH DRILL AT ASSY WITH CRANK PINION {PINION_NUMBER}",
         "AT PINION BOSS MID-LENGTH",
-        f"REAM TO LIGHT DRIVE FIT WITH PIN {PIN_NUMBER}",
+        f"REAM TO FIT PIN {PIN_NUMBER}",
+        "SEAT BY LIGHT HAND-HAMMER TAPS",
+        "NOT REMOVABLE BY HAND",
         "FLUSH BOTH SIDES",
     )
 )
@@ -203,7 +216,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BossProfile": {
         "OutsideDia": 2,
         "BoreDia": 3,
-        "BossDia": 2,
+        "BossDia": 1,
         "OverallLength": 1,
     },
     "BossBreak": {"BossChamfer": 1},
@@ -233,11 +246,10 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     """Render an aligned gear/sprocket data block for a property-linked note."""
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
-
 # Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
-# as dimensions. Every generating number is REF -- the cutter and the depth of
-# cut produce them, and the print's acceptance sizes are the three native
-# dimensions above.
+# as ordinary view dimensions. Cutter inputs and derived diameters are REF;
+# circular tooth thickness is the shop's controlling acceptance and carries
+# the explicit one-sided pair-derived limit above.
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
@@ -247,8 +259,10 @@ GEAR_DATA = gear_data_note(
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.2f}"),
         (
-            "CIRCULAR TOOTH THICKNESS (mm, REF)",
-            f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f}",
+            "CIRCULAR TOOTH THICKNESS (mm)",
+            f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
+            f"+{TOOTH_THICKNESS_UPPER_DEVIATION:.3f}/"
+            f"{TOOTH_THICKNESS_LOWER_DEVIATION:.3f}",
         ),
         ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-021, 64T"),
