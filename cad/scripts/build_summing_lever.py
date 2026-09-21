@@ -17,7 +17,7 @@ user's explicit direction (2026-06-16), superseding the M6.4 "knife-edge tube +
   references/.../ch18_images/page001_img0{1,3}, photogrammetry 194637152 /
   194651412) and is tuned against the knife-mount fit + ch30 parity.
 
-Seven features (the six .cs features + the hex knife edge):
+Eight manufacturing feature groups:
 
 1. Coefficients plate  -- Top-plane rectangle on the +X (channel-spring) arm,
    carrying the 20 spring holes; mid-plane extrude centred on the pivot (local
@@ -31,10 +31,10 @@ Seven features (the six .cs features + the hex knife edge):
    at the plate ends, blind-extruded at a start offset.
 5. Summation plate     -- Top-plane leaf on the -X (counter-spring) arm: vertical
    base edge, two curved sides, short tip edge.
-6. Summation anchor    -- Top-plane concentric ring (outer + bore) at the -X tip,
-   the eye the counter-spring hangs from.
+6. Summation anchor    -- Top-plane solid boss at the -X tip.
 7. Middle rib          -- Front-plane elongated diamond spanning the lever, two
    tangent lines per side meeting two coradial arcs that wrap the cylinder.
+8. Counter-anchor tap  -- native #10-24 through tap in the finished boss.
 
 Part-local frame: origin = the knife-edge line, placed IDENTITY at machine
 (-15, 979.7, 0), so local axes ARE machine axes: +X = the channel-spring
@@ -67,6 +67,7 @@ from _common import (
     CASTING_GREEN,
     IN,
     SketchDims,
+    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
@@ -81,6 +82,7 @@ from _common import (
     extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -92,21 +94,22 @@ from _common import (
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _drawing_marks import (
+    _named_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from summing_lever_notes import (
-    DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    ISOMETRIC_VIEW_NOTE,
-)
+from summing_lever_notes import ISOMETRIC_VIEW_NOTE
 from summing_lever_spec import (
     ANCHOR_H,
+    BASIC_DRAWING_DIMENSIONS,
     CHANNEL_PITCH,
     CHANNEL_Z0,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     COUNTER_HOLE_SPEC,
     HOLE_COUNT,
     HOLE_SPEC,
@@ -284,6 +287,10 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "CoefficientsPlate")
+    plate_depth = name_dimensions(
+        adapter, "CoefficientsPlate", ["PlateThickness"]
+    )
+    drive_jobs.append((plate_depth[0], '"PlateT"'))
     # The plate is a plain rectangular prism, so an exact analytic volume gate
     # anchors the hole-field tripwires below (the WHOLE part has no analytic
     # gate -- organic arcs -- but this first feature does).
@@ -340,11 +347,12 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "SpringHolePattern")
-    # Drive the pattern's spacing dim from ChannelPitch so the pitch knob is
-    # live, not inert (the measuring-stick TickPattern Codex P2). The spacing
-    # is D3 (D1 is the pattern's direction-reference length, NOT the pitch);
-    # D3 == as-built CHANNEL_PITCH, so it stays neutral.
-    drive_jobs.append(("D3@SpringHolePattern", '"ChannelPitch"'))
+    # D3 is the native pattern spacing (D1 is the direction-reference length).
+    # Give it a stable manufacturing name before binding it to the model knob.
+    pitch_dimension = name_dimensions(
+        adapter, "SpringHolePattern", [None, None, "HolePitch"]
+    )
+    drive_jobs.append((pitch_dimension[0], '"ChannelPitch"'))
     await volume_check(
         adapter,
         "spring-hole field",
@@ -444,6 +452,10 @@ async def _hex_collar(
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
     name_last_feature(adapter, stem)
+    depth_dimension = name_dimensions(
+        adapter, stem, [f"{stem}Depth"]
+    )
+    drive_jobs.append((depth_dimension[0], '"HexDepth"'))
 
 
 async def _edge_rib(
@@ -622,6 +634,8 @@ async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "SummationAnchor")
+    anchor_depth = name_dimensions(adapter, "SummationAnchor", ["AnchorHeight"])
+    drive_jobs.append((anchor_depth[0], '"AnchorH"'))
 
 
 async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -747,6 +761,142 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
+def _as_construction(adapter, entity_id: str) -> None:
+    """Keep an unabsorbed model-owned drawing reference out of saved views."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _drawing_reference_sketches(
+    adapter, drive_jobs: list[tuple[str, str]]
+) -> None:
+    """Author dimensions that the solid owns only as derived geometry.
+
+    Construction geometry remains available to InsertModelAnnotations3 without
+    printing in a drawing view.  Each displayed value is driven from the same
+    equation-manager globals as the solid it describes.
+    """
+    knife = SketchDims()
+    check("create knife-envelope reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    width = check(
+        "knife-envelope width reference",
+        await adapter.add_line(-HEX_W / 2.0, 0.0, HEX_W / 2.0, 0.0),
+    )
+    height = check(
+        "knife-envelope height reference",
+        await adapter.add_line(0.0, -HEX_H / 2.0, 0.0, HEX_H / 2.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (width, height):
+        _as_construction(adapter, entity)
+    check(
+        "knife-envelope width horizontal",
+        await adapter.add_sketch_constraint(width, None, "horizontal"),
+    )
+    check(
+        "knife-envelope height vertical",
+        await adapter.add_sketch_constraint(height, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{width}.start",
+        f"{width}.end",
+        "horizontal_distance",
+        HEX_W,
+        "knife-envelope width",
+    )
+    knife.record("HexWidth", '"HexW"')
+    await anchor_point_to_origin(
+        adapter, f"{width}.start", -HEX_W / 2.0, 0.0, "knife-envelope width start"
+    )
+    knife.record("HexWidthHalf", '"HexW" / 2')
+    await dimension_between(
+        adapter,
+        f"{height}.start",
+        f"{height}.end",
+        "vertical_distance",
+        HEX_H,
+        "knife-envelope height",
+    )
+    knife.record("HexHeight", '"HexH"')
+    await anchor_point_to_origin(
+        adapter,
+        f"{height}.start",
+        0.0,
+        -HEX_H / 2.0,
+        "knife-envelope height start",
+    )
+    knife.record("HexHeightHalf", '"HexH" / 2')
+    await ensure_fully_defined(adapter, "knife-envelope reference sketch")
+    check("exit knife-envelope reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "KnifeEnvelopeReference")
+    drive_jobs += knife.apply(adapter, "KnifeEnvelopeReference")
+
+    pattern = SketchDims()
+    check("create pattern reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    first_offset = check(
+        "first spring-hole offset reference",
+        await adapter.add_line(
+            HOLE_X,
+            -PLATE_L / 2.0,
+            HOLE_X,
+            HOLE_Z[0],
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, first_offset)
+    check(
+        "first spring-hole offset vertical",
+        await adapter.add_sketch_constraint(first_offset, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{first_offset}.start",
+        f"{first_offset}.end",
+        "vertical_distance",
+        HOLE_Z[0] + PLATE_L / 2.0,
+        "first spring-hole offset",
+    )
+    pattern.record(
+        "HoleStartOffset",
+        '"PlateL" / 2 + "ChannelZ0" + "HoleZOffset"',
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{first_offset}.start",
+        HOLE_X,
+        -PLATE_L / 2.0,
+        "first spring-hole offset start",
+    )
+    pattern.record("PatternRefX", '"HoleX"')
+    pattern.record("PatternRefEnd", '"PlateL" / 2')
+    await ensure_fully_defined(adapter, "pattern reference sketch")
+    check("exit pattern reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PatternReferences")
+    drive_jobs += pattern.apply(adapter, "PatternReferences")
+
+
+def _apply_basic_drawing_dimensions(adapter) -> None:
+    """Author and read back the pattern's source-model BASIC coordinates."""
+    for feature_name, dimension_names in BASIC_DRAWING_DIMENSIONS.items():
+        for dimension_name in dimension_names:
+            _display, dimension = _named_dimension(
+                adapter, feature_name, dimension_name
+            )
+            tolerance = _early_bound(
+                dimension.Tolerance, "IDimensionTolerance"
+            )
+            tolerance.Type = 1  # swTolType_e.swTolBASIC
+            if int(tolerance.Type) != 1:
+                raise RuntimeError(
+                    f"{dimension_name}@{feature_name}: BASIC tolerance did not persist"
+                )
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -756,9 +906,9 @@ async def build(adapter) -> dict[str, str]:
     # an INCH document and the equation manager evaluates BARE numbers in document
     # units, so an unsuffixed "152.4" would read as 152.4 inches and blow the part
     # up 25.4x. Derived globals (ArcR, MidRibReach) reference others as equation
-    # strings so a primitive edit propagates. PlateT/RibT/AnchorH/HexDepth are
-    # extrude depths/offsets -- feature params, not sketch dims, so nothing drives
-    # them, but they stay editable knobs (matches the exemplars).
+    # strings so a primitive edit propagates. The model-owned feature depth
+    # dimensions and drawing-reference sketches below are bound to those same
+    # globals in ``drive_jobs``.
     await set_global(adapter, "PlateW", f"{PLATE_W}mm")
     await set_global(adapter, "PlateL", f"{PLATE_L}mm")
     await set_global(adapter, "PlateT", f"{PLATE_T}mm")
@@ -823,6 +973,7 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
+    await _drawing_reference_sketches(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -866,14 +1017,13 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _apply_basic_drawing_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
@@ -883,7 +1033,6 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
