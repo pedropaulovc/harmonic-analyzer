@@ -162,6 +162,38 @@ def _circle_entity(
         )
     return edge
 
+def _unique_entry_circle(
+    adapter: Any,
+    candidates: tuple[
+        tuple[Any, tuple[float, float]],
+        tuple[Any, tuple[float, float]],
+    ],
+    *,
+    radius_mm: float,
+    center_y_mm: float,
+    label: str,
+) -> tuple[Any, tuple[float, float], Any]:
+    """Find which opposed standard view exposes a blind feature's entry."""
+    matches: list[tuple[Any, tuple[float, float], Any]] = []
+    for view, center in candidates:
+        try:
+            edge = _circle_entity(
+                adapter,
+                view,
+                radius_mm=radius_mm,
+                center_y_mm=center_y_mm,
+                label=label,
+            )
+        except RuntimeError:
+            continue
+        matches.append((view, center, edge))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label} entry must appear in exactly one opposed view; "
+            f"found {len(matches)}"
+        )
+    return matches[0]
+
 def _vertical_outline_edge(
     view: Any,
     *,
@@ -396,19 +428,23 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
 
-    passage_edge = _circle_entity(
+    adjuster_view, adjuster_center, adjuster_edge = _unique_entry_circle(
         adapter,
-        front,
-        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
-        center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="shaft clearance passage",
-    )
-    adjuster_edge = _circle_entity(
-        adapter,
-        back,
+        ((front, FRONT_CENTER), (back, BACK_CENTER)),
         radius_mm=ADJUSTER_BORE_DIA / 2.0,
         center_y_mm=ADJUSTER_AXIS_HEIGHT,
         label="blind adjuster thread",
+    )
+    if adjuster_view is front:
+        passage_view, passage_center = back, BACK_CENTER
+    else:
+        passage_view, passage_center = front, FRONT_CENTER
+    passage_edge = _circle_entity(
+        adapter,
+        passage_view,
+        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="shaft clearance passage",
     )
     pinch_clearance_edge = _circle_entity(
         adapter,
@@ -424,11 +460,11 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch opposite-jaw thread",
     )
-    front_left_face = _vertical_outline_edge(
-        front,
+    passage_side_face = _vertical_outline_edge(
+        passage_view,
         coordinate_axis=0,
         coordinate_mm=-BLOCK_X / 2.0,
-        label="front left finished face",
+        label="shaft-entry left finished face",
     )
     right_depth_face = _vertical_outline_edge(
         right,
@@ -438,18 +474,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_reference_location(
         adapter,
-        front,
+        passage_view,
         face_xy=(
-            FRONT_CENTER[0] - BLOCK_X * _S / 2.0,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
+            passage_center[0] - BLOCK_X * _S / 2.0,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center),
         ),
-        face=front_left_face,
+        face=passage_side_face,
         circle_xy=(
-            FRONT_CENTER[0] - SHAFT_PASSAGE_DIA * _S / 2.0,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
+            passage_center[0] - SHAFT_PASSAGE_DIA * _S / 2.0,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center),
         ),
         circle=passage_edge,
-        text_xy=(FRONT_CENTER[0] - 0.007, 0.172),
+        text_xy=(passage_center[0] - 0.007, 0.172),
         label="adjuster and slot width-centre reference",
     )
     _add_reference_location(
@@ -471,9 +507,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     adjuster_callout = add_native_hole_callout(
         adapter,
-        back,
+        adjuster_view,
         edge=adjuster_edge,
-        callout_xy=(0.356, _elevation_y(ADJUSTER_AXIS_HEIGHT, BACK_CENTER) + 0.012),
+        callout_xy=(
+            adjuster_center[0] + 0.046,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center) + 0.012,
+        ),
         label="blind adjuster thread",
     )
     set_hole_callout_precision(
@@ -499,10 +538,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x in (
-        ("SHAFT ENTRY", FRONT_CENTER[0] - 0.021),
+        ("SHAFT ENTRY", passage_center[0] - 0.021),
         ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026),
         ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023),
-        ("ADJUSTER ENTRY", BACK_CENTER[0] - 0.021),
+        ("ADJUSTER ENTRY", adjuster_center[0] - 0.021),
     ):
         if add_note(adapter, text, x, 0.080) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
