@@ -3,9 +3,9 @@ r"""Create the curated manufacturing drawing for the pinion-handle pin.
 The plain straight pin is shown as an end view and a turned side view.  Both
 ``PinDia`` and ``PinLen`` are native model dimensions on the Right-plane
 revolve, so the side view imports the complete manufacturing definition.  The
-assembly note identifies the pin as the match-ream gauge and requires both
-installed ends to finish flush.  No fit band, GD&T, roughness symbol, or
-invented stock dimension is added.
+assembly note names the MHA-058 handle, MHA-102 arbor, MHA-136 gauge pin and
+required light drive fit, then requires both installed ends to finish flush.
+No GD&T, roughness symbol, or invented stock dimension is added.
 
 Run with SolidWorks open::
 
@@ -29,6 +29,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -59,9 +60,9 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (8.0, 1.0)
 VIEW_SCALE = (8, 1)
-FRONT_CENTER = (0.100, 0.150)  # end view: the one circle
-RIGHT_CENTER = (0.230, 0.150)  # side view: the length and diameter
-ISO_CENTER = (0.360, 0.150)
+FRONT_CENTER = (0.100, 0.180)  # end view: the one circle
+RIGHT_CENTER = (0.230, 0.180)  # side view: the length and diameter
+ISO_CENTER = (0.360, 0.180)
 
 # Printed half-sizes in sheet metres, which every dimension is placed clear of.
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0
@@ -73,6 +74,7 @@ RIGHT_KEEP = {
     "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
+DIMENSION_CALLOUTS = {"PinLen": "STOCK LENGTH"}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -131,6 +133,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     add_view_centerline(
