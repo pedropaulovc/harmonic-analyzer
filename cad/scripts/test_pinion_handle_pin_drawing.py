@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import _config
+from _assembly import _ALLOWED_FREE_STEMS
 import build_drive_train_assembly as assembly
 import draw_pinion_handle_pin as drawing
 import pinion_handle_pin_spec as spec
@@ -23,6 +24,7 @@ def test_part_identity_and_drawing_registry_are_complete() -> None:
     assert int(config["quantity"]) == 1
     registered = DRAWINGS_BY_NAME["pinion_handle_pin"]
     assert registered.artifact_stem == "pinion-handle-pin"
+    assert "pinion-handle-pin" in _ALLOWED_FREE_STEMS["drive-train"]
     assert registered.script == Path(drawing.__file__).resolve()
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
