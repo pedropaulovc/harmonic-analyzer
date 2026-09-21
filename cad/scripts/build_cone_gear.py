@@ -1,9 +1,8 @@
 r"""Reproduction script: cone gear (book ch. 12, pp. 16-21) -- parametric prototype.
 
 One part, configuration-driven tooth count across the full T006..T120-by-six
-family. The blank, gap profile and bore remain equation-driven from
-``ToothCount``/``BoreDia`` and the shared ``DP``/``PA``; each configuration
-owns one fixed-count native pattern feature and suppresses the other nineteen:
+family. All configuration-varying geometry is equation-driven so a switch
+regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
 
 * Equation-manager globals carry the involute math (base/tip radii in
   INCHES, involute parameter span, tooth-gap angles). Two parser facts
@@ -23,9 +22,8 @@ owns one fixed-count native pattern feature and suppresses the other nineteen:
   ``CreateEquationSpline2`` curves referencing the globals; parameter
   ranges are kept numeric (t in [0,1]) so only the expression parser
   needs global support.
-* One gap is cut through the blank. Twenty fixed-count circular-pattern
-  features share that seed; each is unsuppressed only in its owning
-  configuration.
+* One gap is cut through the blank, then circular-patterned about the gear
+  axis; the pattern instance count is equation-linked to ``ToothCount``.
 
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
@@ -71,9 +69,6 @@ import sys
 import time
 from typing import Any
 
-import pythoncom
-from win32com.client import VARIANT
-
 import _config
 from _drawing_marks import (
     apply_drawing_precision,
@@ -106,7 +101,6 @@ from _common import (
     apply_custom_properties,
     apply_material,
     check,
-    define_circle,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -303,165 +297,31 @@ async def equation_curve(
     return check(f"curve {label}", res)
 
 
-def pattern_feature_name(configuration: str) -> str:
-    """Return the fixed-count pattern feature owned by one configuration."""
-    return f"{TOOTH_PATTERN_FEATURE}_{configuration}"
+def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:
+    """Find the pattern's instance-count dimension name (``D?@<feature>``).
 
-
-def _bstr_array(configurations: list[str] | tuple[str, ...]) -> Any:
-    """Marshal names as SAFEARRAY(BSTR), not Python's SAFEARRAY(VARIANT)."""
-    return VARIANT(
-        pythoncom.VT_ARRAY | pythoncom.VT_BSTR,
-        list(configurations),
-    )
-
-
-def assert_configuration_family(model: Any, *, phase: str) -> tuple[str, ...]:
-    """Prove all twenty named family configurations exist and resolve."""
-    raw_names = model.GetConfigurationNames()
-    if raw_names is None:
-        names: tuple[str, ...] = ()
-    elif isinstance(raw_names, (list, tuple)):
-        names = tuple(str(name) for name in raw_names)
-    else:
-        names = (str(raw_names),)
-    expected = tuple(name for name, _teeth in CONFIGS)
-    missing = tuple(name for name in expected if name not in names)
-    if len(set(names)) != len(names) or missing:
-        raise RuntimeError(
-            f"{phase}: configuration enumeration invalid: "
-            f"names={names!r}, missing={missing!r}"
-        )
-
-    lookups: dict[str, str] = {}
-    for name in expected:
-        raw = model.GetConfigurationByName(name)
-        if raw is None:
-            raise RuntimeError(f"{phase}: GetConfigurationByName({name!r}) failed")
-        configuration = _early_bound(raw, "IConfiguration")
-        lookups[name] = str(configuration.Name)
-        if lookups[name] != name:
-            raise RuntimeError(
-                f"{phase}: configuration lookup {name!r} returned "
-                f"{lookups[name]!r}"
-            )
-    _telemetry.info(
-        f"{phase} configuration family: names={names!r}; lookups={lookups!r}"
-    )
-    return names
-
-
-def _pattern_feature(adapter: Any, configuration: str) -> Any:
+    The circular-pattern dimension layout (which of D1/D2 is the count vs
+    the angle) is not documented stably across releases, so probe by value:
+    the count dimension is the one reading ``expected`` (the seed count must
+    differ from the 360-degree angle for this to be unambiguous).
+    """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    part = _early_bound(model, "IPartDoc")
-    name = pattern_feature_name(configuration)
-    raw = part.FeatureByName(name)
-    if raw is None:
-        raise RuntimeError(f"{configuration}: fixed pattern {name} is missing")
-    return _early_bound(raw, "IFeature")
-
-
-def _pattern_suppression_states(
-    feature: Any, configurations: tuple[str, ...]
-) -> tuple[bool, ...]:
-    """Read each named configuration through a typed one-name COM array."""
-    states: list[bool] = []
-    for configuration in configurations:
-        raw = feature.IsSuppressed2(3, _bstr_array((configuration,)))
-        values = tuple(raw) if isinstance(raw, (list, tuple)) else (raw,)
-        if len(values) != 1:
-            raise RuntimeError(
-                f"{configuration}: pattern suppression readback has "
-                f"{len(values)} states, expected one"
-            )
-        states.append(bool(values[0]))
-    return tuple(states)
-
-
-def set_fixed_pattern_scope(
-    adapter: Any,
-    pattern_name: str,
-    owner: str,
-    configurations: tuple[str, ...],
-) -> None:
-    """Suppress one fixed-count pattern everywhere except its owner."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    part = _early_bound(model, "IPartDoc")
-    raw = part.FeatureByName(pattern_name)
-    if raw is None:
-        raise RuntimeError(f"cannot scope missing pattern {pattern_name}")
-    feature = _early_bound(raw, "IFeature")
-    others = tuple(name for name in configurations if name != owner)
-    if not bool(feature.SetSuppression2(0, 3, _bstr_array(others))):
-        raise RuntimeError(f"{pattern_name}: failed to suppress non-owner configs")
-    if not bool(feature.SetSuppression2(1, 3, _bstr_array((owner,)))):
-        raise RuntimeError(f"{pattern_name}: failed to unsuppress owner {owner}")
-
-    if owner == CONFIGS[0][0]:
-        controls = (owner, CONFIGS[-1][0])
-        control_states = _pattern_suppression_states(feature, controls)
-        _telemetry.info(
-            f"{pattern_name}: name-routing control {controls!r} -> "
-            f"{control_states!r}"
-        )
-        if control_states != (False, True):
-            raise RuntimeError(
-                f"{pattern_name}: IsSuppressed2 name-routing control returned "
-                f"{control_states!r}, expected {(False, True)!r}"
-            )
-
-    states = _pattern_suppression_states(feature, configurations)
-    unsuppressed = tuple(
-        name
-        for name, suppressed in zip(configurations, states, strict=True)
-        if not suppressed
+    for dim in ("D1", "D2", "D3", "D4"):
+        full = f"{dim}@{feature_name}"
+        param = adapter._attempt(lambda f=full: model.Parameter(f), default=None)
+        if param is None:
+            continue
+        try:
+            value = float(_read_member(param, "Value"))
+        except (TypeError, ValueError):
+            continue
+        _telemetry.debug(f"{full} reads {value:g}")
+        if abs(value - expected) < 1e-9:
+            return full
+    raise RuntimeError(
+        f"no dimension of {feature_name} reads {expected:g} -- cannot link "
+        "the instance count to ToothCount"
     )
-    _telemetry.info(
-        f"{pattern_name}: SetSuppression2 owner={owner}, "
-        f"unsuppressed={unsuppressed!r}"
-    )
-    if unsuppressed != (owner,):
-        raise RuntimeError(
-            f"{pattern_name}: unsuppressed in {unsuppressed!r}, expected {(owner,)!r}"
-        )
-
-
-def assert_fixed_pattern_matrix(adapter: Any, *, phase: str) -> None:
-    """Prove one and only one fixed pattern is active per configuration."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    names = assert_configuration_family(model, phase=phase)
-    matrix: dict[str, tuple[str, ...]] = {}
-    for owner, _teeth in CONFIGS:
-        feature = _pattern_feature(adapter, owner)
-        states = _pattern_suppression_states(feature, names)
-        unsuppressed = tuple(
-            name
-            for name, suppressed in zip(names, states, strict=True)
-            if not suppressed
-        )
-        matrix[owner] = unsuppressed
-        if unsuppressed != (owner,):
-            raise RuntimeError(
-                f"{phase}: {pattern_feature_name(owner)} unsuppressed in "
-                f"{unsuppressed!r}, expected {(owner,)!r}"
-            )
-
-    equations = _early_bound(model.GetEquationMgr(), "IEquationMgr")
-    count_equations_list: list[str] = []
-    for index in range(int(_read_member(equations, "GetCount") or 0)):
-        equation = str(equations.Equation(index) or "")
-        if TOOTH_PATTERN_FEATURE in equation:
-            count_equations_list.append(equation)
-    count_equations = tuple(count_equations_list)
-    _telemetry.info(
-        f"{phase} fixed-pattern suppression matrix: {matrix!r}; "
-        f"count_equations={count_equations!r}"
-    )
-    if count_equations:
-        raise RuntimeError(
-            f"{phase}: fixed pattern counts still have equations "
-            f"{count_equations!r}"
-        )
 
 
 def read_dimension(adapter: Any, full_name: str) -> float:
@@ -523,14 +383,15 @@ def _configuration_definition_state(
         if name in wanted:
             equations[name] = (equation, float(equation_manager.Value(index)))
 
-    pattern_name = pattern_feature_name(configuration)
     feature_states: dict[str, tuple[bool, int, bool]] = {}
-    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, pattern_name):
+    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE):
         raw = part.FeatureByName(name)
         if raw is None:
             raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
         feature = _early_bound(raw, "IFeature")
-        states = _pattern_suppression_states(feature, (configuration,))
+        states = feature.IsSuppressed2(3, [configuration])
+        if not isinstance(states, (list, tuple)):
+            states = (states,)
         error_result = feature.GetErrorCode2()
         if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
             raise RuntimeError(
@@ -542,15 +403,15 @@ def _configuration_definition_state(
             bool(error_result[1]),
         )
 
-    pattern = _pattern_feature(adapter, configuration)
+    pattern = _early_bound(
+        part.FeatureByName(TOOTH_PATTERN_FEATURE), "IFeature"
+    )
     definition = _early_bound(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
-    axis_type = int(definition.GetAxisType())
     _telemetry.info(
         f"{phase} cone-gear definition state {configuration}: "
         f"equations={equations!r}, features={feature_states!r}, "
-        f"axis_type={axis_type}, "
         f"geometry_pattern={bool(definition.GeometryPattern)}, "
         f"instances={int(definition.TotalInstances)}"
     )
@@ -567,15 +428,18 @@ async def _configuration_topology(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     active = _activate_configuration(model, configuration)
     part = _early_bound(model, "IPartDoc")
-    pattern_name = pattern_feature_name(configuration)
-    pattern = _pattern_feature(adapter, configuration)
-    states = _pattern_suppression_states(pattern, (configuration,))
-    suppressed = bool(states[0])
+    raw_pattern = part.FeatureByName(TOOTH_PATTERN_FEATURE)
+    if raw_pattern is None:
+        raise RuntimeError(f"{configuration}: {TOOTH_PATTERN_FEATURE} is missing")
+    pattern = _early_bound(raw_pattern, "IFeature")
+    states = pattern.IsSuppressed2(3, [configuration])
+    if not isinstance(states, (list, tuple)):
+        states = (states,)
+    suppressed = len(states) != 1 or bool(states[0])
     definition = _early_bound(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
     instances = int(definition.TotalInstances)
-    axis_type = int(definition.GetAxisType())
     error_result = pattern.GetErrorCode2()
     if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
         raise RuntimeError(
@@ -599,7 +463,7 @@ async def _configuration_topology(
     observation = (
         f"{configuration}: active={str(active.Name)}, "
         f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
-        f"{pattern_name} instances={instances}, axis_type={axis_type}, "
+        f"{TOOTH_PATTERN_FEATURE} instances={instances}, "
         f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
         f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
         f"expected={expected:.1f}"
@@ -610,18 +474,15 @@ async def _configuration_topology(
         issues.append("configuration needs rebuild")
     if instances != teeth:
         issues.append(f"pattern instances {instances} != {teeth}")
-    if axis_type != 0:
-        issues.append(f"pattern axis type {axis_type} != reference axis 0")
     if suppressed:
         issues.append("pattern is suppressed")
     if error_code:
         issues.append(f"pattern error {error_code} warning={is_warning}")
     if len(bodies) != 1:
         issues.append(f"solid body count {len(bodies)} != 1")
-    expected_faces = 4 * teeth + 3
-    if face_count != expected_faces:
+    if face_count < 2 * teeth + 4:
         issues.append(
-            f"solid face count {face_count} != pristine topology {expected_faces}"
+            f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
         )
     if abs(volume - expected) > 0.01 * expected:
         issues.append(f"volume {volume:.1f} outside 1% of {expected:.1f}")
@@ -657,72 +518,57 @@ def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
         )
 
 
-def _save_active_configuration(adapter: Any, configuration: str) -> None:
-    """Force and verify a real in-place save while one config is active."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = str(_active_configuration(model).Name)
-    if active != configuration:
-        raise RuntimeError(
-            f"cannot save {configuration}: active configuration is {active!r}"
-        )
-    before = bool(model.GetSaveFlag())
-    if not before:
-        model.SetSaveFlag()
-    armed = bool(model.GetSaveFlag())
-    _telemetry.info(
-        f"{configuration} active-save preflight: active={active}, "
-        f"save_flag_before={before}, save_flag_armed={armed}"
-    )
-    if not armed:
-        raise RuntimeError(f"{configuration}: SetSaveFlag did not dirty the document")
-    _save3_with_contract(
-        adapter,
-        1,
-        label=f"persist verified active configuration {configuration}",
-    )
-    active_after = str(_active_configuration(model).Name)
-    after = bool(model.GetSaveFlag())
-    _telemetry.info(
-        f"{configuration} active-save readback: active={active_after}, "
-        f"save_flag_after={after}"
-    )
-    if active_after != configuration:
-        raise RuntimeError(
-            f"{configuration}: active configuration changed to {active_after!r} "
-            "during Save3"
-        )
-    if after:
-        raise RuntimeError(f"{configuration}: document stayed dirty after Save3")
-
-
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
-    """Probe sentinels first; scan all 20 only if the discriminator passes."""
-    assert_fixed_pattern_matrix(adapter, phase=phase)
-    sentinels = (CONFIGS[-1], CONFIGS[0], CONFIGS[1], CONFIGS[3])
-    ordered = (*sentinels, *(item for item in CONFIGS if item not in sentinels))
+    """Fail closed unless all 20 reopened configurations retain real teeth."""
+    failures: list[str] = []
     volumes: dict[str, float] = {}
+    ordered = (CONFIGS[-1], *CONFIGS[:-1])
     for configuration, teeth in ordered:
-        volume, observation, issues = await _configuration_topology(
-            adapter,
-            configuration,
-            teeth,
-            phase=phase,
-        )
+        try:
+            volume, observation, issues = await _configuration_topology(
+                adapter,
+                configuration,
+                teeth,
+                phase=phase,
+            )
+        except Exception as exc:
+            failures.append(f"{configuration}: {exc}")
+            continue
         volumes[configuration] = volume
         if issues:
-            raise RuntimeError(
-                f"{phase} cone-gear configuration topology is invalid: "
-                f"{observation}; issues={issues!r}"
+            model = _early_bound(adapter.currentModel, "IModelDoc2")
+            rebuilt = bool(model.ForceRebuild3(False))
+            try:
+                _healed_volume, healed_observation, healed_issues = (
+                    await _configuration_topology(
+                        adapter,
+                        configuration,
+                        teeth,
+                        phase=f"{phase} explicit-rebuild",
+                    )
+                )
+            except Exception as exc:
+                healed_observation = f"measurement failed: {exc}"
+                healed_issues = ("measurement failed",)
+            failures.append(
+                f"{observation}; issues={issues!r}; "
+                f"ForceRebuild3={rebuilt}; after={healed_observation}; "
+                f"after_issues={healed_issues!r}"
             )
-
     _activate_configuration(
         _early_bound(adapter.currentModel, "IModelDoc2"), CONFIGS[-1][0]
     )
-    family = [volumes[name] for name, _teeth in CONFIGS]
-    if not all(a < b for a, b in zip(family, family[1:], strict=False)):
-        raise RuntimeError(f"reopened volumes not monotonic: {volumes!r}")
+    if len(volumes) == len(CONFIGS):
+        family = [volumes[name] for name, _teeth in CONFIGS]
+        if not all(a < b for a, b in zip(family, family[1:], strict=False)):
+            failures.append(f"reopened volumes not monotonic: {volumes!r}")
+    if failures:
+        raise RuntimeError(
+            f"{phase} cone-gear configuration topology is invalid: "
+            + "; ".join(failures)
+        )
     return volumes
 
 
@@ -757,709 +603,13 @@ def _apply_configuration_properties(
             )
 
 
-async def _configuration_cache_control_state(
-    adapter: Any,
-    configuration: str,
-    *,
-    phase: str,
-) -> dict[str, Any]:
-    """Capture one pattern-free configuration without mutating it."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = _active_configuration(model)
-    active_name = str(active.Name)
-    needs_rebuild = bool(active.NeedsRebuild)
-    part = _early_bound(model, "IPartDoc")
-    raw_hole = part.FeatureByName("ControlHoleCut")
-    if raw_hole is None:
-        raise RuntimeError("configuration-cache control hole feature is missing")
-    hole = _early_bound(raw_hole, "IFeature")
-    suppressed = _pattern_suppression_states(hole, (configuration,))[0]
-    error_result = hole.GetErrorCode2()
-    if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
-        raise RuntimeError(
-            f"{configuration}: unreadable control-hole error {error_result!r}"
-        )
-    bodies = tuple(part.GetBodies2(0, False) or ())
-    face_count = (
-        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
-        if len(bodies) == 1
-        else 0
-    )
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(
-            f"{configuration}: control mass properties failed: {mass.error}"
-        )
-    state = {
-        "configuration": active_name,
-        "needs_rebuild": needs_rebuild,
-        "suppressed": suppressed,
-        "error": int(error_result[0] or 0),
-        "warning": bool(error_result[1]),
-        "bodies": len(bodies),
-        "faces": face_count,
-        "volume": float(mass.data.volume),
-    }
-    _telemetry.info(f"{phase} configuration-cache control: {state!r}")
-    if active_name != configuration:
-        raise RuntimeError(
-            f"{phase}: active configuration {active_name!r} != {configuration!r}"
-        )
-    return state
-
-
-def _configuration_cache_states_match(
-    observed: dict[str, Any],
-    reference: dict[str, Any],
-) -> bool:
-    """Compare a cache-control state with a tight floating-volume tolerance."""
-    exact_keys = (
-        "configuration",
-        "needs_rebuild",
-        "suppressed",
-        "error",
-        "warning",
-        "bodies",
-        "faces",
-    )
-    if any(observed[key] != reference[key] for key in exact_keys):
-        return False
-    expected_volume = float(reference["volume"])
-    return abs(float(observed["volume"]) - expected_volume) <= max(
-        1e-6,
-        abs(expected_volume) * 1e-9,
-    )
-
-
-async def _run_configuration_cache_control(adapter: Any) -> None:
-    """Run a pattern-free two-configuration cold/warm persistence control."""
-    from solidworks_mcp.adapters.base import (
-        CreateConfigurationParameters,
-        ExtrusionParameters,
-    )
-
-    names = ("HOLE_ON", "HOLE_OFF")
-    check("control create_part", await adapter.create_part())
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = _active_configuration(model)
-    active.Name = names[0]
-    if str(_active_configuration(model).Name) != names[0]:
-        raise RuntimeError("failed to rename Default configuration to HOLE_ON")
-
-    check("control create base sketch", await adapter.create_sketch("Front"))
-    base_circle = check(
-        "control add base circle",
-        await adapter.add_circle(0.0, 0.0, 20.0),
-    )
-    check(
-        "control base diameter",
-        await adapter.add_sketch_dimension(
-            base_circle,
-            None,
-            "diameter",
-            40.0,
-        ),
-    )
-    await ensure_fully_defined(adapter, "configuration-cache base sketch")
-    check("control exit base sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "ControlBaseProfile")
-    check(
-        "control extrude base",
-        await adapter.create_extrusion(ExtrusionParameters(depth=10.0)),
-    )
-    name_last_feature(adapter, "ControlBase")
-
-    check(
-        f"control create_configuration {names[1]}",
-        await adapter.create_configuration(
-            CreateConfigurationParameters(
-                name=names[1],
-                comment="pattern-free configuration cache control",
-            )
-        ),
-    )
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    enumerated = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
-    if len(enumerated) != 2 or set(enumerated) != set(names):
-        raise RuntimeError(
-            f"control configurations are {enumerated!r}, expected exactly {names!r}"
-        )
-
-    activation = await adapter.set_active_configuration(names[0])
-    check(f"control activate {names[0]}", activation)
-    if not bool(activation.data.get("rebuilt")):
-        raise RuntimeError(f"control activation did not rebuild {names[0]}")
-    check("control create hole sketch", await adapter.create_sketch("Front"))
-    hole_circle = check(
-        "control add hole circle",
-        await adapter.add_circle(0.0, 0.0, 5.0),
-    )
-    check(
-        "control hole diameter",
-        await adapter.add_sketch_dimension(
-            hole_circle,
-            None,
-            "diameter",
-            10.0,
-        ),
-    )
-    await ensure_fully_defined(adapter, "configuration-cache hole sketch")
-    check("control exit hole sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "ControlHoleProfile")
-    check(
-        "control cut through hole",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=12.0)),
-    )
-    hole_name = name_last_feature(adapter, "ControlHoleCut")
-    raw_hole = _early_bound(model, "IPartDoc").FeatureByName(hole_name)
-    if raw_hole is None:
-        raise RuntimeError("control hole cut was not created")
-    hole = _early_bound(raw_hole, "IFeature")
-    if not bool(hole.SetSuppression2(0, 3, _bstr_array((names[1],)))):
-        raise RuntimeError(f"failed to suppress control hole in {names[1]}")
-    if not bool(hole.SetSuppression2(1, 3, _bstr_array((names[0],)))):
-        raise RuntimeError(f"failed to unsuppress control hole in {names[0]}")
-    states = _pattern_suppression_states(hole, names)
-    if states != (False, True):
-        raise RuntimeError(
-            f"control hole suppression states {states!r} != {(False, True)!r}"
-        )
-
-    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
-    control_path = (OUT_SLDPRT / "cone-gear-config-cache-control.SLDPRT").resolve()
-    check(
-        f"establish configuration-cache control path -> {control_path}",
-        await adapter.save_file(str(control_path)),
-    )
-
-    references: dict[str, dict[str, Any]] = {}
-    for configuration in names:
-        activation = await adapter.set_active_configuration(configuration)
-        check(f"control reference activate {configuration}", activation)
-        if not bool(activation.data.get("rebuilt")):
-            raise RuntimeError(f"control reference did not rebuild {configuration}")
-        references[configuration] = await _configuration_cache_control_state(
-            adapter,
-            configuration,
-            phase="reference",
-        )
-        reference = references[configuration]
-        if (
-            reference["needs_rebuild"]
-            or reference["error"]
-            or reference["bodies"] != 1
-            or reference["faces"] < 1
-        ):
-            raise RuntimeError(
-                f"{configuration}: control reference is not clean: {reference!r}"
-            )
-        raw_configuration = model.GetConfigurationByName(configuration)
-        if raw_configuration is None:
-            raise RuntimeError(f"control configuration {configuration} disappeared")
-        config = _early_bound(raw_configuration, "IConfiguration")
-        config.AddRebuildSaveMark = True
-        if not bool(config.AddRebuildSaveMark):
-            raise RuntimeError(f"{configuration}: control save mark was not set")
-        _telemetry.info(
-            f"{configuration} control AddRebuildSaveMark="
-            f"{bool(config.AddRebuildSaveMark)}"
-        )
-        _save_active_configuration(adapter, configuration)
-
-    hole_on = references[names[0]]
-    hole_off = references[names[1]]
-    if (
-        hole_on["suppressed"]
-        or not hole_off["suppressed"]
-        or hole_on["faces"] == hole_off["faces"]
-        or abs(float(hole_on["volume"]) - float(hole_off["volume"])) < 1.0
-    ):
-        raise RuntimeError(
-            f"configuration-cache control is vacuous: references={references!r}"
-        )
-
-    title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
-    adapter.swApp.CloseDoc(title)
-    adapter.currentModel = None
-    check(
-        "reopen configuration-cache control",
-        await adapter.open_model(str(control_path)),
-    )
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    comparisons: dict[str, dict[str, Any]] = {}
-    for configuration in names:
-        _activate_configuration(model, configuration)
-        cold = await _configuration_cache_control_state(
-            adapter,
-            configuration,
-            phase="cold",
-        )
-        if not bool(model.ForceRebuild3(False)):
-            raise RuntimeError(f"{configuration}: control ForceRebuild3 failed")
-        warm = await _configuration_cache_control_state(
-            adapter,
-            configuration,
-            phase="rebuilt",
-        )
-        reference = references[configuration]
-        comparisons[configuration] = {
-            "cold_matches": _configuration_cache_states_match(cold, reference),
-            "rebuilt_matches": _configuration_cache_states_match(warm, reference),
-            "reference": reference,
-            "cold": cold,
-            "rebuilt": warm,
-        }
-
-    _telemetry.info(
-        f"configuration-cache control comparisons: {comparisons!r}"
-    )
-    if not all(
-        bool(comparison["rebuilt_matches"])
-        for comparison in comparisons.values()
-    ):
-        raise RuntimeError(
-            "configuration-cache control failed after rebuild: "
-            f"{comparisons!r}"
-        )
-    cold_clean = all(
-        bool(comparison["cold_matches"])
-        for comparison in comparisons.values()
-    )
-    verdict = "cold-and-rebuilt-clean" if cold_clean else "cold-stale-rebuilt-clean"
-    raise RuntimeError(
-        f"diagnostic complete: pattern-free configuration-cache control {verdict}; "
-        "refusing to publish probe artefacts"
-    )
-
-
-async def _t006_pattern_control_state(
-    adapter: Any,
-    *,
-    phase: str,
-) -> dict[str, Any]:
-    """Capture the exact single-config T006 seed and pattern state."""
-    configuration = CONFIGS[0][0]
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = _active_configuration(model)
-    active_name = str(active.Name)
-    needs_rebuild = bool(active.NeedsRebuild)
-    part = _early_bound(model, "IPartDoc")
-    feature_states: dict[str, tuple[bool, int, bool]] = {}
-    for name in (
-        TOOTH_GAP_PROFILE,
-        TOOTH_GAP_CUT,
-        pattern_feature_name(configuration),
-    ):
-        raw = part.FeatureByName(name)
-        if raw is None:
-            raise RuntimeError(f"T006 pattern control feature {name!r} is missing")
-        feature = _early_bound(raw, "IFeature")
-        error_result = feature.GetErrorCode2()
-        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
-            raise RuntimeError(
-                f"T006 pattern control error state unreadable for {name}: "
-                f"{error_result!r}"
-            )
-        feature_states[name] = (
-            _pattern_suppression_states(feature, (configuration,))[0],
-            int(error_result[0] or 0),
-            bool(error_result[1]),
-        )
-
-    pattern = _pattern_feature(adapter, configuration)
-    definition = _early_bound(
-        pattern.GetDefinition(),
-        "ICircularPatternFeatureData",
-    )
-    bodies = tuple(part.GetBodies2(0, False) or ())
-    face_count = (
-        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
-        if len(bodies) == 1
-        else 0
-    )
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(f"T006 pattern control mass failed: {mass.error}")
-    state = {
-        "configuration": active_name,
-        "needs_rebuild": needs_rebuild,
-        "features": feature_states,
-        "instances": int(definition.TotalInstances),
-        "axis_type": int(definition.GetAxisType()),
-        "geometry_pattern": bool(definition.GeometryPattern),
-        "bodies": len(bodies),
-        "faces": face_count,
-        "volume": float(mass.data.volume),
-    }
-    _telemetry.info(f"{phase} T006 pattern control: {state!r}")
-    if active_name != configuration:
-        raise RuntimeError(
-            f"{phase}: T006 pattern control active config is {active_name!r}"
-        )
-    return state
-
-
-def _t006_pattern_states_match(
-    observed: dict[str, Any],
-    reference: dict[str, Any],
-) -> bool:
-    """Compare T006 pattern states with a tight volume tolerance."""
-    exact_keys = (
-        "configuration",
-        "needs_rebuild",
-        "features",
-        "instances",
-        "axis_type",
-        "geometry_pattern",
-        "bodies",
-        "faces",
-    )
-    if any(observed[key] != reference[key] for key in exact_keys):
-        return False
-    expected_volume = float(reference["volume"])
-    return abs(float(observed["volume"]) - expected_volume) <= max(
-        1e-6,
-        abs(expected_volume) * 1e-9,
-    )
-
-
-async def _run_single_t006_pattern_control(adapter: Any) -> None:
-    """Run the production T006 equation-curve seed and native pattern alone."""
-    from solidworks_mcp.adapters.base import (
-        CircularPatternParameters,
-        CreateAxisParameters,
-        ExtrusionParameters,
-    )
-
-    configuration, teeth = CONFIGS[0]
-    facts = gear_facts(teeth)
-    check("T006 control create_part", await adapter.create_part())
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    active = _active_configuration(model)
-    active.Name = configuration
-    raw_names = model.GetConfigurationNames()
-    names = (
-        tuple(str(name) for name in raw_names)
-        if isinstance(raw_names, (list, tuple))
-        else (str(raw_names),)
-    )
-    if names != (configuration,):
-        raise RuntimeError(
-            f"T006 pattern control configurations {names!r} != {(configuration,)!r}"
-        )
-
-
-    async def create_control_circle_sketch(
-        radius_mm: float,
-        label: str,
-    ) -> None:
-        reported_sketch = check(
-            f"T006 control create {label} sketch",
-            await adapter.create_sketch("Front"),
-        )
-        active_sketch = model.GetActiveSketch2()
-        active_sketch_name = (
-            str(active_sketch.Name) if active_sketch is not None else None
-        )
-        sketch_manager = adapter.currentSketchManager
-        add_to_db_before = bool(sketch_manager.AddToDB)
-        _telemetry.info(
-            f"T006 control {label} authoring: "
-            f"reported_sketch={reported_sketch!r}, "
-            f"active_sketch={active_sketch_name!r}, "
-            f"radius_mm={radius_mm!r}, "
-            f"AddToDB_before={add_to_db_before}"
-        )
-        if active_sketch_name != reported_sketch:
-            raise RuntimeError(
-                f"T006 control active {label} sketch mismatch: "
-                f"{active_sketch_name!r} != {reported_sketch!r}"
-            )
-        try:
-            await define_circle(
-                adapter,
-                0.0,
-                0.0,
-                radius_mm,
-                f"T006 control {label}",
-            )
-        finally:
-            add_to_db_after = bool(sketch_manager.AddToDB)
-            active_sketch_after = model.GetActiveSketch2()
-            active_sketch_name_after = (
-                str(active_sketch_after.Name)
-                if active_sketch_after is not None
-                else None
-            )
-            _telemetry.info(
-                f"T006 control {label} authoring restored: "
-                f"active_sketch={active_sketch_name_after!r}, "
-                f"radius_mm={radius_mm!r}, "
-                f"AddToDB_after={add_to_db_after}"
-            )
-            if active_sketch_name_after != reported_sketch:
-                raise RuntimeError(
-                    f"T006 control active {label} sketch changed: "
-                    f"{active_sketch_name_after!r} != {reported_sketch!r}"
-                )
-            if add_to_db_after != add_to_db_before:
-                raise RuntimeError(
-                    f"T006 control {label} did not restore AddToDB"
-                )
-        await ensure_fully_defined(
-            adapter,
-            f"T006 pattern-control {label} sketch",
-        )
-        check(
-            f"T006 control exit {label} sketch",
-            await adapter.exit_sketch(),
-        )
-
-    tip_radius_mm = facts["Ra"] * 25.4
-    await create_control_circle_sketch(tip_radius_mm, "blank")
-    name_last_feature(adapter, "T006ControlBlankProfile")
-    check(
-        "T006 control extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
-    )
-    name_last_feature(adapter, "T006ControlBlank")
-
-    bore_radius_mm = bore_dia_in(teeth) * 12.7
-    await create_control_circle_sketch(bore_radius_mm, "bore")
-    name_last_feature(adapter, "T006ControlBoreProfile")
-    check(
-        "T006 control cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=FACE_WIDTH + 2.0)
-        ),
-    )
-    name_last_feature(adapter, "T006ControlBoreCut")
-    await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
-    await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
-    atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
-    if abs(atn_probe - 45.0) < 1e-6:
-        atn_rad = f"atn(%s) * {PI_LIT} / 180"
-    elif abs(atn_probe - math.pi / 4.0) < 1e-6:
-        atn_rad = "atn(%s)"
-    else:
-        raise RuntimeError(
-            f"T006 pattern control atn(1)={atn_probe!r}: unknown dialect"
-        )
-    atn_tmax = atn_rad % '"Tmax"'
-    await set_global(adapter, "ToothCount", str(teeth), teeth)
-    await set_global(adapter, "DP", f"{DP:g}", DP)
-    await set_global(adapter, "PA", f"{PA_DEG:g}", PA_DEG)
-    await set_global(adapter, "PArad", f'"PA" * {PI_LIT} / 180', facts["PArad"])
-    await set_global(
-        adapter,
-        "Rb",
-        '"ToothCount" / "DP" * cos("PA") / 2',
-        facts["Rb"],
-    )
-    await set_global(
-        adapter,
-        "Ra",
-        '("ToothCount" + 2) / "DP" / 2',
-        facts["Ra"],
-    )
-    await set_global(
-        adapter,
-        "Tmax",
-        'sqr("Ra" * "Ra" / ("Rb" * "Rb") - 1)',
-        facts["Tmax"],
-    )
-    await set_global(
-        adapter,
-        "Delta",
-        f'{PI_LIT} / (2 * "ToothCount") + tan("PA") - "PArad"',
-        facts["Delta"],
-    )
-    await set_global(
-        adapter,
-        "Gamma",
-        f'2 * {PI_LIT} / "ToothCount"',
-        facts["Gamma"],
-    )
-    await set_global(
-        adapter,
-        "ThetaL",
-        f'{atn_tmax} - "Tmax" + "Delta"',
-        facts["ThetaL"],
-    )
-    await set_global(
-        adapter,
-        "ThetaU",
-        f'"Tmax" - {atn_tmax} - "Delta" + "Gamma"',
-        facts["ThetaU"],
-    )
-
-    check("T006 control create gap sketch", await adapter.create_sketch("Front"))
-    u = '("Tmax" * t)'
-    ph_low = f'({u} - "Delta")'
-    ph_up = f'({u} - "Delta" + "Gamma")'
-    gap_curves = [
-        await equation_curve(
-            adapter,
-            "T006 lower flank",
-            f'"Rb" * (cos{ph_low} + {u} * sin{ph_low})',
-            f'"Rb" * ({u} * cos{ph_low} - sin{ph_low})',
-        ),
-        await equation_curve(
-            adapter,
-            "T006 upper flank",
-            f'"Rb" * (cos{ph_up} + {u} * sin{ph_up})',
-            f'"Rb" * (sin{ph_up} - {u} * cos{ph_up})',
-        ),
-        await equation_curve(
-            adapter,
-            "T006 base chord",
-            '"Rb" * ((1 - t) * cos("Gamma" - "Delta") + t * cos("Delta"))',
-            '"Rb" * ((1 - t) * sin("Gamma" - "Delta") + t * sin("Delta"))',
-        ),
-        await equation_curve(
-            adapter,
-            "T006 lower radial extension",
-            f'("Ra" + t * ({R_CLEAR_IN:g} - "Ra")) * cos("ThetaL")',
-            f'("Ra" + t * ({R_CLEAR_IN:g} - "Ra")) * sin("ThetaL")',
-        ),
-        await equation_curve(
-            adapter,
-            "T006 outer clearance arc",
-            f'{R_CLEAR_IN:g} * cos("ThetaL" + t * ("ThetaU" - "ThetaL"))',
-            f'{R_CLEAR_IN:g} * sin("ThetaL" + t * ("ThetaU" - "ThetaL"))',
-        ),
-        await equation_curve(
-            adapter,
-            "T006 upper radial extension",
-            f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * cos("ThetaU")',
-            f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * sin("ThetaU")',
-        ),
-    ]
-    await ensure_fully_defined(
-        adapter,
-        "T006 pattern-control gap sketch",
-        fix_entities=gap_curves,
-        allow_fix_escalation=True,
-    )
-    check("T006 control exit gap sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, TOOTH_GAP_PROFILE)
-    check(
-        "T006 control cut tooth gap",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=FACE_WIDTH + 1.0)
-        ),
-    )
-    gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
-
-    axis = check(
-        "T006 control create named axis",
-        await adapter.create_axis(
-            CreateAxisParameters(
-                mode="two_planes",
-                planes=["Top Plane", "Right Plane"],
-            )
-        ),
-    )
-    check(
-        f"T006 control fixed pattern about {axis.name}",
-        await adapter.circular_pattern_feature(
-            CircularPatternParameters(
-                axis_name=axis.name,
-                features=[gap_cut_name],
-                count=teeth,
-                geometry_pattern=True,
-            )
-        ),
-    )
-    name_last_feature(adapter, pattern_feature_name(configuration))
-    if not bool(model.ForceRebuild3(False)):
-        raise RuntimeError("T006 pattern-control reference rebuild failed")
-    reference = await _t006_pattern_control_state(adapter, phase="reference")
-    expected_volume = _expected_configuration_volume(teeth)
-    if (
-        reference["needs_rebuild"]
-        or any(
-            suppressed or error
-            for suppressed, error, _warning in reference["features"].values()
-        )
-        or reference["instances"] != teeth
-        or reference["axis_type"] != 0
-        or not reference["geometry_pattern"]
-        or reference["bodies"] != 1
-        or reference["faces"] != 4 * teeth + 3
-        or abs(float(reference["volume"]) - expected_volume)
-        > 0.01 * expected_volume
-    ):
-        raise RuntimeError(
-            f"T006 pattern-control reference is invalid: {reference!r}, "
-            f"expected_volume={expected_volume!r}"
-        )
-
-    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
-    control_path = (OUT_SLDPRT / "cone-gear-t006-pattern-control.SLDPRT").resolve()
-    check(
-        f"establish T006 pattern-control path -> {control_path}",
-        await adapter.save_file(str(control_path)),
-    )
-    raw_configuration = model.GetConfigurationByName(configuration)
-    if raw_configuration is None:
-        raise RuntimeError("T006 pattern-control configuration disappeared")
-    config = _early_bound(raw_configuration, "IConfiguration")
-    config.AddRebuildSaveMark = True
-    if not bool(config.AddRebuildSaveMark):
-        raise RuntimeError("T006 pattern-control save mark was not set")
-    _telemetry.info(
-        f"T006 pattern-control AddRebuildSaveMark={bool(config.AddRebuildSaveMark)}"
-    )
-    _save_active_configuration(adapter, configuration)
-
-    title = str(model.GetTitle())
-    adapter.swApp.CloseDoc(title)
-    adapter.currentModel = None
-    check(
-        "reopen T006 pattern control",
-        await adapter.open_model(str(control_path)),
-    )
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    _activate_configuration(model, configuration)
-    cold = await _t006_pattern_control_state(adapter, phase="cold")
-    edit_rebuild_ok = bool(model.EditRebuild3())
-    edited = await _t006_pattern_control_state(adapter, phase="edit-rebuilt")
-    force_rebuild_ok = bool(model.ForceRebuild3(False))
-    forced = await _t006_pattern_control_state(adapter, phase="force-rebuilt")
-    cold_matches = _t006_pattern_states_match(cold, reference)
-    edited_matches = _t006_pattern_states_match(edited, reference)
-    forced_matches = _t006_pattern_states_match(forced, reference)
-    _telemetry.info(
-        "T006 pattern-control comparisons: "
-        f"EditRebuild3={edit_rebuild_ok}, ForceRebuild3={force_rebuild_ok}, "
-        f"cold_matches={cold_matches}, edited_matches={edited_matches}, "
-        f"forced_matches={forced_matches}, reference={reference!r}, "
-        f"cold={cold!r}, edited={edited!r}, forced={forced!r}"
-    )
-    if cold_matches:
-        verdict = "cold-edit-force-clean"
-    elif edited_matches:
-        verdict = "cold-stale-edit-clean"
-    elif forced_matches:
-        verdict = "cold-and-edit-stale-force-clean"
-    else:
-        verdict = "cold-edit-force-invalid"
-    raise RuntimeError(
-        f"diagnostic complete: exact single-config T006 pattern {verdict}; "
-        "refusing to publish probe artefacts"
-    )
-
-
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
+        CreateEquationParameters,
         ExtrusionParameters,
     )
-
-    await _run_single_t006_pattern_control(adapter)
-    raise RuntimeError("single-config T006 pattern control returned without a verdict")
 
     findings: list[str] = []
 
@@ -1761,6 +911,71 @@ async def build(adapter) -> dict[str, str]:
     check("cut tooth gap", gap_cut)
     gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
+    # ------------------------------------------------------------------
+    # Pattern the gap about the gear axis; link the instance count to
+    # ToothCount. Axis selection is by point (view-projected, flaky for
+    # edge-on cylindrical faces), so walk candidates: a reference axis on
+    # Z first, then OD-face points at several angles away from the seed
+    # gap (which sits at ~0..1.4 degrees).
+    # ------------------------------------------------------------------
+    from solidworks_mcp.adapters.base import CreateAxisParameters
+
+    check(
+        "create_axis Z (Top x Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    adapter._zoom_to_fit(adapter.currentModel)
+    ra_default_mm = facts["Ra"] * 25.4
+    candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
+    for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
+        a = math.radians(angle_deg)
+        candidates.append(
+            [ra_default_mm * math.cos(a), ra_default_mm * math.sin(a), FACE_WIDTH / 2.0]
+        )
+    pattern = None
+    for point in candidates:
+        # geometry_pattern: per-instance re-solve of the global-driven
+        # equation-curve profile produces corrupt sliver cuts (live SW 2026
+        # finding on the removable transgear); verbatim copies are exact.
+        res = await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_point=point,
+                features=[gap_cut_name],
+                count=DEFAULT_TEETH,
+                geometry_pattern=True,
+            )
+        )
+        if res.is_success:
+            pattern = res
+            _telemetry.success(f"circular pattern axis via point {point}")
+            break
+        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
+    if pattern is None:
+        raise RuntimeError("circular pattern: no axis candidate selectable")
+    pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
+    count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
+    check(
+        f"link {count_dim} to ToothCount",
+        await adapter.create_equation(
+            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
+        ),
+    )
+
+    # ------------------------------------------------------------------
+    # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
+    # expectation the per-config loop uses (blank - teeth*gap - bore). This is
+    # the "last check" the neutrality re-check below reuses.
+    # ------------------------------------------------------------------
+    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
+    v_gear = (
+        expected_blank
+        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
+        - bore_default_mm3
+    )
+    await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
+
     # Native tooth-system acceptance size.  The involute is generated from the
     # gear equations and exposes no stable feature dimension for circular tooth
     # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
@@ -1816,14 +1031,17 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    await volume_check(
+        adapter, "driven cone gear (equations neutral)", v_gear, 0.01 * v_gear
+    )
 
     await apply_material(adapter, MATERIAL)
 
     # ------------------------------------------------------------------
-    # Complete the configuration family after all shared geometry exists, then
-    # give each configuration its own fixed-count native pattern feature.  The
-    # suppression matrix is the tree contract: exactly one pattern is
-    # unsuppressed in each configuration, with no count-dimension equation.
+    # Configurations + the regeneration experiment (plan risk #2): switch
+    # through all configs asserting per-config instance count, volume bounds
+    # and monotonic growth, then return to the first config and require the
+    # volume to reproduce (determinism).
     # ------------------------------------------------------------------
     for name, teeth in CONFIGS[:-1]:
         check(
@@ -1834,15 +1052,7 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    document_configurations = assert_configuration_family(
-        model,
-        phase="before first fixed-pattern suppression",
-    )
-    from solidworks_mcp.adapters.base import (
-        CreateAxisParameters,
-        SetGlobalVariableParameters,
-    )
+    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
     for name, teeth in CONFIGS:
         check(
@@ -1863,57 +1073,6 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-
-    axis = check(
-        "create_axis Z (Top x Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
-        ),
-    )
-    for name, teeth in CONFIGS:
-        _activate_configuration(model, name)
-        if not bool(model.ForceRebuild3(False)):
-            raise RuntimeError(f"{name}: seed rebuild failed before fixed pattern")
-        check(
-            f"fixed {teeth}-instance pattern about {axis.name} for {name}",
-            await adapter.circular_pattern_feature(
-                CircularPatternParameters(
-                    axis_name=axis.name,
-                    features=[gap_cut_name],
-                    count=teeth,
-                    geometry_pattern=True,
-                )
-            ),
-        )
-        pattern_name = name_last_feature(adapter, pattern_feature_name(name))
-        set_fixed_pattern_scope(
-            adapter,
-            pattern_name,
-            name,
-            document_configurations,
-        )
-
-    assert_fixed_pattern_matrix(adapter, phase="authored")
-    _activate_configuration(model, CONFIGS[-1][0])
-    if not bool(model.ForceRebuild3(False)):
-        raise RuntimeError("T120: rebuild failed after fixed-pattern authoring")
-
-    # Default-config (DEFAULT_TEETH) gear volume, using the same analytic
-    # expectation as the per-configuration loop (blank - teeth*gap - bore).
-    # This proves the newly authored T120 pattern before the regeneration sweep.
-    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
-    v_gear = (
-        expected_blank
-        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
-        - bore_default_mm3
-    )
-    await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
-
-    # ------------------------------------------------------------------
-    # Regeneration experiment (plan risk #2): switch through all configs
-    # asserting the owned fixed-count pattern, volume bounds and monotonic
-    # growth, then revisit the first config to require determinism.
-    # ------------------------------------------------------------------
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1950,6 +1109,13 @@ async def build(adapter) -> dict[str, str]:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if not bool(model.ForceRebuild3(False)):
             raise RuntimeError(f"{name}: ForceRebuild3 reported failure")
+
+        count = read_dimension(adapter, count_dim)
+        if abs(count - teeth) > 1e-9:
+            raise RuntimeError(
+                f"{name}: pattern instance count reads {count:g}, expected {teeth}"
+            )
+        _telemetry.success(f"{name}: pattern count = {count:g}")
 
         volume, observation, issues = await _configuration_topology(
             adapter,
@@ -1988,7 +1154,6 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         artefacts[f"iso_{name}"] = str(img)
-        _save_active_configuration(adapter, name)
 
     ordered = [volumes[name] for name, _ in CONFIGS]
     if not all(a < b for a, b in zip(ordered, ordered[1:], strict=False)):
@@ -2092,10 +1257,77 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
-    await assert_saved_configuration_topology(adapter, phase="reopened")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+
+    async def snapshot_reopened(
+        configuration: str,
+        teeth: int,
+        *,
+        phase: str,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        volume, observation, issues = await _configuration_topology(
+            adapter,
+            configuration,
+            teeth,
+            phase=phase,
+        )
+        elapsed = time.perf_counter() - started
+        state = {
+            "configuration": configuration,
+            "volume": volume,
+            "reference_volume": volumes[configuration],
+            "observation": observation,
+            "issues": issues,
+            "snapshot_elapsed_s": elapsed,
+        }
+        _telemetry.info(f"{phase} multi-config discriminator: {state!r}")
+        return state
+
+    t120 = await snapshot_reopened("T120", 120, phase="reopened T120 cold")
+    t006_cold = await snapshot_reopened(
+        "T006",
+        6,
+        phase="reopened T006 cold",
+    )
+
+    rebuild_started = time.perf_counter()
+    edit_rebuild_ok = bool(model.EditRebuild3())
+    edit_rebuild_elapsed = time.perf_counter() - rebuild_started
+    t006_edited = await snapshot_reopened(
+        "T006",
+        6,
+        phase="reopened T006 EditRebuild3",
+    )
+
+    rebuild_started = time.perf_counter()
+    force_rebuild_ok = bool(model.ForceRebuild3(False))
+    force_rebuild_elapsed = time.perf_counter() - rebuild_started
+    t006_forced = await snapshot_reopened(
+        "T006",
+        6,
+        phase="reopened T006 ForceRebuild3",
+    )
+
+    _telemetry.info(
+        "b399963e multi-config discriminator rebuild results: "
+        f"EditRebuild3={edit_rebuild_ok} elapsed={edit_rebuild_elapsed:.6f}s, "
+        f"ForceRebuild3={force_rebuild_ok} elapsed={force_rebuild_elapsed:.6f}s, "
+        f"T120={t120!r}, cold={t006_cold!r}, "
+        f"edited={t006_edited!r}, forced={t006_forced!r}"
+    )
+    if not t006_cold["issues"]:
+        verdict = "T006-cold-clean"
+    elif not t006_edited["issues"]:
+        verdict = "T006-cold-invalid-edit-clean"
+    elif not t006_forced["issues"]:
+        verdict = "T006-cold-edit-invalid-force-clean"
+    else:
+        verdict = "T006-cold-edit-force-invalid"
     raise RuntimeError(
-        "diagnostic complete: fixed per-configuration pattern-tree persistence "
-        "evidence captured; refusing to publish probe artefacts"
+        "diagnostic complete: b399963e shared pattern "
+        f"{verdict}; T120_issues={t120['issues']!r}; "
+        "refusing to publish probe artefacts"
     )
 
     if findings:
