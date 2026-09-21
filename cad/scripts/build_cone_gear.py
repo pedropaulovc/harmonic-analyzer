@@ -93,6 +93,7 @@ from cone_gear_spec import (
 )
 from _common import (
     OUT_PNG,
+    OUT_SLDPRT,
     SketchDims,
     _early_bound,
     _read_member,
@@ -1078,6 +1079,16 @@ async def build(adapter) -> dict[str, str]:
     # symbol created in the 120T geometry makes every other configuration's
     # component feature rebuild with swFeatureErrorUnknown.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    # Establish the final path once while T120 is active. The per-configuration
+    # sweep can then use IModelDoc2.Save3 directly; the adapter's in-place save
+    # deliberately adds AvoidRebuildOnSave, which live probes proved does not
+    # persist rebuilt inactive-configuration bodies.
+    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
+    part_path = (OUT_SLDPRT / f"{PART_NAME}.SLDPRT").resolve()
+    check(
+        f"establish cone-gear part path -> {part_path}",
+        await adapter.save_file(str(part_path)),
+    )
 
     png_dir = OUT_PNG / PART_NAME
     png_dir.mkdir(parents=True, exist_ok=True)
@@ -1128,6 +1139,22 @@ async def build(adapter) -> dict[str, str]:
                 "regenerate"
             )
         _telemetry.success(f"{name}: blank diameter dim = {od:g}")
+        active = _active_configuration(model)
+        active.AddRebuildSaveMark = True
+        if not bool(active.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to set rebuild-save mark")
+        # Save3(Silent) rebuilds and writes this one active, marked
+        # configuration. Save3(Silent|AvoidRebuildOnSave) returned success but
+        # reopened T006 with pattern error 1 and four faces; options=1 reopened
+        # it clean with the expected 27 faces.
+        _save3_with_contract(
+            adapter,
+            1,
+            label=f"persist active configuration {name}",
+        )
+        active.AddRebuildSaveMark = False
+        if bool(active.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: failed to clear rebuild-save mark")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -1211,92 +1238,13 @@ async def build(adapter) -> dict[str, str]:
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
 
-    # Discriminating persistence probe: keep BOTH marks true to distinguish
-    # that variant from the previous loop, which cleared every inactive mark.
-    # This diagnostic build deliberately fails after reporting both Save3
-    # variants, so no probe state can publish as a successful part artefact.
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for configuration in ("T006", "T120"):
-        _activate_configuration(model, configuration)
-        active = _active_configuration(model)
-        active.AddRebuildSaveMark = True
-        if not bool(active.AddRebuildSaveMark):
-            raise RuntimeError(f"{configuration}: failed to retain save mark")
-        _save3_with_contract(
-            adapter,
-            1 | 8,
-            label=f"probe keep-marks {configuration}",
-        )
-
-    def _reopen_probe() -> None:
-        current = _early_bound(adapter.currentModel, "IModelDoc2")
-        title = str(current.GetTitle())
-        adapter.swApp.CloseDoc(title)
-        adapter.currentModel = None
-
-    _reopen_probe()
-    check("probe reopen after Save3(9)", await adapter.open_model(part_path))
-    t120_volume, t120_observation, t120_issues = await _configuration_topology(
-        adapter, "T120", 120, phase="probe Save3(9) reopened"
+    part_title = str(
+        _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
     )
-    t006_volume, t006_observation, t006_issues = await _configuration_topology(
-        adapter, "T006", 6, phase="probe Save3(9) reopened"
-    )
-    save9_result = (
-        f"T120 volume={t120_volume:.1f} issues={t120_issues!r}; "
-        f"T006 volume={t006_volume:.1f} issues={t006_issues!r}"
-    )
-    if not t120_issues and not t006_issues:
-        raise RuntimeError(
-            "persistence probe complete: keeping T006/T120 marks true with "
-            f"Save3(9) persisted both; {save9_result}"
-        )
-
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    rebuilt = bool(model.ForceRebuild3(False))
-    _healed_volume, healed_observation, healed_issues = (
-        await _configuration_topology(
-            adapter, "T006", 6, phase="probe Save3(9) explicit-rebuild"
-        )
-    )
-    if not rebuilt or healed_issues:
-        raise RuntimeError(
-            f"Save3(9) probe did not heal cleanly: before={t006_observation}; "
-            f"ForceRebuild3={rebuilt}; after={healed_observation}; "
-            f"after_issues={healed_issues!r}; control={t120_observation}"
-        )
-
-    t120 = _early_bound(
-        model.GetConfigurationByName("T120"), "IConfiguration"
-    )
-    t006 = _early_bound(
-        model.GetConfigurationByName("T006"), "IConfiguration"
-    )
-    t120.AddRebuildSaveMark = False
-    t006.AddRebuildSaveMark = True
-    _save3_with_contract(
-        adapter,
-        1,
-        label="probe active T006 mark with rebuild-on-save",
-    )
-    _reopen_probe()
-    check("probe reopen after Save3(1)", await adapter.open_model(part_path))
-    _t120_volume_2, t120_observation_2, t120_issues_2 = (
-        await _configuration_topology(
-            adapter, "T120", 120, phase="probe Save3(1) reopened"
-        )
-    )
-    _t006_volume_2, t006_observation_2, t006_issues_2 = (
-        await _configuration_topology(
-            adapter, "T006", 6, phase="probe Save3(1) reopened"
-        )
-    )
-    raise RuntimeError(
-        "persistence probe complete: "
-        f"Save3(9)={save9_result}; Save3(1) T120={t120_observation_2}, "
-        f"issues={t120_issues_2!r}; T006={t006_observation_2}, "
-        f"issues={t006_issues_2!r}"
-    )
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved cone-gear", await adapter.open_model(part_path))
+    await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:
         summary = "; ".join(findings)
