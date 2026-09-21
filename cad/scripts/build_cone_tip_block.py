@@ -240,6 +240,7 @@ async def build(adapter) -> dict[str, str]:
     # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
     # tables, not driven dims.)
     await set_global(adapter, "SlitW", f"{SLIT_W}mm")
+    await set_global(adapter, "SlitDepth", f"{SLIT_DEPTH}mm")
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
     await set_global(adapter, "PassageCenter", '"BlockX" / 2')
     await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
@@ -357,6 +358,8 @@ async def build(adapter) -> dict[str, str]:
     check("cut slit", await adapter.create_cut_extrude(
         ExtrusionParameters(depth=SLIT_DEPTH)))  # default cut dir = down into the block
     name_last_feature(adapter, "TopSlit")
+    slit_depth_dim = name_dimensions(adapter, "TopSlit", ["SlitDepth"])[0]
+    drive_jobs.append((slit_depth_dim, '"SlitDepth"'))
     volume = await volume_check(
         adapter, "top slit", volume - _slit_removed(), 0.02 * _slit_removed()
     )

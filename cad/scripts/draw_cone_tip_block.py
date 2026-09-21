@@ -38,6 +38,7 @@ from cone_tip_block_spec import (
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
     SHAFT_PASSAGE_DIA,
+    SLIT_DEPTH,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
@@ -63,7 +64,7 @@ RIGHT_CENTER = (0.166, FRONT_CENTER[1])
 LEFT_CENTER = (0.238, FRONT_CENTER[1])
 BACK_CENTER = (0.310, FRONT_CENTER[1])
 SECTION_CENTER = (0.190, 0.225)
-ISO_CENTER = (0.330, 0.225)
+ISO_CENTER = (0.320, 0.205)
 
 
 def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
@@ -92,7 +93,7 @@ RIGHT_KEEP = {
     )
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS = {"PassageDiaDim": "THRU - CLEARANCE PASSAGE"}
+DIMENSION_CALLOUTS = {"PassageDiaDim": "DRILL THRU\nCLEARANCE"}
 
 
 def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
@@ -322,22 +323,32 @@ async def build(adapter: Any) -> dict[str, str]:
     back_keep: dict[str, tuple[float, float]] = {}
     passage_keep = {
         "PassageDiaDim": (
-            passage_center[0] + 0.040,
+            passage_center[0] + 0.055,
             _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center) - 0.012,
         ),
+    }
+    adjuster_axis_keep = {
         "PassageZ": (
-            passage_center[0] - 0.045,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, passage_center),
+            adjuster_center[0] - 0.045,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
         ),
         "PassageCenter": (
-            passage_center[0],
-            _elevation_y(BLOCK_HEIGHT, passage_center) + 0.012,
+            adjuster_center[0],
+            _elevation_y(BLOCK_HEIGHT, adjuster_center) + 0.012,
+        ),
+        "SlitDepth": (
+            adjuster_center[0] + 0.035,
+            _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
         ),
     }
     if passage_view is front:
         front_keep.update(passage_keep)
     else:
         back_keep.update(passage_keep)
+    if adjuster_view is front:
+        front_keep.update(adjuster_axis_keep)
+    else:
+        back_keep.update(adjuster_axis_keep)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -416,13 +427,18 @@ async def build(adapter: Any) -> dict[str, str]:
         {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
         label="adjuster tap depths",
     )
-    add_native_hole_callout(
+    pinch_clearance_callout = add_native_hole_callout(
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.190, 0.152),
+        callout_xy=(0.220, 0.152),
         label="pinch entry-jaw clearance",
         process="DRILL",
+    )
+    set_hole_callout_precision(
+        pinch_clearance_callout,
+        {"hw-depth": 1},
+        label="pinch clearance depth",
     )
     add_native_hole_callout(
         adapter,
@@ -441,10 +457,6 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
-    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.250) is None:
-        raise RuntimeError("failed to orient the section shaft side")
-    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.250) is None:
-        raise RuntimeError("failed to orient the section adjuster side")
 
     foot_edge = _foot_edge(adapter, front)
     add_surface_finish(
