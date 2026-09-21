@@ -558,14 +558,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate pinion bracket relief sheet")
     detail_parent = place_view(
-        adapter, str(SOURCE), "*Front", 0.270, 0.155, scale=(2, 1)
+        adapter, str(SOURCE), "*Front", 0.285, 0.155, scale=(2, 1)
     )
     seat_axis_y = 0.155 + (-PIN_DROP - FRONT_BBOX_CY) * 2.0 / 1000.0
     seat_section = create_section_view(
         adapter,
         detail_parent,
         line_start=(0.230, seat_axis_y),
-        line_end=(0.315, seat_axis_y),
+        line_end=(0.320, seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),
@@ -611,7 +611,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.130, 0.105),
+        symbol_xy=(0.245, 0.115),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
