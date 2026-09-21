@@ -1139,22 +1139,6 @@ async def build(adapter) -> dict[str, str]:
                 "regenerate"
             )
         _telemetry.success(f"{name}: blank diameter dim = {od:g}")
-        active = _active_configuration(model)
-        active.AddRebuildSaveMark = True
-        if not bool(active.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: failed to set rebuild-save mark")
-        # Save3(Silent) rebuilds and writes this one active, marked
-        # configuration. Save3(Silent|AvoidRebuildOnSave) returned success but
-        # reopened T006 with pattern error 1 and four faces; options=1 reopened
-        # it clean with the expected 27 faces.
-        _save3_with_contract(
-            adapter,
-            1,
-            label=f"persist active configuration {name}",
-        )
-        active.AddRebuildSaveMark = False
-        if bool(active.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: failed to clear rebuild-save mark")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -1175,28 +1159,6 @@ async def build(adapter) -> dict[str, str]:
     if not all(a < b for a, b in zip(ordered, ordered[1:], strict=False)):
         raise RuntimeError(f"volumes not monotonically increasing: {volumes}")
     _telemetry.success(f"volumes monotonic: {ordered}")
-    # Each configuration's body cache is now on disk. Re-arm the all-
-    # configuration rebuild-save marks before the final metadata save: clearing
-    # a mark and then saving another configuration makes SolidWorks reopen the
-    # cleared configuration without its cached pattern body. AvoidRebuildOnSave
-    # is intentional here because every configuration was already rebuilt and
-    # persisted individually above.
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
-    if not bool(manager.AddRebuildSaveMark(2, "")):
-        raise RuntimeError("failed to restore all-configuration rebuild-save marks")
-    for name, _teeth in CONFIGS:
-        raw_configuration = model.GetConfigurationByName(name)
-        if raw_configuration is None:
-            raise RuntimeError(f"{name}: configuration missing while restoring save marks")
-        configuration = _early_bound(raw_configuration, "IConfiguration")
-        if not bool(configuration.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: rebuild-save mark was not restored")
-    _save3_with_contract(
-        adapter,
-        9,
-        label="persist all rebuild-save marks without another rebuild",
-    )
 
 
     # Determinism: revisit the first configuration after the full cycle.
@@ -1260,6 +1222,26 @@ async def build(adapter) -> dict[str, str]:
         )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
+    # Rebuild and serialize every marked configuration in one Save3 call.
+    # Saving configurations one at a time is not cumulative: each later save
+    # evicts the body cache of every unmarked configuration, even if that cache
+    # was persisted by an earlier save.
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    if not bool(manager.AddRebuildSaveMark(2, "")):
+        raise RuntimeError("failed to set all-configuration rebuild-save marks")
+    for name, _teeth in CONFIGS:
+        raw_configuration = model.GetConfigurationByName(name)
+        if raw_configuration is None:
+            raise RuntimeError(f"{name}: configuration missing while setting save marks")
+        configuration = _early_bound(raw_configuration, "IConfiguration")
+        if not bool(configuration.AddRebuildSaveMark):
+            raise RuntimeError(f"{name}: rebuild-save mark was not set")
+    _save3_with_contract(
+        adapter,
+        1,
+        label="rebuild and persist all marked configurations",
+    )
 
     part_title = str(
         _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
