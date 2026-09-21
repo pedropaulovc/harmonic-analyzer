@@ -27,6 +27,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
+from build_knife_hanger_stud import THREAD_TIP_Y_MM
 from knife_hanger_stud_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
@@ -34,6 +35,7 @@ from knife_hanger_stud_spec import (
     CHAMFER_WIDTH_TOLERANCE_MM,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
+    DRAWING_DIMENSIONS,
     FINISHED_UNDERHEAD_MM,
     FINISHED_UNDERHEAD_TOLERANCE_MM,
 )
@@ -53,7 +55,7 @@ SHEET = TrimSheet(
     detail_center=(0.280, 0.115),
     detail_scale=(12.0, 1.0),
     fence_radius_mm=8.0,
-    cut_end_y_mm=0.0,
+    cut_end_y_mm=THREAD_TIP_Y_MM,
     detail_offset_mm=1.0,
     detail_label_xy=(0.360, 0.085),
     parent_letter_offset=(0.020, 0.014),
@@ -124,10 +126,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, detail)
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="cut end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished under-head length"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="finished under-head length",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *detail_annotations]
     _verify_controls(adapter, annotations)
