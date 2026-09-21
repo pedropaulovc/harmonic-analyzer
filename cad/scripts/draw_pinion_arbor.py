@@ -84,6 +84,7 @@ PRINCIPAL_KEEP = {
 SHAFT_DIAMETER_XY = (PRINCIPAL_CENTER[0] + 0.055, PRINCIPAL_CENTER[1] + 0.025)
 SHAFT_FLANK_Y = PRINCIPAL_CENTER[1] + SHAFT_DIA / 2000.0
 DIMENSION_CALLOUTS = {
+    "Depth": "TO CROWN ROOT",
     "CapSagDim": f"SR{CAP_R:.1f} CROWN",
     "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
 }
@@ -230,8 +231,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         principal,
-        edge_xy=(PRINCIPAL_CENTER[0] + 0.040, SHAFT_FLANK_Y),
-        symbol_xy=(PRINCIPAL_CENTER[0] + 0.045, PRINCIPAL_CENTER[1] + 0.050),
+        edge_xy=(PRINCIPAL_CENTER[0] - 0.040, SHAFT_FLANK_Y),
+        symbol_xy=(PRINCIPAL_CENTER[0] - 0.035, PRINCIPAL_CENTER[1] + 0.050),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",

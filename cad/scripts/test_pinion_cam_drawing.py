@@ -31,7 +31,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert cam.DRAWING_DIMENSIONS is pinion_cam_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.BOTTOM_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert (drawing.CAM_OD, drawing.BORE, drawing.ECC) == (
@@ -56,7 +56,7 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     eccentricity = drawing.DIMENSION_CALLOUTS["CollarCy"]
     assert "ECCENTRICITY" in eccentricity
     assert "BORE AXIS TO OD AXIS" in eccentricity
-    assert "BOTH END FACES" in eccentricity
+    assert "BOTH END FACES" not in eccentricity
     assert pinion_cam_geometry.THIN_SIDE_WALL >= 0.5
     assert pinion_cam_geometry.CAM_OD == 10.32
 
@@ -94,7 +94,7 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "ISO 4026" in notes
     boss = drawing.DIMENSION_CALLOUTS["BossDia"]
-    assert "COSMETIC BOSS" in boss
+    assert "COSMETIC RAISED SET-SCREW BOSS REQUIRED" in boss
     assert "M2.5 X 0.45-6H THRU TO BORE" in boss
     assert "THROUGH THE BOSS" not in boss
 
@@ -118,16 +118,16 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     # The visible boss-end view owns both boss dimensions; the collar OD stays
     # in the length view and the bore in the circular front view.
     assert set(drawing.BOTTOM_KEEP) == {"BossDia", "BossCz"}
-    assert "BossCz" not in drawing.TOP_KEEP
-    assert "CollarOd" in drawing.TOP_KEEP
+    assert "BossCz" not in drawing.SIDE_KEEP
+    assert "CollarOd" in drawing.SIDE_KEEP
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
-    assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
     assert drawing.DIMENSION_CALLOUTS["BossCz"] == "BOSS AXIS STATION"
     assert "BossProjection" in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
-        "COSMETIC BOSS PROJECTION"
+        "RAISED BOSS PROJECTION (REF)"
     )
 
 

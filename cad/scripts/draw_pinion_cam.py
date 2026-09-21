@@ -3,8 +3,8 @@ r"""Create the curated machinist drawing for the pinion lift cam.
 An eccentric steel collar: the Ø6.37 bore is offset 1.4 mm from the Ø10.32 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
-on the Front plane (front view carries OD/bore/eccentricity); the collar length
-stays in the top view while the visible boss end owns its diameter and station.
+on the Front plane (front view carries bore/eccentricity); a true boss-profile
+view carries collar length/OD while the visible boss end owns diameter/station.
 
 Run with SolidWorks open::
 
@@ -71,9 +71,9 @@ SHEET_SCALE = (3.0, 1.0)
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.140)
-# Third angle: the length view sits above the circular view, so the body and
-# bore axes project vertically between them.
-TOP_CENTER = (0.105, 0.217)
+# Third angle: the boss-profile view sits above the circular view, so the body
+# and bore axes project vertically between them.
+SIDE_CENTER = (0.105, 0.217)
 ISO_CENTER = (0.350, 0.175)
 BOTTOM_CENTER = (0.270, 0.185)
 
@@ -89,16 +89,16 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 _SQRT_HALF = 0.5**0.5
 
 # Diameters go on the view that shows them as a SOLID edge: the OD as the
-# length view's width, the boss on the boss end view, the bore on the circular
-# view where it is the only diagonal (its and the OD's diagonals both pass
-# through nearly the same centre, so the two cannot share a view without
+# boss-profile view's width, the boss on the boss end view, and the bore on the
+# circular view where it is the only diagonal (its and the OD's diagonals both
+# pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.176),
     "CollarCy": (0.172, 0.162),
     "BossProjection": (0.180, 0.112),
 }
-TOP_KEEP = {
+SIDE_KEEP = {
     "Depth": (0.062, 0.217),
     "CollarOd": (0.105, 0.190),
 }
@@ -108,9 +108,12 @@ BOTTOM_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": f"REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS\nBOTH END FACES",
-    "BossProjection": "COSMETIC BOSS PROJECTION",
-    "BossDia": "COSMETIC BOSS\nM2.5 X 0.45-6H THRU TO BORE",
+    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
+    "BossProjection": "RAISED BOSS PROJECTION (REF)",
+    "BossDia": (
+        "COSMETIC RAISED SET-SCREW BOSS REQUIRED\n"
+        "M2.5 X 0.45-6H THRU TO BORE"
+    ),
     "BossCz": "BOSS AXIS STATION",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
@@ -159,7 +162,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(3, 1))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
     # The built-in isometric looks from +Y, which hides the set-screw boss --
     # the part's one additional feature -- behind the collar, because the boss
@@ -168,7 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=(2, 1)
     )
-    for view in (front, top, bottom, iso):
+    for view in (front, side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
     # The boss end view is curated first so its visible circle owns both the
@@ -180,10 +183,10 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+    side_annotations = curate_view_dimensions(
+        adapter, side, keep=SIDE_KEEP, view_label="boss profile"
     )
-    annotations = [*bottom_annotations, *front_annotations, *top_annotations]
+    annotations = [*bottom_annotations, *front_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # The boss dome is cosmetic: its diameter and projection communicate
@@ -233,6 +236,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    if add_note(adapter, "BOSS PROFILE VIEW", 0.055, 0.252) is None:
+        raise RuntimeError("failed to label cam boss-profile view")
     if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.164) is None:
         raise RuntimeError("failed to label cam boss end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.135)
