@@ -87,7 +87,7 @@ FRONT_KEEP = {
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
 SECTION_KEEP = {
     "PinchZ": (
-        SECTION_CENTER[0] - 0.036,
+        SECTION_CENTER[0] - 0.060,
         _elevation_y(PINCH_HEIGHT / 2.0, SECTION_CENTER),
     )
 }
