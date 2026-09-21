@@ -248,7 +248,7 @@ FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
-    "AnchorOffset": (0.110, 0.158),
+    "AnchorOffset": (0.095, 0.158),
     "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
     "Width": (0.274, FRONT_CENTER[1]),
     # Left of the boss so its leader and the bore's (above) never cross.
@@ -261,7 +261,7 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
 TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
-    "AnchorOffset": "TO TOP EDGE",
+    "AnchorOffset": "TOP EDGE",
     "ShaftBoreDia": (
         "REAM THRU (3/8 IN)\n"
         f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"
