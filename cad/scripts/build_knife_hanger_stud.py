@@ -78,6 +78,22 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "FinishedOverall", FINISHED_UNDERHEAD_TOLERANCE_MM
     )
+    # General tolerance carries the title-block band without a redundant
+    # per-dimension ± callout; retain its numerical acceptance range natively.
+    _, dimension = _named_dimension(adapter, "StockTrimProfile", "FinishedOverall")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = FINISHED_UNDERHEAD_TOLERANCE_MM / 1000
+    tolerance.Type = 11  # swTolType_e.swTolGeneral
+    if not tolerance.SetValues(-band, band):
+        raise RuntimeError("FinishedOverall@StockTrimProfile: general tolerance rejected")
+    if (
+        int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError(
+            "FinishedOverall@StockTrimProfile: general tolerance readback changed"
+        )
     set_dimension_symmetric_tolerance(
         adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
     )
