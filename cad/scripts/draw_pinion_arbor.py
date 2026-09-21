@@ -53,23 +53,23 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 PRINCIPAL_CENTER = (0.200, 0.170)
-ISO_CENTER = (0.350, 0.105)
+ISO_CENTER = (0.375, 0.235)
 DONOR_KEEP = {
     "HeadDia": (0.030, 0.225),
     "NeckDia": (0.045, 0.185),
     "ShaftDia": (0.030, 0.145),
 }
 PRINCIPAL_KEEP = {
-    "HeadLen": (0.075, 0.118),
-    "NeckLen": (0.095, 0.102),
+    "HeadLen": (0.340, 0.120),
+    "NeckLen": (0.320, 0.100),
     "ExposedShaftLen": (0.205, 0.090),
-    "HeadCapR": (0.048, 0.218),
-    "BackCapSagDim": (0.342, 0.218),
-    "CrossHoleDia": (0.082, 0.242),
+    "HeadCapR": (0.305, 0.220),
+    "BackCapSagDim": (0.055, 0.220),
+    "CrossHoleDia": (0.200, 0.250),
 }
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.060, 0.185),
-    "NeckDia": (0.105, 0.205),
+    "HeadDia": (0.325, 0.190),
+    "NeckDia": (0.290, 0.208),
     "ShaftDia": (0.175, 0.205),
 }
 DIMENSION_CALLOUTS = {
@@ -232,7 +232,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.170)
+    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.267)
 
     return await finalize_drawing(
         adapter,
