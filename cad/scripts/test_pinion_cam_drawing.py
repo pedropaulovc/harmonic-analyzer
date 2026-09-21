@@ -110,10 +110,25 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "M2.5 X 0.45-6H" in notes
     assert "ISO 4026" in notes
-    assert "THROUGH THE BOSS INTO THE BORE" in notes
+    # The thread lives in the collar's thick-side wall, not in the Ø3.2 dome
+    # (codex iter3 sized the M2.5 major against the dome): say so.
+    assert "THRU THE COLLAR WALL INTO THE BORE" in notes
+    assert "THROUGH THE BOSS" not in notes
     source = Path(cam.__file__).read_text(encoding="utf-8")
     assert 'name_last_feature(adapter, "M2.5TapDrill")' in source
     assert "TAP_DRILL_DIA" in source
+
+
+def test_set_screw_thread_cannot_break_the_front_face_at_general_grade() -> None:
+    # BOSS_Z 1.7 left 0.45 nominal wall between the M2.5 major and the front
+    # face; the .X ±0.8 general grade the station prints under then permitted a
+    # breakout (codex iter3 blocker).  The station is bounded above by the
+    # assembly's follower-pin and spring-foot bands (build_drive_train_assembly).
+    import pinion_cam_geometry as geometry
+
+    thread_major_r = 2.5 / 2.0
+    general_grade_mm = 0.8
+    assert geometry.BOSS_Z - thread_major_r - general_grade_mm > 0.0
 
 
 def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
