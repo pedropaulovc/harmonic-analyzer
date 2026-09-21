@@ -407,7 +407,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     )
     # The pin-hole callout hangs above the side view, its leader landing on
     # the hole's rim inside the boss silhouette.
-    assert drawing.PIN_HOLE_CALLOUT[1] > drawing.RIGHT_CENTER[1] + half_od + 0.020
+    assert drawing.PIN_HOLE_CALLOUT[1] > drawing.RIGHT_CENTER[1] + half_od + 0.040
     assert abs(drawing.PIN_HOLE_EDGE[1] - drawing.RIGHT_CENTER[1]) == pytest.approx(
         spec.PIN_DIA * 4 / 2000.0
     )
