@@ -180,8 +180,8 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # bore diameter sits just right of the silhouette, still clear of the
 # isometric. The two lengths stay baseline-stacked below the view from the
 # toothed south face (rule 7: one origin per view, baseline not chained). The
-# boss diameter sits on its vertical dimension line in the clear gap left of
-# the hub, while the end break reads separately above-right of the chamfer.
+# boss diameter sits above-right on a vertical dimension line beyond the boss
+# end, while the end break stays separately above the chamfer.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 RIGHT_KEEP = {
     "OutsideDia": (
@@ -189,8 +189,8 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
     "BossDia": (
-        _side_x(0.0) - 0.016,
-        RIGHT_CENTER[1],
+        _side_x(OVERALL_LENGTH) + 0.034,
+        RIGHT_CENTER[1] + 0.020,
     ),
     "BoreDia": (_side_x(OVERALL_LENGTH) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),

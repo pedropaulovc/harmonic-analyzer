@@ -385,18 +385,18 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert outside_x < max(drawing._side_x(0.0), drawing._side_x(spec.FACE_WIDTH))
     assert outside_y > drawing.RIGHT_CENTER[1] + half_od + 0.008
     boss_x, boss_y = drawing.RIGHT_KEEP["BossDia"]
-    assert drawing.FRONT_CENTER[0] + half_od + 0.010 < boss_x
-    assert boss_x < drawing._side_x(spec.OVERALL_LENGTH) - 0.010
-    assert boss_y == pytest.approx(drawing.RIGHT_CENTER[1])
+    assert drawing._side_x(spec.OVERALL_LENGTH) < boss_x
+    assert boss_x < drawing.ISO_CENTER[0] - half_od - 0.010
+    assert boss_y > drawing.RIGHT_CENTER[1] + 0.015
     bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
     assert bore_x > drawing._side_x(0.0) + 0.010
     assert bore_x < drawing.ISO_CENTER[0] - half_od - 0.010
     assert bore_y == pytest.approx(drawing.RIGHT_CENTER[1])
     for name in ("FaceWidth", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
-    # The boss diameter reads on its vertical line left of the hub. The end
-    # break sits separately above-right, next to the actual chamfer and beyond
-    # the match-drill leader's path.
+    # The boss diameter reads beyond the boss end without extension lines
+    # crossing the section. The end break sits separately above-right, next to
+    # the actual chamfer and beyond the match-drill leader's path.
     chamfer_x, chamfer_y = drawing.RIGHT_KEEP["BossChamfer"]
     assert drawing._side_x(spec.OVERALL_LENGTH) < chamfer_x
     assert chamfer_x < drawing.ISO_CENTER[0] - half_od - 0.010
