@@ -24,7 +24,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
-    add_view_centerline,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
@@ -55,6 +54,7 @@ from pinion_handle_spec import (
     TUBE_OD,
     WALL_T,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -208,26 +208,111 @@ def _point(
 
 
 
+def _segment_distance(
+    point: tuple[float, float, float],
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+) -> float:
+    delta = tuple(b - a for a, b in zip(start, end))
+    length_sq = sum(value * value for value in delta)
+    if length_sq <= 0.0:
+        return math.dist(point, start)
+    fraction = sum(
+        (value - origin) * direction
+        for value, origin, direction in zip(point, start, delta)
+    ) / length_sq
+    fraction = min(1.0, max(0.0, fraction))
+    nearest = tuple(
+        origin + fraction * direction for origin, direction in zip(start, delta)
+    )
+    return math.dist(point, nearest)
+
+
 def _add_body_centerline(adapter: Any, view: Any) -> None:
-    """Insert the socket cylinder's turning axis away from its pin opening."""
+    """Insert the socket axis from its two enumerated OD silhouettes."""
     draw = adapter.currentModel
-    # Select the cylindrical face inside its projected flanks.  The old
-    # midpoint landed on the MHA-136 opening; the quarter-length station is
-    # intact authored OD, and selecting the face lets SolidWorks derive the
-    # native axis without ambiguous silhouette hit-testing.
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate body centerline view")
+    native_view = _early_bound(view, "IView")
+    native_view.UpdateViewDisplayGeometry()
     station = SHOULDER_Z + WALL_T + TUBE_LEN / 4.0
     if abs(station - RETENTION_PIN_CENTER_Z) <= RETENTION_PIN_DIA / 2.0:
         raise RuntimeError("body centerline pick station intersects retention hole")
-    face_xy = _point(adapter, view, (0.0, TUBE_OD / 4.0, station))
-    add_view_centerline(
-        adapter,
-        view,
-        face_xy=face_xy,
-        label="pinion-handle socket turning axis",
+    targets = tuple(
+        (0.0, side * TUBE_OD / 2000.0, station / 1000.0)
+        for side in (-1.0, 1.0)
     )
+    candidates: list[
+        tuple[Any, tuple[float, float, float], tuple[float, float, float]]
+    ] = []
+    components = adapter._attempt(native_view.GetVisibleComponents, default=()) or ()
+    for component in components:
+        silhouettes = (
+            adapter._attempt(
+                lambda c=component: native_view.GetVisibleEntities2(c, 4),
+                default=(),
+            )
+            or ()
+        )
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            face = adapter._attempt(silhouette.GetFace)
+            if face is None:
+                continue
+            surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - TUBE_OD / 2000.0) > 1e-7:
+                continue
+            start_point = adapter._attempt(silhouette.GetStartPoint)
+            end_point = adapter._attempt(silhouette.GetEndPoint)
+            if start_point is None or end_point is None:
+                continue
+            start_data = adapter._get_attr_or_call(start_point, "ArrayData")
+            end_data = adapter._get_attr_or_call(end_point, "ArrayData")
+            if start_data is None or end_data is None:
+                continue
+            start = tuple(float(value) for value in start_data[:3])
+            end = tuple(float(value) for value in end_data[:3])
+            candidates.append((silhouette, start, end))
+    if len(candidates) < 2:
+        raise RuntimeError("socket OD did not expose two usable silhouette segments")
+    flanks: list[Any] = []
+    for target in targets:
+        ranked = [
+            (_segment_distance(target, start, end), silhouette)
+            for silhouette, start, end in candidates
+        ]
+        distance, flank = min(ranked, key=lambda item: item[0])
+        if distance > 2e-4:
+            raise RuntimeError(
+                f"socket flank is {distance * 1000:g} mm from its authored pick"
+            )
+        flanks.append(flank)
+    if int(adapter.swApp.IsSame(flanks[0], flanks[1])) != 0:
+        raise RuntimeError("body centerline resolved the same socket flank twice")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.View = view
+    for index, flank in enumerate(flanks):
+        selectable = _sw_type_info.early_bound_or_flag(
+            flank, "ISilhouetteEdge", "Select2"
+        )
+        if not bool(selectable.Select2(index > 0, selection_data)):
+            raise RuntimeError(
+                f"failed to select enumerated socket flank {index + 1}"
+            )
+    if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
+        raise RuntimeError("body centerline socket-flank selection was not a pair")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError("failed to insert centerline between socket flanks")
     # SOLIDWORKS also generates axes for the omitted rod and coaxial body faces.
-    # Retain one native turning axis by its sheet geometry, never annotation IDs.
-    native_view = _early_bound(view, "IView")
     axis_y = _point(adapter, view, (0.0, 0.0, 0.0))[1]
     body_x = sorted(
         _point(adapter, view, (0.0, 0.0, z))[0] for z in (CROWN_TIP_Z, HUB_END_Z)
