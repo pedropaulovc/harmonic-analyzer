@@ -36,6 +36,7 @@ import _telemetry
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
+    _select_view_entity,
     DrawingOutputs,
     add_edge_dimension,
     add_native_hole_callout,
@@ -53,6 +54,7 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
@@ -309,62 +311,63 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
         raise RuntimeError("top-view selective hide did not persist every target edge")
 
     # The through handle-pivot bore has no BREP rim corresponding to this
-    # edge-on view; SolidWorks exposes its two dashed generators to coordinate
-    # hit-testing as EDGE selections rather than SILHOUETTE objects.  Their
-    # midpoints derive from the authored hole station and diameter, with no
-    # other edge at either point.
-    handle_points = tuple(
-        (
-            _sheet_x(ARM_C2C + side * _HANDLE_PIVOT_HOLE_DIA / 2.0),
-            TOP_CENTER[1],
+    # edge-on view.  Enumerate the drawing's native silhouette entities and
+    # identify the two generators by the cylindrical face they own; coordinate
+    # hit-testing cannot select hidden generators on this view.
+    def handle_pivot_silhouettes() -> list[Any]:
+        matches: list[Any] = []
+        for raw_silhouette in visible_view_entities(
+            view, 4, label="crank handle-pivot silhouettes"
+        ):
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            raw_face = silhouette.GetFace()
+            if raw_face is None:
+                continue
+            face = _early_bound(raw_face, "IFace2")
+            raw_surface = face.GetSurface()
+            if raw_surface is None:
+                continue
+            surface = _early_bound(raw_surface, "ISurface")
+            if not bool(surface.IsCylinder()):
+                continue
+            cylinder = tuple(float(value) for value in (surface.CylinderParams or ()))
+            if (
+                len(cylinder) >= 7
+                and abs(cylinder[0] - ARM_C2C / 1000.0) <= 1e-6
+                and abs(cylinder[1]) <= 1e-6
+                and abs(cylinder[3]) <= 1e-6
+                and abs(cylinder[4]) <= 1e-6
+                and abs(abs(cylinder[5]) - 1.0) <= 1e-6
+                and abs(cylinder[6] - _HANDLE_PIVOT_HOLE_DIA / 2000.0) <= 1e-6
+            ):
+                matches.append(silhouette)
+        return matches
+
+    handle_silhouettes = handle_pivot_silhouettes()
+    if len(handle_silhouettes) != 2:
+        raise RuntimeError(
+            "top view did not resolve the two handle-pivot silhouettes: "
+            f"found {len(handle_silhouettes)}"
         )
-        for side in (-1.0, 1.0)
-    )
-    for index, point in enumerate(handle_points):
-        drawing_view.UpdateViewDisplayGeometry()
-        draw.ClearSelection2(True)
-        if not draw.Extension.SelectByID2(
-            "",
-            "EDGE",
-            point[0],
-            point[1],
-            0.0,
-            False,
-            0,
-            null_callout(),
-            0,
-        ):
-            raise RuntimeError(
-                f"failed to select handle-pivot hidden edge {index + 1}"
-            )
-        if (
-            int(selection_manager.GetSelectedObjectCount2(-1)) != 1
-            or int(selection_manager.GetSelectedObjectType3(1, -1)) != 1
-        ):
-            raise RuntimeError(
-                f"handle-pivot hidden edge {index + 1} selection was not singular"
-            )
+    for index, silhouette in enumerate(handle_silhouettes):
+        _select_view_entity(
+            adapter,
+            view,
+            "SILHOUETTE",
+            None,
+            label=f"handle-pivot silhouette {index + 1}",
+            entity=silhouette,
+        )
         ddoc.HideEdge()
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     drawing_view.UpdateViewDisplayGeometry()
-    for index, point in enumerate(handle_points):
-        draw.ClearSelection2(True)
-        if draw.Extension.SelectByID2(
-            "",
-            "EDGE",
-            point[0],
-            point[1],
-            0.0,
-            False,
-            0,
-            null_callout(),
-            0,
-        ):
-            raise RuntimeError(
-                f"handle-pivot hidden edge {index + 1} remained visible after hiding"
-            )
-    draw.ClearSelection2(True)
+    remaining = handle_pivot_silhouettes()
+    if remaining:
+        raise RuntimeError(
+            "handle-pivot silhouettes remained visible after hiding: "
+            f"{len(remaining)}"
+        )
     if int(drawing_view.GetDisplayMode2()) != 1:  # preserve HLV cross-hole evidence
         raise RuntimeError("top view left HLV after selective edge hiding")
 
