@@ -1,11 +1,19 @@
-r"""Pure-data dimensional contract shared by the cone gear and its drawing.
+r"""Pure-data dimensional contract shared by the cone-gear family and drawing.
 
-The cone gear is a 20-member configured family (T006..T120 by 6); this sheet
-documents the fundamental T120 configuration and the shared tooth system, with a
-family note. See the batch gear-drawing pattern in ``cylinder_gear_spec``.
+The cone gear is a 20-member configured family (T006..T120 by 6).  The drawing
+package gives every configuration its own complete sheet: configuration-owned
+tip and bore diameters, common face width, and a native driving tooth-thickness
+dimension whose band comes from the configured gear-mesh backlash.
+
+This module stays fit-free because assemblies import it.  The part builder
+derives the bore and tooth-thickness bands from ``cone_gear_shaft_spec`` and
+``_config.fit`` at authoring time; the drawing merely imports the resulting
+native model dimensions, precision, and tolerances.
 """
 
 from __future__ import annotations
+
+import math
 
 import _config
 from _gtol_spec import CylinderFace
@@ -21,27 +29,42 @@ _MFG = _config.parts("cone-gear")
 BODY_MATERIAL_SPEC = str(_MFG["material_specification"])
 TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
-TEETH = 120  # drawn (fundamental) configuration
+TEETH = 120  # default/fundamental configuration
+CONFIGURATION_TEETH = tuple(range(6, 121, 6))
 DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
+PITCH_DIA = TEETH * MODULE_MM
+OUTSIDE_DIA = (TEETH + 2) * MODULE_MM
+WHOLE_DEPTH = 2.157 * MODULE_MM
+TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 FACE_WIDTH = 6.5
-FAMILY_BORES_MM = {
-    # T006 is 1/16", not 1/32": these teeth are through-cut from this module's
-    # own DXF profile, whose gap floor is the chord across the base circle, so
-    # the as-cut root radius is 1.3365 mm (tooth depth 0.703) and a 1/16" bore
-    # still leaves a 0.543 mm rim -- while the shaft's terminal journal drops
-    # from L/D 26 to 13.  See build_cone_gear.bore_dia_in.
-    6: 0.0625 * MM_PER_IN,
-    12: 0.125 * MM_PER_IN,
-    18: 0.25 * MM_PER_IN,
-    24: 0.375 * MM_PER_IN,
-}
+
+def bore_dia_mm(teeth: int) -> float:
+    """Return the configured bore that fits the matching stepped-shaft land."""
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    # T006 is 1/16", not 1/32": its as-cut base-chord root still leaves a
+    # 0.543 mm rim, while the shaft tip improves from L/D 26 to 13.
+    if teeth == 6:
+        return 0.0625 * MM_PER_IN
+    if teeth == 12:
+        return 0.125 * MM_PER_IN
+    if teeth == 18:
+        return 0.25 * MM_PER_IN
+    return BORE_DIA
+
+
+def material_specification(teeth: int) -> str:
+    """Return the configuration-owned alloy printed in that sheet's title block."""
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    return TIP_MATERIAL_SPEC if teeth <= 24 else BODY_MATERIAL_SPEC
+
+
+FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -52,51 +75,45 @@ SURFACE_FINISHES = (
     ),
 )
 
+# The three blank sizes and the tooth-system acceptance size.  ToothThickness
+# is a DRIVING dimension in a construction-only authoring sketch: policy rule 2
+# permits that pattern when the printed value is not itself a solid feature
+# dimension.  It is not a reference-status drawing dimension, so its native
+# asymmetric tolerance remains meaningful.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "BlankProfile": {"BlankDia"},
+    "Blank": {"FaceWidth"},
     "BoreProfile": {"BoreCutDia"},
+    "ToothThicknessReference": {"ToothThickness"},
 }
 
-
-def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
-    """Render an aligned gear/sprocket data block for a property-linked note."""
-    return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
-
-
-GEAR_DATA = gear_data_note(
-    [
-        ("NUMBER OF TEETH", f"{TEETH}"),
-        ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
-        ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
-        ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.2f}"),
-        ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
-        ("FAMILY T006", f"6T; BORE {FAMILY_BORES_MM[6]:.3f}"),
-        ("FAMILY T012", f"12T; BORE {FAMILY_BORES_MM[12]:.3f}"),
-        ("FAMILY T018", f"18T; BORE {FAMILY_BORES_MM[18]:.3f}"),
-        ("FAMILY T024-T120", f"24T TO 120T BY 6; BORE {FAMILY_BORES_MM[24]:.3f}"),
-    ]
-)
-
-DRAWING_NOTES = "\n".join(
-    (
-        "CUT TEETH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        "CONE SET: MAKE 1 OF EACH CONFIGURATION (T006-T120 BY 6; 20 GEARS TOTAL).",
-        "TITLE-BLOCK MATERIAL APPLIES TO T030-T120 ONLY.",
-        f"T006-T024 TIP GEARS: {TIP_MATERIAL_SPEC.upper()}, DRAWN ROD (HARDER ALLOY; FINEST TEETH WEAR MOST).",
-        "ALL 20 GEARS PLAIN-BORED (NO KEYWAY); SOLDER TO MATCHING SHAFT SEATS.",
-        "THIS SHEET SHOWS T120; FAMILY ROWS ABOVE GOVERN TOOTH COUNT AND BORE.",
-        "  PITCH DIA=N×25.4/DP; OUTSIDE DIA=(N+2)×25.4/DP.",
-        "SMALLEST TIP GEARS CUT STUB-FORM (GAP FLOOR AT THE BASE-CIRCLE CHORD)",
-        "  WHERE FULL DEPTH WOULD UNDERCUT.",
-    )
-)
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "gear face squareness to bore": "0.05",
+# --- Decimal places, authored ON THE PART ------------------------------------
+#
+# Policy rule 2: places and bands are model properties.  Three places belong
+# on the two fit dimensions: the bore and circular tooth thickness.  Tip
+# diameter and face width stay at the two-place general grade.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BlankProfile": {"BlankDia": 2},
+    "Blank": {"FaceWidth": 2},
+    "BoreProfile": {"BoreCutDia": 3},
+    "ToothThicknessReference": {"ToothThickness": 3},
 }
+
+# The drawing reads this flat view back off the sheet: a dimension name is
+# unique across the features that expose one, and a marked dimension nobody
+# authored places for would otherwise print SolidWorks' template default.
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: decimals
+    for dimensions in DRAWING_PRECISION.values()
+    for name, decimals in dimensions.items()
+}
+if len(DRAWING_PRECISION_BY_NAME) != sum(
+    len(dimensions) for dimensions in DRAWING_PRECISION.values()
+):
+    raise AssertionError("two features share a drawing-precision dimension name")
+for _feature, _dimensions in DRAWING_PRECISION.items():
+    _unmarked = sorted(set(_dimensions) - DRAWING_DIMENSIONS.get(_feature, set()))
+    if _unmarked:
+        raise AssertionError(
+            f"{_feature}: precision authored for unmarked dimensions {_unmarked}"
+        )
