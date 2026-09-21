@@ -1,3 +1,4 @@
+# farm-launch-smoke: 20260921-launch-contract-74a183db
 r"""Reproduction script: pen square rod (book ch. 24, pp. 64-65).
 
 The square brass rod that carries the v-block; the wire from the
