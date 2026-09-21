@@ -55,16 +55,19 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-VIEW_SCALE = (1, 1)
+FRONT_SCALE = (2, 1)
+PROFILE_SCALE = (1, 1)
+ISO_SCALE = (1, 2)
 FRONT_CENTER = (0.150, 0.185)
 RIGHT_CENTER = (0.285, 0.185)
-ISO_CENTER = (0.320, 0.120)
+ISO_CENTER = (0.350, 0.225)
 GEAR_DATA_POS = (0.018, 0.262)
+ISOMETRIC_NOTE_POS = (0.330, 0.262)
 MANUFACTURING_NOTES_POS = (0.018, 0.085)
 
 
 FRONT_KEEP = {
-    "ArborBoreDia": (0.115, 0.175),
+    "ArborBoreDia": (0.085, 0.175),
     "OutsideDia": (0.150, 0.230),
 }
 RIGHT_KEEP = {
@@ -98,6 +101,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -106,6 +110,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -123,9 +128,15 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    front = place_view(
+        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=FRONT_SCALE
+    )
+    right = place_view(
+        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=PROFILE_SCALE
+    )
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE
+    )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -145,14 +156,23 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.180, 0.155),
+        symbol_xy=(0.205, 0.155),
         control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
         label="drum bore finish",
         entity=bore_edge,
-        leader_attach_xy=(FRONT_CENTER[0], FRONT_CENTER[1] - BORE_DIA / 2000.0),
+        leader_attach_xy=(
+            FRONT_CENTER[0],
+            FRONT_CENTER[1] - BORE_DIA * FRONT_SCALE[0] / FRONT_SCALE[1] / 2000.0,
+        ),
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
+    add_property_linked_note(
+        adapter,
+        "Isometric View Note",
+        *ISOMETRIC_NOTE_POS,
+        char_height=0.0025,
+    )
     add_property_linked_note(
         adapter,
         "Manufacturing Notes",

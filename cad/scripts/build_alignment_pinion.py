@@ -72,6 +72,7 @@ from alignment_pinion_spec import (
     FACE_WIDTH,
     FACE_WIDTH_TOLERANCE_MM,
     GEAR_DATA,
+    ISOMETRIC_VIEW_NOTE,
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
     SURFACE_FINISHES,
@@ -196,7 +197,11 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {
+            "Gear Data": GEAR_DATA,
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
     )
     return await save_part_and_images(adapter, PART_NAME)
 
