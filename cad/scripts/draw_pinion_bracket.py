@@ -508,7 +508,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
-        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", 0.395, 0.260) is None:
+        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", 0.380, 0.260) is None:
             raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
         rebuild_drawing(adapter, label=f"pinion bracket {sheet_name} layout")
         check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
