@@ -317,14 +317,18 @@ def _pattern_feature(adapter: Any, configuration: str) -> Any:
 def _pattern_suppression_states(
     feature: Any, configurations: list[str]
 ) -> tuple[bool, ...]:
-    raw = feature.IsSuppressed2(3, configurations)
-    values = tuple(raw) if isinstance(raw, (list, tuple)) else (raw,)
-    if len(values) != len(configurations):
-        raise RuntimeError(
-            f"pattern suppression readback has {len(values)} states for "
-            f"{len(configurations)} configurations"
-        )
-    return tuple(bool(value) for value in values)
+    """Read each requested configuration's one-element suppression array."""
+    states: list[bool] = []
+    for configuration in configurations:
+        raw = feature.IsSuppressed2(3, [configuration])
+        values = tuple(raw) if isinstance(raw, (list, tuple)) else (raw,)
+        if len(values) != 1:
+            raise RuntimeError(
+                f"{configuration}: pattern suppression readback has "
+                f"{len(values)} states, expected one"
+            )
+        states.append(bool(values[0]))
+    return tuple(states)
 
 
 def set_fixed_pattern_scope(
