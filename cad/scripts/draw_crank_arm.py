@@ -1,25 +1,13 @@
-r"""Create the curated machinist drawing for the crank arm.
+r"""Create the curated machinist drawing for crank arm MHA-020.
 
-The SLDPRT remains authoritative.  This recipe supplies only the crank-arm
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+The arm is match-fitted to separate through hub MHA-137.  Its outboard face
+shows the simple punched alignment witness and the six-o'clock axial seam for
+MHA-138; neither is an independently sized machined dimple or radial hole.
+The MHA-024 taper-pin cross-hole belongs to the hub and shaft drawings.
 
-The sheet runs at 2:1 (the arm is 93 mm end to end); the isometric carries an
-explicit 1:1 override so it stays clear of the title block.
-
-The principal view is the model's *Front* face, where the fiducial dimple and
-keeper-ring anchor are authored on ``HandleSeat`` at local z=8 mm. Third-angle
-projection therefore uses the unrotated *Top* and *Right* views; model +X runs
-to paper-right in the principal and top views.
-
-The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
-arm is a pinned hand-crank lever, so it carries no datums, no feature-control
-frames, no roughness symbols and no basic dimensions -- the title block's
-general tolerances govern everything.  Every printed value is a model
-dimension imported with the part's own decimal places (rule 2); the hole
-stations the Hole Wizard cannot measure from a feature come from the part's
-hidden ``StationReference`` / ``PinStationReference`` sketches.
+The sheet remains deliberately plain: no datums, feature-control frames or
+roughness symbols.  Every controlling value is imported from the part; matched
+arm/hub and seam-pin operations are stated on their receiving feature/note.
 
 Run with SolidWorks open::
 
@@ -34,7 +22,6 @@ import sys
 from typing import Any
 
 import _telemetry
-from _config import parts, title_block
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -63,17 +50,13 @@ from crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
-    DIMPLE_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
-    SHAFT_BORE_DIA,
-    PIN_HOLE_SPEC,
+    HUB_SEAT_CALLOUT,
 )
-from crankshaft_spec import SHAFT_DIA as CRANKSHAFT_DIA
-from crankshaft_spec import SHAFT_DIA_BAND as CRANKSHAFT_DIA_BAND
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -95,30 +78,14 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _HANDLE_PIVOT_HOLE_DIA = blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC)
-_PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
-_CRANKSHAFT_NUMBER = str(parts("crankshaft")["number"])
-_HOLE_TOLERANCE = title_block("drilled_hole")
-_SHAFT_CLEARANCE_MIN = (
-    SHAFT_BORE_DIA + float(_HOLE_TOLERANCE["minus_mm"])
-) - (CRANKSHAFT_DIA + CRANKSHAFT_DIA_BAND[0])
-_SHAFT_CLEARANCE_MAX = (
-    SHAFT_BORE_DIA + float(_HOLE_TOLERANCE["plus_mm"])
-) - (CRANKSHAFT_DIA + CRANKSHAFT_DIA_BAND[1])
-if _SHAFT_CLEARANCE_MIN < 0.0:
-    raise AssertionError("title-block crank-arm bore range interferes with shaft")
-PIN_HOLE_CALLOUT_PREFIX = f"{drill_process(PIN_HOLE_SPEC)}\nON SHAFT-BORE CL"
-# The top view is cropped around the shaft boss: it retains the HLV evidence
-# that the #14 cross-hole meets the shaft bore without repeating the remote
-# tap, dimple and handle-pivot profiles.
+_ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  The principal (front) view's model bbox runs
-# boss..arm-end in sheet X (93 mm overall, model +X to the right) and +/-8 in
-# Y; at 2:1 the principal view is 186 x 32 mm. The cropped edge-on view sits
-# above it and carries only the shaft-boss cross-hole evidence; the side view
-# (16 x 8 stock section) is to its right.
+# Sheet layout (meters).  At 2:1 the 94.1-mm overall arm remains clear of the
+# title block.  The cropped edge-on view isolates the hub end and axial seam;
+# the side view shows the 18.1 x 8 stock section.
 FRONT_CENTER = (0.145, 0.135)
 TOP_CENTER = (0.145, 0.205)
 RIGHT_CENTER = (0.300, 0.135)
@@ -157,21 +124,18 @@ def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
         )
 
 
-def _add_arm_centerline(adapter: Any, view: Any) -> None:
     """Draw the arm's longitudinal centreline between its two long edges.
 
-    The shaft bore, the fiducial dimple and the handle-pivot hole all sit on
-    the arm's mid-width axis and no cross-width location dimension exists to
-    say so; the drawn centreline through their centre marks is the ASME way
-    to state it.  Both picks land on the straight edge run between the
-    dimple and the pivot, clear of every hole.
+    The through-hub seat and handle pivot lie on the arm mid-width axis.  A
+    centreline through their centre marks states that relationship without an
+    invented cross-width dimension.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate the front view for its centreline")
     draw.ClearSelection2(True)
-    x = _sheet_x((DIMPLE_X + ARM_C2C) / 2.0)
+    x = _sheet_x((ANCHOR_SCREW_X + ARM_C2C) / 2.0)
     for index, side in enumerate((-1.0, 1.0)):
         y = FRONT_CENTER[1] + side * HALF_WIDTH * SHEET_SCALE[0] / 1000.0
         if not draw.Extension.SelectByID2(
@@ -187,13 +151,13 @@ def _add_arm_centerline(adapter: Any, view: Any) -> None:
     if count != 1:
         raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
-def _crop_top_view_to_shaft(adapter: Any, view: Any) -> None:
-    """Crop the HLV top view to the shaft boss and prove remote holes are absent."""
+def _crop_top_view_to_hub(adapter: Any, view: Any) -> None:
+    """Crop the HLV top view to the hub end and axial seam groove."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     native_view = _early_bound(view, "IView")
     if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate top view for shaft-boss crop")
+        raise RuntimeError("failed to activate top view for hub-end crop")
     draw.ClearSelection2(True)
 
     crop_center = (_sheet_x(0.0), TOP_CENTER[1])
@@ -213,28 +177,27 @@ def _crop_top_view_to_shaft(adapter: Any, view: Any) -> None:
         points.append(tuple(float(value) for value in projected.ArrayData))
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
     if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create shaft-boss crop fence")
+        raise RuntimeError("failed to create hub-end crop fence")
 
     # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
     if int(native_view.Crop2(False, True, 0)) != 1:
-        raise RuntimeError("failed to crop top view to shaft boss")
+        raise RuntimeError("failed to crop top view to hub end")
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     native_view.UpdateViewDisplayGeometry()
     if not bool(native_view.IsCropped()):
-        raise RuntimeError("top view did not retain its shaft-boss crop")
+        raise RuntimeError("top view did not retain its hub-end crop")
     outline = tuple(float(value) for value in native_view.GetOutline())
     if (
         len(outline) != 4
         or not outline[0] < crop_center[0] < outline[2]
-        or outline[2] >= _sheet_x(DIMPLE_X)
+        or outline[2] >= _sheet_x(ANCHOR_SCREW_X)
     ):
         raise RuntimeError(
-            "top-view crop did not isolate the shaft boss: "
-            f"outline={outline!r}, dimple_x={_sheet_x(DIMPLE_X)!r}"
+            "top-view crop did not isolate the hub end: "
+            f"outline={outline!r}, anchor_x={_sheet_x(ANCHOR_SCREW_X)!r}"
         )
 
-_ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
 def _omit_title_block_thread_class(display: Any) -> None:
     """Remove only the redundant Hole Wizard thread-class field."""
@@ -255,39 +218,20 @@ def _omit_title_block_thread_class(display: Any) -> None:
         raise RuntimeError("anchor tap callout retained its redundant thread class")
 
 
-
-
-# Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  Leadered diameters sit above the arm at each feature's station;
-# the linear chain stacks below the view from the shaft-bore axis, smallest
-# span nearest the geometry (anchor 20, dimple 30, pivot 75, end 85, ref 93).
-# The anchor's offset from the top long edge stands just left of the tap,
-# above the arm; the stock width stands past the arm end.
+# Per-view survivors of the marked-dimension import.
 FRONT_KEEP = {
     "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
-    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
-    "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
+    "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.095, 0.158),
     "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
     "Width": (0.274, FRONT_CENTER[1]),
-    # Left of the boss so its leader and the bore's (above) never cross.
     "BossRadius": (0.030, FRONT_CENTER[1]),
-    "ShaftBoreDia": (0.060, 0.166),
-    # Right of the anchor tap so its leader never meets the tap callout's.
-    "DimpleDia": (0.178, 0.180),
+    "HubSeatDia": (0.060, 0.166),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-# The straight #14 cross-hole's station from the broad face, seen edge-on.
-TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
-DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": (
-        "REAM THRU (3/8 IN)\n"
-        f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"
-        f"CLEARANCE ON {_CRANKSHAFT_NUMBER}"
-    ),
-    "DimpleDia": "FIDUCIAL FLAT-BOTTOM\n0.3 MIN, 1.0 MAX DEEP",
-}
+TOP_KEEP: dict[str, tuple[float, float]] = {}
+DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -304,6 +248,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -311,6 +256,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -324,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Arm Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank arm; manufacturing drawing; straight cross-hole",
+            3: "crank arm; separate through hub; axial seam key",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -336,12 +282,9 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    # The cropped top view alone needs HLV: it proves the #14 cross-drill meets
-    # the shaft bore.  The front view's blind-feature depths are fully carried
-    # by their callouts, so HLR keeps same-face dimple/tap evidence consistent
-    # and removes the cross-hole's redundant hidden projection.
+    # The cropped top view exposes the blind axial seam's half-depth.
     set_hidden_lines_visible(adapter, top)
-    _crop_top_view_to_shaft(adapter, top)
+    _crop_top_view_to_hub(adapter, top)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -350,9 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Right view: the 16 x 8 stock section.  Thickness is the model Depth dim;
-    # the 16 width is the model's Width dim on the principal view, standing
-    # past the arm end.
+    # Right view: stock width by thickness.
     right_annotations = curate_view_dimensions(
         adapter,
         right,
@@ -360,8 +301,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Top view: cross-drill geometry is visible; its station from the broad
-    # face is the model's PinStation dim and its size a native hole callout.
+    # Top view carries only the visible axial seam geometry; no independent
+    # receiver dimension survives because the actual MHA-138 governs it.
     top_annotations = curate_view_dimensions(
         adapter,
         top,
@@ -371,10 +312,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
-    # The part authored every decimal place (policy rule 2): three on the
-    # reamed 3/8 in bore alone, one everywhere else.  Read them back; an
-    # import that fell back to the sheet default would print a band nobody
-    # specified.
+    # The part authored every displayed decimal place.  The match-fit hub seat
+    # remains a one-place nominal because the assigned actual hub governs size.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in ((front, "front"), (top, "top")):
@@ -432,21 +371,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(adapter, overall, "overall length reference")
 
-    # The straight #14 cross-hole, seen in the cropped top view: the native
-    # size callout carries the drill prefix and PinStation locates it from the
-    # broad face.
-    pin_edge = (
-        _sheet_x(0.0),
-        TOP_CENTER[1] + _PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    add_native_hole_callout(
-        adapter,
-        top,
-        edge_xy=pin_edge,
-        callout_xy=(0.120, 0.230),
-        label="crank-arm cross-hole",
-        process=PIN_HOLE_CALLOUT_PREFIX,
-    )
+    # MHA-138's axial seam is match-drilled in the assembled arm and hub; the
+    # actual pin and linked manufacturing note govern its size and depth.
     # Handle pivot hole: above and just right of the arm, arrow on the hole's
     # top rim. Keeping it on the handle end avoids crossing the full principal
     # view now that model +X runs to paper-right.
@@ -459,8 +385,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(HANDLE_PIVOT_HOLE_SPEC),
     )
 
-    if add_note(adapter, "PARTIAL TOP VIEW - SHAFT END", 0.047, 0.184) is None:
+    if add_note(adapter, "PARTIAL TOP VIEW - HUB END / AXIAL SEAM", 0.038, 0.184) is None:
         raise RuntimeError("failed to label partial crank-arm top view")
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.220)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
     return await finalize_drawing(
