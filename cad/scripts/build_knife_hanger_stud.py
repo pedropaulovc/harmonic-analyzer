@@ -1,12 +1,20 @@
-"""Build the knife-hanger bolt from McMaster 91247A720."""
+"""Build the shortened knife-hanger bolt from McMaster 91247A720 stock."""
 
 from __future__ import annotations
 
 from functools import wraps
+import math
 import sys
 
-from _common import run_build
-from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
+from _common import _early_bound, _read_member, run_build
+from _drawing_marks import (
+    _named_dimension,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_symmetric_angular_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fastener_catalog import fastener
 from _saved_part_guard import require_saved_drawing_properties
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
@@ -19,6 +27,18 @@ from diagnostics.diag_build_91247A720 import (
     GB_WASHER_T,
     build_91247A720,
 )
+from knife_hanger_stud_spec import (
+    CHAMFER_ANGLE_DEG,
+    CHAMFER_ANGLE_TOLERANCE_DEG,
+    CHAMFER_WIDTH_MM,
+    CHAMFER_WIDTH_TOLERANCE_MM,
+    DIMENSION_PRECISION,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    FINISHED_UNDERHEAD_MM,
+    FINISHED_UNDERHEAD_TOLERANCE_MM,
+    ISOMETRIC_VIEW_NOTE,
+)
 
 PART_NAME = "knife-hanger-stud"
 SPEC = fastener(PART_NAME)
@@ -27,16 +47,59 @@ MATERIAL = SPEC.material
 HEAD_AF = GB_HW
 HEAD_H = GB_HH
 SHANK_DIA = 2.0 * GB_MAJOR_R
-SHANK_LEN = GB_LEN
-UNDERHEAD_LEN = GB_LEN - GB_WASHER_T
+STOCK_SHANK_LEN = GB_LEN
+SHANK_LEN = FINISHED_UNDERHEAD_MM
+UNDERHEAD_LEN = FINISHED_UNDERHEAD_MM
+TRIMMED_TIP_TRANSLATION_MM = FINISHED_UNDERHEAD_MM - (GB_UNDERSIDE - GB_WASHER_T)
+
+
+def _manufacturing_controls(adapter) -> None:
+    """Set and mark the native trim and end-deburr controls before saving."""
+    clear_dimensions_for_drawing(adapter)
+    for feature, name, nominal in (
+        ("StockTrimProfile", "FinishedOverall", FINISHED_UNDERHEAD_MM / 1000),
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_MM / 1000),
+        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_DEG)),
+    ):
+        display, dimension = _named_dimension(adapter, feature, name)
+        if int(dimension.DrivenState) != 2:
+            raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
+        if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
+            raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
+        display = _early_bound(display, "IDisplayDimension")
+        digits = DIMENSION_PRECISION[name]
+        result = display.SetPrecision3(digits, -1, -1, -1)
+        if (
+            result is None
+            or int(_read_member(display, "GetPrimaryPrecision2")) != digits
+        ):
+            raise RuntimeError(f"{name}@{feature}: native precision did not persist")
+    set_dimension_symmetric_tolerance(
+        adapter, "StockTrimProfile", "FinishedOverall", FINISHED_UNDERHEAD_TOLERANCE_MM
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
+    )
+    for feature, names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
 
 
 @wraps(build_91247A720)
 async def _prepared_stud(adapter, truth=None, **parameters):
-    """Stamp only identity properties; the purchased sheet has no PMI."""
+    """Build and author the post-purchase trim controls before the final save."""
     receipt = await build_91247A720(adapter, truth, **parameters)
-    clear_dimensions_for_drawing(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    _manufacturing_controls(adapter)
     return receipt
 
 
@@ -48,7 +111,10 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(
                 "91247A720",
                 _prepared_stud,
-                RigidTransform(translation_mm=(0.0, GB_LEN - GB_UNDERSIDE, 0.0)),
+                RigidTransform(
+                    translation_mm=(0.0, TRIMMED_TIP_TRANSLATION_MM, 0.0)
+                ),
+                parameters={"finished_underhead_mm": FINISHED_UNDERHEAD_MM},
             ),
         ),
         material=MATERIAL,
