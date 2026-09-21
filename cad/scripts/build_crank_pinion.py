@@ -34,10 +34,14 @@ from _common import (
     IN,
     SketchDims,
     _feature_by_name,
+    _early_bound,
+    add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     name_bore_axis,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -47,8 +51,10 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -92,7 +98,11 @@ BORE_DIAMETER = 0.375 * IN  # 9.525 -- crankshaft dia (med)
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -147,35 +157,137 @@ async def build(adapter) -> dict[str, str]:
         )
     ]
 
-    # Hub boss (ch12 p.19): the root-circle cylinder extruded from the SAME
-    # faced end as the teeth, through the toothed length and BOSS_LENGTH past
-    # it, so its depth IS the part's overall length -- one conspicuous native
-    # dimension from one faced end (policy rule 7). Inside the toothed length
-    # the cylinder lies within the blank's solid core (its surface is the
-    # relieved gap floors' own root arc), so the merge adds exactly the
-    # outboard stub, which the volume gate proves.
+    # Hub boss (ch12 p.19): the root-circle cylinder from the SAME faced end
+    # as the teeth, through the toothed length and BOSS_LENGTH past it, so its
+    # length IS the part's overall length -- one conspicuous native dimension
+    # from one faced end (policy rule 7). Inside the toothed length the
+    # cylinder lies within the blank's solid core (its surface is the relieved
+    # gap floors' own root arc), so the merge adds exactly the outboard stub,
+    # which the volume gate proves. It is a REVOLVE of a half-profile on the
+    # Right plane (local x -> model -Z, local y -> model Y) rather than an
+    # extruded circle: a turned part prints its diameter beside its length on
+    # the side view (rule 7), and only a dimension whose sketch plane is
+    # parallel to that view imports there natively -- the boss diameter as a
+    # doubled centerline-to-outline dim, the overall length along the outline.
     boss = SketchDims()
-    check("create_sketch boss", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, 0.0, BOSS_DIA / 2.0, "boss", dims=boss,
-        names=("BossCx", "BossCz", "BossDia"),
-        drives=(None, None, '"BossDia"'),
+    check("create_sketch boss", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    boss_axis = check(
+        "boss axis centerline",
+        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+    )
+    boss_pts = [
+        (0.0, 0.0),
+        (0.0, BOSS_DIA / 2.0),
+        (-OVERALL_LENGTH, BOSS_DIA / 2.0),
+        (-OVERALL_LENGTH, 0.0),
+    ]
+    boss_lines = await add_line_chain(adapter, boss_pts)
+    # Construction-only side-view witnesses for the other two turned
+    # diameters.  The gear helper's blank circle and the bore circle must stay
+    # on Front to create their features, but rule 2 permits a construction
+    # reference sketch whose own driving dimension carries the printed value.
+    # Keeping the witnesses in this Right-plane profile lets every turned
+    # diameter import natively beside its axial extent without changing the
+    # solid or showing hidden bore lines.
+    outside_ref = check(
+        "outside-diameter reference line",
+        await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
+    )
+    bore_ref = check(
+        "bore-diameter reference line",
+        await adapter.add_line(0.0, BORE_DIAMETER / 2.0, -OVERALL_LENGTH, BORE_DIAMETER / 2.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (outside_ref, bore_ref):
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{line}: failed to become construction geometry")
+    for i, line in enumerate(boss_lines):
+        (_, y1), (_, y2) = boss_pts[i], boss_pts[(i + 1) % len(boss_lines)]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"boss {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    for label, line in (
+        ("outside-diameter reference", outside_ref),
+        ("bore-diameter reference", bore_ref),
+    ):
+        check(
+            f"{label} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+        check(
+            f"{label} starts at faced end",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{boss_lines[0]}.start", "vertical_points"
+            ),
+        )
+    check(
+        "bore-diameter reference ends at boss end",
+        await adapter.add_sketch_constraint(
+            f"{bore_ref}.end", f"{boss_lines[2]}.end", "vertical_points"
+        ),
+    )
+    boss_outline = boss_lines[1]
+    await dimension_between(
+        adapter,
+        f"{boss_outline}.start",
+        f"{boss_outline}.end",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "boss OverallLength",
+    )
+    boss.record("OverallLength", '"FaceWidth" + "BossLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        boss_outline,
+        (-OVERALL_LENGTH / 2.0, BOSS_DIA / 2.0 + 5.0),
+        "BossDia",
+    )
+    boss.record("BossDia", '"BossDia"')
+    # The outside-diameter witness stops at the tooth face, so its axial
+    # attachment says which cylinder the diameter belongs to.  Its span is
+    # definition-only and therefore deliberately stays auto-named/unmarked.
+    await dimension_between(
+        adapter,
+        f"{outside_ref}.start",
+        f"{outside_ref}.end",
+        "horizontal_distance",
+        FACE_WIDTH,
+        "outside-diameter reference span",
+    )
+    boss.record(None, None)
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        outside_ref,
+        (-FACE_WIDTH / 2.0, OUTSIDE_DIA / 2.0 + 5.0),
+        "OutsideDia",
+    )
+    boss.record("OutsideDia", '"OutsideDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        bore_ref,
+        (-OVERALL_LENGTH / 2.0, BORE_DIAMETER / 2.0 + 3.0),
+        "BoreDia",
+    )
+    boss.record("BoreDia", '"BoreDia"')
+    await anchor_point_to_origin(
+        adapter, f"{boss_lines[0]}.start", 0.0, 0.0, "boss anchor"
     )
     await ensure_fully_defined(adapter, "boss sketch")
     check("exit_sketch boss", await adapter.exit_sketch())
     name_last_feature(adapter, "BossProfile")
     drive_jobs += boss.apply(adapter, "BossProfile")
     check(
-        "extrude boss",
-        await adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_LENGTH)),
+        "revolve boss", await adapter.create_revolve(RevolveParameters(angle=360.0))
     )
     name_last_feature(adapter, "Boss")
-    drive_jobs += [
-        (
-            name_dimensions(adapter, "Boss", ["OverallLength"])[0],
-            '"FaceWidth" + "BossLength"',
-        )
-    ]
     v_boss = math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
     volume = await volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
 
@@ -269,7 +381,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     set_dimension_bilateral_tolerance(
-        adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+        adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
     # No band on the blank's outside diameter: the title block's .XX general
     # grade fits inside the crossed mesh's radial room (crank_pinion_spec).

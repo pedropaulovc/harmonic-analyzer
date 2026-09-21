@@ -1,10 +1,12 @@
 r"""Create the curated manufacturing drawing for the crank pinion retention pin.
 
 Recreated under ``cad/docs/drawing-simplicity-policy.md``: a plain straight
-pin is two native model dimensions -- its diameter on the end view, its length
-on the side view -- an axis centerline, the isometric, and one note saying
-where the stock may come from. No datums, no frames, no roughness symbol, no
-band: the match-drilled hole it is driven into (crank_pinion_spec) is the fit.
+pin is two native model dimensions -- its diameter and its length, both on
+the side view where a turned part's diameter sits beside its axial extent
+(rule 7) -- an axis centerline, a bare end view, the isometric, and one note
+saying where the stock may come from. No datums, no frames, no roughness
+symbol, no band: the match-drilled hole it is driven into (crank_pinion_spec)
+is the fit.
 The decimal places are the PART's (``crank_pinion_pin_spec.DRAWING_PRECISION``,
 applied natively by ``build_crank_pinion_pin``); this script only reads them
 back off the sheet.
@@ -67,13 +69,12 @@ ISO_CENTER = (0.360, 0.150)
 HALF_DIA = PIN_DIA * VIEW_SCALE[0] / 2000.0  # 0.0127
 HALF_LEN = PIN_LEN * VIEW_SCALE[0] / 2000.0  # 0.054
 
-# End view: the diameter, leadered up and left into the free field.
-FRONT_KEEP = {
-    "PinDia": (FRONT_CENTER[0] - 0.040, FRONT_CENTER[1] + 0.040),
-}
-# Side view: the length, below the view (a *Right view lays model +Z to the
-# left; a plain pin has no end to prefer).
+# Side view (a *Right view lays model +Z to the left; a plain pin has no end
+# to prefer): the diameter above the view, its dimension line left of centre
+# so the axis-centerline pick at the view's middle lands on bare face; the
+# length below.
 RIGHT_KEEP = {
+    "PinDia": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1] + HALF_DIA + 0.016),
     "PinLen": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_DIA - 0.016),
 }
 
@@ -124,13 +125,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="front",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    # The end view is a bare circle with its center mark: both of the pin's
+    # dimensions live on the revolve's half-profile and import into the side
+    # view only.
     right_annotations = curate_view_dimensions(
         adapter,
         right,
@@ -138,9 +135,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    assert_imported_precision(
-        adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
-    )
+    assert_imported_precision(adapter, right_annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
     # The side view is a rectangle: its axis centerline says which pair of

@@ -21,22 +21,22 @@ if PIN_LENGTH != BOSS_DIA:
     raise AssertionError("retention pin is defined flush with the boss")
 PIN_LEN = PIN_LENGTH  # 13.51
 
-# Marked model dimensions: the two the print carries. Both are routine turned
-# / cut sizes at the title block's .XX general grade -- the diameter because
-# the match-drilled hole sets the fit (a drill-size pin in its own drill's
-# hole is a light drive fit), the length because flush-with-boss has no
-# function beyond "not proud".
+# Marked model dimensions: the two the print carries, both on the revolve's
+# half-profile so both import into the side view (rule 7: a turned part's
+# diameter sits beside its length). The diameter is a routine turned / cut
+# size at the title block's .XX general grade -- the match-drilled hole sets
+# the fit (a drill-size pin in its own drill's hole is a light drive fit).
+# The length has no function beyond "not proud": one place, the .X grade
+# (codex machinist review, 2026-09-21: two places claimed a need it lacks).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PinProfile": {"PinDia"},
-    "Pin": {"PinLen"},
+    "PinProfile": {"PinDia", "PinLen"},
 }
 
 # Decimal places, authored ON THE PART (drawing-simplicity-policy.md rule 2);
 # ``build_crank_pinion_pin`` applies this natively and ``draw_crank_pinion_pin``
 # reads it back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PinProfile": {"PinDia": 2},
-    "Pin": {"PinLen": 2},
+    "PinProfile": {"PinDia": 2, "PinLen": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: decimals
@@ -53,5 +53,6 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked pin dimension needs authored places")
 
 # The one fact the views cannot show (rule 6): where the stock may come from.
-# The drill-rod size is the drawing's own diameter, not a second number.
-DRAWING_NOTES = "STOCK 1/8 IN DRILL ROD OK; FACE BOTH ENDS SQUARE."
+# The drill-rod size is the drawing's own diameter, not a second number; the
+# faced ends are the depicted geometry, so the note does not prescribe them.
+DRAWING_NOTES = "STOCK 1/8 IN DRILL ROD OK."

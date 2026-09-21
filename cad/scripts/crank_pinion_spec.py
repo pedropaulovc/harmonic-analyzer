@@ -153,13 +153,17 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_crank_pinion`` marks exactly these; ``draw_crank_pinion``
-# keeps exactly their union across its per-view ``keep`` maps. ---
+# keeps exactly their union across its per-view ``keep`` maps. The
+# ``BossProfile`` is a Right-plane revolve profile with construction-only
+# witnesses for the tooth blank and bore. It therefore owns all four printed
+# turned diameters/lengths on the side view without changing the solid:
+# ``BossDia`` and ``OverallLength`` drive the revolve, while ``OutsideDia`` and
+# ``BoreDia`` are equation-driven native reference dimensions attached to the
+# matching axial extents (rule 2's reference-sketch allowance and rule 7's
+# turned-part layout). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "GearBlankProfile": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},
-    "BossProfile": {"BossDia"},
-    "Boss": {"OverallLength"},
-    "BoreProfile": {"BoreDia"},
+    "BossProfile": {"OutsideDia", "BoreDia", "BossDia", "OverallLength"},
     "BossBreak": {"BossChamfer"},
     "PinStationPlane": {"PinStation"},
 }
@@ -173,22 +177,25 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # The bore is the only fit on the part and prints three places with its own
-# band. The outside diameter prints two with its own band. The face width is a
-# free length between two turned faces: one place, so the title block's
+# band. The outside diameter prints two at the general grade. The face width is
+# a free length between two turned faces: one place, so the title block's
 # .X +/-0.8 is the band it claims -- and that is the band it needs, the 64T row
-# it runs in being far wider than this face. The boss diameter, the overall
-# length and the pin station are routine turned/drilled sizes at the general
-# .XX grade: the boss is not a running surface (no band, no symbol), the
-# overall length only has to leave the shaft end recessed (0.32 of room against
-# +/-0.51 -- see the assembly's recess assert, which uses the nominal, and the
-# match-drill that makes the station's own position immaterial to the fit).
-# The end break is a deburr: one place.
+# it runs in being far wider than this face. The boss diameter and the pin
+# station are routine turned/drilled sizes at the general .XX grade: the boss
+# is not a running surface (no band, no symbol), and the match-drill makes the
+# station's own position immaterial to the fit. The overall length is one
+# place like the face width: it only has to leave the shaft end recessed
+# inside the boss (the assembly's recess assert, which uses the nominal), a
+# look, not a fit (codex machinist review, 2026-09-21). The end break is a
+# deburr: one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlankProfile": {"OutsideDia": 2},
     "GearBlank": {"FaceWidth": 1},
-    "BossProfile": {"BossDia": 2},
-    "Boss": {"OverallLength": 2},
-    "BoreProfile": {"BoreDia": 3},
+    "BossProfile": {
+        "OutsideDia": 2,
+        "BoreDia": 3,
+        "BossDia": 2,
+        "OverallLength": 1,
+    },
     "BossBreak": {"BossChamfer": 1},
     "PinStationPlane": {"PinStation": 2},
 }

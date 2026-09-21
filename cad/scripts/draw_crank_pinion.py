@@ -1,12 +1,11 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
 Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is three
-views of a toothed disc with a hub boss and seven native model dimensions --
-outside diameter, reamed bore and boss diameter on the face view; face width,
-pin station and overall length stacked from the toothed face, plus the boss
-end break, on the side view -- the retention pin's match-drill hole callout,
-and the gear-data block rule 6 keeps for the tooth system a cut-gear print
-cannot dimension.
+views of a toothed disc with a hub boss and seven native model dimensions.
+Every turned diameter sits beside its axial extent on the side view: tooth-tip
+blank, reamed bore and boss, with face width, pin station, overall length and
+the boss end break. The retention pin's match-drill hole callout and the
+gear-data block carry the process facts that geometry cannot.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
 removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
@@ -47,6 +46,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from crank_pinion_spec import (
     BORE_DIA,
+    BOSS_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
@@ -83,8 +83,9 @@ ISO_CENTER = (0.345, 0.150)
 
 # Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
 # radius and the side view's half-height, which every dimension is placed clear
-# of.
+# of; and half the printed boss, the side view's height past the teeth.
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0356
+HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
 
 
 def _side_x(z_mm: float) -> float:
@@ -98,26 +99,34 @@ def _side_x(z_mm: float) -> float:
     return RIGHT_CENTER[0] + (OVERALL_LENGTH / 2.0 - z_mm) * VIEW_SCALE[0] / 1000.0
 
 
-# Face view: the three turned diameters, leadered out into the free field
-# around the face -- tip circle upper-left, bore lower-left (its roughness
-# symbol hangs below), boss upper-right, so no leader crosses another or the
-# data block.
-FRONT_KEEP = {
-    "OutsideDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.048),
-    "BoreDia": (FRONT_CENTER[0] - 0.070, FRONT_CENTER[1] - 0.035),
-    "BossDia": (FRONT_CENTER[0] + 0.050, FRONT_CENTER[1] + 0.053),
-}
-# Side view: the three lengths stacked below the view, every one from the
-# toothed south face (rule 7: one origin per view, baseline not chained) --
-# shortest nearest the part, the overall length outermost and clear of the
-# title block's top edge. The boss end break sits off the boss end's lower
-# corner, left of the overall length's extension line.
+# The end view is pictorial and carries only its center mark. Every turned
+# diameter belongs beside the matching axial extent on the side view (rule 7);
+# ``BossProfile`` supplies the tooth-tip and bore as construction-only native
+# model dimensions so they import without hidden lines or sheet-authored
+# numbers.
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
+# Side view: the two solid-profile diameters sit above their own axial spans;
+# the bore diameter sits just right of the silhouette, still clear of the
+# isometric. The three lengths stay baseline-stacked below the view, every one
+# from the toothed south face (rule 7: one origin per view, baseline not
+# chained). The boss end break's text sits left of the boss end below the
+# bore's roughness symbol, so its dimension line reaches the boss without
+# crossing the symbol.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 RIGHT_KEEP = {
+    "OutsideDia": (
+        (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
+        RIGHT_CENTER[1] + HALF_OD + 0.012,
+    ),
+    "BossDia": (
+        (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
+        RIGHT_CENTER[1] + HALF_BOSS + 0.012,
+    ),
+    "BoreDia": (_side_x(0.0) + 0.014, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
-    "BossChamfer": (_side_x(OVERALL_LENGTH) - 0.020, _SIDE_BOTTOM - 0.008),
+    "BossChamfer": (_side_x(OVERALL_LENGTH) - 0.018, _SIDE_BOTTOM - 0.034),
 }
 
 DIMENSION_CALLOUTS = {

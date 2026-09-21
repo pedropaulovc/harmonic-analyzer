@@ -60,14 +60,25 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         }
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # Turned part (rule 7): diameters on the face view, lengths from the one
-    # faced end on the side view.
-    assert set(drawing.FRONT_KEEP) == {"OutsideDia", "BoreDia", "BossDia"}
+    # Turned part (rule 7): every diameter sits beside its axial extent on the
+    # side view. The tip circle and bore are native construction-reference
+    # dimensions in the Right-plane boss profile, not numbers authored by the
+    # drawing; the end view is left dimension-free.
+    assert drawing.FRONT_KEEP == {}
     assert set(drawing.RIGHT_KEEP) == {
+        "OutsideDia",
+        "BoreDia",
+        "BossDia",
         "FaceWidth",
         "PinStation",
         "OverallLength",
         "BossChamfer",
+    }
+    assert spec.DRAWING_DIMENSIONS["BossProfile"] == {
+        "OutsideDia",
+        "BoreDia",
+        "BossDia",
+        "OverallLength",
     }
 
 
@@ -97,13 +108,14 @@ def test_the_blank_sizes_are_native_model_dimensions() -> None:
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # Rule 2: the places a dimension prints are part of the tolerance it
-    # claims, so the model owns them.
+    # claims, so the model owns them. The overall length is a look (the shaft
+    # end recessed inside the boss), not a fit: one place like the face width.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "OutsideDia": 2,
         "FaceWidth": 1,
         "BoreDia": 3,
         "BossDia": 2,
-        "OverallLength": 2,
+        "OverallLength": 1,
         "BossChamfer": 1,
         "PinStation": 2,
     }
@@ -168,11 +180,10 @@ def test_pin_hole_is_match_drilled_with_the_named_mate() -> None:
 def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
     # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
     # title-block general grade only through the named chain. On this part
-    # exactly one feature can cite it -- the fit over the crankshaft.
-    build = _build_source()
-    assert build.count("set_dimension_bilateral_tolerance(") == 1
-    assert '"BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)' in build
+    # exactly one feature can cite it -- the fit over the crankshaft -- and
+    # the native Right-plane dimension carrying it is the one the sheet keeps.
     assert [name for name in dir(spec) if name.endswith("_BAND")] == ["BORE_DIA_BAND"]
+    assert "BoreDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
     # ... and it is the only three-decimal dimension for the same reason.
     assert [
         name
@@ -208,7 +219,7 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
     # system's own tip clearance, so the general .XX grade fits inside the
     # radial room and the tips still cannot bottom.
     assert not hasattr(spec, "OUTSIDE_DIA_BAND")
-    assert spec.DRAWING_PRECISION["GearBlankProfile"]["OutsideDia"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["OutsideDia"] == 2
     assert spec.MESH_C2C_SLACK_MM == _config.fit("crank_mesh")["c2c_slack_mm"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.155, abs=0.001)
     radial_room = spec.MESH_C2C_SLACK_MM + spec.TIP_CLEARANCE_MM
@@ -346,16 +357,33 @@ def test_hidden_lines_are_off_in_every_view() -> None:
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
-    # Offline layout guard: every dimension is leadered or extended OUT of the
-    # silhouette it measures, and nothing crosses into the title block's
-    # bottom-right corner of the B sheet.
+    # Offline layout guard: every dimension is extended OUT of the silhouette
+    # it measures, and nothing crosses into the title block's bottom-right
+    # corner of the B sheet.
     half_od = drawing.HALF_OD
     assert half_od == pytest.approx(spec.OUTSIDE_DIA * 4 / 2000.0)
-    for name, (x, y) in drawing.FRONT_KEEP.items():
-        reach = math.hypot(x - drawing.FRONT_CENTER[0], y - drawing.FRONT_CENTER[1])
-        assert reach > half_od + 0.010, name
-    for name, (x, y) in drawing.RIGHT_KEEP.items():
-        assert y < drawing.RIGHT_CENTER[1] - half_od, name
+    assert drawing.FRONT_KEEP == {}
+    half_boss = drawing.HALF_BOSS
+    assert half_boss == pytest.approx(spec.BOSS_DIA * 4 / 2000.0)
+    outside_x, outside_y = drawing.RIGHT_KEEP["OutsideDia"]
+    assert drawing._side_x(spec.FACE_WIDTH) < outside_x < drawing._side_x(0.0)
+    assert outside_y > drawing.RIGHT_CENTER[1] + half_od + 0.008
+    boss_x, boss_y = drawing.RIGHT_KEEP["BossDia"]
+    assert drawing._side_x(spec.OVERALL_LENGTH) < boss_x < drawing._side_x(
+        spec.FACE_WIDTH
+    )
+    assert boss_y > drawing.RIGHT_CENTER[1] + half_boss + 0.008
+    bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
+    assert bore_x > drawing._side_x(0.0) + 0.010
+    assert bore_x < drawing.ISO_CENTER[0] - half_od - 0.010
+    assert bore_y == pytest.approx(drawing.RIGHT_CENTER[1])
+    for name in ("FaceWidth", "PinStation", "OverallLength", "BossChamfer"):
+        assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
+    # The end break's text clears the bore's roughness symbol (which hangs
+    # below the face view's bore) and the notes block.
+    chamfer_x, chamfer_y = drawing.RIGHT_KEEP["BossChamfer"]
+    assert chamfer_y < drawing.FRONT_CENTER[1] - 0.060 - 0.004
+    assert chamfer_x > 0.140
     # The side view's three lengths are baseline-stacked from the toothed face
     # (rule 7): shortest nearest the part, overall length outermost.
     assert (

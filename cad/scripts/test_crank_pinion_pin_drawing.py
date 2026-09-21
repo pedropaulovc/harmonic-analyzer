@@ -51,22 +51,20 @@ def test_pin_is_the_hole_it_is_cut_for() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked == {"PinDia", "PinLen"}
-    # Turned part (rule 7): the diameter on the end view, the length on the
-    # side view.
-    assert set(drawing.FRONT_KEEP) == {"PinDia"}
-    assert set(drawing.RIGHT_KEEP) == {"PinLen"}
-    build = _build_source()
-    assert 'name_dimensions(adapter, "Pin", ["PinLen"])' in build
-    assert 'names=("PinCx", "PinCz", "PinDia")' in build
-
+    assert set(drawing.RIGHT_KEEP) == marked == {"PinDia", "PinLen"}
+    # Turned part (rule 7): the diameter beside the length on the side view,
+    # which only a half-profile parallel to that view can supply natively --
+    # so the pin is a Right-plane revolve, not an extruded circle, and its
+    # end view carries no dimension at all.
+    assert not hasattr(drawing, "FRONT_KEEP")
+    assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
 
 def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
-    # Rule 2: both sizes are routine at the title block's .XX grade -- the
-    # match-drilled hole sets the fit, and flush-with-boss has no function
-    # beyond "not proud" -- so two places, no band, no three-place number.
-    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 2, "PinLen": 2}
+    # Rule 2: the diameter is routine at the title block's .XX grade (the
+    # match-drilled hole sets the fit) and the length, whose only function is
+    # "not proud", claims no more than the .X grade -- no band, no three-place
+    # number.
+    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 2, "PinLen": 1}
     assert "draw_crank_pinion_pin.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
     assert "set_dimension_precision" not in source
@@ -102,10 +100,12 @@ def test_print_carries_no_gdt_roughness_or_callouts() -> None:
 
 
 def test_notes_say_where_stock_may_come_from_and_nothing_else() -> None:
+    # Rule 6: one stock fact; the faced ends are depicted geometry, not a
+    # method the note prescribes.
     notes = spec.DRAWING_NOTES
-    assert notes == "STOCK 1/8 IN DRILL ROD OK; FACE BOTH ENDS SQUARE."
+    assert notes == "STOCK 1/8 IN DRILL ROD OK."
     assert "\n" not in notes
-    for banned in ("+/-", "MHA-", "MATCH", "PRESS", "HARDEN", "TOLERANCE"):
+    for banned in ("+/-", "MHA-", "MATCH", "PRESS", "HARDEN", "TOLERANCE", "FACE"):
         assert banned not in notes, banned
 
 
@@ -118,13 +118,11 @@ def test_sheet_runs_at_8_to_1_with_every_view_at_sheet_scale() -> None:
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing.HALF_DIA == pytest.approx(spec.PIN_DIA * 8 / 2000.0)
     assert drawing.HALF_LEN == pytest.approx(spec.PIN_LEN * 8 / 2000.0)
-    for name, (x, y) in drawing.FRONT_KEEP.items():
-        reach = math.hypot(x - drawing.FRONT_CENTER[0], y - drawing.FRONT_CENTER[1])
-        assert reach > drawing.HALF_DIA + 0.010, name
-    for name, (x, y) in drawing.RIGHT_KEEP.items():
-        assert y < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA, name
+    (dia_x, dia_y) = drawing.RIGHT_KEEP["PinDia"]
+    assert dia_y > drawing.RIGHT_CENTER[1] + drawing.HALF_DIA
+    assert dia_x < drawing.RIGHT_CENTER[0] - 0.020  # off the centerline pick
+    assert drawing.RIGHT_KEEP["PinLen"][1] < drawing.RIGHT_CENTER[1] - drawing.HALF_DIA
     positions = (
-        *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
         (0.016, 0.082),  # manufacturing-notes anchor
     )
