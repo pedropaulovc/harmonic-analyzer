@@ -95,10 +95,19 @@ def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> 
         "GetUseDocBrokenLeader",
         "GetBrokenLeader2",
     )
-    display.Diametric = True
-    display.ArrowSide = 1
+    adapter._attempt(lambda: setattr(display, "DisplayAsLinear", False))
+    if bool(adapter._attempt(lambda: display.DisplayAsLinear)):
+        raise RuntimeError(f"{label} became a linear dimension")
+    adapter._attempt(lambda: setattr(display, "Diametric", True))
+    if not bool(adapter._attempt(lambda: display.Diametric)):
+        raise RuntimeError(f"{label} is not diametric")
+    adapter._attempt(lambda: setattr(display, "ArrowSide", 1))
+    if int(adapter._attempt(lambda: display.ArrowSide)) != 1:
+        raise RuntimeError(f"{label} did not retain its outside arrow")
     display.SetSecondArrow(False, False)
-    display.SolidLeader = False
+    if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
+        raise RuntimeError(f"{label} retained its opposite-side arrow")
+    adapter._attempt(lambda: setattr(display, "SolidLeader", False))
     if display.SetBrokenLeader2(False, 2) != 0:
         raise RuntimeError(f"failed to apply {label} broken leader")
     display.LeaderVisibility = _LEADER_LINE_NONE
