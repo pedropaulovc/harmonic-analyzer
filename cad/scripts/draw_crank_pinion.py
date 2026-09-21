@@ -25,7 +25,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -35,6 +35,7 @@ from _drawing_common import (
     assert_imported_precision,
     check_drawing_layout,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -218,6 +219,45 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
+    # A diametric dimension already hangs on its own broken leader. SolidWorks
+    # otherwise adds a second dimension-line pair through the multi-line fit
+    # callout. Hide that redundant pair while retaining the shoulder and arrow
+    # at the bore; this is the same live-proven pattern used by tube-frame.
+    bore_annotation = next(
+        (
+            annotation
+            for annotation in right_annotations
+            if dimension_name(adapter, annotation) == "BoreDia"
+        ),
+        None,
+    )
+    if bore_annotation is None:
+        raise RuntimeError("side view lost the BoreDia annotation")
+    bore_display = adapter._attempt(lambda: bore_annotation.GetSpecificAnnotation())
+    if bore_display is None:
+        raise RuntimeError("BoreDia has no display annotation")
+    bore_display = _early_bound(bore_display, "IDisplayDimension")
+    bore_display.DisplayAsLinear = False
+    bore_display.Diametric = True
+    bore_display.ArrowSide = 1
+    bore_display.SetSecondArrow(False, False)
+    bore_display.SolidLeader = False
+    if int(bore_display.SetBrokenLeader2(False, 2)) != 0:
+        raise RuntimeError("failed to apply broken horizontal BoreDia leader")
+    if (
+        bool(bore_display.DisplayAsLinear)
+        or not bool(bore_display.Diametric)
+        or int(bore_display.ArrowSide) != 1
+        or bool(bore_display.SolidLeader)
+        or bool(bore_display.GetUseDocBrokenLeader())
+        or int(bore_display.GetBrokenLeader2()) != 2
+        or bool(bore_display.GetUseDocSecondArrow())
+        or bool(bore_display.GetSecondArrow())
+    ):
+        raise RuntimeError("BoreDia leader style did not persist")
+    bore_display.LeaderVisibility = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+    if int(bore_display.LeaderVisibility) != 3:
+        raise RuntimeError("BoreDia kept its redundant dimension-line pair")
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
@@ -253,18 +293,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
-    # work" case). Attach at the bore's 9-o'clock edge and keep the compact
-    # symbol below-left of the tooth silhouette: the arrow lands on the inner
-    # circle, away from the concentric boss and tooth-root edges.
+    # work" case). A surface symbol's native anchor is its lower-left corner,
+    # and its text grows rightward; place it below-right so the leader approaches
+    # from above-left and cannot cross the Ra text.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] - HALF_OD - 0.019, FRONT_CENTER[1] - 0.055),
+        symbol_xy=(FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.055),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=(
-            FRONT_CENTER[0] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
+            FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
             FRONT_CENTER[1],
         ),
         char_height=0.0025,
