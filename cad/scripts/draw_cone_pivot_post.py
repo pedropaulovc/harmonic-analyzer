@@ -542,6 +542,25 @@ def _configure_section_caption(drawing_model: Any) -> None:
         raise RuntimeError("native section-label scale text did not persist")
 
 
+def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
+    """Retain the linked native caption fields and expose the 1:2 value."""
+    candidates = []
+    for raw_note in _early_bound(view, "IView").GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+            candidates.append(note)
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"expected one native cone-section caption, found {len(candidates)}"
+        )
+    expected = "<VLNAME> <VLLABEL>\nSCALE <VLSCALEV>"
+    note = candidates[0]
+    note.PropertyLinkedText = expected
+    rebuild_drawing(adapter, label="show cone-section scale in native caption")
+    if str(note.PropertyLinkedText or "") != expected:
+        raise RuntimeError("native cone-section scale caption did not persist")
+
 
 def _assert_native_layout(
     adapter: Any,
@@ -792,7 +811,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         section_annotations,
-        {"ConeBossLen": (0.310, 0.225)},
+        {"ConeBossLen": (0.265, 0.257)},
     )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
@@ -920,6 +939,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, journal)
     set_hidden_lines_removed(adapter, section)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
+    _show_section_scale_in_caption(adapter, section)
     _assert_native_layout(
         adapter,
         journal,
