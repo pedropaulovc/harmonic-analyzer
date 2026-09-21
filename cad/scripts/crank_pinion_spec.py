@@ -28,7 +28,7 @@ import math
 import _config
 import crankshaft_spec
 from _gtol_spec import CylinderFace
-from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec, drill_process
+from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
@@ -100,18 +100,16 @@ OVERALL_LENGTH = FACE_WIDTH + BOSS_LENGTH  # 17.28
 BOSS_CHAMFER = 1.0
 
 # Retention pin: a plain 1/8 in straight pin (stock drill rod) through the boss
-# and the crankshaft, match-drilled at assembly with the pinion on its seat --
-# a one-off shop cannot hit a 0.25-wall cross-hole on two parts separately and
-# have the pin pass. The pinion's print therefore shows the hole at its station
-# with a MATCH DRILL callout; the pin is the hole's own drill size (a driven
-# fit, like the pinion arbor in its drums) and flush with the boss on both
-# sides, so nothing stands proud to catch the mesh. It sits on the pinion's own
-# local -X (azimuth 0, which keeps the side view's callout clean; the azimuth is
-# physically free) at the boss's mid-length. The CLOCKING against the 64T
-# tooth-in-gap seed is carried by the crankshaft's hole, whose entry point is
-# turned by PIN_CLOCKING_DEG: the assembly places the pinion rot_z(-seed) and
-# asserts that this constant IS its seed, so a re-derived mesh phase fails
-# loud at import instead of drilling the shaft at the old angle.
+# and crankshaft, match-drilled at assembly with the pinion on its seat. The
+# drawing therefore governs the hole by its fit to the named pin, not by the
+# model's nominal drill diameter: the shop drills undersize and reams until the
+# actual pin is a light drive fit. The callout locates the operation at the
+# boss mid-length and requires the fitted pin flush on both sides. The hole sits
+# on the pinion's local -X; its clocking against the 64T tooth-in-gap seed is
+# carried by the crankshaft hole, whose entry point is turned by
+# PIN_CLOCKING_DEG. The assembly places the pinion rot_z(-seed) and asserts that
+# this constant is its seed, so a re-derived mesh phase fails loud at import
+# instead of drilling the shaft at the old angle.
 PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
@@ -132,20 +130,28 @@ PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
 BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
-        "MATES WITH",
-        f"CRANKSHAFT {CRANKSHAFT_NUMBER}",
-        "REQD DIA CLR",
-        f"{_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
+        "BORE LIMITS GOVERN",
+        f"MATE SHAFT {CRANKSHAFT_NUMBER}",
+        f"\N{DIAMETER SIGN}{crankshaft_spec.SHAFT_DIA:.3f} "
+        f"+{_SHAFT_UPPER:.3f}/{_SHAFT_LOWER:.3f}",
+        f"DIA CLR {_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
     )
 )
-PIN_HOLE_PROCESS = (
-    f"MATCH DRILL AT ASSY WITH\nCRANKSHAFT {CRANKSHAFT_NUMBER}\n"
-    f"PIN {PIN_NUMBER} LIGHT DRIVE FIT\nFLUSH BOTH SIDES\n"
-    f"{drill_process(PIN_HOLE_SPEC)}"
+PIN_HOLE_PROCESS = "\n".join(
+    (
+        "MATCH DRILL AT BOSS MID-LENGTH",
+        f"AT ASSY WITH CRANKSHAFT {CRANKSHAFT_NUMBER}",
+        f"REAM TO LIGHT DRIVE FIT WITH PIN {PIN_NUMBER}",
+        "FLUSH BOTH SIDES",
+    )
 )
-CRANKSHAFT_PIN_HOLE_PROCESS = (
-    f"MATCH DRILL AT ASSY WITH\nCRANK PINION {PINION_NUMBER}\n"
-    f"{drill_process(PIN_HOLE_SPEC)}"
+CRANKSHAFT_PIN_HOLE_PROCESS = "\n".join(
+    (
+        f"MATCH DRILL AT ASSY WITH CRANK PINION {PINION_NUMBER}",
+        "AT PINION BOSS MID-LENGTH",
+        f"REAM TO LIGHT DRIVE FIT WITH PIN {PIN_NUMBER}",
+        "FLUSH BOTH SIDES",
+    )
 )
 
 # One roughness, on the one surface whose function depends on it: the bore is
@@ -171,7 +177,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BossProfile": {"OutsideDia", "BoreDia", "BossDia", "OverallLength"},
     "BossBreak": {"BossChamfer"},
-    "PinStationPlane": {"PinStation"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -183,17 +188,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # The bore is the only fit on the part and prints three places with its own
-# band. The outside diameter prints two at the general grade. The face width is
-# a free length between two turned faces: one place, so the title block's
-# .X +/-0.8 is the band it claims -- and that is the band it needs, the 64T row
-# it runs in being far wider than this face. The boss diameter is a routine
-# turned size at the general .XX grade: it is not a running surface (no band,
-# no symbol). The match-drilled pin station is displayed parenthetically on
-# the sheet because its position is set at assembly. The overall length is one
-# place like the face width: it only has to leave the shaft end recessed
-# inside the boss (the assembly's recess assert, which uses the nominal), a
-# look, not a fit (codex machinist review, 2026-09-21). The end break is a
-# deburr: one place.
+# derived band. The outside diameter prints two at the general grade. The face
+# width is a free length between two turned faces: one place, so the title
+# block's .X +/-0.8 is the band it claims -- and that is the band it needs, the
+# 64T row it runs in being far wider than this face. The boss diameter is a
+# routine turned size at the general .XX grade: it is not a running surface
+# (no band, no symbol). The match-drilled pin station is deliberately absent:
+# its callout locates the shared operation at boss mid-length and the actual
+# crankshaft/pinion stack sets it. The overall length is one place like the
+# face width: it only has to leave the shaft end recessed inside the boss, a
+# look, not a fit. The end break is a deburr: one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 1},
     "BossProfile": {
@@ -203,7 +207,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "OverallLength": 1,
     },
     "BossBreak": {"BossChamfer": 1},
-    "PinStationPlane": {"PinStation": 2},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -252,13 +255,9 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# Notes: the two part-specific tooth-system facts the title block cannot carry
-# (drawing-simplicity-policy.md rule 6). A 0.25 break is a quarter of this
-# tooth's whole depth, and the nonstandard 0.987 module must not silently become
-# a 1 MOD or 26 DP cutter. The matched-pin acceptance is on its feature callout.
+# The title block's normal 0.25 edge break is a quarter of this fine tooth's
+# whole depth, so the print carries the one part-specific exception it needs.
+# The nonstandard cutter geometry is already explicit in the gear-data block;
+# it needs no duplicate method prohibition.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-CUTTER_REQUIREMENT_NOTE = (
-    f"CUT EXACT {MODULE_MM:.3f} MODULE TOOTH FORM; "
-    "DO NOT SUBSTITUTE 1 MOD OR 26 DP."
-)
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_REQUIREMENT_NOTE))
+DRAWING_NOTES = TOOTH_EDGE_NOTE

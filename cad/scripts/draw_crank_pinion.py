@@ -1,11 +1,11 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
 Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is three
-views of a toothed disc with a hub boss and seven native model dimensions.
+views of a toothed disc with a hub boss and six native model dimensions.
 Every turned diameter sits beside its axial extent on the side view: tooth-tip
-blank, reamed bore and boss, with face width, pin station, overall length and
-the boss end break. The retention pin's match-drill hole callout and the
-gear-data block carry the process facts that geometry cannot.
+blank, reamed bore and boss, with face width, overall length and the boss end
+break. The retention pin's matched-fit hole callout and the gear-data block
+carry the process facts that geometry cannot.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
 removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
@@ -28,7 +28,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_native_hole_callout,
+    add_attached_note,
     add_leader_note,
     add_property_linked_note,
     add_surface_finish,
@@ -36,7 +36,6 @@ from _drawing_common import (
     assert_imported_precision,
     check_drawing_layout,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -44,7 +43,6 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -190,13 +188,12 @@ def _simplify_side_gear_edges(adapter: Any, view: Any) -> None:
 # model dimensions so they import without hidden lines or sheet-authored
 # numbers.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
-# Side view: the two solid-profile diameters sit above their own axial spans;
-# the bore diameter sits just right of the silhouette, still clear of the
-# isometric. The three lengths stay baseline-stacked below the view, every one
-# from the toothed south face (rule 7: one origin per view, baseline not
-# chained). The boss diameter and end break sit in the clear gap immediately
-# left of the boss, rather than running through the cross-hole or down to the
-# sheet's bottom dimension stack.
+# Side view: the tooth-tip diameter sits above its axial span; the bore diameter
+# sits just right of the silhouette, still clear of the isometric. The two
+# lengths stay baseline-stacked below the view from the toothed south face
+# (rule 7: one origin per view, baseline not chained). The boss diameter sits
+# on its vertical dimension line in the clear gap left of the hub, while the
+# end break stays separately above the chamfer.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 RIGHT_KEEP = {
     "OutsideDia": (
@@ -205,15 +202,14 @@ RIGHT_KEEP = {
     ),
     "BossDia": (
         _side_x(OVERALL_LENGTH) - 0.016,
-        RIGHT_CENTER[1] + HALF_BOSS + 0.012,
+        RIGHT_CENTER[1],
     ),
     "BoreDia": (_side_x(0.0) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
-    "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
     "BossChamfer": (
-        _side_x(OVERALL_LENGTH) - 0.016,
-        RIGHT_CENTER[1] + HALF_BOSS + 0.002,
+        _side_x(OVERALL_LENGTH) - 0.006,
+        RIGHT_CENTER[1] + HALF_BOSS + 0.010,
     ),
 }
 
@@ -226,8 +222,8 @@ DIMENSION_CALLOUTS = {
 }
 
 # The retention-pin cross-hole: its exit circle on the boss wall nearest the
-# viewer, at the pin station on the axis. The native callout hangs above the
-# side view with the match-drill statement as its prefix.
+# viewer, at the boss mid-length. Its attached matched-fit callout hangs above
+# the side view and names every assembly acceptance criterion.
 PIN_HOLE_EDGE = (
     _side_x(PIN_STATION),
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
@@ -295,29 +291,13 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # Whole-model import for the side view (the crankshaft's JournalStart
-    # idiom): the targeted path selects a dimension's owner as a SKETCH or a
-    # BODYFEATURE, and PinStation's owner is a reference PLANE, which it cannot
-    # address (farm leaf 2026-09-21T13:51Z). The keep set still prunes the rest.
+    # idiom): the targeted path can select a dimension owner as a SKETCH or
+    # BODYFEATURE, while the keep set prunes every unrequested annotation.
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
-    )
-    pin_station_annotation = next(
-        (
-            annotation
-            for annotation in right_annotations
-            if dimension_name(adapter, annotation) == "PinStation"
-        ),
-        None,
-    )
-    if pin_station_annotation is None:
-        raise RuntimeError("side view lost the PinStation annotation")
-    set_reference_dimension(
-        adapter,
-        pin_station_annotation,
-        label="pin station",
     )
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
@@ -339,16 +319,16 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="crank pinion axis centerline",
     )
-    # The retention pin's hole: native size and THRU from the Hole Wizard,
-    # the match-drill statement (mate by number) as its prefix -- rule 6 puts
-    # a matched-fit requirement on the feature callout, not in a note.
-    add_native_hole_callout(
+    # The cross-hole is governed by a matched fit, not the model's nominal
+    # drill diameter. Attach the operation and acceptance directly to its rim:
+    # drill both seated parts together, ream to the named pin and finish flush.
+    add_attached_note(
         adapter,
         right,
-        edge_xy=PIN_HOLE_EDGE,
-        callout_xy=PIN_HOLE_CALLOUT,
-        label="retention-pin cross-hole",
-        process=PIN_HOLE_PROCESS,
+        text=PIN_HOLE_PROCESS,
+        entity_xy=PIN_HOLE_EDGE,
+        note_xy=PIN_HOLE_CALLOUT,
+        label="retention-pin matched cross-hole",
     )
     # Keep the fit acceptance beside the visible bore rather than stacking it
     # under the side-view diameter. The view-owned pointer names the bore while
@@ -356,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
-        text_xy=(0.074, 0.220),
+        text_xy=(0.055, 0.220),
         attach_xy=(
             FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
             FRONT_CENTER[1],
