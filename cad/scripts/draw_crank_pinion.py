@@ -30,7 +30,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_attached_note,
     add_leader_note,
     add_property_linked_note,
     add_surface_finish,
@@ -293,13 +292,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # The cross-hole is governed by a matched fit, not the model's nominal
     # drill diameter. Attach the operation and acceptance directly to its rim:
     # drill both seated parts together, ream to the named pin and finish flush.
-    add_attached_note(
+    # A longitudinal section presents the radial through-hole as cut edges, not
+    # a selectable model circle, so this view-owned pointer names its cut
+    # location without dimensioning that hole.
+    add_leader_note(
         adapter,
-        right,
-        text=PIN_HOLE_PROCESS,
-        entity=visible_circle_edge(adapter, right, PIN_DIA),
-        note_xy=PIN_HOLE_CALLOUT,
+        PIN_HOLE_PROCESS,
+        text_xy=PIN_HOLE_CALLOUT,
+        attach_xy=PIN_HOLE_EDGE,
         label="retention-pin matched cross-hole",
+        view=right,
+        height=0.0025,
     )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
