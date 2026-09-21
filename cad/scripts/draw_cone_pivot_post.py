@@ -155,7 +155,7 @@ FRONT_KEEP = {
     "MainBodyDia": (0.150, 0.090),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
-    "HeadDia": (FRONT_CENTER[0], 0.170),
+    "HeadDia": (FRONT_CENTER[0], 0.160),
     "CrankBossDia": (0.170, 0.125),
     "CrankBoreDia": (0.175, 0.172),
 }
@@ -167,7 +167,7 @@ TOP_KEEP = {
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "ConeBossLen": (0.355, 0.243),
+    "ConeBossLen": (0.355, 0.235),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -179,13 +179,12 @@ JOURNAL_KEEP = {
 # station identify the real local crank spotface without inventing a uniform
 # depth against the curved collar.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "CRANK BOSS DIA\nSPOTFACE FOOTPRINT",
-    "CrankBossLen": "CRANK BOSS FACE-TO-FACE",
+    "CrankBossDia": "CRANK SPOTFACE DIA",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
-    "ConeBossDia": "RAISED CONE JOURNAL PADS",
-    "ConeBossLen": "PAD FACE-TO-FACE",
-    "CrankBossStartZ": "TO SPOTFACE PLANE",
+    "ConeBossDia": "CONE JOURNAL BOSS OD",
+    "ConeBossLen": "CONE BOSS FACE-TO-FACE",
+    "CrankBossStartZ": "POST AXIS TO CRANK\nSPOTFACE PLANE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
