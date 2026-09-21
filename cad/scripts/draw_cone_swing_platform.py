@@ -157,6 +157,14 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
             raise RuntimeError("profile cosmetic thread refused the hidden layer")
+        thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
+        callout = _early_bound(_read_member(thread, "ThreadCallout"), "INote")
+        callout_annotation = _early_bound(
+            _read_member(callout, "GetAnnotation"), "IAnnotation"
+        )
+        callout_annotation.Layer = _COSMETIC_THREAD_LAYER
+        if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("profile thread callout refused the hidden layer")
         hidden += 1
     if not hidden:
         raise RuntimeError("profile view has no cosmetic thread to hide")
