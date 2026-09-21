@@ -157,7 +157,7 @@ FRONT_KEEP = {
     "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.160),
     "CrankBossDia": (0.115, 0.120),
-    "CrankBoreDia": (0.125, 0.172),
+    "CrankBoreDia": (0.155, 0.172),
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
