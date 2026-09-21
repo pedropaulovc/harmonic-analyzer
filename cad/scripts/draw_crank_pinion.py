@@ -21,6 +21,7 @@ isometric ran off the B sheet's right border.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -229,6 +230,13 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (ISO_CENTER[0] - 0.025, RIGHT_CENTER[1] + HALF_OD + 0.056)
+_BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
+_BORE_GAP_ANGLE_RAD = math.radians(168.75)
+BORE_FIT_NOTE = (0.016, 0.193)
+BORE_FIT_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(_BORE_GAP_ANGLE_RAD),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(_BORE_GAP_ANGLE_RAD),
+)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -330,20 +338,17 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=PIN_HOLE_CALLOUT,
         label="retention-pin matched cross-hole",
     )
-    # Keep the fit acceptance beside the visible bore rather than stacking it
-    # under the side-view diameter. The view-owned pointer names the bore while
-    # the native side-view dimension keeps its normal, connected leader.
+    # Put the fit note immediately left of the end view and send its short
+    # leader radially through the upper-left tooth gap to the visible bore.
+    # The native side-view diameter remains beside its axial extent (rule 7).
     add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
-        text_xy=(0.055, 0.220),
-        attach_xy=(
-            FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
-            FRONT_CENTER[1],
-        ),
+        text_xy=BORE_FIT_NOTE,
+        attach_xy=BORE_FIT_ATTACH,
         label="crank pinion bore fit",
         view=front,
-        height=0.0025,
+        height=0.0022,
     )
     # The fit note and finish symbol use different bore quadrants, so their
     # leaders cannot be mistaken for one another.

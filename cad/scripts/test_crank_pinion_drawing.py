@@ -410,10 +410,20 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     )
     assert drawing.PIN_HOLE_EDGE[0] == pytest.approx(drawing._side_x(spec.PIN_STATION))
     assert drawing.PIN_HOLE_CALLOUT[0] > drawing._side_x(0.0) + 0.060
+    # The bore-fit note stays left of the end view; its short pointer enters
+    # radially through the upper-left tooth gap and lands on the bore circle.
+    assert drawing.BORE_FIT_NOTE[0] < drawing.FRONT_CENTER[0] - half_od
+    bore_dx = drawing.BORE_FIT_ATTACH[0] - drawing.FRONT_CENTER[0]
+    bore_dy = drawing.BORE_FIT_ATTACH[1] - drawing.FRONT_CENTER[1]
+    assert math.hypot(bore_dx, bore_dy) == pytest.approx(
+        spec.BORE_DIA * 4 / 2000.0
+    )
+    assert bore_dx < 0 < bore_dy
     positions = (
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
         drawing.PIN_HOLE_CALLOUT,
+        drawing.BORE_FIT_NOTE,
         (0.016, 0.258),  # gear-data note anchor
         (0.016, 0.082),  # manufacturing-notes anchor
     )
