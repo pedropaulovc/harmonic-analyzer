@@ -34,7 +34,7 @@ from typing import Any
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm, drill_process
-from _common import CAD_ROOT, _early_bound, _preference_id, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -89,6 +89,11 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _HANDLE_PIVOT_HOLE_DIA = blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC)
 _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
+# swUserPreferenceToggle_e.swEdgesHiddenEdgeSelectionInWireframe, read from
+# the SOLIDWORKS 2026 Constant type library 34.0 generated binding.  The API's
+# Selection options page documents this as the hidden-edge selection switch for
+# wireframe and HLV; the published enum page omits the integer.
+_SW_HLV_HIDDEN_EDGE_SELECTION = 115
 
 
 SHEET_SCALE = (2.0, 1.0)
@@ -320,11 +325,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
         )
         for side in (-1.0, 1.0)
     )
-    hidden_selection_pref = _preference_id(
-        adapter, "swEdgesHiddenEdgeSelectionInWireframe"
-    )
-    if hidden_selection_pref is None:
-        raise RuntimeError("seat cannot resolve the HLV hidden-edge selection preference")
+    hidden_selection_pref = _SW_HLV_HIDDEN_EDGE_SELECTION
     selection_before = bool(app.GetUserPreferenceToggle(hidden_selection_pref))
     app.SetUserPreferenceToggle(hidden_selection_pref, True)
     if bool(app.GetUserPreferenceToggle(hidden_selection_pref)) is not True:
