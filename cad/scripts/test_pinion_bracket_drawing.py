@@ -101,15 +101,19 @@ def test_print_carries_no_gdt_no_datums_and_no_note_block() -> None:
 def test_callouts_state_processes_and_never_restate_numbers() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
     # The only thing a callout adds is what the dimension cannot say: how the
-    # feature is made and whether it goes through.
+    # feature is made, which feature a separate model dimension belongs to,
+    # and whether it goes through.
     assert callouts["PivotBoreDia"] == "REAM THRU"
     assert callouts["ArborBoreDia"] == "REAM THRU"
-    assert callouts["PinSeatDia"] == "REAM; FLAT-BOTTOM BLIND"
-    # The blind seat's depth and the one finely-held location each say what
-    # the number alone cannot: where the depth is measured from, and why the
-    # station is held tighter than the title block's general grade.  The
-    # latter wraps: on one line it ran off the sheet's left border.
-    assert callouts["PinSeatDepth"] == "DEPTH FROM ENTRY FACE"
+    assert callouts["PinSeatDia"] == "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND"
+    # The blind seat's native diameter and native depth share a feature name,
+    # and the latter identifies the physical face its value starts from.  The
+    # finely-held location separately says why it is tighter than the title
+    # block's general grade.
+    assert (
+        callouts["PinSeatDepth"]
+        == "FOLLOWER SEAT\nREAM DEPTH\nFROM ENTRY FACE"
+    )
     assert callouts["PinSeatCy"] == "CAM ENGAGE CLEARANCE\nHOLD FINE GRADE"
     assert max(len(line) for line in callouts["PinSeatCy"].splitlines()) <= 20
     joined = "\n".join(callouts.values())
@@ -159,6 +163,16 @@ def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("set_reference_dimension(") == 1
     assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
+    # The reference overall sits outside the flank on the clear side between
+    # views; the follower-seat diameter leader leaves from the opposite side.
+    flank_left = (
+        drawing.LEFT_CENTER[0]
+        - pinion_bracket_geometry.THICKNESS
+        * drawing.SHEET_SCALE[0]
+        / 2000.0
+    )
+    assert drawing._front_x(pinion_bracket_geometry.HALF_WIDTH) < drawing.OVERALL_XY[0]
+    assert drawing.OVERALL_XY[0] < flank_left
 
 
 def test_only_the_face_view_carries_hidden_lines() -> None:
@@ -180,18 +194,23 @@ def test_only_the_face_view_carries_hidden_lines() -> None:
 
 
 def test_scallop_detail_encloses_what_it_dimensions() -> None:
-    # The detail carries every scallop dimension, and each of them is measured
-    # from the pivot axis to a centre in the air beside the strap: the fence
-    # must hold the axis, both centres and both bites with a margin, or the
-    # imported dimensions land on geometry the crop does not show.
+    # The detail carries every scallop dimension, and each is measured from
+    # the pivot-bore axis: a reachable physical origin rather than an
+    # off-part construction centre.  The fence must therefore show the whole
+    # pivot bore (so its centre mark reads as a bore axis), both relief
+    # centres, and both bites.
     assert set(drawing.DETAIL_KEEP) == (
         pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefParkProfile"]
         | pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefEngagedProfile"]
     )
     fence_center = drawing.DETAIL_FENCE_CENTER_MM
     radius = drawing.DETAIL_FENCE_RADIUS_MM
+    assert (
+        math.dist((0.0, 0.0), fence_center)
+        + pinion_bracket_geometry.PIVOT_BORE / 2.0
+        <= radius - 1.0
+    )
     for point in (
-        (0.0, 0.0),
         pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
         pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
     ):
@@ -210,14 +229,22 @@ def test_scallop_detail_encloses_what_it_dimensions() -> None:
             assert math.dist(end, fence_center) <= radius - 1.0, end
     # The detail enlarges: at the sheet's 2:1 the six dimensions overprinted.
     assert drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] > 2.0
-    # It sits below the face view's left column, inside the border with room
-    # for its native caption underneath.
+    # It sits below the face view's left column, inside the border; its native
+    # caption is placed beside it, clear of the fence, and the fence's letter
+    # on the face view stays outside the fence circle there.
     sheet_radius = radius * drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
     assert drawing.DETAIL_CENTER[1] - sheet_radius >= 0.030
     assert drawing.DETAIL_CENTER[0] - sheet_radius >= 0.020
     assert drawing.DETAIL_CENTER[0] + sheet_radius < drawing._front_x(
         -pinion_bracket_geometry.HALF_WIDTH
     )
+    assert drawing.DETAIL_CAPTION_XY[0] > drawing.DETAIL_CENTER[0] + sheet_radius
+    fence_sheet_center = (
+        drawing._front_x(fence_center[0]),
+        drawing._front_y(fence_center[1]),
+    )
+    fence_sheet_radius = radius * drawing.SHEET_SCALE[0] / 1000.0
+    assert math.dist(drawing.DETAIL_LETTER_XY, fence_sheet_center) > fence_sheet_radius
 
 
 def test_blind_seat_entry_face_is_solid_flank_where_the_reamer_lands() -> None:
@@ -299,6 +326,8 @@ def test_label_positions_are_on_the_sheet_and_do_not_collide() -> None:
         **{f"detail:{k}": v for k, v in drawing.DETAIL_KEEP.items()},
         **{f"left:{k}": v for k, v in drawing.LEFT_KEEP.items()},
         "left:overall": drawing.OVERALL_XY,
+        "detail:caption": drawing.DETAIL_CAPTION_XY,
+        "front:detail-letter": drawing.DETAIL_LETTER_XY,
         "front:pivot-finish": drawing.PIVOT_FINISH_XY,
         "front:arbor-finish": drawing.ARBOR_FINISH_XY,
     }

@@ -125,13 +125,19 @@ def _flank_y(model_y_mm: float) -> float:
 
 
 # DETAIL A: a native detail of the face view, fenced around the pivot bore so
-# it holds the pivot axis (every scallop location is measured from it), both
-# scallop centres (in the air beside the strap) and both bites.  3:1 turns the
-# 6.90 radius into a 21 mm arc the two radius leaders can land on separately.
+# it holds the COMPLETE pivot bore and its centre mark: that reachable bore
+# axis is the common physical origin for every relief-centre coordinate.  The
+# fence also holds both scallop centres (in the air beside the strap) and both
+# bites.  3:1 turns the 6.90 radius into a 21 mm arc the two radius leaders can
+# land on separately.  The native caption goes to the detail's right (the sheet
+# border is too close underneath), and the fence's own letter stays clear of
+# the follower seat on the parent view.
 DETAIL_SCALE = (3.0, 1.0)
-DETAIL_CENTER = (0.066, 0.064)
-DETAIL_FENCE_CENTER_MM = (-8.0, -0.5)
-DETAIL_FENCE_RADIUS_MM = 9.5
+DETAIL_CENTER = (0.066, 0.072)
+DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
+DETAIL_FENCE_RADIUS_MM = 11.5
+DETAIL_CAPTION_XY = (0.108, 0.050)
+DETAIL_LETTER_XY = (0.116, 0.104)
 
 
 def _detail_x(model_x_mm: float) -> float:
@@ -161,20 +167,21 @@ FRONT_KEEP = {
     "BottomCapRadius": (0.164, 0.062),
     "TopCapRadius": (0.164, 0.238),
     "PinSeatCy": (0.088, 0.134),
-    "PinSeatDepth": (0.082, 0.156),
+    "PinSeatDepth": (0.100, 0.158),
 }
 # The scallop pair is dimensioned in the enlarged detail the way it is cut:
-# each centre from the pivot axis (X stacked above the fence, Y beside it) and
-# each cutter radius leadered from its own visible bite, the park bite above
-# the crossover and the engaged bite below it, so neither leader lands on the
-# virtual circle in the air the way both did at 2:1.
+# each centre from the pivot axis (X stacked above the fence, the shorter one
+# inside; Y beside it on the open left) and each cutter radius leadered from
+# its own visible bite, the park bite above the crossover and the engaged bite
+# below it, so neither leader lands on the virtual circle in the air the way
+# both did at 2:1.
 DETAIL_KEEP = {
-    "CamReliefParkR": (0.100, 0.088),
-    "CamReliefParkX": (0.071, 0.112),
-    "CamReliefParkY": (0.112, 0.073),
-    "CamReliefEngagedR": (0.100, 0.040),
-    "CamReliefEngagedX": (0.071, 0.103),
-    "CamReliefEngagedY": (0.122, 0.054),
+    "CamReliefParkR": (0.100, 0.090),
+    "CamReliefParkX": (0.068, 0.115),
+    "CamReliefParkY": (0.031, 0.084),
+    "CamReliefEngagedR": (0.100, 0.036),
+    "CamReliefEngagedX": (0.068, 0.106),
+    "CamReliefEngagedY": (0.031, 0.064),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -183,27 +190,29 @@ LEFT_KEEP = {
     "PinSeatCz": (0.240, 0.090),
     "PinSeatDia": (0.290, 0.140),
 }
-# The flank's top and bottom edges are the strap's two extreme lines, so the
-# overall reads between straight edges here; the text sits clear of the seat
-# callout's leader, outboard of the flank.
-OVERALL_XY = (0.262, 0.168)
+# The flank's top and bottom edges are the strap's two extreme lines.  Put the
+# overall outside the flank on its clear LEFT, between the aligned views, so
+# neither its dimension line nor its short witness lines cross the follower-
+# seat size leader on the flank's right.
+OVERALL_XY = (0.212, 0.168)
 # Each bore's roughness symbol leads out to the upper/lower LEFT of its arc
 # and that same bore's end-radius label sits to the upper/lower RIGHT, so the
 # two leaders leaving the same crowded corner diverge instead of crossing and
 # the symbol's "Ra" text stops short of the radius label.
 PIVOT_FINISH_EDGE = (_front_x(0.0), _front_y(-PIVOT_BORE / 2.0))
-PIVOT_FINISH_XY = (0.126, 0.080)
+PIVOT_FINISH_XY = (0.128, 0.086)
 ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
 ARBOR_FINISH_XY = (0.108, 0.222)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
-# why it is held there.  The seat-height callout wraps so it stays inside the
-# sheet border to the left of its dimension line.
+# why it is held there.  Naming both follower-seat annotations ties the native
+# diameter and native depth together without copying either model value into
+# note text; the depth then reads explicitly from the depicted entry face.
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "REAM; FLAT-BOTTOM BLIND",
-    "PinSeatDepth": "DEPTH FROM ENTRY FACE",
+    "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
+    "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH\nFROM ENTRY FACE",
     "PinSeatCy": "CAM ENGAGE CLEARANCE\nHOLD FINE GRADE",
 }
 
@@ -272,7 +281,48 @@ def _cam_relief_detail(adapter: Any, front: Any) -> Any:
         raise RuntimeError("native scallop detail scale did not persist")
     if math.dist(center, DETAIL_CENTER) > 0.0001:
         raise RuntimeError(f"native scallop detail centre did not persist: {center}")
+    _position_detail_caption(adapter, detail)
+    _position_fence_letter(adapter, detail)
     return detail
+
+
+def _position_detail_caption(adapter: Any, detail: Any) -> None:
+    """Move the native "DETAIL A / SCALE 3:1" caption without replacing its
+    linked fields; SolidWorks drops it under the view, below the border here."""
+    view = _early_bound(detail, "IView")
+    candidates = []
+    for raw_note in view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        # GetText is blank at this point; the native view-label fields persist.
+        if all(
+            token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")
+        ):
+            candidates.append((note, linked_text))
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"expected one native linked detail caption, found {len(candidates)}"
+        )
+    note, linked_text = candidates[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*DETAIL_CAPTION_XY, 0.0):
+        raise RuntimeError("failed to position native detail caption")
+    rebuild_drawing(adapter, label="_position_detail_caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], DETAIL_CAPTION_XY) > 1e-6:
+        raise RuntimeError("native detail caption position did not persist")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("detail caption lost its native view-label fields")
+
+
+def _position_fence_letter(adapter: Any, detail: Any) -> None:
+    """Keep the fence's A on the face view off the pivot bore and its leaders."""
+    circle = _early_bound(_early_bound(detail, "IView").GetDetail(), "IDetailCircle")
+    circle.SetLabelPosition(*DETAIL_LETTER_XY)
+    rebuild_drawing(adapter, label="_position_fence_letter")
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"fence letter position did not persist: {actual}")
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
@@ -361,6 +411,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, front)
     for view in (left, iso, detail):
         set_hidden_lines_removed(adapter, view)
+
+    # The complete pivot bore is the relief coordinates' reachable physical
+    # origin.  Mark its axis in the enlarged detail before importing the
+    # origin-based scallop dimensions, so their common baseline is visible.
+    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
+        raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
 
     # The detail claims the scallop dimensions before the parent import.
     detail_annotations = curate_view_dimensions(
