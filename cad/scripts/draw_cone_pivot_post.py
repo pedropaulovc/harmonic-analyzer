@@ -135,7 +135,7 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "ConeBossLen": (0.1266, 0.2167),
+    "ConeBossLen": (0.160, 0.232),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
