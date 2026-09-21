@@ -346,6 +346,7 @@ def _orient_section(adapter: Any, view: Any) -> None:
 def _model_face_evidence(model: Any) -> None:
     """Read the final BREP surfaces behind the four disputed callouts."""
     rows: dict[str, list[tuple[str, tuple[float, ...]]]] = {}
+    part = _early_bound(model, "IPartDoc")
     for name in (
         "CrankSprocketBoss",
         "CrankSpotFace",
@@ -353,7 +354,7 @@ def _model_face_evidence(model: Any) -> None:
         "ConeShaftBoss",
         "ConeShaftBore",
     ):
-        feature = model.FeatureByName(name)
+        feature = part.FeatureByName(name)
         if feature is None:
             raise RuntimeError(f"missing model feature for drawing evidence: {name}")
         feature = _early_bound(feature, "IFeature")
