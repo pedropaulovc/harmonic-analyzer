@@ -1149,11 +1149,47 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
 
 
     tip_radius_mm = facts["Ra"] * 25.4
-    check("T006 control create blank sketch", await adapter.create_sketch("Front"))
-    blank_circle = check(
-        "T006 control add blank circle",
-        await adapter.add_circle(0.0, 0.0, tip_radius_mm),
+    blank_sketch_name = check(
+        "T006 control create blank sketch",
+        await adapter.create_sketch("Front"),
     )
+    active_sketch = model.GetActiveSketch2()
+    active_sketch_name = (
+        str(active_sketch.Name) if active_sketch is not None else None
+    )
+    sketch_manager = adapter.currentSketchManager
+    add_to_db_before = bool(sketch_manager.AddToDB)
+    _telemetry.info(
+        "T006 control blank authoring: "
+        f"reported_sketch={blank_sketch_name!r}, "
+        f"active_sketch={active_sketch_name!r}, "
+        f"radius_mm={tip_radius_mm!r}, "
+        f"AddToDB_before={add_to_db_before}"
+    )
+    if active_sketch_name != blank_sketch_name:
+        raise RuntimeError(
+            "T006 control active sketch mismatch before blank circle: "
+            f"{active_sketch_name!r} != {blank_sketch_name!r}"
+        )
+    set_sketch_direct_db(adapter, True)
+    if not bool(sketch_manager.AddToDB):
+        raise RuntimeError("T006 control failed to enable AddToDB")
+    try:
+        blank_circle = check(
+            "T006 control add blank circle",
+            await adapter.add_circle(0.0, 0.0, tip_radius_mm),
+        )
+    finally:
+        set_sketch_direct_db(adapter, add_to_db_before)
+        add_to_db_restored = bool(sketch_manager.AddToDB)
+        _telemetry.info(
+            "T006 control blank authoring restored: "
+            f"AddToDB_after={add_to_db_restored}"
+        )
+        if add_to_db_restored != add_to_db_before:
+            raise RuntimeError(
+                "T006 control did not restore AddToDB after blank circle"
+            )
     check(
         "T006 control blank diameter",
         await adapter.add_sketch_dimension(
