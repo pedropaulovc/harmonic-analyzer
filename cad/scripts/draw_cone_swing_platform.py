@@ -95,7 +95,7 @@ PROFILE_KEEP = {
     "CornerNER": (0.135, 0.130),
     "CornerNWR": (0.025, 0.130),
     "CornerSWR": (0.118, 0.235),
-    "CornerSER": (0.030, 0.240),
+    "CornerSER": (0.040, 0.240),
 }
 FEATURE_KEEP = {
     "PivotBearingReliefDia": (0.215, 0.130),
