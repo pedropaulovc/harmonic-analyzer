@@ -48,31 +48,34 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
+    ADJUSTER_BORE_DIA,
     ADJUSTER_AXIS_HEIGHT,
     BLOCK_HEIGHT,
-    BLOCK_HEIGHT_BAND,
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     PINCH_CLEARANCE_DIA,
     PINCH_BORE_SPEC,
+    PINCH_BORE_DIA,
     PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT,
     SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SLIT_W,
+    SURFACE_FINISHES,
 )
-from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
+from _hole_spec import DRILL_POINT_H
 from _holes import blind_hole_volume_mm3, wizard_holes
+from _part_pmi import author_part_pmi
 
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
@@ -85,13 +88,11 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 # Native 5/16-18 blind tapped adjuster receiver from the north face. Its
 # tap-drill diameter is manufacturing geometry, distinct from the purchased
 # screw's true major-diameter solid.
-ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
 SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
 
 ADJUSTER_BORE_DEPTH = ADJUSTER_BORE_SPEC.depth_mm
 # McMaster 90280A108 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
-PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)
 PINCH_BORE_Y = PINCH_HEIGHT
 
 # The pinch cross-bore must land wholly in the material band between the
@@ -340,9 +341,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
-    set_dimension_bilateral_tolerance(
-        adapter, "Block", "BlockHt", *deviations(BLOCK_HEIGHT_BAND)
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
@@ -350,6 +349,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
