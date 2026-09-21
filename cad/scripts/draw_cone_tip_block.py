@@ -32,6 +32,7 @@ from cone_tip_block_spec import (
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
@@ -118,6 +119,40 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
         raise RuntimeError(f"locating-foot edge span is only {span:.3f} mm")
     return edge
 
+def _circle_entity(
+    adapter: Any,
+    view: Any,
+    *,
+    radius_mm: float,
+    center_y_mm: float,
+    label: str,
+) -> Any:
+    """Resolve a real circular edge by model size and vertical station."""
+    candidates: list[tuple[float, float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[6], params[1], edge))
+    if not candidates:
+        raise RuntimeError(f"{label} view has no visible circular model edges")
+    radius, center_y, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - center_y_mm),
+    )
+    if abs(radius - radius_mm) > 0.01 or abs(center_y - center_y_mm) > 0.01:
+        raise RuntimeError(
+            f"no {label} circle matches radius {radius_mm:.3f} mm at "
+            f"height {center_y_mm:.3f} mm; nearest is "
+            f"R{radius:.3f} at {center_y:.3f} mm"
+        )
+    return edge
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -183,22 +218,46 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, section)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="passage entry elevation"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="passage entry elevation",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="plan"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     section_annotations = curate_view_dimensions(
-        adapter, section, keep=SECTION_KEEP, view_label="bore centre section"
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="bore centre section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="pinch clearance entry"
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="pinch clearance entry",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     left_annotations = curate_view_dimensions(
-        adapter, left, keep=LEFT_KEEP, view_label="pinch threaded entry"
+        adapter,
+        left,
+        keep=LEFT_KEEP,
+        view_label="pinch threaded entry",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     back_annotations = curate_view_dimensions(
-        adapter, back, keep=BACK_KEEP, view_label="adjuster threaded entry"
+        adapter,
+        back,
+        keep=BACK_KEEP,
+        view_label="adjuster threaded entry",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [
         *front_annotations,
@@ -220,23 +279,38 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
 
+    adjuster_edge = _circle_entity(
+        adapter,
+        back,
+        radius_mm=ADJUSTER_BORE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="blind adjuster thread",
+    )
+    pinch_clearance_edge = _circle_entity(
+        adapter,
+        right,
+        radius_mm=PINCH_CLEARANCE_DIA / 2.0,
+        center_y_mm=PINCH_HEIGHT,
+        label="pinch entry-jaw clearance",
+    )
+    pinch_thread_edge = _circle_entity(
+        adapter,
+        left,
+        radius_mm=PINCH_BORE_DIA / 2.0,
+        center_y_mm=PINCH_HEIGHT,
+        label="pinch opposite-jaw thread",
+    )
     add_native_hole_callout(
         adapter,
         back,
-        edge_xy=(
-            BACK_CENTER[0] + ADJUSTER_BORE_DIA * _S / 2.0,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, BACK_CENTER),
-        ),
+        edge=adjuster_edge,
         callout_xy=(0.356, _elevation_y(ADJUSTER_AXIS_HEIGHT, BACK_CENTER) + 0.012),
         label="blind adjuster thread",
     )
     add_native_hole_callout(
         adapter,
         right,
-        edge_xy=(
-            RIGHT_CENTER[0],
-            _elevation_y(PINCH_HEIGHT, RIGHT_CENTER) + PINCH_CLEARANCE_DIA * _S / 2.0,
-        ),
+        edge=pinch_clearance_edge,
         callout_xy=(0.182, 0.181),
         label="pinch entry-jaw clearance",
         process="DRILL",
@@ -244,10 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         left,
-        edge_xy=(
-            LEFT_CENTER[0],
-            _elevation_y(PINCH_HEIGHT, LEFT_CENTER) + PINCH_BORE_DIA * _S / 2.0,
-        ),
+        edge=pinch_thread_edge,
         callout_xy=(0.254, 0.181),
         label="pinch opposite-jaw thread",
     )
