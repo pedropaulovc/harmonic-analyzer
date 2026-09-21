@@ -135,7 +135,7 @@ DETAIL_SCALE = (3.0, 1.0)
 DETAIL_CENTER = (0.105, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.172, 0.105)
+DETAIL_CAPTION_XY = (0.215, 0.085)
 DETAIL_LETTER_XY = (0.245, 0.100)
 
 
@@ -185,7 +185,7 @@ DETAIL_KEEP = {
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCz": (0.080, 0.090),
-    "PinSeatDia": (0.130, 0.140),
+    "PinSeatDia": (0.045, 0.150),
 }
 SECTION_KEEP = {"PinSeatDepth": (0.395, 0.115)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
@@ -203,24 +203,17 @@ DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
-    "CamReliefParkX": "PARK X FROM Ø6.35 AXIS",
-    "CamReliefParkY": "PARK +Y FROM Ø6.35 AXIS",
-    "CamReliefEngagedX": "ENGAGED X FROM Ø6.35 AXIS",
-    "CamReliefEngagedY": "ENGAGED -Y FROM Ø6.35 AXIS",
+    "CamReliefParkX": "PARK X\nØ6.35 AXIS ORIGIN",
+    "CamReliefParkY": "PARK +Y\nØ6.35 AXIS ORIGIN",
+    "CamReliefEngagedX": "ENGAGED X\nØ6.35 AXIS ORIGIN",
+    "CamReliefEngagedY": "ENGAGED -Y\nØ6.35 AXIS ORIGIN",
     "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE",
     "PinSeatCy": "CAM ENGAGEMENT",
 }
 
 
 def _cam_relief_detail(adapter: Any, front: Any) -> Any:
-    """Enlarge the scallops as a native detail of the face view.
-
-    The fence is sketched in the parent's own sketch space (its
-    ``ModelToSketchTransform``), the way the cylinder-gear notch and the
-    top-frame underside details are, and the detail is then re-centred on its
-    OUTLINE because SolidWorks places a detail by its parent-relative origin,
-    not by the fenced region.
-    """
+    """Enlarge the scallops as a native detail in the parent's sketch space."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(front, "IView")
