@@ -107,15 +107,21 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The one thing the native dimensions cannot say: WHY three shoulder stations
-# print three places (drawing-simplicity policy rule 2: a location requirement
-# names its mate).  The note explains, it does not add a check: acceptance is
-# the title-block .XXX grade on those dimensions, and a note that asked the
-# shop to verify gear faces it has no positions for would be uncheckable
-# (codex, 375a122c).  No digits, no method words.  Lines stay short: the
-# note block starts 58 mm in and the title block begins at 216 mm.
+# What the native dimensions cannot say (drawing-simplicity policy rule 2: a
+# fit or location requirement names its mate).  Line 1-2: the h band on the
+# gear-seat lands is a slip fit into the cone gears' bores -- the gear must
+# pass down the land and seat square before it is soldered, which a land
+# turned to the .XXX grade (+0.13 over a nominal-size bore) would not allow;
+# the acceptance is the printed limits.  Line 3-4: why three shoulder
+# stations print three places.  Neither line adds a check the shop cannot
+# make (codex, 375a122c: a "must fall between the gear faces" clause was
+# uncheckable without gear positions).  No digits but the mate's number, no
+# method words.  Lines stay short: the note block starts 58 mm in and the
+# title block begins at 216 mm.
 DRAWING_NOTES = "\n".join(
     (
+        "GEAR SEAT DIAMETERS ARE A SLIP FIT",
+        "IN THE CONE GEAR BORES, MHA-013.",
         "THREE-PLACE SHOULDER STATIONS LOCATE",
         "THE SOLDERED CONE GEAR SEATS.",
     )
