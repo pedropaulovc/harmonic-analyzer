@@ -202,7 +202,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=bore_finish_edge,
-        symbol_xy=(0.150, 0.190),
+        # Its BORE label stacks upward from the symbol; 0.190 put the label
+        # 4 mm under the boss-station callout's underline (iter4).
+        symbol_xy=(0.150, 0.180),
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
     )
