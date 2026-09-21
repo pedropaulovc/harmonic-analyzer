@@ -21,25 +21,20 @@ The horizontal arm retains the photographed 90-degree bend and axial screw.
 The 1330K524 double-loop eye needs its full axial wire band on the exposed
 shank; the assembly checks both end-face/head clearance and coil clearance.
 
-The screw is modelled INTEGRAL to the post: this repo models small
-captive fasteners as part of their carrier when they never come apart in
-use, and this one is set once and carries the spring for life. Its
-modelled shank is the EXPOSED length (end face to head underside); the
-engaged thread sits inside a 6.0-deep end plug that caps the tube's O12
-bore (the end face is otherwise a 2 mm annulus with nothing on the axis
-for the shank to merge into), so plug + shank + head are ONE stepped
-revolve about the tube axis. The head slot is omitted (a 0.8 x 0.8 slot
-across the head face adds nothing the notes don't carry).
+The released MHA-032 remains one inseparable fabricated part but its physical
+construction is explicit: a bent Ø16 x 2 tube body, a separate AISI 1018 annular
+plug match-turned to the actual tube bore for the BAg-7 capillary clearance, and
+a separate captive #6-32 slotted screw. The plug is 6 mm deep and carries the
+standard Ø2.705 tap-minor envelope. The screw body extends 6 mm into the plug,
+leaves the calibrated 8 mm shank exposed, and carries the Ø12 x 2 head with its
+0.8 x 0.8 slot. These are three native bodies so the joint section retains the
+fabrication interfaces; MHA-032 is still one assembly BOM row.
 
 Layout: part origin at the vertical leg's mid-height; leg y -330..+112.3,
 bend arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -101.8
-(a 50.8 run: the arm end is set so the screw's shank midpoint lands on the
-summing lever's counter anchor, see gooseneck_geom.ARM_END_X),
-end plug x -101.8..-95.8 (mid-wall O14, overlapping the tube wall), shank
-x -101.8..-109.8 (O3.6), and head x -109.8..-111.8 (O12). The enlarged
-head retains the stock double-loop eye without a separate washer.
-The tube is HOLLOW -- O16 x 2.0 wall, matching
-the drawing's tube stock -- so every tube profile is an annulus.
+(a 50.8 run: the arm end sets the spring's calibrated plumb line). The plug
+occupies x -101.8..-95.8 inside the arm, the screw shank x -109.8..-95.8,
+and the head x -111.8..-109.8. The tube remains hollow Ø16 x 2 wall.
 Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
@@ -53,6 +48,7 @@ import math
 import sys
 
 from _common import (
+    _early_bound,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
@@ -62,9 +58,11 @@ from _common import (
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
+    blank_sketch,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -76,6 +74,7 @@ from _common import (
 
 import _telemetry
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -83,8 +82,11 @@ from _drawing_marks import (
 from gooseneck_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ELEVATION_VIEW_NOTE,
+    END_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    JOINT_VIEW_NOTE,
 )
 
 # The form nominals live in gooseneck_geom -- the prose-free module the summing
@@ -95,11 +97,17 @@ from gooseneck_geom import (  # noqa: E402
     ARM_RUN,
     ARM_Y,
     BEND_R,
+    PLUG_BRAZE_RADIAL_CLEARANCE,
+    PLUG_DIA,
     PLUG_T,
     SCREW_HEAD_DIA,
     SCREW_HEAD_T,
-    SCREW_SHANK_DIA,
     SCREW_SHANK_LEN,
+    SCREW_THREAD_MAJOR_DIA,
+    SCREW_SLOT_DEPTH,
+    SCREW_SLOT_W,
+    SCREW_TAP_MINOR_DIA,
+    SCREW_THREAD_ENGAGEMENT,
     TUBE_DIA,
     WALL_T,
 )
@@ -123,25 +131,30 @@ LEG_BOTTOM = -330.0  # leg bottom = machine 880: the post passes through a
 TUBE_R = TUBE_DIA / 2.0
 TUBE_IR = TUBE_R - WALL_T  # hollow bore radius (6.0)
 _RING_AREA = math.pi * (TUBE_R**2 - TUBE_IR**2)  # annular wall cross-section
-PLUG_DIA = TUBE_DIA - WALL_T  # 14: mid-wall, so the plug OVERLAPS the wall by
-# 1.0 instead of sharing the bore's cylindrical face (a curved face needs real
-# overlap to merge; the volume it adds is only the bore fill)
 PLUG_R = PLUG_DIA / 2.0
-SHANK_R = SCREW_SHANK_DIA / 2.0
+TAP_MINOR_R = SCREW_TAP_MINOR_DIA / 2.0
+SHANK_R = SCREW_THREAD_MAJOR_DIA / 2.0
 HEAD_R = SCREW_HEAD_DIA / 2.0
-HEAD_X = ARM_END_X - SCREW_SHANK_LEN  # -109.8: head underside (shoulder)
-SCREW_TIP_X = HEAD_X - SCREW_HEAD_T  # -111.8: head outer face
+HEAD_X = ARM_END_X - SCREW_SHANK_LEN
+SCREW_TIP_X = HEAD_X - SCREW_HEAD_T
 
 
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
 
+def _solid_body_count(adapter) -> int:
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    bodies = adapter._attempt(lambda: part.GetBodies2(0, False), default=None)
+    if bodies is None:
+        raise RuntimeError("gooseneck solid-body census failed")
+    return len(tuple(bodies))
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
-        RevolveParameters,
+        ExtrusionParameters,
         SweepParameters,
     )
 
@@ -154,9 +167,8 @@ async def build(adapter) -> dict[str, str]:
     # 25.4x). Signed coordinates keep their sign in the global; the UNSIGNED
     # distance dims they drive negate them so the equation evaluates positive
     # (a centre/anchor dim at a negative coordinate displays as the magnitude).
-    # Derived spans (ArmY/ArmRun/PlugDia) reference other globals as equation
-    # strings. LegBottom is a feature parameter (start-offset extrude), NOT a
-    # sketch dim, so it is an editable knob that nothing drives.
+    # Derived spans (ArmY/ArmRun) reference other globals as equation strings;
+    # the leg feature's named depth/start dimensions are likewise driven below.
     await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
     await set_global(adapter, "WallT", f"{WALL_T}mm")
     await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
@@ -165,12 +177,19 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmEndX", f"{ARM_END_X}mm")
     await set_global(adapter, "ArmY", '"LegTop" + "BendR"')
     await set_global(adapter, "ArmRun", '-"ArmEndX" - "BendR"')
+    await set_global(adapter, "PlugDia", f"{PLUG_DIA}mm")
     await set_global(adapter, "PlugT", f"{PLUG_T}mm")
-    await set_global(adapter, "PlugDia", '"TubeDia" - "WallT"')
-    await set_global(adapter, "ScrewShankDia", f"{SCREW_SHANK_DIA}mm")
+    await set_global(adapter, "TapMinorDia", f"{SCREW_TAP_MINOR_DIA}mm")
+    await set_global(adapter, "ScrewShankDia", f"{SCREW_THREAD_MAJOR_DIA}mm")
     await set_global(adapter, "ScrewShankLen", f"{SCREW_SHANK_LEN}mm")
+    await set_global(
+        adapter, "ScrewThreadEngagement", f"{SCREW_THREAD_ENGAGEMENT}mm"
+    )
     await set_global(adapter, "ScrewHeadDia", f"{SCREW_HEAD_DIA}mm")
     await set_global(adapter, "ScrewHeadT", f"{SCREW_HEAD_T}mm")
+    await set_global(adapter, "ScrewSlotW", f"{SCREW_SLOT_W}mm")
+    await set_global(adapter, "ScrewSlotDepth", f"{SCREW_SLOT_DEPTH}mm")
+    await set_global(adapter, "ScrewRefY", '"ArmY" + 20mm')
 
     # Per-sketch dim names + drive equations are declared inline at each define_*
     # / record call; their drive jobs collect here and apply in one deferred batch
@@ -210,6 +229,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += leg.apply(adapter, "LegProfile")
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
     name_last_feature(adapter, "Leg")
+    leg_dims = name_dimensions(adapter, "Leg", ["LegLength", "LegStart"])
+    drive_jobs += [
+        (leg_dims[0], '"LegTop" - "LegBottom"'),
+        (leg_dims[1], '"LegBottom"'),
+    ]
     expected = _RING_AREA * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -387,100 +411,220 @@ async def build(adapter) -> dict[str, str]:
     # the same absolute B-rep slack is ~2.3x larger relative to the expectation.
     if abs(vol - expected) > 0.02 * expected:
         raise RuntimeError(f"bend volume {vol:.1f} != {expected:.1f}")
+    nominal_braze_gap = TUBE_IR - PLUG_R
+    if abs(nominal_braze_gap - PLUG_BRAZE_RADIAL_CLEARANCE) > 1e-9:
+        raise RuntimeError(
+            "nominal plug/tube radial gap drifted from the fabrication contract"
+        )
+    if not 0.051 <= nominal_braze_gap <= 0.127:
+        raise RuntimeError(
+            f"nominal BAg-7 surface gap {nominal_braze_gap:g} mm is out of range"
+        )
+    if PLUG_DIA >= 2.0 * TUBE_IR:
+        raise RuntimeError("end plug cannot enter the nominal tube bore")
     expected = vol  # rebase: keep the sweep's B-rep slack out of the screw delta
 
-    # 3. End plug + spring screw: ONE stepped half-profile revolved 360 about
-    # the tube axis (a centreline along X at y = ARM_Y in the Front plane -- no
-    # Right-plane axis-mapping ambiguity). Read from the tube inward-out: the
-    # plug (mid-wall radius, PLUG_T deep INTO the arm from the end face), the
-    # exposed shank (SCREW_SHANK_LEN beyond the end face, toward more negative
-    # x), then the head. The centreline shares the profile's on-axis corners
-    # (exact-coordinate merge, the pin pattern proven live) and carries no dim
-    # of its own. Emission order = per-segment distance dims in line order,
-    # skipping the LAST segment of each direction (closure supplies it): the
-    # plug radius (line0, V), plug depth (line1, H), plug-to-shank step
-    # (line2, V), shank length (line3, H), shank-to-head step (line4, V), head
-    # thickness (line5, H); line6 (V, head radius) and line7 (H, on the axis)
-    # are the skipped closers. THEN the anchor at vertex 0 (the plug's inner
-    # on-axis corner at (ARM_END_X + PLUG_T, ARM_Y)) -- both non-zero, X then
-    # Y, the X driven by its magnitude (the vertex is at negative x).
-    y_axis = ARM_Y
-    y_plug = ARM_Y + PLUG_R
-    y_shank = ARM_Y + SHANK_R
-    y_head = ARM_Y + HEAD_R
-    x_plug_in = ARM_END_X + PLUG_T
-    screw_dims = SketchDims()
-    check("create_sketch end screw", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    check(
-        "end screw centerline",
-        await adapter.add_centerline(SCREW_TIP_X, y_axis, x_plug_in, y_axis),
+    # 3. The arm-end fabrication is three physical bodies in one released part:
+    # bent tube, capillary-clearance plug, and captive screw. The old Ø14 plug
+    # was only Boolean overlap and could not enter the Ø12 tube bore. This
+    # Ø11.85 annular plug leaves 0.075 mm nominal gap per facing surface and keeps
+    # a modeled #6-32 tap-minor passage. The screw retains the calibrated outer
+    # envelope but now includes its 6 mm engagement and a real head slot.
+    if _solid_body_count(adapter) != 1:
+        raise RuntimeError("formed gooseneck tube is not one solid body")
+
+    plug = SketchDims()
+    check("create_sketch end plug", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        ARM_Y,
+        PLUG_R,
+        "end plug",
+        dims=plug,
+        names=("PlugCz", "PlugCy", "PlugDia"),
+        drives=(None, '"ArmY"', '"PlugDia"'),
     )
-    screw_profile = [
-        (x_plug_in, y_axis),
-        (x_plug_in, y_plug),
-        (ARM_END_X, y_plug),
-        (ARM_END_X, y_shank),
-        (HEAD_X, y_shank),
-        (HEAD_X, y_head),
-        (SCREW_TIP_X, y_head),
-        (SCREW_TIP_X, y_axis),
+    await define_circle(
+        adapter,
+        0.0,
+        ARM_Y,
+        TAP_MINOR_R,
+        "plug tap minor",
+        dims=plug,
+        names=("TapCz", "TapCy", "TapMinorDia"),
+        drives=(None, '"ArmY"', '"TapMinorDia"'),
+    )
+    await ensure_fully_defined(adapter, "end plug sketch")
+    check("exit_sketch end plug", await adapter.exit_sketch())
+    name_last_feature(adapter, "EndPlugProfile")
+    drive_jobs += plug.apply(adapter, "EndPlugProfile")
+    extrude_at_offset(adapter, PLUG_T, ARM_END_X, merge_result=False)
+    name_last_feature(adapter, "EndPlug")
+    plug_feature_dims = name_dimensions(
+        adapter, "EndPlug", ["PlugDepth", "PlugStart"]
+    )
+    drive_jobs += [
+        (plug_feature_dims[0], '"PlugT"'),
+        (plug_feature_dims[1], '"ArmEndX"'),
     ]
-    profile = await add_line_chain(adapter, screw_profile)
-    set_sketch_direct_db(adapter, False)
+    if _solid_body_count(adapter) != 2:
+        raise RuntimeError("brazed end plug did not persist as a separate body")
+
+    shank = SketchDims()
+    check("create_sketch spring screw shank", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        ARM_Y,
+        SHANK_R,
+        "spring screw shank",
+        dims=shank,
+        names=("ShankCz", "ShankCy", "ScrewShankDia"),
+        drives=(None, '"ArmY"', '"ScrewShankDia"'),
+    )
+    await ensure_fully_defined(adapter, "spring screw shank sketch")
+    check("exit_sketch spring screw shank", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewShankProfile")
+    drive_jobs += shank.apply(adapter, "ScrewShankProfile")
+    under_head_len = SCREW_THREAD_ENGAGEMENT + SCREW_SHANK_LEN
+    extrude_at_offset(adapter, under_head_len, HEAD_X, merge_result=False)
+    name_last_feature(adapter, "ScrewShank")
+    shank_feature_dims = name_dimensions(
+        adapter, "ScrewShank", ["UnderHeadLength", "ShankStart"]
+    )
+    drive_jobs += [
+        (
+            shank_feature_dims[0],
+            '"ScrewThreadEngagement" + "ScrewShankLen"',
+        ),
+        (shank_feature_dims[1], '"ArmEndX" - "ScrewShankLen"'),
+    ]
+    if _solid_body_count(adapter) != 3:
+        raise RuntimeError("spring screw shank did not persist as a separate body")
+
+    head = SketchDims()
+    check("create_sketch spring screw head", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        0.0,
+        ARM_Y,
+        HEAD_R,
+        "spring screw head",
+        dims=head,
+        names=("HeadCz", "HeadCy", "ScrewHeadDia"),
+        drives=(None, '"ArmY"', '"ScrewHeadDia"'),
+    )
+    await ensure_fully_defined(adapter, "spring screw head sketch")
+    check("exit_sketch spring screw head", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewHeadProfile")
+    drive_jobs += head.apply(adapter, "ScrewHeadProfile")
+    extrude_at_offset(adapter, SCREW_HEAD_T, SCREW_TIP_X)
+    name_last_feature(adapter, "ScrewHead")
+    head_feature_dims = name_dimensions(
+        adapter, "ScrewHead", ["HeadThickness", "HeadStart"]
+    )
+    drive_jobs += [
+        (head_feature_dims[0], '"ScrewHeadT"'),
+        (
+            head_feature_dims[1],
+            '"ArmEndX" - "ScrewShankLen" - "ScrewHeadT"',
+        ),
+    ]
+    if _solid_body_count(adapter) != 3:
+        raise RuntimeError("spring screw head did not merge only with its shank")
+
+    # Hidden model reference: the exposed shank is the spring's functional seat,
+    # so its 8.00 value must be model-owned even though the solid shank is one
+    # continuous 14 mm feature through the tapped plug.
+    exposed_ref_y = ARM_Y + 20.0
+    exposed = SketchDims()
+    check("create_sketch exposed shank reference", await adapter.create_sketch("Front"))
+    exposed_line = check(
+        "exposed shank reference line",
+        await adapter.add_line(HEAD_X, exposed_ref_y, ARM_END_X, exposed_ref_y),
+    )
+    check(
+        "exposed shank reference horizontal",
+        await adapter.add_sketch_constraint(exposed_line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{exposed_line}.start",
+        f"{exposed_line}.end",
+        "horizontal_distance",
+        SCREW_SHANK_LEN,
+        "exposed shank",
+    )
+    exposed.record("ExposedShank", '"ScrewShankLen"')
+    await anchor_point_to_origin(
+        adapter,
+        f"{exposed_line}.start",
+        HEAD_X,
+        exposed_ref_y,
+        "exposed shank reference",
+    )
+    exposed.record("ExposedRefX", '-"ArmEndX" + "ScrewShankLen"')
+    exposed.record("ExposedRefY", '"ScrewRefY"')
+    await ensure_fully_defined(adapter, "exposed shank reference sketch")
+    check("exit_sketch exposed shank reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewStationReference")
+    drive_jobs += exposed.apply(adapter, "ScrewStationReference")
+    blank_sketch(adapter, "ScrewStationReference")
+
+    slot = SketchDims()
+    slot_profile = [
+        (SCREW_TIP_X, ARM_Y - SCREW_SLOT_W / 2.0),
+        (SCREW_TIP_X + SCREW_SLOT_DEPTH, ARM_Y - SCREW_SLOT_W / 2.0),
+        (SCREW_TIP_X + SCREW_SLOT_DEPTH, ARM_Y + SCREW_SLOT_W / 2.0),
+        (SCREW_TIP_X, ARM_Y + SCREW_SLOT_W / 2.0),
+    ]
+    check("create_sketch spring screw slot", await adapter.create_sketch("Front"))
+    slot_lines = await add_line_chain(adapter, slot_profile)
     await define_rectilinear_chain(
         adapter,
-        profile,
-        screw_profile,
-        label="end screw",
-        dims=screw_dims,
-        names=[
-            "PlugRadius",
-            "PlugDepth",
-            "PlugShankStep",
-            "ShankLen",
-            "ShankHeadStep",
-            "HeadThick",
-            "ScrewAnchorX",
-            "ScrewAnchorY",
-        ],
-        drives=[
-            '"PlugDia" / 2',
-            '"PlugT"',
-            '"PlugDia" / 2 - "ScrewShankDia" / 2',
-            '"ScrewShankLen"',
-            '"ScrewHeadDia" / 2 - "ScrewShankDia" / 2',
-            '"ScrewHeadT"',
-            '-"ArmEndX" - "PlugT"',
-            '"ArmY"',
-        ],
+        slot_lines,
+        slot_profile,
+        label="spring screw slot",
+        dims=slot,
+        names=("SlotDepth", "SlotWidth", None, None),
+        drives=('"ScrewSlotDepth"', '"ScrewSlotW"', None, None),
     )
-    await ensure_fully_defined(adapter, "end screw sketch")
-    check("exit_sketch end screw", await adapter.exit_sketch())
-    name_last_feature(adapter, "EndScrewProfile")
-    drive_jobs += screw_dims.apply(adapter, "EndScrewProfile")
+    await ensure_fully_defined(adapter, "spring screw slot sketch")
+    check("exit_sketch spring screw slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "ScrewSlotProfile")
+    drive_jobs += slot.apply(adapter, "ScrewSlotProfile")
     check(
-        "revolve end screw",
-        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        "cut spring screw slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * HEAD_R + 2.0, both_directions=True)
+        ),
     )
-    name_last_feature(adapter, "EndScrew")
-    # Added material: the plug fills only the BORE (its mid-wall overlap band
-    # r 6..7 is already tube wall), then the solid shank and head outside the
-    # end face. The plug/end-face boundary is coplanar with the tube's annular
-    # end face over r 6..7 -- a planar coincidence the union merges cleanly.
-    v_plug = math.pi * TUBE_IR**2 * PLUG_T
-    v_shank = math.pi * SHANK_R**2 * SCREW_SHANK_LEN
+    name_last_feature(adapter, "ScrewSlot")
+    if _solid_body_count(adapter) != 3:
+        raise RuntimeError("spring screw slot changed the three-body fabrication")
+
+    v_plug = math.pi * (PLUG_R**2 - TAP_MINOR_R**2) * PLUG_T
+    v_shank = math.pi * SHANK_R**2 * under_head_len
     v_head = math.pi * HEAD_R**2 * SCREW_HEAD_T
-    v_screw = v_plug + v_shank + v_head
+    half_slot = SCREW_SLOT_W / 2.0
+    slot_strip_area = 2.0 * (
+        half_slot * math.sqrt(HEAD_R**2 - half_slot**2)
+        + HEAD_R**2 * math.asin(half_slot / HEAD_R)
+    )
+    v_slot = slot_strip_area * SCREW_SLOT_DEPTH
+    v_fabrication = v_plug + v_shank + v_head - v_slot
     before = expected
     vol = await _volume(adapter)
     added = vol - before
     _telemetry.info(
-        f"volume after end screw: {vol:.1f} mm^3 (+{added:.1f}, analytic {v_screw:.1f}:"
-        f" plug {v_plug:.1f} + shank {v_shank:.1f} + head {v_head:.1f})"
+        f"volume after plug + captive screw: {vol:.1f} mm^3 "
+        f"(+{added:.1f}, analytic {v_fabrication:.1f})"
     )
-    if abs(added - v_screw) > 0.02 * v_screw:
-        raise RuntimeError(f"end screw: added {added:.1f}, expected ~{v_screw:.1f}")
+    if abs(added - v_fabrication) > 0.02 * v_fabrication:
+        raise RuntimeError(
+            f"plug + captive screw: added {added:.1f}, expected ~{v_fabrication:.1f}"
+        )
     final_vol = vol
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
@@ -493,17 +637,22 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
+    if _solid_body_count(adapter) != 3:
+        raise RuntimeError("driven gooseneck did not retain tube/plug/screw bodies")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
             "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+            "Joint View Note": JOINT_VIEW_NOTE,
             "Elevation View Note": ELEVATION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },

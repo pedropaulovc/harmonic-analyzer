@@ -46,6 +46,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
     {
         "draw_boss_hook.py",
         "draw_counter_spring.py",
+        "draw_gooseneck.py",
         "draw_harmonic_base.py",
         "draw_knife_hanger_stud.py",
         "draw_knife_hanger_washer.py",
