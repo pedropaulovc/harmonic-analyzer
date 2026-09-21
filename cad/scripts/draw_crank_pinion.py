@@ -196,12 +196,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Whole-model import for the side view (the crankshaft's JournalStart
+    # idiom): the targeted path selects a dimension's owner as a SKETCH or a
+    # BODYFEATURE, and PinStation's owner is a reference PLANE, which it cannot
+    # address (farm leaf 2026-09-21T13:51Z). The keep set still prunes the rest.
     right_annotations = curate_view_dimensions(
-        adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
