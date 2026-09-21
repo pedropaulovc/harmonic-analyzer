@@ -106,6 +106,7 @@ from _common import (
     apply_custom_properties,
     apply_material,
     check,
+    define_circle,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -1148,59 +1149,74 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
         )
 
 
-    tip_radius_mm = facts["Ra"] * 25.4
-    blank_sketch_name = check(
-        "T006 control create blank sketch",
-        await adapter.create_sketch("Front"),
-    )
-    active_sketch = model.GetActiveSketch2()
-    active_sketch_name = (
-        str(active_sketch.Name) if active_sketch is not None else None
-    )
-    sketch_manager = adapter.currentSketchManager
-    add_to_db_before = bool(sketch_manager.AddToDB)
-    _telemetry.info(
-        "T006 control blank authoring: "
-        f"reported_sketch={blank_sketch_name!r}, "
-        f"active_sketch={active_sketch_name!r}, "
-        f"radius_mm={tip_radius_mm!r}, "
-        f"AddToDB_before={add_to_db_before}"
-    )
-    if active_sketch_name != blank_sketch_name:
-        raise RuntimeError(
-            "T006 control active sketch mismatch before blank circle: "
-            f"{active_sketch_name!r} != {blank_sketch_name!r}"
+    async def create_control_circle_sketch(
+        radius_mm: float,
+        label: str,
+    ) -> None:
+        reported_sketch = check(
+            f"T006 control create {label} sketch",
+            await adapter.create_sketch("Front"),
         )
-    set_sketch_direct_db(adapter, True)
-    if not bool(sketch_manager.AddToDB):
-        raise RuntimeError("T006 control failed to enable AddToDB")
-    try:
-        blank_circle = check(
-            "T006 control add blank circle",
-            await adapter.add_circle(0.0, 0.0, tip_radius_mm),
+        active_sketch = model.GetActiveSketch2()
+        active_sketch_name = (
+            str(active_sketch.Name) if active_sketch is not None else None
         )
-    finally:
-        set_sketch_direct_db(adapter, add_to_db_before)
-        add_to_db_restored = bool(sketch_manager.AddToDB)
+        sketch_manager = adapter.currentSketchManager
+        add_to_db_before = bool(sketch_manager.AddToDB)
         _telemetry.info(
-            "T006 control blank authoring restored: "
-            f"AddToDB_after={add_to_db_restored}"
+            f"T006 control {label} authoring: "
+            f"reported_sketch={reported_sketch!r}, "
+            f"active_sketch={active_sketch_name!r}, "
+            f"radius_mm={radius_mm!r}, "
+            f"AddToDB_before={add_to_db_before}"
         )
-        if add_to_db_restored != add_to_db_before:
+        if active_sketch_name != reported_sketch:
             raise RuntimeError(
-                "T006 control did not restore AddToDB after blank circle"
+                f"T006 control active {label} sketch mismatch: "
+                f"{active_sketch_name!r} != {reported_sketch!r}"
             )
-    check(
-        "T006 control blank diameter",
-        await adapter.add_sketch_dimension(
-            blank_circle,
-            None,
-            "diameter",
-            2.0 * tip_radius_mm,
-        ),
-    )
-    await ensure_fully_defined(adapter, "T006 pattern-control blank sketch")
-    check("T006 control exit blank sketch", await adapter.exit_sketch())
+        try:
+            await define_circle(
+                adapter,
+                0.0,
+                0.0,
+                radius_mm,
+                f"T006 control {label}",
+            )
+        finally:
+            add_to_db_after = bool(sketch_manager.AddToDB)
+            active_sketch_after = model.GetActiveSketch2()
+            active_sketch_name_after = (
+                str(active_sketch_after.Name)
+                if active_sketch_after is not None
+                else None
+            )
+            _telemetry.info(
+                f"T006 control {label} authoring restored: "
+                f"active_sketch={active_sketch_name_after!r}, "
+                f"radius_mm={radius_mm!r}, "
+                f"AddToDB_after={add_to_db_after}"
+            )
+            if active_sketch_name_after != reported_sketch:
+                raise RuntimeError(
+                    f"T006 control active {label} sketch changed: "
+                    f"{active_sketch_name_after!r} != {reported_sketch!r}"
+                )
+            if add_to_db_after != add_to_db_before:
+                raise RuntimeError(
+                    f"T006 control {label} did not restore AddToDB"
+                )
+        await ensure_fully_defined(
+            adapter,
+            f"T006 pattern-control {label} sketch",
+        )
+        check(
+            f"T006 control exit {label} sketch",
+            await adapter.exit_sketch(),
+        )
+
+    tip_radius_mm = facts["Ra"] * 25.4
+    await create_control_circle_sketch(tip_radius_mm, "blank")
     name_last_feature(adapter, "T006ControlBlankProfile")
     check(
         "T006 control extrude blank",
@@ -1209,22 +1225,7 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
     name_last_feature(adapter, "T006ControlBlank")
 
     bore_radius_mm = bore_dia_in(teeth) * 12.7
-    check("T006 control create bore sketch", await adapter.create_sketch("Front"))
-    bore_circle = check(
-        "T006 control add bore circle",
-        await adapter.add_circle(0.0, 0.0, bore_radius_mm),
-    )
-    check(
-        "T006 control bore diameter",
-        await adapter.add_sketch_dimension(
-            bore_circle,
-            None,
-            "diameter",
-            2.0 * bore_radius_mm,
-        ),
-    )
-    await ensure_fully_defined(adapter, "T006 pattern-control bore sketch")
-    check("T006 control exit bore sketch", await adapter.exit_sketch())
+    await create_control_circle_sketch(bore_radius_mm, "bore")
     name_last_feature(adapter, "T006ControlBoreProfile")
     check(
         "T006 control cut bore",
@@ -1422,22 +1423,28 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     _activate_configuration(model, configuration)
     cold = await _t006_pattern_control_state(adapter, phase="cold")
-    if not bool(model.ForceRebuild3(False)):
-        raise RuntimeError("T006 pattern-control post-open rebuild failed")
-    rebuilt = await _t006_pattern_control_state(adapter, phase="rebuilt")
+    edit_rebuild_ok = bool(model.EditRebuild3())
+    edited = await _t006_pattern_control_state(adapter, phase="edit-rebuilt")
+    force_rebuild_ok = bool(model.ForceRebuild3(False))
+    forced = await _t006_pattern_control_state(adapter, phase="force-rebuilt")
     cold_matches = _t006_pattern_states_match(cold, reference)
-    rebuilt_matches = _t006_pattern_states_match(rebuilt, reference)
+    edited_matches = _t006_pattern_states_match(edited, reference)
+    forced_matches = _t006_pattern_states_match(forced, reference)
     _telemetry.info(
         "T006 pattern-control comparisons: "
-        f"cold_matches={cold_matches}, rebuilt_matches={rebuilt_matches}, "
-        f"reference={reference!r}, cold={cold!r}, rebuilt={rebuilt!r}"
+        f"EditRebuild3={edit_rebuild_ok}, ForceRebuild3={force_rebuild_ok}, "
+        f"cold_matches={cold_matches}, edited_matches={edited_matches}, "
+        f"forced_matches={forced_matches}, reference={reference!r}, "
+        f"cold={cold!r}, edited={edited!r}, forced={forced!r}"
     )
     if cold_matches:
-        verdict = "cold-and-rebuilt-clean"
-    elif rebuilt_matches:
-        verdict = "cold-stale-rebuilt-clean"
+        verdict = "cold-edit-force-clean"
+    elif edited_matches:
+        verdict = "cold-stale-edit-clean"
+    elif forced_matches:
+        verdict = "cold-and-edit-stale-force-clean"
     else:
-        verdict = "cold-and-rebuilt-invalid"
+        verdict = "cold-edit-force-invalid"
     raise RuntimeError(
         f"diagnostic complete: exact single-config T006 pattern {verdict}; "
         "refusing to publish probe artefacts"
