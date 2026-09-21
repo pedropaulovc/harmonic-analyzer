@@ -276,7 +276,13 @@ def _cam_relief_detail(adapter: Any, front: Any) -> Any:
 
 
 def _overall_reference(adapter: Any, left: Any) -> None:
-    """The (43.0) overall between the flank's top and bottom edges."""
+    """The (43.0) overall between the flank's top and bottom runs.
+
+    Both end caps are half-cylinders whose axes run through the bar, so the
+    flank shows each as a SILHOUETTE line, not a model edge (the cap's own
+    edges are the two arcs on the faces): an EDGE pick there finds nothing
+    (farm iter9).
+    """
     display = add_edge_dimension(
         adapter,
         left,
@@ -285,6 +291,7 @@ def _overall_reference(adapter: Any, left: Any) -> None:
         text_xy=OVERALL_XY,
         label="overall length reference",
         orientation="vertical",
+        entity_type="SILHOUETTE",
     )
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
