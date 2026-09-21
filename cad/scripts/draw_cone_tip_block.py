@@ -10,9 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_native_hole_callout,
-    add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
@@ -21,11 +19,9 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
-    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hole_callout_precision,
-    set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -35,16 +31,13 @@ from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
     BLOCK_HEIGHT,
-    BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
-    DRAWING_REFERENCE_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
     SHAFT_PASSAGE_DIA,
-    SLIT_W,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
@@ -80,29 +73,25 @@ def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _elevation_y(0.0, FRONT_CENTER) - 0.012),
     "BlockHt": (FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
-    "PassageDiaDim": (
-        FRONT_CENTER[0] + 0.068,
-        _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
-    ),
-    "PassageZ": (
-        FRONT_CENTER[0] - 0.045,
-        _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, FRONT_CENTER),
-    ),
     "SlitW": (FRONT_CENTER[0], _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.014),
 }
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
 SECTION_KEEP = {
     "PinchRise": (
-        SECTION_CENTER[0] - 0.060,
+        SECTION_CENTER[0] + 0.060,
         _elevation_y(
             (ADJUSTER_AXIS_HEIGHT + PINCH_HEIGHT) / 2.0,
             SECTION_CENTER,
         ),
     )
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP = {
+    "PinchDepthCenter": (
+        RIGHT_CENTER[0],
+        _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.012,
+    )
+}
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
-BACK_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {"PassageDiaDim": "THRU - CLEARANCE PASSAGE"}
 
 
@@ -194,43 +183,6 @@ def _unique_entry_circle(
         )
     return matches[0]
 
-def _vertical_outline_edge(
-    view: Any,
-    *,
-    coordinate_axis: int,
-    coordinate_mm: float,
-    label: str,
-) -> Any:
-    """Resolve one finished vertical face edge by model-space coordinate."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
-            continue
-        p0 = tuple(
-            float(value) * 1000.0
-            for value in _early_bound(start, "IVertex").GetPoint()
-        )
-        p1 = tuple(
-            float(value) * 1000.0
-            for value in _early_bound(end, "IVertex").GetPoint()
-        )
-        if (
-            abs(p0[coordinate_axis] - coordinate_mm) > 0.01
-            or abs(p1[coordinate_axis] - coordinate_mm) > 0.01
-        ):
-            continue
-        span = abs(p1[1] - p0[1])
-        if span > 0.01:
-            candidates.append((span, edge))
-    if not candidates:
-        raise RuntimeError(
-            f"{label} has no vertical edge at model coordinate "
-            f"{coordinate_mm:.3f} mm"
-        )
-    return max(candidates, key=lambda item: item[0])[1]
 
 _COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
 
@@ -271,36 +223,6 @@ def _hide_section_cosmetic_threads(adapter: Any, view: Any) -> int:
     return hidden
 
 
-def _add_reference_location(
-    adapter: Any,
-    view: Any,
-    *,
-    face_xy: tuple[float, float],
-    face: Any,
-    circle_xy: tuple[float, float],
-    circle: Any,
-    text_xy: tuple[float, float],
-    label: str,
-) -> Any:
-    """Restate a model-owned centred feature from one finished face."""
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=face_xy,
-        p1=circle_xy,
-        text_xy=text_xy,
-        orientation="horizontal",
-        entity_types=("EDGE", "EDGE"),
-        entities=(face, circle),
-        label=label,
-    )
-    set_arc_endpoints_to_center(adapter, display, label=label)
-    annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
-    display = set_reference_dimension(adapter, annotation, label=label)
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
-        raise RuntimeError(f"{label}: reference precision did not persist")
-    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -366,10 +288,63 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, section)
 
+    adjuster_view, adjuster_center, adjuster_edge = _unique_entry_circle(
+        adapter,
+        ((front, FRONT_CENTER), (back, BACK_CENTER)),
+        radius_mm=ADJUSTER_BORE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="blind adjuster thread",
+    )
+    if adjuster_view is front:
+        passage_view, passage_center = back, BACK_CENTER
+    else:
+        passage_view, passage_center = front, FRONT_CENTER
+    passage_edge = _circle_entity(
+        adapter,
+        passage_view,
+        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="shaft clearance passage",
+    )
+    pinch_clearance_edge = _circle_entity(
+        adapter,
+        right,
+        radius_mm=PINCH_CLEARANCE_DIA / 2.0,
+        center_y_mm=PINCH_HEIGHT,
+        label="pinch entry-jaw clearance",
+    )
+    pinch_thread_edge = _circle_entity(
+        adapter,
+        left,
+        radius_mm=PINCH_BORE_DIA / 2.0,
+        center_y_mm=PINCH_HEIGHT,
+        label="pinch opposite-jaw thread",
+    )
+    front_keep = dict(FRONT_KEEP)
+    back_keep: dict[str, tuple[float, float]] = {}
+    passage_keep = {
+        "PassageDiaDim": (
+            passage_center[0] + 0.040,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center) - 0.012,
+        ),
+        "PassageZ": (
+            passage_center[0] - 0.045,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, passage_center),
+        ),
+        "PassageCenter": (
+            passage_center[0],
+            _elevation_y(BLOCK_HEIGHT, passage_center) + 0.012,
+        ),
+    }
+    if passage_view is front:
+        front_keep.update(passage_keep)
+    else:
+        back_keep.update(passage_keep)
+
     front_annotations = curate_view_dimensions(
         adapter,
         front,
-        keep=FRONT_KEEP,
+        keep=front_keep,
         view_label="passage entry elevation",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -404,7 +379,7 @@ async def build(adapter: Any) -> dict[str, str]:
     back_annotations = curate_view_dimensions(
         adapter,
         back,
-        keep=BACK_KEEP,
+        keep=back_keep,
         view_label="adjuster threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -428,83 +403,6 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
 
-    adjuster_view, adjuster_center, adjuster_edge = _unique_entry_circle(
-        adapter,
-        ((front, FRONT_CENTER), (back, BACK_CENTER)),
-        radius_mm=ADJUSTER_BORE_DIA / 2.0,
-        center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="blind adjuster thread",
-    )
-    if adjuster_view is front:
-        passage_view, passage_center = back, BACK_CENTER
-    else:
-        passage_view, passage_center = front, FRONT_CENTER
-    passage_edge = _circle_entity(
-        adapter,
-        passage_view,
-        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
-        center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="shaft clearance passage",
-    )
-    pinch_clearance_edge = _circle_entity(
-        adapter,
-        right,
-        radius_mm=PINCH_CLEARANCE_DIA / 2.0,
-        center_y_mm=PINCH_HEIGHT,
-        label="pinch entry-jaw clearance",
-    )
-    pinch_thread_edge = _circle_entity(
-        adapter,
-        left,
-        radius_mm=PINCH_BORE_DIA / 2.0,
-        center_y_mm=PINCH_HEIGHT,
-        label="pinch opposite-jaw thread",
-    )
-    passage_side_face = _vertical_outline_edge(
-        passage_view,
-        coordinate_axis=0,
-        coordinate_mm=-BLOCK_X / 2.0,
-        label="shaft-entry left finished face",
-    )
-    right_depth_face = _vertical_outline_edge(
-        right,
-        coordinate_axis=2,
-        coordinate_mm=-BLOCK_Z / 2.0,
-        label="right depth finished face",
-    )
-    _add_reference_location(
-        adapter,
-        passage_view,
-        face_xy=(
-            passage_center[0] - BLOCK_X * _S / 2.0,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center),
-        ),
-        face=passage_side_face,
-        circle_xy=(
-            passage_center[0] - SHAFT_PASSAGE_DIA * _S / 2.0,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center),
-        ),
-        circle=passage_edge,
-        text_xy=(passage_center[0] - 0.007, 0.172),
-        label="adjuster and slot width-centre reference",
-    )
-    _add_reference_location(
-        adapter,
-        right,
-        face_xy=(
-            RIGHT_CENTER[0] - BLOCK_Z * _S / 2.0,
-            _elevation_y(PINCH_HEIGHT, RIGHT_CENTER),
-        ),
-        face=right_depth_face,
-        circle_xy=(
-            RIGHT_CENTER[0],
-            _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
-            + PINCH_CLEARANCE_DIA * _S / 2.0,
-        ),
-        circle=pinch_clearance_edge,
-        text_xy=(RIGHT_CENTER[0] - 0.006, 0.181),
-        label="pinch depth-centre reference",
-    )
     adjuster_callout = add_native_hole_callout(
         adapter,
         adjuster_view,
@@ -524,7 +422,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.182, 0.197),
+        callout_xy=(0.190, 0.152),
         label="pinch entry-jaw clearance",
         process="DRILL",
     )
@@ -543,7 +441,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023),
         ("ADJUSTER ENTRY", adjuster_center[0] - 0.021),
     ):
-        if add_note(adapter, text, x, 0.080) is None:
+        if add_note(adapter, text, x, 0.066) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
     if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.260) is None:
         raise RuntimeError("failed to orient the section shaft side")
@@ -555,12 +453,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=foot_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.028, _elevation_y(0.0, FRONT_CENTER) - 0.006),
+        symbol_xy=(FRONT_CENTER[0] + 0.034, _elevation_y(0.0, FRONT_CENTER) + 0.008),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
+        char_height=0.003,
         label="swing-platform locating foot seat",
-    )
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.020, 0.060, char_height=0.0025
     )
 
     # Annotation insertion can regenerate a view with inherited display state;

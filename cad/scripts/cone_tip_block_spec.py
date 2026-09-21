@@ -84,12 +84,31 @@ WORST_TOP_LIGAMENT_MM = (
     - _worst_pinch_height
     - _worst_clearance_radius
 )
+_worst_adjuster_side_ligament = (
+    round(BLOCK_X, 1)
+    - _GENERAL_1PL_MM
+    - (round(BLOCK_X / 2.0, 1) + _GENERAL_1PL_MM)
+    - _adjuster_major_radius
+)
+_worst_pinch_depth_ligament = (
+    round(BLOCK_Z, 1)
+    - _GENERAL_1PL_MM
+    - (round(BLOCK_Z / 2.0, 1) + _GENERAL_1PL_MM)
+    - _worst_clearance_radius
+)
+MIN_SIDE_LIGAMENT_MM = 0.50
+WORST_ADJUSTER_SIDE_LIGAMENT_MM = _worst_adjuster_side_ligament
+WORST_PINCH_DEPTH_LIGAMENT_MM = _worst_pinch_depth_ligament
 if WORST_CLEARANCE_TO_ADJUSTER_MM < MIN_CLEARANCE_TO_ADJUSTER_MM:
     raise AssertionError("pinch clearance envelope can cut the adjuster thread")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
 if WORST_TOP_LIGAMENT_MM < MIN_TOP_LIGAMENT_MM:
     raise AssertionError("pinch clearance can break through the block top")
+if WORST_ADJUSTER_SIDE_LIGAMENT_MM < MIN_SIDE_LIGAMENT_MM:
+    raise AssertionError("general passage-centre band can break out an adjuster side")
+if WORST_PINCH_DEPTH_LIGAMENT_MM < MIN_SIDE_LIGAMENT_MM:
+    raise AssertionError("general pinch-depth band can break out a block side")
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
@@ -101,6 +120,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},
     "Block": {"BlockHt"},
     "PassageProfile": {"PassageDiaDim", "PassageZ"},
+    "PassageCenterReference": {"PassageCenter"},
+    "PinchDepthReference": {"PinchDepthCenter"},
     "PinchRiseReference": {"PinchRise"},
     "SlitProfile": {"SlitW"},
 }
@@ -112,10 +133,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": 1, "Depth": 1},
     "Block": {"BlockHt": 1},
     "PassageProfile": {"PassageDiaDim": 2, "PassageZ": 2},
+    "PassageCenterReference": {"PassageCenter": 1},
+    "PinchDepthReference": {"PinchDepthCenter": 1},
     "PinchRiseReference": {"PinchRise": 2},
     "SlitProfile": {"SlitW": 2},
 }
-DRAWING_REFERENCE_PRECISION = 1
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -132,11 +154,4 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
             f"DRAWING_PRECISION names unmarked {_feature} dimensions: {_unmarked}"
         )
 
-DRAWING_NOTES = "\n".join(
-    (
-        "SHAFT PASSAGE IS CLEARANCE ONLY; NOT A BEARING SURFACE.",
-        "PINCH SCREW CLEARS ENTRY JAW AND THREADS OPPOSITE JAW.",
-        "ADJUSTER THREAD IS INTERRUPTED BY THE CLAMP SLOT.",
-        "ADJUSTER, SLOT AND PINCH AXES LIE ON THE SHOWN CENTRELINES.",
-    )
-)
+DRAWING_NOTES = ""

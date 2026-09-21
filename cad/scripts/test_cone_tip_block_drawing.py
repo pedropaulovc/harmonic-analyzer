@@ -72,6 +72,14 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
         cone_tip_block_spec.WORST_TOP_LIGAMENT_MM
         >= cone_tip_block_spec.MIN_TOP_LIGAMENT_MM
     )
+    assert (
+        cone_tip_block_spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM
+        >= cone_tip_block_spec.MIN_SIDE_LIGAMENT_MM
+    )
+    assert (
+        cone_tip_block_spec.WORST_PINCH_DEPTH_LIGAMENT_MM
+        >= cone_tip_block_spec.MIN_SIDE_LIGAMENT_MM
+    )
     tap_bottom = part.PINCH_BORE_Y - part.PINCH_BORE_DIA / 2.0
     assert cone_tip_block_spec.SLIT_FLOOR <= tap_bottom
 
