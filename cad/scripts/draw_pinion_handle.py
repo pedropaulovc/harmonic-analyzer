@@ -105,7 +105,7 @@ RIGHT_KEEP = {
 }
 TOP_KEEP = {
     "RodHoleDia": (0.104, 0.215),
-    "CapR": (0.035, 0.270),
+    "CapR": (0.020, 0.255),
     "RodHoleZ": (0.122, 0.223),
     "RetentionHoleDia": (0.177, 0.250),
     "RetentionPinFromMouth": (0.145, 0.223),
