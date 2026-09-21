@@ -31,6 +31,7 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
+    check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -300,6 +301,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (profile, feature, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
         adapter,
