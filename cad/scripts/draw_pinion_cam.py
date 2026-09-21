@@ -72,10 +72,10 @@ SHEET_SCALE = (3.0, 1.0)
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.140)
 # Third angle: the right-side boss profile projects to the right of the front
-# view; its separated label makes it unambiguous when read away from that axis.
-SIDE_CENTER = (0.220, 0.140)
-ISO_CENTER = (0.350, 0.175)
-BOTTOM_CENTER = (0.270, 0.185)
+# view.  Its rotated boss-end view projects below it at sheet scale.
+SIDE_CENTER = (0.260, 0.140)
+ISO_CENTER = (0.365, 0.155)
+BOTTOM_CENTER = (0.260, 0.085)
 
 def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
@@ -103,22 +103,17 @@ SIDE_KEEP = {
     "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
 }
 BOTTOM_KEEP = {
-    "BossDia": (0.312, 0.218),
-    "BossCz": (0.235, 0.225),
+    "BossDia": (0.320, 0.105),
+    "BossCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": (
-        "REAM THRU\n"
-        "0.010-0.045 DIAMETRAL CLEARANCE\n"
-        f"ON LIFT ROD {LIFT_ROD_NUMBER}\n"
-        "LOCK AFTER POSITIONING"
-    ),
+    "BoreDia": f"REAM THRU\nSLIDE FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
     "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
     "BossProjection": "RAISED BOSS PROJECTION (REF)",
     "BossDia": (
-        "M2.5 X 0.45-6H THRU TO BORE\n"
         "COSMETIC RAISED BOSS;\n"
-        "SIZE/SHAPE NONCRITICAL"
+        "SIZE/SHAPE NONCRITICAL\n"
+        "M2.5 X 0.45-6H THRU TO BORE"
     ),
     "BossCz": "BOSS AXIS STATION",
 }
@@ -193,7 +188,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(3, 1))
-    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(2, 1))
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(3, 1))
     # The built-in isometric looks from +Y, which hides the set-screw boss --
     # the part's one additional feature -- behind the collar, because the boss
     # points at -Y.  The FRONT-BOTTOM-RIGHT octant the PART names shows the
@@ -222,7 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front_annotations,
         {"CollarCy", "BossProjection"},
-        0.025,
+        0.008,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # The boss dome is cosmetic: its diameter and projection communicate
@@ -269,11 +264,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    if add_note(adapter, "RIGHT-SIDE VIEW", 0.185, 0.205) is None:
+    if add_note(adapter, "RIGHT-SIDE VIEW", 0.225, 0.210) is None:
         raise RuntimeError("failed to label cam right-side view")
-    if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.164) is None:
-        raise RuntimeError("failed to label cam boss end view")
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.135)
+    if add_note(adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.215, 0.065) is None:
+        raise RuntimeError("failed to label rotated cam boss end view")
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
 
     return await finalize_drawing(
         adapter,

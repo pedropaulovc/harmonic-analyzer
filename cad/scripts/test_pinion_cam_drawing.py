@@ -85,8 +85,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     )
     assert pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "0.010-0.045 DIAMETRAL CLEARANCE" in bore
-    assert "LOCK AFTER POSITIONING" in bore
+    assert "SLIDE FIT" in bore
+    assert "DIAMETRAL CLEARANCE" not in bore
+    assert "LOCK AFTER POSITIONING" not in bore
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
