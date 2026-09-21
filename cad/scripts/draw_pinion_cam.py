@@ -18,7 +18,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -71,9 +71,9 @@ SHEET_SCALE = (3.0, 1.0)
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.140)
-# Third angle: the boss-profile view sits above the circular view, so the body
-# and bore axes project vertically between them.
-SIDE_CENTER = (0.105, 0.217)
+# Third angle: the right-side boss profile projects to the right of the front
+# view; its separated label makes it unambiguous when read away from that axis.
+SIDE_CENTER = (0.220, 0.140)
 ISO_CENTER = (0.350, 0.175)
 BOTTOM_CENTER = (0.270, 0.185)
 
@@ -99,26 +99,52 @@ FRONT_KEEP = {
     "BossProjection": (0.180, 0.112),
 }
 SIDE_KEEP = {
-    "Depth": (0.062, 0.217),
-    "CollarOd": (0.105, 0.190),
+    "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.040),
+    "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
 }
 BOTTOM_KEEP = {
     "BossDia": (0.312, 0.218),
     "BossCz": (0.235, 0.225),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
-    "BossProjection": "RAISED BOSS PROJECTION (REF)",
-    "BossDia": (
-        "COSMETIC RAISED SET-SCREW BOSS REQUIRED\n"
-        "M2.5 X 0.45-6H THRU TO BORE"
+    "BoreDia": (
+        "REAM THRU\n"
+        "0.010-0.045 DIAMETRAL CLEARANCE\n"
+        f"ON LIFT ROD {LIFT_ROD_NUMBER}\n"
+        "LOCK AFTER POSITIONING"
     ),
+    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
+    "BossProjection": "OPTIONAL BOSS PROJECTION (REF)",
+    "BossDia": "M2.5 X 0.45-6H THRU TO BORE\nCOSMETIC BOSS OPTIONAL",
     "BossCz": "BOSS AXIS STATION",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity, one
 # everywhere else.  The sheet only reads them back.
+
+
+def _limit_witness_lines(
+    adapter: Any, annotations: list[Any], names: set[str], length: float
+) -> None:
+    """Keep long axis witnesses from running through the circular profile."""
+    remaining = set(names)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        native_annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(
+            native_annotation.GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.MaxWitnessLineLength = float(length)
+        if abs(float(display.MaxWitnessLineLength) - length) > 1e-9:
+            raise RuntimeError(f"{name}: maximum witness-line length did not persist")
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(
+            f"missing dimensions for witness-line limits: {sorted(remaining)!r}"
+        )
+    adapter.currentModel.GraphicsRedraw2()
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -188,6 +214,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*bottom_annotations, *front_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _limit_witness_lines(
+        adapter,
+        front_annotations,
+        {"CollarCy", "BossProjection"},
+        0.025,
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # The boss dome is cosmetic: its diameter and projection communicate
     # nominal shape, but neither controls the functional M2.5 thread, which
@@ -215,29 +247,26 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to boss end view")
 
-    # Bore roughness: picked on the bore's upper-right rim and carried up-right
-    # -- the one quadrant of the circular view no other annotation uses, now
-    # that the OD is dimensioned on the length view and the bore diameter's
-    # diagonal runs up-left.
+    # Bore roughness: use the lower-left bore rim and a small, routine callout
+    # below the circular view so it cannot dominate or cross the dimensions.
     bore_center = (FRONT_CENTER[0], _front_y(0.0))
     bore_finish_edge = (
-        bore_center[0] + BORE_R_SHEET * _SQRT_HALF,
-        bore_center[1] + BORE_R_SHEET * _SQRT_HALF,
+        bore_center[0] - BORE_R_SHEET * _SQRT_HALF,
+        bore_center[1] - BORE_R_SHEET * _SQRT_HALF,
     )
     add_surface_finish(
         adapter,
         front,
         edge_xy=bore_finish_edge,
-        # Its BORE label stacks upward from the symbol; 0.190 put the label
-        # 4 mm under the boss-station callout's underline (iter4).
-        symbol_xy=(0.150, 0.170),
+        symbol_xy=(0.055, 0.105),
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
+        char_height=0.0025,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    if add_note(adapter, "BOSS PROFILE VIEW", 0.055, 0.252) is None:
-        raise RuntimeError("failed to label cam boss-profile view")
+    if add_note(adapter, "RIGHT-SIDE VIEW", 0.185, 0.205) is None:
+        raise RuntimeError("failed to label cam right-side view")
     if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.164) is None:
         raise RuntimeError("failed to label cam boss end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.135)

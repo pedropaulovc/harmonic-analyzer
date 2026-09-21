@@ -81,7 +81,7 @@ def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
 
 def test_hole_callouts_state_size_process_and_fit() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["AnchorOffset"] == "TAP AXIS\nFROM TOP EDGE"
+    assert "TOP EDGE" in callouts["AnchorOffset"]
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
     assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]

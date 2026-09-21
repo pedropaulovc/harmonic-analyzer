@@ -218,13 +218,30 @@ def _point(
         label="handle dimension pick",
     )
 
-def _shorten_radius_leader(adapter: Any, annotation: Any) -> None:
-    """Stop the spherical-radius leader before it crosses the handle holes."""
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+def _shorten_radius_leader(
+    adapter: Any, annotation: Any, position: tuple[float, float]
+) -> None:
+    """Shorten the spherical-radius leader, then restore its curated position."""
+    native_annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(
+        native_annotation.GetSpecificAnnotation(), "IDisplayDimension"
+    )
     display.ShortenedRadius = True
+    # SolidWorks recentres radial text when ShortenedRadius changes.  Move it
+    # only after that transition so the SR callout stays outside the crown.
+    if native_annotation.SetPosition2(position[0], position[1], 0.0) is not True:
+        raise RuntimeError("failed to restore handle crown-radius position")
     adapter.currentModel.GraphicsRedraw2()
     if display.ShortenedRadius is not True:
         raise RuntimeError("handle crown radius did not retain shortened leader")
+    actual = tuple(float(value) for value in (native_annotation.GetPosition() or ()))
+    if len(actual) < 2 or any(
+        abs(measured - expected) > 1e-6
+        for measured, expected in zip(actual[:2], position, strict=True)
+    ):
+        raise RuntimeError(
+            f"handle crown radius position did not persist: {actual!r}"
+        )
 
 
 
@@ -554,7 +571,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     if len(cap_radius) != 1:
         raise RuntimeError("expected one handle crown-radius dimension")
-    _shorten_radius_leader(adapter, cap_radius[0])
+    _shorten_radius_leader(adapter, cap_radius[0], TOP_KEEP["CapR"])
     # Every place the part authored (policy rule 2) must have survived the
     # import and the moves: a dimension that fell back to the sheet default
     # would print a band nobody specified.
