@@ -83,9 +83,9 @@ def test_sheet_runs_at_3_to_1_with_a_boss_showing_2_to_1_pictorial() -> None:
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
-    # Only the two critical features carry a band: the reamed RUNNING bore and
-    # the cam OD / eccentricity that sets the follower lift.  Everything else
-    # takes the title block's general grade (cad/docs/tolerance-policy.md).
+    # Only the critical features carry bands: the reamed RUNNING bore and the
+    # cam OD / eccentricity that sets the follower lift.  Routine controlling
+    # dimensions take the title-block grade; the cosmetic projection is reference.
     assert model_toleranced_dimensions(cam) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
@@ -171,11 +171,11 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
-    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+    """Policy rule 2: the .SLDPRT owns places for every imported nominal.
 
-    Two places on the critical trio only (the reamed running bore, the cam OD
-    and the eccentricity that IS the lift); one everywhere else, so the title
-    block's .X row governs the collar length and the set-screw boss.
+    Two places serve the critical trio (the reamed running bore, the cam OD
+    and the eccentricity that IS the lift); routine controls use one place and
+    the cosmetic boss-projection nominal is parenthesized as reference.
     """
     by_name = pinion_cam_spec.DRAWING_PRECISION_BY_NAME
     assert set(by_name) == set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())

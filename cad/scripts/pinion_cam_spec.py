@@ -37,8 +37,9 @@ BORE_BAND = (
 )
 # The cam OD is the working surface the follower rides, and the bore-to-OD
 # offset IS the lift: both are on the drive train's critical list.  Nothing
-# else on this collar mates with anything, so nothing else carries a band --
-# the title block's general grade governs it (tolerance-policy rule 11).
+# else on this collar mates with anything, so nothing else carries a band.
+# Routine controlling dimensions use the title block's general grade; the
+# purely cosmetic boss projection prints as a reference nominal.
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
@@ -58,13 +59,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPinBossProjection": {"BossProjection"},
 }
 
-# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
-# 2), so the MODEL owns them: build_pinion_cam applies this map to the .SLDPRT
-# and draw_pinion_cam only reads it back.  Two places on the critical trio --
-# the reamed running bore (its band rides the dimension), the cam OD and the
-# bore-to-OD eccentricity that IS the lift; one place everywhere else, so the
-# title block's .X row governs the collar length, the set-screw boss and its
-# station (cad/docs/tolerance-policy.md).
+# The MODEL owns every printed decimal place: build_pinion_cam applies this
+# map to the .SLDPRT and draw_pinion_cam only reads it back.  Two places on
+# the critical trio -- the reamed running bore (its band rides the dimension),
+# the cam OD and the bore-to-OD eccentricity that IS the lift; one place
+# everywhere else.  Routine controlling dimensions therefore use the title
+# block's .X row, while the cosmetic BossProjection nominal is parenthesized
+# as reference by the drawing recipe.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": 2, "CollarCy": 2},
     "BoreProfile": {"BoreDia": 2},
