@@ -352,7 +352,7 @@ async def build(adapter) -> dict[str, str]:
         "retention hole",
         dims=retention,
         names=("RetentionHoleCx", "RetentionHoleCenterZ", "RetentionHoleDia"),
-        drives=(None, '-"RetentionPinCenterZ"', '"RetentionPinDia"'),
+        drives=(None, '"RetentionPinCenterZ"', '"RetentionPinDia"'),
     )
     await ensure_fully_defined(adapter, "retention-hole sketch")
     check("exit_sketch retention hole", await adapter.exit_sketch())
