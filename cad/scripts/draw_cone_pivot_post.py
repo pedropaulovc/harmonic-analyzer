@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the v2 cone pivot post.
 
 The SLDPRT remains authoritative.  This recipe places the plan, the front
-elevation, a true-shape cone-journal view, a native axial section and a
-pictorial isometric, and imports exactly the model dimensions
+elevation, a true-shape cone-journal view, a native section through the cone
+bore plane and a pictorial isometric, and imports exactly the model dimensions
 ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared sheet/template,
 import, curation and export behaviour lives in ``_drawing_common``.
 
@@ -10,10 +10,11 @@ The casting has two axes and they are not parallel: the crank journal runs
 along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
 body axis.  The part therefore persists a named view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
-Ø12.281 bore as separate true-shape circles.  A native section through the
-same axis shows the raised boss, its tangent relationship to the body OD and
-its axial length in solid-line profile; the elevation keeps the crank journal,
-whose own sketch plane is parallel to it.
+Ø12.281 bore as separate true-shape circles.  A native section in the
+horizontal cone-bore plane removes the head from the projection and exposes
+the raised boss corners beyond the Ø42 body, together with the boss's axial
+length, in a hatched solid-line profile; the elevation keeps the crank
+journal, whose own sketch plane is parallel to it.
 
 Run with SolidWorks open::
 
@@ -99,6 +100,7 @@ TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
 SECTION_CENTER = (0.365, 0.242)
+SECTION_CAPTION = (0.300, 0.238)
 SECTION_SCALE = (1, 2)
 
 # The checked-in landscape template's FINISH value cell, measured between its
@@ -128,19 +130,19 @@ def _top_y(model_z: float) -> float:
     # The *Top orientation looks down -Y: model +Z runs DOWN the sheet.
     return TOP_CENTER[1] + (_TOP_Z_CENTER - model_z) * _S
 
-# The A-A cutting plane contains the post axis and the inclined cone-journal
-# axis.  Its trace spans the whole Ø44 top silhouette, so SolidWorks creates a
-# complete native section rather than an open/partial cut.
+# The A-A cutting plane is horizontal at the cone bore's model-Y station.  It
+# therefore contains the inclined cone axis, while removing the head that
+# hides the boss in the ordinary Top projection.  Its section shows the angled
+# 42 x 17.2 boss strip extending past the Ø42 body circle at all four corners.
 _CONE_SECTION_HALF_SPAN_MM = 25.0
-_CONE_AXIS_RAD = math.radians(INCLINE_DEG)
 CONE_SECTION_LINE = (
     (
-        _top_x(-_CONE_SECTION_HALF_SPAN_MM * math.sin(_CONE_AXIS_RAD)),
-        _top_y(-_CONE_SECTION_HALF_SPAN_MM * math.cos(_CONE_AXIS_RAD)),
+        _front_x(-_CONE_SECTION_HALF_SPAN_MM),
+        _front_y(BORE_HEIGHT),
     ),
     (
-        _top_x(_CONE_SECTION_HALF_SPAN_MM * math.sin(_CONE_AXIS_RAD)),
-        _top_y(_CONE_SECTION_HALF_SPAN_MM * math.cos(_CONE_AXIS_RAD)),
+        _front_x(_CONE_SECTION_HALF_SPAN_MM),
+        _front_y(BORE_HEIGHT),
     ),
 )
 
@@ -490,6 +492,44 @@ def _assert_view_geometry(
         "both ConeShaftBoss face centres"
     )
 
+def _prepare_cone_section(adapter: Any, view: Any) -> None:
+    """Keep only the full cut surface so the raised collar reads in section."""
+    bound = _early_bound(view, "IView")
+    section = _early_bound(bound.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    section.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="cone boss cut surface")
+    if not bool(section.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError("cone boss section retained geometry beyond the cut")
+    if bool(section.GetPartialSection()):
+        raise RuntimeError("cone boss section cutting line did not close")
+
+
+def _position_section_caption(adapter: Any, view: Any) -> None:
+    """Move the one linked native caption left of the section geometry."""
+    candidates = []
+    for raw_note in _early_bound(view, "IView").GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+            candidates.append((note, linked_text))
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"expected one native cone-section caption, found {len(candidates)}"
+        )
+    note, linked_text = candidates[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*SECTION_CAPTION, 0.0):
+        raise RuntimeError("failed to position native cone-section caption")
+    rebuild_drawing(adapter, label="cone section caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], SECTION_CAPTION) > 1e-6:
+        raise RuntimeError("native cone-section caption position did not persist")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("cone-section caption lost its native linked fields")
+
+
 def _assert_native_layout(
     adapter: Any,
     journal: Any,
@@ -677,17 +717,19 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     section = create_section_view(
         adapter,
-        top,
+        front,
         line_start=CONE_SECTION_LINE[0],
         line_end=CONE_SECTION_LINE[1],
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=SECTION_SCALE,
-        label="cone boss axial profile",
+        label="cone boss bore-plane profile",
     )
+    _prepare_cone_section(adapter, section)
+    _position_section_caption(adapter, section)
     # The named journal view looks exactly down the inclined model axis.  Unlike
-    # the axial section, it retains the boss end face, so its Ø17.2 OD and
-    # Ø12.281 bore are two visible concentric circles with unambiguous leaders.
+    # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
+    # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
     for view in (front, top, journal, section):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
@@ -724,7 +766,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         section,
         keep=SECTION_KEEP,
-        view_label="cone boss axial section",
+        view_label="cone boss bore-plane section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [
@@ -858,6 +900,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, front)
     set_hidden_lines_removed(adapter, top)
     set_hidden_lines_removed(adapter, journal)
+    set_hidden_lines_removed(adapter, section)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _assert_native_layout(
         adapter,
