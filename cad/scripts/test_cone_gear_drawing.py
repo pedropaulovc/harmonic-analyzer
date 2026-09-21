@@ -170,6 +170,11 @@ def test_no_gdt_and_only_the_fitted_bore_has_a_surface_finish() -> None:
     assert not hasattr(spec, "PART_DATUMS")
     assert [control.key for control in spec.SURFACE_FINISHES] == ["cone_gear_bore"]
     assert spec.SURFACE_FINISHES[0].native_attachment == "model"
+    for teeth in spec.CONFIGURATION_TEETH:
+        control = spec.bore_surface_finish(teeth)
+        assert control.key == "cone_gear_bore"
+        assert control.native_attachment == "model"
+        assert control.face.diameter_mm == pytest.approx(spec.bore_dia_mm(teeth))
 
 
 def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() -> None:

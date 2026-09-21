@@ -66,14 +66,20 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
+def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
+    """Return the bore finish control qualified by this configuration's bore."""
+    return SurfaceFinishControl(
         "cone_gear_bore",
         MACHINED_UM,
-        CylinderFace(BORE_DIA),
+        CylinderFace(bore_dia_mm(teeth)),
         native_attachment="model",
-    ),
-)
+    )
+
+
+# Part PMI is authored while the default T120 configuration is active.  Drawing
+# sheets call ``bore_surface_finish`` with their own tooth count so native face
+# validation follows each configured bore.
+SURFACE_FINISHES = (bore_surface_finish(TEETH),)
 
 # The three blank sizes and the tooth-system acceptance size.  ToothThickness
 # is a DRIVING dimension in a construction-only authoring sketch: policy rule 2

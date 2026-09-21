@@ -43,7 +43,6 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import surface_finish_by_key
 from cone_gear_notes import CYLINDER_MATE_NUMBER
 from cone_gear_spec import (
     CONFIGURATION_TEETH,
@@ -51,8 +50,8 @@ from cone_gear_spec import (
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     MODULE_MM,
-    SURFACE_FINISHES,
     bore_dia_mm,
+    bore_surface_finish,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -155,15 +154,18 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 
 
 def _configure_views(
-    adapter: Any, configuration: str, views: tuple[Any, ...]
+    adapter: Any,
+    configuration: str,
+    teeth: int,
+    views: tuple[Any, ...],
 ) -> None:
-    """Select one source configuration on every view and regenerate it."""
+    """Select one source configuration and prove the resulting view geometry."""
     bound_views = tuple(_early_bound(view, "IView") for view in views)
     for view in bound_views:
         view.ReferencedConfiguration = configuration
-    # Drawing EditRebuild3 legitimately returns False when no model feature
-    # needs rebuilding (observed on the first T006 sheet).  Use the project's
-    # drawing rebuild chokepoint, then verify the authoritative view properties.
+    # The common drawing chokepoint deliberately does not treat EditRebuild3's
+    # BOOL as the sole health signal.  Validate the authoritative configuration
+    # properties, then validate the regenerated front-view envelope itself.
     rebuild_drawing(adapter, label=f"{configuration} view configuration")
     for view in bound_views:
         observed = str(view.ReferencedConfiguration)
@@ -171,6 +173,19 @@ def _configure_views(
             raise RuntimeError(
                 f"view configuration readback {observed!r} != {configuration!r}"
             )
+    outline = tuple(float(value) for value in bound_views[0].GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError(f"{configuration} front view has invalid outline {outline!r}")
+    numerator, denominator = _SCALE_BY_TEETH[teeth]
+    expected = outside_dia_mm(teeth) * numerator / (denominator * 1000.0)
+    width = outline[2] - outline[0]
+    height = outline[3] - outline[1]
+    tolerance = max(0.0005, 0.01 * expected)
+    if abs(width - expected) > tolerance or abs(height - expected) > tolerance:
+        raise RuntimeError(
+            f"{configuration} front view envelope {(width, height)!r} does not "
+            f"match configured outside diameter {expected:g} m"
+        )
 
 
 def _curate_repeated_dimensions(
@@ -295,7 +310,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=view_scale
         )
         views = (front, right, iso)
-        _configure_views(adapter, configuration, views)
+        _configure_views(adapter, configuration, teeth, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
 
@@ -328,7 +343,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 FRONT_CENTER[0] + half_od + 0.015,
                 FRONT_CENTER[1] - 0.025,
             ),
-            control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
+            control=bore_surface_finish(teeth),
             label=f"{configuration} cone-gear bore finish",
         )
 
