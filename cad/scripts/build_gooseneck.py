@@ -232,7 +232,7 @@ async def build(adapter) -> dict[str, str]:
     leg_dims = name_dimensions(adapter, "Leg", ["LegLength", "LegStart"])
     drive_jobs += [
         (leg_dims[0], '"LegTop" - "LegBottom"'),
-        (leg_dims[1], '-"LegBottom"'),
+        (leg_dims[1], '"LegBottom"'),
     ]
     expected = _RING_AREA * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
@@ -466,7 +466,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += [
         (plug_feature_dims[0], '"PlugT"'),
-        (plug_feature_dims[1], '-"ArmEndX"'),
+        (plug_feature_dims[1], '"ArmEndX"'),
     ]
     if _solid_body_count(adapter) != 2:
         raise RuntimeError("brazed end plug did not persist as a separate body")
@@ -498,7 +498,7 @@ async def build(adapter) -> dict[str, str]:
             shank_feature_dims[0],
             '"ScrewThreadEngagement" + "ScrewShankLen"',
         ),
-        (shank_feature_dims[1], '-"ArmEndX" + "ScrewShankLen"'),
+        (shank_feature_dims[1], '"ArmEndX" - "ScrewShankLen"'),
     ]
     if _solid_body_count(adapter) != 3:
         raise RuntimeError("spring screw shank did not persist as a separate body")
@@ -528,7 +528,7 @@ async def build(adapter) -> dict[str, str]:
         (head_feature_dims[0], '"ScrewHeadT"'),
         (
             head_feature_dims[1],
-            '-"ArmEndX" + "ScrewShankLen" + "ScrewHeadT"',
+            '"ArmEndX" - "ScrewShankLen" - "ScrewHeadT"',
         ),
     ]
     if _solid_body_count(adapter) != 3:
