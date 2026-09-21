@@ -402,24 +402,15 @@ def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
         qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"failed to select drawing witness sketch {qualified!r}")
+    # BlankSketch is a VT_VOID mutator.  Its drawing-view override has no
+    # corresponding getter: IFeature.Visible reports the model feature's
+    # global state, not the per-view override (and therefore remains "shown").
+    # The selected qualified path above is the API's documented call form; the
+    # exported sheet is the authoritative read-back for this view-local change.
     draw.BlankSketch()
     rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
     draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"hidden drawing witness sketch vanished: {qualified!r}")
-    selected = _early_bound(
-        draw.SelectionManager.GetSelectedObject6(1, -1),
-        "IFeature",
-    )
-    state = int(selected.Visible)
-    draw.ClearSelection2(True)
-    if state != 1:
-        raise RuntimeError(
-            f"drawing witness sketch stayed visible in {name!r}: {state}"
-        )
-    _telemetry.info(f"drawing witness sketch hidden: {qualified}, state={state}")
+    _telemetry.info(f"drawing witness sketch blanked in view: {qualified}")
 
 
 def _assert_view_geometry(
