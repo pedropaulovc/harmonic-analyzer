@@ -1,15 +1,19 @@
-"""Offline manufacturing boundaries for the modified purchased anchor."""
+"""Offline manufacturing contracts for the modified purchased anchor."""
+
+from __future__ import annotations
 
 import math
 from types import SimpleNamespace
 
 import pytest
 
+import _config
 import _stock_trim_drawing as trim_drawing
 import boss_hook_spec as spec
 import draw_boss_hook as drawing
 from _hole_spec import TAP_DRILL_MM
 from stock_anchor_geom import ANCHOR_9490T1 as anchor
+from summing_lever_spec import COUNTER_HOLE_SPEC
 
 
 def test_finished_overall_preserves_factory_thread_datum():
@@ -31,11 +35,24 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
     assert short_shank - maximum_axial > 17.0
 
 
+def test_direct_fit_is_the_mha073_tap_and_has_no_nut():
+    assert spec.MATING_PART_NUMBER == _config.parts("summing-lever")["number"] == "MHA-073"
+    assert COUNTER_HOLE_SPEC.kind == "tapped"
+    assert COUNTER_HOLE_SPEC.size == spec.MATING_THREAD_SIZE == anchor.thread_size == "#10-24"
+    assert spec.SHANK_LENGTH_MM == pytest.approx(19.05)
+    assert spec.NUT_INSTALLED is False
+    assert anchor.nut is None
+
+
+
+
 @pytest.mark.parametrize(
     "fault", [None, "reference", "nominal", "tolerance", "precision", "missing"]
 )
-def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
-    """General is toleranced, unlike None; neither replaces a real driving size."""
+def test_drawing_accepts_native_controls_and_rejects_lost_control(
+    monkeypatch, fault
+):
+    """Every imported control stays driving, toleranced, and at model precision."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
@@ -69,7 +86,7 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
             GetText=lambda _index: "",
-            GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
+            GetPrimaryPrecision2=lambda name=name: spec.DRAWING_PRECISION_BY_NAME[name],
         )
         annotations.append(
             SimpleNamespace(
@@ -88,7 +105,7 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
         annotations[0].dimension.Tolerance.Type = 0
     elif fault == "precision":
         annotations[0].display.GetPrimaryPrecision2 = lambda: (
-            spec.DIMENSION_PRECISION["FinishedOverall"] + 1
+            spec.DRAWING_PRECISION_BY_NAME["FinishedOverall"] + 1
         )
     elif fault == "missing":
         annotations.pop()

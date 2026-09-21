@@ -17,20 +17,20 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_precision,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
 from boss_hook_spec import (
+    DRAWING_DIMENSIONS,
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
     CHAMFER_WIDTH_MM,
     CHAMFER_WIDTH_TOLERANCE_MM,
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
-    DIMENSION_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     DIMENSION_TOLERANCE_TYPES,
     TRIM,
 )
@@ -80,7 +80,7 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
-        precision=DIMENSION_PRECISION,
+        precision=DRAWING_PRECISION_BY_NAME,
     )
 
 
@@ -123,13 +123,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     # The detail claims its manufacturing dimensions before the parent import.
     detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="cut end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished overall"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="finished overall",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *detail_annotations]
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     _verify_controls(adapter, annotations)
     add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
