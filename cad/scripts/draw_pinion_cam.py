@@ -74,10 +74,10 @@ SHEET_SCALE = (3.0, 1.0)
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
 # Third angle: the right-side boss profile projects to the right of the front
-# view.  The separately labelled, rotated boss-end view sits below it.
+# view.  The rotated boss-end view is deliberately offset from that projection.
 SIDE_CENTER = (0.260, 0.150)
 ISO_CENTER = (0.365, 0.165)
-BOTTOM_CENTER = (0.260, 0.105)
+BOTTOM_CENTER = (0.320, 0.105)
 
 def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
@@ -101,11 +101,11 @@ FRONT_KEEP = {
     "BossProjection": (0.120, 0.105),
 }
 SIDE_KEEP = {
-    "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.040),
+    "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
     "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
 }
 BOTTOM_KEEP = {
-    "BossDia": (0.320, 0.105),
+    "BossDia": (0.360, 0.105),
     "BossCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {
@@ -266,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         boss_station[0],
         side,
-        (SIDE_CENTER[0], SIDE_CENTER[1] - 0.030),
+        (SIDE_CENTER[0], SIDE_CENTER[1] + 0.030),
         source_view=bottom,
     )
     bottom_annotations = [
@@ -329,9 +329,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(
-        adapter, "REMOVED VIEW A - BOSS END - ROTATED 90 DEG", 0.200, 0.075
+        adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.265, 0.075
     ) is None:
-        raise RuntimeError("failed to label removed cam boss end view")
+        raise RuntimeError("failed to label rotated cam boss end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(

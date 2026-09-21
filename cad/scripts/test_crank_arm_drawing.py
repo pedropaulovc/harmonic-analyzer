@@ -80,7 +80,7 @@ def test_anchor_callout_defers_its_thread_class_to_the_title_block() -> None:
     class NativeCallout:
         def __init__(self) -> None:
             self.definition = (
-                "<hw-threadsize> <hw-threadseries> - <hw-threadclass> "
+                "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> "
                 "<hw-threaddepth>"
             )
 
@@ -95,7 +95,7 @@ def test_anchor_callout_defers_its_thread_class_to_the_title_block() -> None:
     callout = NativeCallout()
     drawing._omit_title_block_thread_class(callout)
     assert callout.definition == (
-        "<hw-threadsize> <hw-threadseries> <hw-threaddepth>"
+        "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
     )
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
