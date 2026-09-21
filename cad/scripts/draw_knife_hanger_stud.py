@@ -25,6 +25,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
 from build_knife_hanger_stud import THREAD_TIP_Y_MM
 from knife_hanger_stud_spec import (
