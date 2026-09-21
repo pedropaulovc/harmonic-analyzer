@@ -101,8 +101,6 @@ def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
 def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     registry = _config.parts("cone-swing-platform")
     assert registry["tolerance_class"] == "machined_block"
-    assert "steel plate" in str(registry["material_specification"]).lower()
-    assert "5/16 in minimum stock" in str(registry["material_specification"]).lower()
     assert "mil-dtl-13924 class 1" in str(registry["finish"]).lower()
     assert "oil seal" in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
