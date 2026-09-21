@@ -2,10 +2,11 @@ r"""Create the two-sheet manufacturing drawing for MHA-073.
 
 The SLDPRT owns every nominal, decimal place, tolerance and surface control.
 Sheet ``FORM-KNIFE`` defines the lever envelope, knife trunnions and
-counter-spring boss at useful scales.  Sheet ``SPRING-PATTERN`` gives the
-authoritative 20-hole field its own 1:1 plan, one rule-3 position frame, and
-unobstructed native thread callout.  All orthographic views are HLR; the
-standard isometric is finalized as precision Shaded With Edges.
+counter-spring boss at one native 1:2 sheet scale.  Sheet ``SPRING-PATTERN``
+gives the authoritative 20-hole field its own readable 1:2 plan, one rule-3
+position frame, and unobstructed native thread callout.
+All orthographic views are HLR; the standard isometric is finalized as
+precision Shaded With Edges.
 
 Run with SolidWorks open::
 
@@ -27,7 +28,6 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_note,
-    add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
     create_blank_drawing_sheets,
@@ -80,13 +80,13 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)
+SHEET_SCALE = (1.0, 2.0)
 SHEET_NAMES = ("FORM-KNIFE", "SPRING-PATTERN")
 
-FORM_FRONT_SCALE = (1, 1)
-FORM_TOP_SCALE = (1, 2)
-ISO_SCALE = (1, 2)
-PATTERN_SCALE = (1, 1)
+FORM_FRONT_SCALE = SHEET_SCALE
+FORM_TOP_SCALE = SHEET_SCALE
+ISO_SCALE = SHEET_SCALE
+PATTERN_SCALE = SHEET_SCALE
 
 # Front (down -Z) and top (down -Y) share this X envelope.
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
@@ -102,7 +102,7 @@ def _top_xy(
     mz: float,
     *,
     center: tuple[float, float],
-    scale: tuple[int, int],
+    scale: tuple[float, float],
 ) -> tuple[float, float]:
     """Project model X/Z millimetres into one explicit top-view sheet frame."""
     factor = scale[0] / scale[1]
@@ -110,6 +110,12 @@ def _top_xy(
         center[0] + (mx - _BBOX_CX) * factor / 1000.0,
         center[1] + mz * factor / 1000.0,
     )
+
+def _assert_uses_sheet_scale(view: Any, label: str) -> None:
+    """Prove a view follows the native sheet scale printed in the title block."""
+    bound = _early_bound(view, "IView")
+    if int(bound.UseSheetScale) != 1:
+        raise RuntimeError(f"{label} does not use its native sheet scale")
 
 
 FORM_FRONT_KEEP = {
@@ -173,14 +179,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -209,22 +213,21 @@ async def build(adapter: Any) -> dict[str, str]:
         str(SOURCE),
         "*Front",
         *FORM_FRONT_CENTER,
-        scale=FORM_FRONT_SCALE,
     )
     top = place_view(
         adapter,
         str(SOURCE),
         "*Top",
         *FORM_TOP_CENTER,
-        scale=FORM_TOP_SCALE,
     )
     iso = place_view(
         adapter,
         str(SOURCE),
         "*Isometric",
         *ISO_CENTER,
-        scale=ISO_SCALE,
     )
+    for label, view in (("form front", front), ("form top", top), ("iso", iso)):
+        _assert_uses_sheet_scale(view, label)
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
@@ -270,7 +273,6 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.105)
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate summing-lever spring-pattern sheet")
@@ -279,8 +281,8 @@ async def build(adapter: Any) -> dict[str, str]:
         str(SOURCE),
         "*Top",
         *PATTERN_CENTER,
-        scale=PATTERN_SCALE,
     )
+    _assert_uses_sheet_scale(pattern, "spring-pattern plan")
     set_hidden_lines_removed(adapter, pattern)
     pattern_dimensions = curate_view_dimensions(
         adapter,
@@ -330,7 +332,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         pattern,
         edge_xy=seed_rim_bottom,
-        callout_xy=(0.330, 0.060),
+        callout_xy=(0.330, 0.075),
         label="spring-hole seed",
     )
     pattern_rim_right = _top_xy(

@@ -88,10 +88,9 @@ HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
 
-# Drawing prose stays in ``summing_lever_notes`` so a wording edit does not
-# rebuild the summing assembly.  The manufacturing-dimension and precision
-# contracts belong here with the geometry: the part build authors them on the
-# SLDPRT and the drawing only imports and verifies them.
+# Manufacturing-dimension and precision contracts live with the geometry: the
+# part build authors them on the SLDPRT and the drawing only imports and
+# verifies them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
     "CoefficientsPlate": {"PlateThickness"},

@@ -102,7 +102,6 @@ from _drawing_marks import (
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from summing_lever_notes import ISOMETRIC_VIEW_NOTE
 from summing_lever_spec import (
     ANCHOR_H,
     BASIC_DRAWING_DIMENSIONS,
@@ -1021,11 +1020,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     _apply_basic_drawing_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -1034,7 +1029,6 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
     )
     return artefacts
