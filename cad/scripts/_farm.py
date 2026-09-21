@@ -15,7 +15,6 @@ certificate and the bearer token (``Authorization: Bearer <jwt>``).
 from __future__ import annotations
 
 import asyncio
-import codecs
 import getpass
 import json
 import os
@@ -25,6 +24,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
+from io import TextIOWrapper
 from pathlib import Path
 from typing import BinaryIO
 
@@ -192,26 +192,24 @@ def run_pool_cli(
     )
 
 
-def _write_spooled_utf8(spool: BinaryIO) -> int:
-    """Copy a binary spool to task stderr; return decoded characters written."""
+def _write_spooled_utf8(spool: BinaryIO, line_prefix: str) -> int:
+    """Copy a binary spool to stderr with normalized, attributed UTF-8 lines."""
 
     spool.seek(0)
-    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    reader = TextIOWrapper(
+        spool,
+        encoding="utf-8",
+        errors="replace",
+        newline=None,
+    )
     written_chars = 0
-    ends_with_newline = True
-    while chunk := spool.read(64 * 1024):
-        text = decoder.decode(chunk)
-        if text:
-            sys.stderr.write(text)
-            written_chars += len(text)
-            ends_with_newline = text.endswith(("\n", "\r"))
-    tail = decoder.decode(b"", final=True)
-    if tail:
-        sys.stderr.write(tail)
-        written_chars += len(tail)
-        ends_with_newline = tail.endswith(("\n", "\r"))
-    if written_chars and not ends_with_newline:
-        sys.stderr.write("\n")
+    try:
+        for line in reader:
+            written_chars += len(line)
+            ending = "" if line.endswith("\n") else "\n"
+            sys.stderr.write(line_prefix + line + ending)
+    finally:
+        reader.detach()
     sys.stderr.flush()
     return written_chars
 
@@ -224,9 +222,11 @@ def _write_failed_task_log_block(
     warnings: list[tuple[str, str]],
     retrieval_exit_code: int | None,
 ) -> None:
-    """Write one already-retrieved failure as an indivisible console block."""
+    """Write one already-retrieved failure with line-level source attribution."""
 
-    identity = f"{task} ({wf_id})"
+    blob_identity = result.log_blob or "<absent>"
+    identity = f"task={task} workflow={wf_id} log_blob={blob_identity}"
+    line_prefix = f"[farm task={task}] "
     fields = {
         "task": task,
         "workflow_id": wf_id,
@@ -234,7 +234,8 @@ def _write_failed_task_log_block(
         "worker_id": result.worker_id,
         "attempt": result.attempt,
     }
-    print(f"--- begin failed farm task log: {identity} ---", file=sys.stderr, flush=True)
+    sys.stderr.write(f"--- begin failed farm task log: {identity} ---\n")
+    sys.stderr.flush()
     if result.log_blob is None:
         _telemetry.warn(
             "no task log was published for this failed leaf; "
@@ -244,7 +245,7 @@ def _write_failed_task_log_block(
         )
     elif spool is not None:
         try:
-            written_chars = _write_spooled_utf8(spool)
+            written_chars = _write_spooled_utf8(spool, line_prefix)
         except (OSError, ValueError) as exc:
             written_chars = 0
             warnings.append(
@@ -260,12 +261,12 @@ def _write_failed_task_log_block(
             reason=reason,
             **fields,
         )
-    print(file=sys.stderr, flush=True)
-    print(f"--- end failed farm task log: {identity} ---", file=sys.stderr, flush=True)
+    sys.stderr.write(f"\n--- end failed farm task log: {identity} ---\n")
+    sys.stderr.flush()
 
 
 def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
-    """Retrieve in parallel, then print one failed leaf as a complete block."""
+    """Retrieve in parallel, then print one failed leaf with attributed lines."""
 
     warnings: list[tuple[str, str]] = []
     spool: BinaryIO | None = None

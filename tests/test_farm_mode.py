@@ -10,9 +10,10 @@ import multiprocessing
 import os
 import subprocess
 import sys
+import threading
 import time
 from datetime import timedelta
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 
 import pytest
@@ -112,15 +113,11 @@ def _emit_failed_log_in_process(
     class CoordinatedOutput:
         def __init__(self, output):
             self.output = output
-            self.begin_pending = False
 
         def write(self, text):
             written = self.output.write(text)
             self.output.flush()
             if text.startswith("--- begin failed farm task log:"):
-                self.begin_pending = True
-            elif self.begin_pending and text == "\n":
-                self.begin_pending = False
                 with begin_count.get_lock():
                     begin_count.value += 1
                     position = begin_count.value
@@ -1562,17 +1559,149 @@ def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error
     captured = capsys.readouterr()
     log_output = captured.err
     report_output = reporter_output.getvalue()
+    line_prefix = "[farm task=part:x] "
     begin = log_output.index("--- begin failed farm task log:")
-    worker_log = log_output.index("failed execution log: café")
-    replacement = log_output.index("failed log with damaged UTF-8: \ufffd")
+    worker_log = log_output.index(line_prefix + "failed execution log: café")
+    replacement = log_output.index(
+        line_prefix + "failed log with damaged UTF-8: \ufffd"
+    )
     end = log_output.index("--- end failed farm task log:")
     assert begin < worker_log < replacement < end
-    assert expected_wf_id in log_output
+    assert (
+        f"task=part:x workflow={expected_wf_id} log_blob={failed.log_blob}"
+        in log_output
+    )
     assert (
         "part:x failed on sw-01@3 [task_failed] exit 87: "
         "SolidWorks connect timed out"
     ) in report_output
     assert exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("chunks", "expected_lines"),
+    [
+        (
+            [b"phase1\rphase2\n"],
+            ["phase1", "phase2"],
+        ),
+        (
+            [b"caf\xc3", b"\xa9\r", b"\nnext\r", b"last"],
+            ["café", "next", "last"],
+        ),
+    ],
+)
+def test_spooled_log_normalizes_newlines_across_binary_read_boundaries(
+    monkeypatch, chunks, expected_lines
+):
+    class ChunkedSpool(BytesIO):
+        def __init__(self, parts):
+            super().__init__(b"".join(parts))
+            self.read_sizes = [len(part) for part in parts]
+            self.read1_calls = 0
+
+        def read1(self, size=-1):
+            self.read1_calls += 1
+            if not self.read_sizes:
+                return b""
+            part_size = self.read_sizes.pop(0)
+            if size >= 0:
+                part_size = min(part_size, size)
+            return super().read(part_size)
+
+    prefix = "[farm task=part:pen_rod] "
+    spool = ChunkedSpool(chunks)
+    output = StringIO()
+    monkeypatch.setattr(sys, "stderr", output)
+
+    _farm._write_spooled_utf8(spool, prefix)
+
+    assert output.getvalue() == "".join(
+        prefix + line + "\n" for line in expected_lines
+    )
+    assert spool.read1_calls >= len(chunks)
+    assert not spool.closed
+
+
+def test_retrieved_lines_remain_attributed_when_normal_output_interleaves(
+    tmp_path, monkeypatch
+):
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:key:900s"
+    failed = _leaf_result(**_FAILED_LEAF)
+    line_prefix = f"[farm task={task}] "
+    output = StringIO()
+    retrieved_line_written = threading.Event()
+    normal_line_written = threading.Event()
+
+    class InterleavingOutput:
+        def write(self, text):
+            written = output.write(text)
+            if text == line_prefix + "farm.py diagnostic\n":
+                retrieved_line_written.set()
+                if not normal_line_written.wait(timeout=3):
+                    raise AssertionError("normal build writer did not interleave")
+            return written
+
+        def flush(self):
+            output.flush()
+
+    def normal_writer():
+        if retrieved_line_written.wait(timeout=3):
+            output.write("normal build output\n")
+            normal_line_written.set()
+
+    def retrieve(
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
+    ):
+        stderr.write(b"farm.py diagnostic\n")
+        stdout.write(b"worker log line\n")
+        stdout.write(b"unterminated worker line")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: tmp_path / "pool")
+    monkeypatch.setattr(_farm, "run_pool_cli", retrieve)
+    monkeypatch.setattr(sys, "stderr", InterleavingOutput())
+    writer = threading.Thread(target=normal_writer)
+    writer.start()
+    try:
+        _farm._emit_failed_task_log(task, workflow_id, failed)
+    finally:
+        writer.join(timeout=5)
+
+    assert not writer.is_alive()
+    lines = output.getvalue().splitlines()
+    assert lines[0] == (
+        "--- begin failed farm task log: "
+        f"task={task} workflow={workflow_id} log_blob={failed.log_blob} ---"
+    )
+    assert line_prefix + "farm.py diagnostic" in lines
+    assert "normal build output" in lines
+    assert line_prefix + "worker log line" in lines
+    assert line_prefix + "unterminated worker line" in lines
+    assert not {
+        "farm.py diagnostic",
+        "worker log line",
+        "unterminated worker line",
+    }.intersection(lines)
+    assert lines[-1] == (
+        "--- end failed farm task log: "
+        f"task={task} workflow={workflow_id} log_blob={failed.log_blob} ---"
+    )
+    assert lines.index(line_prefix + "farm.py diagnostic") < lines.index(
+        "normal build output"
+    )
+    assert lines.index("normal build output") < lines.index(
+        line_prefix + "worker log line"
+    )
 
 
 def test_parallel_failed_leaf_logs_are_emitted_as_complete_blocks(
@@ -1614,11 +1743,16 @@ def test_parallel_failed_leaf_logs_are_emitted_as_complete_blocks(
     assert [process.exitcode for process in processes] == [0, 0]
 
     def block(name):
-        identity = f"part:{name} (leaf:{name})"
+        task = f"part:{name}"
+        identity = (
+            f"task={task} workflow=leaf:{name} "
+            f"log_blob=results/{name}/task.log"
+        )
+        prefix = f"[farm task={task}] "
         return (
             f"--- begin failed farm task log: {identity} ---\n"
-            f"retrieval diagnostic for {name}\n"
-            f"worker log for {name}\n"
+            f"{prefix}retrieval diagnostic for {name}\n"
+            f"{prefix}worker log for {name}\n"
             "\n"
             f"--- end failed farm task log: {identity} ---\n"
         )

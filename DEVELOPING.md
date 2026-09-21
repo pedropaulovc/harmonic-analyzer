@@ -203,14 +203,17 @@ Read the records first, in this order:
    anything.
 
 When a leaf returns a failed result, the submitter includes its worker `task.log`
-in the build output before exiting, with delimiters naming the task and workflow.
-Log retrieval has a 30-second timeout; an absent or unavailable log produces a
-warning without replacing the original worker failure or changing the nonzero
-exit. Successful leaves do not download logs. The commands below remain useful
-for following a running workflow or recovering evidence after an interruption.
-Concurrent failures download their logs in parallel, then serialize each complete
-log block with a build-scoped output lock so one task's log cannot nest inside
-another's.
+in the build output before exiting. The delimiters name the task, workflow and
+exact log blob. Every retrieved log or captured CLI-diagnostic line begins with
+`[farm task=<task>]`. Log retrieval has a 30-second timeout; an absent or
+unavailable log produces a warning without replacing the original worker
+failure or changing the nonzero exit. Successful leaves do not download logs.
+The commands below remain useful for following a running workflow or recovering
+evidence after an interruption.
+Concurrent failures download their logs in parallel. A build-scoped output lock
+prevents failed-log emitters from nesting with each other, but normal doit and
+telemetry output can still interleave; the per-line task prefix preserves source
+attribution when it does.
 Farm preflight prepares the pool's locked Python environment and checks that its
 local `farm.py` advertises `logs <workflow-id> --log-blob <blob>`. This is a
 local CLI capability check, not a farm protocol bump: a protocol-4 checkout
