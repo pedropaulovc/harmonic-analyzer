@@ -135,7 +135,8 @@ BORE_FIT_CALLOUT = "\n".join(
     (
         "REAM THRU",
         "MATES WITH",
-        f"CRANKSHAFT {CRANKSHAFT_NUMBER}",
+        "CRANKSHAFT",
+        CRANKSHAFT_NUMBER,
         "REQD DIA CLR",
         f"{_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
     )
