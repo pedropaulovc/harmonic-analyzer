@@ -84,11 +84,11 @@ SECTION_CENTER = (0.335, 0.105)
 
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
-    "NorthEastX": (0.100, 0.258),
+    "NorthEastX": (0.100, 0.105),
     "NorthEdgeZ": (0.105, 0.150),
-    "NorthWestX": (0.050, 0.255),
-    "SouthWestX": (0.045, 0.115),
-    "SouthEastX": (0.108, 0.105),
+    "NorthWestX": (0.050, 0.115),
+    "SouthWestX": (0.045, 0.258),
+    "SouthEastX": (0.108, 0.248),
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
@@ -105,13 +105,13 @@ FEATURE_KEEP = {
     "PostMountEastZ": (0.225, 0.175),
 }
 NOTCH_KEEP = {
-    "CapECx": (0.250, 0.112),
+    "CapECx": (0.250, 0.258),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.105),
 }
 SECTION_KEEP = {
     "PlateThk": (0.300, 0.120),
-    "PivotBearingReliefDepth": (0.405, 0.125),
+    "PivotBearingReliefDepth": (0.375, 0.110),
 }
 
 
@@ -316,6 +316,11 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(2, 1),
         label="pivot bearing section",
     )
+    cut = _early_bound(section.GetSection(), "IDrSection")
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="pivot section cut faces only")
+    if cut.GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
 
@@ -375,7 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.300, 0.140),
+        symbol_xy=(0.300, 0.128),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
