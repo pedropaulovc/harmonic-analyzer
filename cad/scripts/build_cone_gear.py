@@ -1222,10 +1222,10 @@ async def build(adapter) -> dict[str, str]:
         )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
-    # Rebuild and serialize every marked configuration in one Save3 call.
-    # Saving configurations one at a time is not cumulative: each later save
-    # evicts the body cache of every unmarked configuration, even if that cache
-    # was persisted by an earlier save.
+    # Rebuild every configuration through the API intended for File > Save All
+    # > Rebuild and save document, then serialize all marked configuration
+    # caches in one Save3 call. AddRebuildSaveMark controls which caches are
+    # written; Save3 alone does not rebuild those configurations.
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     if not bool(manager.AddRebuildSaveMark(2, "")):
@@ -1237,6 +1237,14 @@ async def build(adapter) -> dict[str, str]:
         configuration = _early_bound(raw_configuration, "IConfiguration")
         if not bool(configuration.AddRebuildSaveMark):
             raise RuntimeError(f"{name}: rebuild-save mark was not set")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    rebuild_started = time.perf_counter()
+    if not bool(extension.ForceRebuildAll()):
+        raise RuntimeError("ForceRebuildAll failed for cone-gear configurations")
+    _telemetry.info(
+        "rebuilt all cone-gear configurations in "
+        f"{time.perf_counter() - rebuild_started:.3f}s"
+    )
     _save3_with_contract(
         adapter,
         1,
