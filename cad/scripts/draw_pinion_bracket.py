@@ -134,10 +134,10 @@ def _flank_y(model_y_mm: float) -> float:
 # underneath), and the fence's own letter stays clear of the follower seat on
 # the parent view.
 DETAIL_SCALE = (6.0, 1.0)
-DETAIL_CENTER = (0.105, 0.145)
+DETAIL_CENTER = (0.120, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.220, 0.085)
+DETAIL_CAPTION_XY = (0.235, 0.085)
 DETAIL_LETTER_XY = (0.245, 0.100)
 
 
@@ -179,7 +179,7 @@ DETAIL_KEEP = {
     "CamReliefParkR": (0.170, 0.190),
     "CamReliefParkX": (0.055, 0.220),
     "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.170, 0.105),
+    "CamReliefEngagedR": (0.160, 0.085),
     "CamReliefEngagedX": (0.055, 0.200),
     "CamReliefEngagedY": (0.065, 0.125),
 }
@@ -537,7 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.210, 0.105),
+        symbol_xy=(0.190, 0.120),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
