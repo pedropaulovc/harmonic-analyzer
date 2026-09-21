@@ -52,7 +52,8 @@ def test_face_shift_preserves_every_inboard_world_station() -> None:
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
-    assert spec.SHAFT_DIA == geometry.SHAFT_DIA == 9.525
+    assert spec.SHAFT_DIA == geometry.SHAFT_DIA
+    assert spec.SHAFT_DIA == pytest.approx(9.525, abs=1e-12)
     assert spec.SHAFT_DOME_HEIGHT == geometry.SHAFT_DOME_HEIGHT == 2.0
     assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] < (
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1]

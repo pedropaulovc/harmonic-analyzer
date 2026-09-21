@@ -23,7 +23,8 @@ def test_six_oclock_seam_has_a_coupled_finished_wall_acceptance() -> None:
     assert geometry.HUB_SEAT_DIA_MIN_GENERAL == pytest.approx(14.2)
     assert geometry.AXIAL_PIN_DIA_MAX_GENERAL == pytest.approx(4.2)
     assert geometry.HUB_BORE_DIA_MAX == pytest.approx(9.58)
-    assert geometry.SEAM_WEB_GENERAL_WORST_MM == pytest.approx(-0.04)
+    assert geometry.SEAM_WEB_NOMINAL_MM == pytest.approx(0.51)
+    assert geometry.SEAM_WEB_GENERAL_WORST_MM == pytest.approx(-0.29)
 
 
 def test_drawing_registry_and_native_dimensions_are_complete() -> None:
