@@ -325,7 +325,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.215, 0.220),
+        callout_xy=(0.125, 0.220),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
@@ -350,7 +350,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.260, 0.150)
+    add_property_linked_note(adapter, "Section View Note", 0.285, 0.145)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
