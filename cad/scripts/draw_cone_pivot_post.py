@@ -51,6 +51,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
+    BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
     CRANK_BORE_DIA,
@@ -331,11 +332,18 @@ async def build(adapter: Any) -> dict[str, str]:
         process="DRILL",
     )
 
+    # The seat is the elevation's bottom line: the O42.011 foot rim seen
+    # edge-on.  A coordinate pick on that line failed on the farm (the two
+    # mounting-hole exit rims project onto the same line, so the hit-test has
+    # nothing unambiguous to return), so the rim is found by its geometry --
+    # the ONE circular edge of body radius centred at y=0 -- and the leader is
+    # pinned to the seat's left quarter, clear of the MainBodyHt witness line.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(_front_x(-10.0), _front_y(0.0)),
+        edge_entity=_circular_edge(front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0),
         symbol_xy=(_front_x(-26.0), _front_y(-8.0)),
+        leader_attach_xy=(_front_x(-10.0), _front_y(0.0)),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
     )
