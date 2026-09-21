@@ -542,6 +542,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBoss")
+    name_dimensions(adapter, "ConeShaftBoss", ["ConeBossLen"])
     volume += CONE_PADS_OUTSIDE_BODY_MM3
     await volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
 

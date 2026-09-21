@@ -135,6 +135,7 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
+    "ConeBossLen": (0.125, 0.226),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
@@ -151,10 +152,11 @@ JOURNAL_KEEP = {
 # as-cast collar the shop has to know that face is machined back to a station,
 # not left as cast.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "BOSS SPOT FACE",
+    "CrankBossDia": "CRANK BOSS - FULL-FACE SPOT FACE",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS",
+    "ConeBossLen": "CONE BOSS TOTAL - SYMMETRIC",
     "CrankBossStartZ": "TO BOSS SPOT FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
@@ -269,7 +271,10 @@ def _model_face_evidence(model: Any) -> None:
         if not surfaces:
             raise RuntimeError(f"{name} exposes no planar/cylindrical BREP surfaces")
         rows[name] = surfaces
-    _telemetry.info(f"cone pivot post final BREP surfaces: {rows!r}")
+    for feature, surfaces in rows.items():
+        _telemetry.info(
+            f"cone pivot post final BREP {feature}: {surfaces!r}"
+        )
 
 
 def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
@@ -374,8 +379,22 @@ def _assert_view_geometry(
         raise RuntimeError(
             f"top-view bore-axis angle {acute:.6f} != {INCLINE_DEG:.6f}"
         )
+    iso_crank = rows["isometric"]["crank_center"]
+    iso_cone = rows["isometric"]["cone_center"]
+    if iso_crank[1] <= iso_cone[1]:
+        raise RuntimeError(
+            "isometric feature identity is inverted: "
+            f"crank y={iso_crank[1]!r}, cone y={iso_cone[1]!r}"
+        )
+    for label, evidence in rows.items():
+        _telemetry.info(
+            f"cone pivot post native view {label}: {evidence!r}"
+        )
     _telemetry.info(
-        f"cone pivot post native view transforms: {rows!r}; "
+        "cone pivot post isometric feature identity: "
+        f"upper centre={iso_crank!r} is CrankSprocketBoss/CrankBore at "
+        f"model Y={CRANK_BORE_HEIGHT:.3f}mm; lower centre={iso_cone!r} is "
+        f"ConeShaftBoss/ConeShaftBore at model Y={BORE_HEIGHT:.3f}mm; "
         f"top acute axis angle={acute:.6f} deg"
     )
 
@@ -697,7 +716,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cone journal bore finish",
         char_height=0.0025,
     )
-    add_note(adapter, "CONE JOURNAL VIEW", 0.218, 0.104)
+    add_note(
+        adapter,
+        "CONE JOURNAL VIEW - LOOK ALONG CONE AXIS",
+        0.202,
+        0.104,
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.

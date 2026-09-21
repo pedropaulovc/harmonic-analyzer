@@ -83,6 +83,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "CrankAxisY",
         "CrankBossDia",
         "CrankBossLen",
+        "ConeBossLen",
         "CrankBoreDia",
         "JournalAxisY",
         "ConeBossDia",
@@ -227,16 +228,10 @@ def test_sheet_carries_no_datums_or_feature_control_frames() -> None:
         assert banned not in source
 
 
-def test_manufacturing_notes_only_identify_mating_parts() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert lines == [
-        "CRANK BORE CARRIES CRANKSHAFT MHA-026.",
-        "CONE BORE CARRIES CONE GEAR SHAFT MHA-014.",
-        "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
-    ]
-    # A note may not restate a size, a band or a finish: those are dimensions
-    # and native symbols (drawing-simplicity-policy.md rules 1 and 6).  The
-    # only digits a note may carry are the mating parts' numbers.
+def test_manufacturing_notes_do_not_restate_dimensions() -> None:
+    # A note may state the axis relationship, but it may not restate a size, a
+    # band or a finish: those remain dimensions and native symbols under
+    # drawing-simplicity-policy.md rules 1 and 6.
     stripped = re.sub(r"MHA-\d+", "", spec.DRAWING_NOTES)
     assert not any(character.isdigit() for character in stripped)
     for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra"):
