@@ -27,14 +27,13 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
     add_leader_note,
     add_property_linked_note,
     add_surface_finish,
-    add_view_centerline,
     assert_imported_precision,
     check_drawing_layout,
     create_section_view,
@@ -46,6 +45,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
@@ -105,6 +105,43 @@ def _side_x(z_mm: float) -> float:
     and the boss end its left.
     """
     return RIGHT_CENTER[0] + (OVERALL_LENGTH / 2.0 - z_mm) * VIEW_SCALE[0] / 1000.0
+
+@_telemetry.traced("drawing.planar_centerline", label_param="label")
+def _create_section_axis_centerline(
+    adapter: Any,
+    view: Any,
+    *,
+    label: str,
+) -> Any:
+    """Create the retained turning axis in the longitudinal-section sketch."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate section view {name!r} ({label})")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    previous_display = bool(sketch_manager.DisplayWhenAdded)
+    sketch_manager.AddToDB = True
+    sketch_manager.DisplayWhenAdded = True
+    half_length = OVERALL_LENGTH / 2000.0
+    try:
+        centerline = sketch_manager.CreateCenterLine(
+            -half_length - 0.001,
+            0.0,
+            0.0,
+            half_length + 0.001,
+            0.0,
+            0.0,
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+        sketch_manager.DisplayWhenAdded = previous_display
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError(f"failed to create section-axis centerline ({label})")
+    return centerline
 
 
 
@@ -227,12 +264,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Whole-model import for the longitudinal section (the crankshaft's
-    # JournalStart idiom): the targeted path can select a dimension owner as a
-    # SKETCH or BODYFEATURE, while the keep set prunes every unrequested
-    # annotation.
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="longitudinal section"
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="longitudinal section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
@@ -244,18 +281,14 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin cross-hole")
-    # The longitudinal section is the turned part's length view: its axis
-    # centerline says which pair of edges is the faced ends (rule 7), while the
-    # cut exposes the bore so its native diameter never lands on hidden lines.
-    # Pick the boss's cylindrical face between the tooth face and pin-hole rim.
-    add_view_centerline(
+    # The longitudinal section is the turned part's length view: its explicit
+    # sketch centerline says which pair of edges is the faced ends (rule 7),
+    # while the cut exposes the bore so its native diameter never lands on
+    # hidden lines.
+    _create_section_axis_centerline(
         adapter,
         right,
-        face_xy=(
-            (_side_x(FACE_WIDTH) + _side_x(PIN_STATION - PIN_DIA / 2.0)) / 2.0,
-            RIGHT_CENTER[1] + 0.004,
-        ),
-        label="crank pinion axis centerline",
+        label="crank pinion axis",
     )
     # The cross-hole is governed by a matched fit, not the model's nominal
     # drill diameter. Attach the operation and acceptance directly to its rim:
