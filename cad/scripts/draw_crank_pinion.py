@@ -36,6 +36,7 @@ from _drawing_common import (
     assert_imported_precision,
     check_drawing_layout,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -43,7 +44,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_reference_dimensions,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -303,7 +304,21 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
-    set_reference_dimensions(adapter, right_annotations, ("PinStation",))
+    pin_station_annotation = next(
+        (
+            annotation
+            for annotation in right_annotations
+            if dimension_name(adapter, annotation) == "PinStation"
+        ),
+        None,
+    )
+    if pin_station_annotation is None:
+        raise RuntimeError("side view lost the PinStation annotation")
+    set_reference_dimension(
+        adapter,
+        pin_station_annotation,
+        label="pin station",
+    )
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
