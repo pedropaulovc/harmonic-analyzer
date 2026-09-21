@@ -336,7 +336,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
             draw.ClearSelection2(True)
             if not draw.Extension.SelectByID2(
                 "",
-                "SILHOUETTE",
+                "EDGE",
                 point[0],
                 point[1],
                 0.0,
@@ -346,14 +346,14 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
                 0,
             ):
                 raise RuntimeError(
-                    f"failed to select handle-pivot hidden silhouette {index + 1}"
+                    f"failed to select handle-pivot hidden edge {index + 1}"
                 )
             if (
                 int(selection_manager.GetSelectedObjectCount2(-1)) != 1
-                or int(selection_manager.GetSelectedObjectType3(1, -1)) != 46
+                or int(selection_manager.GetSelectedObjectType3(1, -1)) != 1
             ):
                 raise RuntimeError(
-                    f"handle-pivot hidden silhouette {index + 1} "
+                    f"handle-pivot hidden edge {index + 1} "
                     "selection was not singular"
                 )
             ddoc.HideEdge()
@@ -364,7 +364,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
             draw.ClearSelection2(True)
             if draw.Extension.SelectByID2(
                 "",
-                "SILHOUETTE",
+                "EDGE",
                 point[0],
                 point[1],
                 0.0,
@@ -374,7 +374,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
                 0,
             ):
                 raise RuntimeError(
-                    f"handle-pivot hidden silhouette {index + 1} "
+                    f"handle-pivot hidden edge {index + 1} "
                     "remained visible after hiding"
                 )
         draw.ClearSelection2(True)

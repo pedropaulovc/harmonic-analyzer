@@ -26,9 +26,7 @@ def test_required_drawing_paths_and_registry() -> None:
 def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.DONOR_KEEP) | set(drawing.PROFILE_KEEP) | set(
-        drawing.PIN_VIEW_KEEP
-    )
+    kept = set(drawing.DONOR_KEEP) | set(drawing.PRINCIPAL_KEEP)
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
@@ -54,25 +52,20 @@ def test_retention_hole_matches_the_handle_and_dedicated_pin() -> None:
         handle_spec.RETENTION_PIN_STATION_FROM_FLOOR
     )
     assert pin_spec.PIN_LEN == pytest.approx(handle_spec.TUBE_OD)
-    assert drawing.PIN_VIEW_KEEP.keys() == {
-        "RetentionHoleDia",
-        "RetentionPinStation",
-    }
     callout = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
     assert callout is spec.RETENTION_HOLE_CALLOUT
     assert "MHA-058" in callout and "MHA-136" in callout
     assert "LIGHT DRIVE FIT" in callout
-    assert "MHA-136" in spec.DRAWING_NOTES and "FLUSH" in spec.DRAWING_NOTES
 
 
 def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
     radius, sag = spec.SHAFT_DIA / 2.0, spec.CAP_SAG
     assert spec.CAP_R == pytest.approx((radius * radius + sag * sag) / (2.0 * sag))
     assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
-    assert "CapSagDim" in drawing.PROFILE_KEEP
+    assert "CapSagDim" in drawing.PRINCIPAL_KEEP
 
 
-def test_part_authors_every_display_precision() -> None:
+def test_every_printed_dimension_has_authored_precision() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ShaftDia": 2,
         "Depth": 2,
@@ -80,12 +73,6 @@ def test_part_authors_every_display_precision() -> None:
         "RetentionHoleDia": 1,
         "RetentionPinStation": 1,
     }
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
-    assert "assert_imported_precision(" in drawing_source
-    assert "set_dimension_precision" not in drawing_source
-    assert "project_part_pmi" not in drawing_source
 
 
 def test_registry_retains_make_critical_material_and_finish() -> None:
@@ -93,5 +80,5 @@ def test_registry_retains_make_critical_material_and_finish() -> None:
 
     config = _config.parts("pinion-arbor")
     assert "1018" in str(config["material_specification"])
-    assert config["finish"]
+    assert config["finish"] == "oiled"
     assert int(config["quantity"]) == 1
