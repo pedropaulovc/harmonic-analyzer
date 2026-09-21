@@ -124,6 +124,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinchDepthReference": {"PinchDepthCenter"},
     "PinchRiseReference": {"PinchRise"},
     "SlitProfile": {"SlitW"},
+    "TopSlit": {"SlitDepth"},
 }
 
 # Decimal places carry the general tolerance and therefore live on the model.
@@ -137,6 +138,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchDepthReference": {"PinchDepthCenter": 1},
     "PinchRiseReference": {"PinchRise": 2},
     "SlitProfile": {"SlitW": 2},
+    "TopSlit": {"SlitDepth": 1},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places
