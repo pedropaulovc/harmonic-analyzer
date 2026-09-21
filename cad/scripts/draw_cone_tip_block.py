@@ -421,7 +421,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=adjuster_edge,
         callout_xy=(
             adjuster_center[0] + 0.060,
-            0.195,
+            0.155,
         ),
         label="blind adjuster thread",
     )
@@ -434,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.170, 0.205),
+        callout_xy=(0.170, 0.185),
         label="pinch entry-jaw clearance",
         process="DRILL",
     )
