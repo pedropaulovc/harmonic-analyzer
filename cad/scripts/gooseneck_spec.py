@@ -25,13 +25,19 @@ JOINT_DIMENSIONS: dict[str, set[str]] = {
     "ScrewShank": {"UnderHeadLength"},
     "ScrewHeadProfile": {"ScrewHeadDia"},
     "ScrewHead": {"HeadThickness"},
-    "ScrewStationReference": {"ExposedShank"},
-    "ScrewSlotProfile": {"SlotDepth", "SlotWidth"},
+    "ScrewSlotProfile": {"SlotDepth"},
+}
+SLOT_FACE_DIMENSIONS: dict[str, set[str]] = {
+    "ScrewSlotProfile": {"SlotWidth"},
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     feature: set(names)
-    for partition in (ELEVATION_DIMENSIONS, END_DIMENSIONS, JOINT_DIMENSIONS)
-    for feature, names in partition.items()
+    for partition in (
+        ELEVATION_DIMENSIONS,
+        END_DIMENSIONS,
+        JOINT_DIMENSIONS,
+        SLOT_FACE_DIMENSIONS,
+    )
 }
 
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
@@ -47,7 +53,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewShank": {"UnderHeadLength": 2},
     "ScrewHeadProfile": {"ScrewHeadDia": 2},
     "ScrewHead": {"HeadThickness": 2},
-    "ScrewStationReference": {"ExposedShank": 2},
     "ScrewSlotProfile": {"SlotDepth": 2, "SlotWidth": 2},
 }
 
@@ -75,7 +80,7 @@ PLUG_FIT_CALLOUT = (
     "0.051-0.127 RADIAL CLEARANCE\n"
     "CENTER CONCENTRIC; SILVER-BRAZE AWS A5.8 BAg-7"
 )
-TAP_CALLOUT = "#6-32 UNC-2B\n6.00 FULL THREAD"
+TAP_CALLOUT = "#6-32 UNC-2B THRU"
 SCREW_CALLOUT = "#6-32 UNC-2A"
 
 # Only non-dimensional fabrication/functional facts remain in notes. Coating
@@ -84,7 +89,7 @@ DRAWING_NOTES = "\n".join(
     (
         "FULL FAYING-SURFACE BRAZE PENETRATION; NO OPEN VOIDS.",
         "BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
-        "MHA-019 EYE MUST ROTATE FREELY ON SHANK AND REMAIN HEAD-CAPTURED.",
+        "DEFAULT SHOWN CLAMPED; LOOSEN SCREW FOR EYE INSTALLATION, THEN RETIGHTEN.",
     )
 )
 END_VIEW_NOTE = "POST END VIEW SCALE 2:1"
