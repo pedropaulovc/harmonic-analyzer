@@ -2,12 +2,10 @@ r"""Knife-mount dimensional contract -- the single source of truth shared by the
 part build (``build_knife_mount.py``) and its manufacturing drawing
 (``draw_knife_mount.py``).
 
-PURE DATA, no SolidWorks/COM imports.  Nothing else consumes this part's
-nominals (no assembly imports ``build_knife_mount``), so one ``_spec`` module is
-right here.  The block/bore geometry is derived in the build from the summing-
-assembly layout; the fixed values are mirrored here for the drawing's view math,
-and the offline lockstep test asserts the part marks and the drawing keeps
-EXACTLY ``DRAWING_DIMENSIONS``.
+PURE DATA, no SolidWorks/COM imports.  The block/bore geometry is derived in
+the build from the summing-assembly layout; the fixed values are mirrored here
+for drawing view math, native nominal readback, tolerance-stack checks, and the
+assembly's unambiguous tap-depth contract.
 
 NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
@@ -30,7 +28,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 BLK_HALF_X = 12.0  # block half-width (24 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
-BLK_TOP = 14.62  # local block top at the hanging-stack envelope
+BLK_TOP = 14.616  # exact local top from 999.7 - (979.7 + 10.268/2) - 0.25
 BORE_CY = -6.0  # bore crown is the knife axis: actual trunnion line contact
 BLK_BOT = -15.0  # BORE_CY - R_BORE - 3.0 wall
 BORE_FROM_TOP = BLK_TOP - BORE_CY
