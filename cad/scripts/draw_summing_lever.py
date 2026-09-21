@@ -377,8 +377,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Summing Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # Native readback inventories six view-owned descriptive INotes from
+        # the two tap families across this four-view package. The associative
+        # IDisplayDimension hole callouts are a separate annotation type.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=3,
+        expected_redundant_notes=6,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
