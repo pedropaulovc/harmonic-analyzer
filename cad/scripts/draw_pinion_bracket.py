@@ -136,7 +136,7 @@ DETAIL_SCALE = (3.0, 1.0)
 DETAIL_CENTER = (0.066, 0.072)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.108, 0.050)
+DETAIL_CAPTION_XY = (0.108, 0.075)
 DETAIL_LETTER_XY = (0.116, 0.104)
 
 
@@ -179,7 +179,7 @@ DETAIL_KEEP = {
     "CamReliefParkR": (0.100, 0.090),
     "CamReliefParkX": (0.068, 0.115),
     "CamReliefParkY": (0.031, 0.084),
-    "CamReliefEngagedR": (0.100, 0.036),
+    "CamReliefEngagedR": (0.100, 0.048),
     "CamReliefEngagedX": (0.068, 0.106),
     "CamReliefEngagedY": (0.031, 0.064),
 }
