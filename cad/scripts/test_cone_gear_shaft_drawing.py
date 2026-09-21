@@ -242,14 +242,30 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # One feature, one dimension, one quantity prefix -- not four dimensions.
     assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone; the one note left
-    # names the requirement behind the three-place stations (rule 2) and
-    # carries no number, tolerance, datum or method word.
+    # names the mate behind the three-place stations (rule 2) without adding
+    # a check of its own (no MUST), and carries no number, tolerance, datum
+    # or method word.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
+    # The sheet's note text runs ~2.7 mm per character; a line from the
+    # note anchor must end before the title block at x = 0.216 m (the
+    # first render's 67-character line ran under the tolerance table).
+    assert max(len(line) for line in notes.splitlines()) * 0.0027 < (
+        0.216 - drawing.NOTES_XY[0]
+    )
     assert not any(character.isdigit() for character in notes)
-    for forbidden in ("R0.", "MAX", "DATUM", "BASIC", "FINISH", "TURN", "GRIND"):
+    for forbidden in (
+        "R0.",
+        "MAX",
+        "MUST",
+        "DATUM",
+        "BASIC",
+        "FINISH",
+        "TURN",
+        "GRIND",
+    ):
         assert forbidden not in notes.upper()
-    assert "SOLDERED CONE GEAR FACES" in notes
+    assert "SOLDERED CONE GEAR SEATS" in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
         in source

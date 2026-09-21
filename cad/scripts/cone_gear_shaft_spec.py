@@ -109,11 +109,15 @@ SURFACE_FINISHES = (
 
 # The one thing the native dimensions cannot say: WHY three shoulder stations
 # print three places (drawing-simplicity policy rule 2: a location requirement
-# names its mate and states its acceptance).  No digits, no method words.
+# names its mate).  The note explains, it does not add a check: acceptance is
+# the title-block .XXX grade on those dimensions, and a note that asked the
+# shop to verify gear faces it has no positions for would be uncheckable
+# (codex, 375a122c).  No digits, no method words.  Lines stay short: the
+# note block starts 58 mm in and the title block begins at 216 mm.
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR SEAT SHOULDERS MUST FALL BETWEEN THE SOLDERED CONE GEAR FACES;",
-        "HOLD THE THREE-PLACE STATIONS.",
+        "THREE-PLACE SHOULDER STATIONS LOCATE",
+        "THE SOLDERED CONE GEAR SEATS.",
     )
 )
 
