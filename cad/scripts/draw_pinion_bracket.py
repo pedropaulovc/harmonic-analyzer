@@ -473,7 +473,7 @@ async def build(adapter: Any) -> dict[str, str]:
         add_note(
             adapter,
             "6.000 DIMENSION:\nPIVOT AXIS TO FOLLOWER-SEAT AXIS",
-            0.150,
+            0.105,
             0.105,
             height=0.003,
         )
