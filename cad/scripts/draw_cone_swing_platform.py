@@ -381,7 +381,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.350, 0.140),
+        symbol_xy=(0.350, 0.095),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
