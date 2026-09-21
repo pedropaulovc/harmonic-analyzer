@@ -266,65 +266,45 @@ def _add_body_centerline(adapter: Any, view: Any) -> None:
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate body centerline view")
-    station = (SHOULDER_Z + WALL_T + TUBE_LEN / 2.0) / 1000.0
     radius = TUBE_OD / 2000.0
-    candidates: dict[int, list[tuple[float, Any]]] = {-1: [], 1: []}
-    for raw_silhouette in visible_view_entities(
+    flanks: list[Any] = []
+    observed_cylinders: list[tuple[float, ...]] = []
+    raw_silhouettes = visible_view_entities(
         view, 4, label="pinion-handle socket flanks"
-    ):
+    )
+    for raw_silhouette in raw_silhouettes:
         silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
         raw_face = silhouette.GetFace()
         if raw_face is None:
             continue
-        surface = _early_bound(
-            _early_bound(raw_face, "IFace2").GetSurface(), "ISurface"
-        )
+        raw_surface = _early_bound(raw_face, "IFace2").GetSurface()
+        if raw_surface is None:
+            continue
+        surface = _early_bound(raw_surface, "ISurface")
         if not bool(surface.IsCylinder()):
             continue
         cylinder = tuple(float(value) for value in (surface.CylinderParams or ()))
-        if (
-            len(cylinder) < 7
-            or abs(cylinder[3]) > 1e-6
-            or abs(cylinder[4]) > 1e-6
-            or abs(abs(cylinder[5]) - 1.0) > 1e-6
-            or abs(cylinder[6] - radius) > 1e-6
-        ):
-            continue
-        start = silhouette.GetStartPoint()
-        end = silhouette.GetEndPoint()
-        if start is None or end is None:
-            continue
-        start_xyz = adapter._get_attr_or_call(start, "ArrayData")
-        end_xyz = adapter._get_attr_or_call(end, "ArrayData")
-        if not start_xyz or not end_xyz:
-            continue
-        start_xyz = tuple(float(value) for value in start_xyz)
-        end_xyz = tuple(float(value) for value in end_xyz)
-        z_min, z_max = sorted((start_xyz[2], end_xyz[2]))
-        if not z_min - 1e-6 <= station <= z_max + 1e-6:
-            continue
-        for side in (-1, 1):
-            if (
-                abs(start_xyz[1] - side * radius) <= 1e-6
-                and abs(end_xyz[1] - side * radius) <= 1e-6
-            ):
-                candidates[side].append((z_max - z_min, silhouette))
-    if any(len(matches) != 1 for matches in candidates.values()):
+        observed_cylinders.append(cylinder)
+        if len(cylinder) >= 7 and abs(cylinder[6] - radius) <= 1e-6:
+            flanks.append(silhouette)
+    if len(flanks) != 2:
         raise RuntimeError(
-            "body centerline did not resolve one socket flank per side: "
-            f"{ {side: len(matches) for side, matches in candidates.items()} }"
+            "body centerline did not resolve the two socket-OD silhouettes: "
+            f"found {len(flanks)} of {len(raw_silhouettes)} silhouettes; "
+            f"cylinders={observed_cylinders!r}"
         )
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
     selection_data.View = view
     draw.ClearSelection2(True)
-    for index, side in enumerate((-1, 1)):
-        silhouette = candidates[side][0][1]
+    for index, silhouette in enumerate(flanks):
         selectable = _sw_type_info.early_bound_or_flag(
             silhouette, "ISilhouetteEdge", "Select2"
         )
         if not bool(selectable.Select2(index > 0, selection_data)):
-            raise RuntimeError(f"failed to select body centerline socket flank {side:+d}")
+            raise RuntimeError(
+                f"failed to select body centerline socket flank {index + 1}"
+            )
     if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
         raise RuntimeError("body centerline socket-flank selection was not a pair")
     centerline = ddoc.InsertCenterLine2()
