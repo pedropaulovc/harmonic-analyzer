@@ -88,7 +88,7 @@ SECTION_KEEP = {
 }
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        RIGHT_CENTER[0],
+        RIGHT_CENTER[0] + 0.029,
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.012,
     )
 }
@@ -436,7 +436,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pinch_clearance_edge,
         callout_xy=(0.170, 0.185),
         label="pinch entry-jaw clearance",
-        process="DRILL",
+        process="DRILL TO SLOT",
     )
     set_hole_callout_precision(
         pinch_clearance_callout,
@@ -453,14 +453,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x, y in (
-        ("SHAFT ENTRY", passage_center[0] - 0.021, 0.078),
-        ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
-        ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
-        ("ADJUSTER ENTRY", adjuster_center[0] - 0.054, 0.185),
+        ("REAR — SHAFT ENTRY", passage_center[0] - 0.028, 0.078),
+        ("RIGHT — PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.035, 0.078),
+        ("LEFT — PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.031, 0.078),
+        ("FRONT — ADJUSTER ENTRY", adjuster_center[0] - 0.060, 0.185),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
-    if add_note(adapter, "ROTATED 90°", SECTION_CENTER[0] + 0.040, 0.195) is None:
+    if add_note(adapter, "ROTATED 90°", SECTION_CENTER[0] - 0.015, 0.195) is None:
         raise RuntimeError("failed to label the rotated section")
 
     foot_edge = _foot_edge(adapter, front)
