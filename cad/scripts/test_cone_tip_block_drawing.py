@@ -28,6 +28,13 @@ def test_tip_passage_is_the_adjuster_cup_clearance_envelope() -> None:
     assert "THRU" in callout
     assert "CLEARANCE" in callout
 
+def test_adjuster_tap_has_lead_beyond_the_required_full_thread() -> None:
+    """A blind tap cannot deliver full threads to its drill shoulder."""
+    spec = part.ADJUSTER_BORE_SPEC
+    thread_depth = spec.overrides_mm["ThreadDepth"]
+    assert 0.0 < thread_depth < spec.depth_mm
+    assert thread_depth == cone_tip_block_spec.ADJUSTER_THREAD_DEPTH
+
 
 def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
     """The screw must pass one jaw and engage the other, not bind in both."""
@@ -48,14 +55,25 @@ def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
     assert part.PINCH_CLEARANCE_DIA > part.PINCH_BORE_DIA
 
 
-def test_pinch_bore_stays_in_the_clamp_band_and_crosses_the_slot() -> None:
-    """Keep the cross-bore clear of the adjuster and above the slit floor."""
-    bore_bottom = part.PINCH_BORE_Y - part.PINCH_BORE_DIA / 2.0
-    bore_top = part.PINCH_BORE_Y + part.PINCH_BORE_DIA / 2.0
-    adjuster_top = part.ADJUSTER_AXIS_HEIGHT + part.ADJUSTER_BORE_DIA / 2.0
-    assert bore_bottom >= adjuster_top + 0.25
-    assert bore_top <= part.BLOCK_HEIGHT - 0.25
-    assert part.BLOCK_HEIGHT - part.SLIT_DEPTH <= bore_bottom
+def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
+    """The user-approved relative axis control prevents both breakout and collision."""
+    assert abs(part.PINCH_BORE_Y - part.ADJUSTER_AXIS_HEIGHT - part.PINCH_RISE) < 1e-12
+    assert abs(
+        cone_tip_block_spec.BLOCK_HEIGHT
+        - cone_tip_block_spec.SLIT_DEPTH
+        - cone_tip_block_spec.SLIT_FLOOR
+    ) < 1e-12
+    assert (
+        cone_tip_block_spec.WORST_CLEARANCE_TO_ADJUSTER_MM
+        >= cone_tip_block_spec.MIN_CLEARANCE_TO_ADJUSTER_MM
+    )
+    assert cone_tip_block_spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
+    assert (
+        cone_tip_block_spec.WORST_TOP_LIGAMENT_MM
+        >= cone_tip_block_spec.MIN_TOP_LIGAMENT_MM
+    )
+    tap_bottom = part.PINCH_BORE_Y - part.PINCH_BORE_DIA / 2.0
+    assert cone_tip_block_spec.SLIT_FLOOR <= tap_bottom
 
 
 def test_foot_seat_is_the_only_locating_surface_finish() -> None:

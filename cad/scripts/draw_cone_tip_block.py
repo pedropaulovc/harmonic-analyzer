@@ -10,6 +10,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -19,8 +20,12 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hole_callout_precision,
+    set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -33,6 +38,7 @@ from cone_tip_block_spec import (
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
+    DRAWING_REFERENCE_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
@@ -41,7 +47,7 @@ from cone_tip_block_spec import (
     SLIT_W,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_tip_block"]
@@ -75,7 +81,7 @@ FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _elevation_y(0.0, FRONT_CENTER) - 0.012),
     "BlockHt": (FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
     "PassageDiaDim": (
-        FRONT_CENTER[0] + 0.038,
+        FRONT_CENTER[0] + 0.068,
         _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
     ),
     "PassageZ": (
@@ -86,9 +92,12 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
 SECTION_KEEP = {
-    "PinchZ": (
+    "PinchRise": (
         SECTION_CENTER[0] - 0.060,
-        _elevation_y(PINCH_HEIGHT / 2.0, SECTION_CENTER),
+        _elevation_y(
+            (ADJUSTER_AXIS_HEIGHT + PINCH_HEIGHT) / 2.0,
+            SECTION_CENTER,
+        ),
     )
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -152,6 +161,75 @@ def _circle_entity(
             f"R{radius:.3f} at {center_y:.3f} mm"
         )
     return edge
+
+_COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
+
+
+def _hide_section_cosmetic_threads(adapter: Any, view: Any) -> int:
+    """Keep cosmetic-thread annotation ink out of the solid-line section."""
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    if layer is None:
+        if int(
+            manager.AddLayer(
+                _COSMETIC_THREAD_LAYER,
+                "cosmetic thread ink hidden in cone-tip section",
+                0,
+                0,
+                0,
+            )
+        ) != 1:
+            raise RuntimeError("failed to add cone-tip section thread layer")
+        layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("cone-tip section thread layer is not hidden")
+    hidden = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 1:  # swCosmeticThread
+            continue
+        annotation.Layer = _COSMETIC_THREAD_LAYER
+        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("cone-tip section cosmetic thread refused hidden layer")
+        hidden += 1
+    if not hidden:
+        raise RuntimeError("cone-tip section has no cosmetic thread to hide")
+    rebuild_drawing(adapter, label="_hide_section_cosmetic_threads")
+    return hidden
+
+
+def _add_reference_location(
+    adapter: Any,
+    view: Any,
+    *,
+    face_xy: tuple[float, float],
+    circle_xy: tuple[float, float],
+    circle: Any,
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Restate a model-owned centred feature from one finished face."""
+    display = add_edge_dimension(
+        adapter,
+        view,
+        p0=face_xy,
+        p1=circle_xy,
+        text_xy=text_xy,
+        orientation="horizontal",
+        entity_types=("EDGE", "EDGE"),
+        entities=(None, circle),
+        label=label,
+    )
+    set_arc_endpoints_to_center(adapter, display, label=label)
+    annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
+    display = set_reference_dimension(adapter, annotation, label=label)
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label}: reference precision did not persist")
+    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -279,6 +357,13 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
 
+    passage_edge = _circle_entity(
+        adapter,
+        front,
+        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
+        center_y_mm=ADJUSTER_AXIS_HEIGHT,
+        label="shaft clearance passage",
+    )
     adjuster_edge = _circle_entity(
         adapter,
         back,
@@ -300,18 +385,54 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch opposite-jaw thread",
     )
-    add_native_hole_callout(
+    _add_reference_location(
+        adapter,
+        front,
+        face_xy=(
+            FRONT_CENTER[0] - BLOCK_X * _S / 2.0,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
+        ),
+        circle_xy=(
+            FRONT_CENTER[0] - SHAFT_PASSAGE_DIA * _S / 2.0,
+            _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
+        ),
+        circle=passage_edge,
+        text_xy=(FRONT_CENTER[0] - 0.007, 0.172),
+        label="adjuster and slot width-centre reference",
+    )
+    _add_reference_location(
+        adapter,
+        right,
+        face_xy=(
+            RIGHT_CENTER[0] - BLOCK_Z * _S / 2.0,
+            _elevation_y(PINCH_HEIGHT, RIGHT_CENTER),
+        ),
+        circle_xy=(
+            RIGHT_CENTER[0],
+            _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
+            + PINCH_CLEARANCE_DIA * _S / 2.0,
+        ),
+        circle=pinch_clearance_edge,
+        text_xy=(RIGHT_CENTER[0] - 0.006, 0.181),
+        label="pinch depth-centre reference",
+    )
+    adjuster_callout = add_native_hole_callout(
         adapter,
         back,
         edge=adjuster_edge,
         callout_xy=(0.356, _elevation_y(ADJUSTER_AXIS_HEIGHT, BACK_CENTER) + 0.012),
         label="blind adjuster thread",
     )
+    set_hole_callout_precision(
+        adjuster_callout,
+        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+        label="adjuster tap depths",
+    )
     add_native_hole_callout(
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.182, 0.181),
+        callout_xy=(0.182, 0.197),
         label="pinch entry-jaw clearance",
         process="DRILL",
     )
@@ -322,6 +443,20 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.254, 0.181),
         label="pinch opposite-jaw thread",
     )
+
+    _hide_section_cosmetic_threads(adapter, section)
+    for text, x in (
+        ("SHAFT ENTRY", FRONT_CENTER[0] - 0.021),
+        ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026),
+        ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023),
+        ("ADJUSTER ENTRY", BACK_CENTER[0] - 0.021),
+    ):
+        if add_note(adapter, text, x, 0.080) is None:
+            raise RuntimeError(f"failed to add {text.lower()} view caption")
+    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.260) is None:
+        raise RuntimeError("failed to orient the section shaft side")
+    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.260) is None:
+        raise RuntimeError("failed to orient the section adjuster side")
 
     foot_edge = _foot_edge(adapter, front)
     add_surface_finish(
@@ -347,6 +482,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Tip Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 
