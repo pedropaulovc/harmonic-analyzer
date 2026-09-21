@@ -137,7 +137,7 @@ DETAIL_SCALE = (3.0, 1.0)
 DETAIL_CENTER = (0.058, 0.072)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.112, 0.075)
+DETAIL_CAPTION_XY = (0.125, 0.075)
 DETAIL_LETTER_XY = (0.116, 0.104)
 
 
@@ -314,6 +314,31 @@ def _position_detail_caption(adapter: Any, detail: Any) -> None:
         raise RuntimeError("native detail caption position did not persist")
     if str(note.PropertyLinkedText or "") != linked_text:
         raise RuntimeError("detail caption lost its native view-label fields")
+    extent = tuple(float(value) for value in note.GetExtent())
+    outline = tuple(float(value) for value in view.GetOutline())
+    if len(extent) != 6 or len(outline) != 4:
+        raise RuntimeError(
+            f"cannot measure detail caption clearance: extent={extent!r}, "
+            f"outline={outline!r}"
+        )
+    caption_left = min(extent[0], extent[3])
+    view_right = max(outline[0], outline[2])
+    gap = caption_left - view_right
+    if gap < 0.003:
+        raise RuntimeError(
+            f"detail caption is not outboard of its view: {gap * 1000:.1f} mm gap"
+        )
+    _telemetry.info(
+        f"detail caption measured outboard: {gap * 1000:.1f} mm gap; "
+        f"caption=[{min(extent[0], extent[3]) * 1000:.1f}, "
+        f"{min(extent[1], extent[4]) * 1000:.1f}, "
+        f"{max(extent[0], extent[3]) * 1000:.1f}, "
+        f"{max(extent[1], extent[4]) * 1000:.1f}] mm; "
+        f"view=[{min(outline[0], outline[2]) * 1000:.1f}, "
+        f"{min(outline[1], outline[3]) * 1000:.1f}, "
+        f"{max(outline[0], outline[2]) * 1000:.1f}, "
+        f"{max(outline[1], outline[3]) * 1000:.1f}] mm"
+    )
 
 
 def _position_fence_letter(adapter: Any, detail: Any) -> None:
