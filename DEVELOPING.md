@@ -208,6 +208,9 @@ Log retrieval has a 30-second timeout; an absent or unavailable log produces a
 warning without replacing the original worker failure or changing the nonzero
 exit. Successful leaves do not download logs. The commands below remain useful
 for following a running workflow or recovering evidence after an interruption.
+Concurrent failures download their logs in parallel, then serialize each complete
+log block with a build-scoped output lock so one task's log cannot nest inside
+another's.
 
 In case 3, harvest every workflow ID the log recorded — both
 `Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import inspect
 import json
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -79,6 +80,85 @@ _FAILED_LEAF = dict(
     failure_category="task_failed",
     failure_message="SolidWorks connect timed out",
 )
+
+
+_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV = "HARMONIC_TEST_REMOVE_FARM_LOG_LOCK"
+
+
+def _emit_failed_log_in_process(
+    output_path: str, retrieval_barrier, begin_count, both_begun, name: str
+) -> None:
+    """Fetch in parallel and make unlocked block emission overlap deterministically."""
+
+    def fetch(
+        _pool, *args, stdout=subprocess.PIPE, stderr=None, timeout_s=None
+    ):
+        retrieval_barrier.wait(timeout=10)
+        diagnostic = f"retrieval diagnostic for {name}\n"
+        if stderr is None:
+            sys.stderr.write(diagnostic)
+            sys.stderr.flush()
+        else:
+            stderr.write(diagnostic.encode())
+        stdout.write(f"worker log for {name}\n".encode())
+        return subprocess.CompletedProcess(args, 0)
+
+    class CoordinatedOutput:
+        def __init__(self, output):
+            self.output = output
+            self.begin_pending = False
+
+        def write(self, text):
+            written = self.output.write(text)
+            self.output.flush()
+            if text.startswith("--- begin failed farm task log:"):
+                self.begin_pending = True
+            elif self.begin_pending and text == "\n":
+                self.begin_pending = False
+                with begin_count.get_lock():
+                    begin_count.value += 1
+                    position = begin_count.value
+                    if position == 2:
+                        both_begun.set()
+                if position == 1:
+                    both_begun.wait(timeout=1)
+            return written
+
+        def flush(self):
+            self.output.flush()
+
+    if os.environ.get(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV) == "1":
+
+        class NoOutputLock:
+            def __init__(self, _path):
+                pass
+
+            def acquire(self):
+                pass
+
+            def release(self):
+                pass
+
+        _farm.FileLock = NoOutputLock
+
+    _farm.run_pool_cli = fetch
+    result = _farm.LeafResult(
+        state="failed",
+        exit_code=87,
+        worker_id=f"worker-{name}",
+        attempt=1,
+        cache_present=False,
+        log_blob=f"results/{name}/task.log",
+        failure_category="task_failed",
+        failure_message=f"{name} failed",
+    )
+    with Path(output_path).open("a", encoding="utf-8", buffering=1) as output:
+        previous = sys.stderr
+        sys.stderr = CoordinatedOutput(output)
+        try:
+            _farm._emit_failed_task_log(f"part:{name}", f"leaf:{name}", result)
+        finally:
+            sys.stderr = previous
 
 
 def _refuse_local_build(dodo, monkeypatch, calls):
@@ -1406,7 +1486,9 @@ def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error
     dodo = _load_dodo()
     expected_wf_id = "leaf:part:x:" + "k" * 64 + ":900s"
 
-    def pool_cli(_pool, *args, stdout=subprocess.PIPE, timeout_s=None):
+    def pool_cli(
+        _pool, *args, stdout=subprocess.PIPE, stderr=None, timeout_s=None
+    ):
         if args == ("agents", "--json"):
             return subprocess.CompletedProcess(args, 0, _agents_summary(), "")
         if args[-2:] == ("--log-blob", failed.log_blob):
@@ -1445,6 +1527,58 @@ def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error
         "SolidWorks connect timed out"
     ) in report_output
     assert exit_code == 2
+
+
+def test_parallel_failed_leaf_logs_are_emitted_as_complete_blocks(
+    tmp_path, monkeypatch
+):
+    output_path = tmp_path / "build-stderr.log"
+    output_path.write_text("", encoding="utf-8")
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    context = multiprocessing.get_context("spawn")
+    retrieval_barrier = context.Barrier(2)
+    begin_count = context.Value("i", 0)
+    both_begun = context.Event()
+    processes = [
+        context.Process(
+            target=_emit_failed_log_in_process,
+            args=(
+                str(output_path),
+                retrieval_barrier,
+                begin_count,
+                both_begun,
+                name,
+            ),
+        )
+        for name in ("a", "b")
+    ]
+    try:
+        for process in processes:
+            process.start()
+        for process in processes:
+            process.join(timeout=15)
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)
+
+    assert [process.exitcode for process in processes] == [0, 0]
+
+    def block(name):
+        identity = f"part:{name} (leaf:{name})"
+        return (
+            f"--- begin failed farm task log: {identity} ---\n"
+            f"retrieval diagnostic for {name}\n"
+            f"worker log for {name}\n"
+            "\n"
+            f"--- end failed farm task log: {identity} ---\n"
+        )
+
+    output = output_path.read_text(encoding="utf-8")
+    assert output in (block("a") + block("b"), block("b") + block("a"))
 
 
 @pytest.mark.parametrize(

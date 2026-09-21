@@ -28,6 +28,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import BinaryIO
 
+from filelock import FileLock
+
 import _telemetry
 
 FARM_PROTOCOL_VERSION = 4
@@ -47,6 +49,27 @@ LEAF_TIMEOUT_MAX_S = 3 * 3600
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FAILED_LOG_TIMEOUT_S = 30.0
+FAILED_LOG_LOCK_ENV = "HARMONIC_FARM_LOG_LOCK"
+
+
+def _failed_log_lock_path() -> Path:
+    """One output lock shared by the doit processes in this submitter build."""
+
+    override = os.environ.get(FAILED_LOG_LOCK_ENV)
+    if override:
+        return Path(override)
+    path = (
+        Path(tempfile.gettempdir())
+        / "harmonic-analyzer"
+        / f"farm-output-{os.getpid()}.lock"
+    )
+    # dodo imports _farm before it spawns its workers, so this build-specific path
+    # travels to every worker without serializing unrelated build invocations.
+    os.environ[FAILED_LOG_LOCK_ENV] = str(path)
+    return path
+
+
+_FAILED_LOG_LOCK_PATH = _failed_log_lock_path()
 
 
 @dataclass(frozen=True)
@@ -105,13 +128,14 @@ def run_pool_cli(
     pool: Path,
     *args: str,
     stdout: int | BinaryIO = subprocess.PIPE,
+    stderr: int | BinaryIO | None = None,
     timeout_s: float | None = None,
 ) -> subprocess.CompletedProcess:
     """Run the pool's ``farm.py`` in its own locked environment.
 
     Captured output is decoded explicitly as UTF-8 for machine-readable callers.
-    A supplied binary sink receives raw stdout instead, allowing callers to spool
-    a task log without requiring the current ``sys.stderr`` to expose ``fileno``.
+    Supplied binary sinks receive raw child streams instead, allowing failure-log
+    output to be spooled without requiring ``sys.stderr`` to expose ``fileno``.
     """
 
     argv = [
@@ -131,6 +155,7 @@ def run_pool_cli(
             cwd=REPO_ROOT,
             env=env,
             stdout=stdout,
+            stderr=stderr,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -141,38 +166,44 @@ def run_pool_cli(
         cwd=REPO_ROOT,
         env=env,
         stdout=stdout,
+        stderr=stderr,
         timeout=timeout_s,
     )
 
 
-def _write_spooled_utf8(spool: BinaryIO) -> bool:
-    """Copy a binary spool to task stderr incrementally, replacing bad UTF-8."""
+def _write_spooled_utf8(spool: BinaryIO) -> int:
+    """Copy a binary spool to task stderr; return decoded characters written."""
 
     spool.seek(0)
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
-    wrote = False
+    written_chars = 0
     ends_with_newline = True
     while chunk := spool.read(64 * 1024):
         text = decoder.decode(chunk)
         if text:
             sys.stderr.write(text)
-            wrote = True
+            written_chars += len(text)
             ends_with_newline = text.endswith(("\n", "\r"))
     tail = decoder.decode(b"", final=True)
     if tail:
         sys.stderr.write(tail)
-        wrote = True
+        written_chars += len(tail)
         ends_with_newline = tail.endswith(("\n", "\r"))
-    if wrote and not ends_with_newline:
+    if written_chars and not ends_with_newline:
         sys.stderr.write("\n")
     sys.stderr.flush()
-    return wrote
+    return written_chars
 
 
-def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
-    """Print one failed leaf's complete worker log without changing its result."""
+def _write_failed_task_log_block(
+    identity: str,
+    result: LeafResult,
+    spool: BinaryIO | None,
+    warnings: list[str],
+    retrieval_exit_code: int | None,
+) -> None:
+    """Write one already-retrieved failure as an indivisible console block."""
 
-    identity = f"{task} ({wf_id})"
     print(f"--- begin failed farm task log: {identity} ---", file=sys.stderr, flush=True)
     if result.log_blob is None:
         print(
@@ -180,50 +211,85 @@ def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
             file=sys.stderr,
             flush=True,
         )
-    else:
-        warnings = []
+    elif spool is not None:
         try:
-            with tempfile.TemporaryFile() as spool:
-                retrieved = None
-                try:
-                    retrieved = run_pool_cli(
-                        pool_home(),
-                        "logs",
-                        wf_id,
-                        "--log-blob",
-                        result.log_blob,
-                        stdout=spool,
-                        timeout_s=FAILED_LOG_TIMEOUT_S,
-                    )
-                except subprocess.TimeoutExpired:
-                    warnings.append(
-                        f"task log retrieval timed out after "
-                        f"{FAILED_LOG_TIMEOUT_S:g}s"
-                    )
-                except OSError as exc:
-                    warnings.append(f"task log retrieval could not start: {exc}")
-                try:
-                    wrote_log = _write_spooled_utf8(spool)
-                except (OSError, ValueError) as exc:
-                    wrote_log = False
-                    warnings.append(f"the retrieved task log could not be read: {exc}")
-                if retrieved is not None:
-                    if retrieved.returncode != 0:
-                        warnings.append(
-                            f"task log retrieval exited {retrieved.returncode}"
-                        )
-                    elif not wrote_log:
-                        warnings.append("task log retrieval returned no output")
-        except OSError as exc:
-            warnings.append(f"task log retrieval could not create its spool: {exc}")
-        for warning in warnings:
-            print(
-                f"warning: {warning}; the original farm failure is unchanged",
-                file=sys.stderr,
-                flush=True,
-            )
+            written_chars = _write_spooled_utf8(spool)
+        except (OSError, ValueError) as exc:
+            written_chars = 0
+            warnings.append(f"the retrieved task log could not be read: {exc}")
+        if retrieval_exit_code == 0 and written_chars == 0:
+            warnings.append("task log retrieval returned no output")
+    for warning in warnings:
+        print(
+            f"warning: {warning}; the original farm failure is unchanged",
+            file=sys.stderr,
+            flush=True,
+        )
     print(file=sys.stderr, flush=True)
     print(f"--- end failed farm task log: {identity} ---", file=sys.stderr, flush=True)
+
+
+def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
+    """Retrieve in parallel, then print one failed leaf as a complete block."""
+
+    identity = f"{task} ({wf_id})"
+    warnings: list[str] = []
+    spool: BinaryIO | None = None
+    retrieval_exit_code: int | None = None
+    if result.log_blob is not None:
+        try:
+            spool = tempfile.TemporaryFile()
+        except OSError as exc:
+            warnings.append(f"task log retrieval could not create its spool: {exc}")
+        else:
+            try:
+                retrieved = run_pool_cli(
+                    pool_home(),
+                    "logs",
+                    wf_id,
+                    "--log-blob",
+                    result.log_blob,
+                    stdout=spool,
+                    stderr=spool,
+                    timeout_s=FAILED_LOG_TIMEOUT_S,
+                )
+            except subprocess.TimeoutExpired:
+                warnings.append(
+                    f"task log retrieval timed out after {FAILED_LOG_TIMEOUT_S:g}s"
+                )
+            except OSError as exc:
+                warnings.append(f"task log retrieval could not start: {exc}")
+            else:
+                retrieval_exit_code = retrieved.returncode
+                if retrieval_exit_code != 0:
+                    warnings.append(
+                        f"task log retrieval exited {retrieval_exit_code}"
+                    )
+
+    lock_path = _failed_log_lock_path()
+    output_lock = FileLock(str(lock_path))
+    locked = False
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        output_lock.acquire()
+        locked = True
+    except OSError as exc:
+        warnings.append(f"failed task log output could not be serialized: {exc}")
+    try:
+        _write_failed_task_log_block(
+            identity, result, spool, warnings, retrieval_exit_code
+        )
+    finally:
+        if locked:
+            try:
+                output_lock.release()
+            except OSError:
+                pass
+        if spool is not None:
+            try:
+                spool.close()
+            except OSError:
+                pass
 
 
 def config_path() -> Path:
