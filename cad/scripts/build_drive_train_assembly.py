@@ -748,10 +748,6 @@ from arbor_pedestal_spec import SCREW_HOLE_SPEC as ARBOR_PED_HOLE_SPEC  # noqa: 
 from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
-from build_pinion_arbor import (  # noqa: E402
-    SHAFT_DIA as ARBOR_DIA,
-    SHAFT_LEN as ARBOR_LEN,
-)
 from pinion_arbor_spec import (  # noqa: E402
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
@@ -759,6 +755,8 @@ from pinion_arbor_spec import (  # noqa: E402
     HEAD_DIA as ARBOR_HEAD_DIA,
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
     NECK_END_Z as ARBOR_NECK_END_Z,
+    SHAFT_DIA as ARBOR_DIA,
+    SHAFT_LEN as ARBOR_LEN,
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
@@ -1334,7 +1332,13 @@ ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
 # Preserve the released MHA-058 component origin at the head/cross-hole axis.
 # The head is now integral with MHA-102, whose local head centre is z=-6.5.
 HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
-HANDLE_ROWS = rot_z_rows(HANDLE_TILT_DEG)
+_HANDLE_C = math.cos(math.radians(HANDLE_TILT_DEG))
+_HANDLE_S = math.sin(math.radians(HANDLE_TILT_DEG))
+HANDLE_ROWS = [
+    [_HANDLE_C, _HANDLE_S, 0.0],
+    [-_HANDLE_S, _HANDLE_C, 0.0],
+    [0.0, 0.0, 1.0],
+]
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")

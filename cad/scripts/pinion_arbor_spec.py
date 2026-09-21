@@ -11,7 +11,7 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from pinion_handle_spec import ROD_DIA
+from pinion_handle_geometry import ROD_DIA
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
