@@ -27,6 +27,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
@@ -207,11 +208,16 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [shaft_diameter, *principal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(
-        adapter,
-        annotations,
-        {"CapSagDim", "RetentionHoleDia", "RetentionPinStation"},
-    )
+    set_reference_dimensions(adapter, annotations, {"RetentionHoleDia"})
+    for name in ("CapSagDim", "RetentionPinStation"):
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one arbor {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"arbor {name} reference")
 
     if not auto_center_marks(adapter, principal, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to retention-hole view")
