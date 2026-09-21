@@ -150,6 +150,7 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
         raise RuntimeError("cosmetic-thread layer did not remain hidden")
 
     hidden = 0
+    hidden_callouts = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != 1:  # swCosmeticThread
@@ -158,16 +159,21 @@ def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
             raise RuntimeError("profile cosmetic thread refused the hidden layer")
         thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
-        callout = _early_bound(_read_member(thread, "ThreadCallout"), "INote")
-        callout_annotation = _early_bound(
-            _read_member(callout, "GetAnnotation"), "IAnnotation"
-        )
-        callout_annotation.Layer = _COSMETIC_THREAD_LAYER
-        if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("profile thread callout refused the hidden layer")
+        raw_callout = _read_member(thread, "ThreadCallout")
+        if raw_callout is not None:
+            callout = _early_bound(raw_callout, "INote")
+            callout_annotation = _early_bound(
+                _read_member(callout, "GetAnnotation"), "IAnnotation"
+            )
+            callout_annotation.Layer = _COSMETIC_THREAD_LAYER
+            if str(callout_annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+                raise RuntimeError("profile thread callout refused the hidden layer")
+            hidden_callouts += 1
         hidden += 1
     if not hidden:
         raise RuntimeError("profile view has no cosmetic thread to hide")
+    if not hidden_callouts:
+        raise RuntimeError("profile cosmetic threads have no callout note to hide")
     rebuild_drawing(adapter, label="hide profile cosmetic threads")
 
 
