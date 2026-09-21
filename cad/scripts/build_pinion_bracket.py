@@ -17,12 +17,9 @@ Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..THICKNESS; the blind follower seat runs along X into the
 -X edge at (y -PIN_DROP, z mid), PIN_SEAT deep from a tangent plane at
 x -R_END.  PIN_DROP is negative, so the seat sits ABOVE the pivot on the
-STRAIGHT flank -- clear of both cap arcs.  The parked cam-relief
-scallop opens that flank up to y +4.675, so it nicks the bottom 0.68 mm
-of the seat's mouth by at most 0.53 mm; the seat axis and the whole
-upper half of the mouth are on solid metal, and the print shows the
-interruption rather than hiding it.  The
-assembly composes a Ry(180) into the strap's lean pose, so local -x (the
+STRAIGHT flank -- clear of both cap arcs.  The solid flank preserves the
+complete follower-seat mouth around its axis.
+The assembly composes a Ry(180) into the strap's lean pose, so local -x (the
 seat edge) reads machine WEST and the origin lands at the strap's NORTH
 face.
 
@@ -41,7 +38,6 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -72,9 +68,6 @@ from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pinion_bracket_geometry import (
     ARBOR_BORE,
-    CAM_RELIEF_ENGAGED_CENTER,
-    CAM_RELIEF_PARK_CENTER,
-    CAM_RELIEF_RADIUS,
     C2C,
     PIN_BORE,
     PIN_DROP,
@@ -118,7 +111,7 @@ def _pin_bore_removed() -> float:
     def f(dy: float) -> float:
         y = -PIN_DROP + dy
         chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
-        surface = _cam_relief_right_x(y)  # the true edge, or the scallop past it
+        surface = _edge_x(y)
         return chord * max(bottom - surface, 0.0)
 
     total = f(-r) + f(r)
@@ -127,60 +120,6 @@ def _pin_bore_removed() -> float:
     return total * h / 3.0
 
 
-def _cam_relief_intervals(y: float, centers) -> list[tuple[float, float]]:
-    """Scallop intervals clipped to the rounded strap outline at local *y*."""
-    if not -R_END <= y <= C2C + R_END:
-        return []
-    if y < 0.0:
-        strap_half = math.sqrt(max(R_END * R_END - y * y, 0.0))
-    elif y <= C2C:
-        strap_half = R_END
-    else:
-        strap_half = math.sqrt(max(R_END * R_END - (y - C2C) * (y - C2C), 0.0))
-    intervals: list[tuple[float, float]] = []
-    for cx, cy in centers:
-        dy = y - cy
-        if abs(dy) >= CAM_RELIEF_RADIUS:
-            continue
-        half = math.sqrt(CAM_RELIEF_RADIUS**2 - dy * dy)
-        lo = max(-strap_half, cx - half)
-        hi = min(strap_half, cx + half)
-        if hi > lo:
-            intervals.append((lo, hi))
-    return sorted(intervals)
-
-
-def _cam_relief_width(y: float, centers) -> float:
-    intervals = _cam_relief_intervals(y, centers)
-    if not intervals:
-        return 0.0
-    total = 0.0
-    lo, hi = intervals[0]
-    for next_lo, next_hi in intervals[1:]:
-        if next_lo > hi:
-            total += hi - lo
-            lo, hi = next_lo, next_hi
-            continue
-        hi = max(hi, next_hi)
-    return total + hi - lo
-
-
-def _cam_relief_area(centers) -> float:
-    """Plan area removed from the rounded strap, Simpson-integrated."""
-    n = 4000
-    span = C2C + 2.0 * R_END
-    h = span / n
-    values = [_cam_relief_width(-R_END + i * h, centers) for i in range(n + 1)]
-    return (
-        h
-        / 3.0
-        * (
-            values[0]
-            + values[-1]
-            + 4.0 * sum(values[1:-1:2])
-            + 2.0 * sum(values[2:-1:2])
-        )
-    )
 
 
 def _edge_x(y: float) -> float:
@@ -192,12 +131,6 @@ def _edge_x(y: float) -> float:
     return -math.sqrt(max(R_END**2 - off * off, 0.0))
 
 
-def _cam_relief_right_x(y: float) -> float:
-    """Rightmost opened edge at *y*, or the original edge if untouched."""
-    intervals = _cam_relief_intervals(
-        y, (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
-    )
-    return max((hi for _, hi in intervals), default=_edge_x(y))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -219,7 +152,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
     await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
-    await set_global(adapter, "CamReliefRadius", f"{CAM_RELIEF_RADIUS}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -327,71 +259,6 @@ async def build(adapter) -> dict[str, str]:
     expected = area * THICKNESS
     await volume_check(adapter, "strap", expected, 0.005 * expected)
 
-    # Full-spin cam-envelope relief at the parked and engaged strap poses.
-    # Each open circle is cut through the strap; their union covers the
-    # intervening centre arc with >=0.25 air while retaining >2.5 mm around
-    # the pivot bore.  Dimensioned the way it is cut -- two plunges of ONE
-    # cutter -- so each scallop records its centre from the pivot-bore axis
-    # plus a RADIUS, and both radii are driven by the one cutter global.
-    # Hand-authored rather than via define_circle because that helper always
-    # emits a DIAMETER, and a diameter on an arc that never closes on the
-    # part is not a callout a machinist can pick up (policy rule 7: arcs are
-    # dimensioned to their radius centres).
-    relief_centers = (CAM_RELIEF_PARK_CENTER, CAM_RELIEF_ENGAGED_CENTER)
-    previous_area = 0.0
-    for label, centre, centers in (
-        ("Park", CAM_RELIEF_PARK_CENTER, relief_centers[:1]),
-        ("Engaged", CAM_RELIEF_ENGAGED_CENTER, relief_centers),
-    ):
-        relief = SketchDims()
-        check(f"create_sketch cam relief {label}", await adapter.create_sketch("Front"))
-        sketch_mgr = adapter.currentSketchManager
-        previous_add_to_db = bool(sketch_mgr.AddToDB)
-        sketch_mgr.AddToDB = True
-        try:
-            circle = await adapter.add_circle(centre[0], centre[1], CAM_RELIEF_RADIUS)
-            check(f"add_circle cam relief {label}", circle)
-        finally:
-            sketch_mgr.AddToDB = previous_add_to_db
-        await anchor_point_to_origin(
-            adapter,
-            f"{circle.data}.center",
-            centre[0],
-            centre[1],
-            f"cam relief {label} centre",
-        )
-        # Both coordinates are non-zero, so the anchor emits exactly two
-        # distance dims, horizontal then vertical (see anchor_point_to_origin).
-        relief.record(f"CamRelief{label}X")
-        relief.record(f"CamRelief{label}Y")
-        check(
-            f"dimension cam relief {label} radius",
-            await adapter.add_sketch_dimension(
-                circle.data, None, "radial", CAM_RELIEF_RADIUS
-            ),
-        )
-        relief.record(f"CamRelief{label}R", '"CamReliefRadius"')
-        await ensure_fully_defined(adapter, f"cam relief {label} sketch")
-        check(f"exit_sketch cam relief {label}", await adapter.exit_sketch())
-        name_last_feature(adapter, f"CamRelief{label}Profile")
-        drive_jobs += relief.apply(adapter, f"CamRelief{label}Profile")
-        check(
-            f"cut cam relief {label}",
-            await adapter.create_cut_extrude(
-                ExtrusionParameters(
-                    depth=2.0 * (THICKNESS + 1.0),
-                    both_directions=True,
-                )
-            ),
-        )
-        name_last_feature(adapter, f"CamRelief{label}")
-        union_area = _cam_relief_area(centers)
-        removed = (union_area - previous_area) * THICKNESS
-        expected -= removed
-        await volume_check(
-            adapter, f"cam relief {label}", expected, max(0.5, 0.02 * removed)
-        )
-        previous_area = union_area
 
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
     # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Both signs are

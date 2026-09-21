@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import pinion_bracket_spec
@@ -25,8 +24,6 @@ def test_required_drawing_paths() -> None:
 def _kept() -> dict[str, tuple[float, float]]:
     return {
         **drawing.FRONT_KEEP,
-        **drawing.DETAIL_KEEP,
-        **drawing.DETAIL_RADIUS_XY,
         **drawing.LEFT_KEEP,
         **drawing.SECTION_KEEP,
     }
@@ -50,8 +47,6 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         len(group)
         for group in (
             drawing.FRONT_KEEP,
-            drawing.DETAIL_KEEP,
-            drawing.DETAIL_RADIUS_XY,
             drawing.LEFT_KEEP,
             drawing.SECTION_KEEP,
         )
@@ -114,7 +109,7 @@ def test_decimal_places_cover_every_marked_dimension_and_resolve_fit_bands() -> 
     ):
         width = abs(deviations(band)[0] - deviations(band)[1])
         assert width >= 10.0 ** -by_name[name]
-    # The follower-seat height rides the cam clearance budget, so it is the one
+    # The follower-seat height sets engagement geometry, so it is the one
     # dimension held to the title block's finest general grade.
     assert by_name["PinSeatCy"] == 3
     assert max(by_name.values()) == 3
@@ -143,99 +138,19 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
     assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCy", "PinSeatCz", "Depth"}
 
 
-def test_scallop_detail_encloses_what_it_dimensions() -> None:
-    # The detail imports each relief centre coordinate plus the pivot-bore
-    # size. Its two radii are drawing-native dimensions on the visible cut
-    # arcs, so their arrowheads cannot land on the circles' trimmed-away sides.
-    # The fence must show the whole pivot bore (so its centre mark reads as a
-    # bore axis), both relief centres, and both bites.
-    relief_dimensions = (
-        pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefParkProfile"]
-        | pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefEngagedProfile"]
-    )
-    assert set(drawing.DETAIL_KEEP) | set(drawing.DETAIL_RADIUS_XY) == (
-        relief_dimensions | {"PivotBoreDia"}
-    )
-    fence_center = drawing.DETAIL_FENCE_CENTER_MM
-    radius = drawing.DETAIL_FENCE_RADIUS_MM
-    assert (
-        math.dist((0.0, 0.0), fence_center)
-        + pinion_bracket_geometry.PIVOT_BORE / 2.0
-        <= radius - 1.0
-    )
-    for point in (
-        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
-        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
-    ):
-        assert math.dist(point, fence_center) <= radius - 1.0, point
-    # The bites run down the strap's left edge; both ends of each bite sit
-    # inside the fence.
-    edge = -pinion_bracket_geometry.HALF_WIDTH
-    for cx, cy in (
-        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
-        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
-    ):
-        half_chord = math.sqrt(
-            pinion_bracket_geometry.CAM_RELIEF_RADIUS**2 - (edge - cx) ** 2
-        )
-        for end in ((edge, cy - half_chord), (edge, cy + half_chord)):
-            assert math.dist(end, fence_center) <= radius - 1.0, end
-    # The detail enlarges: at the sheet's 2:1 the six dimensions overprinted.
-    assert drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] > 2.0
 
-
-def test_blind_seat_entry_face_is_solid_flank_where_the_reamer_lands() -> None:
-    # The seat's mouth has to land on flat metal above the pivot bore. The
-    # parked relief scallop reaches up past the bottom tangent of that mouth,
-    # so the print shows the mouth slightly interrupted -- but the entry stays
-    # startable: the axis and the whole upper half of the circle are on solid
-    # flank, and the nick never eats more than a tenth of the seat depth.
+def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
+    # The full follower-seat mouth lies on the straight flank between the two
+    # rounded ends. Its complete diameter and blind depth therefore remain in
+    # solid stock without opening into an adjacent cut.
     seat_y = -pinion_bracket_geometry.PIN_DROP
-    assert seat_y > 0.0
-    assert seat_y < pinion_bracket_geometry.C2C - pinion_bracket_geometry.R_END
+    seat_radius = pinion_bracket_geometry.PIN_BORE / 2.0
+    straight_end = pinion_bracket_geometry.C2C
+    assert seat_y - seat_radius >= 0.0
+    assert seat_y + seat_radius <= straight_end
+    assert pinion_bracket_geometry.WIDTH - pinion_bracket_geometry.PIN_SEAT >= seat_radius
     assert seat_y - pinion_bracket_geometry.PIVOT_BORE / 2.0 > 1.0
-    half_width = pinion_bracket_geometry.WIDTH / 2.0
-    radius = pinion_bracket_geometry.CAM_RELIEF_RADIUS
-    seat_half = pinion_bracket_geometry.PIN_BORE / 2.0
-    worst = 0.0
-    interrupted = 0.0
-    steps = 64
-    for centre in (
-        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
-        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
-    ):
-        for step in range(steps + 1):
-            probe = seat_y - seat_half + 2.0 * seat_half * step / steps
-            rise = abs(probe - centre[1])
-            if rise >= radius:
-                continue  # the scallop never reaches this height at all
-            depth = centre[0] + math.sqrt(radius**2 - rise**2) + half_width
-            if depth <= 0.0:
-                continue  # it stops short of the flank at this height
-            worst = max(worst, depth)
-            interrupted = max(interrupted, probe - (seat_y - seat_half))
-            # Nothing may reach the axis height or above it.
-            assert probe < seat_y
-    assert worst < 0.15 * pinion_bracket_geometry.PIN_SEAT
-    assert interrupted < 0.2 * pinion_bracket_geometry.PIN_BORE
 
-
-def test_cam_scallops_are_dimensioned_the_way_they_are_cut() -> None:
-    # Two plunges of one cutter: each centre located from the pivot-bore axis,
-    # each carrying a RADIUS, both radii driven by a single equation global so
-    # they cannot drift apart.
-    dims = pinion_bracket_spec.DRAWING_DIMENSIONS
-    assert dims["CamReliefParkProfile"] == {
-        "CamReliefParkX",
-        "CamReliefParkY",
-        "CamReliefParkR",
-    }
-    assert dims["CamReliefEngagedProfile"] == {
-        "CamReliefEngagedX",
-        "CamReliefEngagedY",
-        "CamReliefEngagedR",
-    }
-    assert pinion_bracket_geometry.CAM_RELIEF_MIN_PIVOT_LIGAMENT >= 2.5
 
 
 def test_strap_thickness_carries_the_cam_pin_seat_and_the_photo_band() -> None:

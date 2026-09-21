@@ -754,10 +754,6 @@ from build_pinion_arbor import (  # noqa: E402
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
-    CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
-    CAM_RELIEF_ENVELOPE_RADIUS as STRAP_CAM_RELIEF_ENVELOPE_R,
-    CAM_RELIEF_PARK_CENTER as STRAP_CAM_RELIEF_PARK,
-    CAM_RELIEF_RADIUS as STRAP_CAM_RELIEF_R,
     C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
@@ -1660,59 +1656,20 @@ if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
     raise AssertionError("engaged pinion lever left the photographed +X-side range")
 
 
-# Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
-# so its centre traces an arc in the bracket's local frame. The part carries
-# two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
-# must cover the full collar sweep plus 0.25 air over the intervening arc.
-def _lift_axis_in_strap(lean_rad: float) -> tuple[float, float]:
-    dx, dy = LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y
-    c, s = math.cos(lean_rad), math.sin(lean_rad)
-    return (-dx * c - dy * s, -dx * s + dy * c)
-
-
-_RELIEF_PARK_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG))
-_RELIEF_ENG_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG) + _PHI_ENG)
-for _label, _actual, _authored in (
-    ("parked", _RELIEF_PARK_ACTUAL, STRAP_CAM_RELIEF_PARK),
-    ("engaged", _RELIEF_ENG_ACTUAL, STRAP_CAM_RELIEF_ENGAGED),
-):
-    if math.dist(_actual, _authored) > 0.001:
-        raise AssertionError(
-            f"bracket cam relief {_label} centre {_authored} != linkage {_actual}"
-        )
-_RELIEF_CENTRE_CHORD = math.dist(_RELIEF_PARK_ACTUAL, _RELIEF_ENG_ACTUAL)
-_RELIEF_ARC_SAGITTA = math.hypot(LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y) * (
-    1.0 - math.cos(_PHI_ENG / 2.0)
-)
-_RELIEF_REQUIRED_R = (
-    math.hypot(STRAP_CAM_RELIEF_ENVELOPE_R, _RELIEF_CENTRE_CHORD / 2.0)
-    + _RELIEF_ARC_SAGITTA
-)
-if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
+# Follower-seat integrity in the uncut strap. The complete Ø4 mouth must land
+# on the straight -X flank, and the 4-deep blind seat must leave solid stock
+# before the opposite flank.
+_PIN_SEAT_Y = -FPIN_DROP
+_PIN_SEAT_R = FPIN_DIA / 2.0
+if _PIN_SEAT_Y - _PIN_SEAT_R < 0.0 or _PIN_SEAT_Y + _PIN_SEAT_R > STRAP_C2C:
+    raise AssertionError("follower-seat mouth leaves the bracket's straight flank")
+_PIN_SEAT_ENTRY_X = -STRAP_R_END
+_PIN_SEAT_BOTTOM_X = _PIN_SEAT_ENTRY_X + FPIN_SEAT
+_PIN_SEAT_REMAINING_WALL = STRAP_R_END - _PIN_SEAT_BOTTOM_X
+if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
     raise AssertionError(
-        f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
-        f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
-    )
-# Seat mouth: on the straight flank when the stud sits between the two bores
-# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
-_PIN_SEAT_SURFACE_X = (
-    -STRAP_R_END
-    if 0.0 <= -FPIN_DROP <= STRAP_C2C
-    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
-)
-_PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
-_PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
-for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
-    _dy = -FPIN_DROP - _cy
-    if abs(_dy) < STRAP_CAM_RELIEF_R:
-        _PIN_SEAT_OPEN_X = max(
-            _PIN_SEAT_OPEN_X,
-            _cx + math.sqrt(STRAP_CAM_RELIEF_R**2 - _dy**2),
-        )
-_PIN_SEAT_REMAINING = _PIN_SEAT_BOTTOM_X - _PIN_SEAT_OPEN_X
-if _PIN_SEAT_REMAINING < 1.5:
-    raise AssertionError(
-        f"cam scallop leaves only {_PIN_SEAT_REMAINING:.3f} mm follower-stud seat"
+        f"follower seat leaves only {_PIN_SEAT_REMAINING_WALL:.3f} mm "
+        "before the opposite flank"
     )
 
 # Full-rotation sweep of collar + set-pin boss about the rod axis. The boss

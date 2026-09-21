@@ -25,7 +25,6 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_bracket_geometry import (
     ARBOR_BORE as ARBOR_BORE,
     C2C as C2C,
-    CAM_RELIEF_RADIUS as CAM_RELIEF_RADIUS,
     HALF_WIDTH as HALF_WIDTH,
     OVERALL_LENGTH as OVERALL_LENGTH,
     PIN_BORE as PIN_BORE,
@@ -61,15 +60,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TopCapRadius",
     },
     "Strap": {"Depth"},
-    # The cam-clearance scallops are two plunges of one cutter: each centre
-    # from the pivot-bore axis, each carrying the cutter radius (both radii
-    # are driven by one equation global, so they cannot drift apart).
-    "CamReliefParkProfile": {"CamReliefParkX", "CamReliefParkY", "CamReliefParkR"},
-    "CamReliefEngagedProfile": {
-        "CamReliefEngagedX",
-        "CamReliefEngagedY",
-        "CamReliefEngagedR",
-    },
     # PinSeatCz locates the blind follower seat THROUGH the bar thickness, so
     # the seat is fully located rather than merely drawn centred.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy", "PinSeatCz"},
@@ -85,10 +75,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # cam lift, and the engaged pose is budgeted with 0.25 of air -- half a
 # millimetre there is twice the whole clearance.  Everything else is two
 # places (.XX, +/-0.51): the bore centre distance and the bar thickness are
-# routine link geometry, the scallops are clearance, and the two running
-# bores plus the pressed seat carry their own bands on top.  One place (.X)
-# on the two end radii and the seat depth: the ends are profiled to the bar's
-# own width and the seat bottoms out on a flat-bottom reamer.
+# routine link geometry, and the two running bores plus the pressed seat carry
+# their own bands on top.  One place (.X) on the two end radii and the seat
+# depth: the ends are profiled to the bar's own width and the seat bottoms out
+# on a flat-bottom reamer.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StrapProfile": {
         "PivotBoreDia": 2,
@@ -98,16 +88,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TopCapRadius": 1,
     },
     "Strap": {"Depth": 1},
-    "CamReliefParkProfile": {
-        "CamReliefParkX": 2,
-        "CamReliefParkY": 2,
-        "CamReliefParkR": 2,
-    },
-    "CamReliefEngagedProfile": {
-        "CamReliefEngagedX": 2,
-        "CamReliefEngagedY": 2,
-        "CamReliefEngagedR": 2,
-    },
     "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3, "PinSeatCz": 2},
     "PinSeat": {"PinSeatDepth": 1},
 }
@@ -151,9 +131,8 @@ SURFACE_FINISHES = (
 
 # No manufacturing-note block.  Everything this strap needs is a dimension, a
 # hole callout, a roughness symbol or a title-block field (drawing-simplicity
-# policy rule 6); the retired block restated the profile the outline already
-# draws, prescribed a fixturing method, and repeated the ligament the
-# dimensioned scallop centres already guarantee.
+# policy rule 6); the retired block restated geometry the native dimensions
+# and outline already define and prescribed an unnecessary fixturing method.
 DRAWING_NOTES = ""
 
 # Brackets carry no datums and no feature-control frames (policy rule 3): the

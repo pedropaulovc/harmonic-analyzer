@@ -1831,7 +1831,7 @@ sections:
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
-        - 28.0 centre-to-centre × 15 wide × 8 thick (2026-10 re-derive from ch25 page001_img01 — the 5 thick of the first pass left only 0.50 mm of web each side of the Ø4 blind follower-stud seat), R7.5 ends, parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore; two R6.9 cam-relief scallops
+        - 28.0 centre-to-centre × 15 wide × 8 thick (2026-10 re-derive from ch25 page001_img01 — the 5 thick of the first pass left only 0.50 mm of web each side of the Ø4 blind follower-stud seat), R7.5 ends, parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore
         - —
         - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — 36 × 18.75 × 12 blocks, lift bore 1.86 above the pivot bore)'
         - scaled
@@ -1893,11 +1893,8 @@ sections:
       cam eccentricity is 1.4 and its Ø10.32 OD retains a 0.575-mm thin-side
       wall. Parked surface gap is 0.150; the solved −81.871° cam rotation
       gives 1.202 mm engaged authority and leaves 7.015 mm of follower pin
-      beyond the contact station. Two open R6.90 bracket scallops cover the
-      collar's complete parked-to-engaged swept envelope with 0.25 air and
-      >2.5 pivot-bore ligament; the partially exposed follower-stud mouth is
-      silver-brazed after pressing. All are asserted analytically (`CAM_*` +
-      the segment-distance scan). At DP 49.82
+      beyond the contact station. The cam contact relationships are asserted
+      analytically (`CAM_*` + the segment-distance scan). At DP 49.82
       the drum is 42T Ø22.4 (same DP as the cylinder train it must mesh); the
       table above records the book-vintage DP 30 readings.
 
