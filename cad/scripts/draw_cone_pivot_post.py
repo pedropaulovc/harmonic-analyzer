@@ -745,7 +745,9 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
-    for view in (front, top, journal, section, iso):
+    # Derived section views do not expose selectable feature-sketch instances;
+    # the blank state inherited from their base view is sufficient.
+    for view in (front, top, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
