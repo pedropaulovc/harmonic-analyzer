@@ -62,6 +62,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 1},
+    "HeadProfile": {"HeadDia": 1},
+    "NeckProfile": {"NeckDia": 1},
     "ShaftProfile": {"ShaftDia": 2},
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},
     "BackCapProfile": {"BackCapSagDim": 1},
@@ -75,8 +77,13 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked integral-arbor dimension needs authored places")
+_DRAWING_CREATED_DIMENSIONS = {"HeadDia", "NeckDia"}
+if set(DRAWING_PRECISION_BY_NAME) != (
+    set().union(*DRAWING_DIMENSIONS.values()) | _DRAWING_CREATED_DIMENSIONS
+):
+    raise AssertionError(
+        "every imported or drawing-created integral-arbor dimension needs authored places"
+    )
 
 CROSS_HOLE_CALLOUT = (
     "MATCH-REAM THRU\n"
