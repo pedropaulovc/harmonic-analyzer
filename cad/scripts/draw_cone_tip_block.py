@@ -439,11 +439,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023),
         ("ADJUSTER ENTRY", adjuster_center[0] - 0.021),
     ):
-        if add_note(adapter, text, x, 0.066) is None:
+        if add_note(adapter, text, x, 0.078) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
-    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.260) is None:
+    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.204) is None:
         raise RuntimeError("failed to orient the section shaft side")
-    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.260) is None:
+    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.204) is None:
         raise RuntimeError("failed to orient the section adjuster side")
 
     foot_edge = _foot_edge(adapter, front)
