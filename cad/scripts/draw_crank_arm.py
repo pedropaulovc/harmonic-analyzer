@@ -241,7 +241,7 @@ def _omit_title_block_thread_class(display: Any) -> None:
     native = _early_bound(display, "IDisplayDimension")
     definition = str(native.GetText(5) or "")
     without_class = re.sub(
-        r"\s*-\s*<hw-threadclass>\s*", " ", definition, flags=re.IGNORECASE
+        r"\s*(?:-\s*)?<hw-threadclass>\s*", " ", definition, flags=re.IGNORECASE
     )
     without_class = re.sub(r" {2,}", " ", without_class)
     if without_class == definition:
