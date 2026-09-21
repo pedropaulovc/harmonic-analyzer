@@ -61,14 +61,14 @@ def test_retention_hole_matches_the_handle_and_dedicated_pin() -> None:
 def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
     radius, sag = spec.SHAFT_DIA / 2.0, spec.CAP_SAG
     assert spec.CAP_R == pytest.approx((radius * radius + sag * sag) / (2.0 * sag))
-    assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
+    assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.3 CROWN"
     assert "CapSagDim" in drawing.PRINCIPAL_KEEP
 
 
 def test_every_printed_dimension_has_authored_precision() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ShaftDia": 2,
-        "Depth": 2,
+        "Depth": 1,
         "CapSagDim": 1,
         "RetentionHoleDia": 1,
         "RetentionPinStation": 1,

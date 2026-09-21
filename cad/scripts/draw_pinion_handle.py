@@ -24,6 +24,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_view_centerline,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
@@ -54,7 +55,6 @@ from pinion_handle_spec import (
     TUBE_OD,
     WALL_T,
 )
-from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -209,58 +209,22 @@ def _point(
 
 
 def _add_body_centerline(adapter: Any, view: Any) -> None:
-    """Select two intact socket flanks away from the transverse pin opening."""
+    """Insert the socket cylinder's turning axis away from its pin opening."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate body centerline view")
-    # The old midpoint pick landed exactly on the new MHA-136 hole and selected
-    # no silhouette.  The quarter-length station is still on the constant OD,
-    # with authored clearance from that opening.
+    # Select the cylindrical face inside its projected flanks.  The old
+    # midpoint landed on the MHA-136 opening; the quarter-length station is
+    # intact authored OD, and selecting the face lets SolidWorks derive the
+    # native axis without ambiguous silhouette hit-testing.
     station = SHOULDER_Z + WALL_T + TUBE_LEN / 4.0
     if abs(station - RETENTION_PIN_CENTER_Z) <= RETENTION_PIN_DIA / 2.0:
         raise RuntimeError("body centerline pick station intersects retention hole")
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    flanks: list[Any] = []
-    for index, side in enumerate((-1.0, 1.0)):
-        x, y = _point(adapter, view, (0.0, side * TUBE_OD / 2.0, station))
-        draw.ClearSelection2(True)
-        if not draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, False, 0, null_callout(), 0
-        ):
-            raise RuntimeError(
-                f"failed to resolve intact body centerline socket flank {index + 1}"
-            )
-        selected = selection_manager.GetSelectedObject6(1, -1)
-        if (
-            int(selection_manager.GetSelectedObjectCount2(-1)) != 1
-            or int(selection_manager.GetSelectedObjectType3(1, -1)) != 46
-            or selected is None
-        ):
-            raise RuntimeError(
-                f"body centerline socket flank {index + 1} was not singular"
-            )
-        flanks.append(selected)
-    draw.ClearSelection2(True)
-    if int(adapter.swApp.IsSame(flanks[0], flanks[1])) != 0:
-        raise RuntimeError("body centerline resolved the same socket flank twice")
-    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
-    selection_data.View = view
-    for index, flank in enumerate(flanks):
-        selectable = _sw_type_info.early_bound_or_flag(
-            flank, "ISilhouetteEdge", "Select2"
-        )
-        if not bool(selectable.Select2(index > 0, selection_data)):
-            raise RuntimeError(
-                f"failed to select resolved body centerline socket flank {index + 1}"
-            )
-    if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
-        raise RuntimeError("body centerline socket-flank selection was not a pair")
-    centerline = ddoc.InsertCenterLine2()
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError("failed to insert centerline between socket flanks")
+    face_xy = _point(adapter, view, (0.0, TUBE_OD / 4.0, station))
+    add_view_centerline(
+        adapter,
+        view,
+        face_xy=face_xy,
+        label="pinion-handle socket turning axis",
+    )
     # SOLIDWORKS also generates axes for the omitted rod and coaxial body faces.
     # Retain one native turning axis by its sheet geometry, never annotation IDs.
     native_view = _early_bound(view, "IView")
