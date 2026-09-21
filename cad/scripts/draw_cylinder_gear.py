@@ -26,6 +26,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_visible,
@@ -331,9 +332,9 @@ def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> No
 
     Inside arrows draw the dimension line right across the circle, through the
     gear centre -- where every leader to the eccentric bore from the note
-    lanes above has to cross it (codex iter4).  Outside arrows keep the value
-    and its band and leave a single leader to the rim (draw_tube_frame's OD
-    reference does the same).
+    lanes above has to cross it (codex iter4).  Outside arrows plus hidden
+    diametral leaders keep the value and its band while leaving a single
+    leader to the rim (draw_tube_frame's OD reference does the same).
     """
     matches = [
         annotation
@@ -346,10 +347,12 @@ def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> No
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.ArrowSide = 1  # swDimArrowsOutside
     display.SetSecondArrow(False, False)
+    display.LeaderVisibility = 3  # swLeaderLineNone; keep only the rim arrow
     if (
         int(display.ArrowSide) != 1
         or bool(display.GetUseDocSecondArrow())
         or bool(display.GetSecondArrow())
+        or int(display.LeaderVisibility) != 3
     ):
         raise RuntimeError(f"{name} did not keep its single outside arrow")
 
@@ -432,6 +435,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
+    # Keep the controlled face-width value while moving only its text outside
+    # the side-view extension lines; the offset leader returns to the dimension.
+    offset_dimension_text(
+        adapter,
+        right_annotations,
+        {"FaceWidth": (0.225, 0.220)},
+    )
     _leader_outside_arrow(adapter, front_annotations, "CamDia")
     cam_thickness_annotations = [
         annotation
