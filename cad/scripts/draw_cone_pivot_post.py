@@ -152,11 +152,12 @@ JOURNAL_KEEP = {
 # as-cast collar the shop has to know that face is machined back to a station,
 # not left as cast.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "BOSS OD\nFULL SPOTFACE",
+    "CrankBossDia": "CRANK BOSS OD\nSPOTFACE NEAR END",
+    "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS",
-    "ConeBossLen": "BOSS LENGTH\nMIDPLANE",
+    "ConeBossLen": "CONE BOSS LENGTH\nMIDPLANE",
     "CrankBossStartZ": "TO BOSS SPOT FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
@@ -795,6 +796,12 @@ async def build(adapter: Any) -> dict[str, str]:
         "CONE JOURNAL VIEW - LOOK ALONG CONE AXIS",
         0.202,
         0.104,
+    )
+    add_note(
+        adapter,
+        f"TOP VIEW - AXIS PROFILE\nCRANK / CONE BORE AXES {INCLINE_DEG:.2f}°",
+        0.130,
+        0.187,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
 
