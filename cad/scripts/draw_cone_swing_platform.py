@@ -35,6 +35,7 @@ from _drawing_common import (
     check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
+    rebuild_drawing,
     new_project_drawing,
     model_point_in_view,
     read_required_properties,
@@ -113,11 +114,53 @@ NOTCH_KEEP = {
     "CapEDia": (0.285, 0.105),
 }
 SECTION_KEEP = {
-    "PlateThk": (0.275, 0.105),
+    "PlateThk": (0.300, 0.120),
     "PivotBearingReliefDepth": (0.365, 0.125),
 }
 
 
+
+
+_COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+
+
+def _hide_profile_cosmetic_threads(adapter: Any, view: Any) -> None:
+    """Hide the redundant model cosmetic-thread callout in the profile view."""
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    if layer is None:
+        if (
+            int(
+                manager.AddLayer(
+                    _COSMETIC_THREAD_LAYER,
+                    "cosmetic thread ink hidden in profile view",
+                    0,
+                    0,
+                    0,
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError("failed to add hidden cosmetic-thread layer")
+        layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("cosmetic-thread layer did not remain hidden")
+
+    hidden = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 1:  # swCosmeticThread
+            continue
+        annotation.Layer = _COSMETIC_THREAD_LAYER
+        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("profile cosmetic thread refused the hidden layer")
+        hidden += 1
+    if not hidden:
+        raise RuntimeError("profile view has no cosmetic thread to hide")
+    rebuild_drawing(adapter, label="hide profile cosmetic threads")
 
 
 def _position_section_label(adapter: Any, section: Any) -> None:
@@ -268,6 +311,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="profile plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _hide_profile_cosmetic_threads(adapter, profile)
     # Put the angular text inside the acute notch wedge.  A fixed sheet point
     # can select the opposite angular region after the view is moved, which
     # produces the sheet-spanning arc seen in the native drawing.
