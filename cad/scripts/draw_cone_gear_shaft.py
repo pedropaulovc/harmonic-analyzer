@@ -268,12 +268,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
-    # symbol sits above and LEFT of the tip, short of the Ø1.588 dimension
-    # line, and its leader drops onto the tip's top flank inside the first
-    # 2 mm of the land: no length extension line runs up there (they all
-    # drop from the bottom flank) and no diameter line stands left of the
-    # Ø1.588 one.  Below the tip the text ran across the 184.492/177.592/
-    # 170.692 extension lines (codex, a0c249d1).
+    # symbol stands above the tip with its glyph LEFT of the Ø1.588 dimension
+    # line and its text ABOVE the Ø1.588 text, well inside the left border
+    # (x 0.012; a glyph at 0.016 poked through it, codex c4720c62); the
+    # leader drops onto the tip's top flank inside the first 2 mm of the land.
+    # No length extension line runs up there (they all hang from the bottom
+    # flank) and no diameter line stands left of the Ø1.588 one.
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
     tip_top = (
@@ -293,7 +293,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.0160, 0.1800),
+        symbol_xy=(0.0240, 0.2160),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
