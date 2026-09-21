@@ -15,6 +15,7 @@ from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
@@ -45,8 +46,10 @@ from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_arbor_spec import (
+    BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
     BACK_CAP_SAG,
+    CROSS_HOLE_FROM_HEAD_REAR,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -63,6 +66,7 @@ from pinion_arbor_spec import (
     NECK_DIA,
     NECK_END_Z,
     NECK_LEN,
+    OVERALL_LEN,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
@@ -124,6 +128,45 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         raise RuntimeError(f"{label}: expected exactly one solid body, found {len(bodies)}")
 
 
+async def _add_axial_reference(
+    adapter,
+    *,
+    feature_name: str,
+    dimension_name: str,
+    start_v: float,
+    end_v: float,
+    drive_expression: str,
+) -> list[tuple[str, str]]:
+    """Author one native axial dimension without adding model geometry."""
+    dims = SketchDims()
+    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    line = check(
+        f"add {feature_name} witness",
+        await adapter.add_centerline(0.0, start_v, 0.0, end_v),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        f"{feature_name} vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", 0.0, start_v, f"{feature_name} start"
+    )
+    dims.record(None, None)
+    check(
+        f"dimension {dimension_name}",
+        await adapter.add_sketch_dimension(
+            f"{line}.start", f"{line}.end", "vertical_distance", abs(end_v - start_v)
+        ),
+    )
+    dims.record(dimension_name, drive_expression)
+    await ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    return dims.apply(adapter, feature_name)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
@@ -143,6 +186,9 @@ async def build(adapter) -> dict[str, str]:
         "ShaftLen": SHAFT_LEN,
         "BackCapSag": BACK_CAP_SAG,
         "CrossHoleDia": CROSS_HOLE_DIA,
+        "BackRimFromHeadRear": BACK_RIM_FROM_HEAD_REAR,
+        "CrossHoleFromHeadRear": CROSS_HOLE_FROM_HEAD_REAR,
+        "OverallLen": OVERALL_LEN,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -391,6 +437,31 @@ async def build(adapter) -> dict[str, str]:
     _require_one_solid_body(adapter, label="integral pinion arbor")
 
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "arbor axis")
+    drive_jobs += await _add_axial_reference(
+        adapter,
+        feature_name="BackRimReference",
+        dimension_name="BackRimFromHeadRear",
+        start_v=-HEAD_REAR_Z,
+        end_v=-SHAFT_LEN,
+        drive_expression='"BackRimFromHeadRear"',
+    )
+    drive_jobs += await _add_axial_reference(
+        adapter,
+        feature_name="CrossHoleReference",
+        dimension_name="CrossHoleFromHeadRear",
+        start_v=-HEAD_REAR_Z,
+        end_v=-HEAD_CENTER_Z,
+        drive_expression='"CrossHoleFromHeadRear"',
+    )
+    drive_jobs += await _add_axial_reference(
+        adapter,
+        feature_name="OverallReference",
+        dimension_name="OverallLen",
+        start_v=-(HEAD_FRONT_Z - HEAD_CAP_SAG),
+        end_v=-(SHAFT_LEN + BACK_CAP_SAG),
+        drive_expression='"OverallLen"',
+    )
+
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
