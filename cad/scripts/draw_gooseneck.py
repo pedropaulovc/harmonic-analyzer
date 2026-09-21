@@ -2,12 +2,12 @@ r"""Create the curated machinist drawing for the gooseneck counter-spring post.
 
 The SLDPRT remains authoritative. Sheet 1 defines the formed tube and post with
 an elevation, enlarged post end, and standard isometric. Sheet 2 carries the
-longitudinal arm/joint section that exposes the separate brazed plug and captive
-slotted screw; every displayed size is imported from the model.
+longitudinal arm/joint section that exposes the separate brazed plug and slotted
+adjustment screw; every displayed size is imported from the model.
 
-The external calibration envelope stays unchanged: Ø16 tube, R51 bend, 50.80
-arm run, 8 mm exposed shank and Ø12 head. The package is explicitly 1:3 at
-sheet level, with 2:1 end, 1:1 joint-section and 1:4 isometric overrides.
+The maximum envelope remains Ø16 tube, R51 bend, 50.80 arm run, an 8 mm open
+head gap and Ø12 head. Default shows the screw clamped on the MHA-019 end band.
+The package uses 1:3 sheets with 2:1 end, 1:1 section and 1:4 iso overrides.
 
 Run with SolidWorks open::
 
@@ -41,12 +41,19 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
-from gooseneck_geom import ARM_END_X, ARM_Y, BEND_R, SCREW_HEAD_T, SCREW_SHANK_LEN
+from gooseneck_geom import (
+    ARM_END_X,
+    ARM_Y,
+    BEND_R,
+    SCREW_HEAD_T,
+    SPRING_SCREW_OPEN_GAP_MM,
+)
 from gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
     ELEVATION_DIMENSIONS,
     END_DIMENSIONS,
     JOINT_DIMENSIONS,
+    SLOT_FACE_DIMENSIONS,
     PLUG_FIT_CALLOUT,
     SCREW_CALLOUT,
     TAP_CALLOUT,
@@ -94,8 +101,9 @@ JOINT_KEEP = {
     "ScrewHeadDia": (0.070, 0.185),
     "HeadThickness": (0.080, 0.145),
     "SlotDepth": (0.215, 0.235),
-    "ExposedShank": (0.155, 0.145),
-    "SlotWidth": (0.215, 0.215),
+}
+SLOT_FACE_KEEP = {
+    "SlotWidth": (0.395, 0.205),
 }
 
 
@@ -142,7 +150,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Gooseneck Post Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "gooseneck; plated tube; brazed plug; captive spring screw",
+            3: "gooseneck; plated tube; brazed plug; spring adjustment screw",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -179,7 +187,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Front", *JOINT_PARENT_CENTER, scale=(1, 3)
     )
     set_hidden_lines_removed(adapter, parent)
-    screw_tip_x = ARM_END_X - SCREW_SHANK_LEN - SCREW_HEAD_T
+    slot_face_dimensions = curate_view_dimensions(
+        adapter,
+        parent,
+        keep=SLOT_FACE_KEEP,
+        view_label="screw slot face",
+        dimensions_by_feature=SLOT_FACE_DIMENSIONS,
+    )
+    screw_tip_x = ARM_END_X - SPRING_SCREW_OPEN_GAP_MM - SCREW_HEAD_T
     line_start = model_point_in_view(
         adapter,
         parent,
@@ -227,7 +242,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     assert_imported_precision(
         adapter,
-        [*front_dimensions, *end_dimensions, *joint_dimensions],
+        [*front_dimensions, *end_dimensions, *joint_dimensions, *slot_face_dimensions],
         DRAWING_PRECISION_BY_NAME,
     )
     return await finalize_drawing(
