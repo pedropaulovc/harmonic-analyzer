@@ -338,8 +338,12 @@ async def build(adapter) -> dict[str, str]:
         "arm width reference line",
         await adapter.add_line(ARM_END_X, -HALF_WIDTH, ARM_END_X, HALF_WIDTH),
     )
+    axis_ref = check(
+        "common-axis offset reference line",
+        await adapter.add_line(ARM_END_X, 0.0, ARM_END_X, HALF_WIDTH),
+    )
     set_sketch_direct_db(adapter, False)
-    for line in (pivot_ref, anchor_ref, offset_ref, width_ref):
+    for line in (pivot_ref, anchor_ref, offset_ref, width_ref, axis_ref):
         _as_construction(adapter, line)
     for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
         check(
@@ -363,9 +367,19 @@ async def build(adapter) -> dict[str, str]:
             f"{offset_ref}.end", f"{anchor_ref}.end", "vertical_points"
         ),
     )
+    for line, label in (
+        (width_ref, "arm width"),
+        (axis_ref, "common-axis offset"),
+    ):
+        check(
+            f"{label} reference vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
     check(
-        "arm width reference vertical",
-        await adapter.add_sketch_constraint(width_ref, None, "vertical"),
+        "common-axis offset ends on the top long edge",
+        await adapter.add_sketch_constraint(
+            f"{axis_ref}.end", f"{width_ref}.end", "coincident"
+        ),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
     await dimension_between(
@@ -413,6 +427,15 @@ async def build(adapter) -> dict[str, str]:
         "arm width reference",
     )
     stations.record("Width", '"ArmWidth"')
+    await dimension_between(
+        adapter,
+        f"{axis_ref}.start",
+        f"{axis_ref}.end",
+        "vertical_distance",
+        HALF_WIDTH,
+        "common-axis offset reference",
+    )
+    stations.record("AxisOffset", '"ArmWidth" / 2')
     await anchor_point_to_origin(
         adapter, f"{width_ref}.start", ARM_END_X, -HALF_WIDTH, "arm width reference"
     )
