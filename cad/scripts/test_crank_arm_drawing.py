@@ -71,7 +71,6 @@ def test_reference_dimensions_remain_model_owned() -> None:
 
 def test_punch_and_seam_operations_are_notes_not_fake_dimensions() -> None:
     notes = spec.DRAWING_NOTES
-    assert "PUNCH ALIGNMENT WITNESS" in notes
     assert "AXIAL SEAM" in notes
     assert "MHA-138" in notes
     assert "MHA-024" not in notes

@@ -124,6 +124,7 @@ def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
         )
 
 
+def _add_arm_centerline(adapter: Any, view: Any) -> None:
     """Draw the arm's longitudinal centreline between its two long edges.
 
     The through-hub seat and handle pivot lie on the arm mid-width axis.  A

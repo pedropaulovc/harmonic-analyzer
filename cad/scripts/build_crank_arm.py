@@ -315,10 +315,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut axial seam groove",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(
-                depth=AXIAL_PIN_LENGTH,
-                reverse_direction=True,
-            )
+            ExtrusionParameters(depth=AXIAL_PIN_LENGTH)
         ),
     )
     name_last_feature(adapter, "AxialPinGroove")
