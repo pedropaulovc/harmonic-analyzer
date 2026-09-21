@@ -51,17 +51,20 @@ workflow is always a separate, explicit `farm.py cancel`.
 | `-Worktree` | yes | absolute path to the checkout that supplies `build.py` and the environment; the build runs from here |
 | `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
 | `-LogDirectory` | yes | absolute path for the log and the run records; created if missing, and rejected if it resolves inside `-Worktree` |
-| `-Targets` | yes | doit task names; repeat the parameter or comma-separate them (`part:pen_rod,part:cone_gear`) |
+| `-Targets` | yes | doit task names as ONE comma-separated string (`part:pen_rod,part:cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
-Targets are *selections*, not variables. The launcher trims each comma-separated
-component and rejects an empty set, an empty component, a token starting with
-`-`, and a token containing `=`. That last rule matters: doit removes a
-`name=value` argument as a command-line variable, so a mistyped target would
-leave no selection at all and silently launch the full default build. Task names
-use underscores (`part:pen_rod`), never dashes — a dashed name is rejected by
-`build.py` before the fleet is contacted.
+Targets are *selections*, not variables, and they arrive as one string. `pwsh
+-File` binds a single token per parameter, so a repeated `-Targets` or a
+space-separated list is rejected before the script runs: pass
+`"part:pen_rod,part:cone_gear"`. The launcher splits that string on commas,
+trims each component, and rejects an empty set, an empty component, a token
+starting with `-`, and a token containing `=`. That last rule matters: doit
+removes a `name=value` argument as a command-line variable, so a mistyped
+target would leave no selection at all and silently launch the full default
+build. Task names use underscores (`part:pen_rod`), never dashes — a dashed
+name is rejected by `build.py` before the fleet is contacted.
 
 The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw` and
 `PYTHONUNBUFFERED=1`, then runs, from the worktree:
@@ -71,9 +74,10 @@ uv run --frozen python build.py --executor farm --leaf-timeout <minutes> \
   --verbosity info -n 4 --continue <targets...>
 ```
 
-`-n 4` is the submitter's own concurrency and `--continue` collects later
-failures instead of stopping at the first; any failed task still leaves the run
-nonzero.
+`-n 4` is the submitter's own concurrency, passed explicitly so it wins over the
+`-n 8` (`HARMONIC_FARM_PARALLELISM`) that `build.py` would otherwise insert.
+`--continue` collects later failures instead of stopping at the first; any failed
+task still leaves the run nonzero.
 
 ### Starting one under the supervisor
 

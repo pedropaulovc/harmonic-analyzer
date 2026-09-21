@@ -18,7 +18,7 @@ param(
     [ValidateRange(1, 180)]
     [int]$LeafTimeout,
 
-    [ValidatePattern('^[A-Za-z0-9_-]+$')]
+    [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
     [string]$Tag = 'run'
 )
 

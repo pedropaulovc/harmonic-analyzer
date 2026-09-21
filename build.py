@@ -155,7 +155,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _isolated_tasks(task_list):
-    """Shallow task copies safe for doit's mutating native selection pass."""
+    """Copy only the task state needed by doit's mutating selection pass.
+
+    Task.__getstate__ omits runtime action/value-saver state during copy.copy;
+    TaskControl does not use it. The original tasks remain executable.
+    """
     isolated = []
     for task in task_list:
         task_copy = copy.copy(task)

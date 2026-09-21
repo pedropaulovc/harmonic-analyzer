@@ -137,7 +137,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
     environment = dict(fixture["environment"])
-    environment["UV_STUB_SLEEP"] = "1.5"
+    environment["UV_STUB_SLEEP"] = "3"
     command = _command(fixture, "part:pen_rod, drawing:pen", tag="spaces-ok")
 
     process = subprocess.Popen(
@@ -163,6 +163,19 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert process.poll() is None
     assert running["state"] == "running"
     assert not Path(running["done"]).exists()
+
+    stream_deadline = time.monotonic() + 5
+    launch_log = ""
+    while time.monotonic() < stream_deadline:
+        launch_log = Path(running["log"]).read_text(encoding="utf-8")
+        if "uv-stdout" in launch_log and "uv-stderr" in launch_log:
+            break
+        if process.poll() is not None:
+            break
+        time.sleep(0.05)
+    assert "uv-stdout" in launch_log
+    assert "uv-stderr" in launch_log
+    assert process.poll() is None
 
     stdout, stderr = process.communicate(timeout=10)
     assert process.returncode == 0, (stdout, stderr)
@@ -319,6 +332,24 @@ def test_invalid_targets_never_start_or_invoke_uv(
 
     assert result.returncode != 0
     assert diagnostic in result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not list(log_directory.glob("*.run.json"))
+    assert not list(log_directory.glob("*.done"))
+
+def test_tag_with_trailing_newline_is_rejected_before_startup(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+
+    result = subprocess.run(
+        _command(fixture, "part:pen_rod", tag="apparently-valid\n"),
+        env=fixture["environment"],
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+
+    assert result.returncode != 0
+    assert "Tag" in result.stderr
     assert not Path(fixture["invocation"]).exists()
     log_directory = Path(fixture["log_directory"])
     assert not list(log_directory.glob("*.run.json"))
