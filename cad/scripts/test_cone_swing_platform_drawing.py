@@ -41,7 +41,8 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     assert kept == marked
     assert sum(len(names) for names in view_sets) == len(kept)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
+    assert spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
 
 
 def test_pivot_preserves_native_close_clearance_hole() -> None:
@@ -131,7 +132,9 @@ def test_pivot_section_exposes_thickness_and_relief_depth() -> None:
     assert set(drawing.SECTION_KEEP) == {"PlateThk", "PivotBearingReliefDepth"}
     assert len({drawing.PROFILE_CENTER, drawing.FEATURE_CENTER, drawing.NOTCH_CENTER}) == 3
     assert spec.SECTION_VIEW_NOTE == "SCALE 1:2"
-    assert spec.PLAN_VIEW_NOTE == "PLAN VIEWS SCALE 1:2"
+    assert spec.PROFILE_VIEW_NOTE == "PLATE PROFILE — SCALE 1:2"
+    assert spec.FEATURE_VIEW_NOTE == "HOLE LOCATIONS — SCALE 1:2"
+    assert spec.NOTCH_VIEW_NOTE == "LOCK NOTCH — SCALE 1:2"
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert drawing.SHEET_SCALE == (1.0, 3.0)
 

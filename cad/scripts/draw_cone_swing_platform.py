@@ -98,15 +98,13 @@ PROFILE_KEEP = {
     "CornerSER": (0.030, 0.258),
 }
 FEATURE_KEEP = {
-    "PivotBearingReliefDia": (0.145, 0.260),
+    "PivotBearingReliefDia": (0.215, 0.130),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.130, 0.175),
     "PostMountEastX": (0.205, 0.185),
     "PostMountEastZ": (0.225, 0.175),
 }
 NOTCH_KEEP = {
-    # Kept close to the acute notch wedge so SolidWorks uses the minor arc.
-    "NotchRunAngle": (0.300, 0.255),
     "CapECx": (0.250, 0.112),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.105),
@@ -388,9 +386,11 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=_horizontal_section_edge(section, 0.0, label="base slide"),
     )
 
-    add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
+    add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
+    add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
+    add_property_linked_note(adapter, "Notch View Note", 0.245, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.210, 0.075)
+    add_property_linked_note(adapter, "Section View Note", 0.305, 0.065)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
