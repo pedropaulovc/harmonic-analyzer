@@ -136,9 +136,9 @@ def _flank_y(model_y_mm: float) -> float:
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_CENTER = (0.120, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
-DETAIL_FENCE_RADIUS_MM = 11.5
+DETAIL_FENCE_RADIUS_MM = 15.0
 DETAIL_CAPTION_XY = (0.235, 0.085)
-DETAIL_LETTER_XY = (0.245, 0.100)
+DETAIL_LETTER_XY = (0.225, 0.100)
 
 
 def _detail_x(model_x_mm: float) -> float:
@@ -178,10 +178,10 @@ DETAIL_KEEP = {
     "PivotBoreDia": (0.170, 0.155),
     "CamReliefParkR": (0.220, 0.190),
     "CamReliefParkX": (0.055, 0.220),
-    "CamReliefParkY": (0.225, 0.175),
+    "CamReliefParkY": (0.065, 0.175),
     "CamReliefEngagedR": (0.200, 0.060),
     "CamReliefEngagedX": (0.055, 0.200),
-    "CamReliefEngagedY": (0.225, 0.125),
+    "CamReliefEngagedY": (0.065, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -485,14 +485,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate pinion bracket relief sheet")
     detail_parent = place_view(
-        adapter, str(SOURCE), "*Front", 0.285, 0.155, scale=(2, 1)
+        adapter, str(SOURCE), "*Front", 0.270, 0.155, scale=(2, 1)
     )
     seat_axis_y = 0.155 + (-PIN_DROP - FRONT_BBOX_CY) * 2.0 / 1000.0
     seat_section = create_section_view(
         adapter,
         detail_parent,
-        line_start=(0.230, seat_axis_y),
-        line_end=(0.320, seat_axis_y),
+        line_start=(0.215, seat_axis_y),
+        line_end=(0.315, seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),
