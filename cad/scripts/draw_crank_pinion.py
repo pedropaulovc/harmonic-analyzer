@@ -126,7 +126,7 @@ RIGHT_KEEP = {
         (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_BOSS + 0.012,
     ),
-    "BoreDia": (_side_x(0.0) + 0.020, RIGHT_CENTER[1]),
+    "BoreDia": (_side_x(0.0) + 0.035, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
@@ -258,6 +258,25 @@ async def build(adapter: Any) -> dict[str, str]:
     bore_display.LeaderVisibility = 3  # swLeaderLineVisibility_e.swLeaderLineNone
     if int(bore_display.LeaderVisibility) != 3:
         raise RuntimeError("BoreDia kept its redundant dimension-line pair")
+    # Changing the diametric leader shape can let SolidWorks snap the text back
+    # toward the source geometry. Re-apply the measured sheet-space placement
+    # after the style change and bound the native readback.
+    bore_annotation = _early_bound(bore_annotation, "IAnnotation")
+    bore_position = RIGHT_KEEP["BoreDia"]
+    if not bore_annotation.SetPosition2(*bore_position, 0.0):
+        raise RuntimeError("failed to restore BoreDia text position")
+    actual_bore_position = tuple(
+        float(value) for value in (bore_annotation.GetPosition() or ())
+    )
+    if (
+        len(actual_bore_position) < 2
+        or abs(actual_bore_position[0] - bore_position[0]) > 0.002
+        or abs(actual_bore_position[1] - bore_position[1]) > 0.002
+    ):
+        raise RuntimeError(
+            "BoreDia text position did not persist: "
+            f"{actual_bore_position!r} vs {bore_position!r}"
+        )
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
@@ -294,12 +313,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
     # work" case). A surface symbol's native anchor is its lower-left corner,
-    # and its text grows rightward; place it below-right so the leader approaches
-    # from above-left and cannot cross the Ra text.
+    # and its text grows rightward; place it to the right of the leader tip but
+    # left of the boss-chamfer witness, so neither line can cross the Ra text.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + HALF_OD + 0.005, FRONT_CENTER[1] - 0.055),
+        symbol_xy=(FRONT_CENTER[0] + HALF_OD - 0.006, FRONT_CENTER[1] - 0.055),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
