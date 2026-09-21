@@ -18,6 +18,7 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -33,9 +34,11 @@ from pinion_arbor_spec import (
     BACK_CAP_R,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
+    HEAD_CENTER_Z,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -54,29 +57,34 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 PRINCIPAL_CENTER = (0.200, 0.170)
 ISO_CENTER = (0.365, 0.225)
+DETAIL_CENTER = (0.165, 0.235)
+DETAIL_SCALE = (3, 1)
+DETAIL_RADIUS_MM = 15.0
 DONOR_KEEP = {
     "HeadDia": (0.030, 0.225),
     "NeckDia": (0.045, 0.185),
     "ShaftDia": (0.030, 0.145),
 }
 PRINCIPAL_KEEP = {
-    "HeadLen": (0.345, 0.118),
     "NeckLen": (0.325, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
-    "HeadCapR": (0.325, 0.215),
-    "HeadCapSagDim": (0.340, 0.158),
     "BackCapSagDim": (0.055, 0.220),
-    "CrossHoleDia": (0.275, 0.250),
-    "CrossHoleFromHeadRear": (0.320, 0.135),
+}
+DETAIL_KEEP = {
+    "HeadLen": (0.165, 0.185),
+    "HeadCapR": (0.195, 0.265),
+    "HeadCapSagDim": (0.195, 0.198),
+    "CrossHoleDia": (0.245, 0.245),
+    "CrossHoleFromHeadRear": (0.155, 0.270),
 }
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.325, 0.190),
-    "NeckDia": (0.307, 0.150),
+    "HeadDia": (0.165, 0.208),
+    "NeckDia": (0.125, 0.208),
     "ShaftDia": (0.175, 0.205),
 }
 DIMENSION_CALLOUTS = {
-    "BackRimFromHeadRear": "TO BACK CROWN ROOT",
+    "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
     "OverallLen": "OVERALL",
     "BackCapSagDim": f"SR{BACK_CAP_R:.1f} BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
@@ -124,6 +132,70 @@ def _move_dimension(
     if len(matches) != 1:
         raise RuntimeError(f"{name}: native dimension did not move into target view")
     return matches[0]
+
+
+def _head_detail(adapter: Any, parent_view: Any) -> Any:
+    """Create an enlarged native detail of the crowded turned head."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(parent_view, "IView")
+    if not drawing.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError("failed to activate integral-arbor detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        parent_view,
+        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
+        label="integral-arbor head detail centre",
+    )
+    radius = DETAIL_RADIUS_MM / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(
+            point.MultiplyTransform(transform), "IMathPoint"
+        )
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create integral-arbor detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,
+        *DETAIL_SCALE,
+        "A",
+        1,
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create integral-arbor head detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("integral-arbor head detail has invalid bounds")
+    target = [
+        position[axis]
+        + DETAIL_CENTER[axis]
+        - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position integral-arbor head detail")
+    draw.EditRebuild3()
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -182,28 +254,35 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (donor, principal, iso):
         set_hidden_lines_removed(adapter, view)
 
+    detail = _head_detail(adapter, principal)
+    set_hidden_lines_removed(adapter, detail)
     donor_annotations = curate_view_dimensions(
         adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
     principal_annotations = curate_view_dimensions(
         adapter, principal, keep=PRINCIPAL_KEEP, view_label="integral-arbor profile"
     )
-    moved_diameters = [
-        _move_dimension(
-            adapter,
-            annotation,
-            principal,
-            DIAMETER_POSITIONS[dimension_name(adapter, annotation)],
-            source_view=donor,
+    detail_annotations = curate_view_dimensions(
+        adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
+    )
+    moved_diameters = []
+    for annotation in donor_annotations:
+        name = dimension_name(adapter, annotation)
+        moved_diameters.append(
+            _move_dimension(
+                adapter,
+                annotation,
+                principal if name == "ShaftDia" else detail,
+                DIAMETER_POSITIONS[name],
+                source_view=donor,
+            )
         )
-        for annotation in donor_annotations
-    ]
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
 
-    annotations = [*moved_diameters, *principal_annotations]
+    annotations = [*moved_diameters, *principal_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
@@ -221,8 +300,8 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"expected one {label}")
         set_reference_dimension(adapter, matches[0], label=label)
 
-    if not auto_center_marks(adapter, principal, holes=True, size=0.0025):
-        raise RuntimeError("failed to add center mark to the grip cross-hole")
+    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
+        raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     add_view_centerline(
         adapter,
         principal,
@@ -233,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         principal,
         edge_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
-        symbol_xy=(PRINCIPAL_CENTER[0] + 0.025, PRINCIPAL_CENTER[1] + 0.045),
+        symbol_xy=(0.230, 0.195),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
