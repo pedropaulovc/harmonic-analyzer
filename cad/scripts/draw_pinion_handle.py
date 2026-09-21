@@ -105,7 +105,7 @@ RIGHT_KEEP = {
 }
 TOP_KEEP = {
     "RodHoleDia": (0.104, 0.215),
-    "CapR": (0.048, 0.260),
+    "CapR": (0.035, 0.270),
     "RodHoleZ": (0.122, 0.223),
     "RetentionHoleDia": (0.177, 0.250),
     "RetentionPinFromMouth": (0.145, 0.223),
@@ -132,8 +132,8 @@ if _SOCKET_CLEARANCE_MIN < 0.0:
     raise AssertionError("title-block socket range interferes with the arbor")
 DIMENSION_CALLOUTS = {
     "TubeId": (
-        f"REAM FOR {_SOCKET_CLEARANCE_MIN:.2f}-{_SOCKET_CLEARANCE_MAX:.2f} "
-        "DIAMETRAL CLEARANCE\nON PINION ARBOR MHA-102"
+        f"REAM FOR {_SOCKET_CLEARANCE_MIN:.2f}-{_SOCKET_CLEARANCE_MAX:.2f}\n"
+        "DIAMETRAL CLEARANCE ON\nPINION ARBOR MHA-102"
     ),
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
