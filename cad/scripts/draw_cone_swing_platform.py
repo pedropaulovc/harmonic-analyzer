@@ -8,8 +8,8 @@ model.
 
 The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
-west-edge lock notch, and four rounded plan corners.  The main plan and pivot
-section run 1:2; the isometric runs 1:3.
+west-edge lock notch and four rounded plan corners.  The three plan views and
+pivot section run 1:2; the isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -73,12 +73,14 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
 
-# Sheet layout (meters).  Two 1:2 plan views separate the profile definition
-# from hole/notch layout instead of routing twenty leaders through one narrow
-# 224-mm wedge.  The section and pictorial occupy the right-hand field.
+# Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
+# pattern and lock-notch definitions instead of routing unrelated leaders
+# through one narrow 224-mm wedge.  The section and pictorial occupy the
+# right-hand field.
 PROFILE_CENTER = (0.075, 0.190)
-FEATURE_CENTER = (0.195, 0.190)
-ISO_CENTER = (0.345, 0.205)
+FEATURE_CENTER = (0.180, 0.190)
+NOTCH_CENTER = (0.260, 0.190)
+ISO_CENTER = (0.355, 0.205)
 SECTION_CENTER = (0.325, 0.105)
 
 PROFILE_KEEP = {
@@ -91,25 +93,27 @@ PROFILE_KEEP = {
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
-    "CornerNER": (0.120, 0.102),
-    "CornerNWR": (0.028, 0.108),
+    "CornerNER": (0.125, 0.095),
+    "CornerNWR": (0.022, 0.095),
     "CornerSWR": (0.118, 0.258),
     "CornerSER": (0.030, 0.258),
 }
 FEATURE_KEEP = {
-    "PivotBearingReliefDia": (0.225, 0.250),
-    "PostMountWestX": (0.165, 0.185),
-    "PostMountWestZ": (0.145, 0.175),
-    "PostMountEastX": (0.220, 0.185),
-    "PostMountEastZ": (0.240, 0.175),
-    # Replaced from model/view geometry after the feature view exists.
+    "PivotBearingReliefDia": (0.145, 0.255),
+    "PostMountWestX": (0.150, 0.185),
+    "PostMountWestZ": (0.130, 0.175),
+    "PostMountEastX": (0.205, 0.185),
+    "PostMountEastZ": (0.225, 0.175),
+}
+NOTCH_KEEP = {
+    # Replaced from model/view geometry after the notch view exists.
     "NotchRunAngle": (0.0, 0.0),
-    "CapECx": (0.175, 0.112),
-    "CapECz": (0.145, 0.138),
-    "CapEDia": (0.205, 0.105),
+    "CapECx": (0.250, 0.112),
+    "CapECz": (0.225, 0.138),
+    "CapEDia": (0.285, 0.105),
 }
 SECTION_KEEP = {
-    "PlateThk": (0.285, 0.105),
+    "PlateThk": (0.275, 0.105),
     "PivotBearingReliefDepth": (0.365, 0.125),
 }
 
@@ -123,7 +127,7 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"expected one native section label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (SECTION_CENTER[0], 0.080, 0.0)
+    target = (0.270, 0.080, 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native section label")
     adapter.currentModel.EditRebuild3()
@@ -235,8 +239,9 @@ async def build(adapter: Any) -> dict[str, str]:
     feature = place_view(
         adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2)
     )
+    notch = place_view(adapter, str(SOURCE), "*Top", *NOTCH_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (profile, feature, iso):
+    for view in (profile, feature, notch, iso):
         set_hidden_lines_removed(adapter, view)
 
     pivot_xy = model_point_in_view(
@@ -269,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
     half_angle = NOTCH_RUN_DEG / 2.0
     notch_angle_xy = model_point_in_view(
         adapter,
-        feature,
+        notch,
         (
             (SLOT_E_X + 15.0 * math.cos(math.radians(half_angle))) / 1000.0,
             0.0,
@@ -277,13 +282,20 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         label="notch angular dimension",
     )
-    feature_keep = dict(FEATURE_KEEP)
-    feature_keep["NotchRunAngle"] = notch_angle_xy
+    notch_keep = dict(NOTCH_KEEP)
+    notch_keep["NotchRunAngle"] = notch_angle_xy
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
-        keep=feature_keep,
+        keep=FEATURE_KEEP,
         view_label="feature plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    notch_annotations = curate_view_dimensions(
+        adapter,
+        notch,
+        keep=notch_keep,
+        view_label="notch plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     section_annotations = curate_view_dimensions(
@@ -296,6 +308,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [
         *profile_annotations,
         *feature_annotations,
+        *notch_annotations,
         *section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
@@ -305,14 +318,14 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.255, 0.150),
+        callout_xy=(0.215, 0.150),
         label="pivot close-clearance hole",
         edge=pivot_edge,
     )
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.255, 0.248),
+        callout_xy=(0.215, 0.220),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
@@ -337,10 +350,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.315, 0.145)
+    add_property_linked_note(adapter, "Section View Note", 0.260, 0.150)
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, section, iso):
+    for view in (profile, feature, notch, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
