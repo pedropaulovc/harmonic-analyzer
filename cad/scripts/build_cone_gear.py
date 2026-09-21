@@ -656,6 +656,44 @@ def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
         )
 
 
+def _save_active_configuration(adapter: Any, configuration: str) -> None:
+    """Force and verify a real in-place save while one config is active."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = str(_active_configuration(model).Name)
+    if active != configuration:
+        raise RuntimeError(
+            f"cannot save {configuration}: active configuration is {active!r}"
+        )
+    before = bool(model.GetSaveFlag())
+    if not before:
+        model.SetSaveFlag()
+    armed = bool(model.GetSaveFlag())
+    _telemetry.info(
+        f"{configuration} active-save preflight: active={active}, "
+        f"save_flag_before={before}, save_flag_armed={armed}"
+    )
+    if not armed:
+        raise RuntimeError(f"{configuration}: SetSaveFlag did not dirty the document")
+    _save3_with_contract(
+        adapter,
+        1,
+        label=f"persist verified active configuration {configuration}",
+    )
+    active_after = str(_active_configuration(model).Name)
+    after = bool(model.GetSaveFlag())
+    _telemetry.info(
+        f"{configuration} active-save readback: active={active_after}, "
+        f"save_flag_after={after}"
+    )
+    if active_after != configuration:
+        raise RuntimeError(
+            f"{configuration}: active configuration changed to {active_after!r} "
+            "during Save3"
+        )
+    if after:
+        raise RuntimeError(f"{configuration}: document stayed dirty after Save3")
+
+
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
@@ -1252,6 +1290,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         artefacts[f"iso_{name}"] = str(img)
+        _save_active_configuration(adapter, name)
 
     ordered = [volumes[name] for name, _ in CONFIGS]
     if not all(a < b for a, b in zip(ordered, ordered[1:], strict=False)):
