@@ -33,6 +33,7 @@ import sys
 from typing import Any
 
 import _telemetry
+from _config import parts, title_block
 from _hole_spec import blind_cut_dia_mm, drill_process
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -67,8 +68,11 @@ from crank_arm_spec import (
     DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
+    SHAFT_BORE_DIA,
     PIN_HOLE_SPEC,
 )
+from crankshaft_spec import SHAFT_DIA as CRANKSHAFT_DIA
+from crankshaft_spec import SHAFT_DIA_BAND as CRANKSHAFT_DIA_BAND
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -91,6 +95,17 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _HANDLE_PIVOT_HOLE_DIA = blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC)
 _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
+_CRANKSHAFT_NUMBER = str(parts("crankshaft")["number"])
+_HOLE_TOLERANCE = title_block("drilled_hole")
+_SHAFT_CLEARANCE_MIN = (
+    SHAFT_BORE_DIA + float(_HOLE_TOLERANCE["minus_mm"])
+) - (CRANKSHAFT_DIA + CRANKSHAFT_DIA_BAND[0])
+_SHAFT_CLEARANCE_MAX = (
+    SHAFT_BORE_DIA + float(_HOLE_TOLERANCE["plus_mm"])
+) - (CRANKSHAFT_DIA + CRANKSHAFT_DIA_BAND[1])
+if _SHAFT_CLEARANCE_MIN < 0.0:
+    raise AssertionError("title-block crank-arm bore range interferes with shaft")
+PIN_HOLE_CALLOUT_PREFIX = f"{drill_process(PIN_HOLE_SPEC)}\nON SHAFT-BORE CL"
 # The top view is cropped around the shaft boss: it retains the HLV evidence
 # that the #14 cross-hole meets the shaft bore without repeating the remote
 # tap, dimple and handle-pivot profiles.
@@ -246,7 +261,12 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
 TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
-    "ShaftBoreDia": "REAM THRU (3/8 IN)",
+    "AnchorOffset": "ANCHOR AXIS FROM TOP EDGE",
+    "ShaftBoreDia": (
+        "REAM THRU (3/8 IN)\n"
+        f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL "
+        f"CLEARANCE ON {_CRANKSHAFT_NUMBER}"
+    ),
     "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
 }
 
@@ -407,7 +427,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=pin_edge,
         callout_xy=(0.120, 0.230),
         label="crank-arm cross-hole",
-        process=drill_process(PIN_HOLE_SPEC),
+        process=PIN_HOLE_CALLOUT_PREFIX,
     )
     # Handle pivot hole: above and just right of the arm, arrow on the hole's
     # top rim. Keeping it on the handle end avoids crossing the full principal

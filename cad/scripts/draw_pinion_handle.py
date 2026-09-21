@@ -20,6 +20,7 @@ import sys
 from typing import Any
 
 import _telemetry
+from _config import title_block
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -41,6 +42,8 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from pinion_arbor_spec import SHAFT_DIA as ARBOR_DIA
+from pinion_arbor_spec import SHAFT_DIA_BAND as ARBOR_DIA_BAND
 from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_PRECISION_BY_NAME,
@@ -48,6 +51,7 @@ from pinion_handle_spec import (
     GRIP_LEN,
     RETENTION_HOLE_CALLOUT,
     ROD_SPAN,
+    TUBE_ID,
     TUBE_LEN,
     TUBE_OD,
     WALL_T,
@@ -79,10 +83,10 @@ ISO_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.075, 0.150)
 RIGHT_CENTER = (0.175, 0.150)
 TOP_CENTER = (0.075, 0.230)
-SECTION_CENTER = (0.295, 0.155)
+SECTION_CENTER = (0.270, 0.145)
 ASSEMBLED_CENTER = (0.115, 0.090)
 ROD_END_CENTER = (0.220, 0.050)
-ISO_CENTER = (0.355, 0.225)
+ISO_CENTER = (0.325, 0.210)
 SECTION_SCALE = (3, 1)
 
 # Import in the actual authoring planes, then MOVE the native dimensions to
@@ -103,22 +107,34 @@ TOP_KEEP = {
     "RodHoleDia": (0.104, 0.215),
     "CapR": (0.048, 0.260),
     "RodHoleZ": (0.122, 0.223),
-    "RetentionHoleDia": (0.132, 0.250),
-    "RetentionPinFromMouth": (0.117, 0.242),
+    "RetentionHoleDia": (0.177, 0.250),
+    "RetentionPinFromMouth": (0.145, 0.223),
 }
 # TubeId's text stands right of the section, under the seating-depth callout:
 # its dimension line runs in the 13 mm between the socket mouth (sheet 0.120)
 # and the SECTION A-A label (top 0.105); the four-line block clears the
 # seating-depth callout above it.  Centred under the view it printed on top of
 # that label and against the assembled view's (Ø6.0) rod reference.
-SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.380, 0.126)}
-SEATING_DEPTH_TEXT_XY = (0.378, 0.151)
+SECTION_KEEP = {"TubeLen": (0.322, 0.135), "TubeId": (0.355, 0.116)}
+SEATING_DEPTH_TEXT_XY = (0.353, 0.141)
 ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
+_HOLE_TOLERANCE = title_block("drilled_hole")
+_SOCKET_CLEARANCE_MIN = (
+    TUBE_ID + float(_HOLE_TOLERANCE["minus_mm"])
+) - (ARBOR_DIA + ARBOR_DIA_BAND[0])
+_SOCKET_CLEARANCE_MAX = (
+    TUBE_ID + float(_HOLE_TOLERANCE["plus_mm"])
+) - (ARBOR_DIA + ARBOR_DIA_BAND[1])
+if _SOCKET_CLEARANCE_MIN < 0.0:
+    raise AssertionError("title-block socket range interferes with the arbor")
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM\nSLIP FIT ON\nARBOR MHA-102",
+    "TubeId": (
+        f"REAM FOR {_SOCKET_CLEARANCE_MIN:.2f}-{_SOCKET_CLEARANCE_MAX:.2f} "
+        "DIAMETRAL CLEARANCE\nON PINION ARBOR MHA-102"
+    ),
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
@@ -201,6 +217,15 @@ def _point(
         tuple(value / 1000.0 for value in xyz_mm),
         label="handle dimension pick",
     )
+
+def _shorten_radius_leader(adapter: Any, annotation: Any) -> None:
+    """Stop the spherical-radius leader before it crosses the handle holes."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ShortenedRadius = True
+    adapter.currentModel.GraphicsRedraw2()
+    if display.ShortenedRadius is not True:
+        raise RuntimeError("handle crown radius did not retain shortened leader")
+
 
 
 
@@ -522,6 +547,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty rod-dimension donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    cap_radius = [
+        annotation
+        for annotation in top_annotations
+        if dimension_name(adapter, annotation) == "CapR"
+    ]
+    if len(cap_radius) != 1:
+        raise RuntimeError("expected one handle crown-radius dimension")
+    _shorten_radius_leader(adapter, cap_radius[0])
     # Every place the part authored (policy rule 2) must have survived the
     # import and the moves: a dimension that fell back to the sheet default
     # would print a band nobody specified.
@@ -542,7 +575,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.058, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.196)
+    add_property_linked_note(adapter, "Isometric View Note", 0.292, 0.181)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
