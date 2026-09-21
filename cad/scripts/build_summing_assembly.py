@@ -11,9 +11,9 @@ above by the boss-hook / counter-spring / gooseneck chain.
   ``SUMMING_Z`` and separated by ``+/-HEX_Z_MID``.
 * knife-hanger-washer x2 -- McMaster 90126A211 washers seated separately on
   the casting top face, one at each mount centreline.
-* knife-hanger-stud x2 -- McMaster 91247A720 bolts under the stable legacy
-  stem: each passes through its washer and the casting's clearance hole, then
-  threads into the knife-mount's 1/2-13 top tap.
+* knife-hanger-stud x2 -- modified/shortened McMaster 91247A720 bolts under
+  the stable legacy stem: each passes through its washer and the casting's
+  clearance hole, then threads into the knife-mount's 1/2-13 top tap.
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -43,10 +43,16 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
+from pathlib import Path
+from typing import Any
+
+import _telemetry
 
 from _common import (
     apply_custom_properties,
+    _early_bound,
     apply_summary_info,
     check,
     log,
@@ -71,6 +77,7 @@ from _assembly import (
     save_assembly_and_images,
     write_dof_manifest,
 )
+from _assembly_patterns import ensure_global_pattern_axis
 from _native_spring_contact import assert_assembly_spring_contacts
 from _interference_contracts import allowed_interference_pairs
 from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
@@ -84,8 +91,17 @@ from build_knife_hanger_washer import (
     OUTER_DIA as HANGER_WASHER_OUTER_DIA,
     THICKNESS as HANGER_WASHER_THICKNESS,
 )
-from build_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH
+from build_knife_mount import (
+    CASTING_UNDERSIDE_Y,
+    MOUNT_GAP,
+    STUD_TAP_THREAD_DEPTH_MM,
+)
 from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
+from summing_assembly_spec import (
+    BOM_QUANTITIES,
+    EXPLODED_VIEW_NAME,
+    SOURCE_CONFIGURATION,
+)
 
 ASM_NAME = "summing"
 
@@ -98,9 +114,9 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
 # --- knife-hanger hardware (two bolts + two separate washers) ----------------
 # The top-frame crossbar and knife-mount exports own the surrounding stack.
-# Each washer's local origin is its mid-plane.  The 91247A720 wrapper preserves
-# the legacy bolt frame (thread tip at local Y=0, axis +Y), so seating its
-# under-head face on the washer top determines the bolt origin without an
+# Each washer's local origin is its mid-plane. The modified 91247A720 wrapper
+# preserves the legacy bolt frame (thread tip at local Y=0, axis +Y), so its
+# under-head seat on the washer top determines the bolt origin without an
 # independent stud-station assumption.
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
 HANGER_WASHER_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS / 2.0
@@ -152,15 +168,11 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
     if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
         raise RuntimeError("knife-hanger bolt under-head face is not seated on washer")
-    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_DEPTH:
+    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_THREAD_DEPTH_MM:
         raise RuntimeError(
-            "knife-hanger bolt misses the knife-mount tap envelope: "
-            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement"
-        )
-    if abs(KNIFE_MOUNT_THREAD_ENGAGEMENT - 11.3735) > 1e-9:
-        raise RuntimeError(
-            "knife-hanger thread engagement drifted from 11.3735 mm: "
-            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm"
+            "knife-hanger bolt misses the knife-mount full-thread envelope: "
+            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement, "
+            f"{STUD_TAP_THREAD_DEPTH_MM:.4f} mm usable thread"
         )
     log(
         "knife-hanger stack: washer "
@@ -257,6 +269,340 @@ def _assert_counter_spring_hang(pose: spring_mounts.SpringPose) -> None:
     )
 
 
+def _explode_transform(component: Any) -> tuple[float, ...]:
+    transform = _early_bound(component.GetTotalTransform(True), "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{component.Name2}: missing total presentation transform")
+    values = tuple(float(value) for value in transform.ArrayData)
+    if len(values) != 16 or not all(math.isfinite(value) for value in values):
+        raise RuntimeError(f"{component.Name2}: invalid presentation transform {values!r}")
+    return values
+
+
+@_telemetry.traced("assembly.summing_explode")
+def _create_summing_explode(adapter: Any) -> None:
+    """Author the released seven-step presentation and restore the free model."""
+    from solidworks_mcp.adapters.com_variant import null_callout
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    assembly = _early_bound(model, "IAssemblyDoc")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if str(configuration.Name) != SOURCE_CONFIGURATION:
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME} requires the builder's "
+            f"{SOURCE_CONFIGURATION} configuration"
+        )
+    if int(assembly.GetExplodedViewCount2(SOURCE_CONFIGURATION)):
+        raise RuntimeError("new summing assembly unexpectedly contains exploded views")
+
+    components = tuple(
+        _early_bound(component, "IComponent2")
+        for component in (assembly.GetComponents(True) or ())
+    )
+    groups: dict[str, list[Any]] = {stem: [] for stem in BOM_QUANTITIES}
+    for component in components:
+        stem = Path(str(component.GetPathName() or "")).stem.casefold()
+        if stem not in groups:
+            raise RuntimeError(
+                f"{EXPLODED_VIEW_NAME}: unexpected component "
+                f"{component.Name2}: {stem}"
+            )
+        groups[stem].append(component)
+    actual_counts = {stem: len(group) for stem, group in groups.items()}
+    if actual_counts != BOM_QUANTITIES:
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME} component counts: "
+            f"{actual_counts!r} != {BOM_QUANTITIES!r}"
+        )
+    for group in groups.values():
+        group.sort(key=lambda component: str(component.Name2))
+
+    baseline = {
+        str(component.Name2): _explode_transform(component)
+        for component in components
+    }
+    if len(baseline) != sum(BOM_QUANTITIES.values()):
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: duplicate component identities")
+    expected = {name: [0.0, 0.0, 0.0] for name in baseline}
+
+    supports = sorted(
+        groups["knife-mount"],
+        key=lambda component: baseline[str(component.Name2)][11],
+    )
+    if len(supports) != 2:
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: expected two knife supports")
+    plans = (
+        ("hanger bolts lift", groups["knife-hanger-stud"], "y", 0.080),
+        ("hanger washers lift", groups["knife-hanger-washer"], "y", 0.040),
+        ("front support withdraws", [supports[1]], "z", 0.050),
+        ("back support withdraws", [supports[0]], "z", -0.050),
+        ("counter anchor lifts", groups["boss-hook"], "y", 0.035),
+        ("counter spring moves clear", groups["counter-spring"], "x", -0.060),
+        ("gooseneck lifts", groups["gooseneck"], "y", 0.080),
+    )
+
+    axes = {}
+    for index, key in enumerate("xyz"):
+        axis_name = ensure_global_pattern_axis(adapter, key)
+        feature = _early_bound(assembly.FeatureByName(axis_name), "IFeature")
+        if feature is None or str(feature.GetTypeName2()) != "RefAxis":
+            raise RuntimeError(
+                f"{EXPLODED_VIEW_NAME}: missing reference axis {axis_name}"
+            )
+        axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
+        points = tuple(float(value) for value in axis.GetRefAxisParams())
+        if len(points) != 6 or not all(math.isfinite(value) for value in points):
+            raise RuntimeError(f"{axis_name}: invalid axis endpoints {points!r}")
+        vector = tuple(points[i + 3] - points[i] for i in range(3))
+        length = math.sqrt(sum(value * value for value in vector))
+        if length <= 1e-12 or any(
+            abs(vector[i] / length) > 1e-9
+            for i in range(3)
+            if i != index
+        ):
+            raise RuntimeError(
+                f"{axis_name}: not aligned with world {key.upper()}: {vector!r}"
+            )
+        axes[key] = (axis_name, vector[index] > 0.0)
+
+    if not assembly.CreateExplodedView():
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: CreateExplodedView failed")
+    names = tuple(
+        assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ()
+    )
+    if len(names) != 1:
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: unexpected created views {names!r}"
+        )
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        str(names[0]),
+        "EXPLODEDVIEWS",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: cannot select created exploded view "
+            f"{names[0]!r}"
+        )
+    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+    if int(selection.GetSelectedObjectType3(1, 0)) != 43:
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: selection is not an exploded-view feature"
+        )
+    feature = _early_bound(selection.GetSelectedObject6(1, 0), "IFeature")
+    if feature is None or str(feature.GetTypeName2()) != "AsmExploder":
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: selected object is not an AsmExploder"
+        )
+    feature.Name = EXPLODED_VIEW_NAME
+    model.ClearSelection2(True)
+    if (
+        not model.EditRebuild3()
+        or tuple(
+            assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ()
+        )
+        != (EXPLODED_VIEW_NAME,)
+    ):
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: exploded-view feature rename did not persist"
+        )
+    if not assembly.ShowExploded2(True, EXPLODED_VIEW_NAME):
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: cannot activate authored view")
+
+    try:
+        for index in range(
+            int(configuration.GetNumberOfExplodeSteps()) - 1,
+            -1,
+            -1,
+        ):
+            seed = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
+            if seed is None or not configuration.DeleteExplodeStep(str(seed.Name)):
+                raise RuntimeError(
+                    f"{EXPLODED_VIEW_NAME}: cannot remove auto step {index}"
+                )
+        if int(configuration.GetNumberOfExplodeSteps()) != 0:
+            raise RuntimeError(f"{EXPLODED_VIEW_NAME}: auto steps remain")
+
+        for step_index, (label, moved, key, distance) in enumerate(plans, 1):
+            with _telemetry.span("assembly.summing_explode.step", label=label):
+                model.ClearSelection2(True)
+                selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                data = _early_bound(selection.CreateSelectData(), "ISelectData")
+                if data is None:
+                    raise RuntimeError(
+                        f"{label}: cannot create component selection data"
+                    )
+                data.Mark = 1
+                if int(data.Mark) != 1:
+                    raise RuntimeError(
+                        f"{label}: component selection mark did not persist"
+                    )
+                for component in moved:
+                    if not component.Select4(True, data, False):
+                        raise RuntimeError(
+                            f"{label}: cannot select {component.Name2}"
+                        )
+                axis_name, positive = axes[key]
+                if not model.Extension.SelectByID2(
+                    axis_name,
+                    "AXIS",
+                    0.0,
+                    0.0,
+                    0.0,
+                    True,
+                    2,
+                    null_callout(),
+                    0,
+                ):
+                    raise RuntimeError(
+                        f"{label}: cannot select global direction "
+                        f"{axis_name} with mark 2"
+                    )
+                result = configuration.AddExplodeStep2(
+                    abs(distance),
+                    -1,
+                    (distance > 0.0) != positive,
+                    0.0,
+                    -1,
+                    False,
+                    True,
+                    False,
+                )
+                model.ClearSelection2(True)
+                if not isinstance(result, tuple) or len(result) != 2:
+                    raise RuntimeError(
+                        f"{label}: incomplete AddExplodeStep2 result {result!r}"
+                    )
+                raw_step, error = result
+                if int(error) != 0 or raw_step is None:
+                    raise RuntimeError(
+                        f"{label}: AddExplodeStep2 error {error!r}"
+                    )
+                step = _early_bound(raw_step, "IExplodeStep")
+                step.Name = f"SUMMING {label.upper()}"
+                if (
+                    str(step.Name) != f"SUMMING {label.upper()}"
+                    or not model.EditRebuild3()
+                ):
+                    raise RuntimeError(f"{label}: step name/rebuild failed")
+                if int(configuration.GetNumberOfExplodeSteps()) != step_index:
+                    raise RuntimeError(
+                        f"{label}: authored step count is not {step_index}"
+                    )
+                actual = {
+                    str(_early_bound(component, "IComponent2").Name2)
+                    for component in (step.GetComponents() or ())
+                }
+                intended = {str(component.Name2) for component in moved}
+                if (
+                    actual != intended
+                    or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9
+                ):
+                    raise RuntimeError(
+                        f"{label}: step component/distance readback mismatch: "
+                        f"{actual!r}"
+                    )
+                for name in intended:
+                    expected[name]["xyz".index(key)] += distance
+                for component in components:
+                    name = str(component.Name2)
+                    current = _explode_transform(component)
+                    delta = tuple(
+                        current[i + 9] - baseline[name][i + 9]
+                        for i in range(3)
+                    )
+                    _telemetry.event(
+                        "assembly.summing_explode.translation",
+                        step=label,
+                        component=name,
+                        expected_mm=[
+                            value * 1000.0 for value in expected[name]
+                        ],
+                        actual_mm=[value * 1000.0 for value in delta],
+                    )
+                    if any(
+                        abs(delta[i] - expected[name][i]) > 1e-7
+                        for i in range(3)
+                    ):
+                        raise RuntimeError(
+                            f"{label}: {name} world translation mm "
+                            f"{tuple(value * 1000.0 for value in delta)!r} != "
+                            f"{tuple(value * 1000.0 for value in expected[name])!r}; "
+                            f"direction={axis_name}, "
+                            f"signed distance={distance * 1000.0:g} mm"
+                        )
+                    if any(
+                        abs(current[i] - baseline[name][i]) > 1e-9
+                        for i in (*range(9), 12)
+                    ):
+                        raise RuntimeError(
+                            f"{label}: {name} presentation rotated or scaled"
+                        )
+    finally:
+        primary_error = sys.exception()
+        try:
+            model.ClearSelection2(True)
+            if (
+                not assembly.ShowExploded2(False, EXPLODED_VIEW_NAME)
+                or not model.EditRebuild3()
+            ):
+                raise RuntimeError(
+                    f"{EXPLODED_VIEW_NAME}: failed to restore collapsed "
+                    "operational assembly"
+                )
+            for component in components:
+                name = str(component.Name2)
+                current = _explode_transform(component)
+                transform = _early_bound(component.Transform2, "IMathTransform")
+                operational = tuple(float(value) for value in transform.ArrayData)
+                if len(operational) != 16 or any(
+                    abs(values[i] - baseline[name][i]) > 1e-9
+                    for values in (current, operational)
+                    for i in range(16)
+                ):
+                    raise RuntimeError(
+                        f"{EXPLODED_VIEW_NAME}: collapse changed "
+                        f"operational transform of {name}"
+                    )
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(
+                f"{EXPLODED_VIEW_NAME}: cleanup after authoring failure: "
+                f"{cleanup_error}"
+            )
+
+    if int(configuration.GetNumberOfExplodeSteps()) != len(plans):
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: collapsed presentation lost authored steps"
+        )
+    if tuple(
+        assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ()
+    ) != (EXPLODED_VIEW_NAME,):
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: collapsed presentation lost named view"
+        )
+    if (
+        str(assembly.GetExplodedViewConfigurationName(EXPLODED_VIEW_NAME))
+        != SOURCE_CONFIGURATION
+    ):
+        raise RuntimeError(
+            f"{EXPLODED_VIEW_NAME}: named presentation is not owned by "
+            f"{SOURCE_CONFIGURATION}"
+        )
+    _telemetry.success(
+        f"{EXPLODED_VIEW_NAME}: seven native steps verified in world space; "
+        "all ten instances restored"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     counter_seat, gooseneck_origin_y = settled_spring_seats.counter_seat()
     counter_pose = counter_seat.pose
@@ -291,11 +637,11 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="knife-mount (back)",
     )
-    # Purchased knife-hanger hardware, one fixed washer + bolt pair on each
-    # mount centreline.  The washer lower face is exactly on the crossbar top;
-    # the 91247A720 under-head face is exactly on the washer upper face.  Both
-    # parts are independently fixed at the authored transform, so this
-    # structural stack contributes no operational DOF.
+    # Purchased-then-modified knife-hanger hardware: one fixed washer + bolt
+    # pair on each mount centreline. The washer lower face is exactly on the
+    # crossbar top, and the modified 91247A720 under-head face is exactly on
+    # the washer upper face. Both parts are independently fixed at the authored
+    # transforms, so this structural stack contributes no operational DOF.
     hanger_washers: list[str] = []
     hanger_bolts: list[str] = []
     for side, station_z in (
@@ -326,7 +672,7 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Count the live top-level instances, not just the placement requests:
-    # exactly two stock bolts and two separate washers must survive insertion.
+    # exactly two modified bolts and two separate washers must survive insertion.
     live_names = component_names(adapter)
     for stem, inserted in (
         ("knife-hanger-washer", hanger_washers),
@@ -506,6 +852,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "summing assembly" (not
     # the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    _create_summing_explode(adapter)
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,

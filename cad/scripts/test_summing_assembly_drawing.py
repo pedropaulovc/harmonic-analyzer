@@ -1,22 +1,36 @@
-"""Offline contract for the simple summing assembly drawing."""
+"""Behavioral boundary contract for the summing assembly package."""
 
-from pathlib import Path
+import _config
+import summing_assembly_spec as assembly_spec
+from _buildgraph import references_of
 
-import draw_summing_assembly as drawing
-from _drawing_registry import DRAWINGS_BY_NAME
+
+def test_bom_tracks_direct_assembly_sources_and_released_part_identities() -> None:
+    direct = set(references_of("summing"))
+    assert set(assembly_spec.BOM_QUANTITIES) == direct
+    assert assembly_spec.BOM_QUANTITIES == {
+        stem: int(_config.parts(stem)["quantity"]) for stem in direct
+    }
+    assert assembly_spec.BOM_PART_NUMBERS == {
+        stem: str(_config.parts(stem)["number"]) for stem in direct
+    }
+    assert set(assembly_spec.BOM_DESCRIPTIONS) == direct
 
 
-def test_summing_assembly_keeps_registry_outputs_and_precomputed_placement() -> None:
-    spec = DRAWINGS_BY_NAME["summing_assembly"]
-    assert spec.source_kind == "assembly"
-    assert spec.part == "summing"
-    assert drawing.SOURCE == spec.source
-    assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
-        spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
-    )
-    assert drawing.SHEET_SCALE == (1.0, 5.0)
-    assert drawing.FRONT_CENTER == (0.060, 0.150)
-    assert drawing.RIGHT_CENTER == (0.130, 0.150)
-    assert drawing.ISO_CENTER == (0.225, 0.140)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "return await build_simple_three_view_drawing(" in source
+def test_frame_and_channel_interfaces_are_identified_without_duplication() -> None:
+    direct = set(references_of("summing"))
+    interfaces = assembly_spec.EXTERNAL_INTERFACES
+    assert set(interfaces) == {
+        "top-frame",
+        "gooseneck-set-screw",
+        "spring-hook",
+        "channel-spring-installed",
+    }
+    assert direct.isdisjoint(interfaces)
+    assert interfaces == {
+        stem: (
+            str(_config.parts(stem)["number"]),
+            int(_config.parts(stem)["quantity"]),
+        )
+        for stem in interfaces
+    }

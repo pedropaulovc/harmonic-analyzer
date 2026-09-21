@@ -55,9 +55,10 @@ The normal build command is:
 uv run python -m doit drawing:<stem>_assembly
 ```
 
-Offline coverage lives in `test_assembly_drawing_batch_contract.py` plus one
-small per-assembly contract file. The batch contract owns the shared invariants;
-the per-assembly files pin each registry row, output mapping, scale, and centers.
+Offline coverage for the remaining simple recipes lives in
+`test_assembly_drawing_batch_contract.py` plus one small per-assembly contract
+file. The batch contract owns their shared invariants; each per-assembly file
+pins its registry row, output mapping, scale, and centers.
 
 ## Frame package
 
@@ -75,3 +76,24 @@ The drawing lifecycle also checks that the source assembly remains unchanged.
 
 Use `uv run python -m doit drawing:frame_assembly` to regenerate the package.
 Inspect every page and complete the blind machinist review before release.
+
+## Summing package
+
+`draw_summing_assembly.py` uses three landscape ASME B sheets: collapsed
+assembled Front/Right HLR views with a standard Shaded With Edges isometric,
+the builder-owned persisted `SUMMING_EXPLODED` presentation with a native
+seven-row BOM and one balloon per row, and ordered assembly/setup instructions
+with functional checks. The BOM contains the ten direct instances only.
+Top-frame MHA-077, its MHA-118 gooseneck set screw, and the twenty channel
+MHA-090/MHA-011 spring connections are identified as external installation
+interfaces rather than duplicated BOM occurrences.
+
+The source assembly remains saved collapsed in `Default`. Its `lever_rock` DOF
+stays genuinely free, and the package identifies the saved pose as the neutral
+reference; it does not invent parked or engaged assembly configurations.
+Final balance is established with the installed springs by sliding MHA-032 in
+the MHA-077 guide before tightening MHA-118, rather than treating the computed
+CAD spring placement as a fitter tolerance.
+
+Use `uv run python -m doit drawing:summing_assembly` to regenerate the package.
+Inspect all three pages and complete the blind machinist review before release.
