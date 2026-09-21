@@ -228,7 +228,7 @@ PIN_HOLE_EDGE = (
     _side_x(PIN_STATION),
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
-PIN_HOLE_CALLOUT = (FRONT_CENTER[0] + 0.015, RIGHT_CENTER[1] + HALF_OD + 0.056)
+PIN_HOLE_CALLOUT = (ISO_CENTER[0] - 0.025, RIGHT_CENTER[1] + HALF_OD + 0.056)
 
 
 async def build(adapter: Any) -> dict[str, str]:
