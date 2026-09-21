@@ -54,8 +54,10 @@ def test_retention_hole_matches_the_handle_and_dedicated_pin() -> None:
     assert pin_spec.PIN_LEN == pytest.approx(handle_spec.TUBE_OD)
     callout = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
     assert callout is spec.RETENTION_HOLE_CALLOUT
-    assert "MHA-058" in callout and "MHA-136" in callout
+    assert "PINION HANDLE MHA-058" in callout
+    assert "RETENTION PIN MHA-136" in callout
     assert "LIGHT DRIVE FIT" in callout
+    assert "NOT HAND-REMOVABLE" in callout
 
 
 def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
@@ -63,6 +65,7 @@ def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
     assert spec.CAP_R == pytest.approx((radius * radius + sag * sag) / (2.0 * sag))
     assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.3 CROWN"
     assert "CapSagDim" in drawing.PRINCIPAL_KEEP
+    assert drawing.DIMENSION_CALLOUTS["Depth"] == "TO CROWN ROOT"
 
 
 def test_every_printed_dimension_has_authored_precision() -> None:
