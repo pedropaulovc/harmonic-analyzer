@@ -493,18 +493,23 @@ def _assert_view_geometry(
     )
 
 def _prepare_cone_section(adapter: Any, view: Any) -> None:
-    """Keep only the full cut surface so the raised collar reads in section."""
+    """Keep only the full cut surface at an explicitly independent 1:2 scale."""
     bound = _early_bound(view, "IView")
+    bound.UseSheetScale = 0
     section = _early_bound(bound.GetSection(), "IDrSection")
     # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
     # dedicated bool getter may be truth-tested.
     section.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="cone boss cut surface")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if int(bound.UseSheetScale) != 0 or not math.isclose(
+        ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]
+    ):
+        raise RuntimeError(f"independent cone-section scale did not persist: {ratio!r}")
     if not bool(section.GetDisplayOnlySurfaceCut()):
         raise RuntimeError("cone boss section retained geometry beyond the cut")
     if bool(section.GetPartialSection()):
         raise RuntimeError("cone boss section cutting line did not close")
-
 
 
 def _configure_section_caption(drawing_model: Any) -> None:
@@ -777,7 +782,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         section_annotations,
-        {"ConeBossLen": (0.274, 0.210)},
+        {"ConeBossLen": (0.310, 0.225)},
     )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
