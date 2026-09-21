@@ -240,6 +240,28 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert "uv-stdout" in launch_log
     assert "uv-stderr" in launch_log
 
+def test_log_directory_with_brackets_is_treated_as_a_literal_path(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    fixture["log_directory"] = tmp_path / "external [launch] records"
+
+    result = subprocess.run(
+        _command(fixture, "part:pen_rod"),
+        env=fixture["environment"],
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    log_directory = Path(fixture["log_directory"])
+    finished = _record(_only(log_directory, "*.done"))
+    assert finished["state"] == "succeeded"
+    launch_log = Path(finished["log"]).read_text(encoding="utf-8")
+    assert "uv-stdout" in launch_log
+    assert "uv-stderr" in launch_log
+
 
 def test_native_failure_preserves_exit_and_writes_a_failed_terminal_record(
     tmp_path: Path,

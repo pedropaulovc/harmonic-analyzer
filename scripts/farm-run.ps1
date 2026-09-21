@@ -326,7 +326,7 @@ try {
     $env:PYTHONUNBUFFERED = '1'
     Push-Location -LiteralPath $resolvedWorktree
     try {
-        & uv @buildArgs *>&1 | Tee-Object -FilePath $logPath
+        & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
         $code = $LASTEXITCODE
     }
     finally {
