@@ -104,7 +104,7 @@ RIGHT_KEEP = {
     "BodyLen": (RIGHT_CENTER[0], 0.219),
 }
 TOP_KEEP = {
-    "RodHoleDia": (0.104, 0.215),
+    "RodHoleDia": (0.045, 0.205),
     "CapR": (0.035, 0.255),
     "RodHoleZ": (0.122, 0.223),
     "RetentionHoleDia": (0.177, 0.250),

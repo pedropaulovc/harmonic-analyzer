@@ -52,36 +52,14 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert crank_arm_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
 
 
-def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
-    notes = crank_arm_spec.DRAWING_NOTES
-    assert "SAME FACE SHOWN IN THE FRONT VIEW" in notes
-    assert "CENTRELINE" not in notes
-    assert "INTERSECTS" not in notes
-    assert not any(character.isdigit() for character in notes)
-    # drawing-simplicity-policy rule 6: at most four short lines, and never a
-    # dimension or a tolerance among them.
-    assert len(notes.splitlines()) <= 4
-    assert "+/-" not in notes and "DEEP" not in notes
-    assert "MHA-026" not in notes and "MHA-024" not in notes
-    assert "OUTSIDE THIS PART DRAWING" not in notes
-    assert "MATCH-REAM" not in notes
-    assert "NOT INDIVIDUAL PART ACCEPTANCE" not in notes
-    assert "NO. 2" not in notes
-    assert "DATUM AXIS" not in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "HOLE CENTRES" not in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series.
-    assert "BA" not in notes
-    assert "X.XX" not in notes
+def test_part_needs_no_redundant_manufacturing_note() -> None:
+    assert crank_arm_spec.DRAWING_NOTES == ""
 
 
 
 def test_hole_callouts_state_size_process_and_fit() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert "TOP EDGE" in callouts["AnchorOffset"]
+    assert "AnchorOffset" not in callouts
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
     assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]
