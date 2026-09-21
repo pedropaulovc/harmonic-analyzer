@@ -131,7 +131,7 @@ KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNI
 CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
 MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.616
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
@@ -238,7 +238,11 @@ def _tolerance_hole_depth(
         )
     lower = float(tolerance.GetMinValue()) * 1000.0
     upper = float(tolerance.GetMaxValue()) * 1000.0
-    if abs(lower - lower_mm) > 1e-9 or abs(upper - upper_mm) > 1e-9:
+    if (
+        int(tolerance.Type) != 2
+        or abs(lower - lower_mm) > 1e-6
+        or abs(upper - upper_mm) > 1e-6
+    ):
         raise RuntimeError(
             f"{feature_name} {dimension_token}: tolerance readback "
             f"{lower:+.3f}/{upper:+.3f} mm"
