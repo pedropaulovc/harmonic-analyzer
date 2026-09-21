@@ -146,6 +146,6 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 # View scales differ from the sheet scale and therefore remain property-linked
 # labels.  They are not manufacturing-note dimensions.
-PLAN_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
+PLAN_VIEW_NOTE = "PLAN VIEWS SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:2"

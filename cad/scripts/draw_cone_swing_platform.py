@@ -34,13 +34,13 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -48,6 +48,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from cone_swing_platform_spec import (
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_HOLE_DIA,
     POST_MOUNT_SPEC,
@@ -69,128 +70,43 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
 
-# Sheet layout (meters).  The 1:2 plan is the main definition view; the
-# pivot section and isometric occupy the open right-hand field.
-TOP_CENTER = (0.115, 0.195)
-ISO_CENTER = (0.330, 0.175)
-SECTION_CENTER = (0.330, 0.075)
+# Sheet layout (meters).  Two 1:2 plan views separate the profile definition
+# from hole/notch layout instead of routing twenty leaders through one narrow
+# 224-mm wedge.  The section and pictorial occupy the right-hand field.
+PROFILE_CENTER = (0.075, 0.190)
+FEATURE_CENTER = (0.195, 0.190)
+ISO_CENTER = (0.345, 0.205)
+SECTION_CENTER = (0.325, 0.105)
 
-# Parametric model dimensions partition by the view where their geometry is
-# visible.  The plan uses exterior lanes around the long vertical wedge.
-TOP_KEEP = {
-    "PlateLenDim": (0.045, TOP_CENTER[1]),
-    "NorthEastX": (0.145, 0.255),
-    "NorthEdgeZ": (0.170, 0.245),
-    "NorthWestX": (0.080, 0.265),
-    "SouthWestX": (0.065, 0.120),
-    "SouthEastX": (0.155, 0.110),
-    "PivotBearingReliefDia": (0.185, 0.225),
-    "PostMountWestX": (0.080, 0.175),
-    "PostMountWestZ": (0.060, 0.165),
-    "PostMountEastX": (0.150, 0.175),
-    "PostMountEastZ": (0.170, 0.165),
-    "NotchRunAngle": (0.065, 0.145),
-    "CapECx": (0.070, 0.130),
-    "CapECz": (0.055, 0.150),
-    "CapEDia": (0.085, 0.115),
-    "CornerNER": (0.160, 0.263),
-    "CornerNWR": (0.060, 0.270),
-    "CornerSWR": (0.050, 0.105),
-    "CornerSER": (0.165, 0.100),
+PROFILE_KEEP = {
+    "PlateLenDim": (0.018, PROFILE_CENTER[1]),
+    "NorthEastX": (0.100, 0.258),
+    "NorthEdgeZ": (0.120, 0.245),
+    "NorthWestX": (0.050, 0.268),
+    "SouthWestX": (0.045, 0.115),
+    "SouthEastX": (0.108, 0.105),
+    "CornerNER": (0.118, 0.258),
+    "CornerNWR": (0.030, 0.266),
+    "CornerSWR": (0.028, 0.108),
+    "CornerSER": (0.120, 0.102),
+}
+FEATURE_KEEP = {
+    "PivotBearingReliefDia": (0.225, 0.250),
+    "PostMountWestX": (0.165, 0.185),
+    "PostMountWestZ": (0.145, 0.175),
+    "PostMountEastX": (0.220, 0.185),
+    "PostMountEastZ": (0.240, 0.175),
+    "NotchRunAngle": (0.155, 0.118),
+    "CapECx": (0.175, 0.112),
+    "CapECz": (0.145, 0.138),
+    "CapEDia": (0.205, 0.105),
 }
 SECTION_KEEP = {
-    "PlateThk": (0.300, 0.075),
-    "PivotBearingReliefDepth": (0.365, 0.105),
+    "PlateThk": (0.285, 0.105),
+    "PivotBearingReliefDepth": (0.365, 0.125),
 }
 
 
-def _view_xy_mapper(adapter: Any, view: Any) -> Any:
-    """Return a model-XYZ -> sheet-XY mapper for ``view``.
-
-    Sheet coordinates are what every annotation placement is expressed in, so
-    anything derived from model geometry (a rim centre, a leader attachment on
-    an edge) has to come through this transform rather than a hand-measured
-    literal -- a literal silently goes stale the next time the part is refitted.
-    """
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-
-    def _view_xy(point_xyz: tuple[float, float, float]) -> tuple[float, float]:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array(point_xyz)),
-            "IMathPoint",
-        )
-        mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        values = tuple(float(value) for value in mapped.ArrayData)
-        return values[0], values[1]
-
-    return _view_xy
-
-
-def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
-    """Draw the plan-view cone axis through the modeled pivot-hole center."""
-    _view_xy = _view_xy_mapper(adapter, view)
-
-    expected_radius_m = PIVOT_HOLE_DIA / 2000.0
-    pivot_centers: list[tuple[float, float]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        edges = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1), default=()
-            )
-            or ()
-        )
-        for raw_edge in edges:
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            parameters = tuple(float(value) for value in curve.CircleParams)
-            if abs(parameters[6] - expected_radius_m) > 1e-6:
-                continue
-            pivot_centers.append(_view_xy(parameters[:3]))
-    if not pivot_centers:
-        raise RuntimeError(
-            "cone-platform plan view has no visible pivot-hole rim at "
-            f"radius {expected_radius_m:g} m"
-        )
-
-    pivot = pivot_centers[0]
-    if any(
-        abs(center[0] - pivot[0]) > 1e-6 or abs(center[1] - pivot[1]) > 1e-6
-        for center in pivot_centers[1:]
-    ):
-        raise RuntimeError(
-            f"cone-platform plan view has conflicting pivot centers: {pivot_centers!r}"
-        )
-    outline = tuple(float(value) for value in view.GetOutline())
-    margin = 0.001
-    if not (
-        outline[0] - margin <= pivot[0] <= outline[2] + margin
-        and outline[1] - margin <= pivot[1] <= outline[3] + margin
-    ):
-        raise RuntimeError(
-            f"projected pivot center {pivot!r} falls outside plan-view outline "
-            f"{outline!r}"
-        )
-    north = (pivot[0], outline[3])
-    south = (pivot[0], outline[1])
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    model = adapter.currentModel
-    # IDrawingDoc.EditSheet explicitly makes subsequently created geometry
-    # sheet-owned. The endpoints are already transformed into sheet space, so
-    # this keeps the centerline coincident with the projected model axis.
-    drawing.EditSheet()
-    sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
-    )
-    if centerline is None:
-        raise RuntimeError("failed to create cone-axis centerline in plan view")
-    adapter.currentModel.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
-    return pivot
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -287,18 +203,25 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
+    profile = place_view(
+        adapter, str(SOURCE), "*Top", *PROFILE_CENTER, scale=(1, 2)
+    )
+    feature = place_view(
+        adapter, str(SOURCE), "*Top", *FEATURE_CENTER, scale=(1, 2)
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    for view in (top, iso):
+    for view in (profile, feature, iso):
         set_hidden_lines_removed(adapter, view)
 
-    pivot_xy = _add_cone_axis_centerline(adapter, top)
-    top_outline = tuple(float(value) for value in top.GetOutline())
+    pivot_xy = model_point_in_view(
+        adapter, feature, (0.0, 0.0, 0.0), label="pivot section station"
+    )
+    feature_outline = tuple(float(value) for value in feature.GetOutline())
     section = create_section_view(
         adapter,
-        top,
-        line_start=(top_outline[0] - 0.002, pivot_xy[1]),
-        line_end=(top_outline[2] + 0.002, pivot_xy[1]),
+        feature,
+        line_start=(feature_outline[0] - 0.002, pivot_xy[1]),
+        line_end=(feature_outline[2] + 0.002, pivot_xy[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(1, 2),
@@ -306,40 +229,54 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, section)
 
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="plan"
+    profile_annotations = curate_view_dimensions(
+        adapter,
+        profile,
+        keep=PROFILE_KEEP,
+        view_label="profile plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    feature_annotations = curate_view_dimensions(
+        adapter,
+        feature,
+        keep=FEATURE_KEEP,
+        view_label="feature plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     section_annotations = curate_view_dimensions(
-        adapter, section, keep=SECTION_KEEP, view_label="pivot section"
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="pivot section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*top_annotations, *section_annotations]
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the pivot bore")
+    annotations = [
+        *profile_annotations,
+        *feature_annotations,
+        *section_annotations,
+    ]
+    if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center marks to feature plan")
 
-    pivot_edge, mount_edge = _visible_plan_controls(adapter, top)
+    pivot_edge, mount_edge = _visible_plan_controls(adapter, feature)
     add_native_hole_callout(
         adapter,
-        top,
-        callout_xy=(0.200, 0.215),
+        feature,
+        callout_xy=(0.255, 0.238),
         label="pivot close-clearance hole",
         edge=pivot_edge,
     )
     add_native_hole_callout(
         adapter,
-        top,
-        # Below the pair, not level with it: the model's own "1/4-20 Tapped
-        # Hole" note drops a leader onto the east hole, and a callout placed
-        # level with the holes routes its leader straight across that descent
-        # (fail-loud layout gate, 2 leader crossings). Coming up from below
-        # keeps this leader clear of the note for the whole span.
-        callout_xy=(0.175, 0.225),
+        feature,
+        callout_xy=(0.255, 0.218),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.285, 0.118),
+        symbol_xy=(0.300, 0.120),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
@@ -348,19 +285,19 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.285, 0.045),
+        symbol_xy=(0.300, 0.092),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
         entity=_horizontal_section_edge(section, 0.0, label="base slide"),
     )
 
-    add_property_linked_note(adapter, "Plan View Note", 0.190, 0.205)
-    add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.135)
-    add_property_linked_note(adapter, "Section View Note", 0.300, 0.115)
+    add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
+    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    add_property_linked_note(adapter, "Section View Note", 0.315, 0.145)
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (top, section, iso):
+    for view in (profile, feature, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
