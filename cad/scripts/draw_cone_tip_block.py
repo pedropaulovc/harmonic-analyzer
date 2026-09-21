@@ -437,7 +437,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("SHAFT ENTRY", passage_center[0] - 0.021, 0.078),
         ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
         ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
-        ("ADJUSTER ENTRY", adjuster_center[0] - 0.021, 0.185),
+        ("ADJUSTER ENTRY", adjuster_center[0] - 0.054, 0.185),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
