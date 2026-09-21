@@ -261,7 +261,7 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
 TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
-    "AnchorOffset": "TAP AXIS\nFROM TOP EDGE",
+    "AnchorOffset": "TO TOP EDGE",
     "ShaftBoreDia": (
         "REAM THRU (3/8 IN)\n"
         f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"

@@ -84,6 +84,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
         round(pinion_cam_spec.LIFT_ROD_DIA + REAM_SLIDE[1] - pinion_cam_spec.BORE, 6),
     )
     assert pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "0.010-0.045 DIAMETRAL CLEARANCE" in bore
+    assert "LOCK AFTER POSITIONING" in bore
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
@@ -94,7 +97,7 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     assert "RELEASE HOLD" not in notes
     assert "ISO 4026" in notes
     boss = drawing.DIMENSION_CALLOUTS["BossDia"]
-    assert "COSMETIC RAISED SET-SCREW BOSS REQUIRED" in boss
+    assert "COSMETIC BOSS OPTIONAL" in boss
     assert "M2.5 X 0.45-6H THRU TO BORE" in boss
     assert "THROUGH THE BOSS" not in boss
 
@@ -127,7 +130,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert drawing.DIMENSION_CALLOUTS["BossCz"] == "BOSS AXIS STATION"
     assert "BossProjection" in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
-        "RAISED BOSS PROJECTION (REF)"
+        "OPTIONAL BOSS PROJECTION (REF)"
     )
 
 
