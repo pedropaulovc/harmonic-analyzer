@@ -133,11 +133,12 @@ def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
 
 def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
     # The blind floor and its depth are solid geometry in the dedicated seat
-    # section. The third-angle left view owns the visible mouth diameter and
-    # its through-thickness station.
+    # section. The third-angle left view owns the visible mouth diameter, its
+    # through-thickness station, and the critical axis-to-axis engagement
+    # location without dimensioning hidden lines.
     assert set(drawing.SECTION_KEEP) == {"PinSeatDepth"}
     assert pinion_bracket_geometry.PIN_SEAT < pinion_bracket_geometry.WIDTH
-    assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCz", "Depth"}
+    assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCy", "PinSeatCz", "Depth"}
 
 
 def test_scallop_detail_encloses_what_it_dimensions() -> None:

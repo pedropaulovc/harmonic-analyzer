@@ -157,14 +157,15 @@ def _detail_y(model_y_mm: float) -> float:
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position. The front view carries the upper bore, end radii and seat height;
-# the relief detail owns the lower pivot bore, and the seat section owns depth.
+# position. The front view carries the upper bore and end radii. The side view
+# owns every follower-seat dimension so that its axis is located from visible
+# geometry; the relief detail owns the lower pivot bore, and the seat section
+# owns depth.
 FRONT_KEEP = {
     "ArborBoreDia": (0.256, 0.214),
     "ArborBoreCz": (0.240, 0.151),
     "BottomCapRadius": (0.250, 0.080),
     "TopCapRadius": (0.236, 0.238),
-    "PinSeatCy": (0.180, 0.125),
 }
 # The scallop pair is dimensioned in the enlarged detail the way it is cut:
 # each centre from the pivot axis (X stacked above the fence, the shorter one
@@ -176,16 +177,17 @@ DETAIL_KEEP = {
     "PivotBoreDia": (0.170, 0.155),
     "CamReliefParkR": (0.170, 0.190),
     "CamReliefParkX": (0.105, 0.220),
-    "CamReliefParkY": (0.040, 0.175),
+    "CamReliefParkY": (0.065, 0.175),
     "CamReliefEngagedR": (0.170, 0.105),
     "CamReliefEngagedX": (0.105, 0.200),
-    "CamReliefEngagedY": (0.040, 0.125),
+    "CamReliefEngagedY": (0.065, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCz": (0.080, 0.090),
+    "PinSeatCy": (0.130, 0.125),
     "PinSeatDia": (0.040, 0.160),
 }
 SECTION_CENTER = (0.350, 0.115)
@@ -193,9 +195,9 @@ SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
 # overall on its clear right, between the third-angle left and front views.
 OVERALL_XY = (0.112, 0.168)
-# The arbor symbol leads away to the upper left of its bore.
-ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
-ARBOR_FINISH_XY = (0.168, 0.222)
+# The arbor symbol has a short leader to the bore's unobstructed left edge.
+ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
+ARBOR_FINISH_XY = (0.155, 0.205)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.  Naming both follower-seat annotations ties the native
@@ -209,7 +211,7 @@ DIMENSION_CALLOUTS = {
     "CamReliefParkY": "PARK +Y",
     "CamReliefEngagedX": "ENGAGED X",
     "CamReliefEngagedY": "ENGAGED -Y",
-    "PinSeatCy": "CAM ENGAGEMENT",
+    "PinSeatCy": "PIVOT-SEAT\nAXIS TO AXIS",
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE"
 
