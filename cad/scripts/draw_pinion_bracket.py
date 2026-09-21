@@ -128,11 +128,12 @@ def _flank_y(model_y_mm: float) -> float:
 # it holds the COMPLETE pivot bore and its centre mark: that reachable bore
 # axis is the common physical origin for every relief-centre coordinate.  The
 # fence also holds both scallop centres (in the air beside the strap) and both
-# bites.  3:1 turns the 6.90 radius into a 21 mm arc the two radius leaders can
-# land on separately.  The native caption goes to the detail's right (the sheet
-# border is too close underneath), and the fence's own letter stays clear of
-# the follower seat on the parent view.
-DETAIL_SCALE = (3.0, 1.0)
+# bites.  6:1 separates the near-coincident PARK and ENGAGED X witness lines
+# while giving each 6.90 radius enough arc for a distinct leader. The native
+# caption goes to the detail's right (the sheet border is too close
+# underneath), and the fence's own letter stays clear of the follower seat on
+# the parent view.
+DETAIL_SCALE = (6.0, 1.0)
 DETAIL_CENTER = (0.105, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
@@ -141,7 +142,7 @@ DETAIL_LETTER_XY = (0.245, 0.100)
 
 
 def _detail_x(model_x_mm: float) -> float:
-    """Sheet X of a model-X point in the detail (3:1, fence-centred)."""
+    """Sheet X of a model-X point in the native detail."""
     return (
         DETAIL_CENTER[0]
         + (model_x_mm - DETAIL_FENCE_CENTER_MM[0]) * DETAIL_SCALE[0] / 1000.0
@@ -149,7 +150,7 @@ def _detail_x(model_x_mm: float) -> float:
 
 
 def _detail_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the detail (3:1, fence-centred)."""
+    """Sheet Y of a model-Y point in the native detail."""
     return (
         DETAIL_CENTER[1]
         + (model_y_mm - DETAIL_FENCE_CENTER_MM[1]) * DETAIL_SCALE[0] / 1000.0
@@ -490,8 +491,8 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_section = create_section_view(
         adapter,
         detail_parent,
-        line_start=(0.250, seat_axis_y),
-        line_end=(0.320, seat_axis_y),
+        line_start=(0.230, seat_axis_y),
+        line_end=(0.340, seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),
