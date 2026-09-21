@@ -165,7 +165,7 @@ FRONT_KEEP = {
     "ArborBoreDia": (0.256, 0.214),
     "ArborBoreCz": (0.240, 0.151),
     "BottomCapRadius": (0.250, 0.080),
-    "TopCapRadius": (0.236, 0.238),
+    "TopCapRadius": (0.188, 0.245),
 }
 # The scallop pair is dimensioned in the enlarged detail the way it is cut:
 # each centre from the pivot axis (X stacked above the fence, the shorter one
@@ -186,7 +186,7 @@ DETAIL_KEEP = {
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
-    "PinSeatCz": (0.080, 0.090),
+    "PinSeatCz": (0.060, 0.090),
     "PinSeatCy": (0.130, 0.125),
     "PinSeatDia": (0.040, 0.160),
 }
@@ -211,7 +211,6 @@ DIMENSION_CALLOUTS = {
     "CamReliefParkY": "PARK +Y",
     "CamReliefEngagedX": "ENGAGED X",
     "CamReliefEngagedY": "ENGAGED -Y",
-    "PinSeatCy": "PIVOT-SEAT\nAXIS TO AXIS",
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE"
 
@@ -470,6 +469,17 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _overall_reference(adapter, left)
+    if (
+        add_note(
+            adapter,
+            "6.000 DIMENSION:\nPIVOT AXIS TO FOLLOWER-SEAT AXIS",
+            0.150,
+            0.105,
+            height=0.003,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to identify follower-seat axis dimension")
     for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
@@ -536,8 +546,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         detail,
-        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.170, 0.130),
+        edge_xy=(_detail_x(PIVOT_BORE / 2.0), _detail_y(0.0)),
+        symbol_xy=(0.145, 0.135),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
