@@ -1,18 +1,11 @@
-r"""Create the curated machinist drawing for the summing lever.
+r"""Create the two-sheet manufacturing drawing for MHA-073.
 
-The SLDPRT remains authoritative.  This recipe supplies only the summing-lever
-views, dimension layout, hole callouts, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
-
-A large green cast-iron first-class lever hung on hex knife-edge trunnions (no
-bore): a coefficients plate on the +X arm carrying the 20 channel-spring anchor
-taps, a solid pivot cylinder (152.4 long, along Z), and a summation arm
-reaching to the tapped counter-spring anchor boss on the -X arm.  Both spring
-anchors are purchased eyebolts that thread straight into those taps, so the
-print controls thread identity and position, never a seat bore.  The print
-shows a 1:2 front profile (pivot Ø), a 1:2 top plan (plate width/length +
-anchor boss), and a 1:4 isometric.  The sheet runs at 1:2.
+The SLDPRT owns every nominal, decimal place, tolerance and surface control.
+Sheet ``FORM-KNIFE`` defines the lever envelope, knife trunnions and
+counter-spring boss at useful scales.  Sheet ``SPRING-PATTERN`` gives the
+authoritative 20-hole field its own 1:1 plan, one rule-3 position frame, and
+unobstructed native thread callout.  All orthographic views are HLR; the
+standard isometric is finalized as precision Shaded With Edges.
 
 Run with SolidWorks open::
 
@@ -25,24 +18,23 @@ import argparse
 import sys
 from typing import Any
 
-from summing_lever_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
+    add_note,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
+    create_blank_drawing_sheets,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -50,18 +42,23 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
     ANCHOR_R,
-    CHANNEL_PITCH,
+    BASIC_DRAWING_DIMENSIONS,
     COUNTER_HOLE_SPEC,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_FIRST,
+    HOLE_Z_LAST,
     PLATE_L,
     PLATE_W,
     SURFACE_FINISHES,
     TIP_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
     place_view,
 )
 
@@ -83,43 +80,83 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 2.0)  # 1:2
-_S = SHEET_SCALE[0] / SHEET_SCALE[1]  # sheet-mm per model-mm (0.5)
+SHEET_SCALE = (1.0, 1.0)
+SHEET_NAMES = ("FORM-KNIFE", "SPRING-PATTERN")
 
-# Front (down -Z) and top (down -Y) share the same X extent: anchor eye
-# (TIP_X - ANCHOR_R) on the left to the plate right edge (PLATE_W).
+FORM_FRONT_SCALE = (1, 1)
+FORM_TOP_SCALE = (1, 2)
+ISO_SCALE = (1, 2)
+PATTERN_SCALE = (1, 1)
+
+# Front (down -Z) and top (down -Y) share this X envelope.
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 
-FRONT_CENTER = (0.225, 0.235)
-TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
-ISO_CENTER = (0.350, 0.225)
+FORM_FRONT_CENTER = (0.150, 0.220)
+FORM_TOP_CENTER = (0.165, 0.105)
+ISO_CENTER = (0.335, 0.165)
+PATTERN_CENTER = (0.225, 0.145)
 
 
-def _front_xy(mx: float, my: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Y) point in the front profile view (1:2)."""
+def _top_xy(
+    mx: float,
+    mz: float,
+    *,
+    center: tuple[float, float],
+    scale: tuple[int, int],
+) -> tuple[float, float]:
+    """Project model X/Z millimetres into one explicit top-view sheet frame."""
+    factor = scale[0] / scale[1]
     return (
-        FRONT_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        FRONT_CENTER[1] + my * _S / 1000.0,
+        center[0] + (mx - _BBOX_CX) * factor / 1000.0,
+        center[1] + mz * factor / 1000.0,
     )
 
 
-def _top_xy(mx: float, mz: float) -> tuple[float, float]:
-    """Sheet (x, y) of a model (X, Z) point in the top plan view (1:2)."""
-    return (
-        TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
-        TOP_CENTER[1] + mz * _S / 1000.0,
-    )
-
-
-FRONT_KEEP = {
-    "CylDia": (0.145, 0.260),
+FORM_FRONT_KEEP = {
+    "CylDia": (0.120, 0.255),
+    "PlateThickness": (0.225, 0.215),
+    "AnchorHeight": (0.045, 0.215),
+    "HexWidth": (0.160, 0.245),
+    "HexHeight": (0.095, 0.245),
 }
-TOP_KEEP = {
-    "PlateWidth": (0.300, 0.160),
-    "PlateLength": (0.395, TOP_CENTER[1]),
-    "AnchorOuterDia": (0.145, 0.175),
+FORM_TOP_KEEP = {
+    "PlateWidth": (0.195, 0.158),
+    "PlateLength": (0.220, FORM_TOP_CENTER[1]),
+    "AnchorOuterDia": (0.105, 0.125),
+    "AnchorOuterX": (0.145, 0.052),
+    "HexKnifeFrontDepth": (0.120, 0.172),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+PATTERN_KEEP = {
+    "HoleSeedX": (0.340, 0.245),
+    "HolePitch": (0.320, 0.120),
+    "HoleStartOffset": (0.350, 0.085),
+}
+
+def _assert_imported_basics(adapter: Any, annotations: list[Any]) -> None:
+    """Prove the pattern coordinates retained the part-authored BASIC state."""
+    expected = {
+        name
+        for dimension_names in BASIC_DRAWING_DIMENSIONS.values()
+        for name in dimension_names
+    }
+    remaining = set(expected)
+    for annotation in annotations:
+        annotation = _early_bound(annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != 1:  # swTolType_e.swTolBASIC
+            raise RuntimeError(
+                f"imported pattern dimension {name!r} is no longer BASIC"
+            )
+        remaining.remove(name)
+    if remaining:
+        raise RuntimeError(
+            f"part-authored BASIC dimensions never reached the sheet: {sorted(remaining)}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -136,7 +173,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -144,12 +180,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="summing-lever manufacturing package"
     )
     stamp_drawing_summary(
         adapter,
@@ -158,150 +196,154 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Summing Lever Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "summing lever; gray iron; knife-edge first-class lever",
+            3: "summing lever; ferrous; knife-edge first-class lever",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (top, iso):
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate summing-lever form sheet")
+    front = place_view(
+        adapter,
+        str(SOURCE),
+        "*Front",
+        *FORM_FRONT_CENTER,
+        scale=FORM_FRONT_SCALE,
+    )
+    top = place_view(
+        adapter,
+        str(SOURCE),
+        "*Top",
+        *FORM_TOP_CENTER,
+        scale=FORM_TOP_SCALE,
+    )
+    place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ISO_CENTER,
+        scale=ISO_SCALE,
+    )
+    for view in (front, top):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    front_dimensions = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FORM_FRONT_KEEP,
+        view_label="form front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    top_dimensions = curate_view_dimensions(
+        adapter,
+        top,
+        keep=FORM_TOP_KEEP,
+        view_label="form top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
 
-    # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
-    # a point on the hole rim (not its centre) so SolidWorks catches the
-    # circular edge.
-    anchor_tap_edge = _top_xy(TIP_X, COUNTER_R)
+    counter_tap_edge = _top_xy(
+        TIP_X,
+        COUNTER_R,
+        center=FORM_TOP_CENTER,
+        scale=FORM_TOP_SCALE,
+    )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=anchor_tap_edge,
-        callout_xy=(0.145, 0.155),
-        label="anchor tap",
+        edge_xy=counter_tap_edge,
+        callout_xy=(0.070, 0.115),
+        label="counter-spring anchor tap",
     )
-
-    # Datum A is the actual knife-edge pivot ridge, not the merged cylinder
-    # silhouette hidden by the ribs in the front view.  A SolidWorks Top view
-    # reverses model Z on the sheet: the positive sheet offset selects the -Z
-    # ridge, while the negative offset selects the part-owned +Z finish face.
-    # Keep datum and finish on opposite ridges so their leaders stay distinct.
-    knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
-    add_datum_feature(
-        adapter,
-        top,
-        edge_xy=knife_edge_datum,
-        symbol_xy=(knife_edge_datum[0] + 0.020, knife_edge_datum[1] - 0.012),
-        datum="A",
-        label="knife-edge pivot axis",
+    knife_edge = _top_xy(
+        0.0,
+        -(PLATE_L / 2.0 + HEX_DEPTH / 2.0),
+        center=FORM_TOP_CENTER,
+        scale=FORM_TOP_SCALE,
     )
-    knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
     add_surface_finish(
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(0.185, 0.100),
+        symbol_xy=(0.095, 0.070),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
-    # Use a separate point on the tap rim so the position-frame leader does
-    # not stack on the hole-callout leader at the hole's 12-o'clock point.
-    anchor_tap_fcf_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
-    add_feature_control_frame(
-        adapter,
-        top,
-        edge_xy=anchor_tap_fcf_edge,
-        frame_xy=(
-            anchor_tap_fcf_edge[0] - 0.010,
-            anchor_tap_fcf_edge[1] + 0.055,
-        ),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
-        datums=("A",),
-        diameter=True,
-        label="summation anchor position",
-    )
-    # BASIC X coordinate backing the anchor position frame: knife-edge pivot
-    # axis (datum A, the -Z trunnion ridge line) to the anchor tap centre.
-    ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
-    anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
-    anchor_location = add_edge_dimension(
-        adapter,
-        top,
-        p0=ridge_dim_edge,
-        p1=anchor_tap_bottom,
-        text_xy=(0.216, 0.075),
-        label="anchor tap X location",
-        orientation="horizontal",
-    )
-    set_basic_dimension(adapter, anchor_location, label="anchor tap X location")
+    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.105)
 
-    # Anchor-tap pattern control: datum B on the -Z plate end, BASIC row-X /
-    # start-Z / pitch coordinates off A|B, a native thread callout, and a 20X
-    # position frame -- the inspectable pattern definition (the notes no longer
-    # carry these numbers as prose).
-    # Pick B toward the plate's -X side and hang its tag down-LEFT: the seed
-    # hole's callout leader sweeps down-right from the hole and crossed a
-    # right-hung tag (layout audit).
-    plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate summing-lever spring-pattern sheet")
+    pattern = place_view(
+        adapter,
+        str(SOURCE),
+        "*Top",
+        *PATTERN_CENTER,
+        scale=PATTERN_SCALE,
+    )
+    set_hidden_lines_removed(adapter, pattern)
+    pattern_dimensions = curate_view_dimensions(
+        adapter,
+        pattern,
+        keep=PATTERN_KEEP,
+        view_label="spring-pattern plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    _assert_imported_basics(adapter, pattern_dimensions)
+
+    knife_edge_datum = _top_xy(
+        0.0,
+        PLATE_L / 2.0 + HEX_DEPTH / 2.0,
+        center=PATTERN_CENTER,
+        scale=PATTERN_SCALE,
+    )
     add_datum_feature(
         adapter,
-        top,
+        pattern,
+        edge_xy=knife_edge_datum,
+        symbol_xy=(knife_edge_datum[0] + 0.022, knife_edge_datum[1] - 0.012),
+        datum="A",
+        label="knife-edge pivot axis",
+    )
+    plate_end_edge = _top_xy(
+        10.0,
+        -PLATE_L / 2.0,
+        center=PATTERN_CENTER,
+        scale=PATTERN_SCALE,
+    )
+    add_datum_feature(
+        adapter,
+        pattern,
         edge_xy=plate_end_edge,
-        symbol_xy=(plate_end_edge[0] - 0.013, plate_end_edge[1] - 0.011),
+        symbol_xy=(plate_end_edge[0] - 0.020, plate_end_edge[1] - 0.010),
         datum="B",
-        label="plate -Z end face",
+        label="plate first-hole end",
     )
-    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, HOLE_Z_FIRST)
-    row_x = add_edge_dimension(
-        adapter,
-        top,
-        p0=ridge_dim_edge,
-        p1=seed_rim_right,
-        text_xy=(0.248, 0.075),
-        label="spring-hole row X",
-        orientation="horizontal",
+
+    seed_rim_bottom = _top_xy(
+        HOLE_X,
+        HOLE_Z_FIRST - HOLE_DIA / 2.0,
+        center=PATTERN_CENTER,
+        scale=PATTERN_SCALE,
     )
-    set_basic_dimension(adapter, row_x, label="spring-hole row X")
-    seed_rim_top = _top_xy(HOLE_X, HOLE_Z_FIRST + HOLE_DIA / 2.0)
-    start_z = add_edge_dimension(
-        adapter,
-        top,
-        p0=plate_end_edge,
-        p1=seed_rim_top,
-        text_xy=(0.266, 0.094),
-        label="spring-hole start Z",
-        orientation="vertical",
-    )
-    set_basic_dimension(adapter, start_z, label="spring-hole start Z")
-    second_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST + CHANNEL_PITCH - HOLE_DIA / 2.0)
-    pitch = add_edge_dimension(
-        adapter,
-        top,
-        p0=seed_rim_top,
-        p1=second_rim_bottom,
-        text_xy=(0.275, 0.1015),
-        label="spring-hole pitch",
-        orientation="vertical",
-    )
-    set_basic_dimension(adapter, pitch, label="spring-hole pitch")
-    seed_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST - HOLE_DIA / 2.0)
     add_native_hole_callout(
         adapter,
-        top,
+        pattern,
         edge_xy=seed_rim_bottom,
-        callout_xy=(0.310, 0.087),
+        callout_xy=(0.330, 0.060),
         label="spring-hole seed",
     )
-    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    pattern_rim_right = _top_xy(
+        HOLE_X + HOLE_DIA / 2.0,
+        HOLE_Z_LAST,
+        center=PATTERN_CENTER,
+        scale=PATTERN_SCALE,
+    )
     add_feature_control_frame(
         adapter,
-        top,
-        edge_xy=seed_rim_left,
-        frame_xy=(0.310, 0.115),
+        pattern,
+        edge_xy=pattern_rim_right,
+        frame_xy=(0.330, 0.225),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
@@ -310,9 +352,25 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
+    for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to label drawing sheet {sheet_name}")
+        if (
+            add_note(
+                adapter,
+                f"SHEET {sheet_index} OF {len(SHEET_NAMES)}",
+                0.350,
+                0.263,
+            )
+            is None
+        ):
+            raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
 
+    assert_imported_precision(
+        adapter,
+        [*front_dimensions, *top_dimensions, *pattern_dimensions],
+        DRAWING_PRECISION_BY_NAME,
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -321,6 +379,9 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=3,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
     )
 
 
