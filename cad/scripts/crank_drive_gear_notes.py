@@ -49,8 +49,11 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
 # as dimensions. Every GENERATING number is REF -- the cutter, its depth of cut
 # and the helix setting produce them, and the acceptance sizes are the three
 # native dimensions on the views. The two rows that are NOT REF are the pair's
-# requirement: the thickness the flanks must be cut to, and the backlash that
-# thickness exists to produce when the pair is assembled.
+# requirement, and each names WHERE it is accepted: the tooth thickness is
+# checked on this part, the backlash it exists to produce is checked when the
+# pair is assembled (the operating centre distance and shaft angle live on the
+# assembly, not here -- codex's iter1 blocker was that the sheet claimed a
+# backlash range a part inspector cannot establish alone).
 GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{spec.TEETH}"),
@@ -65,12 +68,12 @@ GEAR_DATA = gear_data_note(
             f"{spec.HELIX_ANGLE_DEG:.1f} DEG {spec.HELIX_HAND}",
         ),
         (
-            "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm)",
+            "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm), ACCEPT ON THIS PART",
             f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
             f"+{TOOTH_THICKNESS_DEVIATIONS[0]:.3f} / {TOOTH_THICKNESS_DEVIATIONS[1]:.3f}",
         ),
         (
-            "TRANSVERSE BACKLASH ASSEMBLED WITH MHA-025 (mm)",
+            "TRANSVERSE BACKLASH WITH MHA-025, ACCEPT AT ASSEMBLY (mm)",
             f"{BACKLASH_MM[0]:.2f} TO {BACKLASH_MM[1]:.2f}",
         ),
         ("TOOTH FORM", "HELICAL INVOLUTE, FULL DEPTH, ARC ROOT FLOOR"),

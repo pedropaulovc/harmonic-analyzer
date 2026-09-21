@@ -203,8 +203,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "ROOT DIAMETER (mm, REF)",
         "WHOLE DEPTH (mm, REF)",
         "HELIX ANGLE AT PITCH DIAMETER",
-        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm)",
-        "TRANSVERSE BACKLASH ASSEMBLED WITH MHA-025 (mm)",
+        "CIRCULAR TOOTH THICKNESS AT PITCH DIA, TRANSVERSE (mm), ACCEPT ON THIS PART",
+        "TRANSVERSE BACKLASH WITH MHA-025, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
         "MATES WITH",
     ):
@@ -222,6 +222,27 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "RUNOUT",
     ):
         assert banned not in data, banned
+    # Each of the two rows that is NOT reference-only says where it is accepted,
+    # so a part inspector is never asked to establish a pair result: the
+    # thickness is checkable on this part with a gear-tooth caliper, while the
+    # backlash depends on the operating centre distance and shaft angle, which
+    # belong to the assembly. (codex iter1 blocked on exactly that ambiguity.)
+    accepting = [
+        line
+        for line in data.splitlines()
+        if "ACCEPT ON THIS PART" in line or "ACCEPT AT ASSEMBLY" in line
+    ]
+    assert len(accepting) == 2
+    for line in accepting:
+        assert "REF" not in line
+    # ... and no OTHER row claims an acceptance band. A tooth count, the
+    # cutter's pitch and the pressure angle are definitional; a row that
+    # carries limits without saying who checks them is the defect.
+    for line in data.splitlines()[1:]:
+        if line in accepting:
+            continue
+        _, _, value = line.partition(":")
+        assert " +" not in value and " TO " not in value, line
     source = _source()
     assert 'adapter, "Gear Data"' in source
     assert 'adapter, "Manufacturing Notes"' in source
