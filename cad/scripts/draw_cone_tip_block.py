@@ -93,7 +93,10 @@ RIGHT_KEEP = {
     )
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
-DIMENSION_CALLOUTS = {"PassageDiaDim": "DRILL THRU\nCLEARANCE"}
+DIMENSION_CALLOUTS = {
+    "PassageDiaDim": "DRILL THRU\nCLEARANCE",
+    "SlitDepth": "SLOT DEPTH",
+}
 
 
 def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
@@ -431,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.220, 0.152),
+        callout_xy=(0.170, 0.185),
         label="pinch entry-jaw clearance",
         process="DRILL",
     )
@@ -457,6 +460,8 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
+    if add_note(adapter, "ROTATED 90°", SECTION_CENTER[0] + 0.040, 0.195) is None:
+        raise RuntimeError("failed to label the rotated section")
 
     foot_edge = _foot_edge(adapter, front)
     add_surface_finish(
