@@ -29,6 +29,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -41,6 +42,7 @@ from _drawing_common import (
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
     set_dimension_callouts,
@@ -48,6 +50,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -125,18 +128,18 @@ def _top_y(model_z: float) -> float:
 
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
+    "MainBodyDia": (0.150, 0.090),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
+    "HeadDia": (FRONT_CENTER[0], 0.170),
     "CrankBossDia": (0.170, _front_y(BLOCK_HEIGHT + 2.0)),
     "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
-    "MainBodyDia": (0.025, 0.213),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
-    "HeadDia": (0.158, _top_y(0.0)),
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
@@ -150,10 +153,12 @@ SECTION_KEEP = {
 # as-cast collar the shop has to know that face is machined back to a station,
 # not left as cast.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "SPOT FACE",
-    "CrankBoreDia": "BORE THRU",
-    "JournalBoreDia": "BORE THRU",
-    "CrankBossStartZ": "TO SPOT FACE",
+    "CrankBossDia": "BOSS SPOT FACE",
+    "CrankBoreDia": "CRANK BORE THRU",
+    "JournalBoreDia": "CONE BORE THRU",
+    "ConeBossDia": "CONE JOURNAL BOSS",
+    "CrankBossStartZ": "TO BOSS SPOT FACE",
+    "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
 
@@ -337,6 +342,163 @@ def _orient_section(adapter: Any, view: Any) -> None:
         )
 
 
+
+def _model_face_evidence(model: Any) -> None:
+    """Read the final BREP surfaces behind the four disputed callouts."""
+    rows: dict[str, list[tuple[str, tuple[float, ...]]]] = {}
+    for name in (
+        "CrankSprocketBoss",
+        "CrankSpotFace",
+        "CrankBore",
+        "ConeShaftBoss",
+        "ConeShaftBore",
+    ):
+        feature = model.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"missing model feature for drawing evidence: {name}")
+        feature = _early_bound(feature, "IFeature")
+        surfaces = []
+        seen = set()
+        for raw_face in feature.GetFaces() or ():
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if surface.IsCylinder():
+                item = (
+                    "cylinder",
+                    tuple(round(float(value), 9) for value in surface.CylinderParams),
+                )
+            elif surface.IsPlane():
+                item = (
+                    "plane",
+                    tuple(round(float(value), 9) for value in surface.PlaneParams),
+                )
+            else:
+                continue
+            if item not in seen:
+                seen.add(item)
+                surfaces.append(item)
+        if not surfaces:
+            raise RuntimeError(f"{name} exposes no planar/cylindrical BREP surfaces")
+        rows[name] = surfaces
+    _telemetry.info(f"cone pivot post final BREP surfaces: {rows!r}")
+
+
+def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
+    """Hide one model sketch in one drawing view, retaining imported dimensions."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    typed_view = _early_bound(view, "IView")
+    name = view_name(adapter, typed_view)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate {name!r} to hide {sketch_name}")
+    root = typed_view.RootDrawingComponent2(False)
+    if root is None:
+        raise RuntimeError(f"{name!r} has no drawing component for {sketch_name}")
+    component = str(_early_bound(root, "IDrawingComponent").Name)
+    qualified = f"{sketch_name}@{component}@{name}"
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"failed to select drawing witness sketch {qualified!r}")
+    draw.BlankSketch()
+    rebuild_drawing(adapter, label=f"hide {sketch_name} in {name}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        qualified, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"hidden drawing witness sketch vanished: {qualified!r}")
+    selected = _early_bound(
+        draw.SelectionManager.GetSelectedObject6(1, -1),
+        "IFeature",
+    )
+    state = int(selected.Visible)
+    draw.ClearSelection2(True)
+    if state != 1:
+        raise RuntimeError(
+            f"drawing witness sketch stayed visible in {name!r}: {state}"
+        )
+    _telemetry.info(f"drawing witness sketch hidden: {qualified}, state={state}")
+
+
+def _assert_view_geometry(
+    adapter: Any,
+    *,
+    front: Any,
+    top: Any,
+    section: Any,
+    iso: Any,
+) -> None:
+    """Prove which bore axis each manufacturing view is normal to."""
+    incline = math.radians(INCLINE_DEG)
+    crank_axis = (0.0, 0.0, 1.0)
+    cone_axis = (math.sin(incline), 0.0, math.cos(incline))
+    crank_center = (0.0, CRANK_BORE_HEIGHT / 1000.0, 0.0)
+    cone_center = (0.0, BORE_HEIGHT / 1000.0, 0.0)
+    sample = 0.040
+
+    rows = {}
+    for label, raw_view in (
+        ("front", front),
+        ("top", top),
+        ("section", section),
+        ("isometric", iso),
+    ):
+        view = _early_bound(raw_view, "IView")
+        transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
+        matrix = tuple(round(float(value), 9) for value in transform.ArrayData)
+
+        def projected(
+            center: tuple[float, float, float],
+            axis: tuple[float, float, float],
+        ) -> tuple[float, float]:
+            origin = model_point_in_view(
+                adapter, view, center, label=f"{label} bore-axis origin"
+            )
+            endpoint = model_point_in_view(
+                adapter,
+                view,
+                tuple(center[i] + sample * axis[i] for i in range(3)),
+                label=f"{label} bore-axis endpoint",
+            )
+            return tuple(endpoint[i] - origin[i] for i in range(2))
+
+        rows[label] = {
+            "transform": matrix,
+            "crank_center": model_point_in_view(
+                adapter, view, crank_center, label=f"{label} crank centre"
+            ),
+            "cone_center": model_point_in_view(
+                adapter, view, cone_center, label=f"{label} cone centre"
+            ),
+            "crank_axis": projected(crank_center, crank_axis),
+            "cone_axis": projected(cone_center, cone_axis),
+        }
+
+    def length(vector: tuple[float, float]) -> float:
+        return math.hypot(*vector)
+
+    if length(rows["front"]["crank_axis"]) > 1e-8:
+        raise RuntimeError(f"front is not normal to crank bore: {rows['front']!r}")
+    if length(rows["section"]["cone_axis"]) > 1e-8:
+        raise RuntimeError(
+            f"cone journal section is not normal to cone bore: {rows['section']!r}"
+        )
+    top_crank = rows["top"]["crank_axis"]
+    top_cone = rows["top"]["cone_axis"]
+    cosine = sum(a * b for a, b in zip(top_crank, top_cone)) / (
+        length(top_crank) * length(top_cone)
+    )
+    acute = math.degrees(math.acos(max(-1.0, min(1.0, abs(cosine)))))
+    if abs(acute - INCLINE_DEG) > 0.01:
+        raise RuntimeError(
+            f"top-view bore-axis angle {acute:.6f} != {INCLINE_DEG:.6f}"
+        )
+    _telemetry.info(
+        f"cone pivot post native view transforms: {rows!r}; "
+        f"top acute axis angle={acute:.6f} deg"
+    )
+
 def _assert_native_layout(
     adapter: Any,
     section: Any,
@@ -344,7 +506,13 @@ def _assert_native_layout(
     expected_finish: str,
 ) -> None:
     """Prove the final live sheet geometry before spending an export."""
-    from _layout_geometry import Box, audit_sheet, format_findings
+    from _layout_geometry import (
+        DEFAULT_TEXT_TOUCH_TOL_M,
+        Box,
+        audit_sheet,
+        format_findings,
+        segment_box_overlap_length,
+    )
     from diagnostics.drawing_layout_audit import collect_document
 
     sheets = collect_document(adapter)
@@ -418,6 +586,30 @@ def _assert_native_layout(
             "cone pivot post must expose three native Ra text boxes: "
             f"{len(surface_boxes)}"
         )
+    journal_dimensions = [
+        annotation
+        for annotation in sheet.annotations
+        if annotation.label == "JournalAxisY"
+    ]
+    if len(journal_dimensions) != 1:
+        raise RuntimeError(
+            "expected one native JournalAxisY annotation, found "
+            f"{len(journal_dimensions)}"
+        )
+    journal_dimension = journal_dimensions[0]
+    own_overlap = max(
+        (
+            segment_box_overlap_length(segment, box)
+            for box in journal_dimension.text_boxes
+            for segment in journal_dimension.segments
+        ),
+        default=0.0,
+    )
+    if own_overlap > DEFAULT_TEXT_TOUCH_TOL_M:
+        raise RuntimeError(
+            "JournalAxisY's own dimension ink crosses its text by "
+            f"{own_overlap * 1000.0:.3f} mm"
+        )
     findings = audit_sheet(sheet)
     if findings:
         raise RuntimeError(
@@ -428,7 +620,8 @@ def _assert_native_layout(
         "cone pivot post native layout: "
         f"section={section_box.format_mm()}; "
         f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
-        f"Ra={[box.format_mm() for box in surface_boxes]}"
+        f"Ra={[box.format_mm() for box in surface_boxes]}; "
+        f"JournalAxisY self-overlap={own_overlap * 1000.0:.3f}mm"
     )
 
 
@@ -456,6 +649,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
+    _model_face_evidence(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -492,6 +686,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _orient_section(adapter, section)
     set_hidden_lines_removed(adapter, section)
+    _assert_view_geometry(
+        adapter,
+        front=front,
+        top=top,
+        section=section,
+        iso=iso,
+    )
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -522,6 +723,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # the third place their fit band is written in.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
+    offset_dimension_text(
+        adapter,
+        section_annotations,
+        {"JournalAxisY": (0.190, 0.157)},
+    )
+    for view in (front, top, iso):
+        _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (section, "section")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
