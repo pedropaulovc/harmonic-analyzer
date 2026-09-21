@@ -1,18 +1,17 @@
 r"""Create the curated machinist drawing for the v2 cone pivot post.
 
 The SLDPRT remains authoritative.  This recipe places the plan, the front
-elevation, ONE section and a pictorial isometric, and imports exactly the model
-dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared
-sheet/template, import, curation and export behaviour lives in
+elevation, a true-shape cone-journal view and a pictorial isometric, and imports
+exactly the model dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks;
+shared sheet/template, import, curation and export behaviour lives in
 ``_drawing_common``.
 
 The casting has two axes and they are not parallel: the crank journal runs
 along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
-body axis.  Sketches on ``ConeShaftNormal`` are therefore not parallel to the
-front elevation, so the cone-journal sizes are imported into SECTION A-A -- a
-full section cut in the PLAN perpendicular to the journal axis, which looks
-straight down that axis and shows the pad and bore in true shape.  The
-elevation keeps the crank journal, which its own sketch plane is parallel to.
+body axis.  The part therefore persists a named view looking exactly down the
+cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
+Ø12.281 bore as separate true-shape circles; the elevation keeps the crank
+journal, whose own sketch plane is parallel to it.
 
 Run with SolidWorks open::
 
@@ -28,7 +27,6 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
@@ -37,7 +35,6 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -61,6 +58,7 @@ from cone_pivot_post_spec import (
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
+    CONE_AXIS_VIEW,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_END_Z,
@@ -71,6 +69,7 @@ from cone_pivot_post_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -94,9 +93,8 @@ _S = SHEET_SCALE[0] / 1000.0
 # Third-angle: the plan sits above the front elevation, both at sheet scale.
 FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
-SECTION_CENTER = (0.240, 0.168)
+JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
-SECTION_LABEL = "A"
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -142,7 +140,7 @@ TOP_KEEP = {
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.136, _top_y(28.0)),
 }
-SECTION_KEEP = {
+JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
     "ConeBossDia": (0.292, 0.184),
     "JournalBoreDia": (0.292, 0.163),
@@ -228,118 +226,8 @@ def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
     raise RuntimeError(f"view has no rim adjacent to a {diameter_mm:g} mm bore")
 
 
-def _section_cut() -> tuple[tuple[float, float], tuple[float, float]]:
-    """Sheet endpoints of the plan cut taken PERPENDICULAR to the cone journal.
-
-    The journal's plan direction is ``(sin, -cos)`` in sheet axes (model +Z
-    runs down the plan), so a cut along its perpendicular makes the section
-    look straight down the journal axis -- the only orientation in which the
-    inclined pad and bore are true shape and their ConeShaftNormal sketch
-    dimensions can be imported at all.
-    """
-    incline = math.radians(INCLINE_DEG)
-    axis = (_top_x(0.0), _top_y(0.0))
-    half = 0.032
-    step = (half * math.cos(incline), half * math.sin(incline))
-    return (
-        (axis[0] - step[0], axis[1] - step[1]),
-        (axis[0] + step[0], axis[1] + step[1]),
-    )
 
 
-def _orient_section(adapter: Any, view: Any) -> None:
-    """Show the journal section upright, with the casting's top at the top.
-
-    The section plane contains model +Y and the plan-normal cross-axis.  Native
-    section creation can mirror either axis and inherits the oblique cutting
-    line's sheet rotation, so project both model axes, reverse the cut when
-    needed, then remove that rotation.  This keeps the mounting counterbores at
-    the same end as the front elevation instead of making the shop mentally
-    invert SECTION A-A.
-    """
-
-    section_view = _early_bound(view, "IView")
-    section = section_view.GetSection()
-    if section is None:
-        raise RuntimeError("cone journal section has no section definition")
-    section = _early_bound(section, "IDrSection")
-    incline = math.radians(INCLINE_DEG)
-    cross_axis = (0.040 * math.cos(incline), 0.0, -0.040 * math.sin(incline))
-
-    def projected_axes() -> tuple[tuple[float, float], tuple[float, float]]:
-        origin = model_point_in_view(
-            adapter, section_view, (0.0, 0.0, 0.0), label="journal section origin"
-        )
-        endpoints = (
-            model_point_in_view(
-                adapter,
-                section_view,
-                cross_axis,
-                label="journal section horizontal axis",
-            ),
-            model_point_in_view(
-                adapter,
-                section_view,
-                (0.0, 0.040, 0.0),
-                label="journal section vertical axis",
-            ),
-        )
-        return tuple(
-            tuple(endpoint[index] - origin[index] for index in range(2))
-            for endpoint in endpoints
-        )
-
-    horizontal, vertical = projected_axes()
-    if horizontal[0] * vertical[1] - horizontal[1] * vertical[0] < 0.0:
-        reversed_cut = not bool(section.GetReversedCutDirection())
-        section.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="orient cone journal section")
-        if bool(section.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("cone journal section cut reversal did not persist")
-        horizontal, vertical = projected_axes()
-
-    section_view.Angle = float(section_view.Angle) - math.atan2(
-        horizontal[1], horizontal[0]
-    )
-    rebuild_drawing(adapter, label="orient cone journal section")
-    horizontal, vertical = projected_axes()
-    if (
-        horizontal[0] <= 0.0
-        or abs(horizontal[1]) > 1e-8
-        or vertical[1] <= 0.0
-        or abs(vertical[0]) > 1e-8
-    ):
-        raise RuntimeError(
-            "cone journal section axes did not persist upright: "
-            f"{horizontal=}, {vertical=}"
-        )
-
-    # A section's native Position is its cut-plane origin, not its outline
-    # centre.  Rotation therefore moved this 86 mm-tall view through the top
-    # border; translate the native position by the measured outline-centre
-    # error and prove the visible geometry is centred on the declared target.
-    outline = tuple(float(value) for value in section_view.GetOutline())
-    position = tuple(float(value) for value in section_view.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("cone journal section has invalid bounds")
-    target = [
-        position[axis]
-        + SECTION_CENTER[axis]
-        - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
-    ]
-    if not section_view.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to centre cone journal section")
-    rebuild_drawing(adapter, label="centre cone journal section")
-    outline = tuple(float(value) for value in section_view.GetOutline())
-    outline_center = tuple(
-        (outline[axis] + outline[axis + 2]) / 2.0 for axis in range(2)
-    )
-    if math.dist(outline_center, SECTION_CENTER) > 0.0001:
-        raise RuntimeError(
-            "cone journal section centre did not persist: "
-            f"{outline_center=}, target={SECTION_CENTER}"
-        )
 
 
 
@@ -418,7 +306,7 @@ def _assert_view_geometry(
     *,
     front: Any,
     top: Any,
-    section: Any,
+    journal: Any,
     iso: Any,
 ) -> None:
     """Prove which bore axis each manufacturing view is normal to."""
@@ -433,7 +321,7 @@ def _assert_view_geometry(
     for label, raw_view in (
         ("front", front),
         ("top", top),
-        ("section", section),
+        ("journal", journal),
         ("isometric", iso),
     ):
         view = _early_bound(raw_view, "IView")
@@ -472,9 +360,9 @@ def _assert_view_geometry(
 
     if length(rows["front"]["crank_axis"]) > 1e-8:
         raise RuntimeError(f"front is not normal to crank bore: {rows['front']!r}")
-    if length(rows["section"]["cone_axis"]) > 1e-8:
+    if length(rows["journal"]["cone_axis"]) > 1e-8:
         raise RuntimeError(
-            f"cone journal section is not normal to cone bore: {rows['section']!r}"
+            f"cone journal view is not normal to cone bore: {rows['journal']!r}"
         )
     top_crank = rows["top"]["crank_axis"]
     top_cone = rows["top"]["cone_axis"]
@@ -493,7 +381,7 @@ def _assert_view_geometry(
 
 def _assert_native_layout(
     adapter: Any,
-    section: Any,
+    journal: Any,
     *,
     expected_finish: str,
 ) -> None:
@@ -512,15 +400,15 @@ def _assert_native_layout(
         raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
     sheet = sheets[0]
 
-    section_values = tuple(float(value) for value in section.GetOutline())
-    if len(section_values) != 4:
-        raise RuntimeError("cone journal section has invalid final outline")
-    section_box = Box(*section_values)
-    section_escape = section_box.escape(sheet.region)
-    if section_escape is not None:
+    journal_values = tuple(float(value) for value in journal.GetOutline())
+    if len(journal_values) != 4:
+        raise RuntimeError("cone journal view has invalid final outline")
+    journal_box = Box(*journal_values)
+    journal_escape = journal_box.escape(sheet.region)
+    if journal_escape is not None:
         raise RuntimeError(
-            "cone journal section leaves the inner border: "
-            f"{section_box.format_mm()}, {section_escape=}"
+            "cone journal view leaves the inner border: "
+            f"{journal_box.format_mm()}, {journal_escape=}"
         )
 
     finish_notes = []
@@ -619,7 +507,7 @@ def _assert_native_layout(
         )
     _telemetry.info(
         "cone pivot post native layout: "
-        f"section={section_box.format_mm()}; "
+        f"journal={journal_box.format_mm()}; "
         f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
         f"Ra={[box.format_mm() for box in surface_boxes]}; "
         f"JournalAxisY self-overlap={own_overlap * 1000.0:.3f}mm"
@@ -668,30 +556,24 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, front)
-    # SECTION A-A defines the inclined bore and the plan's native 12.52-degree
-    # model dimension defines its direction, so dashed bore edges add no
-    # manufacturing information here and only crowd the holes and cut line.
-    set_hidden_lines_removed(adapter, top)
-
-    cut_start, cut_end = _section_cut()
-    section = create_section_view(
+    journal = place_view(
         adapter,
-        top,
-        line_start=cut_start,
-        line_end=cut_end,
-        view_xy=SECTION_CENTER,
-        section_label=SECTION_LABEL,
-        label="cone journal section",
+        str(SOURCE),
+        CONE_AXIS_VIEW,
+        *JOURNAL_CENTER,
+        scale=(1, 1),
     )
-    _orient_section(adapter, section)
-    set_hidden_lines_removed(adapter, section)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    # The named journal view looks exactly down the inclined model axis.  Unlike
+    # the former full section, it retains the boss end face, so its Ø17.2 OD and
+    # Ø12.281 bore are two visible concentric circles with unambiguous leaders.
+    for view in (front, top, journal):
+        set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
         front=front,
         top=top,
-        section=section,
+        journal=journal,
         iso=iso,
     )
 
@@ -709,14 +591,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section_annotations = curate_view_dimensions(
+    journal_annotations = curate_view_dimensions(
         adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="section",
+        journal,
+        keep=JOURNAL_KEEP,
+        view_label="cone journal",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *top_annotations, *section_annotations]
+    annotations = [*front_annotations, *top_annotations, *journal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
@@ -726,12 +608,12 @@ async def build(adapter: Any) -> dict[str, str]:
 
     offset_dimension_text(
         adapter,
-        section_annotations,
+        journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
-    for view in (front, top, iso):
+    for view in (front, top, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
-    for view, label in ((front, "front"), (top, "top"), (section, "section")):
+    for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
     add_view_centerline(
@@ -798,12 +680,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
-        section,
-        edge_entity=_bore_rim_edge(section, diameter_mm=BORE_DIA),
+        journal,
+        edge_entity=_bore_rim_edge(journal, diameter_mm=BORE_DIA),
         symbol_xy=(0.300, 0.120),
         leader_attach_xy=model_point_in_view(
             adapter,
-            section,
+            journal,
             (
                 0.0,
                 (BORE_HEIGHT - BORE_DIA / 2.0) / 1000.0,
@@ -815,18 +697,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cone journal bore finish",
         char_height=0.0025,
     )
-
+    add_note(adapter, "CONE JOURNAL VIEW", 0.218, 0.104)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.
     # Reassert each manufacturing view after its final annotation.
     set_hidden_lines_removed(adapter, front)
     set_hidden_lines_removed(adapter, top)
-    set_hidden_lines_removed(adapter, section)
+    set_hidden_lines_removed(adapter, journal)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _assert_native_layout(
         adapter,
-        section,
+        journal,
         expected_finish=source_properties["Finish"],
     )
 
