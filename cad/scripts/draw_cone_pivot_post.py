@@ -161,7 +161,7 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.125, 0.2305),
+    "CrankBossStartZ": (0.1255, 0.2225),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.136, _top_y(28.0)),
