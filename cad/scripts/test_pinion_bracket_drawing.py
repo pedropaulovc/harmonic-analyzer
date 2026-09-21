@@ -129,15 +129,15 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
 
 
 def test_scallop_detail_encloses_what_it_dimensions() -> None:
-    # The detail carries every scallop dimension, and each is measured from
-    # the pivot-bore axis: a reachable physical origin rather than an
-    # off-part construction centre.  The fence must therefore show the whole
-    # pivot bore (so its centre mark reads as a bore axis), both relief
-    # centres, and both bites.
-    assert set(drawing.DETAIL_KEEP) == (
+    # The detail carries every scallop dimension plus the size of the pivot
+    # bore whose centre is their common, reachable physical origin. The fence
+    # must therefore show the whole pivot bore (so its centre mark reads as a
+    # bore axis), both relief centres, and both bites.
+    relief_dimensions = (
         pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefParkProfile"]
         | pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefEngagedProfile"]
     )
+    assert set(drawing.DETAIL_KEEP) == relief_dimensions | {"PivotBoreDia"}
     fence_center = drawing.DETAIL_FENCE_CENTER_MM
     radius = drawing.DETAIL_FENCE_RADIUS_MM
     assert (

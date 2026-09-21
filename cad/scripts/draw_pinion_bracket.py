@@ -76,6 +76,7 @@ from pinion_bracket_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    add_note,
     place_view,
 )
 
@@ -138,7 +139,7 @@ DETAIL_CENTER = (0.058, 0.072)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
 DETAIL_CAPTION_XY = (0.125, 0.075)
-DETAIL_LETTER_XY = (0.116, 0.104)
+DETAIL_LETTER_XY = (0.105, 0.105)
 
 
 def _detail_x(model_x_mm: float) -> float:
@@ -158,14 +159,13 @@ def _detail_y(model_y_mm: float) -> float:
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  The face features and their locations stay on the front view; the
-# two bore diameters and the end radii on its closed right side, the seat's
-# height and depth on its open left side.
+# position. The front view carries the upper bore, end radii and the seat's
+# height/depth; the lower pivot bore moves into the relief detail so the
+# parent-view detail fence is not crossed by its size leader.
 FRONT_KEEP = {
-    "PivotBoreDia": (0.196, 0.086),
     "ArborBoreDia": (0.196, 0.214),
     "ArborBoreCz": (0.180, 0.151),
-    "BottomCapRadius": (0.164, 0.062),
+    "BottomCapRadius": (0.190, 0.060),
     "TopCapRadius": (0.164, 0.238),
     "PinSeatCy": (0.088, 0.134),
     "PinSeatDepth": (0.100, 0.158),
@@ -177,6 +177,7 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
+    "PivotBoreDia": (0.101, 0.073),
     "CamReliefParkR": (0.100, 0.090),
     "CamReliefParkX": (0.068, 0.115),
     "CamReliefParkY": (0.031, 0.084),
@@ -196,12 +197,9 @@ LEFT_KEEP = {
 # neither its dimension line nor its short witness lines cross the follower-
 # seat size leader on the flank's right.
 OVERALL_XY = (0.212, 0.168)
-# Each bore's roughness symbol leads out to the upper/lower LEFT of its arc
-# and that same bore's end-radius label sits to the upper/lower RIGHT, so the
-# two leaders leaving the same crowded corner diverge instead of crossing and
-# the symbol's "Ra" text stops short of the radius label.
-PIVOT_FINISH_EDGE = (_front_x(0.0), _front_y(-PIVOT_BORE / 2.0))
-PIVOT_FINISH_XY = (0.128, 0.086)
+# Each running bore keeps one roughness symbol. The pivot symbol is owned by
+# its enlarged detail, clear of the parent-view fence; the arbor symbol leads
+# away to the upper left while that bore's radius label remains on the right.
 ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
 ARBOR_FINISH_XY = (0.108, 0.222)
 # A callout says only what a dimension cannot: how the feature is made, where
@@ -213,8 +211,8 @@ DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
-    "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH\nFROM ENTRY FACE",
-    "PinSeatCy": "CAM ENGAGE CLEARANCE\nHOLD FINE GRADE",
+    "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE",
+    "PinSeatCy": "CAM ENGAGE CLEARANCE",
 }
 
 
@@ -439,10 +437,22 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     # The complete pivot bore is the relief coordinates' reachable physical
-    # origin.  Mark its axis in the enlarged detail before importing the
-    # origin-based scallop dimensions, so their common baseline is visible.
+    # origin. Mark its axis in the enlarged detail before importing the
+    # origin-based scallop dimensions, and identify that physical feature
+    # directly so the four X/Y values cannot read as construction arithmetic.
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
+    if (
+        add_note(
+            adapter,
+            "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
+            0.060,
+            0.131,
+            height=0.0035,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to identify relief coordinate origin")
 
     # The detail claims the scallop dimensions before the parent import.
     detail_annotations = curate_view_dimensions(
@@ -485,9 +495,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # the upper one.  Nothing else on the strap slides, seats or locates.
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=PIVOT_FINISH_EDGE,
-        symbol_xy=PIVOT_FINISH_XY,
+        detail,
+        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
+        symbol_xy=(0.100, 0.102),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
