@@ -145,6 +145,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankSprocketBoss": {"CrankBossLen"},
     "CrankBoreProfile": {"CrankBoreDia"},
     "ConeBossProfile": {"JournalAxisY", "ConeBossDia"},
+    "ConeShaftBoss": {"ConeBossLen"},
     "JournalBoreProfile": {"JournalBoreDia"},
     "JournalPlanReference": {"CrankBossStartZ", "InclineAngle"},
 }
@@ -167,6 +168,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankSprocketBoss": {"CrankBossLen": 1},
     "CrankBoreProfile": {"CrankBoreDia": 3},
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
+    "ConeShaftBoss": {"ConeBossLen": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
     "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 2},
 }
@@ -192,6 +194,7 @@ DRAWING_NOTES = "\n".join(
     (
         "CRANK BORE CARRIES CRANKSHAFT MHA-026.",
         "CONE BORE CARRIES CONE GEAR SHAFT MHA-014.",
+        "CRANK AND CONE BORE AXES INTERSECT THE POST AXIS.",
         "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
     )
 )
