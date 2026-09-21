@@ -381,7 +381,8 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     half_boss = drawing.HALF_BOSS
     assert half_boss == pytest.approx(spec.BOSS_DIA * 4 / 2000.0)
     outside_x, outside_y = drawing.RIGHT_KEEP["OutsideDia"]
-    assert drawing._side_x(spec.FACE_WIDTH) < outside_x < drawing._side_x(0.0)
+    assert min(drawing._side_x(0.0), drawing._side_x(spec.FACE_WIDTH)) < outside_x
+    assert outside_x < max(drawing._side_x(0.0), drawing._side_x(spec.FACE_WIDTH))
     assert outside_y > drawing.RIGHT_CENTER[1] + half_od + 0.008
     boss_x, boss_y = drawing.RIGHT_KEEP["BossDia"]
     assert drawing.FRONT_CENTER[0] + half_od + 0.010 < boss_x
@@ -402,16 +403,16 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         drawing.RIGHT_KEEP["FaceWidth"][1]
         > drawing.RIGHT_KEEP["OverallLength"][1]
     )
-    # The pin-hole note hangs above the boss. Its leader reaches the visible
-    # cross-hole through the boss instead of crossing its own text, the toothed
-    # rectangle, or the outside-diameter extension line.
+    # The pin-hole note hangs above-right of the section. Its leader reaches
+    # the sectioned cross-hole through the boss instead of crossing its own
+    # text, the toothed rectangle, or the outside-diameter extension line.
     assert drawing.PIN_HOLE_CALLOUT[1] > drawing.RIGHT_CENTER[1] + half_od + 0.040
     assert abs(drawing.PIN_HOLE_EDGE[1] - drawing.RIGHT_CENTER[1]) == pytest.approx(
         spec.PIN_DIA * 4 / 2000.0
     )
     assert drawing.PIN_HOLE_EDGE[0] == pytest.approx(drawing._side_x(spec.PIN_STATION))
     assert drawing.PIN_HOLE_EDGE[0] < drawing.PIN_HOLE_CALLOUT[0]
-    assert drawing.PIN_HOLE_CALLOUT[0] < drawing._side_x(spec.FACE_WIDTH)
+    assert drawing.PIN_HOLE_CALLOUT[0] < drawing.ISO_CENTER[0] - half_od - 0.010
     # The bore-fit note stays left of the end view; its short pointer enters
     # radially through the upper-left tooth gap and lands on the bore circle.
     assert drawing.BORE_FIT_NOTE[0] < drawing.FRONT_CENTER[0] - half_od

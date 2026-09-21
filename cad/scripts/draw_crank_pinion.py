@@ -98,12 +98,11 @@ HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
 def _side_x(z_mm: float) -> float:
     """Sheet x of a model-z station in the longitudinal section.
 
-    SolidWorks centres the derived view on its geometry, and the rightward
-    longitudinal section lays model +Z to the LEFT (the boss end sits nearest
-    the face view), so the toothed south face (z = 0) is the view's right edge
-    and the boss end its left.
+    SolidWorks centres the derived view on its geometry, and this section lays
+    model +Z to the RIGHT: the toothed south face (z = 0) is the left edge and
+    the boss end is the right edge.
     """
-    return RIGHT_CENTER[0] + (OVERALL_LENGTH / 2.0 - z_mm) * VIEW_SCALE[0] / 1000.0
+    return RIGHT_CENTER[0] + (z_mm - OVERALL_LENGTH / 2.0) * VIEW_SCALE[0] / 1000.0
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")
 def _create_section_axis_centerline(
@@ -142,6 +141,34 @@ def _create_section_axis_centerline(
         raise RuntimeError(f"failed to create section-axis centerline ({label})")
     return centerline
 
+def _position_section_caption(
+    adapter: Any,
+    view: Any,
+    target: tuple[float, float],
+) -> None:
+    """Move the native linked section caption clear of the length dimensions."""
+    bound_view = _early_bound(view, "IView")
+    candidates = []
+    for raw_note in bound_view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+            candidates.append((note, linked_text))
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"expected one native linked section caption, found {len(candidates)}"
+        )
+    note, linked_text = candidates[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*target, 0.0):
+        raise RuntimeError("failed to position crank-pinion section caption")
+    rebuild_drawing(adapter, label="position crank-pinion section caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], target) > 1e-6:
+        raise RuntimeError("crank-pinion section caption position did not persist")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("crank-pinion section caption lost its native fields")
+
 
 
 # The end view is pictorial and carries only its center mark. Every turned
@@ -162,10 +189,10 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
     "BossDia": (
-        _side_x(OVERALL_LENGTH) - 0.016,
+        _side_x(0.0) - 0.016,
         RIGHT_CENTER[1],
     ),
-    "BoreDia": (_side_x(0.0) + 0.020, RIGHT_CENTER[1]),
+    "BoreDia": (_side_x(OVERALL_LENGTH) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
     "BossChamfer": (
@@ -182,15 +209,14 @@ DIMENSION_CALLOUTS = {
     "BossChamfer": "X 45 DEG",
 }
 
-# The retention-pin cross-hole: its upper edge on the boss wall nearest the
-# viewer, at the boss mid-length. Keep the attached matched-fit callout
-# above-left of the side view so its leader enters through the boss rather than
-# crossing the toothed body.
+# The retention-pin cross-hole is cut in section at the boss mid-length. Keep
+# its matched-fit callout above-right of the section so its leader leaves the
+# text cleanly, crosses only the boss, and lands at the upper cut edge.
 PIN_HOLE_EDGE = (
     _side_x(PIN_STATION),
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
-PIN_HOLE_CALLOUT = (0.200, RIGHT_CENTER[1] + HALF_OD + 0.056)
+PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
 _BORE_GAP_ANGLE_RAD = math.radians(168.75)
 BORE_FIT_NOTE = (0.016, 0.174)
@@ -252,6 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="crank pinion longitudinal centre section",
     )
+    _position_section_caption(adapter, right, (0.290, 0.080))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
