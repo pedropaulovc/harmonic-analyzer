@@ -1,8 +1,9 @@
 r"""Reproduction script: cone gear (book ch. 12, pp. 16-21) -- parametric prototype.
 
 One part, configuration-driven tooth count across the full T006..T120-by-six
-family. All configuration-varying geometry is equation-driven so a switch
-regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
+family. The blank, gap profile and bore remain equation-driven from
+``ToothCount``/``BoreDia`` and the shared ``DP``/``PA``; each configuration
+owns one fixed-count native pattern feature and suppresses the other nineteen:
 
 * Equation-manager globals carry the involute math (base/tip radii in
   INCHES, involute parameter span, tooth-gap angles). Two parser facts
@@ -22,8 +23,9 @@ regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
   ``CreateEquationSpline2`` curves referencing the globals; parameter
   ranges are kept numeric (t in [0,1]) so only the expression parser
   needs global support.
-* One gap is cut through the blank, then circular-patterned about the gear
-  axis; the pattern instance count is equation-linked to ``ToothCount``.
+* One gap is cut through the blank. Twenty fixed-count circular-pattern
+  features share that seed; each is unsuppressed only in its owning
+  configuration.
 
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
@@ -297,31 +299,100 @@ async def equation_curve(
     return check(f"curve {label}", res)
 
 
-def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:
-    """Find the pattern's instance-count dimension name (``D?@<feature>``).
+def pattern_feature_name(configuration: str) -> str:
+    """Return the fixed-count pattern feature owned by one configuration."""
+    return f"{TOOTH_PATTERN_FEATURE}_{configuration}"
 
-    The circular-pattern dimension layout (which of D1/D2 is the count vs
-    the angle) is not documented stably across releases, so probe by value:
-    the count dimension is the one reading ``expected`` (the seed count must
-    differ from the 360-degree angle for this to be unambiguous).
-    """
+
+def _pattern_feature(adapter: Any, configuration: str) -> Any:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for dim in ("D1", "D2", "D3", "D4"):
-        full = f"{dim}@{feature_name}"
-        param = adapter._attempt(lambda f=full: model.Parameter(f), default=None)
-        if param is None:
-            continue
-        try:
-            value = float(_read_member(param, "Value"))
-        except (TypeError, ValueError):
-            continue
-        _telemetry.debug(f"{full} reads {value:g}")
-        if abs(value - expected) < 1e-9:
-            return full
-    raise RuntimeError(
-        f"no dimension of {feature_name} reads {expected:g} -- cannot link "
-        "the instance count to ToothCount"
+    part = _early_bound(model, "IPartDoc")
+    name = pattern_feature_name(configuration)
+    raw = part.FeatureByName(name)
+    if raw is None:
+        raise RuntimeError(f"{configuration}: fixed pattern {name} is missing")
+    return _early_bound(raw, "IFeature")
+
+
+def _pattern_suppression_states(
+    feature: Any, configurations: list[str]
+) -> tuple[bool, ...]:
+    raw = feature.IsSuppressed2(3, configurations)
+    values = tuple(raw) if isinstance(raw, (list, tuple)) else (raw,)
+    if len(values) != len(configurations):
+        raise RuntimeError(
+            f"pattern suppression readback has {len(values)} states for "
+            f"{len(configurations)} configurations"
+        )
+    return tuple(bool(value) for value in values)
+
+
+def set_fixed_pattern_scope(
+    adapter: Any, pattern_name: str, owner: str
+) -> None:
+    """Suppress one fixed-count pattern everywhere except its owner."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    raw = part.FeatureByName(pattern_name)
+    if raw is None:
+        raise RuntimeError(f"cannot scope missing pattern {pattern_name}")
+    feature = _early_bound(raw, "IFeature")
+    names = [name for name, _teeth in CONFIGS]
+    others = [name for name in names if name != owner]
+    if not bool(feature.SetSuppression2(0, 3, others)):
+        raise RuntimeError(f"{pattern_name}: failed to suppress non-owner configs")
+    if not bool(feature.SetSuppression2(1, 3, [owner])):
+        raise RuntimeError(f"{pattern_name}: failed to unsuppress owner {owner}")
+    states = _pattern_suppression_states(feature, names)
+    unsuppressed = tuple(
+        name for name, suppressed in zip(names, states, strict=True) if not suppressed
     )
+    _telemetry.info(
+        f"{pattern_name}: SetSuppression2 owner={owner}, "
+        f"unsuppressed={unsuppressed!r}"
+    )
+    if unsuppressed != (owner,):
+        raise RuntimeError(
+            f"{pattern_name}: unsuppressed in {unsuppressed!r}, expected {(owner,)!r}"
+        )
+
+
+def assert_fixed_pattern_matrix(adapter: Any, *, phase: str) -> None:
+    """Prove one and only one fixed pattern is active per configuration."""
+    names = [name for name, _teeth in CONFIGS]
+    matrix: dict[str, tuple[str, ...]] = {}
+    for owner, _teeth in CONFIGS:
+        feature = _pattern_feature(adapter, owner)
+        states = _pattern_suppression_states(feature, names)
+        unsuppressed = tuple(
+            name
+            for name, suppressed in zip(names, states, strict=True)
+            if not suppressed
+        )
+        matrix[owner] = unsuppressed
+        if unsuppressed != (owner,):
+            raise RuntimeError(
+                f"{phase}: {pattern_feature_name(owner)} unsuppressed in "
+                f"{unsuppressed!r}, expected {(owner,)!r}"
+            )
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    equations = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    count_equations_list: list[str] = []
+    for index in range(int(_read_member(equations, "GetCount") or 0)):
+        equation = str(equations.Equation(index) or "")
+        if TOOTH_PATTERN_FEATURE in equation:
+            count_equations_list.append(equation)
+    count_equations = tuple(count_equations_list)
+    _telemetry.info(
+        f"{phase} fixed-pattern suppression matrix: {matrix!r}; "
+        f"count_equations={count_equations!r}"
+    )
+    if count_equations:
+        raise RuntimeError(
+            f"{phase}: fixed pattern counts still have equations "
+            f"{count_equations!r}"
+        )
 
 
 def read_dimension(adapter: Any, full_name: str) -> float:
@@ -383,8 +454,9 @@ def _configuration_definition_state(
         if name in wanted:
             equations[name] = (equation, float(equation_manager.Value(index)))
 
+    pattern_name = pattern_feature_name(configuration)
     feature_states: dict[str, tuple[bool, int, bool]] = {}
-    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE):
+    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, pattern_name):
         raw = part.FeatureByName(name)
         if raw is None:
             raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
@@ -403,9 +475,7 @@ def _configuration_definition_state(
             bool(error_result[1]),
         )
 
-    pattern = _early_bound(
-        part.FeatureByName(TOOTH_PATTERN_FEATURE), "IFeature"
-    )
+    pattern = _pattern_feature(adapter, configuration)
     definition = _early_bound(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
@@ -430,10 +500,8 @@ async def _configuration_topology(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     active = _activate_configuration(model, configuration)
     part = _early_bound(model, "IPartDoc")
-    raw_pattern = part.FeatureByName(TOOTH_PATTERN_FEATURE)
-    if raw_pattern is None:
-        raise RuntimeError(f"{configuration}: {TOOTH_PATTERN_FEATURE} is missing")
-    pattern = _early_bound(raw_pattern, "IFeature")
+    pattern_name = pattern_feature_name(configuration)
+    pattern = _pattern_feature(adapter, configuration)
     states = pattern.IsSuppressed2(3, [configuration])
     if not isinstance(states, (list, tuple)):
         states = (states,)
@@ -466,7 +534,7 @@ async def _configuration_topology(
     observation = (
         f"{configuration}: active={str(active.Name)}, "
         f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
-        f"{TOOTH_PATTERN_FEATURE} instances={instances}, axis_type={axis_type}, "
+        f"{pattern_name} instances={instances}, axis_type={axis_type}, "
         f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
         f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
         f"expected={expected:.1f}"
@@ -528,6 +596,7 @@ async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
     """Probe sentinels first; scan all 20 only if the discriminator passes."""
+    assert_fixed_pattern_matrix(adapter, phase=phase)
     sentinels = (CONFIGS[-1], CONFIGS[0], CONFIGS[1], CONFIGS[3])
     ordered = (*sentinels, *(item for item in CONFIGS if item not in sentinels))
     volumes: dict[str, float] = {}
@@ -589,7 +658,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
-        CreateEquationParameters,
         ExtrusionParameters,
     )
 
@@ -893,52 +961,6 @@ async def build(adapter) -> dict[str, str]:
     check("cut tooth gap", gap_cut)
     gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
-    # ------------------------------------------------------------------
-    # Pattern the gap about the gear's permanent Top x Right reference axis;
-    # select the feature by its returned name instead of projecting a point
-    # through the current graphics view.
-    # ------------------------------------------------------------------
-    from solidworks_mcp.adapters.base import CreateAxisParameters
-
-    axis = check(
-        "create_axis Z (Top x Right)",
-        await adapter.create_axis(
-            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
-        ),
-    )
-    check(
-        f"circular pattern about {axis.name}",
-        await adapter.circular_pattern_feature(
-            CircularPatternParameters(
-                axis_name=axis.name,
-                features=[gap_cut_name],
-                count=DEFAULT_TEETH,
-                geometry_pattern=True,
-            )
-        ),
-    )
-    pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
-    count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
-    check(
-        f"link {count_dim} to ToothCount",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
-        ),
-    )
-
-    # ------------------------------------------------------------------
-    # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
-    # expectation the per-config loop uses (blank - teeth*gap - bore). This is
-    # the "last check" the neutrality re-check below reuses.
-    # ------------------------------------------------------------------
-    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
-    v_gear = (
-        expected_blank
-        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
-        - bore_default_mm3
-    )
-    await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
-
     # Native tooth-system acceptance size.  The involute is generated from the
     # gear equations and exposes no stable feature dimension for circular tooth
     # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
@@ -994,17 +1016,14 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(
-        adapter, "driven cone gear (equations neutral)", v_gear, 0.01 * v_gear
-    )
 
     await apply_material(adapter, MATERIAL)
 
     # ------------------------------------------------------------------
-    # Configurations + the regeneration experiment (plan risk #2): switch
-    # through all configs asserting per-config instance count, volume bounds
-    # and monotonic growth, then return to the first config and require the
-    # volume to reproduce (determinism).
+    # Complete the configuration family after all shared geometry exists, then
+    # give each configuration its own fixed-count native pattern feature.  The
+    # suppression matrix is the tree contract: exactly one pattern is
+    # unsuppressed in each configuration, with no count-dimension equation.
     # ------------------------------------------------------------------
     for name, teeth in CONFIGS[:-1]:
         check(
@@ -1015,7 +1034,10 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
+    from solidworks_mcp.adapters.base import (
+        CreateAxisParameters,
+        SetGlobalVariableParameters,
+    )
 
     for name, teeth in CONFIGS:
         check(
@@ -1036,6 +1058,53 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+
+    axis = check(
+        "create_axis Z (Top x Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for name, teeth in CONFIGS:
+        _activate_configuration(model, name)
+        if not bool(model.ForceRebuild3(False)):
+            raise RuntimeError(f"{name}: seed rebuild failed before fixed pattern")
+        check(
+            f"fixed {teeth}-instance pattern about {axis.name} for {name}",
+            await adapter.circular_pattern_feature(
+                CircularPatternParameters(
+                    axis_name=axis.name,
+                    features=[gap_cut_name],
+                    count=teeth,
+                    geometry_pattern=True,
+                )
+            ),
+        )
+        pattern_name = name_last_feature(adapter, pattern_feature_name(name))
+        set_fixed_pattern_scope(adapter, pattern_name, name)
+
+    assert_fixed_pattern_matrix(adapter, phase="authored")
+    _activate_configuration(model, CONFIGS[-1][0])
+    if not bool(model.ForceRebuild3(False)):
+        raise RuntimeError("T120: rebuild failed after fixed-pattern authoring")
+
+    # Default-config (DEFAULT_TEETH) gear volume, using the same analytic
+    # expectation as the per-configuration loop (blank - teeth*gap - bore).
+    # This proves the newly authored T120 pattern before the regeneration sweep.
+    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
+    v_gear = (
+        expected_blank
+        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
+        - bore_default_mm3
+    )
+    await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
+
+    # ------------------------------------------------------------------
+    # Regeneration experiment (plan risk #2): switch through all configs
+    # asserting the owned fixed-count pattern, volume bounds and monotonic
+    # growth, then revisit the first config to require determinism.
+    # ------------------------------------------------------------------
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1072,13 +1141,6 @@ async def build(adapter) -> dict[str, str]:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if not bool(model.ForceRebuild3(False)):
             raise RuntimeError(f"{name}: ForceRebuild3 reported failure")
-
-        count = read_dimension(adapter, count_dim)
-        if abs(count - teeth) > 1e-9:
-            raise RuntimeError(
-                f"{name}: pattern instance count reads {count:g}, expected {teeth}"
-            )
-        _telemetry.success(f"{name}: pattern count = {count:g}")
 
         volume, observation, issues = await _configuration_topology(
             adapter,
@@ -1222,8 +1284,8 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     await assert_saved_configuration_topology(adapter, phase="reopened")
     raise RuntimeError(
-        "diagnostic complete: named reference-axis pattern persistence evidence "
-        "captured; refusing to publish probe artefacts"
+        "diagnostic complete: fixed per-configuration pattern-tree persistence "
+        "evidence captured; refusing to publish probe artefacts"
     )
 
     if findings:
