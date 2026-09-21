@@ -23,7 +23,12 @@ def test_required_drawing_paths() -> None:
 
 
 def _kept() -> dict[str, tuple[float, float]]:
-    return {**drawing.FRONT_KEEP, **drawing.DETAIL_KEEP, **drawing.LEFT_KEEP}
+    return {
+        **drawing.FRONT_KEEP,
+        **drawing.DETAIL_KEEP,
+        **drawing.LEFT_KEEP,
+        **drawing.SECTION_KEEP,
+    }
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -40,8 +45,14 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert set(kept) == marked
     # Each name is shown exactly once: a dimension repeated across two views is a
     # double specification, and the second copy is what drifts.
-    assert len(kept) == (
-        len(drawing.FRONT_KEEP) + len(drawing.DETAIL_KEEP) + len(drawing.LEFT_KEEP)
+    assert len(kept) == sum(
+        len(group)
+        for group in (
+            drawing.FRONT_KEEP,
+            drawing.DETAIL_KEEP,
+            drawing.LEFT_KEEP,
+            drawing.SECTION_KEEP,
+        )
     )
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(kept)
@@ -121,9 +132,10 @@ def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
 
 
 def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
-    # The blind depth is visible in the face view.  The solid mouth circle in
-    # the flank view owns its diameter and through-thickness station.
-    assert "PinSeatDepth" in drawing.FRONT_KEEP
+    # The blind floor and its depth are solid geometry in the dedicated seat
+    # section. The third-angle left view owns the visible mouth diameter and
+    # its through-thickness station.
+    assert set(drawing.SECTION_KEEP) == {"PinSeatDepth"}
     assert pinion_bracket_geometry.PIN_SEAT < pinion_bracket_geometry.WIDTH
     assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCz", "Depth"}
 

@@ -47,6 +47,7 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     create_blank_drawing_sheets,
+    create_section_view,
     check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
@@ -68,6 +69,7 @@ from pinion_bracket_spec import (
     C2C,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    PIN_DROP,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIVOT_BORE,
@@ -97,19 +99,12 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  The strap runs UP the sheet: the front view's model
-# bbox is +/-7.5 in X and -7.5..35.5 in Y, so at 2:1 it is 30 x 86 mm and the
-# left flank view beside it is 16 x 86.  The face view keeps the clear column
-# to its LEFT for the two seat dimensions measured off the pivot axis and the
-# column to its RIGHT for the leadered sizes, so no two dimension lanes cross.
-# The scallop detail sits in the empty lower-left quarter, under that left
-# column.  Each end radius is labelled almost straight below/above its own arc
-# while that bore's roughness symbol leads away to the LEFT of it: the two
-# leaders leave the same crowded corner on diverging paths and never cross,
-# and the symbol's text ends before the radius label begins.
+# Sheet layout (meters). The third-angle left view belongs to the LEFT of the
+# front view. That leaves the lane between them for the follower-seat location,
+# while the bore sizes and radii remain outside the front silhouette.
 FRONT_BBOX_CY = (C2C + 2.0 * R_END) / 2.0 - R_END
-FRONT_CENTER = (0.150, 0.150)
-LEFT_CENTER = (0.240, 0.150)
+FRONT_CENTER = (0.210, 0.150)
+LEFT_CENTER = (0.080, 0.150)
 ISO_CENTER = (0.350, 0.215)
 
 
@@ -161,16 +156,14 @@ def _detail_y(model_y_mm: float) -> float:
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position. The front view carries the upper bore, end radii and the seat's
-# height/depth; the lower pivot bore moves into the relief detail so the
-# parent-view detail fence is not crossed by its size leader.
+# position. The front view carries the upper bore, end radii and seat height;
+# the relief detail owns the lower pivot bore, and the seat section owns depth.
 FRONT_KEEP = {
-    "ArborBoreDia": (0.196, 0.214),
-    "ArborBoreCz": (0.180, 0.151),
-    "BottomCapRadius": (0.190, 0.060),
-    "TopCapRadius": (0.176, 0.238),
-    "PinSeatCy": (0.088, 0.134),
-    "PinSeatDepth": (0.100, 0.158),
+    "ArborBoreDia": (0.256, 0.214),
+    "ArborBoreCz": (0.240, 0.151),
+    "BottomCapRadius": (0.250, 0.060),
+    "TopCapRadius": (0.236, 0.238),
+    "PinSeatCy": (0.148, 0.134),
 }
 # The scallop pair is dimensioned in the enlarged detail the way it is cut:
 # each centre from the pivot axis (X stacked above the fence, the shorter one
@@ -179,31 +172,28 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
-    "PivotBoreDia": (0.120, 0.085),
-    "CamReliefParkR": (0.160, 0.170),
-    "CamReliefParkX": (0.110, 0.205),
-    "CamReliefParkY": (0.050, 0.160),
-    "CamReliefEngagedR": (0.160, 0.120),
-    "CamReliefEngagedX": (0.110, 0.195),
-    "CamReliefEngagedY": (0.050, 0.130),
+    "PivotBoreDia": (0.170, 0.155),
+    "CamReliefParkR": (0.170, 0.190),
+    "CamReliefParkX": (0.105, 0.220),
+    "CamReliefParkY": (0.040, 0.175),
+    "CamReliefEngagedR": (0.170, 0.105),
+    "CamReliefEngagedX": (0.105, 0.200),
+    "CamReliefEngagedY": (0.040, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
-    "Depth": (0.240, 0.212),
-    "PinSeatCz": (0.240, 0.090),
-    "PinSeatDia": (0.290, 0.140),
+    "Depth": (0.080, 0.212),
+    "PinSeatCz": (0.080, 0.090),
+    "PinSeatDia": (0.130, 0.140),
 }
-# The flank's top and bottom edges are the strap's two extreme lines.  Put the
-# overall outside the flank on its clear LEFT, between the aligned views, so
-# neither its dimension line nor its short witness lines cross the follower-
-# seat size leader on the flank's right.
-OVERALL_XY = (0.212, 0.168)
-# Each running bore keeps one roughness symbol. The pivot symbol is owned by
-# its enlarged detail, clear of the parent-view fence; the arbor symbol leads
-# away to the upper left while that bore's radius label remains on the right.
+SECTION_KEEP = {"PinSeatDepth": (0.340, 0.065)}
+# The flank's top and bottom edges are the strap's two extreme lines. Put the
+# overall on its clear right, between the third-angle left and front views.
+OVERALL_XY = (0.112, 0.168)
+# The arbor symbol leads away to the upper left of its bore.
 ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
-ARBOR_FINISH_XY = (0.108, 0.222)
+ARBOR_FINISH_XY = (0.168, 0.222)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.  Naming both follower-seat annotations ties the native
@@ -213,6 +203,10 @@ DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
+    "CamReliefParkX": "PARK X FROM Ø6.35 AXIS",
+    "CamReliefParkY": "PARK +Y FROM Ø6.35 AXIS",
+    "CamReliefEngagedX": "ENGAGED X FROM Ø6.35 AXIS",
+    "CamReliefEngagedY": "ENGAGED -Y FROM Ø6.35 AXIS",
     "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE",
     "PinSeatCy": "CAM ENGAGEMENT",
 }
@@ -469,22 +463,22 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_parent = place_view(
         adapter, str(SOURCE), "*Front", 0.285, 0.155, scale=(2, 1)
     )
+    seat_axis_y = 0.155 + (-PIN_DROP - FRONT_BBOX_CY) * 2.0 / 1000.0
+    seat_section = create_section_view(
+        adapter,
+        detail_parent,
+        line_start=(0.265, seat_axis_y),
+        line_end=(0.305, seat_axis_y),
+        view_xy=(0.300, 0.065),
+        section_label="B",
+        scale=(3.0, 1.0),
+        label="follower seat depth section",
+    )
     detail = _cam_relief_detail(adapter, detail_parent)
-    for view in (detail_parent, detail):
+    for view in (detail_parent, detail, seat_section):
         set_hidden_lines_removed(adapter, view)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
-    if (
-        add_note(
-            adapter,
-            "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
-            0.105,
-            0.225,
-            height=0.0035,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to identify relief coordinate origin")
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
@@ -492,16 +486,39 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="scallop detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    section_annotations = curate_view_dimensions(
+        adapter,
+        seat_section,
+        keep=SECTION_KEEP,
+        view_label="follower seat section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    if (
+        add_note(
+            adapter,
+            "FOLLOWER SEAT BREAK-OUT\nINTO CAM RELIEF IS INTENDED",
+            0.300,
+            0.105,
+            height=0.0035,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to state intended follower-seat break-out")
     add_surface_finish(
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.160, 0.145),
+        symbol_xy=(0.170, 0.130),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
 
-    annotations = [*front_annotations, *left_annotations, *detail_annotations]
+    annotations = [
+        *front_annotations,
+        *left_annotations,
+        *detail_annotations,
+        *section_annotations,
+    ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
