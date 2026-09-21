@@ -100,7 +100,6 @@ TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
 SECTION_CENTER = (0.365, 0.242)
-SECTION_CAPTION = (0.300, 0.238)
 SECTION_SCALE = (1, 2)
 
 # The checked-in landscape template's FINISH value cell, measured between its
@@ -164,7 +163,7 @@ TOP_KEEP = {
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "ConeBossLen": (SECTION_CENTER[0], 0.212),
+    "ConeBossLen": (0.295, 0.215),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -506,28 +505,6 @@ def _prepare_cone_section(adapter: Any, view: Any) -> None:
         raise RuntimeError("cone boss section cutting line did not close")
 
 
-def _position_section_caption(adapter: Any, view: Any) -> None:
-    """Move the one linked native caption left of the section geometry."""
-    candidates = []
-    for raw_note in _early_bound(view, "IView").GetNotes() or ():
-        note = _early_bound(raw_note, "INote")
-        linked_text = str(note.PropertyLinkedText or "")
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
-            candidates.append((note, linked_text))
-    if len(candidates) != 1:
-        raise RuntimeError(
-            f"expected one native cone-section caption, found {len(candidates)}"
-        )
-    note, linked_text = candidates[0]
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    if not annotation.SetPosition2(*SECTION_CAPTION, 0.0):
-        raise RuntimeError("failed to position native cone-section caption")
-    rebuild_drawing(adapter, label="cone section caption")
-    position = tuple(float(value) for value in annotation.GetPosition())
-    if math.dist(position[:2], SECTION_CAPTION) > 1e-6:
-        raise RuntimeError("native cone-section caption position did not persist")
-    if str(note.PropertyLinkedText or "") != linked_text:
-        raise RuntimeError("cone-section caption lost its native linked fields")
 
 
 def _assert_native_layout(
@@ -726,7 +703,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cone boss bore-plane profile",
     )
     _prepare_cone_section(adapter, section)
-    _position_section_caption(adapter, section)
     # The named journal view looks exactly down the inclined model axis.  Unlike
     # the bore-plane section, it retains the uncut boss end face, so its Ø17.2
     # OD and Ø12.281 bore are two visible concentric circles with clear leaders.
