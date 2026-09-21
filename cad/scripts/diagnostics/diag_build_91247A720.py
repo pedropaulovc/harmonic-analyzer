@@ -138,6 +138,7 @@ async def build_91247A720(
         split_at_plane,
         trim_factory_shank,
     )
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     major_r = GB_MAJOR_R
     pitch = GB_PITCH
