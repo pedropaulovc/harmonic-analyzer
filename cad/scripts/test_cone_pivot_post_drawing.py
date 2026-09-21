@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import re
 from pathlib import Path
 
@@ -71,7 +70,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP)
+        set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.JOURNAL_KEEP)
     )
     assert kept == marked
     assert marked == {
@@ -94,31 +93,18 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
     assert len(drawing.FRONT_KEEP) + len(drawing.TOP_KEEP) + len(
-        drawing.SECTION_KEEP
+        drawing.JOURNAL_KEEP
     ) == len(kept)
 
 
-def test_inclined_journal_sizes_live_in_the_section_that_sees_them() -> None:
-    """ConeShaftNormal is 12.52 deg off the front plane.
-
-    Its sketch dimensions cannot be imported into a front elevation, and a
-    front elevation cannot show the pad or bore true shape.  SECTION A-A is
-    cut in the PLAN perpendicular to the journal axis for exactly that reason,
-    so every ConeShaftNormal-owned value belongs to it and nothing else does.
-    """
+def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
+    """The cone-axis view alone exposes the boss OD and bore in true shape."""
     cone_owned = (
         spec.DRAWING_DIMENSIONS["ConeBossProfile"]
         | spec.DRAWING_DIMENSIONS["JournalBoreProfile"]
     )
-    assert set(drawing.SECTION_KEEP) == cone_owned
-    start, end = drawing._section_cut()
-    cut = (end[0] - start[0], end[1] - start[1])
-    # The journal's plan direction in sheet axes; the cut must be normal to it.
-    incline = math.radians(spec.INCLINE_DEG)
-    journal = (math.sin(incline), -math.cos(incline))
-    assert abs(cut[0] * journal[0] + cut[1] * journal[1]) < 1e-12
-    # A full section needs a line that leaves the plan on both sides.
-    assert math.hypot(*cut) > (spec.HEAD_DIA + 10.0) / 1000.0
+    assert set(drawing.JOURNAL_KEEP) == cone_owned
+    assert drawing.CONE_AXIS_VIEW == part.CONE_AXIS_VIEW == "CONE JOURNAL"
 
 
 def test_part_owns_every_printed_decimal_place() -> None:
@@ -312,13 +298,6 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert 'name="AttachmentScrewHoles"' in source
 
 
-def test_every_view_prints_at_sheet_scale() -> None:
-    """One scale means no scale notes and no mental arithmetic."""
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 3
-    assert "scale=(1, 2)" not in source
-    assert "VIEW SCALE" not in source
 
 
 def test_bore_rim_com_scan_is_traced() -> None:

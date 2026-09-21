@@ -57,7 +57,9 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _holes import HoleSpec, wizard_holes
+from _named_views import octant_rotation
 from _part_pmi import author_part_pmi
+from solidworks_mcp.adapters.com_variant import double_array
 from cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DEPTH,
     ATTACHMENT_CBORE_DIA,
@@ -68,6 +70,7 @@ from cone_pivot_post_spec import (
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
+    CONE_AXIS_VIEW,
     CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
@@ -196,6 +199,80 @@ if abs(_ANALYTIC_FINAL_MM3 - HARVESTED_VOLUME_MM3) > 0.01:
     raise AssertionError(
         f"HARVESTED_VOLUME_MM3 {HARVESTED_VOLUME_MM3} is not the feature sum "
         f"{_ANALYTIC_FINAL_MM3:.4f}"
+    )
+
+
+def _transpose_rotation(rotation: tuple[float, ...]) -> tuple[float, ...]:
+    return tuple(
+        rotation[column + 3 * row]
+        for column in range(3)
+        for row in range(3)
+    )
+
+
+def _rotations_close(
+    left: tuple[float, ...],
+    right: tuple[float, ...],
+    tolerance: float,
+) -> bool:
+    return len(left) == len(right) and max(
+        abs(a - b) for a, b in zip(left, right, strict=True)
+    ) <= tolerance
+
+
+def _name_cone_axis_view(adapter: Any) -> None:
+    """Persist the true-shape journal view used by the manufacturing drawing."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+
+    built_in = tuple(float(value) for value in model.GetStandardViewRotation(7))
+    row_isometric = octant_rotation(1, 1, 1)
+    if _rotations_close(built_in, row_isometric, 1e-3):
+        store = lambda rotation: rotation  # noqa: E731
+    elif _rotations_close(built_in, _transpose_rotation(row_isometric), 1e-3):
+        store = _transpose_rotation
+    else:
+        raise RuntimeError(
+            f"*Isometric rotation {built_in!r} establishes no known convention"
+        )
+
+    incline = math.radians(INCLINE_DEG)
+    sine = math.sin(incline)
+    cosine = math.cos(incline)
+    # View X is the cone-axis-normal direction in the model X-Z plane, view Y
+    # is model +Y, and view Z points along the journal axis at the observer.
+    row_rotation = (
+        cosine,
+        0.0,
+        -sine,
+        0.0,
+        1.0,
+        0.0,
+        sine,
+        0.0,
+        cosine,
+    )
+    rotation = store(row_rotation)
+    transform = utility.CreateTransform(
+        double_array([*rotation, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    )
+    if transform is None:
+        raise RuntimeError("failed to create cone-axis view transform")
+    view = _early_bound(model.ActiveView, "IModelView")
+    view.Orientation3 = transform
+    model.NameView(CONE_AXIS_VIEW)
+    readback = tuple(
+        float(value)
+        for value in (extension.GetNamedViewRotation(CONE_AXIS_VIEW) or ())
+    )
+    if not _rotations_close(readback, rotation, 1e-6):
+        raise RuntimeError(
+            f"cone-axis named view read back {readback!r}, expected {rotation!r}"
+        )
+    model.ShowNamedView2("*Isometric", 7)
+    _telemetry.info(
+        f"cone-axis named view {CONE_AXIS_VIEW!r}: rotation={readback!r}"
     )
 
 
@@ -680,6 +757,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
+    _name_cone_axis_view(adapter)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
