@@ -56,6 +56,7 @@ from pinion_handle_spec import (
     TUBE_OD,
     WALL_T,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -272,16 +273,40 @@ def _add_body_centerline(adapter: Any, view: Any) -> None:
     station = SHOULDER_Z + WALL_T + TUBE_LEN / 4.0
     if abs(station - RETENTION_PIN_CENTER_Z) <= RETENTION_PIN_DIA / 2.0:
         raise RuntimeError("body centerline pick station intersects retention hole")
-    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    flanks: list[Any] = []
     for index, side in enumerate((-1.0, 1.0)):
         x, y = _point(adapter, view, (0.0, side * TUBE_OD / 2.0, station))
+        draw.ClearSelection2(True)
         if not draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
+            "", "SILHOUETTE", x, y, 0.0, False, 0, null_callout(), 0
         ):
             raise RuntimeError(
-                f"failed to select intact body centerline socket flank {index + 1}"
+                f"failed to resolve intact body centerline socket flank {index + 1}"
             )
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selected = selection_manager.GetSelectedObject6(1, -1)
+        if (
+            int(selection_manager.GetSelectedObjectCount2(-1)) != 1
+            or int(selection_manager.GetSelectedObjectType3(1, -1)) != 46
+            or selected is None
+        ):
+            raise RuntimeError(
+                f"body centerline socket flank {index + 1} was not singular"
+            )
+        flanks.append(selected)
+    draw.ClearSelection2(True)
+    if int(adapter.swApp.IsSame(flanks[0], flanks[1])) != 0:
+        raise RuntimeError("body centerline resolved the same socket flank twice")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.View = view
+    for index, flank in enumerate(flanks):
+        selectable = _sw_type_info.early_bound_or_flag(
+            flank, "ISilhouetteEdge", "Select2"
+        )
+        if not bool(selectable.Select2(index > 0, selection_data)):
+            raise RuntimeError(
+                f"failed to select resolved body centerline socket flank {index + 1}"
+            )
     if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
         raise RuntimeError("body centerline socket-flank selection was not a pair")
     centerline = ddoc.InsertCenterLine2()
