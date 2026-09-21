@@ -741,13 +741,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # edge-on.  A coordinate pick on that line failed on the farm (the two
     # mounting-hole exit rims project onto the same line, so the hit-test has
     # nothing unambiguous to return), so the rim is found by its geometry --
-    # the ONE circular edge of body radius centred at y=0 -- and the leader is
-    # pinned to the seat's left quarter, clear of the MainBodyHt witness line.
+    # the ONE circular edge of body radius centred at y=0.  Its leader lands
+    # on the seat's left quarter while the symbol sits clear of the body at right.
     add_surface_finish(
         adapter,
         front,
         edge_entity=_circular_edge(front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0),
-        symbol_xy=(_front_x(-26.0), _front_y(-8.0)),
+        symbol_xy=(_front_x(30.0), _front_y(-6.0)),
         leader_attach_xy=(_front_x(-10.0), _front_y(0.0)),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
