@@ -62,10 +62,10 @@ DONOR_KEEP = {
 PRINCIPAL_KEEP = {
     "HeadLen": (0.345, 0.118),
     "NeckLen": (0.325, 0.100),
-    "BackRimFromHeadRear": (0.205, 0.088),
-    "OverallLen": (0.205, 0.073),
-    "HeadCapR": (0.300, 0.220),
-    "HeadCapSagDim": (0.340, 0.215),
+    "BackRimFromHeadRear": (0.205, 0.095),
+    "OverallLen": (0.205, 0.080),
+    "HeadCapR": (0.325, 0.215),
+    "HeadCapSagDim": (0.327, 0.205),
     "BackCapSagDim": (0.055, 0.220),
     "CrossHoleDia": (0.275, 0.250),
     "CrossHoleFromHeadRear": (0.320, 0.135),
@@ -206,19 +206,20 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*moved_diameters, *principal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(
-        adapter, annotations, {"CrossHoleDia", "HeadCapSagDim", "OverallLen"}
-    )
-    sag_matches = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "BackCapSagDim"
-    ]
-    if len(sag_matches) != 1:
-        raise RuntimeError("expected one back-crown reference dimension")
-    set_reference_dimension(
-        adapter, sag_matches[0], label="back-crown descriptive reference"
-    )
+    set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
+    for name, label in {
+        "HeadCapSagDim": "front-crown height reference",
+        "BackCapSagDim": "back-crown descriptive reference",
+        "OverallLen": "overall length reference",
+    }.items():
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {label}")
+        set_reference_dimension(adapter, matches[0], label=label)
 
     if not auto_center_marks(adapter, principal, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the grip cross-hole")
@@ -236,6 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
+        char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
