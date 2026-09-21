@@ -490,6 +490,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_pinion_pin",
+        part="crank_pinion_pin",
+        artifact_stem="crank-pinion-pin",
+        script_name="draw_crank_pinion_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="alignment_pinion",
         part="alignment_pinion",
         artifact_stem="alignment-pinion",

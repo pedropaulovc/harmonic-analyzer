@@ -45,6 +45,7 @@ _TOLERANCE_SETTERS = frozenset(
 PRECISION_MIGRATED_DRAWINGS = frozenset(
     {
         "draw_crank_pinion.py",
+        "draw_crank_pinion_pin.py",
         "draw_harmonic_base.py",
         "draw_top_frame.py",
         "draw_tube_frame.py",

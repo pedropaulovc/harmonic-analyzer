@@ -648,6 +648,56 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) 
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_ARM) - CRANK_ARM_ORIGIN_Z) > 1e-6:
     raise AssertionError("crankshaft SeatArm datum off the arm origin station")
+# Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
+# pinion's hub boss and the crankshaft, match-drilled at assembly. The hole is
+# on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
+# turned PIN_CLOCKING_DEG so that, with the pinion seated rot_z(-seed), the two
+# holes are one. The pin lies along machine X through the shaft axis, flush
+# with the boss on both sides. crank_pinion_spec carries the seed as a literal
+# (the part build must not import this module), so it is proven equal HERE.
+from crank_pinion_spec import (  # noqa: E402
+    BOSS_DIA as PINION_BOSS_DIA,
+    FACE_WIDTH as PINION_SPEC_FACE,
+    OVERALL_LENGTH as PINION_OVERALL_LENGTH,
+    PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
+    PIN_DIA as PINION_PIN_DIA,
+    PIN_LENGTH as PINION_PIN_LENGTH,
+    PIN_STATION as PINION_PIN_STATION,
+)
+from build_crankshaft import PINION_PIN_STATION_Y as CS_PINION_PIN_STATION  # noqa: E402
+
+PINION_Z0 = PINION_TOOTH_Z - PINION_FACE / 2.0  # pinion origin: toothed south face
+PINION_PIN_Z = PINION_Z0 + PINION_PIN_STATION  # -55.92
+# The pin's axis is the seated pinion's local X: rot_z(-seed) turns local +X to
+# machine (cos s, -sin s, 0). The pin part's +Z runs along that (ROT_Y_POS90
+# lays part +Z on machine +X, then the same rot_z(-seed) as the pinion), so
+# the pin origin sits on the boss's local -X wall, a half boss diameter back.
+PINION_PIN_U = (
+    math.cos(math.radians(PINION_SEED_DEG)),
+    -math.sin(math.radians(PINION_SEED_DEG)),
+    0.0,
+)
+PINION_PIN_ORIGIN = [
+    X_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[0],
+    Y_CRANK - PINION_PIN_LENGTH / 2.0 * PINION_PIN_U[1],
+    PINION_PIN_Z,
+]
+if abs(PINION_SPEC_FACE - PINION_FACE) > 1e-9:
+    raise AssertionError("crank_pinion_spec.FACE_WIDTH disagrees with PINION_FACE")
+if abs(PINION_PIN_CLOCKING_DEG - PINION_SEED_DEG) > 1e-9:
+    raise AssertionError(
+        "crankshaft pin hole is clocked to a stale pinion seed: set "
+        f"crank_pinion_spec.PIN_CLOCKING_DEG = {PINION_SEED_DEG!r}"
+    )
+if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
+    raise AssertionError("crankshaft pin hole station off the pinion's pin station")
+if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
+    raise AssertionError("pinion pin is not flush with the boss")
+_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -53.0
+if (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END < 0.25:
+    raise AssertionError("crankshaft end is not recessed inside the pinion boss")
+if _SHAFT_NORTH_END - (PINION_PIN_Z + PINION_PIN_DIA / 2.0) < 1.0:
+    raise AssertionError("pinion pin hole leaves under 1.0 wall to the shaft end")
 
 # The whole cone set rides the SWING PLATFORM (ch.12 p.18: the dark wedge
 # plate labelled "pivot" at its tip end). The green pivot post (big-end
@@ -2562,6 +2612,26 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ring}", "PLANE"),
         named_ref(f"Front Plane@{pin}", "PLANE"),
         label="keeper ring locked to the pin",
+    )
+    # Pinion retention pin (ch12 p.19): through the boss and the shaft at the
+    # pin station along the seated pinion's local X (PINION_PIN_U), flush with
+    # the boss both sides. Locked to the pinion so it turns with the crank; a
+    # light drive fit in its own match-drilled hole is line contact at the
+    # nominal, so no allowed-pair volume is needed.
+    pinion_pin = await place_component(
+        adapter,
+        "crank-pinion-pin",
+        PINION_PIN_ORIGIN,
+        [0.0, 90.0, -PINION_SEED_DEG],
+        compose_rows(ROT_Y_POS90, rot_z_rows(-PINION_SEED_DEG)),
+        ground=False,
+        label="crank pinion retention pin",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{pinion_pin}", "PLANE"),
+        named_ref(f"Front Plane@{pinion}", "PLANE"),
+        label="pinion retention pin locked to the pinion",
     )
     # Keeper-ring anchor screw + brass eyelet on the arm's front face (ch11
     # p.14); both lock to the arm so they turn with the crank.

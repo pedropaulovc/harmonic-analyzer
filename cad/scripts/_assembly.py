@@ -1634,6 +1634,7 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "crank-pin-eye",
         "crank-pin-ring",
         "crank-pinion",
+        "crank-pinion-pin",
         "crankshaft",
         "cylinder-gear",
         "fillister-screw",
