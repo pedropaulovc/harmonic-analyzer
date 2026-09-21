@@ -47,8 +47,6 @@ from pinion_handle_spec import (
     GRIP_DIA,
     GRIP_LEN,
     RETENTION_HOLE_CALLOUT,
-    RETENTION_PIN_CENTER_Z,
-    RETENTION_PIN_DIA,
     ROD_SPAN,
     TUBE_LEN,
     TUBE_OD,
@@ -132,7 +130,6 @@ DIMENSION_CALLOUTS = {
 HUB_END_Z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
 CROWN_ROOT_Z = -GRIP_LEN / 2.0
 CROWN_TIP_Z = CROWN_ROOT_Z - CAP_SAG
-SHOULDER_Z = GRIP_LEN / 2.0
 
 
 def _source_bodies(model: Any) -> tuple[Any, Any]:
@@ -208,43 +205,23 @@ def _point(
 
 
 
-def _segment_distance(
-    point: tuple[float, float, float],
-    start: tuple[float, float, float],
-    end: tuple[float, float, float],
-) -> float:
-    delta = tuple(b - a for a, b in zip(start, end))
-    length_sq = sum(value * value for value in delta)
-    if length_sq <= 0.0:
-        return math.dist(point, start)
-    fraction = sum(
-        (value - origin) * direction
-        for value, origin, direction in zip(point, start, delta)
-    ) / length_sq
-    fraction = min(1.0, max(0.0, fraction))
-    nearest = tuple(
-        origin + fraction * direction for origin, direction in zip(start, delta)
-    )
-    return math.dist(point, nearest)
 
 
 def _add_body_centerline(adapter: Any, view: Any) -> None:
-    """Insert the socket axis from its two enumerated OD silhouettes."""
+    """Insert the socket axis from an opposite, overlapping OD-flank pair."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate body centerline view")
     native_view = _early_bound(view, "IView")
     native_view.UpdateViewDisplayGeometry()
-    station = SHOULDER_Z + WALL_T + TUBE_LEN / 4.0
-    if abs(station - RETENTION_PIN_CENTER_Z) <= RETENTION_PIN_DIA / 2.0:
-        raise RuntimeError("body centerline pick station intersects retention hole")
-    targets = tuple(
-        (0.0, side * TUBE_OD / 2000.0, station / 1000.0)
-        for side in (-1.0, 1.0)
-    )
     candidates: list[
-        tuple[Any, tuple[float, float, float], tuple[float, float, float]]
+        tuple[
+            Any,
+            tuple[float, float, float],
+            tuple[float, float, float],
+            tuple[float, float, float],
+        ]
     ] = []
     components = adapter._attempt(native_view.GetVisibleComponents, default=()) or ()
     for component in components:
@@ -276,23 +253,69 @@ def _add_body_centerline(adapter: Any, view: Any) -> None:
                 continue
             start = tuple(float(value) for value in start_data[:3])
             end = tuple(float(value) for value in end_data[:3])
-            candidates.append((silhouette, start, end))
-    if len(candidates) < 2:
-        raise RuntimeError("socket OD did not expose two usable silhouette segments")
-    flanks: list[Any] = []
-    for target in targets:
-        ranked = [
-            (_segment_distance(target, start, end), silhouette)
-            for silhouette, start, end in candidates
-        ]
-        distance, flank = min(ranked, key=lambda item: item[0])
-        if distance > 2e-4:
-            raise RuntimeError(
-                f"socket flank is {distance * 1000:g} mm from its authored pick"
+            length = math.dist(start, end)
+            if length <= 1e-9:
+                continue
+            direction = tuple((b - a) / length for a, b in zip(start, end))
+            candidates.append((silhouette, start, end, direction))
+    pairs: list[tuple[float, float, Any, Any]] = []
+    expected_separation = TUBE_OD / 1000.0
+    for index, (first, first_start, first_end, first_direction) in enumerate(
+        candidates
+    ):
+        for second, second_start, second_end, second_direction in candidates[index + 1 :]:
+            alignment = abs(
+                sum(a * b for a, b in zip(first_direction, second_direction))
             )
-        flanks.append(flank)
-    if int(adapter.swApp.IsSame(flanks[0], flanks[1])) != 0:
-        raise RuntimeError("body centerline resolved the same socket flank twice")
+            if alignment < 1.0 - 1e-6:
+                continue
+            offset = tuple(b - a for a, b in zip(first_start, second_start))
+            axial_offset = sum(
+                value * axis for value, axis in zip(offset, first_direction)
+            )
+            radial_offset = tuple(
+                value - axial_offset * axis
+                for value, axis in zip(offset, first_direction)
+            )
+            separation = math.sqrt(sum(value * value for value in radial_offset))
+            if separation < 0.8 * expected_separation:
+                continue
+            first_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(first_start, first_direction)),
+                    sum(a * b for a, b in zip(first_end, first_direction)),
+                )
+            )
+            second_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(second_start, first_direction)),
+                    sum(a * b for a, b in zip(second_end, first_direction)),
+                )
+            )
+            overlap = min(first_interval[1], second_interval[1]) - max(
+                first_interval[0], second_interval[0]
+            )
+            if overlap > 1e-6:
+                pairs.append(
+                    (
+                        overlap,
+                        abs(separation - expected_separation),
+                        first,
+                        second,
+                    )
+                )
+    if not pairs:
+        raise RuntimeError("socket OD has no opposite overlapping silhouette pair")
+    overlap, separation_error, first, second = max(
+        pairs, key=lambda item: (item[0], -item[1])
+    )
+    if separation_error > 2e-4:
+        raise RuntimeError(
+            f"socket flank separation misses OD by {separation_error * 1000:g} mm"
+        )
+    if overlap < 1e-3:
+        raise RuntimeError("socket flank pair has less than 1 mm axial overlap")
+    flanks = (first, second)
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")

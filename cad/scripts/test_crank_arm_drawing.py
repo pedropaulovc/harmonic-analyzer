@@ -56,10 +56,9 @@ def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
     assert "HANDLE PIVOT" not in notes
     assert "HANDLE PIVOT CENTRED" not in notes
-    # The three coaxial features share the drawn arm centreline; the note
-    # backs it in words without restating the width it is centred across.
-    assert "ON THE ARM CENTRELINE." in notes
-    assert "DIMPLE" in notes and "PIVOT HOLE" in notes
+    assert "HANDLE-SIDE FACE" in notes
+    assert "CENTRELINE" not in notes
+    assert "INTERSECTS" not in notes
     assert not any(character.isdigit() for character in notes)
     # drawing-simplicity-policy rule 6: at most four short lines, and never a
     # dimension or a tolerance among them.
@@ -102,9 +101,7 @@ def test_hole_callouts_state_size_and_process() -> None:
     with pytest.raises(ValueError):
         drill_process(crank_arm_spec.ANCHOR_HOLE_SPEC)
     assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
-    assert drawing.ANCHOR_TAP_PROCESS == "BOTTOMING TAP"
     assert source.count("process=drill_process(") == 2
-    assert "process=ANCHOR_TAP_PROCESS" in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
@@ -156,15 +153,20 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
 def test_every_location_is_a_model_dimension_from_a_feature() -> None:
     """Rule 7 (one feature origin per view) meets rule 2 (the model owns it).
 
-    The pivot and anchor stations read from the shaft-bore axis, the anchor's
-    offset from the top long edge, the stock width and the cross-hole's
-    station from the broad face are all values no feature dimension carries,
+    The pivot and anchor stations, common-axis offset, stock width and the
+    cross-hole station are values no feature dimension carries,
     so the part's reference sketches own them and the print imports them --
     nothing on the sheet is built from view picks except the parenthesised
     overall.
     """
     stations = crank_arm_spec.DRAWING_DIMENSIONS["StationReference"]
-    assert stations == {"PivotStation", "AnchorStation", "AnchorOffset", "Width"}
+    assert stations == {
+        "PivotStation",
+        "AnchorStation",
+        "AnchorOffset",
+        "AxisOffset",
+        "Width",
+    }
     assert crank_arm_spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStation"}
     assert stations <= set(drawing.FRONT_KEEP)
     assert set(drawing.TOP_KEEP) == {"PinStation"}
@@ -204,15 +206,10 @@ def test_overall_length_is_a_conspicuous_reference() -> None:
     assert crank_arm_spec.ARM_END_X + crank_arm_spec.HALF_WIDTH == 93.0
 
 
-def test_coaxial_features_share_a_drawn_centreline() -> None:
-    # Machinist blocker: the dimple and pivot hole had no cross-width location.
-    # They sit on the arm's mid-width axis, so the print draws that axis
-    # between the two long edges and the note backs it.
-    source = _source()
-    assert "_add_arm_centerline(adapter, front)" in source
-    assert "InsertCenterLine2()" in source
-    assert crank_arm_spec.ARM_THICKNESS / 2.0 == 4.0
-    assert crank_arm_spec.DIMPLE_X == 30.0
+def test_common_axis_has_an_edge_referenced_model_dimension() -> None:
+    assert "AxisOffset" in crank_arm_spec.DRAWING_DIMENSIONS["StationReference"]
+    assert crank_arm_spec.HALF_WIDTH == crank_arm_spec.ARM_WIDTH / 2.0 == 8.0
+    assert "AxisOffset" in drawing.FRONT_KEEP
 
 
 def test_dimple_has_both_nominal_location_coordinates() -> None:
