@@ -248,11 +248,11 @@ FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
-    "AnchorOffset": (0.145, 0.158),
+    "AnchorOffset": (0.110, 0.158),
     "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
     "Width": (0.274, FRONT_CENTER[1]),
     # Left of the boss so its leader and the bore's (above) never cross.
-    "BossRadius": (0.035, 0.120),
+    "BossRadius": (0.030, FRONT_CENTER[1]),
     "ShaftBoreDia": (0.060, 0.166),
     # Right of the anchor tap so its leader never meets the tap callout's.
     "DimpleDia": (0.178, 0.180),

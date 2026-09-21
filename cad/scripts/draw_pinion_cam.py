@@ -32,6 +32,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
+    view_name,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -46,6 +47,7 @@ from pinion_cam_spec import (
     LIFT_ROD_NUMBER,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -70,11 +72,11 @@ SHEET_SCALE = (3.0, 1.0)
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
-FRONT_CENTER = (0.105, 0.140)
+FRONT_CENTER = (0.105, 0.150)
 # Third angle: the right-side boss profile projects to the right of the front
-# view.  Its rotated boss-end view projects below it at sheet scale.
-SIDE_CENTER = (0.260, 0.140)
-ISO_CENTER = (0.365, 0.155)
+# view.  The separately labelled, rotated boss-end view sits below it.
+SIDE_CENTER = (0.260, 0.150)
+ISO_CENTER = (0.365, 0.165)
 BOTTOM_CENTER = (0.260, 0.105)
 
 def _front_x(model_x_mm: float) -> float:
@@ -94,9 +96,9 @@ _SQRT_HALF = 0.5**0.5
 # pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 FRONT_KEEP = {
-    "BoreDia": (0.055, 0.176),
-    "CollarCy": (0.172, 0.190),
-    "BossProjection": (0.180, 0.112),
+    "BoreDia": (0.055, 0.186),
+    "CollarCy": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.040),
+    "BossProjection": (0.180, 0.122),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.040),
@@ -115,7 +117,6 @@ DIMENSION_CALLOUTS = {
         "SIZE/SHAPE NONCRITICAL\n"
         "M2.5 X 0.45-6H THRU TO BORE"
     ),
-    "BossCz": "BOSS AXIS STATION",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity, one
@@ -144,6 +145,49 @@ def _limit_witness_lines(
             f"missing dimensions for witness-line limits: {sorted(remaining)!r}"
         )
     adapter.currentModel.GraphicsRedraw2()
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move a model dimension to the projection that shows its extension lines."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name,
+        "DIMENSION",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
+    drawing.DragModelDimension(
+        view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0
+    )
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    matches = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -199,9 +243,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The boss end view is curated first so its visible circle owns both the
-    # cosmetic diameter and the 3.0 axial station; either dimension imported
-    # into the opposite length view could attach only to hidden geometry.
+    # Import the boss station from its authoring projection, then move it to
+    # the right-side profile where its end-face and boss-axis witnesses read
+    # as a conventional horizontal linear dimension.
     bottom_annotations = curate_view_dimensions(
         adapter, bottom, keep=BOTTOM_KEEP, view_label="boss end"
     )
@@ -211,6 +255,26 @@ async def build(adapter: Any) -> dict[str, str]:
     side_annotations = curate_view_dimensions(
         adapter, side, keep=SIDE_KEEP, view_label="boss profile"
     )
+    boss_station = [
+        annotation
+        for annotation in bottom_annotations
+        if dimension_name(adapter, annotation) == "BossCz"
+    ]
+    if len(boss_station) != 1:
+        raise RuntimeError("expected one boss-axis station donor dimension")
+    moved_station = _move_dimension(
+        adapter,
+        boss_station[0],
+        side,
+        (SIDE_CENTER[0], SIDE_CENTER[1] - 0.030),
+        source_view=bottom,
+    )
+    bottom_annotations = [
+        annotation
+        for annotation in bottom_annotations
+        if dimension_name(adapter, annotation) != "BossCz"
+    ]
+    side_annotations.append(moved_station)
     annotations = [*bottom_annotations, *front_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _limit_witness_lines(
@@ -264,11 +328,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    if add_note(adapter, "RIGHT-SIDE VIEW", 0.225, 0.210) is None:
+    if add_note(adapter, "RIGHT-SIDE VIEW", 0.225, 0.190) is None:
         raise RuntimeError("failed to label cam right-side view")
-    if add_note(adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.215, 0.075) is None:
-        raise RuntimeError("failed to label rotated cam boss end view")
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.220)
+    if add_note(
+        adapter, "REMOVED VIEW A - BOSS END - ROTATED 90 DEG", 0.200, 0.075
+    ) is None:
+        raise RuntimeError("failed to label removed cam boss end view")
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(
         adapter,
