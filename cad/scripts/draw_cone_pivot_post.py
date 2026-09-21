@@ -34,6 +34,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -98,10 +99,10 @@ _S = SHEET_SCALE[0] / 1000.0
 # Third-angle: the plan sits above the front elevation, both at sheet scale.
 FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
-JOURNAL_CENTER = (0.240, 0.168)
+JOURNAL_CENTER = (0.235, 0.160)
 ISO_CENTER = (0.360, 0.150)
 SECTION_CENTER = (0.295, 0.230)
-SECTION_CAPTION = (0.218, 0.264)
+SECTION_CAPTION = (0.295, 0.201)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 
@@ -173,18 +174,18 @@ JOURNAL_KEEP = {
     "ConeBossDia": (0.292, 0.184),
     "JournalBoreDia": (0.292, 0.163),
 }
-# Non-preferred finished sizes, so the shop is told to BORE rather than left to
-# hunt for a reamer that does not exist; the size limits are the part's.  The
-# crank boss's near Ø21.93 footprint is machined back to the separately shown
-# 21.3753 mm station, not confused with a second, unspecified spotface.
+# The non-preferred bore limits tell the shop what to inspect without imposing
+# a particular cutting method.  The separate Ø21.93 footprint and 21.3753 mm
+# station identify the real local crank spotface without inventing a uniform
+# depth against the curved collar.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "CRANK BOSS / SPOTFACE DIA\nMACHINE NEAR FACE",
-    "CrankBossLen": "CRANK BOSS LENGTH",
-    "CrankBoreDia": "CRANK BORE THRU\nBORE TO SIZE",
-    "JournalBoreDia": "CONE BORE THRU\nBORE TO SIZE",
+    "CrankBossDia": "CRANK BOSS DIA\nSPOTFACE FOOTPRINT",
+    "CrankBossLen": "CRANK BOSS FACE-TO-FACE",
+    "CrankBoreDia": "CRANK BORE THRU",
+    "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "RAISED CONE JOURNAL PADS",
-    "ConeBossLen": "PAD FACE-TO-FACE\nMIDPLANE",
-    "CrankBossStartZ": "TO MACHINED SPOTFACE STATION",
+    "ConeBossLen": "PAD FACE-TO-FACE",
+    "CrankBossStartZ": "TO SPOTFACE PLANE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
@@ -825,11 +826,10 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
-    # On R2026x, SelectByID2 refused the feature-qualified
-    # ``JournalPlanReference@cone-pivot-post-2@Section View A-A`` path.  The
-    # section is cut-surface-only and the exported section carries no reference
-    # sketch ink, so no second selector call is made for that observed path.
-    for view in (front, top, journal, iso):
+    # The plan must retain JournalPlanReference: its two native centreline rays
+    # and imported dimensions carry the spotface station and 12.52-degree bore
+    # azimuth.  Other projections have no use for that witness geometry.
+    for view in (front, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -845,6 +845,14 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         face_xy=(_top_x(0.0), _top_y(35.0)),
         label="crank boss axis",
+    )
+    add_attached_note(
+        adapter,
+        front,
+        text="VIEW B",
+        entity=_bore_rim_edge(front, diameter_mm=BORE_DIA),
+        note_xy=(0.165, 0.112),
+        label="cone-axis auxiliary-view direction",
     )
 
     add_native_hole_callout(
@@ -920,7 +928,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(
         adapter,
-        "AUXILIARY VIEW - CONE JOURNAL\nLOOK ALONG CONE AXIS",
+        "VIEW B - CONE JOURNAL\nLOOK ALONG CONE AXIS",
         0.202,
         0.104,
     )
