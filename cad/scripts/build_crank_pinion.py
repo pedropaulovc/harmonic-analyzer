@@ -264,7 +264,7 @@ async def build(adapter) -> dict[str, str]:
     await add_diametric_linear_dimension(
         adapter,
         boss_axis,
-        outside_ref,
+        f"{outside_ref}.start",
         (-FACE_WIDTH / 2.0, OUTSIDE_DIA / 2.0 + 5.0),
         "OutsideDia",
     )
@@ -272,7 +272,7 @@ async def build(adapter) -> dict[str, str]:
     await add_diametric_linear_dimension(
         adapter,
         boss_axis,
-        bore_ref,
+        f"{bore_ref}.start",
         (-OVERALL_LENGTH / 2.0, BORE_DIAMETER / 2.0 + 3.0),
         "BoreDia",
     )
