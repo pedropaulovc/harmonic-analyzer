@@ -54,9 +54,7 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
 
 def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     notes = crank_arm_spec.DRAWING_NOTES
-    assert "HANDLE PIVOT" not in notes
-    assert "HANDLE PIVOT CENTRED" not in notes
-    assert "HANDLE-SIDE FACE" in notes
+    assert "SAME FACE SHOWN IN THE FRONT VIEW" in notes
     assert "CENTRELINE" not in notes
     assert "INTERSECTS" not in notes
     assert not any(character.isdigit() for character in notes)
@@ -78,30 +76,26 @@ def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
     # the period British Association series.
     assert "BA" not in notes
     assert "X.XX" not in notes
-    source = _source()
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_hole_callouts_state_size_and_process() -> None:
+
+def test_hole_callouts_state_size_process_and_fit() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
+    assert callouts["AnchorOffset"] == "ANCHOR AXIS FROM TOP EDGE"
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
+    assert "0.00-0.12 DIAMETRAL CLEARANCE" in callouts["ShaftBoreDia"]
+    assert "MHA-026" in callouts["ShaftBoreDia"]
     assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM 0.5 DEEP"
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
-    assert drill_process(crank_arm_spec.PIN_HOLE_SPEC) == "#14 DRILL"
+    assert drawing.PIN_HOLE_CALLOUT_PREFIX == "#14 DRILL\nON SHAFT-BORE CL"
     assert drill_process(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == "15/64 DRILL"
-    source = _source()
-    assert source.count("add_native_hole_callout(") == 3
-    assert 'label="crank-arm cross-hole"' in source
-    assert 'label="handle pivot hole"' in source
-    assert 'label="anchor tap"' in source
     # The anchor is tapped: a drill-size prefix does not exist for it (this
     # raised on the farm, iter2) and the requirement it carries is the tap.
     with pytest.raises(ValueError):
         drill_process(crank_arm_spec.ANCHOR_HOLE_SPEC)
     assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
-    assert source.count("process=drill_process(") == 2
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:

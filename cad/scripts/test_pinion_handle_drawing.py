@@ -150,6 +150,9 @@ def rendered_recipe(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "offset_dimension_text", offset)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
     monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_shorten_radius_leader", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(drawing, "add_note", lambda *args: object())
     monkeypatch.setattr(
         drawing, "add_property_linked_note", lambda _a, name, *xy: notes.append(name)
@@ -191,6 +194,7 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     assert (
         bore.view is section and "REAM" in bore.callout and "THRU" not in bore.callout
     )
+    assert "DIAMETRAL CLEARANCE" in bore.callout
     assert package.dimensions["TubeLen"].view is section
     rod = package.dimensions["RodDia"]
     assert rod.view is package.dimensions["RodSpan"].view
@@ -229,6 +233,7 @@ def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe
     assert "Manufacturing Notes" in rendered_recipe.notes
     assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
     assert "MHA-136" in spec.DRAWING_NOTES
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
     assert "FLUSH" in spec.DRAWING_NOTES
     for forbidden in ("DATUM", "BASIC", "+/-", "MATERIAL", "TOLERANCE", "FINISH"):
         assert forbidden not in spec.DRAWING_NOTES.upper()
@@ -245,10 +250,12 @@ def test_socket_takes_the_title_block_grade_and_names_its_mate():
     assert not [name for name in vars(spec) if name.endswith("_BAND")]
     socket = drawing.DIMENSION_CALLOUTS["TubeId"]
     assert "REAM" in socket and "MHA-102" in socket
+    assert "DIAMETRAL CLEARANCE" in socket
     retention = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
     assert "MATCH-DRILL" in retention
     assert "MHA-102" in retention and "MHA-136" in retention
     assert "LIGHT DRIVE FIT" in retention
+    assert "NOT HAND-REMOVABLE" in retention
 
 
 def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
