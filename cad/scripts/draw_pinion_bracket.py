@@ -128,12 +128,12 @@ def _flank_y(model_y_mm: float) -> float:
 # it holds the COMPLETE pivot bore and its centre mark: that reachable bore
 # axis is the common physical origin for every relief-centre coordinate.  The
 # fence also holds both scallop centres (in the air beside the strap) and both
-# bites.  6:1 separates the near-coincident PARK and ENGAGED X witness lines
-# while giving each 6.90 radius enough arc for a distinct leader. The native
-# caption goes to the detail's right (the sheet border is too close
+# bites.  5:1 separates the near-coincident PARK and ENGAGED X witness lines
+# while fitting a fence that keeps every detail annotation clear.
+# The native caption goes to the detail's right (the sheet border is too close
 # underneath), and the fence's own letter stays clear of the follower seat on
 # the parent view.
-DETAIL_SCALE = (6.0, 1.0)
+DETAIL_SCALE = (5.0, 1.0)
 DETAIL_CENTER = (0.120, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 15.0
