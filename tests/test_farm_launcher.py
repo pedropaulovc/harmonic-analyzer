@@ -95,6 +95,7 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
         "pool": pool,
         "log_directory": log_directory,
         "invocation": invocation,
+        "tools": tools,
         "environment": environment,
     }
 
@@ -256,6 +257,41 @@ def test_native_failure_preserves_exit_and_writes_a_failed_terminal_record(
     assert not any(
         _record(marker)["state"] == "succeeded"
         for marker in log_directory.glob("*.done")
+    )
+
+def test_wrapper_failure_after_startup_writes_a_failed_terminal_record(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    tools = Path(fixture["tools"])
+    (tools / "uv.cmd").unlink()
+    git_executable = shutil.which("git.exe") or shutil.which("git")
+    assert git_executable is not None
+    (tools / "git.cmd").write_text(
+        f'@echo off\r\n"{git_executable}" %*\r\nexit /b %ERRORLEVEL%\r\n',
+        encoding="utf-8",
+    )
+    environment = dict(fixture["environment"])
+    environment["PATH"] = str(tools)
+
+    result = subprocess.run(
+        _command(fixture, "part:pen_rod"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "farm-launch wrapper failed:" in result.stderr
+    log_directory = Path(fixture["log_directory"])
+    running = _record(_only(log_directory, "*.run.json"))
+    finished = _record(_only(log_directory, "*.done"))
+    assert finished["run_id"] == running["run_id"]
+    assert finished["state"] == "failed"
+    assert finished["exit_code"] == 1
+    assert "farm-launch wrapper failed:" in Path(finished["log"]).read_text(
+        encoding="utf-8"
     )
 
 

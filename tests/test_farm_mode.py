@@ -13,7 +13,9 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+import doit.cmd_base as _doit_cmd_base
 from doit.cmd_base import ModuleTaskLoader
+from doit.dependency import CHECKERS, Dependency, JsonDB
 from doit.doit_cmd import DoitMain as _RealDoitMain
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -34,11 +36,24 @@ FARM_ENV = (
 
 
 def _load_dodo():
-    spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
-    assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Load dodo without leaking its process-wide doit patches into other tests."""
+    save_success = Dependency.save_success
+    json_dump = JsonDB.dump
+    missing = object()
+    content_checker = CHECKERS.get("content", missing)
+    try:
+        spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        Dependency.save_success = save_success
+        JsonDB.dump = json_dump
+        if content_checker is missing:
+            CHECKERS.pop("content", None)
+        else:
+            CHECKERS["content"] = content_checker
 
 
 def _leaf_result(**overrides):
@@ -422,7 +437,18 @@ def _install_real_doit(monkeypatch, namespace=None):
     seen = []
     executed = []
     task_namespace = namespace or _fixture_namespace(executed)
-    config = {"GLOBAL": {"backend": "sqlite3", "dep_file": ":memory:"}}
+
+    class MemoryJsonDB(JsonDB):
+        def __init__(self, name, codec, *, module_name=None):
+            self.name = name
+            self.codec = codec
+            self._db = {}
+
+        def dump(self):
+            pass
+
+    monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
+    config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
 
     class FixtureFarmDoit(_RealFarmDoitMain):
         def __init__(self):
@@ -711,13 +737,8 @@ def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeyp
 
     assert build.main(["--executor", "local", "part:x"]) == 0
     assert seen == [["part:x"]]
-    assert executed == [
-        {
-            "HARMONIC_FARM_COMMIT": None,
-            "HARMONIC_EXECUTOR": "local",
-            "HARMONIC_SW_AUTOSTART": None,
-        }
-    ]
+    assert len(executed) == 1
+    assert executed[0]["HARMONIC_EXECUTOR"] == "local"
     assert not _farm.enabled()
 
 

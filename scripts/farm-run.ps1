@@ -37,7 +37,35 @@ function Resolve-ExistingDirectory {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
         throw "$ParameterName is not an existing directory: $Path"
     }
-    return [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Path).Path)
+    return Resolve-PhysicalDirectory -Path (Resolve-Path -LiteralPath $Path).Path
+}
+
+function Resolve-PhysicalDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if (-not [System.IO.Directory]::Exists($fullPath)) {
+        throw "directory does not exist: $Path"
+    }
+
+    $root = [System.IO.Path]::GetPathRoot($fullPath)
+    $relative = [System.IO.Path]::GetRelativePath($root, $fullPath)
+    $current = $root
+    $separators = [char[]]@(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    foreach ($component in $relative.Split(
+        $separators,
+        [System.StringSplitOptions]::RemoveEmptyEntries
+    )) {
+        $current = Join-Path -Path $current -ChildPath $component
+        $linkTarget = [System.IO.Directory]::ResolveLinkTarget($current, $true)
+        if ($null -ne $linkTarget) {
+            $current = $linkTarget.FullName
+        }
+    }
+    return [System.IO.Path]::GetFullPath($current)
 }
 
 function Resolve-FutureDirectory {
@@ -66,7 +94,7 @@ function Resolve-FutureDirectory {
         throw "$ParameterName has a non-directory parent: $existing"
     }
 
-    $resolved = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $existing).Path)
+    $resolved = Resolve-PhysicalDirectory -Path $existing
     foreach ($component in $missing) {
         $resolved = Join-Path -Path $resolved -ChildPath $component
     }
@@ -135,6 +163,8 @@ function New-EmptyFileExclusive {
     $stream.Dispose()
 }
 
+$logCreated = $false
+$startupRecordWritten = $false
 try {
     $resolvedWorktree = Resolve-ExistingDirectory -Path $Worktree -ParameterName 'Worktree'
     $resolvedPoolHome = Resolve-ExistingDirectory -Path $PoolHome -ParameterName 'PoolHome'
@@ -171,14 +201,12 @@ try {
         throw "LogDirectory must be outside the target worktree: $resolvedLogDirectory"
     }
     if (-not (Test-Path -LiteralPath $resolvedLogDirectory)) {
-        New-Item -ItemType Directory -Path $resolvedLogDirectory | Out-Null
+        [System.IO.Directory]::CreateDirectory($resolvedLogDirectory) | Out-Null
     }
     if (-not (Test-Path -LiteralPath $resolvedLogDirectory -PathType Container)) {
         throw "LogDirectory is not a directory: $resolvedLogDirectory"
     }
-    $resolvedLogDirectory = [System.IO.Path]::GetFullPath(
-        (Resolve-Path -LiteralPath $resolvedLogDirectory).Path
-    )
+    $resolvedLogDirectory = Resolve-PhysicalDirectory -Path $resolvedLogDirectory
     if (Test-PathWithin -Candidate $resolvedLogDirectory -Root $resolvedWorktree) {
         throw "LogDirectory must be outside the target worktree: $resolvedLogDirectory"
     }
@@ -189,6 +217,13 @@ try {
         throw "git rev-parse failed with exit $gitCode`: $($headOutput -join [System.Environment]::NewLine)"
     }
     $commit = ([string]($headOutput | Select-Object -Last 1)).Trim()
+    if (-not [System.Text.RegularExpressions.Regex]::IsMatch(
+        $commit,
+        '\A[0-9a-fA-F]{40}\z',
+        [System.Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )) {
+        throw "git rev-parse returned an invalid commit identity: $commit"
+    }
 
     $originOutput = @(
         & git -C $resolvedWorktree for-each-ref "--contains=$commit" '--format=%(refname)' refs/remotes/origin 2>&1
@@ -243,6 +278,7 @@ try {
     } while ($hasConflict)
 
     New-EmptyFileExclusive -Path $logPath
+    $logCreated = $true
     $startedAt = [System.DateTime]::UtcNow
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     $runRecord = [ordered]@{
@@ -262,9 +298,22 @@ try {
         argv = @($nativeArgv)
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
+    $startupRecordWritten = $true
 }
 catch {
-    [System.Console]::Error.WriteLine($_.Exception.Message)
+    $startupFailure = $_.Exception.Message
+    if ($logCreated -and -not $startupRecordWritten -and (Test-Path -LiteralPath $logPath)) {
+        try {
+            Remove-Item -LiteralPath $logPath -Force
+        }
+        catch {
+            $startupFailure = (
+                "$startupFailure; additionally failed to remove unclaimed log " +
+                "$logPath`: $($_.Exception.Message)"
+            )
+        }
+    }
+    [System.Console]::Error.WriteLine($startupFailure)
     exit 1
 }
 
@@ -275,7 +324,7 @@ try {
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
-    Push-Location $resolvedWorktree
+    Push-Location -LiteralPath $resolvedWorktree
     try {
         & uv @buildArgs *>&1 | Tee-Object -FilePath $logPath
         $code = $LASTEXITCODE
