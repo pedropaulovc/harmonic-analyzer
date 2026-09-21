@@ -95,6 +95,11 @@ SECTION_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
 SECTION_LABEL = "A"
 
+# The checked-in landscape template's FINISH value cell, measured between its
+# authored sheet-format rules.  Its linked INote extent is checked natively
+# before export so wrapping can never spill into MATERIAL again.
+_FINISH_CELL = (0.218, 0.0335, 0.310, 0.0450)
+
 # ``place_view`` centres a view on its projected bounding box, so the model
 # origin is offset from the view centre by half that box.  The elevation's box
 # runs y=0..BLOCK_HEIGHT; the plan's runs the crank boss's full z extent.
@@ -332,12 +337,107 @@ def _orient_section(adapter: Any, view: Any) -> None:
         )
 
 
+def _assert_native_layout(
+    adapter: Any,
+    section: Any,
+    *,
+    expected_finish: str,
+) -> None:
+    """Prove the final live sheet geometry before spending an export."""
+    from _layout_geometry import Box, audit_sheet, format_findings
+    from diagnostics.drawing_layout_audit import collect_document
+
+    sheets = collect_document(adapter)
+    if len(sheets) != 1:
+        raise RuntimeError(f"cone pivot post must have one drawing sheet: {len(sheets)}")
+    sheet = sheets[0]
+
+    section_values = tuple(float(value) for value in section.GetOutline())
+    if len(section_values) != 4:
+        raise RuntimeError("cone journal section has invalid final outline")
+    section_box = Box(*section_values)
+    section_escape = section_box.escape(sheet.region)
+    if section_escape is not None:
+        raise RuntimeError(
+            "cone journal section leaves the inner border: "
+            f"{section_box.format_mm()}, {section_escape=}"
+        )
+
+    finish_notes = []
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet_view = _early_bound(drawing.GetFirstView(), "IView")
+    for raw_annotation in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 6:
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        linked = str(note.PropertyLinkedText or "")
+        if "$prp" in linked.casefold() and "finish" in linked.casefold():
+            finish_notes.append(note)
+    if len(finish_notes) != 1:
+        raise RuntimeError(
+            "landscape template must expose exactly one linked Finish note: "
+            f"{len(finish_notes)}"
+        )
+    finish_note = finish_notes[0]
+    actual_finish = str(finish_note.GetText() or "").replace("\r\n", "\n")
+    if actual_finish != expected_finish:
+        raise RuntimeError(
+            "Finish title-block readback mismatch: "
+            f"{actual_finish!r} != {expected_finish!r}"
+        )
+    extent = tuple(float(value) for value in finish_note.GetExtent())
+    if len(extent) != 6:
+        raise RuntimeError(f"Finish title-block note has invalid extent: {extent!r}")
+    finish_box = Box(
+        min(extent[0], extent[3]),
+        min(extent[1], extent[4]),
+        max(extent[0], extent[3]),
+        max(extent[1], extent[4]),
+    )
+    finish_cell = Box(*_FINISH_CELL)
+    if (
+        finish_box.xmin < finish_cell.xmin
+        or finish_box.ymin < finish_cell.ymin
+        or finish_box.xmax > finish_cell.xmax
+        or finish_box.ymax > finish_cell.ymax
+    ):
+        raise RuntimeError(
+            "Finish title-block note leaves its authored cell: "
+            f"note={finish_box.format_mm()}, cell={finish_cell.format_mm()}"
+        )
+
+    surface_boxes = [
+        box
+        for annotation in sheet.annotations
+        if annotation.kind == "surface-finish"
+        for box in annotation.text_boxes
+    ]
+    if len(surface_boxes) != 3:
+        raise RuntimeError(
+            "cone pivot post must expose three native Ra text boxes: "
+            f"{len(surface_boxes)}"
+        )
+    findings = audit_sheet(sheet)
+    if findings:
+        raise RuntimeError(
+            "cone pivot post native annotation layout failed:\n"
+            f"{format_findings(findings)}"
+        )
+    _telemetry.info(
+        "cone pivot post native layout: "
+        f"section={section_box.format_mm()}; "
+        f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
+        f"Ra={[box.format_mm() for box in surface_boxes]}"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open cone-pivot-post source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    source_properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -514,6 +614,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, front)
     set_hidden_lines_removed(adapter, top)
     set_hidden_lines_removed(adapter, section)
+    rebuild_drawing(adapter, label="final cone pivot post native layout")
+    _assert_native_layout(
+        adapter,
+        section,
+        expected_finish=source_properties["Finish"],
+    )
 
     set_high_quality_shaded_with_edges(adapter, iso, label="pictorial isometric")
 

@@ -1,7 +1,7 @@
 cone-pivot-post:
   number: MHA-016
   material_family: ferrous_noncritical
-  finish: RAL 6005 ALKYD, SSPC-SP 3, 50-75 um DFT; MASK MACHINED SURFACES; ISO VG 32 OIL ON BARE SURFACES
+  finish: RAL 6005 ALKYD; SSPC-SP 3; 50-75 um DFT; MASK MACHINED FACES; OIL BARE FACES ISO VG 32
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
