@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -60,11 +60,12 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
-PRINCIPAL_CENTER = (0.200, 0.155)
+PRINCIPAL_CENTER = (0.200, 0.170)
 ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
+DETAIL_LABEL_XY = (0.110, 0.195)
 DONOR_KEEP = {
     "ShaftDia": (0.030, 0.145),
 }
@@ -199,6 +200,26 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
         raise RuntimeError("failed to position integral-arbor head detail")
     draw.EditRebuild3()
     return detail
+
+
+def _position_detail_label(adapter: Any, detail: Any) -> None:
+    """Keep the native detail label clear of the parent shaft."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError("failed to pin sheet scale before positioning detail label")
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    target = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*target):
+        raise RuntimeError("failed to position native detail label")
+    adapter.currentModel.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, target) > 1e-8:
+        raise RuntimeError(f"native detail label position did not persist: {actual}")
 
 
 def _detail_diameter(
@@ -391,6 +412,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
+    _position_detail_label(adapter, detail)
 
     return await finalize_drawing(
         adapter,
