@@ -36,11 +36,10 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
 
 
 def test_direct_fit_is_the_mha073_tap_and_has_no_nut():
-    assert spec.MATING_PART_NUMBER == _config.parts("summing-lever")["number"] == "MHA-073"
+    assert _config.parts("summing-lever")["number"] == "MHA-073"
     assert COUNTER_HOLE_SPEC.kind == "tapped"
-    assert COUNTER_HOLE_SPEC.size == spec.MATING_THREAD_SIZE == anchor.thread_size == "#10-24"
+    assert COUNTER_HOLE_SPEC.size == anchor.thread_size == "#10-24"
     assert spec.SHANK_LENGTH_MM == pytest.approx(19.05)
-    assert spec.NUT_INSTALLED is False
     assert anchor.nut is None
 
 

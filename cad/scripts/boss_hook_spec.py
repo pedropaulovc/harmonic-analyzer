@@ -2,7 +2,7 @@
 
 import _config
 from stock_anchor_geom import ANCHOR_9490T1, trim
-from summing_lever_spec import ANCHOR_H, COUNTER_HOLE_SPEC
+from summing_lever_spec import ANCHOR_H
 
 SHANK_LENGTH_MM = round(ANCHOR_H, 3)
 TRIM = trim(ANCHOR_9490T1, SHANK_LENGTH_MM)
@@ -34,17 +34,11 @@ DRAWING_PRECISION_BY_NAME = {
 }
 DIMENSION_TOLERANCE_TYPES = {"FinishedOverall": 11, "ChamferWidth": 4, "ChamferAngle": 11}
 
-MATING_PART_NUMBER = _config.parts("summing-lever")["number"]
-MATING_THREAD_SIZE = COUNTER_HOLE_SPEC.size
-NUT_INSTALLED = False
 
-# The dimensions define the cut; these notes carry only the post-purchase
-# operation and the direct installation interface, not duplicate tolerances.
+# The dimensions define the cut; this note identifies the post-purchase
+# operation without repeating the controlled chamfer or title-block edge break.
 DRAWING_NOTES = (
-    "POST-PURCHASE: TRIM FREE SHANK END TO FINISHED OVERALL; RESTORE DEBURR.\n"
-    f"THREAD DIRECTLY INTO SUMMING LEVER {MATING_PART_NUMBER}'S "
-    f"{MATING_THREAD_SIZE} TAPPED BOSS; NO NUT.\n"
-    "CLOCK EYE TO PULL PLANE; USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.\n"
+    "POST-PURCHASE: TRIM FREE SHANK END TO FINISHED OVERALL.\n"
     "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

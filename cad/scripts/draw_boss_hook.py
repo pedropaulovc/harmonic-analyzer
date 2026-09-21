@@ -17,6 +17,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
@@ -146,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
     )
     for view in (front, detail):
-        set_hidden_lines_visible(adapter, view)
+        set_hidden_lines_removed(adapter, view)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
     return await finalize_drawing(
