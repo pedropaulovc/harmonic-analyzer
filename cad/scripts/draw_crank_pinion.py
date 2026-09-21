@@ -189,7 +189,7 @@ RIGHT_KEEP = {
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
     "BossDia": (
-        _side_x(OVERALL_LENGTH) + 0.034,
+        _side_x(OVERALL_LENGTH) + 0.049,
         RIGHT_CENTER[1] + 0.020,
     ),
     "BoreDia": (_side_x(OVERALL_LENGTH) + 0.020, RIGHT_CENTER[1]),
