@@ -326,6 +326,34 @@ def _checked_edge_dimension(
     return display
 
 
+def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> None:
+    """Show diameter ``name`` as one outside arrow on the rim, no diametral line.
+
+    Inside arrows draw the dimension line right across the circle, through the
+    gear centre -- where every leader to the eccentric bore from the note
+    lanes above has to cross it (codex iter4).  Outside arrows keep the value
+    and its band and leave a single leader to the rim (draw_tube_frame's OD
+    reference does the same).
+    """
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SetSecondArrow(False, False)
+    if (
+        int(display.ArrowSide) != 1
+        or bool(display.GetUseDocSecondArrow())
+        or bool(display.GetSecondArrow())
+    ):
+        raise RuntimeError(f"{name} did not keep its single outside arrow")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -404,6 +432,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
+    _leader_outside_arrow(adapter, front_annotations, "CamDia")
     cam_thickness_annotations = [
         annotation
         for annotation in right_annotations
