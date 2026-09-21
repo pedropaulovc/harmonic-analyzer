@@ -124,11 +124,20 @@ def logo_ring_profile() -> tuple[Segment, ...]:
     )
 
 
-async def build_91247A720(adapter, truth=None):
+async def build_91247A720(
+    adapter, truth=None, *, finished_underhead_mm: float | None = None
+):
+    """Build stock geometry and optionally cut/deburr its threaded end."""
+    from types import SimpleNamespace
+
     from _common import (add_line_chain, _early_bound, _feature_by_name,
                          _read_member)
-    from diagnostics.diag_mcmaster_lib import (mass_properties, no_sketch_inference,
-                                   split_at_plane)
+    from diagnostics.diag_mcmaster_lib import (
+        mass_properties,
+        no_sketch_inference,
+        split_at_plane,
+        trim_factory_shank,
+    )
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     major_r = GB_MAJOR_R
@@ -301,6 +310,34 @@ async def build_91247A720(adapter, truth=None):
             sketch="RunoutProfile",
         )
     name_last_feature(adapter, "ThreadRunout")
+    if finished_underhead_mm is not None:
+        stock_underhead_y = GB_UNDERSIDE - GB_WASHER_T
+        stock_tip_y = GB_UNDERSIDE - GB_LEN
+        cut_y = stock_underhead_y - finished_underhead_mm
+        removed_mm = cut_y - stock_tip_y
+        if not 0.0 < removed_mm < GB_LEN:
+            raise ValueError(
+                "finished under-head length must remove a positive part of the "
+                f"stock shank, got {finished_underhead_mm!r}"
+            )
+        # Reuse the proven stock-anchor trim/deburr construction while keeping
+        # the bolt's washer-lower face as its finished-length datum. At this
+        # point only the screw body exists; the raised vendor marks are added
+        # below, so the helper's single-body postcondition remains meaningful.
+        trim_stock = SimpleNamespace(
+            thread_major_radius_mm=major_r,
+            thread_major_dia_mm=2.0 * major_r,
+            end_chamfer_mm=tip_ch,
+            shank_end_y_mm=stock_tip_y,
+            eye_od_mm=2.0 * stock_underhead_y,
+        )
+        trim_cut = SimpleNamespace(
+            shank_end_y_mm=cut_y,
+            shank_length_mm=finished_underhead_mm,
+            removed_length_mm=removed_mm,
+        )
+        await trim_factory_shank(adapter, trim_stock, trim_cut)
+
     v_before_marks = mass_properties(adapter)["volume_mm3"]
 
     # --- three raised Grade 5 dashes (separate bodies) -----------------------
