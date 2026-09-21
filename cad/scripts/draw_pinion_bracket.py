@@ -212,7 +212,7 @@ DIMENSION_CALLOUTS = {
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
     "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE",
-    "PinSeatCy": "CAM ENGAGE CLEARANCE",
+    "PinSeatCy": "CAM ENGAGEMENT",
 }
 
 
@@ -446,8 +446,8 @@ async def build(adapter: Any) -> dict[str, str]:
         add_note(
             adapter,
             "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
-            0.060,
-            0.150,
+            0.065,
+            0.190,
             height=0.0035,
         )
         is None
@@ -497,7 +497,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.100, 0.097),
+        symbol_xy=(0.108, 0.085),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
