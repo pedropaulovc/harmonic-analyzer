@@ -29,6 +29,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
+    check_drawing_layout,
     create_blank_drawing_sheets,
     curate_dimensions,
     delete_unnamed_imports,
@@ -154,18 +155,17 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 
 
 def _configure_views(
-    adapter: Any,
-    configuration: str,
-    teeth: int,
-    views: tuple[Any, ...],
+    adapter: Any, configuration: str, views: tuple[Any, ...]
 ) -> None:
-    """Select one source configuration and prove the resulting view geometry."""
+    """Select one source configuration and verify every view's exact readback."""
     bound_views = tuple(_early_bound(view, "IView") for view in views)
     for view in bound_views:
         view.ReferencedConfiguration = configuration
     # The common drawing chokepoint deliberately does not treat EditRebuild3's
-    # BOOL as the sole health signal.  Validate the authoritative configuration
-    # properties, then validate the regenerated front-view envelope itself.
+    # BOOL as the sole health signal.  Exact configuration readback is followed
+    # by model-dimension import and configuration-qualified native bore-edge
+    # validation below.  IView.GetOutline cannot validate nominal geometry: the
+    # adapter contract records that SolidWorks pads that box with whitespace.
     rebuild_drawing(adapter, label=f"{configuration} view configuration")
     for view in bound_views:
         observed = str(view.ReferencedConfiguration)
@@ -173,19 +173,6 @@ def _configure_views(
             raise RuntimeError(
                 f"view configuration readback {observed!r} != {configuration!r}"
             )
-    outline = tuple(float(value) for value in bound_views[0].GetOutline())
-    if len(outline) != 4:
-        raise RuntimeError(f"{configuration} front view has invalid outline {outline!r}")
-    numerator, denominator = _SCALE_BY_TEETH[teeth]
-    expected = outside_dia_mm(teeth) * numerator / (denominator * 1000.0)
-    width = outline[2] - outline[0]
-    height = outline[3] - outline[1]
-    tolerance = max(0.0005, 0.01 * expected)
-    if abs(width - expected) > tolerance or abs(height - expected) > tolerance:
-        raise RuntimeError(
-            f"{configuration} front view envelope {(width, height)!r} does not "
-            f"match configured outside diameter {expected:g} m"
-        )
 
 
 def _curate_repeated_dimensions(
@@ -310,7 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=view_scale
         )
         views = (front, right, iso)
-        _configure_views(adapter, configuration, teeth, views)
+        _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
 
@@ -363,6 +350,10 @@ async def build(adapter: Any) -> dict[str, str]:
             is None
         ):
             raise RuntimeError(f"failed to stamp sheet count on {configuration}")
+        rebuild_drawing(adapter, label=f"{configuration} layout audit")
+        check_drawing_layout(
+            adapter, layout=SPEC.layout, stem=f"cone-gear {configuration}"
+        )
 
     return await finalize_drawing(
         adapter,
