@@ -100,8 +100,8 @@ FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
-SECTION_CENTER = (0.295, 0.239)
-SECTION_CAPTION = (0.360, 0.222)
+SECTION_CENTER = (0.295, 0.230)
+SECTION_CAPTION = (0.205, 0.220)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 1)
 
@@ -166,7 +166,7 @@ TOP_KEEP = {
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "ConeBossLen": (0.355, 0.252),
+    "ConeBossLen": (0.355, 0.243),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -817,7 +817,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         section_annotations,
-        {"ConeBossLen": (0.355, 0.252)},
+        {"ConeBossLen": (0.355, 0.243)},
     )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
