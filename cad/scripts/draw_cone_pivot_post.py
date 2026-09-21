@@ -548,7 +548,7 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
     for raw_note in _early_bound(view, "IView").GetNotes() or ():
         note = _early_bound(raw_note, "INote")
         linked_text = str(note.PropertyLinkedText or "")
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
             candidates.append(note)
     if len(candidates) != 1:
         raise RuntimeError(
