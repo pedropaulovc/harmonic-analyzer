@@ -70,7 +70,10 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     kept = (
-        set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.JOURNAL_KEEP)
+        set(drawing.FRONT_KEEP)
+        | set(drawing.TOP_KEEP)
+        | set(drawing.SECTION_KEEP)
+        | set(drawing.JOURNAL_KEEP)
     )
     assert kept == marked
     assert marked == {
@@ -93,9 +96,13 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
-    assert len(drawing.FRONT_KEEP) + len(drawing.TOP_KEEP) + len(
-        drawing.JOURNAL_KEEP
-    ) == len(kept)
+    assert (
+        len(drawing.FRONT_KEEP)
+        + len(drawing.TOP_KEEP)
+        + len(drawing.SECTION_KEEP)
+        + len(drawing.JOURNAL_KEEP)
+        == len(kept)
+    )
 
 
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
@@ -106,6 +113,13 @@ def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
     )
     assert set(drawing.JOURNAL_KEEP) == cone_owned
     assert drawing.CONE_AXIS_VIEW == part.CONE_AXIS_VIEW == "CONE JOURNAL"
+
+
+def test_cone_boss_length_lives_in_the_axial_section() -> None:
+    """The raised boss's axial extent is dimensioned where its profile is visible."""
+    assert drawing.SECTION_SCALE == (1, 2)
+    assert set(drawing.SECTION_KEEP) == {"ConeBossLen"}
+    assert "ConeBossLen" not in drawing.TOP_KEEP
 
 
 def test_part_owns_every_printed_decimal_place() -> None:
