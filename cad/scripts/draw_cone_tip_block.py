@@ -151,7 +151,7 @@ def _circle_entity(
         )
     return edge
 
-def _unique_entry_circle(
+def _preferred_entry_circle(
     adapter: Any,
     candidates: tuple[
         tuple[Any, tuple[float, float]],
@@ -162,7 +162,7 @@ def _unique_entry_circle(
     center_y_mm: float,
     label: str,
 ) -> tuple[Any, tuple[float, float], Any]:
-    """Find which opposed standard view exposes a blind feature's entry."""
+    """Use the first opposed view that exposes the requested real model edge."""
     matches: list[tuple[Any, tuple[float, float], Any]] = []
     for view, center in candidates:
         try:
@@ -176,11 +176,11 @@ def _unique_entry_circle(
         except RuntimeError:
             continue
         matches.append((view, center, edge))
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{label} entry must appear in exactly one opposed view; "
-            f"found {len(matches)}"
-        )
+    if not matches:
+        raise RuntimeError(f"{label} is absent from both opposed views")
+    # A through passage can expose the blind tap's entry rim from both sides.
+    # Both selections still belong to the same native Hole Wizard feature; the
+    # caller's candidate order supplies a stable sheet-side preference.
     return matches[0]
 
 
@@ -286,7 +286,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, section)
 
-    adjuster_view, adjuster_center, adjuster_edge = _unique_entry_circle(
+    adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
         adapter,
         ((front, FRONT_CENTER), (back, BACK_CENTER)),
         radius_mm=ADJUSTER_BORE_DIA / 2.0,
