@@ -28,6 +28,7 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -127,14 +128,14 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "MainBodyDia": (0.040, _top_y(0.0)),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.057, _top_y(CRANK_BOSS_START_Z / 2.0)),
+    "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (_top_x(-6.7), 0.2525),
     "MountWestX": (_top_x(6.7), 0.2525),
     "HeadDia": (0.158, _top_y(0.0)),
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "JournalAxisY": (0.198, 0.156),
+    "JournalAxisY": (0.208, 0.156),
     "ConeBossDia": (0.292, 0.184),
     "JournalBoreDia": (0.292, 0.163),
 }
@@ -303,6 +304,33 @@ def _orient_section(adapter: Any, view: Any) -> None:
             f"{horizontal=}, {vertical=}"
         )
 
+    # A section's native Position is its cut-plane origin, not its outline
+    # centre.  Rotation therefore moved this 86 mm-tall view through the top
+    # border; translate the native position by the measured outline-centre
+    # error and prove the visible geometry is centred on the declared target.
+    outline = tuple(float(value) for value in section_view.GetOutline())
+    position = tuple(float(value) for value in section_view.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("cone journal section has invalid bounds")
+    target = [
+        position[axis]
+        + SECTION_CENTER[axis]
+        - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not section_view.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to centre cone journal section")
+    rebuild_drawing(adapter, label="centre cone journal section")
+    outline = tuple(float(value) for value in section_view.GetOutline())
+    outline_center = tuple(
+        (outline[axis] + outline[axis + 2]) / 2.0 for axis in range(2)
+    )
+    if math.dist(outline_center, SECTION_CENTER) > 0.0001:
+        raise RuntimeError(
+            "cone journal section centre did not persist: "
+            f"{outline_center=}, target={SECTION_CENTER}"
+        )
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -419,7 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
             center_y_mm=BLOCK_HEIGHT,
             center_x_mm=ATTACHMENT_X,
         ),
-        callout_xy=(0.155, 0.235),
+        callout_xy=(0.160, 0.250),
         label="mounting counterbores",
         process="DRILL",
     )
@@ -438,12 +466,13 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=(_front_x(-10.0), _front_y(0.0)),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot seat finish",
+        char_height=0.0025,
     )
     add_surface_finish(
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.158, _front_y(51.0)),
+        symbol_xy=(0.175, 0.108),
         leader_attach_xy=model_point_in_view(
             adapter,
             front,
@@ -456,12 +485,13 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_bore"),
         label="crank bore finish",
+        char_height=0.0025,
     )
     add_surface_finish(
         adapter,
         section,
         edge_entity=_bore_rim_edge(section, diameter_mm=BORE_DIA),
-        symbol_xy=(0.295, 0.140),
+        symbol_xy=(0.300, 0.120),
         leader_attach_xy=model_point_in_view(
             adapter,
             section,
@@ -474,6 +504,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         control=surface_finish_by_key(SURFACE_FINISHES, "journal_bore"),
         label="cone journal bore finish",
+        char_height=0.0025,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
