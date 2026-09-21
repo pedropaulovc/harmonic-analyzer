@@ -70,6 +70,7 @@ from pinion_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DROP,
+    PIN_SEAT,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIVOT_BORE,
@@ -135,7 +136,7 @@ DETAIL_SCALE = (3.0, 1.0)
 DETAIL_CENTER = (0.105, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.215, 0.085)
+DETAIL_CAPTION_XY = (0.180, 0.085)
 DETAIL_LETTER_XY = (0.245, 0.100)
 
 
@@ -187,7 +188,8 @@ LEFT_KEEP = {
     "PinSeatCz": (0.080, 0.090),
     "PinSeatDia": (0.045, 0.150),
 }
-SECTION_KEEP = {"PinSeatDepth": (0.395, 0.115)}
+SECTION_CENTER = (0.350, 0.115)
+SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
 # overall on its clear right, between the third-angle left and front views.
 OVERALL_XY = (0.112, 0.168)
@@ -203,13 +205,13 @@ DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
-    "CamReliefParkX": "PARK X\nØ6.35 AXIS ORIGIN",
-    "CamReliefParkY": "PARK +Y\nØ6.35 AXIS ORIGIN",
-    "CamReliefEngagedX": "ENGAGED X\nØ6.35 AXIS ORIGIN",
-    "CamReliefEngagedY": "ENGAGED -Y\nØ6.35 AXIS ORIGIN",
-    "PinSeatDepth": "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE",
+    "CamReliefParkX": "PARK X",
+    "CamReliefParkY": "PARK +Y",
+    "CamReliefEngagedX": "ENGAGED X",
+    "CamReliefEngagedY": "ENGAGED -Y",
     "PinSeatCy": "CAM ENGAGEMENT",
 }
+PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nCAM NOTCH FACE"
 
 
 def _cam_relief_detail(adapter: Any, front: Any) -> Any:
@@ -373,6 +375,33 @@ def _overall_reference(adapter: Any, left: Any) -> None:
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("overall length reference precision did not persist")
 
+def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
+    """Dimension the visible entry face to blind floor in Section B-B."""
+    entry_x = SECTION_CENTER[0] - R_END * 3.0 / 1000.0
+    floor_x = entry_x + PIN_SEAT * 3.0 / 1000.0
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=(entry_x, SECTION_CENTER[1]),
+        p1=(floor_x, SECTION_CENTER[1]),
+        text_xy=SECTION_KEEP["PinSeatDepth"],
+        label="follower seat depth",
+        orientation="horizontal",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - PIN_SEAT) > 1e-5:
+        raise RuntimeError(
+            f"follower seat depth measured {measured_mm:g}, expected {PIN_SEAT:g} mm"
+        )
+    digits = DRAWING_PRECISION_BY_NAME["PinSeatDepth"]
+    display.SetPrecision3(digits, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != digits:
+        raise RuntimeError("follower seat depth precision did not persist")
+    display.SetText(3, PIN_SEAT_DEPTH_CALLOUT)
+    return display.GetAnnotation()
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -462,7 +491,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_parent,
         line_start=(0.265, seat_axis_y),
         line_end=(0.305, seat_axis_y),
-        view_xy=(0.350, 0.115),
+        view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),
         label="follower seat depth section",
@@ -472,6 +501,17 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
+    if (
+        add_note(
+            adapter,
+            "ALL RELIEF X/Y COORDINATES\nFROM Ø6.35 PIVOT BORE AXIS",
+            0.105,
+            0.245,
+            height=0.0035,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to identify relief coordinate origin")
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
@@ -479,19 +519,13 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="scallop detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section_annotations = curate_view_dimensions(
-        adapter,
-        seat_section,
-        keep=SECTION_KEEP,
-        view_label="follower seat section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    _seat_depth_dimension(adapter, seat_section)
     if (
         add_note(
             adapter,
             "FOLLOWER SEAT BREAK-OUT\nINTO CAM RELIEF IS INTENDED",
             0.350,
-            0.155,
+            0.185,
             height=0.0035,
         )
         is None
@@ -506,14 +540,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
     )
 
-    annotations = [
-        *front_annotations,
-        *left_annotations,
-        *detail_annotations,
-        *section_annotations,
-    ]
+    annotations = [*front_annotations, *left_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    imported_precision = {
+        name: digits
+        for name, digits in DRAWING_PRECISION_BY_NAME.items()
+        if name != "PinSeatDepth"
+    }
+    assert_imported_precision(adapter, annotations, imported_precision)
 
     for index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
