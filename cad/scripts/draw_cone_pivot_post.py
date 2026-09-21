@@ -100,9 +100,10 @@ FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
-SECTION_CENTER = (0.365, 0.247)
+SECTION_CENTER = (0.295, 0.239)
+SECTION_CAPTION = (0.360, 0.222)
 SECTION_LABEL_SCALE_TEXT = "SCALE"
-SECTION_SCALE = (1, 2)
+SECTION_SCALE = (1, 1)
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -154,8 +155,8 @@ FRONT_KEEP = {
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.170),
-    "CrankBossDia": (0.150, 0.105),
-    "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
+    "CrankBossDia": (0.155, 0.135),
+    "CrankBoreDia": (0.180, 0.160),
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
@@ -165,7 +166,7 @@ TOP_KEEP = {
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "ConeBossLen": (0.295, 0.215),
+    "ConeBossLen": (0.235, 0.245),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -174,17 +175,16 @@ JOURNAL_KEEP = {
 }
 # Non-preferred finished sizes, so the shop is told to BORE rather than left to
 # hunt for a reamer that does not exist; the size limits are the part's.  The
-# boss's near face is the one place a process word IS the requirement: on an
-# as-cast collar the shop has to know that face is machined back to a station,
-# not left as cast.
+# crank boss's near Ø21.93 footprint is machined back to the separately shown
+# 21.3753 mm station, not confused with a second, unspecified spotface.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "CRANK BOSS OD\nSPOTFACE NEAR END",
+    "CrankBossDia": "CRANK BOSS / SPOTFACE DIA\nMACHINE NEAR FACE",
     "CrankBossLen": "CRANK BOSS LENGTH",
-    "CrankBoreDia": "CRANK BORE THRU",
-    "JournalBoreDia": "CONE BORE THRU",
-    "ConeBossDia": "CONE JOURNAL BOSS",
-    "ConeBossLen": "CONE BOSS LENGTH\nMIDPLANE",
-    "CrankBossStartZ": "TO BOSS SPOT FACE",
+    "CrankBoreDia": "CRANK BORE THRU\nBORE TO SIZE",
+    "JournalBoreDia": "CONE BORE THRU\nBORE TO SIZE",
+    "ConeBossDia": "RAISED CONE JOURNAL PADS",
+    "ConeBossLen": "PAD FACE-TO-FACE\nMIDPLANE",
+    "CrankBossStartZ": "TO MACHINED SPOTFACE STATION",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
@@ -543,7 +543,7 @@ def _configure_section_caption(drawing_model: Any) -> None:
 
 
 def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
-    """Retain the linked native caption fields and expose the 1:2 value."""
+    """Retain the linked native caption fields, scale, and clear placement."""
     candidates = []
     for raw_note in _early_bound(view, "IView").GetNotes() or ():
         note = _early_bound(raw_note, "INote")
@@ -557,7 +557,13 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
     expected = "<VLNAME> <VLLABEL>\nSCALE <VLSCALEV>"
     note = candidates[0]
     note.PropertyLinkedText = expected
-    rebuild_drawing(adapter, label="show cone-section scale in native caption")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*SECTION_CAPTION, 0.0):
+        raise RuntimeError("failed to position native cone-section caption")
+    rebuild_drawing(adapter, label="show and position cone-section caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], SECTION_CAPTION) > 1e-6:
+        raise RuntimeError("native cone-section caption position did not persist")
     if str(note.PropertyLinkedText or "") != expected:
         raise RuntimeError("native cone-section scale caption did not persist")
 
@@ -811,7 +817,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         section_annotations,
-        {"ConeBossLen": (0.265, 0.257)},
+        {"ConeBossLen": (0.210, 0.252)},
     )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
@@ -857,7 +863,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         callout_xy=(0.160, 0.250),
         label="mounting counterbores",
-        process="DRILL",
     )
 
     # The seat is the elevation's bottom line: the O42.011 foot rim seen
@@ -920,15 +925,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_note(
         adapter,
-        "CONE JOURNAL VIEW - LOOK ALONG CONE AXIS",
+        "AUXILIARY VIEW - CONE JOURNAL\nLOOK ALONG CONE AXIS",
         0.202,
         0.104,
-    )
-    add_note(
-        adapter,
-        f"TOP VIEW - AXIS PROFILE\nCRANK / CONE BORE AXES {INCLINE_DEG:.2f}°",
-        0.130,
-        0.187,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
 

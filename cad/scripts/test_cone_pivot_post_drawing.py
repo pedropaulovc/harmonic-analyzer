@@ -117,7 +117,7 @@ def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
 
 def test_cone_boss_length_lives_in_the_bore_plane_section() -> None:
     """The raised boss's axial extent is dimensioned where its profile is visible."""
-    assert drawing.SECTION_SCALE == (1, 2)
+    assert drawing.SECTION_SCALE == (1, 1)
     assert set(drawing.SECTION_KEEP) == {"ConeBossLen"}
     assert "ConeBossLen" not in drawing.TOP_KEEP
     start, end = drawing.CONE_SECTION_LINE
