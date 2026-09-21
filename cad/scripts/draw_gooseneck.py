@@ -1,15 +1,13 @@
 r"""Create the curated machinist drawing for the gooseneck counter-spring post.
 
-The SLDPRT remains authoritative.  This recipe supplies only the post's
-elevation + isometric views, the bend-radius / arm-run dimensions, and the
-manufacturing notes; every shared sheet/template, import, curation, and export
-behavior lives in ``_drawing_common``.
+The SLDPRT remains authoritative. Sheet 1 defines the formed tube and post with
+an elevation, enlarged post end, and standard isometric. Sheet 2 carries the
+longitudinal arm/joint section that exposes the separate brazed plug and captive
+slotted screw; every displayed size is imported from the model.
 
-The post is a polished chrome Ø16 tube: a tall vertical leg, a 90-degree bend
-(R51) at the top, and a horizontal arm whose plugged end face carries the
-axial slotted spring screw (Ø3.6 shank, Ø10 head) the counter spring's top eye
-hangs on.  The part is ~493 mm tall, so the sheet runs 1:3; the isometric
-drops to 1:4.
+The external calibration envelope stays unchanged: Ø16 tube, R51 bend, 50.80
+arm run, 8 mm exposed shank and Ø12 head. The package is explicitly 1:3 at
+sheet level, with 2:1 end, 1:1 joint-section and 1:4 isometric overrides.
 
 Run with SolidWorks open::
 
@@ -23,20 +21,36 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    assert_imported_precision,
+    create_blank_drawing_sheets,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
+from gooseneck_geom import ARM_END_X, ARM_Y, BEND_R, SCREW_HEAD_T, SCREW_SHANK_LEN
+from gooseneck_spec import (
+    DRAWING_PRECISION_BY_NAME,
+    ELEVATION_DIMENSIONS,
+    END_DIMENSIONS,
+    JOINT_DIMENSIONS,
+    PLUG_FIT_CALLOUT,
+    SCREW_CALLOUT,
+    TAP_CALLOUT,
+)
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
 PART_STEM = SPEC.artifact_stem
@@ -50,31 +64,38 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~506 mm tall post)
+SHEET_SCALE = (1.0, 3.0)
+SHEET_NAMES = ("FORM + POST", "ARM-END FABRICATION")
 
-# Sheet layout (meters).  The elevation (front) shows the goose-neck profile
-# (leg + bend + arm) right of centre so the notes clear it; the isometric (1:4)
-# sits far right; the notes fill the lower-left.
-FRONT_CENTER = (0.180, 0.150)
-ISO_CENTER = (0.350, 0.150)
-# NO end-screw detail view. Four attempts (three commits + a bbox-shift fix)
-# on the arm-end feature it replaced (a lug + cross-pin) left
-# CreateDetailViewAt4 rendering an empty or near-empty circle even with the
-# fence verified ON the feature: the activated-view sketch transform anchors
-# the model ORIGIN at the view position while CreateDrawViewFromModelView3
-# centers the geometry BBOX there, and even a correctly-shifted fence produced
-# a detail whose content window did not match its fence. The plug + screw are
-# fully specified by notes 3-5 (sizes, locations, braze + tap schedule),
-# matching the note-based style the rest of this batch already uses, so the
-# detail adds legibility only -- not manufacturability -- and stays dropped
-# rather than iterated again.
+# Measured sheet-space layout (metres). Sheet 1 keeps the 493 mm elevation at
+# 1:3, enlarges the post end to 2:1, and raises the 1:4 standard isometric above
+# its caption. Sheet 2 gives the 112 mm arm/joint section a useful 1:1 scale.
+FRONT_CENTER = (0.195, 0.140)
+END_CENTER = (0.060, 0.205)
+ISO_CENTER = (0.350, 0.195)
+JOINT_PARENT_CENTER = (0.345, 0.140)
+JOINT_CENTER = (0.140, 0.190)
 
-# Per-view survivors of the marked-dimension import: the bend radius (R51) and
-# the horizontal arm run, both on the Front-plane sweep path (so both project to
-# the elevation).  Positions are near the bend/arm at the top of the view.
 FRONT_KEEP = {
-    "BendRadius": (0.225, 0.212),
-    "ArmRun": (0.150, 0.250),
+    "LegLength": (0.145, 0.135),
+    "BendRadius": (0.230, 0.205),
+    "ArmRun": (0.155, 0.220),
+}
+END_KEEP = {
+    "TubeDia": (0.095, 0.215),
+    "TubeBoreDia": (0.095, 0.190),
+}
+JOINT_KEEP = {
+    "PlugDia": (0.100, 0.230),
+    "TapMinorDia": (0.100, 0.210),
+    "PlugDepth": (0.145, 0.240),
+    "ScrewShankDia": (0.205, 0.205),
+    "UnderHeadLength": (0.145, 0.165),
+    "ScrewHeadDia": (0.070, 0.185),
+    "HeadThickness": (0.080, 0.145),
+    "SlotDepth": (0.215, 0.235),
+    "ExposedShank": (0.155, 0.145),
+    "SlotWidth": (0.215, 0.215),
 }
 
 
@@ -93,6 +114,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "End View Note",
+            "Joint View Note",
             "Elevation View Note",
             "Isometric View Note",
         ),
@@ -102,6 +125,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "End View Note",
+            "Joint View Note",
             "Elevation View Note",
             "Isometric View Note",
         ),
@@ -109,6 +134,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="gooseneck package")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -116,31 +142,102 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Gooseneck Post Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "gooseneck; chrome tube; 90-deg bend; spring post",
+            3: "gooseneck; plated tube; brazed plug; captive spring screw",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate gooseneck form sheet")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 3))
+    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (front, iso):
+    for view in (front, end):
         set_hidden_lines_removed(adapter, view)
-
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-
-    # 0.114 (was 0.105): machinist round 2 grew the notes to 22 lines and the
-    # block crossed the bottom zone border by 16.1 mm; the trim reclaims ~2
-    # lines and the raise covers the rest (nothing sits above until the
-    # elevation leg at x>0.16).
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.114)
+    front_dimensions = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="elevation",
+        dimensions_by_feature=ELEVATION_DIMENSIONS,
+    )
+    end_dimensions = curate_view_dimensions(
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="post end",
+        dimensions_by_feature=END_DIMENSIONS,
+    )
+    add_property_linked_note(adapter, "End View Note", 0.025, 0.165)
     add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.077)
+    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.120)
 
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate gooseneck fabrication sheet")
+    parent = place_view(
+        adapter, str(SOURCE), "*Front", *JOINT_PARENT_CENTER, scale=(1, 3)
+    )
+    set_hidden_lines_removed(adapter, parent)
+    screw_tip_x = ARM_END_X - SCREW_SHANK_LEN - SCREW_HEAD_T
+    line_start = model_point_in_view(
+        adapter,
+        parent,
+        (screw_tip_x / 1000.0, ARM_Y / 1000.0, 0.0),
+        label="joint section screw-head end",
+    )
+    line_end = model_point_in_view(
+        adapter,
+        parent,
+        (-BEND_R / 1000.0, ARM_Y / 1000.0, 0.0),
+        label="joint section bend end",
+    )
+    joint = create_section_view(
+        adapter,
+        parent,
+        line_start=line_start,
+        line_end=line_end,
+        view_xy=JOINT_CENTER,
+        section_label="A",
+        scale=(1, 1),
+        partial=True,
+        label="arm and brazed end joint",
+    )
+    set_hidden_lines_removed(adapter, joint)
+    joint_dimensions = curate_view_dimensions(
+        adapter,
+        joint,
+        keep=JOINT_KEEP,
+        view_label="arm joint section",
+        dimensions_by_feature=JOINT_DIMENSIONS,
+    )
+    set_dimension_callouts(
+        adapter,
+        joint_dimensions,
+        {
+            "PlugDia": PLUG_FIT_CALLOUT,
+            "TapMinorDia": TAP_CALLOUT,
+            "ScrewShankDia": SCREW_CALLOUT,
+        },
+        location="above",
+    )
+    set_reference_dimensions(adapter, joint_dimensions, ("PlugDia",))
+    add_property_linked_note(adapter, "Joint View Note", 0.080, 0.105)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.245, 0.220)
+
+    assert_imported_precision(
+        adapter,
+        [*front_dimensions, *end_dimensions, *joint_dimensions],
+        DRAWING_PRECISION_BY_NAME,
+    )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Gooseneck Post Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
     )
 
 

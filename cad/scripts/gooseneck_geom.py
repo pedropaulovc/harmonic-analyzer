@@ -16,6 +16,8 @@ part X. Sliding the post sets spring tension, not the part's dimensions.
 
 from __future__ import annotations
 
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
+
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)
 ARM_Y = 163.3  # arm/screw axis above the part origin
@@ -29,12 +31,25 @@ ARM_END_X = -101.8  # flat arm-end face; exposed screw runs toward negative X
 # the 351 mm spring 6.55 mm off plumb.  Sliding the post sets tension, never
 # this face.
 ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
-SCREW_SHANK_DIA = 3.6  # axial #6-32 spring screw envelope
+SCREW_SHANK_DIA = 3.6  # conservative external envelope used by assembly checks
+SCREW_THREAD_MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]
 SCREW_SHANK_LEN = 8.0  # exposed shank: end face to head underside
 SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The former Ø10 head left only 0.2502 mm nominal radial overlap. Ø12 gives
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
 # clearance against this head and the arm end.
 SCREW_HEAD_T = 2.0  # head thickness (low)
-PLUG_T = 6.0  # end plug capping the bore behind the screw: 6.0 gives the
-# #6-32 tap ~7 full threads (a 2.0 cap would hold ~2.5) (derived)
+# Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
+# radial gap). The drawing does not assume stock-ID accuracy: it match-turns
+# this identified plug to the actual assigned bore for the filler supplier's
+# 0.051-0.127 mm gap BETWEEN FACING SURFACES and holds it concentric. The
+# supplier range is at brazing temperature; the AISI 1010 tube and AISI 1018
+# plug are similar-expansion steels, so their centered cold-fit gap is retained
+# to first order through brazing rather than translated into a diametral band.
+PLUG_DIA = 11.85
+PLUG_T = 6.0
+PLUG_BRAZE_RADIAL_CLEARANCE = 0.075
+SCREW_THREAD_ENGAGEMENT = PLUG_T
+SCREW_TAP_MINOR_DIA = TAP_DRILL_MM["#6-32"]
+SCREW_SLOT_W = 0.80
+SCREW_SLOT_DEPTH = 0.80
