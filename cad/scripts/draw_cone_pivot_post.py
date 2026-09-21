@@ -99,7 +99,8 @@ FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
-SECTION_CENTER = (0.365, 0.242)
+SECTION_CENTER = (0.365, 0.247)
+SECTION_LABEL_SCALE_TEXT = "SCALE"
 SECTION_SCALE = (1, 2)
 
 # The checked-in landscape template's FINISH value cell, measured between its
@@ -506,6 +507,26 @@ def _prepare_cone_section(adapter: Any, view: Any) -> None:
 
 
 
+def _configure_section_caption(drawing_model: Any) -> None:
+    """Make the native section caption print its view-specific scale."""
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    # swDetailingSectionViewLabels_{PerStandard,Scale,CustomScale} =
+    # 242/247/84 and swDetailingViewLabelsScale_SCALEcustom = 3 on R2026x.
+    if not extension.SetUserPreferenceToggle(242, 0, False):
+        raise RuntimeError("failed to release standard section-label defaults")
+    if not extension.SetUserPreferenceInteger(247, 0, 3):
+        raise RuntimeError("failed to select custom section-label scale text")
+    if not extension.SetUserPreferenceString(84, 0, SECTION_LABEL_SCALE_TEXT):
+        raise RuntimeError("failed to write section-label scale text")
+    if (
+        extension.GetUserPreferenceToggle(242, 0)
+        or int(extension.GetUserPreferenceInteger(247, 0)) != 3
+        or str(extension.GetUserPreferenceString(84, 0))
+        != SECTION_LABEL_SCALE_TEXT
+    ):
+        raise RuntimeError("native section-label scale text did not persist")
+
+
 
 def _assert_native_layout(
     adapter: Any,
@@ -691,6 +712,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *JOURNAL_CENTER,
         scale=(1, 1),
     )
+    _configure_section_caption(drawing_model)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     section = create_section_view(
         adapter,
@@ -752,6 +774,11 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(
+        adapter,
+        section_annotations,
+        {"ConeBossLen": (0.274, 0.210)},
+    )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
@@ -765,8 +792,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # On R2026x, SelectByID2 refused the feature-qualified
     # ``JournalPlanReference@cone-pivot-post-2@Section View A-A`` path.  The
-    # section derives from the already-blanked Top view, so no second selector
-    # call is made for that one observed derived-view path.
+    # section is cut-surface-only and the exported section carries no reference
+    # sketch ink, so no second selector call is made for that observed path.
     for view in (front, top, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
