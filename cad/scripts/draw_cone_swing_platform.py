@@ -92,7 +92,7 @@ PROFILE_KEEP = {
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
-    "CornerNER": (0.125, 0.095),
+    "CornerNER": (0.125, 0.130),
     "CornerNWR": (0.025, 0.130),
     "CornerSWR": (0.118, 0.258),
     "CornerSER": (0.030, 0.258),
@@ -390,7 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.315, 0.130)
+    add_property_linked_note(adapter, "Section View Note", 0.225, 0.115)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
