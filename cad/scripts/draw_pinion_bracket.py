@@ -176,10 +176,10 @@ FRONT_KEEP = {
 # both did at 2:1.
 DETAIL_KEEP = {
     "PivotBoreDia": (0.240, 0.155),
-    "CamReliefParkR": (0.165, 0.195),
+    "CamReliefParkR": (0.210, 0.185),
     "CamReliefParkX": (0.080, 0.235),
     "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.145, 0.075),
+    "CamReliefEngagedR": (0.210, 0.090),
     "CamReliefEngagedX": (0.080, 0.220),
     "CamReliefEngagedY": (0.065, 0.125),
 }
@@ -537,7 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.170, 0.110),
+        symbol_xy=(0.220, 0.105),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
