@@ -696,6 +696,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
     offset_dimension_text(
         adapter,
+        top_annotations,
+        {"ConeBossLen": (0.158, 0.220)},
+    )
+    offset_dimension_text(
+        adapter,
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
