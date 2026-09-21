@@ -233,7 +233,9 @@ def _bore_rim_edge(view: Any, *, diameter_mm: float) -> Any:
 
 
 
-def _model_face_evidence(model: Any) -> None:
+def _model_face_evidence(
+    model: Any,
+) -> dict[str, list[tuple[str, tuple[float, ...]]]]:
     """Read the final BREP surfaces behind the four disputed callouts."""
     rows: dict[str, list[tuple[str, tuple[float, ...]]]] = {}
     part = _early_bound(model, "IPartDoc")
@@ -275,6 +277,7 @@ def _model_face_evidence(model: Any) -> None:
         _telemetry.info(
             f"cone pivot post final BREP {feature}: {surfaces!r}"
         )
+    return rows
 
 
 def _hide_witness_sketch(adapter: Any, view: Any, sketch_name: str) -> None:
@@ -313,6 +316,7 @@ def _assert_view_geometry(
     top: Any,
     journal: Any,
     iso: Any,
+    face_evidence: dict[str, list[tuple[str, tuple[float, ...]]]],
 ) -> None:
     """Prove which bore axis each manufacturing view is normal to."""
     incline = math.radians(INCLINE_DEG)
@@ -396,6 +400,70 @@ def _assert_view_geometry(
         f"model Y={CRANK_BORE_HEIGHT:.3f}mm; lower centre={iso_cone!r} is "
         f"ConeShaftBoss/ConeShaftBore at model Y={BORE_HEIGHT:.3f}mm; "
         f"top acute axis angle={acute:.6f} deg"
+    )
+    def plane_centres(feature_name: str) -> list[tuple[float, float, float]]:
+        centres = [
+            (values[3], values[4], values[5])
+            for kind, values in face_evidence[feature_name]
+            if kind == "plane"
+        ]
+        if len(centres) != 2:
+            raise RuntimeError(
+                f"{feature_name} has {len(centres)} BREP face centres, expected two"
+            )
+        return centres
+
+    crank_face_centres = sorted(
+        plane_centres("CrankSprocketBoss"),
+        key=lambda point: point[2],
+    )
+    cone_face_centres = sorted(
+        plane_centres("ConeShaftBoss"),
+        key=lambda point: sum(point[i] * cone_axis[i] for i in range(3)),
+    )
+    iso_face_centres = {
+        "crank_spot_face": model_point_in_view(
+            adapter,
+            iso,
+            crank_face_centres[0],
+            label="isometric crank spot-face centre",
+        ),
+        "crank_far_face": model_point_in_view(
+            adapter,
+            iso,
+            crank_face_centres[1],
+            label="isometric crank far-face centre",
+        ),
+        "cone_minus_face": model_point_in_view(
+            adapter,
+            iso,
+            cone_face_centres[0],
+            label="isometric cone minus-face centre",
+        ),
+        "cone_plus_face": model_point_in_view(
+            adapter,
+            iso,
+            cone_face_centres[1],
+            label="isometric cone plus-face centre",
+        ),
+    }
+    crank_face_y = (
+        iso_face_centres["crank_spot_face"][1],
+        iso_face_centres["crank_far_face"][1],
+    )
+    cone_face_y = (
+        iso_face_centres["cone_minus_face"][1],
+        iso_face_centres["cone_plus_face"][1],
+    )
+    if min(crank_face_y) <= max(cone_face_y):
+        raise RuntimeError(
+            "isometric projected face bands overlap or invert: "
+            f"{iso_face_centres!r}"
+        )
+    _telemetry.info(
+        "cone pivot post isometric projected face centres (sheet metres): "
+        f"{iso_face_centres!r}; both CrankSprocketBoss face centres are above "
+        "both ConeShaftBoss face centres"
     )
 
 def _assert_native_layout(
@@ -557,7 +625,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
         ),
     )
-    _model_face_evidence(adapter.currentModel)
+    face_evidence = _model_face_evidence(adapter.currentModel)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -594,6 +662,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top=top,
         journal=journal,
         iso=iso,
+        face_evidence=face_evidence,
     )
 
     front_annotations = curate_view_dimensions(
