@@ -6,12 +6,13 @@ import pytest
 
 import build_pivot_bracket
 import crank_arm_spec
+import crank_hub_spec
 from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
 
 
 def test_crank_drill_process_is_derived_from_part_owned_specs() -> None:
-    assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
-    assert drill_process(crank_arm_spec.PIN_HOLE_SPEC) == "#14 DRILL"
+    assert blind_cut_dia_mm(crank_hub_spec.SERVICE_PIN_HOLE_SPEC) == 4.623
+    assert drill_process(crank_hub_spec.SERVICE_PIN_HOLE_SPEC) == "#14 DRILL"
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
     assert drill_process(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == "15/64 DRILL"
 

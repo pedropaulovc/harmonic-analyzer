@@ -118,6 +118,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_hub",
+        part="crank_hub",
+        artifact_stem="crank-hub",
+        script_name="draw_crank_hub.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_hub_pin",
+        part="crank_hub_pin",
+        artifact_stem="crank-hub-pin",
+        script_name="draw_crank_hub_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="rocker_arm_support",
         part="rocker_arm_support",
         artifact_stem="rocker-arm-support",

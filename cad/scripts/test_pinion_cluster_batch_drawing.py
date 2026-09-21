@@ -489,7 +489,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
     crank_pairs = {
-        frozenset(("crank-pin-1", "crank-arm-1")),
+        frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
@@ -510,6 +510,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert len(cam_limits) == 1
     assert 0.40 < cam_limits.pop() < 0.45
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
+    hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
+    shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
+    assert 79.0 < crank_allowed[hub_pair] < 80.0
+    assert 60.0 < crank_allowed[shaft_pair] < 61.0
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

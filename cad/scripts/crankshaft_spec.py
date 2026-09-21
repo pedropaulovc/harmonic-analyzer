@@ -5,29 +5,35 @@ from __future__ import annotations
 from _hole_spec import HoleSpec
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from crank_hub_geometry import (
+    CRANK_FACE_SHIFT,
+    FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_MODEL_DIA,
+    SERVICE_PIN_STATION,
+    SHAFT_DIA,
+    SHAFT_DIA_BAND,
+    SHAFT_DOME_HEIGHT,
+    SHAFT_FIDUCIAL_RADIUS,
+)
 
 
-MM_PER_IN = 25.4
+SHAFT_LENGTH = 122.0 + CRANK_FACE_SHIFT
+# The common arm/hub/shaft cylinder face moved 8 mm outboard.  Adding the same
+# shift to all inboard stations preserves every established bearing, T12 and
+# pinion world interface and keeps the far end at its prior world coordinate.
 
-SHAFT_DIA = 0.375 * MM_PER_IN  # 9.525: ch11 legacy ShaftDiameter, uncontradicted
-SHAFT_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-SHAFT_LENGTH = 122.0  # 2026-09 re-derive: ends 6.2 past the 16T pinion's north
-# face (ch12 page002_img02 shows a short capped end right behind the pinion,
-# not the 34 mm bare stub the 150 left poking out the column's back)
-
-# The installed v2 pivot post is turned end-for-end and remains fixed at its
-# ch30-fitted world placement. Its Ø11.438 bore therefore spans world
-# z -142.244894428..-70.210494428.  The crank/chain plane stays photo-anchored
-# at the existing world z=-175 shaft origin, so the integral running journal
-# occupies these local stations.  The 0.05 mm diametral clearance is
-# intentional; the surrounding shaft remains
-# the existing 3/8-in OD for the T12, pinion, and crank-arm fits.
+# The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
+# z -142.244894428..-70.210494428.  Moving the common crank face from -175 to
+# -183 and adding the same 8 mm to local stations leaves that journal, the T12
+# and the pinion in their established world positions.
+# The 0.05-mm journal clearance is intentional; the surrounding shaft remains
+# the existing 3/8-in OD for the T12, pinion and through-hub fits.
 JOURNAL_BORE_DIA = 11.438
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
-JOURNAL_START = 32.755105572
-JOURNAL_END = 104.789505572
+JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
+JOURNAL_END = 104.789505572 + CRANK_FACE_SHIFT
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -40,14 +46,14 @@ SURFACE_FINISHES = (
         production_method="BEARING JOURNAL",
     ),
 )
-# Tapered-pin cross-hole: a native number drill radially through the crank seat
-# (axis along Z).
+# MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
-PIN_HOLE_HEIGHT = 4.0  # arm mid-plane above the outboard end
+PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
+    "ShaftDomeProfile": {"DomeHeight"},
     "JournalStartPlane": {"JournalStart"},
     "JournalProfile": {"JournalDiaDim"},
     "Journal": {"JournalLength"},
@@ -60,17 +66,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
 DRAWING_NOTES = "\n".join(
     (
+        "PUNCH FIDUCIAL MARK WHERE SHOWN.",
         "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "MATCH-REAM WITH CRANK ARM MHA-020 TO FIT CUSTOM TAPER PIN",
+        "MATCH-REAM WITH CRANK HUB MHA-137 TO FIT CUSTOM TAPER PIN",
         "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
         f"DIA {JOURNAL_DIA:.3f} BEARING JOURNAL RUNS IN DIA",
         f"{JOURNAL_BORE_DIA:.3f} POST BORE: "
         f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        "KEEP DIA 9.525 ON T12, PINION, AND CRANK-ARM SEATS.",
+        "KEEP DIA 9.525 ON T12, PINION, AND CRANK-HUB SEATS.",
     )
 )
 END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
-CRANK_END_NOTE = "CRANK / OUTBOARD END = LOWER END OF LENGTH VIEW"
+CRANK_END_NOTE = (
+    "OUTBOARD CYLINDER ENDS FLUSH WITH MHA-020/MHA-137; "
+    "ONLY INTEGRAL DOME PROJECTS"
+)
 
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.

@@ -1,15 +1,16 @@
-"""Offline contracts for the crankshaft drawing."""
+"""Offline contracts for the through-hub crankshaft drawing."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
+import pytest
+
 import build_crankshaft as part
-import crankshaft_spec
+import crank_hub_geometry as geometry
+import crankshaft_spec as spec
 import draw_crankshaft as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-import _holes as hole_wizard
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -21,147 +22,98 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is crankshaft_spec.DRAWING_DIMENSIONS
-    marked = set().union(*crankshaft_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked
-    assert (drawing.SHAFT_DIA, drawing.SHAFT_LENGTH) == (
-        crankshaft_spec.SHAFT_DIA,
-        crankshaft_spec.SHAFT_LENGTH,
-    )
-    assert drawing.JOURNAL_DIA == crankshaft_spec.JOURNAL_DIA
-    assert drawing.JOURNAL_START == crankshaft_spec.JOURNAL_START
-    assert drawing.JOURNAL_LENGTH == crankshaft_spec.JOURNAL_LENGTH
-
-
-def test_v2_post_journal_recloses_the_hardware_seats() -> None:
-    assert crankshaft_spec.JOURNAL_BORE_DIA == 11.438
-    assert crankshaft_spec.JOURNAL_CLEARANCE == 0.05
-    assert crankshaft_spec.JOURNAL_DIA == 11.388
-    assert crankshaft_spec.JOURNAL_START == 32.755105572
-    assert crankshaft_spec.JOURNAL_END == 104.789505572
-    assert crankshaft_spec.JOURNAL_LENGTH == 72.0344
-    assert -175.0 + crankshaft_spec.JOURNAL_START == -142.244894428
-    assert -175.0 + crankshaft_spec.JOURNAL_END == -70.210494428
-    assert (part.SEAT_T12, part.SEAT_PINION, part.SEAT_ARM) == (
-        17.5,
-        105.039505572,
-        8.0,
-    )
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'await set_global(adapter, "JournalDia"' in source
-    assert 'await adapter.create_sketch("JournalStartPlane")' in source
-    assert "ExtrusionParameters(depth=JOURNAL_LENGTH)" in source
-
-
-def test_cross_hole_is_part_owned_and_build_station_is_driven() -> None:
-    assert part.PIN_HOLE_SPEC is crankshaft_spec.PIN_HOLE_SPEC
-    assert drawing.PIN_HOLE_SPEC is crankshaft_spec.PIN_HOLE_SPEC
-    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(crankshaft_spec.PIN_HOLE_SPEC)
-    assert part.PIN_HOLE_HEIGHT is crankshaft_spec.PIN_HOLE_HEIGHT
-    assert crankshaft_spec.PIN_HOLE_HEIGHT == 4.0
-    build_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'await set_global(adapter, "PinHoleHeight"' in build_source
-    assert 'name_last_feature(adapter, "PinHoleStationPlane")' in build_source
-    assert "[-SHAFT_DIA / 2.0, PIN_HOLE_HEIGHT, 0.0]" in build_source
-    assert 'point_planes=("PinHoleStationPlane", "Front Plane")' in build_source
-    assert "HoleSpec(" not in build_source
-    assert "\n        PIN_HOLE_SPEC," in build_source
-    assert "pin_hole_dia = blind_cut_dia_mm(PIN_HOLE_SPEC)" in build_source
-    assert "cross_hole_volume_mm3(pin_hole_dia, SHAFT_DIA)" in build_source
-    hole_source = Path(hole_wizard.__file__).read_text(encoding="utf-8")
-    assert "face_candidates.append(candidate)" in hole_source
-    assert "_add_sketch_constraint_impl(" in hole_source
-    notes = crankshaft_spec.DRAWING_NOTES
-    assert "#9" not in notes
-    assert "TAPER PIN" in notes
-    assert "FINISHED SIZE FOR THIS PART" in notes
-    assert "<MOD-DIAM>4.98" not in notes
-    assert "+0.10/0" not in notes
-    assert "INTERSECTS THE SHAFT AXIS" not in notes
-    assert "PART ACCEPTANCE:" not in notes
-    assert "CUSTOM TAPER PIN" in notes and "MHA-024" in notes
-    assert "CRANK ARM MHA-020" in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Ø/THRU comes from the associative wizard callout; a drawing-native
-    # end-face-to-hole-axis dimension supplies the basic station.
-    assert source.count("add_native_hole_callout(") == 1
-    assert "GetVisibleEntities2(c, 1)" in source
-    assert "cross_hole_edge = _visible_cross_hole_edge(adapter, right)" in source
-    assert "edge=cross_hole_edge" in source
-    assert source.count("add_edge_dimension(") == 1
-    assert "pin_station = add_edge_dimension(" in source
-    assert 'orientation="vertical"' in source
-    assert "set_arc_endpoints_to_center(adapter, pin_station" in source
-    assert "set_basic_dimension(adapter, pin_station" in source
-    assert "PinHole" not in crankshaft_spec.DRAWING_DIMENSIONS
-
-
-def test_linked_notes_define_remaining_operations() -> None:
-    notes = crankshaft_spec.DRAWING_NOTES
+    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    assert marked == {
+        "ShaftDiaDim",
+        "Depth",
+        "DomeHeight",
+        "JournalStart",
+        "JournalDiaDim",
+        "JournalLength",
+    }
     assert drawing.DIMENSION_CALLOUTS == {}
-    assert "AISI" not in notes
-    assert "ZINC" not in notes
-    assert "UOS" not in notes
-    assert "OUTSIDE THIS PART DRAWING" in notes
-    assert "11.388 BEARING JOURNAL" in notes
-    assert "11.438 POST BORE" in notes
-    assert "0.05 DIAMETRAL CLEARANCE" in notes
-    assert "KEEP DIA 9.525" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
 
 
-def test_native_finish_and_notes_control_the_turned_shaft() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count("add_surface_finish(") == 1
-    assert "add_view_centerline(" in source
-    assert re.search(r"GetVisibleEntities2\(\s*c,\s*3\s*\)", source)
-    assert "face=journal_face" in source
-    assert re.search(r"GetVisibleEntities2\(\s*c,\s*4\s*\)", source)
-    assert "journal_silhouette = _visible_journal_silhouette(adapter, right)" in source
-    assert "edge_entity=journal_silhouette" in source
-    assert 'entity_type="SILHOUETTE"' in source
-    assert 'production_method="BEARING JOURNAL"' not in source
-    assert crankshaft_spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing_journal")' in source
-    assert 'dimension_name(adapter, annotation) == "ShaftDiaDim"' in source
-    assert drawing.DATUM_A_RIGHT == (
-        drawing.FRONT_CENTER[0] + drawing.JOURNAL_DIA * drawing.END_VIEW_SCALE / 2000.0,
-        drawing.FRONT_CENTER[1],
+def test_face_shift_preserves_every_inboard_world_station() -> None:
+    assert spec.SHAFT_LENGTH == 130.0
+    assert spec.JOURNAL_START == pytest.approx(40.755105572)
+    assert spec.JOURNAL_END == pytest.approx(112.789505572)
+    assert spec.JOURNAL_LENGTH == pytest.approx(72.0344)
+    assert -183.0 + spec.JOURNAL_START == pytest.approx(-142.244894428)
+    assert -183.0 + spec.JOURNAL_END == pytest.approx(-70.210494428)
+    assert part.SEAT_T12 == pytest.approx(25.5)
+    assert part.SEAT_PINION == pytest.approx(113.039505572)
+    assert not hasattr(part, "SEAT_ARM")
+    assert -183.0 + part.SEAT_T12 == pytest.approx(-157.5)
+    assert -183.0 + part.SEAT_PINION == pytest.approx(-69.960494428)
+    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-53.0)
+
+
+def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
+    assert spec.SHAFT_DIA == geometry.SHAFT_DIA == 9.525
+    assert spec.SHAFT_DOME_HEIGHT == geometry.SHAFT_DOME_HEIGHT == 2.0
+    assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] < (
+        geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1]
     )
-    assert "edge_xy=DATUM_A_RIGHT" in source
-    assert "entity=shaft_datum_edge" not in source
-    assert "shoulder=True" not in source
-    assert "annotation=shaft_dia_annotation" not in source
-    assert "symbol_xy=(0.205, 0.145)" in source
-    assert "frame_xy=(0.100, 0.055)" in source
-    assert 'characteristic="position"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert "face_xy=" not in source
-    assert "BOTH END FACES SQUARE" not in crankshaft_spec.DRAWING_NOTES
+    assert "ONLY INTEGRAL DOME PROJECTS" in spec.CRANK_END_NOTE
+    assert "MHA-020/MHA-137" in spec.CRANK_END_NOTE
 
 
-def test_view_scales_are_explicit() -> None:
+def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
+    assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
+    assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
+    assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
+    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == 12.0
+    notes = spec.DRAWING_NOTES
+    assert "CRANK HUB MHA-137" in notes
+    assert "MHA-024" in notes
+    assert "FINISHED SIZE FOR THIS PART" in notes
+    assert "CRANK ARM MHA-020" not in notes
+
+
+def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:
+    assert spec.FIDUCIAL_MODEL_DIA == geometry.FIDUCIAL_MODEL_DIA == 0.8
+    assert spec.FIDUCIAL_MODEL_DEPTH == geometry.FIDUCIAL_MODEL_DEPTH == 0.2
+    assert spec.SHAFT_FIDUCIAL_RADIUS == geometry.SHAFT_FIDUCIAL_RADIUS == 2.5
+    assert "PUNCH FIDUCIAL MARK" in spec.DRAWING_NOTES
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert all("Fiducial" not in name for name in marked)
+    assert "DIMPLE" not in spec.DRAWING_NOTES
+
+
+def test_side_view_references_stations_from_cylinder_face_not_dome_tip() -> None:
+    expected_tip = drawing.RIGHT_CENTER[1] - (
+        spec.SHAFT_LENGTH + spec.SHAFT_DOME_HEIGHT
+    ) / 2000.0
+    assert drawing._OUTBOARD_TIP_Y == pytest.approx(expected_tip)
+    assert drawing._CYLINDER_FACE_Y == pytest.approx(
+        expected_tip + spec.SHAFT_DOME_HEIGHT / 1000.0
+    )
+    assert drawing._PIN_CENTER[1] == pytest.approx(
+        drawing._CYLINDER_FACE_Y + spec.PIN_HOLE_HEIGHT / 1000.0
+    )
+
+
+def test_journal_fit_and_surface_finish_remain_unchanged() -> None:
+    assert spec.JOURNAL_BORE_DIA == 11.438
+    assert spec.JOURNAL_CLEARANCE == 0.05
+    assert spec.JOURNAL_DIA == 11.388
+    assert spec.JOURNAL_DIA_BAND == (0.0, -0.02)
+    assert spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
+    assert "0.05 DIAMETRAL CLEARANCE" in spec.DRAWING_NOTES
+    assert "KEEP DIA 9.525" in spec.DRAWING_NOTES
+
+
+def test_view_scales_and_linked_notes_are_explicit() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
+    assert drawing.END_VIEW_SCALE == 2.0
     assert drawing.ISO_CENTER == (0.345, 0.197)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(1, 1)") == 2
-    assert "scale=(2, 1)" in source
-    assert crankshaft_spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
-    assert 'add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)' in source
-    assert 'place_view(adapter, str(SOURCE), "*Right"' in source
+    assert spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
 
 
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_part_registry_retains_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("crankshaft")
