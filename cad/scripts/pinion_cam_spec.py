@@ -42,7 +42,13 @@ BORE_BAND = (
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
-SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
+# "BORE" names the target: the symbol's leader lands on the bore rim 6 mm
+# inside the OD circle, and a blind reviewer read it as the OD (codex iter3).
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "bore", MACHINED_UM, CylinderFace(BORE), production_method="BORE"
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
@@ -95,7 +101,7 @@ DRAWING_NOTES = "\n".join(
     (
         "BORE AND OD ARE NOT CONCENTRIC; THE ECCENTRICITY IS THE SAME",
         "  AND IN THE SAME DIRECTION AT BOTH ENDS.",
-        "DRILL/TAP M2.5 X 0.45-6H THROUGH THE BOSS INTO THE BORE.",
+        "DRILL/TAP M2.5 X 0.45-6H THRU THE COLLAR WALL INTO THE BORE.",
         "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
     )
 )

@@ -12,7 +12,9 @@ ECC = 1.4  # v2 linkage closure: bore offset -> 2.8 full lift
 BORE = 6.37  # nominal reamed running fit on the Ø6.35 lift rod
 BOSS_DIA = 3.2  # set-pin dome, proud of the OD on the heavy (thick) side
 BOSS_PROUD = 0.5  # boss height proud of the OD
-BOSS_Z = 1.7  # boss axis station from the front face
+BOSS_Z = 3.0  # boss axis station from the front face: 1.75 nominal wall to the
+# M2.5 major (no breakout at the .X general grade); bounded above by the
+# assembly's follower-pin band (3.142) and spring-foot band (3.15)
 TAP_DRILL_DIA = 2.05  # M2.5 x 0.45 coarse-thread tap drill
 
 THIN_SIDE_WALL = CAM_OD / 2.0 - BORE / 2.0 - ECC

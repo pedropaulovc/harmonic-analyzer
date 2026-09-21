@@ -86,11 +86,16 @@ NOTCH_DETAIL_DIMENSIONS = {
     "NotchDepth": (0.025, 0.155),
 }
 
+# The bore-fit note sits LEFT of the notch's vertical, so its leader leaves
+# the bore diagonally instead of riding the notch-phase extension lines, and
+# the phase text starts clear of those lines with the cam diameter dropped
+# below it (codex iter3: extension lines through the text, arc against the
+# note's underline).
 FRONT_KEEP = {
-    "BoreDia": (0.065, 0.360),
-    "CamDia": (0.175, 0.325),
+    "BoreDia": (0.056, 0.336),
+    "CamDia": (0.175, 0.312),
     "CamCy": (0.175, 0.279),
-    "NotchPhase": (0.140, 0.338),
+    "NotchPhase": (0.152, 0.334),
 }
 RIGHT_KEEP = {
     "FaceWidth": (0.205, 0.220),
