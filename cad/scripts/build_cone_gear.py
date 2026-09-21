@@ -1,9 +1,8 @@
 r"""Reproduction script: cone gear (book ch. 12, pp. 16-21) -- parametric prototype.
 
-One part, configuration-driven tooth count (plan M4: prototype 3 configs
-before committing to the full 6..120-step-6 set of 20). All config-varying
-geometry is equation-driven so a configuration switch regenerates the gear
-from ``ToothCount``/``DP``/``PA`` alone:
+One part, configuration-driven tooth count across the full T006..T120-by-six
+family. All configuration-varying geometry is equation-driven so a switch
+regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
 
 * Equation-manager globals carry the involute math (base/tip radii in
   INCHES, involute parameter span, tooth-gap angles). Two parser facts
@@ -37,25 +36,23 @@ involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 
 Prototype scope notes:
 
-* **Configured bore, no keyway** (Appendix C #7 resolution): at DP 30 the
-  small gears cannot clear the 9.5 mm shaft (6T OD is 6.77 mm), so the
-  shaft steps down at the tip (`build_cone_gear_shaft.py`) and the bore
-  diameter is a configured global ``BoreDia``: 3/8" for T024..T120, then
-  1/4" (T018), 3/16" (T012), 1/8" (T006) -- the 6T wall comes out 0.8 mm,
-  matching the visibly thin tip rod in the p.18 photos. The bore circle is
-  origin-centred with a DRIVING diameter dimension equation-linked to
-  ``BoreDia`` (an origin-snapped circle + driving dim is fully defined and
-  config-drivable -- probed live; the fix+driven-dim recipe is not). No
-  keyway: the book never shows the attachment, and the p.21 macro shows
-  solder at the small gears -- key hardware stays out of scope.
-* Root geometry is simplified: the gap floor is the chord at the base
-  circle, not the true root circle + trochoid fillet (for N >= 96 the base
-  circle is slightly inside root, for small N teeth come out stub-form --
-  the 6T gear is severely undercut at standard proportions anyway).
+* **Configured bore, no keyway** (Appendix C #7 resolution): the shaft steps
+  down toward the tip and each bore matches its seat: 3/8" for T024..T120,
+  1/4" for T018, 1/8" for T012, and the approved 1/16" journal at T006.
+  The bore circle is origin-centred with a DRIVING diameter dimension linked
+  to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
+  smallest gears; no evidence supports a key, pin, set screw, or hub.
+* Circular tooth thickness is a native DRIVING dimension in a construction
+  authoring sketch.  Its asymmetric band is derived from the configured
+  ``gear_mesh`` backlash; it is not a drawing/model reference-status dimension.
+* Root geometry is simplified: the gap floor is the chord at the base circle,
+  not the true root circle + trochoid fillet (for N >= 96 the base circle is
+  slightly inside root; the 6T gear is severely undercut at standard
+  proportions anyway).
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 30 / PA 14.5 deg (module
-resolved M4 prep), face width 6.5 mm (M6.7 mesh packing; annotated 7 is
-inconsistent with the drum grid, see FACE_WIDTH comment), tooth counts 6k.
+Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, face
+width 6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum
+grid), tooth counts 6k.
 
 Layout: gear axis = Z through the origin, blank extruded +Z from the Front
 plane (z = 0..7 mm).
@@ -73,33 +70,45 @@ from typing import Any
 
 import _config
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
+import cone_gear_shaft_spec
+from cone_gear_notes import DRAWING_NOTES, gear_data, tooth_thickness_band
 from cone_gear_spec import (
+    CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
-    GEAR_DATA,
+    DRAWING_PRECISION,
     SURFACE_FINISHES,
+    TOOTH_THICKNESS,
+    bore_dia_mm,
+    material_specification,
 )
 from _common import (
     OUT_PNG,
     SketchDims,
     _early_bound,
     _read_member,
+    anchor_point_to_origin,
     apply_custom_properties,
     apply_material,
     check,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
     save_part_and_images,
+    set_sketch_direct_db,
     volume_check,
 )
 # NOTE: this module keeps its OWN validating ``set_global`` (below) -- it
@@ -140,45 +149,35 @@ R_CLEAR_IN = 60.0 / 25.4
 PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
-# The 3-config prototype pass (6/60/120) validated regeneration first, per
-# plan risk #2; the same script now carries all 20 configurations.
-CONFIGS = [(f"T{n:03d}", n) for n in range(6, 121, 6)]
-DEFAULT_TEETH = 120  # globals' all-configuration value at authoring time
+CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
+DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+
+# Model-owned bands, derived live from their named fit inputs.  Bands use the
+# repository's native ``(upper, lower)`` order.
+_BORE_CLEARANCE_MIN, _BORE_CLEARANCE_MAX = (
+    float(value)
+    for value in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
+)
+_LAND_UPPER, _LAND_LOWER = cone_gear_shaft_spec.SECTION_DIA_BAND
+BORE_DIA_BAND = (
+    _LAND_LOWER + _BORE_CLEARANCE_MAX,
+    _LAND_UPPER + _BORE_CLEARANCE_MIN,
+)
+BACKLASH_MM = tuple(float(value) for value in _config.fit("gear_mesh", "backlash_mm"))
+TOOTH_THICKNESS_BAND = tooth_thickness_band(BACKLASH_MM)
 
 
 def bore_dia_in(teeth: int) -> float:
-    """Configured bore diameter (inches) -- snug on the stepped shaft.
+    """Configured bore diameter in inches, matching the stepped-shaft seat."""
+    return bore_dia_mm(teeth) / 25.4
 
-    All 20 gears seat PERPENDICULAR to the shaft (true cone, p.18 --
-    M6.7; the M6.6 canted-vertical experiment is retired: it met the
-    interference checker but visibly deformed the cone). At the finer
-    module DP 49.82 (ch13 OD 62.2) the tip gears are tiny -- T006 OD is
-    only 4.08 mm -- so the shaft steps down much further
-    (`build_cone_gear_shaft.py`) and each bore matches its
-    section AND stays inside the gear's root circle:
-      3/8" T024..T120, 1/4" T018, 1/8" T012, 1/16" T006.
-    The four tip gears (T006..T024, more yellow + harder in the book, p.21)
-    are a harder high-zinc yellow metal (Muntz/manganese bronze) cut from
-    drawn rod and SOLDERED to the shaft (p.21 macro shows solder blobs) --
-    no keyway.
 
-    T006's bore is 1/16", not the 1/32" a literal "bore = shaft section"
-    first produced.  The wall figures below quote the STANDARD full-depth
-    root (2.157/DP under the OD), but these teeth are through-cut from this
-    module's own DXF profile, whose gap floor is the chord across the base
-    circle -- at 6 teeth the involute cannot reach below it.  T006's
-    as-cut minimum-material radius is therefore 1.3365 mm (not 0.939) and
-    its as-cut tooth depth 0.703 mm, so a 1/16" bore leaves a 0.543 mm rim,
-    0.77x that depth, on a soldered keyless gear carrying almost no torque.
-    That buys the shaft's terminal journal L/D 13 instead of 26.
-    """
-    if teeth <= 6:
-        return 0.0625  # 1.59 mm -- T006 as-cut root r 1.3365 mm, 0.54 mm wall
-    if teeth <= 12:
-        return 0.125  # 3.18 mm -- T012 root r 2.42 mm, 0.83 mm wall
-    if teeth <= 18:
-        return 0.25  # 6.35 mm -- T018 root r 3.95 mm, 0.78 mm wall
-    return 0.375  # 9.53 mm -- T024 root r 5.48 mm, 0.71 mm wall
+def _as_construction(adapter, entity_id: str) -> None:
+    """Make a registered sketch line construction-only and prove the flag."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
@@ -330,6 +329,37 @@ def read_dimension(adapter: Any, full_name: str) -> float:
     return float(_read_member(param, "Value"))
 
 
+def _apply_configuration_properties(
+    adapter: Any, configuration: str, properties: dict[str, str]
+) -> None:
+    """Write and verify configuration-specific title/data-block properties."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    extension = _read_member(model, "Extension")
+    manager = adapter._attempt(
+        lambda: extension.CustomPropertyManager(configuration), default=None
+    )
+    if manager is None:
+        raise RuntimeError(
+            f"CustomPropertyManager unavailable for configuration {configuration}"
+        )
+    manager = _early_bound(manager, "ICustomPropertyManager")
+    for name, value in properties.items():
+        text = str(value)
+        adapter._attempt(
+            lambda n=name, v=text: manager.Add3(n, 30, v, 2), default=None
+        )
+        observed = str(
+            adapter._attempt(
+                lambda n=name: model.GetCustomInfoValue(configuration, n), default=""
+            )
+        )
+        if observed != text:
+            raise RuntimeError(
+                f"{configuration} property {name!r} readback "
+                f"{observed!r} != {text!r}"
+            )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -371,6 +401,12 @@ async def build(adapter) -> dict[str, str]:
 
     await set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
     await set_global(adapter, "DP", f"{DP:g}", DP)
+    await set_global(
+        adapter,
+        "ToothThickness",
+        f'{PI_LIT} / (2 * "DP")',
+        TOOTH_THICKNESS / 25.4,
+    )
     await set_global(adapter, "PA", f"{PA_DEG:g}", PA_DEG)
     await set_global(adapter, "PArad", f'"PA" * {PI_LIT} / 180', facts["PArad"])
     await set_global(
@@ -442,6 +478,12 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
     )
     name_last_feature(adapter, "Blank")
+    # The face width is a size the turner sets, so it prints as a NATIVE model
+    # dimension (drawing-simplicity-policy.md rules 1-2): name the extrude
+    # depth so it can be marked and given its decimal places like the two
+    # circle dims. It stays a literal (no drive job): FACE_WIDTH is one value
+    # across all 20 configurations.
+    name_dimensions(adapter, "Blank", ["FaceWidth"])
 
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
@@ -674,15 +716,57 @@ async def build(adapter) -> dict[str, str]:
     )
     await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
 
-    # Apply the deferred ORDINARY-circle drive equations now -- after the whole
-    # base model + a rebuild exists, so every target (BlankDia@BlankProfile,
-    # BoreCutDia@BoreProfile) resolves. These REPLACE the old inline
-    # create_equation links and MUST land before the configuration experiment
-    # below, which asserts that the blank OD and volume track ToothCount/BoreDia
-    # per config (it cannot if the equations don't yet exist). Each equation
-    # evaluates to the value just built, so the geometry must not move -- the
-    # re-check is the proof. The tooth-gap profile is absent from drive_jobs by
-    # design (it stays free to mesh).
+    # Native tooth-system acceptance size.  The involute is generated from the
+    # gear equations and exposes no stable feature dimension for circular tooth
+    # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
+    # print one DRIVING model dimension.  Construction geometry is not drawn,
+    # but its dimension imports; a blanked sketch would suppress the dimension.
+    tooth_reference = SketchDims()
+    check(
+        "create_sketch tooth-thickness reference",
+        await adapter.create_sketch("Front"),
+    )
+    set_sketch_direct_db(adapter, True)
+    tooth_line = check(
+        "tooth-thickness reference line",
+        await adapter.add_line(0.0, 0.0, TOOTH_THICKNESS, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, tooth_line)
+    check(
+        "tooth-thickness reference horizontal",
+        await adapter.add_sketch_constraint(tooth_line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
+        f"{tooth_line}.end",
+        "horizontal_distance",
+        TOOTH_THICKNESS,
+        "circular tooth thickness",
+    )
+    tooth_reference.record("ToothThickness", '"ToothThickness"')
+    await anchor_point_to_origin(
+        adapter,
+        f"{tooth_line}.start",
+        0.0,
+        0.0,
+        "tooth-thickness reference",
+    )
+    await ensure_fully_defined(adapter, "tooth-thickness reference sketch")
+    check(
+        "exit_sketch tooth-thickness reference",
+        await adapter.exit_sketch(),
+    )
+    tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
+    drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
+
+    # Apply every deferred drive equation after all targets exist: blank and
+    # bore circle dimensions plus the construction sketch's native circular
+    # tooth thickness.  The configuration sweep below proves the two
+    # configuration-dependent solids still regenerate; the construction
+    # dimension is volume-neutral.  The involute gap profile remains absent
+    # from drive_jobs by design because its flanks must solve from the globals.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
@@ -845,17 +929,39 @@ async def build(adapter) -> dict[str, str]:
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 
-    # Mark the bore as the single manufacturing model dimension (on the drawn
-    # T120 config) and stamp the title-block + gear-data properties the curated
-    # drawing reads.
+    # Mark the four manufacturing model dimensions.  Both fitted sizes carry
+    # bands derived above; their decimal places live on the model and each
+    # configuration sheet only imports and arranges them.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ToothThicknessReference",
+        "ToothThickness",
+        *deviations(TOOTH_THICKNESS_BAND),
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {
+            "Gear Data": gear_data(DEFAULT_TEETH, BACKLASH_MM),
+            "Manufacturing Notes": DRAWING_NOTES,
+        },
     )
+    for configuration, teeth in CONFIGS:
+        _apply_configuration_properties(
+            adapter,
+            configuration,
+            {
+                "Gear Data": gear_data(teeth, BACKLASH_MM),
+                "Material Specification": material_specification(teeth),
+            },
+        )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
 
     if findings:
