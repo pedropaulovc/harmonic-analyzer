@@ -48,9 +48,7 @@ SURFACE_FINISHES = (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDia"},
     "Head": {"HeadLen"},
-    "NeckProfile": {"NeckDia"},
     "Neck": {"NeckLen"},
     "ShaftProfile": {"ShaftDia"},
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
@@ -62,9 +60,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "HeadProfile": {"HeadDia": 1},
     "Head": {"HeadLen": 1},
-    "NeckProfile": {"NeckDia": 1},
     "Neck": {"NeckLen": 1},
     "ShaftProfile": {"ShaftDia": 2},
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},

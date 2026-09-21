@@ -11,6 +11,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
@@ -35,6 +36,10 @@ from pinion_arbor_spec import (
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
     HEAD_CENTER_Z,
+    HEAD_DIA,
+    HEAD_REAR_Z,
+    NECK_DIA,
+    NECK_END_Z,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -61,8 +66,6 @@ DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 15.0
 DONOR_KEEP = {
-    "HeadDia": (0.030, 0.225),
-    "NeckDia": (0.045, 0.185),
     "ShaftDia": (0.030, 0.145),
 }
 PRINCIPAL_KEEP = {
@@ -198,6 +201,54 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
+def _detail_diameter(
+    adapter: Any,
+    detail: Any,
+    *,
+    station_z_mm: float,
+    diameter_mm: float,
+    text_xy: tuple[float, float],
+    label: str,
+) -> Any:
+    """Create and verify one native diametric size across detail silhouettes."""
+    picks = [
+        model_point_in_view(
+            adapter,
+            detail,
+            (sign * diameter_mm / 2000.0, 0.0, station_z_mm / 1000.0),
+            label=f"{label} silhouette {sign:+g}",
+        )
+        for sign in (-1.0, 1.0)
+    ]
+    display = add_edge_dimension(
+        adapter,
+        detail,
+        p0=picks[0],
+        p1=picks[1],
+        text_xy=text_xy,
+        label=label,
+        orientation="vertical",
+        entity_type="SILHOUETTE",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - diameter_mm) > 1e-5:
+        raise RuntimeError(
+            f"{label}: measured {measured_mm:g} mm, expected {diameter_mm:g} mm"
+        )
+    display.SetText(1, "<MOD-DIAM>")
+    if str(display.GetText(1) or "") != "<MOD-DIAM>":
+        raise RuntimeError(f"{label}: diameter prefix did not persist")
+    display.SetPrecision3(1, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != 1:
+        raise RuntimeError(f"{label}: one-place precision did not persist")
+    annotation = display.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: dimension has no drawing annotation")
+    return _early_bound(annotation, "IAnnotation")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -265,24 +316,44 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_annotations = curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
     )
-    moved_diameters = []
-    for annotation in donor_annotations:
-        name = dimension_name(adapter, annotation)
-        moved_diameters.append(
-            _move_dimension(
-                adapter,
-                annotation,
-                principal if name == "ShaftDia" else detail,
-                DIAMETER_POSITIONS[name],
-                source_view=donor,
-            )
+    moved_diameters = [
+        _move_dimension(
+            adapter,
+            annotation,
+            principal,
+            DIAMETER_POSITIONS["ShaftDia"],
+            source_view=donor,
         )
+        for annotation in donor_annotations
+    ]
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
-
-    annotations = [*moved_diameters, *principal_annotations, *detail_annotations]
+    derived_diameters = [
+        _detail_diameter(
+            adapter,
+            detail,
+            station_z_mm=HEAD_CENTER_Z,
+            diameter_mm=HEAD_DIA,
+            text_xy=DIAMETER_POSITIONS["HeadDia"],
+            label="detail head diameter",
+        ),
+        _detail_diameter(
+            adapter,
+            detail,
+            station_z_mm=(HEAD_REAR_Z + NECK_END_Z) / 2.0,
+            diameter_mm=NECK_DIA,
+            text_xy=DIAMETER_POSITIONS["NeckDia"],
+            label="detail neck diameter",
+        ),
+    ]
+    annotations = [
+        *moved_diameters,
+        *derived_diameters,
+        *principal_annotations,
+        *detail_annotations,
+    ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
