@@ -103,7 +103,6 @@ from cone_swing_platform_spec import (
     POST_MOUNT_SPEC,
     POST_MOUNT_TAP_DIA,
     PROFILE_VIEW_NOTE,
-    SECTION_VIEW_NOTE,
     SURFACE_FINISHES,
 )
 
@@ -908,7 +907,6 @@ async def build(adapter) -> dict[str, str]:
             "Feature View Note": FEATURE_VIEW_NOTE,
             "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-            "Section View Note": SECTION_VIEW_NOTE,
         },
     )
     blank_reference_geometry(

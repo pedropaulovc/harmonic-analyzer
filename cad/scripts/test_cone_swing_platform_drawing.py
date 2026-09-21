@@ -131,7 +131,6 @@ def test_sheet_has_no_gdt_or_dimension_bearing_notes() -> None:
 def test_pivot_section_exposes_thickness_and_relief_depth() -> None:
     assert set(drawing.SECTION_KEEP) == {"PlateThk", "PivotBearingReliefDepth"}
     assert len({drawing.PROFILE_CENTER, drawing.FEATURE_CENTER, drawing.NOTCH_CENTER}) == 3
-    assert spec.SECTION_VIEW_NOTE == "SCALE 2:1"
     assert spec.PROFILE_VIEW_NOTE == "PLATE PROFILE — SCALE 1:2"
     assert spec.FEATURE_VIEW_NOTE == "HOLE LOCATIONS — SCALE 1:2"
     assert spec.NOTCH_VIEW_NOTE == "LOCK NOTCH — SCALE 1:2"
