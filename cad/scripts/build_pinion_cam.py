@@ -16,7 +16,7 @@ stated 0.575-mm wall over the Ø6.37 bore; the former Ø9.2 literal left only
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
 PARK pose -- collar centre at (0, -ECC), heavy side and the set-pin
 boss straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; boss along -Y at z 2.5, 2.0 proud of the OD.
+Collar z 0..9; boss along -Y at z 3.0, nominally 0.5 proud of the OD.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -220,8 +220,8 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
     # Set-pin boss (item 8b): a radial stub straight DOWN the heavy side,
-    # 2.0 proud of the OD -- the img01 dome. Top sketch (u, v) -> (X, -Z);
-    # extruded -Y from an anchor plane fully inside the collar.
+    # nominally 0.5 proud of the OD -- the img01 dome. Top sketch (u, v) ->
+    # (X, -Z); extruded -Y from an anchor plane fully inside the collar.
     boss = SketchDims()
     check("create_sketch boss", await adapter.create_sketch("Top"))
     await define_circle(
@@ -242,9 +242,9 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, _BOSS_TOP_Y - boss_root_y, boss_root_y)
     name_last_feature(adapter, "SetPinBossRoot")
 
-    # A second, coaxial extrusion carries only the projection beyond the OD's
-    # lowest tangent plane. Its depth is therefore the actual make-critical
-    # projection, not prose derived from the full embedded boss length.
+    # A second, coaxial extrusion carries the nominal cosmetic projection
+    # beyond the OD's lowest tangent plane.  The drawing prints this model
+    # value as reference rather than inventing a tight projection band.
     projection = SketchDims()
     check("create_sketch boss projection", await adapter.create_sketch("Top"))
     await define_circle(

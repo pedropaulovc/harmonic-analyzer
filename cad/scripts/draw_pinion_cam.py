@@ -25,12 +25,14 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -184,6 +186,25 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*bottom_annotations, *front_annotations, *top_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The boss projection is cosmetic: its 0.5 mm model value communicates
+    # nominal shape, but must not invent a tight band merely to guarantee that
+    # the dome stays proud at every general-grade limit.  Parentheses make the
+    # imported linear dimension explicitly non-controlling while preserving
+    # the model-owned nominal and BOSS_Z=3.0 station.
+    projection_annotations = [
+        annotation
+        for annotation in front_annotations
+        if dimension_name(adapter, annotation) == "BossProjection"
+    ]
+    if len(projection_annotations) != 1:
+        raise RuntimeError(
+            "expected one cosmetic boss projection reference dimension"
+        )
+    set_reference_dimension(
+        adapter,
+        projection_annotations[0],
+        label="cosmetic boss projection reference",
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
