@@ -178,10 +178,11 @@ key; compare these before reusing or resuming a run.
 
 ### Readiness is not proof of a build
 
-`farm-launch started` means the supervisor is up and the child was spawned. It
-says nothing about the farm. Neither does a green `check:math` (a local,
-SolidWorks-free gate that never contacts the fleet) nor a submitter cache hit (a
-restored blob, with no leaf dispatched). A launch is proven remote only by all
+`farm-launch started` means the wrapper initialized its log and startup record.
+It is emitted before the child invocation, so it does not prove that `uv` started
+or that the launcher is still running. Check the supervisor and terminal record
+before handing off. Neither a green `check:math` (a local, SolidWorks-free gate)
+nor a submitter cache hit proves dispatch. A launch is proven remote only by all
 of: a `.done` with `state: "succeeded"` and `exit_code: 0`, an attached workflow
 ID in the log, a completed `farm.run <task>` span naming a real worker, a
 cache-miss followed by a restored artifact, and the artifact plus its
