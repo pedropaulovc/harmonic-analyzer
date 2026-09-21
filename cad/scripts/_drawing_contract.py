@@ -48,8 +48,10 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_cylinder_gear.py",
         "draw_harmonic_base.py",
         "draw_pinion_cam.py",
+        "draw_pinion_arbor.py",
         "draw_pinion_handle.py",
         "draw_top_frame.py",
+        "draw_pinion_handle_pin.py",
         "draw_tube_frame.py",
     }
 )

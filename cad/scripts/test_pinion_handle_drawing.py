@@ -191,6 +191,11 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     hole = package.dimensions["RodHoleDia"]
     assert hole.view.body == "body" and hole.view.orientation == "*Top"
     assert "REAM" in hole.callout and "THRU" in hole.callout
+    retention = package.dimensions["RetentionHoleDia"]
+    assert retention.view is hole.view
+    assert "MHA-102" in retention.callout
+    assert "MHA-136" in retention.callout
+    assert "LIGHT DRIVE FIT" in retention.callout
     bore = package.dimensions["TubeId"]
     assert (
         bore.view is section and "REAM" in bore.callout and "THRU" not in bore.callout
@@ -227,6 +232,7 @@ def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe
     assembled = dimensions["RodSpan"].view
     assert dimensions["HubLen"].view is dimensions["BodyLen"].view is right
     assert dimensions["RodHoleZ"].view is top
+    assert dimensions["RetentionPinFromMouth"].view is top
     assert dimensions["RodDown"].view is assembled
     crown = dimensions["socket end to crown root"]
     assert crown.view is right and crown.reference
@@ -243,16 +249,9 @@ def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe
     assert marked <= dimensions.keys()
     assert "Manufacturing Notes" in rendered_recipe.notes
     assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert not any(character.isdigit() for character in spec.DRAWING_NOTES)
-    for forbidden in (
-        "DATUM",
-        "BASIC",
-        "+/-",
-        "MATERIAL",
-        "TOLERANCE",
-        "FINISH",
-        "TURN ",
-    ):
+    assert "MHA-136" in spec.DRAWING_NOTES
+    assert "FLUSH" in spec.DRAWING_NOTES
+    for forbidden in ("DATUM", "BASIC", "+/-", "MATERIAL", "TOLERANCE", "FINISH"):
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
@@ -267,6 +266,10 @@ def test_socket_takes_the_title_block_grade_and_names_its_mate():
     assert not [name for name in vars(spec) if name.endswith("_BAND")]
     socket = drawing.DIMENSION_CALLOUTS["TubeId"]
     assert "REAM" in socket and "MHA-102" in socket
+    retention = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
+    assert "MATCH-DRILL" in retention
+    assert "MHA-102" in retention and "MHA-136" in retention
+    assert "LIGHT DRIVE FIT" in retention
 
 
 def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
@@ -291,6 +294,23 @@ def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
     assert "set_dimension_precision" not in source
     assert "assert_imported_precision(" in source
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_upper_handle_retention_is_distinct_and_coaxial_with_the_arbor():
+    assert spec.RETENTION_PIN_DIA == pytest.approx(2.0)
+    assert spec.RETENTION_PIN_LEN == pytest.approx(spec.TUBE_OD)
+    assert spec.RETENTION_PIN_STATION_FROM_FLOOR == pytest.approx(
+        spec.TUBE_LEN / 2.0
+    )
+    assert spec.RETENTION_PIN_STATION_FROM_MOUTH == pytest.approx(
+        spec.TUBE_LEN / 2.0
+    )
+    assert spec.RETENTION_PIN_CENTER_Z == pytest.approx(
+        spec.GRIP_LEN / 2.0
+        + spec.WALL_T
+        + spec.RETENTION_PIN_STATION_FROM_FLOOR
+    )
+    assert spec.RETENTION_PIN_DIA < spec.ROD_DIA
 
 
 def test_wrong_native_edge_measurement_blocks_release(monkeypatch):
