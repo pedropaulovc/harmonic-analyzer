@@ -30,15 +30,15 @@ JOINT_DIMENSIONS: dict[str, set[str]] = {
 SLOT_FACE_DIMENSIONS: dict[str, set[str]] = {
     "ScrewSlotProfile": {"SlotWidth"},
 }
-DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    feature: set(names)
-    for partition in (
-        ELEVATION_DIMENSIONS,
-        END_DIMENSIONS,
-        JOINT_DIMENSIONS,
-        SLOT_FACE_DIMENSIONS,
-    )
-}
+DRAWING_DIMENSIONS: dict[str, set[str]] = {}
+for _partition in (
+    ELEVATION_DIMENSIONS,
+    END_DIMENSIONS,
+    JOINT_DIMENSIONS,
+    SLOT_FACE_DIMENSIONS,
+):
+    for _feature, _names in _partition.items():
+        DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
 
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. The calibration-critical 50.80 arm
