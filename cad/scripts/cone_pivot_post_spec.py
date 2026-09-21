@@ -69,12 +69,27 @@ ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
 
-# V2 B-rep ground truth cascaded through Pedro's boss-length correction and
-# the as-cast collar re-read.  The collar step adds a 21.3753..22.0 mm radius
-# annulus over the head's 26.6 mm, less the part of it the crank boss already
-# occupies.
-HARVESTED_VOLUME_MM3 = 114_171.7672
-HARVESTED_MASS_KG = 0.822036724
+# Final solid volume, the sum of the per-feature analytic terms the build
+# checks natively one feature at a time (build_cone_pivot_post.py asserts
+# the sum at import):
+#
+#   body      pi*21.0055^2*86                       = +119 210.4620
+#   collar    pi*(22^2 - 21.0055^2)*26.6            = +  3 574.0470
+#   crank boss outside the collar cylinder          = + 11 215.7157
+#   spot face (collar proud of z=-21.3753 in disc)  = -     93.1451
+#   crank bore pi*5.719^2*72.0344                   = -  7 401.6752
+#   cone pads outside the body cylinder             = +    209.0550
+#   cone bore pi*6.1404^2*42.011                    = -  4 976.2960
+#   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5921
+#                                                   = 114 076.5723
+#
+# The 2026-09-21 farm build of the previous recipe read 121 575.3: it had
+# never bored the crank boss (7 401.7) and had only nicked the 45 mm^3 collar
+# sliver behind the spot-face plane inside the bore disc -- a cut whose
+# default direction (opposite the sketch normal) found the Ø44 collar to bite
+# instead of auto-flipping into the boss.  Mass at gray iron 7.20 g/cc.
+HARVESTED_VOLUME_MM3 = 114_076.5723
+HARVESTED_MASS_KG = 0.821351
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,

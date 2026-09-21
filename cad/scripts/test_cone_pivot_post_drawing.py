@@ -57,8 +57,14 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
     ) == (26.88704, 7.14248, 11.50874, 6.0198)
-    assert spec.HARVESTED_VOLUME_MM3 == 114_171.7672
-    assert spec.HARVESTED_MASS_KG == 0.822036724
+    # The final volume is the per-feature sum the build checks natively; a
+    # constant that drifts from the features (the 2026-09-21 unbored-boss
+    # build) fails at import, so only mass coherence is left to pin here.
+    assert spec.HARVESTED_VOLUME_MM3 == round(part._ANALYTIC_FINAL_MM3, 4)
+    assert round(spec.HARVESTED_VOLUME_MM3 * 7.2e-6, 6) == spec.HARVESTED_MASS_KG
+    assert round(part.CRANK_BORE_MM3, 1) == 7401.7
+    assert round(part.CRANK_SPOT_FACE_MM3, 1) == 93.1
+    assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:

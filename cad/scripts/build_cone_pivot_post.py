@@ -109,6 +109,96 @@ BLOCK_RADIUS = BLOCK_DIA / 2.0
 HEAD_RADIUS = HEAD_DIA / 2.0
 BORE_RADIUS = BORE_DIA / 2.0
 CRANK_BORE_RADIUS = CRANK_BORE_DIA / 2.0
+CRANK_BOSS_RADIUS = CRANK_BOSS_DIA / 2.0
+CONE_BOSS_RADIUS = CONE_BOSS_DIA / 2.0
+
+
+def _simpson(f: Any, a: float, b: float, n: int = 4000) -> float:
+    h = (b - a) / n
+    s = f(a) + f(b) + sum((4.0 if k % 2 else 2.0) * f(a + k * h) for k in range(1, n))
+    return s * h / 3.0
+
+
+def _disc_column_integral(radius: float, column: Any) -> float:
+    """``∫ 2*sqrt(r²-x²) * column(x) dx`` over ``|x| <= r``.
+
+    The volume of a cylinder feature clipped by a second surface is the disc
+    integral of the clipped column length; ``x = r sin t`` removes the
+    square-root end-point singularity so Simpson converges (error < 1e-4 mm³
+    at n=4000, checked against a 400k-point trapezoid).
+    """
+    return _simpson(
+        lambda t: 2.0 * radius**2 * math.cos(t) ** 2 * column(radius * math.sin(t)),
+        -math.pi / 2.0,
+        math.pi / 2.0,
+    )
+
+
+def _collar_surface_z(x: float) -> float:
+    """|z| of the Ø44 collar cylinder at station ``x`` (the boss lies wholly
+    within the collar's 59.4..86 band, so only the collar clips it)."""
+    return math.sqrt(HEAD_RADIUS**2 - x * x)
+
+
+# Per-feature analytic volumes (mm³) the build checks natively one feature at
+# a time, so a cut that ran the wrong way is caught at THAT feature instead of
+# as an unexplained final gap.  Their sum is HARVESTED_VOLUME_MM3 (asserted at
+# import below).
+#
+# Crank boss: a Ø21.93 cylinder from z=-21.3753 to +50.6591 minus the part of
+# it already inside the collar -- at each x the collar spans |z| <= s(x), and
+# the boss starts at the station, so the overlap column is s + min(21.3753, s).
+CRANK_BOSS_OUTSIDE_COLLAR_MM3 = (
+    math.pi * CRANK_BOSS_RADIUS** 2 * CRANK_BOSS_LENGTH
+    - _disc_column_integral(
+        CRANK_BOSS_RADIUS,
+        lambda x: _collar_surface_z(x) + min(-CRANK_BOSS_START_Z, _collar_surface_z(x)),
+    )
+)
+# Spot face: the collar material standing proud of the station plane inside
+# the boss disc (s(x) - 21.3753 where positive, i.e. |x| < 5.21).
+CRANK_SPOT_FACE_MM3 = _disc_column_integral(
+    CRANK_BOSS_RADIUS,
+    lambda x: max(_collar_surface_z(x) + CRANK_BOSS_START_Z, 0.0),
+)
+# Crank bore: the full Ø11.438 cylinder from the station through the boss end;
+# after the spot face everything on that path is solid.
+CRANK_BORE_MM3 = math.pi * CRANK_BORE_RADIUS**2 * CRANK_BOSS_LENGTH
+# Cone pads: a Ø17.2 mid-plane cylinder of total length 42.011 whose axis is
+# yawed about Y and passes through the post axis, so a point at axial t and
+# radial p (in the yaw plane) sits at post radius sqrt(t² + p²) whatever the
+# yaw -- the body clips each column to |t| <= sqrt(R² - p²).
+CONE_PADS_OUTSIDE_BODY_MM3 = (
+    math.pi * CONE_BOSS_RADIUS** 2 * CONE_BOSS_LENGTH
+    - _disc_column_integral(
+        CONE_BOSS_RADIUS, lambda p: 2.0 * math.sqrt(BLOCK_RADIUS**2 - p * p)
+    )
+)
+CONE_BORE_MM3 = math.pi * BORE_RADIUS**2 * CONE_BOSS_LENGTH
+# Mounting holes: two through drills plus two counterbores; they clear the
+# crank bore (|x| <= 5.72 against a hole edge at 9.87) and, drilled last, are
+# not re-filled by any boss.
+ATTACHMENT_HOLES_MM3 = 2.0 * (
+    math.pi * (ATTACHMENT_THRU_DIA / 2.0) ** 2 * (BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH)
+    + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
+)
+_ANALYTIC_FINAL_MM3 = (
+    math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
+    + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
+    + CRANK_BOSS_OUTSIDE_COLLAR_MM3
+    - CRANK_SPOT_FACE_MM3
+    - CRANK_BORE_MM3
+    + CONE_PADS_OUTSIDE_BODY_MM3
+    - CONE_BORE_MM3
+    - ATTACHMENT_HOLES_MM3
+)
+if abs(_ANALYTIC_FINAL_MM3 - HARVESTED_VOLUME_MM3) > 0.01:
+    raise AssertionError(
+        f"HARVESTED_VOLUME_MM3 {HARVESTED_VOLUME_MM3} is not the feature sum "
+        f"{_ANALYTIC_FINAL_MM3:.4f}"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -225,37 +315,14 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "Head")
     head_depth = name_dimensions(adapter, "Head", ["HeadHt"])
     drive_jobs.append((head_depth[0], '"HeadHeight"'))
-    head_volume = body_volume + math.pi * (
-        HEAD_RADIUS**2 - BLOCK_RADIUS**2
-    ) * HEAD_HEIGHT
+    head_volume = (
+        body_volume + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
+    )
     await volume_check(adapter, "v2 head collar", head_volume, 0.001 * head_volume)
 
-    # 3. Preserve the harvested attachment feature as ONE native ANSI-inch Hole
-    # Wizard counterbore with two driven placement points.  Drill while the
-    # casting is still prismatic: the later transverse boss booleans change the
-    # first body's face topology and make this top face undiscoverable through
-    # COM even though the final geometry still has a top surface.
-    attachment_cut = wizard_holes(
-        adapter,
-        ATTACHMENT_HOLE_SPEC,
-        [
-            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
-            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
-        ],
-        (0.0, 1.0, 0.0),
-        "mounting counterbores (1/4 fillister)",
-        name="AttachmentScrewHoles",
-        expect_dia_mm=ATTACHMENT_THRU_DIA,
-        placement_dims=[
-            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
-            # Horizontal-distance dimensions are unsigned; the authored point
-            # retains the east/west side.
-            (("MountEastX", '"MountSpacing" / 2'), (None, None)),
-        ],
-    )
-    drive_jobs += attachment_cut.placement_drive_jobs
-
-    # 4. Straight crank boss and bore along +Z from the head tangent plane.
+    # 3. Straight crank boss along +Z from the spot-face station, then the
+    # spot face itself, then the bore.  The boss sketch sits ON the station
+    # plane and the blind extrude runs along the plane normal (+Z).
     check(
         "create CrankInterfacePlane",
         await adapter.create_plane(
@@ -288,13 +355,53 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs += crank_boss.apply(adapter, "CrankBossProfile")
     check(
         "extrude CrankSprocketBoss",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=CRANK_BOSS_LENGTH)
-        ),
+        await adapter.create_extrusion(ExtrusionParameters(depth=CRANK_BOSS_LENGTH)),
     )
     name_last_feature(adapter, "CrankSprocketBoss")
     name_dimensions(adapter, "CrankSprocketBoss", ["CrankBossLen"])
+    volume = head_volume + CRANK_BOSS_OUTSIDE_COLLAR_MM3
+    await volume_check(adapter, "v2 crank boss", volume, 0.001 * volume)
 
+    # The spot face is a MACHINED flat at the station: the Ø44 cast collar
+    # stands up to 0.62 mm proud of the station plane over |x| < 5.2 (inside
+    # the boss disc, around the bore mouth) and has to be faced off, or the
+    # 16T pinion that sits 0.25 mm from this face rides on a cast ridge.  A
+    # blind cut's default direction is OPPOSITE the sketch normal (-Z, behind
+    # the plane), so with no direction flag it faces the collar and never
+    # touches the boss; only the collar bulge lies behind the plane inside the
+    # disc, so one collar radius of depth removes exactly that bulge.
+    spot_face = SketchDims()
+    check(
+        "create sketch CrankSpotFaceProfile",
+        await adapter.create_sketch("CrankInterfacePlane"),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        CRANK_BORE_HEIGHT,
+        CRANK_BOSS_DIA / 2.0,
+        "crank spot face",
+        dims=spot_face,
+        names=("SpotFaceX", "SpotFaceY", "SpotFaceDia"),
+        drives=(None, '"CrankAxisY"', '"CrankBossDia"'),
+    )
+    await ensure_fully_defined(adapter, "CrankSpotFaceProfile")
+    check("exit sketch CrankSpotFaceProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankSpotFaceProfile")
+    drive_jobs += spot_face.apply(adapter, "CrankSpotFaceProfile")
+    check(
+        "cut CrankSpotFace",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=HEAD_RADIUS)),
+    )
+    name_last_feature(adapter, "CrankSpotFace")
+    volume -= CRANK_SPOT_FACE_MM3
+    await volume_check(adapter, "v2 crank spot face", volume, 0.1 * CRANK_SPOT_FACE_MM3)
+
+    # The bore runs INTO the boss (+Z), i.e. against the cut default, so it is
+    # reversed explicitly (build_top_frame's SetScrewPocket precedent).  Do
+    # not rely on SolidWorks flipping an empty cut toward material: that is
+    # exactly what stopped working once the Ø44 collar gave the default
+    # direction something to bite.
     crank_bore = SketchDims()
     check(
         "create sketch CrankBoreProfile",
@@ -317,13 +424,16 @@ async def build(adapter: Any) -> dict[str, str]:
     check(
         "cut CrankBore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=CRANK_BOSS_LENGTH)
+            ExtrusionParameters(depth=CRANK_BOSS_LENGTH, reverse_direction=True)
         ),
     )
     name_last_feature(adapter, "CrankBore")
+    volume -= CRANK_BORE_MM3
+    await volume_check(adapter, "v2 crank bore", volume, 0.001 * volume)
 
-    # 5. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
-    # are mid-plane extrusions from the harvested ConeShaftNormal reference.
+    # 4. O17.2 flush pads and O12.2808 journal on the inclined v2 axis.  Both
+    # are mid-plane extrusions from the harvested ConeShaftNormal reference
+    # (material on both sides of the plane, so no cut-direction question).
     # Do not substitute an on-axis revolve here: that SolidWorks topology is
     # known to make later Boolean features fail on this class of casting.
     cone_boss = SketchDims()
@@ -355,6 +465,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBoss")
+    volume += CONE_PADS_OUTSIDE_BODY_MM3
+    await volume_check(adapter, "v2 cone pads", volume, 0.001 * volume)
 
     journal_bore = SketchDims()
     check(
@@ -382,6 +494,38 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "ConeShaftBore")
+    volume -= CONE_BORE_MM3
+    await volume_check(adapter, "v2 cone bore", volume, 0.001 * volume)
+
+    # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
+    # top face, ONE native Hole Wizard feature with two driven placement
+    # points.  Drilled LAST, as the real casting is: the crank boss is cast
+    # integral and its Ø21.93 cylinder passes 1.09 mm into both Ø7.14 thru
+    # holes, so a boss extruded after the holes would re-fill a crescent of
+    # each and no 1/4 screw would pass.  The top face is still one +Y planar
+    # face after the transverse booleans (they stop 2.3 mm below it), which is
+    # all the normal-based placement-face walk needs.
+    attachment_cut = wizard_holes(
+        adapter,
+        ATTACHMENT_HOLE_SPEC,
+        [
+            [ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+            [-ATTACHMENT_X, BLOCK_HEIGHT, 0.0],
+        ],
+        (0.0, 1.0, 0.0),
+        "mounting counterbores (1/4 fillister)",
+        name="AttachmentScrewHoles",
+        expect_dia_mm=ATTACHMENT_THRU_DIA,
+        placement_dims=[
+            (("MountWestX", '"MountSpacing" / 2'), (None, None)),
+            # Horizontal-distance dimensions are unsigned; the authored point
+            # retains the east/west side.
+            (("MountEastX", '"MountSpacing" / 2'), (None, None)),
+        ],
+    )
+    drive_jobs += attachment_cut.placement_drive_jobs
+    volume -= ATTACHMENT_HOLES_MM3
+    await volume_check(adapter, "v2 mounting holes", volume, 0.001 * volume)
 
     # 6. Journal-plan reference sketch.  The 12.5182 deg plan angle between the
     # crank axis and the cone-journal axis is the casting's defining
