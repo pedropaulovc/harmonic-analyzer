@@ -1031,6 +1031,383 @@ async def _run_configuration_cache_control(adapter: Any) -> None:
     )
 
 
+async def _t006_pattern_control_state(
+    adapter: Any,
+    *,
+    phase: str,
+) -> dict[str, Any]:
+    """Capture the exact single-config T006 seed and pattern state."""
+    configuration = CONFIGS[0][0]
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _active_configuration(model)
+    active_name = str(active.Name)
+    needs_rebuild = bool(active.NeedsRebuild)
+    part = _early_bound(model, "IPartDoc")
+    feature_states: dict[str, tuple[bool, int, bool]] = {}
+    for name in (
+        TOOTH_GAP_PROFILE,
+        TOOTH_GAP_CUT,
+        pattern_feature_name(configuration),
+    ):
+        raw = part.FeatureByName(name)
+        if raw is None:
+            raise RuntimeError(f"T006 pattern control feature {name!r} is missing")
+        feature = _early_bound(raw, "IFeature")
+        error_result = feature.GetErrorCode2()
+        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+            raise RuntimeError(
+                f"T006 pattern control error state unreadable for {name}: "
+                f"{error_result!r}"
+            )
+        feature_states[name] = (
+            _pattern_suppression_states(feature, (configuration,))[0],
+            int(error_result[0] or 0),
+            bool(error_result[1]),
+        )
+
+    pattern = _pattern_feature(adapter, configuration)
+    definition = _early_bound(
+        pattern.GetDefinition(),
+        "ICircularPatternFeatureData",
+    )
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    face_count = (
+        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+        if len(bodies) == 1
+        else 0
+    )
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"T006 pattern control mass failed: {mass.error}")
+    state = {
+        "configuration": active_name,
+        "needs_rebuild": needs_rebuild,
+        "features": feature_states,
+        "instances": int(definition.TotalInstances),
+        "axis_type": int(definition.GetAxisType()),
+        "geometry_pattern": bool(definition.GeometryPattern),
+        "bodies": len(bodies),
+        "faces": face_count,
+        "volume": float(mass.data.volume),
+    }
+    _telemetry.info(f"{phase} T006 pattern control: {state!r}")
+    if active_name != configuration:
+        raise RuntimeError(
+            f"{phase}: T006 pattern control active config is {active_name!r}"
+        )
+    return state
+
+
+def _t006_pattern_states_match(
+    observed: dict[str, Any],
+    reference: dict[str, Any],
+) -> bool:
+    """Compare T006 pattern states with a tight volume tolerance."""
+    exact_keys = (
+        "configuration",
+        "needs_rebuild",
+        "features",
+        "instances",
+        "axis_type",
+        "geometry_pattern",
+        "bodies",
+        "faces",
+    )
+    if any(observed[key] != reference[key] for key in exact_keys):
+        return False
+    expected_volume = float(reference["volume"])
+    return abs(float(observed["volume"]) - expected_volume) <= max(
+        1e-6,
+        abs(expected_volume) * 1e-9,
+    )
+
+
+async def _run_single_t006_pattern_control(adapter: Any) -> None:
+    """Run the production T006 equation-curve seed and native pattern alone."""
+    from solidworks_mcp.adapters.base import (
+        CircularPatternParameters,
+        CreateAxisParameters,
+        ExtrusionParameters,
+    )
+
+    configuration, teeth = CONFIGS[0]
+    facts = gear_facts(teeth)
+    check("T006 control create_part", await adapter.create_part())
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _active_configuration(model)
+    active.Name = configuration
+    raw_names = model.GetConfigurationNames()
+    names = (
+        tuple(str(name) for name in raw_names)
+        if isinstance(raw_names, (list, tuple))
+        else (str(raw_names),)
+    )
+    if names != (configuration,):
+        raise RuntimeError(
+            f"T006 pattern control configurations {names!r} != {(configuration,)!r}"
+        )
+
+    await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
+    await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
+    atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
+    if abs(atn_probe - 45.0) < 1e-6:
+        atn_rad = f"atn(%s) * {PI_LIT} / 180"
+    elif abs(atn_probe - math.pi / 4.0) < 1e-6:
+        atn_rad = "atn(%s)"
+    else:
+        raise RuntimeError(
+            f"T006 pattern control atn(1)={atn_probe!r}: unknown dialect"
+        )
+    atn_tmax = atn_rad % '"Tmax"'
+    await set_global(adapter, "ToothCount", str(teeth), teeth)
+    await set_global(adapter, "DP", f"{DP:g}", DP)
+    await set_global(adapter, "PA", f"{PA_DEG:g}", PA_DEG)
+    await set_global(adapter, "PArad", f'"PA" * {PI_LIT} / 180', facts["PArad"])
+    await set_global(
+        adapter,
+        "Rb",
+        '"ToothCount" / "DP" * cos("PA") / 2',
+        facts["Rb"],
+    )
+    await set_global(
+        adapter,
+        "Ra",
+        '("ToothCount" + 2) / "DP" / 2',
+        facts["Ra"],
+    )
+    await set_global(
+        adapter,
+        "Tmax",
+        'sqr("Ra" * "Ra" / ("Rb" * "Rb") - 1)',
+        facts["Tmax"],
+    )
+    await set_global(
+        adapter,
+        "Delta",
+        f'{PI_LIT} / (2 * "ToothCount") + tan("PA") - "PArad"',
+        facts["Delta"],
+    )
+    await set_global(
+        adapter,
+        "Gamma",
+        f'2 * {PI_LIT} / "ToothCount"',
+        facts["Gamma"],
+    )
+    await set_global(
+        adapter,
+        "ThetaL",
+        f'{atn_tmax} - "Tmax" + "Delta"',
+        facts["ThetaL"],
+    )
+    await set_global(
+        adapter,
+        "ThetaU",
+        f'"Tmax" - {atn_tmax} - "Delta" + "Gamma"',
+        facts["ThetaU"],
+    )
+
+    tip_radius_mm = facts["Ra"] * 25.4
+    check("T006 control create blank sketch", await adapter.create_sketch("Front"))
+    blank_circle = check(
+        "T006 control add blank circle",
+        await adapter.add_circle(0.0, 0.0, tip_radius_mm),
+    )
+    check(
+        "T006 control blank diameter",
+        await adapter.add_sketch_dimension(
+            blank_circle,
+            None,
+            "diameter",
+            2.0 * tip_radius_mm,
+        ),
+    )
+    await ensure_fully_defined(adapter, "T006 pattern-control blank sketch")
+    check("T006 control exit blank sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "T006ControlBlankProfile")
+    check(
+        "T006 control extrude blank",
+        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
+    )
+    name_last_feature(adapter, "T006ControlBlank")
+
+    bore_radius_mm = bore_dia_in(teeth) * 12.7
+    check("T006 control create bore sketch", await adapter.create_sketch("Front"))
+    bore_circle = check(
+        "T006 control add bore circle",
+        await adapter.add_circle(0.0, 0.0, bore_radius_mm),
+    )
+    check(
+        "T006 control bore diameter",
+        await adapter.add_sketch_dimension(
+            bore_circle,
+            None,
+            "diameter",
+            2.0 * bore_radius_mm,
+        ),
+    )
+    await ensure_fully_defined(adapter, "T006 pattern-control bore sketch")
+    check("T006 control exit bore sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "T006ControlBoreProfile")
+    check(
+        "T006 control cut bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=FACE_WIDTH + 2.0)
+        ),
+    )
+    name_last_feature(adapter, "T006ControlBoreCut")
+
+    check("T006 control create gap sketch", await adapter.create_sketch("Front"))
+    u = '("Tmax" * t)'
+    ph_low = f'({u} - "Delta")'
+    ph_up = f'({u} - "Delta" + "Gamma")'
+    gap_curves = [
+        await equation_curve(
+            adapter,
+            "T006 lower flank",
+            f'"Rb" * (cos{ph_low} + {u} * sin{ph_low})',
+            f'"Rb" * ({u} * cos{ph_low} - sin{ph_low})',
+        ),
+        await equation_curve(
+            adapter,
+            "T006 upper flank",
+            f'"Rb" * (cos{ph_up} + {u} * sin{ph_up})',
+            f'"Rb" * (sin{ph_up} - {u} * cos{ph_up})',
+        ),
+        await equation_curve(
+            adapter,
+            "T006 base chord",
+            '"Rb" * ((1 - t) * cos("Gamma" - "Delta") + t * cos("Delta"))',
+            '"Rb" * ((1 - t) * sin("Gamma" - "Delta") + t * sin("Delta"))',
+        ),
+        await equation_curve(
+            adapter,
+            "T006 lower radial extension",
+            f'("Ra" + t * ({R_CLEAR_IN:g} - "Ra")) * cos("ThetaL")',
+            f'("Ra" + t * ({R_CLEAR_IN:g} - "Ra")) * sin("ThetaL")',
+        ),
+        await equation_curve(
+            adapter,
+            "T006 outer clearance arc",
+            f'{R_CLEAR_IN:g} * cos("ThetaL" + t * ("ThetaU" - "ThetaL"))',
+            f'{R_CLEAR_IN:g} * sin("ThetaL" + t * ("ThetaU" - "ThetaL"))',
+        ),
+        await equation_curve(
+            adapter,
+            "T006 upper radial extension",
+            f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * cos("ThetaU")',
+            f'({R_CLEAR_IN:g} + t * ("Ra" - {R_CLEAR_IN:g})) * sin("ThetaU")',
+        ),
+    ]
+    await ensure_fully_defined(
+        adapter,
+        "T006 pattern-control gap sketch",
+        fix_entities=gap_curves,
+        allow_fix_escalation=True,
+    )
+    check("T006 control exit gap sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, TOOTH_GAP_PROFILE)
+    check(
+        "T006 control cut tooth gap",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=FACE_WIDTH + 1.0)
+        ),
+    )
+    gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
+
+    axis = check(
+        "T006 control create named axis",
+        await adapter.create_axis(
+            CreateAxisParameters(
+                mode="two_planes",
+                planes=["Top Plane", "Right Plane"],
+            )
+        ),
+    )
+    check(
+        f"T006 control fixed pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_name=axis.name,
+                features=[gap_cut_name],
+                count=teeth,
+                geometry_pattern=True,
+            )
+        ),
+    )
+    name_last_feature(adapter, pattern_feature_name(configuration))
+    if not bool(model.ForceRebuild3(False)):
+        raise RuntimeError("T006 pattern-control reference rebuild failed")
+    reference = await _t006_pattern_control_state(adapter, phase="reference")
+    expected_volume = _expected_configuration_volume(teeth)
+    if (
+        reference["needs_rebuild"]
+        or any(
+            suppressed or error
+            for suppressed, error, _warning in reference["features"].values()
+        )
+        or reference["instances"] != teeth
+        or reference["axis_type"] != 0
+        or not reference["geometry_pattern"]
+        or reference["bodies"] != 1
+        or reference["faces"] != 4 * teeth + 3
+        or abs(float(reference["volume"]) - expected_volume)
+        > 0.01 * expected_volume
+    ):
+        raise RuntimeError(
+            f"T006 pattern-control reference is invalid: {reference!r}, "
+            f"expected_volume={expected_volume!r}"
+        )
+
+    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
+    control_path = (OUT_SLDPRT / "cone-gear-t006-pattern-control.SLDPRT").resolve()
+    check(
+        f"establish T006 pattern-control path -> {control_path}",
+        await adapter.save_file(str(control_path)),
+    )
+    raw_configuration = model.GetConfigurationByName(configuration)
+    if raw_configuration is None:
+        raise RuntimeError("T006 pattern-control configuration disappeared")
+    config = _early_bound(raw_configuration, "IConfiguration")
+    config.AddRebuildSaveMark = True
+    if not bool(config.AddRebuildSaveMark):
+        raise RuntimeError("T006 pattern-control save mark was not set")
+    _telemetry.info(
+        f"T006 pattern-control AddRebuildSaveMark={bool(config.AddRebuildSaveMark)}"
+    )
+    _save_active_configuration(adapter, configuration)
+
+    title = str(model.GetTitle())
+    adapter.swApp.CloseDoc(title)
+    adapter.currentModel = None
+    check(
+        "reopen T006 pattern control",
+        await adapter.open_model(str(control_path)),
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    _activate_configuration(model, configuration)
+    cold = await _t006_pattern_control_state(adapter, phase="cold")
+    if not bool(model.ForceRebuild3(False)):
+        raise RuntimeError("T006 pattern-control post-open rebuild failed")
+    rebuilt = await _t006_pattern_control_state(adapter, phase="rebuilt")
+    cold_matches = _t006_pattern_states_match(cold, reference)
+    rebuilt_matches = _t006_pattern_states_match(rebuilt, reference)
+    _telemetry.info(
+        "T006 pattern-control comparisons: "
+        f"cold_matches={cold_matches}, rebuilt_matches={rebuilt_matches}, "
+        f"reference={reference!r}, cold={cold!r}, rebuilt={rebuilt!r}"
+    )
+    if cold_matches:
+        verdict = "cold-and-rebuilt-clean"
+    elif rebuilt_matches:
+        verdict = "cold-stale-rebuilt-clean"
+    else:
+        verdict = "cold-and-rebuilt-invalid"
+    raise RuntimeError(
+        f"diagnostic complete: exact single-config T006 pattern {verdict}; "
+        "refusing to publish probe artefacts"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -1038,8 +1415,8 @@ async def build(adapter) -> dict[str, str]:
         ExtrusionParameters,
     )
 
-    await _run_configuration_cache_control(adapter)
-    raise RuntimeError("configuration-cache control returned without a verdict")
+    await _run_single_t006_pattern_control(adapter)
+    raise RuntimeError("single-config T006 pattern control returned without a verdict")
 
     findings: list[str] = []
 
