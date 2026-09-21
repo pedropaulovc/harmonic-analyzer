@@ -106,7 +106,10 @@ async def build(adapter) -> dict[str, str]:
     blank_name = feature_name_by_type(adapter, "Extrusion")
     if not blank_name:
         raise RuntimeError("alignment-pinion gear blank extrusion is missing")
-    blank = _early_bound(adapter.currentModel.FeatureByName(blank_name), "IFeature")
+    blank = _early_bound(
+        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(blank_name),
+        "IFeature",
+    )
     raw_profile = _read_member(blank, "GetFirstSubFeature")
     if raw_profile is None:
         raise RuntimeError("alignment-pinion gear blank profile is missing")
