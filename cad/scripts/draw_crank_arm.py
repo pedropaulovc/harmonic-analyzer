@@ -255,16 +255,16 @@ FRONT_KEEP = {
     "BossRadius": (0.035, 0.120),
     "ShaftBoreDia": (0.060, 0.166),
     # Right of the anchor tap so its leader never meets the tap callout's.
-    "DimpleDia": (0.178, 0.166),
+    "DimpleDia": (0.178, 0.180),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
 TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
-    "AnchorOffset": "ANCHOR AXIS FROM TOP EDGE",
+    "AnchorOffset": "TAP AXIS\nFROM TOP EDGE",
     "ShaftBoreDia": (
         "REAM THRU (3/8 IN)\n"
-        f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL "
+        f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"
         f"CLEARANCE ON {_CRANKSHAFT_NUMBER}"
     ),
     "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
