@@ -37,8 +37,6 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _model_item_paths,
-    _select_model_feature,
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
@@ -169,34 +167,6 @@ def _add_arm_centerline(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
 
-def _hide_reference_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Hide an unconsumed reference sketch in ONE drawing view.
-
-    ``StationReference`` exists to own the station dimensions the sheet
-    imports (build_crank_arm); nothing consumes it, so SolidWorks draws its
-    construction lines in the view it faces -- a grey diagonal from the bore
-    axis to the anchor tap printed across the front view (iter3).  The Top
-    plane's ``PinStationReference`` lies inside the bore's hidden lines and
-    is left alone.  Blanking them in the PART would also stop their dimensions
-    reaching ``InsertModelAnnotations3`` (build_harmonic_base measured it), so
-    they are hidden here, per view, AFTER the import: the model-item address
-    and ``IModelDoc2::BlankSketch`` are the documented "Reset Visibility of
-    Sketches in Drawing View" pair.  The imported dimensions stay: the kept
-    annotations are read again after this (callouts, precision), so a hide
-    that took them along fails there, not on the print.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    if not ddoc.ActivateView(name):
-        raise RuntimeError(f"failed to activate {name!r} to hide {sketch!r}")
-    draw.ClearSelection2(True)
-    _select_model_feature(adapter, sketch, paths=_model_item_paths(adapter, view))
-    draw.BlankSketch()
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-
-
 _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 # The anchor is a tapped blind hole, not a drill-size hole, so ``drill_process``
 # refuses it; its native callout already carries the tap drill, the thread and
@@ -315,7 +285,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
-    _hide_reference_sketch(adapter, front, "StationReference")
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every decimal place (policy rule 2): three on the
     # reamed 3/8 in bore alone, one everywhere else.  Read them back; an

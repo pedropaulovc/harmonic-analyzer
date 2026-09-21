@@ -307,11 +307,16 @@ async def build(adapter) -> dict[str, str]:
     # pinned by its boss radius. Each value therefore gets a construction line
     # whose driving dimension IS the value, marked for drawing like any other
     # dimension. Construction, not blanked: a blanked sketch's dimensions never
-    # reach InsertModelAnnotations3 (build_harmonic_base measured it), while
-    # construction geometry imports normally and is never drawn in a view.
-    # Direct-to-DB for the geometry: these lines lie on the axes and on the
-    # arm's own edges, so creation-time inference would snap in exactly the
-    # relations the explicit ones below add and leave the sketch over-defined.
+    # reach InsertModelAnnotations3 (build_harmonic_base measured it), and
+    # hiding the sketch in the drawing VIEW takes its imported dimensions with
+    # it (drawing iter4 lost four). Construction lines DO print, as grey
+    # lines, so every one of them lies on the arm's axis or on an edge or
+    # centre-mark line that covers it: the anchor's station runs along the
+    # axis, not diagonally to the tap (that diagonal printed across the front
+    # view in iter3). Direct-to-DB for the geometry: these lines lie on the
+    # axes and on the arm's own edges, so creation-time inference would snap
+    # in exactly the relations the explicit ones below add and leave the
+    # sketch over-defined.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -321,7 +326,7 @@ async def build(adapter) -> dict[str, str]:
     )
     anchor_ref = check(
         "anchor station reference line",
-        await adapter.add_line(0.0, 0.0, ANCHOR_SCREW_X, ANCHOR_SCREW_Y),
+        await adapter.add_line(0.0, 0.0, ANCHOR_SCREW_X, 0.0),
     )
     offset_ref = check(
         "anchor offset reference line",
@@ -336,10 +341,11 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, False)
     for line in (pivot_ref, anchor_ref, offset_ref, width_ref):
         _as_construction(adapter, line)
-    check(
-        "pivot station reference horizontal",
-        await adapter.add_sketch_constraint(pivot_ref, None, "horizontal"),
-    )
+    for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
+        check(
+            f"{label} station reference horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
     for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
         check(
             f"{label} station reference starts on the bore axis",
@@ -352,9 +358,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(offset_ref, None, "vertical"),
     )
     check(
-        "anchor offset reference ends on the anchor axis",
+        "anchor offset reference ends above the anchor station",
         await adapter.add_sketch_constraint(
-            f"{offset_ref}.end", f"{anchor_ref}.end", "coincident"
+            f"{offset_ref}.end", f"{anchor_ref}.end", "vertical_points"
         ),
     )
     check(
@@ -382,8 +388,8 @@ async def build(adapter) -> dict[str, str]:
     stations.record("AnchorStation", '"AnchorScrewX"')
     await dimension_between(
         adapter,
-        f"{anchor_ref}.start",
         f"{anchor_ref}.end",
+        f"{offset_ref}.end",
         "vertical_distance",
         ANCHOR_SCREW_Y,
         "anchor axis height reference",
