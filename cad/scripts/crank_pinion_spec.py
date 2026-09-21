@@ -43,9 +43,10 @@ PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
-# The crank-specific exact-solid study validates the shipped 0.150 mm tooth
-# thinning but does not sweep centre distance, helix, shaft-angle, face-offset
-# or bore-clearance tolerances; its 0.100 mm sample is not a proven threshold.
+# The crank-specific discrete voxel/phase study checks the shipped 0.150 mm
+# tooth thinning at nominal geometry but does not sweep centre distance, helix,
+# shaft-angle, face-offset or bore-clearance tolerances; its 0.100 mm sample is
+# not a proven threshold.
 # Do not let this member consume that unverified margin. Its maximum thickness
 # therefore stays nominal, and its -0.020 mm side reuses MHA-021's established
 # tooth-control capability. At the nominal geometry the pair's tooth-thinning

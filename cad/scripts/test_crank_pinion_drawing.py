@@ -298,8 +298,8 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0
     )
-    # The pinion must not consume the exact-solid study's unverified margin:
-    # that study validates nominal 0.150 mm tooth thinning and samples 0.100 mm
+    # The pinion must not consume the discrete voxel/phase study's unverified
+    # margin: it checks nominal 0.150 mm tooth thinning and samples 0.100 mm
     # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
     # pinion tooth nominal and reuse MHA-021's established 0.020 mm one-sided
     # tooth-control capability; convert the mate's normal-span lower limit to
