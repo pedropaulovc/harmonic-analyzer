@@ -450,9 +450,9 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    set_hidden_lines_visible(adapter, front)
-    for view in (left, iso):
-        set_hidden_lines_removed(adapter, view)
+    for view in (front, left):
+        set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, iso)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -469,17 +469,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _overall_reference(adapter, left)
-    if (
-        add_note(
-            adapter,
-            "6.000 DIMENSION:\nPIVOT AXIS TO FOLLOWER-SEAT AXIS",
-            0.105,
-            0.105,
-            height=0.003,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to identify follower-seat axis dimension")
     for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
@@ -501,8 +490,8 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_section = create_section_view(
         adapter,
         detail_parent,
-        line_start=(0.265, seat_axis_y),
-        line_end=(0.305, seat_axis_y),
+        line_start=(0.250, seat_axis_y),
+        line_end=(0.320, seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
         scale=(3.0, 1.0),
@@ -546,8 +535,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         detail,
-        edge_xy=(_detail_x(PIVOT_BORE / 2.0), _detail_y(0.0)),
-        symbol_xy=(0.210, 0.130),
+        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
+        symbol_xy=(0.210, 0.125),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
