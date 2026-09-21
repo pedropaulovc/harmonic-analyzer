@@ -46,6 +46,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_surface_finish,
     assert_imported_precision,
+    check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -473,6 +474,13 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
     )
+
+    # Measure the settled native text boxes, view outlines and rendered line
+    # segments before export.  In particular this proves the linked detail
+    # caption is contained and does not sit on the detail geometry or either
+    # relief-radius leader; fixed coordinate spacing alone cannot prove that.
+    rebuild_drawing(adapter, label="pinion bracket pre-export layout")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
         adapter,
