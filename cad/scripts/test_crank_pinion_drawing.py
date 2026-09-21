@@ -232,23 +232,23 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
 
 
 def test_callouts_add_only_what_the_number_cannot_carry() -> None:
-    # Rule 2: the Ø and its limits come from the dimension; the bore's feature
-    # callout adds process, extent, named mate and required clearance. The end
-    # break's callout adds only its angle.
+    # Rule 2: the Ø and its limits come from the native side-view dimension;
+    # its short caption adds process and extent. A separate pointer to the
+    # visible bore keeps the named mate and required clearance legible.
     low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": "\n".join(
-            (
-                "REAM THRU",
-                "MATES WITH",
-                "CRANKSHAFT",
-                spec.CRANKSHAFT_NUMBER,
-                "REQD DIA CLR",
-                f"{low:.3f}-{high:.3f} mm",
-            )
-        ),
+        "BoreDia": spec.BORE_PROCESS_CALLOUT,
         "BossChamfer": "X 45 DEG",
     }
+    assert spec.BORE_PROCESS_CALLOUT == "REAM THRU"
+    assert spec.BORE_FIT_CALLOUT == "\n".join(
+        (
+            "MATES WITH",
+            f"CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
+            "REQD DIA CLR",
+            f"{low:.3f}-{high:.3f} mm",
+        )
+    )
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:

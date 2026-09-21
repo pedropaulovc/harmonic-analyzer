@@ -25,17 +25,17 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
+    add_leader_note,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
     check_drawing_layout,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -50,6 +50,7 @@ from _surface_finish import surface_finish_by_key
 from crank_pinion_spec import (
     BORE_DIA,
     BORE_FIT_CALLOUT,
+    BORE_PROCESS_CALLOUT,
     BOSS_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -126,7 +127,7 @@ RIGHT_KEEP = {
         (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_BOSS + 0.012,
     ),
-    "BoreDia": (_side_x(0.0) + 0.035, RIGHT_CENTER[1]),
+    "BoreDia": (_side_x(0.0) + 0.014, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
@@ -134,9 +135,9 @@ RIGHT_KEEP = {
 }
 
 DIMENSION_CALLOUTS = {
-    # The native value/limits define the bore; the feature callout adds the
-    # process, extent, named mate and acceptance range required by policy rule 2.
-    "BoreDia": BORE_FIT_CALLOUT,
+    # The native value/limits define the bore; this short feature callout adds
+    # the process and extent without tangling its native diameter leaders.
+    "BoreDia": BORE_PROCESS_CALLOUT,
     # The chamfer feature imports its one distance; the angle is the caption.
     "BossChamfer": "X 45 DEG",
 }
@@ -219,64 +220,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
-    # A diametric dimension already hangs on its own broken leader. SolidWorks
-    # otherwise adds a second dimension-line pair through the multi-line fit
-    # callout. Hide that redundant pair while retaining the shoulder and arrow
-    # at the bore; this is the same live-proven pattern used by tube-frame.
-    bore_annotation = next(
-        (
-            annotation
-            for annotation in right_annotations
-            if dimension_name(adapter, annotation) == "BoreDia"
-        ),
-        None,
-    )
-    if bore_annotation is None:
-        raise RuntimeError("side view lost the BoreDia annotation")
-    bore_display = adapter._attempt(lambda: bore_annotation.GetSpecificAnnotation())
-    if bore_display is None:
-        raise RuntimeError("BoreDia has no display annotation")
-    bore_display = _early_bound(bore_display, "IDisplayDimension")
-    bore_display.DisplayAsLinear = False
-    bore_display.Diametric = True
-    bore_display.ArrowSide = 1
-    bore_display.SetSecondArrow(False, False)
-    bore_display.SolidLeader = False
-    if int(bore_display.SetBrokenLeader2(False, 2)) != 0:
-        raise RuntimeError("failed to apply broken horizontal BoreDia leader")
-    if (
-        bool(bore_display.DisplayAsLinear)
-        or not bool(bore_display.Diametric)
-        or int(bore_display.ArrowSide) != 1
-        or bool(bore_display.SolidLeader)
-        or bool(bore_display.GetUseDocBrokenLeader())
-        or int(bore_display.GetBrokenLeader2()) != 2
-        or bool(bore_display.GetUseDocSecondArrow())
-        or bool(bore_display.GetSecondArrow())
-    ):
-        raise RuntimeError("BoreDia leader style did not persist")
-    bore_display.LeaderVisibility = 3  # swLeaderLineVisibility_e.swLeaderLineNone
-    if int(bore_display.LeaderVisibility) != 3:
-        raise RuntimeError("BoreDia kept its redundant dimension-line pair")
-    # Changing the diametric leader shape can let SolidWorks snap the text back
-    # toward the source geometry. Re-apply the measured sheet-space placement
-    # after the style change and bound the native readback.
-    bore_annotation = _early_bound(bore_annotation, "IAnnotation")
-    bore_position = RIGHT_KEEP["BoreDia"]
-    if not bore_annotation.SetPosition2(*bore_position, 0.0):
-        raise RuntimeError("failed to restore BoreDia text position")
-    actual_bore_position = tuple(
-        float(value) for value in (bore_annotation.GetPosition() or ())
-    )
-    if (
-        len(actual_bore_position) < 2
-        or abs(actual_bore_position[0] - bore_position[0]) > 0.002
-        or abs(actual_bore_position[1] - bore_position[1]) > 0.002
-    ):
-        raise RuntimeError(
-            "BoreDia text position did not persist: "
-            f"{actual_bore_position!r} vs {bore_position!r}"
-        )
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
@@ -308,13 +251,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="retention-pin cross-hole",
         process=PIN_HOLE_PROCESS,
     )
+    # Keep the fit acceptance beside the visible bore rather than stacking it
+    # under the side-view diameter. The view-owned pointer names the bore while
+    # the native side-view dimension keeps its normal, connected leader.
+    add_leader_note(
+        adapter,
+        BORE_FIT_CALLOUT,
+        text_xy=(0.148, 0.220),
+        attach_xy=(
+            FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
+            FRONT_CENTER[1],
+        ),
+        label="crank pinion bore fit",
+        view=front,
+        height=0.0025,
+    )
+    # The fit note and finish symbol use different bore quadrants, so their
+    # leaders cannot be mistaken for one another.
     # The bore is the part's one fit surface, and a fit is a function of the
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
     # work" case). A surface symbol's native anchor is its lower-left corner,
-    # and its text grows rightward; place it to the right of the leader tip but
-    # left of the boss-chamfer witness, so neither line can cross the Ra text.
+    # and its text grows rightward; place it below the face view, clear of the
+    # boss-chamfer witness.
     add_surface_finish(
         adapter,
         front,
@@ -323,8 +283,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=(
-            FRONT_CENTER[0] + BORE_DIA * VIEW_SCALE[0] / 2000.0,
-            FRONT_CENTER[1],
+            FRONT_CENTER[0],
+            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
         ),
         char_height=0.0025,
     )

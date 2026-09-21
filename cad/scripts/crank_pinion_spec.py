@@ -131,12 +131,11 @@ if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - BOSS_CHAMFER - 0.5:
 CRANKSHAFT_NUMBER = _config.parts("crankshaft")["number"]
 PINION_NUMBER = _config.parts("crank-pinion")["number"]
 PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
+BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
-        "REAM THRU",
         "MATES WITH",
-        "CRANKSHAFT",
-        CRANKSHAFT_NUMBER,
+        f"CRANKSHAFT {CRANKSHAFT_NUMBER}",
         "REQD DIA CLR",
         f"{_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
     )
