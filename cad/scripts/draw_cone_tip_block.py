@@ -88,7 +88,7 @@ SECTION_KEEP = {
 }
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        RIGHT_CENTER[0] + 0.029,
+        RIGHT_CENTER[0] + 0.049,
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.012,
     )
 }
@@ -434,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.170, 0.185),
+        callout_xy=(0.145, 0.185),
         label="pinch entry-jaw clearance",
         process="DRILL TO SLOT",
     )
@@ -453,10 +453,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x, y in (
-        ("REAR — SHAFT ENTRY", passage_center[0] - 0.028, 0.078),
-        ("RIGHT — PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.035, 0.078),
-        ("LEFT — PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.031, 0.078),
-        ("FRONT — ADJUSTER ENTRY", adjuster_center[0] - 0.060, 0.185),
+        ("REAR VIEW\nSHAFT ENTRY", passage_center[0] - 0.021, 0.078),
+        ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
+        ("LEFT VIEW\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
+        ("ADJUSTER ENTRY", adjuster_center[0] - 0.054, 0.185),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
