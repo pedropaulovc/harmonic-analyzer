@@ -172,6 +172,58 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
+async def _author_reference_dimension(
+    adapter,
+    *,
+    plane: str,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    orientation: str,
+    dimension_type: str,
+    value_mm: float,
+    feature_name: str,
+    dimension_name: str,
+    drive_expression: str,
+) -> None:
+    """Author one construction-only, model-owned drawing location."""
+    check(
+        f"create_sketch {feature_name}",
+        await adapter.create_sketch(plane),
+    )
+    set_sketch_direct_db(adapter, True)
+    reference = check(
+        f"{feature_name} line",
+        await adapter.add_line(*start, *end),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, reference)
+    check(
+        f"{feature_name} {orientation}",
+        await adapter.add_sketch_constraint(reference, None, orientation),
+    )
+    await dimension_between(
+        adapter,
+        f"{reference}.start",
+        f"{reference}.end",
+        dimension_type,
+        value_mm,
+        feature_name,
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{reference}.start",
+        *start,
+        feature_name,
+    )
+    await ensure_fully_defined(adapter, f"{feature_name} sketch")
+    check(f"exit_sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    full_name = name_dimensions(
+        adapter, feature_name, [dimension_name]
+    )[0]
+    await drive_dimension(adapter, full_name, drive_expression)
+    await force_rebuild(adapter)
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -190,6 +242,8 @@ async def build(adapter) -> dict[str, str]:
     # tables, not driven dims.)
     await set_global(adapter, "SlitW", f"{SLIT_W}mm")
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
+    await set_global(adapter, "PassageCenter", '"BlockX" / 2')
+    await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
     await set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
@@ -366,47 +420,44 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
 
-    # Native functional interface: a construction-only line carries the
-    # pinch-to-adjuster axis spacing the shop controls. The Hole Wizard point
-    # and this dimension consume the same PinchRise global, so the printed
-    # relative dimension cannot drift from the cut geometry.
-    check("create_sketch pinch-rise reference", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    pinch_rise_ref = check(
-        "pinch-rise reference line",
-        await adapter.add_line(
-            0.0, ADJUSTER_AXIS_HEIGHT, 0.0, PINCH_BORE_Y
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, pinch_rise_ref)
-    check(
-        "pinch-rise reference vertical",
-        await adapter.add_sketch_constraint(pinch_rise_ref, None, "vertical"),
-    )
-    await dimension_between(
+    # Model-owned functional interfaces: construction-only dimensions carry
+    # every centre location that a machinist must set from a finished face.
+    await _author_reference_dimension(
         adapter,
-        f"{pinch_rise_ref}.start",
-        f"{pinch_rise_ref}.end",
-        "vertical_distance",
-        PINCH_RISE,
-        "pinch-to-adjuster axis spacing",
+        plane="Front",
+        start=(-BLOCK_X / 2.0, ADJUSTER_AXIS_HEIGHT),
+        end=(0.0, ADJUSTER_AXIS_HEIGHT),
+        orientation="horizontal",
+        dimension_type="horizontal_distance",
+        value_mm=BLOCK_X / 2.0,
+        feature_name="PassageCenterReference",
+        dimension_name="PassageCenter",
+        drive_expression='"PassageCenter"',
     )
-    await anchor_point_to_origin(
+    await _author_reference_dimension(
         adapter,
-        f"{pinch_rise_ref}.start",
-        0.0,
-        ADJUSTER_AXIS_HEIGHT,
-        "pinch-rise reference",
+        plane="Right",
+        start=(-BLOCK_Z / 2.0, PINCH_BORE_Y),
+        end=(0.0, PINCH_BORE_Y),
+        orientation="horizontal",
+        dimension_type="horizontal_distance",
+        value_mm=BLOCK_Z / 2.0,
+        feature_name="PinchDepthReference",
+        dimension_name="PinchDepthCenter",
+        drive_expression='"PinchDepthCenter"',
     )
-    await ensure_fully_defined(adapter, "pinch-rise reference sketch")
-    check("exit_sketch pinch-rise reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "PinchRiseReference")
-    pinch_rise_dim = name_dimensions(
-        adapter, "PinchRiseReference", ["PinchRise"]
-    )[0]
-    await drive_dimension(adapter, pinch_rise_dim, '"PinchRise"')
-    await force_rebuild(adapter)
+    await _author_reference_dimension(
+        adapter,
+        plane="Right",
+        start=(0.0, ADJUSTER_AXIS_HEIGHT),
+        end=(0.0, PINCH_BORE_Y),
+        orientation="vertical",
+        dimension_type="vertical_distance",
+        value_mm=PINCH_RISE,
+        feature_name="PinchRiseReference",
+        dimension_name="PinchRise",
+        drive_expression='"PinchRise"',
+    )
     set_dimension_symmetric_tolerance(
         adapter,
         "PinchRiseReference",
