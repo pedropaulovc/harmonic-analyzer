@@ -1,7 +1,21 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
-Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 3:1
-so the small 17 mm pinion reads clearly.
+Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is three
+views of a toothed disc with a hub boss and seven native model dimensions.
+Every turned diameter sits beside its axial extent on the side view: tooth-tip
+blank, reamed bore and boss, with face width, pin station, overall length and
+the boss end break. The retention pin's match-drill hole callout and the
+gear-data block carry the process facts that geometry cannot.
+
+No datums, no feature control frames, one roughness symbol (the bore): a
+removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
+(rules 3-5), and its bore's own limits already say what the fit is. The
+decimal places are the PART's (``crank_pinion_spec.DRAWING_PRECISION``,
+applied natively by ``build_crank_pinion``); this script only reads them back
+off the sheet.
+
+Drawn 4:1 -- the boss makes the part 17.28 long, and at the disc's 5:1 the
+isometric ran off the B sheet's right border.
 """
 
 from __future__ import annotations
@@ -10,29 +24,39 @@ import argparse
 import sys
 from typing import Any
 
-from crank_pinion_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge, visible_tooth_tip_silhouette
+from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from crank_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
+from crank_pinion_spec import (
+    BORE_DIA,
+    BOSS_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    FACE_WIDTH,
+    OUTSIDE_DIA,
+    OVERALL_LENGTH,
+    PIN_DIA,
+    PIN_HOLE_PROCESS,
+    PIN_STATION,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -51,27 +75,76 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (3.0, 1.0)
-VIEW_SCALE = (3, 1)
-FRONT_CENTER = (0.215, 0.175)
-RIGHT_CENTER = (0.300, 0.175)
-ISO_CENTER = (0.385, 0.210)
+SHEET_SCALE = (4.0, 1.0)
+VIEW_SCALE = (4, 1)
+FRONT_CENTER = (0.110, 0.150)
+RIGHT_CENTER = (0.215, 0.150)
+ISO_CENTER = (0.345, 0.150)
 
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
+# Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
+# radius and the side view's half-height, which every dimension is placed clear
+# of; and half the printed boss, the side view's height past the teeth.
+HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0356
+HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
 
-FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.035),
+
+def _side_x(z_mm: float) -> float:
+    """Sheet x of a model-z station in the side view.
+
+    SolidWorks centres a view on its geometry (the crankshaft sheet's
+    ``_SIDE_BOTTOM`` idiom), and a *Right view lays model +Z to the LEFT (the
+    boss end sits nearest the face view), so the toothed south face (z = 0) is
+    the view's right edge and the boss end its left.
+    """
+    return RIGHT_CENTER[0] + (OVERALL_LENGTH / 2.0 - z_mm) * VIEW_SCALE[0] / 1000.0
+
+
+# The end view is pictorial and carries only its center mark. Every turned
+# diameter belongs beside the matching axial extent on the side view (rule 7);
+# ``BossProfile`` supplies the tooth-tip and bore as construction-only native
+# model dimensions so they import without hidden lines or sheet-authored
+# numbers.
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
+# Side view: the two solid-profile diameters sit above their own axial spans;
+# the bore diameter sits just right of the silhouette, still clear of the
+# isometric. The three lengths stay baseline-stacked below the view, every one
+# from the toothed south face (rule 7: one origin per view, baseline not
+# chained). The boss end break's text sits left of the boss end below the
+# bore's roughness symbol, so its dimension line reaches the boss without
+# crossing the symbol.
+_SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+RIGHT_KEEP = {
+    "OutsideDia": (
+        (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
+        RIGHT_CENTER[1] + HALF_OD + 0.012,
+    ),
+    "BossDia": (
+        (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
+        RIGHT_CENTER[1] + HALF_BOSS + 0.012,
+    ),
+    "BoreDia": (_side_x(0.0) + 0.014, RIGHT_CENTER[1]),
+    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
+    "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
+    "BossChamfer": (_side_x(OVERALL_LENGTH) - 0.018, _SIDE_BOTTOM - 0.034),
 }
+
 DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the crankshaft journal (removable) (nominal-or-under, like the
-    # arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # model dimension's own limits do).
-    "BoreDia": "THRU - REAM",
+    # The bore's own limits are the fit; the callout only has to say how far it
+    # goes and how it is finished (policy rule 7).
+    "BoreDia": "REAM THRU",
+    # The chamfer feature imports its one distance; the angle is the caption.
+    "BossChamfer": "X 45 DEG",
 }
-DIMENSION_PRECISION = {"BoreDia": 3}
+
+# The retention-pin cross-hole: its exit circle on the boss wall nearest the
+# viewer, at the pin station on the axis. The native callout hangs above the
+# side view with the match-drill statement as its prefix.
+PIN_HOLE_EDGE = (
+    _side_x(PIN_STATION),
+    RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
+)
+PIN_HOLE_CALLOUT = (_side_x(PIN_STATION) + 0.022, RIGHT_CENTER[1] + HALF_OD + 0.036)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -118,70 +191,82 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
+    # Hidden lines OFF in every view (rule 7): the reamed bore's callout says
+    # THRU, and the pin cross-hole is a standard drill whose callout defines
+    # it -- its exit circle is solid on the side view where its station is
+    # dimensioned, so dashed edges would add ink without adding a fact.
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to pinion bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-    tooth_tip_silhouette = visible_tooth_tip_silhouette(adapter, right, OUTSIDE_DIA)
-
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0)
-    add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_top,
-        # Upper-left of the bore: the mirror spot upper-right sits on the
-        # end-face FCF's "2X AXIAL END FACES" text.
-        symbol_xy=(FRONT_CENTER[0] - 0.030, FRONT_CENTER[1] + 0.033),
-        datum="A",
-        label="crank pinion bore axis",
-        shoulder=True,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    add_feature_control_frame(
+    # Whole-model import for the side view (the crankshaft's JournalStart
+    # idiom): the targeted path selects a dimension's owner as a SKETCH or a
+    # BODYFEATURE, and PinStation's owner is a reference PLANE, which it cannot
+    # address (farm leaf 2026-09-21T13:51Z). The keep set still prunes the rest.
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
+    assert_imported_precision(
+        adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
+    )
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to pinion bore")
+    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the pin cross-hole")
+    # The side view is a turned part's length view: its axis centerline says
+    # which pair of edges is the faced ends (rule 7, turned parts), picked on
+    # the boss's cylindrical face between the tooth face and the pin hole's
+    # rim, a hair above the axis so the pick cannot land in the hole.
+    add_view_centerline(
         adapter,
         right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion end-face squareness to bore"],
-        datums=("A",),
-        quantity="2X AXIAL END FACES",
-        label="pinion end-face squareness to bore",
+        face_xy=(
+            (_side_x(FACE_WIDTH) + _side_x(PIN_STATION - PIN_DIA / 2.0)) / 2.0,
+            RIGHT_CENTER[1] + 0.004,
+        ),
+        label="crank pinion axis centerline",
     )
-    add_feature_control_frame(
+    # The retention pin's hole: native size and THRU from the Hole Wizard,
+    # the match-drill statement (mate by number) as its prefix -- rule 6 puts
+    # a matched-fit requirement on the feature callout, not in a note.
+    add_native_hole_callout(
         adapter,
         right,
-        entity=tooth_tip_silhouette,
-        frame_xy=(0.330, 0.220),
-        characteristic="circular_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion tooth-tip circular runout"],
-        datums=("A",),
-        quantity="TOOTH TIPS",
-        label="pinion tooth-tip circular runout",
-        entity_type="SILHOUETTE",
+        edge_xy=PIN_HOLE_EDGE,
+        callout_xy=PIN_HOLE_CALLOUT,
+        label="retention-pin cross-hole",
+        process=PIN_HOLE_PROCESS,
     )
+    # The bore is the part's one fit surface, and a fit is a function of the
+    # peaks as well as the size: REAM names the operation, not the finish it
+    # leaves. The roughness is the project's general machined grade, authored
+    # on the PART and read back here (policy rule 5's "a surface that has to
+    # work" case; codex machinist review, 2026-09-20).
     add_surface_finish(
         adapter,
         front,
         symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
-        entity=bore_edge,
+        entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=(
             FRONT_CENTER[0],
             FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
         ),
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262, char_height=0.0025)
+    add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
     add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.018, 0.102, char_height=0.0025
+        adapter, "Manufacturing Notes", 0.016, 0.082, char_height=0.0025
     )
     return await finalize_drawing(
         adapter,
