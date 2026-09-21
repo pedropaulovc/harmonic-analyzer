@@ -10,6 +10,7 @@ import multiprocessing
 import os
 import subprocess
 import sys
+import time
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
@@ -91,7 +92,12 @@ def _emit_failed_log_in_process(
     """Fetch in parallel and make unlocked block emission overlap deterministically."""
 
     def fetch(
-        _pool, *args, stdout=subprocess.PIPE, stderr=None, timeout_s=None
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
     ):
         retrieval_barrier.wait(timeout=10)
         diagnostic = f"retrieval diagnostic for {name}\n"
@@ -1487,7 +1493,12 @@ def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error
     expected_wf_id = "leaf:part:x:" + "k" * 64 + ":900s"
 
     def pool_cli(
-        _pool, *args, stdout=subprocess.PIPE, stderr=None, timeout_s=None
+        _pool,
+        *args,
+        interpreter=None,
+        stdout=subprocess.PIPE,
+        stderr=None,
+        timeout_s=None,
     ):
         if args == ("agents", "--json"):
             return subprocess.CompletedProcess(args, 0, _agents_summary(), "")
@@ -1582,25 +1593,37 @@ def test_parallel_failed_leaf_logs_are_emitted_as_complete_blocks(
 
 
 @pytest.mark.parametrize(
-    ("diagnostic_outcome", "warning"),
+    ("diagnostic_outcome", "reason", "warning"),
     [
         (
-            subprocess.TimeoutExpired(["uv", "farm.py", "logs"], 30),
+            subprocess.TimeoutExpired(["python", "farm.py", "logs"], 30),
+            "retrieval_timeout",
             "task log retrieval timed out after 30s",
         ),
-        (OSError("operator CLI unavailable"), "task log retrieval could not start"),
         (
-            subprocess.CompletedProcess(["uv", "farm.py", "logs"], 19),
+            OSError("operator CLI unavailable"),
+            "retrieval_start_error",
+            "task log retrieval could not start",
+        ),
+        (
+            subprocess.CompletedProcess(["python", "farm.py", "logs"], 19),
+            "retrieval_exit",
             "task log retrieval exited 19",
         ),
     ],
 )
 def test_log_retrieval_faults_preserve_the_failed_leaf_result(
-    temporal_boundary, monkeypatch, capsys, diagnostic_outcome, warning
+    temporal_boundary,
+    monkeypatch,
+    capsys,
+    diagnostic_outcome,
+    reason,
+    warning,
 ):
     _calls, resolve = temporal_boundary
     failed = _leaf_result(**_FAILED_LEAF)
     resolve(failed)
+    records = []
 
     def diagnose(*_args, **_kwargs):
         if isinstance(diagnostic_outcome, BaseException):
@@ -1608,11 +1631,26 @@ def test_log_retrieval_faults_preserve_the_failed_leaf_result(
         return diagnostic_outcome
 
     monkeypatch.setattr(_farm, "run_pool_cli", diagnose)
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
 
     assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    assert len(records) == 1
+    message, fields = records[0]
+    assert warning in message
+    assert fields == {
+        "reason": reason,
+        "task": "part:pen_rod",
+        "workflow_id": "leaf:part:pen_rod:" + "k" * 64 + ":900s",
+        "log_blob": failed.log_blob,
+        "worker_id": "sw-01@3",
+        "attempt": 1,
+    }
     error = capsys.readouterr().err
-    assert f"warning: {warning}" in error
-    assert "the original farm failure is unchanged" in error
+    assert warning not in error
     assert "--- end failed farm task log:" in error
 
 
@@ -1622,16 +1660,94 @@ def test_failed_leaf_without_a_log_blob_reports_absence_without_a_cli_call(
     _calls, resolve = temporal_boundary
     failed = _leaf_result(**_FAILED_LEAF, log_blob=None)
     resolve(failed)
+    records = []
     monkeypatch.setattr(
         _farm,
         "run_pool_cli",
         lambda *_args, **_kwargs: pytest.fail("queried logs without a log blob"),
     )
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
 
     assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    assert len(records) == 1
+    message, fields = records[0]
+    assert "no task log was published" in message
+    assert fields["reason"] == "log_blob_absent"
+    assert fields["task"] == "part:pen_rod"
+    assert fields["workflow_id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    assert fields["log_blob"] == ""
     error = capsys.readouterr().err
-    assert "no task log was published for this failed leaf" in error
+    assert "no task log was published" not in error
     assert "--- end failed farm task log:" in error
+
+
+@pytest.mark.parametrize(
+    ("configured_environment", "environment"),
+    [(None, Path(".venv")), ("pool-python", Path("pool-python"))],
+)
+def test_pool_python_resolves_relative_pool_and_environment_from_repo_root(
+    monkeypatch, configured_environment, environment
+):
+    if configured_environment is None:
+        monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
+    else:
+        monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", configured_environment)
+    executable = (
+        Path("Scripts") / "python.exe"
+        if os.name == "nt"
+        else Path("bin/python")
+    )
+
+    assert _farm._pool_python(Path("relative-pool")) == (
+        (_farm.REPO_ROOT / "relative-pool").resolve() / environment / executable
+    )
+
+
+def test_bounded_log_retrieval_kills_the_direct_pool_process(
+    tmp_path, monkeypatch
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    started = tmp_path / "started.txt"
+    survived = tmp_path / "survived.txt"
+    (pool / "farm.py").write_text(
+        "import time\n"
+        "from pathlib import Path\n"
+        f"Path({str(started)!r}).write_text('started', encoding='utf-8')\n"
+        "time.sleep(1.5)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    environment = Path(sys.executable).parents[1]
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", str(environment))
+    monkeypatch.setenv(
+        "HARMONIC_FARM_LOG_LOCK", str(tmp_path / "farm-build-output.lock")
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: pool)
+    monkeypatch.setattr(_farm, "FAILED_LOG_TIMEOUT_S", 0.5)
+    records = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: records.append((message, fields)),
+    )
+
+    _farm._emit_failed_task_log(
+        "part:pen_rod",
+        "leaf:part:pen_rod:key:900s",
+        _leaf_result(**_FAILED_LEAF),
+    )
+
+    assert started.read_text(encoding="utf-8") == "started"
+    time.sleep(1.2)
+    assert not survived.exists(), "timed-out farm.py survived to finish its work"
+    assert [fields["reason"] for _message, fields in records] == [
+        "retrieval_timeout"
+    ]
 
 
 def test_successful_leaf_emits_no_task_log_diagnostic(
