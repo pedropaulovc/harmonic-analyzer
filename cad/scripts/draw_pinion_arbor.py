@@ -53,7 +53,7 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 PRINCIPAL_CENTER = (0.200, 0.170)
-ISO_CENTER = (0.375, 0.235)
+ISO_CENTER = (0.355, 0.225)
 DONOR_KEEP = {
     "HeadDia": (0.030, 0.225),
     "NeckDia": (0.045, 0.185),
@@ -232,7 +232,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.267)
+    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.255)
 
     return await finalize_drawing(
         adapter,
