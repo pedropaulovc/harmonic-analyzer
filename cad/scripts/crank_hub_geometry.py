@@ -79,8 +79,9 @@ HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
 def seam_web_after_edge_break(
     seat_dia: float, pin_dia: float, bore_dia: float
 ) -> float:
-    """Return radial hub wall between the seam hole and chamfered shaft bore."""
-    return (seat_dia - pin_dia - bore_dia) / 2.0 - EDGE_BREAK_MAX_MM
+    """Return finished radial wall after the bore and seam-mouth edge breaks."""
+    raw_web = (seat_dia - pin_dia - bore_dia) / 2.0
+    return raw_web - 2.0 * EDGE_BREAK_MAX_MM
 
 
 SEAM_WEB_NOMINAL_MM = seam_web_after_edge_break(
