@@ -184,7 +184,7 @@ DETAIL_KEEP = {
     "CamReliefEngagedY": (0.065, 0.125),
 }
 DETAIL_RADIUS_XY = {
-    "CamReliefParkR": (0.210, 0.185),
+    "CamReliefParkR": (0.145, 0.190),
     "CamReliefEngagedR": (0.145, 0.075),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
@@ -610,8 +610,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         detail,
-        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.195, 0.070),
+        edge_xy=(_detail_x(0.0), _detail_y(PIVOT_BORE / 2.0)),
+        symbol_xy=(0.245, 0.215),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
