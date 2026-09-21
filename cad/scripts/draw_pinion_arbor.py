@@ -231,7 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         principal,
         edge_xy=(PRINCIPAL_CENTER[0] + 0.040, SHAFT_FLANK_Y),
-        symbol_xy=(PRINCIPAL_CENTER[0] + 0.075, PRINCIPAL_CENTER[1] + 0.050),
+        symbol_xy=(PRINCIPAL_CENTER[0] + 0.045, PRINCIPAL_CENTER[1] + 0.050),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
