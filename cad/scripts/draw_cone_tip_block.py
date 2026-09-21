@@ -433,17 +433,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     _hide_section_cosmetic_threads(adapter, section)
-    for text, x in (
-        ("SHAFT ENTRY", passage_center[0] - 0.021),
-        ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026),
-        ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023),
-        ("ADJUSTER ENTRY", adjuster_center[0] - 0.021),
+    for text, x, y in (
+        ("SHAFT ENTRY", passage_center[0] - 0.021, 0.078),
+        ("PINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
+        ("PINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
+        ("ADJUSTER ENTRY", adjuster_center[0] - 0.021, 0.185),
     ):
-        if add_note(adapter, text, x, 0.078) is None:
+        if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
-    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.204) is None:
+    if add_note(adapter, "SHAFT ENTRY", SECTION_CENTER[0] - 0.052, 0.250) is None:
         raise RuntimeError("failed to orient the section shaft side")
-    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.204) is None:
+    if add_note(adapter, "ADJUSTER ENTRY", SECTION_CENTER[0] + 0.028, 0.250) is None:
         raise RuntimeError("failed to orient the section adjuster side")
 
     foot_edge = _foot_edge(adapter, front)
