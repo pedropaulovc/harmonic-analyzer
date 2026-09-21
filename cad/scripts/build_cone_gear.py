@@ -151,6 +151,8 @@ PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
 CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
 DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+TOOTH_GAP_PROFILE = "ToothGapProfile"
+TOOTH_GAP_CUT = "ToothGapCut"
 TOOTH_PATTERN_FEATURE = "ToothGapPattern"
 
 # Model-owned bands, derived live from their named fit inputs.  Bands use the
@@ -362,13 +364,63 @@ def _expected_configuration_volume(teeth: int) -> float:
     )
 
 
+def _configuration_definition_state(
+    adapter: Any, configuration: str, *, phase: str
+) -> None:
+    """Log the equation, seed-feature and pattern-definition persistence state."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    equation_manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    wanted = {"ToothCount", "BoreDia", "Rb", "Ra", "Rf", "XMax"}
+    equations: dict[str, tuple[str, float]] = {}
+    count = int(_read_member(equation_manager, "GetCount") or 0)
+    for index in range(count):
+        equation = str(equation_manager.Equation(index) or "")
+        left, _, _right = equation.partition("=")
+        name = left.strip().strip('"')
+        if name in wanted:
+            equations[name] = (equation, float(equation_manager.Value(index)))
+
+    feature_states: dict[str, tuple[bool, int, bool]] = {}
+    for name in (TOOTH_GAP_PROFILE, TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE):
+        raw = part.FeatureByName(name)
+        if raw is None:
+            raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
+        feature = _early_bound(raw, "IFeature")
+        states = feature.IsSuppressed2(3, [configuration])
+        if not isinstance(states, (list, tuple)):
+            states = (states,)
+        error_result = feature.GetErrorCode2()
+        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+            raise RuntimeError(
+                f"{configuration}: unreadable {name} error state {error_result!r}"
+            )
+        feature_states[name] = (
+            len(states) != 1 or bool(states[0]),
+            int(error_result[0] or 0),
+            bool(error_result[1]),
+        )
+
+    pattern = _early_bound(
+        part.FeatureByName(TOOTH_PATTERN_FEATURE), "IFeature"
+    )
+    definition = _early_bound(
+        pattern.GetDefinition(), "ICircularPatternFeatureData"
+    )
+    _telemetry.info(
+        f"{phase} cone-gear definition state {configuration}: "
+        f"equations={equations!r}, features={feature_states!r}, "
+        f"geometry_pattern={bool(definition.GeometryPattern)}, "
+        f"instances={int(definition.TotalInstances)}"
+    )
+
+
 async def _configuration_topology(
     adapter: Any,
     configuration: str,
     teeth: int,
     *,
     phase: str,
-    require_save_mark: bool,
 ) -> tuple[float, str, tuple[str, ...]]:
     """Measure one configuration's real pattern and solid-body topology."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -418,8 +470,6 @@ async def _configuration_topology(
     issues: list[str] = []
     if needs_rebuild:
         issues.append("configuration needs rebuild")
-    if require_save_mark and not save_mark:
-        issues.append("configuration lacks rebuild-save mark")
     if instances != teeth:
         issues.append(f"pattern instances {instances} != {teeth}")
     if suppressed:
@@ -434,6 +484,10 @@ async def _configuration_topology(
         )
     if abs(volume - expected) > 0.01 * expected:
         issues.append(f"volume {volume:.1f} outside 1% of {expected:.1f}")
+    if configuration in {CONFIGS[0][0], CONFIGS[-1][0]}:
+        _configuration_definition_state(
+            adapter, configuration, phase=phase
+        )
     return volume, observation, tuple(issues)
 
 
@@ -451,14 +505,31 @@ async def assert_saved_configuration_topology(
                 configuration,
                 teeth,
                 phase=phase,
-                require_save_mark=True,
             )
         except Exception as exc:
             failures.append(f"{configuration}: {exc}")
             continue
         volumes[configuration] = volume
         if issues:
-            failures.append(f"{observation}; issues={issues!r}")
+            model = _early_bound(adapter.currentModel, "IModelDoc2")
+            rebuilt = bool(model.ForceRebuild3(False))
+            try:
+                _healed_volume, healed_observation, healed_issues = (
+                    await _configuration_topology(
+                        adapter,
+                        configuration,
+                        teeth,
+                        phase=f"{phase} explicit-rebuild",
+                    )
+                )
+            except Exception as exc:
+                healed_observation = f"measurement failed: {exc}"
+                healed_issues = ("measurement failed",)
+            failures.append(
+                f"{observation}; issues={issues!r}; "
+                f"ForceRebuild3={rebuilt}; after={healed_observation}; "
+                f"after_issues={healed_issues!r}"
+            )
     _activate_configuration(
         _early_bound(adapter.currentModel, "IModelDoc2"), CONFIGS[-1][0]
     )
@@ -803,7 +874,7 @@ async def build(adapter) -> dict[str, str]:
     # UNdimensioned -- pinning a recorded dim on them would break the mesh.
     # (create_cut_extrude still consumes this most-recent sketch by recency,
     # not by name, so the rename is safe.)
-    name_last_feature(adapter, "ToothGapProfile")
+    name_last_feature(adapter, TOOTH_GAP_PROFILE)
     # Single direction: both_directions splits the depth symmetrically about
     # the sketch plane (caught live: a 10 mm both-ways cut covered only
     # z 0..5 of the 7 mm blank, leaving an uncut full disc at z 5..7).
@@ -811,6 +882,7 @@ async def build(adapter) -> dict[str, str]:
         ExtrusionParameters(depth=FACE_WIDTH + 1.0)
     )
     check("cut tooth gap", gap_cut)
+    gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
     # ------------------------------------------------------------------
     # Pattern the gap about the gear axis; link the instance count to
@@ -843,7 +915,7 @@ async def build(adapter) -> dict[str, str]:
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
-                features=[gap_cut.data.name],
+                features=[gap_cut_name],
                 count=DEFAULT_TEETH,
                 geometry_pattern=True,
             )
@@ -1013,7 +1085,6 @@ async def build(adapter) -> dict[str, str]:
             name,
             teeth,
             phase="pre-save",
-            require_save_mark=False,
         )
         if issues:
             raise RuntimeError(f"{observation}; issues={issues!r}")
@@ -1111,30 +1182,48 @@ async def build(adapter) -> dict[str, str]:
                 "Material Specification": material_specification(teeth),
             },
         )
-    configuration_manager = _early_bound(
-        adapter.currentModel.ConfigurationManager, "IConfigurationManager"
-    )
-    mark_result = bool(configuration_manager.AddRebuildSaveMark(2, ""))
-    unmarked = [
-        name
-        for name, _teeth in CONFIGS
-        if not bool(
-            _early_bound(
-                adapter.currentModel.GetConfigurationByName(name),
-                "IConfiguration",
-            ).AddRebuildSaveMark
-        )
-    ]
-    if unmarked:
-        raise RuntimeError(
-            f"failed to mark configurations for saved rebuild data: {unmarked!r}"
-        )
-    _telemetry.success(
-        f"all cone-gear configurations carry rebuild-save marks "
-        f"(manager result={mark_result})"
-    )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
+
+    # A single all-configuration save mark rebuilds inactive configurations
+    # inside SaveAs. On SW 2026 that path re-solved this equation-driven seed:
+    # T006..T024 reopened with pattern error 1 even though every active
+    # pre-save rebuild was clean. Persist one active configuration per save so
+    # its already-validated geometry is the configuration data written to disk.
+    for index, (configuration, teeth) in enumerate(CONFIGS):
+        check(
+            f"activate {configuration} for configuration-data save",
+            await adapter.set_active_configuration(configuration),
+        )
+        active = _active_configuration(
+            _early_bound(adapter.currentModel, "IModelDoc2")
+        )
+        active.AddRebuildSaveMark = True
+        if not bool(active.AddRebuildSaveMark):
+            raise RuntimeError(
+                f"{configuration}: failed to set active rebuild-save mark"
+            )
+        check(
+            f"save active configuration data {configuration}",
+            await adapter.save_file(part_path),
+        )
+        _volume, observation, issues = await _configuration_topology(
+            adapter,
+            configuration,
+            teeth,
+            phase="post-save active",
+        )
+        if issues:
+            raise RuntimeError(f"{observation}; issues={issues!r}")
+        if index + 1 < len(CONFIGS):
+            active.AddRebuildSaveMark = False
+            if bool(active.AddRebuildSaveMark):
+                raise RuntimeError(
+                    f"{configuration}: failed to clear rebuild-save mark"
+                )
+    _telemetry.success(
+        "persisted all cone-gear configuration data while each was active"
+    )
     part_title = str(
         _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
     )
