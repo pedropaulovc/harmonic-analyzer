@@ -58,6 +58,7 @@ from _common import (
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
+    dump_dimensions,
     blank_sketch,
     ensure_fully_defined,
     extrude_at_offset,
@@ -151,6 +152,32 @@ def _solid_body_count(adapter) -> int:
     return len(tuple(bodies))
 
 
+def _assert_start_stations(adapter) -> None:
+    expected = {
+        ("Leg", "LegStart"): LEG_BOTTOM,
+        ("EndPlug", "PlugStart"): ARM_END_X,
+        ("ScrewShank", "ShankStart"): HEAD_X,
+        ("ScrewHead", "HeadStart"): SCREW_TIP_X,
+    }
+    for (feature, dimension), expected_mm in expected.items():
+        rows = dump_dimensions(adapter, feature)
+        actual = next(
+            (
+                row["value_mm"]
+                for row in rows
+                if row["full_name"].split("@")[:2] == [dimension, feature]
+            ),
+            None,
+        )
+        if actual is None or not math.isclose(
+            actual, expected_mm, rel_tol=0.0, abs_tol=1e-6
+        ):
+            raise RuntimeError(
+                f"{dimension}@{feature}: start station {actual!r} mm; "
+                f"expected {expected_mm:g} mm"
+            )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -168,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
     # distance dims they drive negate them so the equation evaluates positive
     # (a centre/anchor dim at a negative coordinate displays as the magnitude).
     # Derived spans (ArmY/ArmRun) reference other globals as equation strings;
-    # the leg feature's named depth/start dimensions are likewise driven below.
+    # extrude depths are equation-driven below, while negative starts stay native.
     await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
     await set_global(adapter, "WallT", f"{WALL_T}mm")
     await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
@@ -230,10 +257,7 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
     name_last_feature(adapter, "Leg")
     leg_dims = name_dimensions(adapter, "Leg", ["LegLength", "LegStart"])
-    drive_jobs += [
-        (leg_dims[0], '"LegTop" - "LegBottom"'),
-        (leg_dims[1], '"LegBottom"'),
-    ]
+    drive_jobs.append((leg_dims[0], '"LegTop" - "LegBottom"'))
     expected = _RING_AREA * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -464,10 +488,7 @@ async def build(adapter) -> dict[str, str]:
     plug_feature_dims = name_dimensions(
         adapter, "EndPlug", ["PlugDepth", "PlugStart"]
     )
-    drive_jobs += [
-        (plug_feature_dims[0], '"PlugT"'),
-        (plug_feature_dims[1], '"ArmEndX"'),
-    ]
+    drive_jobs.append((plug_feature_dims[0], '"PlugT"'))
     if _solid_body_count(adapter) != 2:
         raise RuntimeError("brazed end plug did not persist as a separate body")
 
@@ -493,13 +514,12 @@ async def build(adapter) -> dict[str, str]:
     shank_feature_dims = name_dimensions(
         adapter, "ScrewShank", ["UnderHeadLength", "ShankStart"]
     )
-    drive_jobs += [
+    drive_jobs.append(
         (
             shank_feature_dims[0],
             '"ScrewThreadEngagement" + "ScrewShankLen"',
-        ),
-        (shank_feature_dims[1], '"ArmEndX" - "ScrewShankLen"'),
-    ]
+        )
+    )
     if _solid_body_count(adapter) != 3:
         raise RuntimeError("spring screw shank did not persist as a separate body")
 
@@ -524,13 +544,7 @@ async def build(adapter) -> dict[str, str]:
     head_feature_dims = name_dimensions(
         adapter, "ScrewHead", ["HeadThickness", "HeadStart"]
     )
-    drive_jobs += [
-        (head_feature_dims[0], '"ScrewHeadT"'),
-        (
-            head_feature_dims[1],
-            '"ArmEndX" - "ScrewShankLen" - "ScrewHeadT"',
-        ),
-    ]
+    drive_jobs.append((head_feature_dims[0], '"ScrewHeadT"'))
     if _solid_body_count(adapter) != 3:
         raise RuntimeError("spring screw head did not merge only with its shank")
 
@@ -627,6 +641,12 @@ async def build(adapter) -> dict[str, str]:
         )
     final_vol = vol
 
+    # Measured on SW 2026: a positive-magnitude equation reverses each of these
+    # negative starts on rebuild, while a signed-global RHS is refused when the
+    # equation is added.  Keep the four native start stations as-built; they are
+    # construction coordinates, not printed controls.  Their final readback
+    # below guards the released envelope.  Positive starts elsewhere (for
+    # example build_wheel_axle) remain equation-driven.
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the re-check below is the proof.
@@ -641,6 +661,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("driven gooseneck did not retain tube/plug/screw bodies")
 
     await apply_material(adapter, MATERIAL)
+    _assert_start_stations(adapter)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
