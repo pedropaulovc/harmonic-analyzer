@@ -521,50 +521,60 @@ def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
-    """Rebuild each reopened configuration, then strictly validate its teeth.
+    """Fully solve each reopened configuration, then strictly validate its teeth.
 
-    ``ShowConfiguration2`` only switches configurations.  The documented
-    authoritative read sequence is switch -> ``EditRebuild3`` -> inspect.
-    A live b399963e discriminator observed a non-authoritative T006 cold read
-    with pattern error 1 / four faces, while a following definition-state read
-    already reported error 0 before ``EditRebuild3``.  The getters therefore
-    are not an atomic cold-cache snapshot.  Evidence:
+    Before any geometry getter, each saved configuration is activated through
+    the repository's established ``set_active_configuration`` helper.  That
+    helper switches with ``ShowConfiguration2`` and applies its documented
+    full-solve strategy for equation-driven geometry: ``ForceRebuild3(False)``
+    with the existing ``EditRebuild3`` fallback.  The returned ``rebuilt`` flag
+    must be true.
+
+    An earlier b399963e discriminator read T006 before rebuilding and observed
+    pattern error 1 / four faces; that read then lazily changed the state before
+    the following ``EditRebuild3``.  A production closure subsequently proved
+    that ``EditRebuild3`` alone returns False on untouched inactive caches.
+    Those runs are preserved at:
     C:/src/dt-logs/farm-runs/20260921T224631Z-cone-b399-capture/
-    20260921T225446Z-leaf-part-cone_gear/task.log lines 481-493.
+    20260921T225446Z-leaf-part-cone_gear/task.log lines 481-493, and
+    C:/src/dt-logs/farm-runs/20260921T230142Z-cone-closure-capture/
+    20260921T231022Z-leaf-part-cone_gear/task.log lines 480-505.
 
-    This gate deliberately performs no topology read before the ordinary
-    rebuild.  A failed rebuild or any post-rebuild error, body, face, volume,
-    or monotonicity mismatch remains fatal; there is no ForceRebuild3 repair.
+    This validates the rebuilt saved model, not its cold caches.  A failed
+    activation/rebuild or any post-rebuild error, body, face, volume, or
+    monotonicity mismatch remains fatal.
     """
     failures: list[str] = []
     volumes: dict[str, float] = {}
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
     _telemetry.info(
-        f"{phase}: validating all configurations only after EditRebuild3; "
-        "the saved cold cache is known to be non-authoritative"
+        f"{phase}: validating all configurations only after the established "
+        "set_active_configuration rebuild; saved cold caches are not being "
+        "validated"
     )
     for configuration, teeth in ordered:
         try:
-            _activate_configuration(model, configuration)
-            rebuild_started = time.perf_counter()
-            rebuilt = bool(model.EditRebuild3())
-            rebuild_elapsed = time.perf_counter() - rebuild_started
+            activation_started = time.perf_counter()
+            activation = await adapter.set_active_configuration(configuration)
+            activation_elapsed = time.perf_counter() - activation_started
+            check(f"{phase} activate {configuration}", activation)
+            rebuilt = bool(activation.data.get("rebuilt"))
             _telemetry.info(
-                f"{phase} {configuration}: EditRebuild3={rebuilt}, "
-                f"elapsed={rebuild_elapsed:.6f}s"
+                f"{phase} {configuration}: "
+                f"set_active_configuration rebuilt={rebuilt}, "
+                f"elapsed={activation_elapsed:.6f}s"
             )
             if not rebuilt:
                 failures.append(
-                    f"{configuration}: EditRebuild3 returned False "
-                    f"after {rebuild_elapsed:.6f}s"
+                    f"{configuration}: set_active_configuration returned "
+                    f"rebuilt=False after {activation_elapsed:.6f}s"
                 )
                 continue
             volume, observation, issues = await _configuration_topology(
                 adapter,
                 configuration,
                 teeth,
-                phase=f"{phase} post-EditRebuild3",
+                phase=f"{phase} post-activation-rebuild",
             )
         except Exception as exc:
             failures.append(f"{configuration}: {exc}")
@@ -574,17 +584,20 @@ async def assert_saved_configuration_topology(
             failures.append(f"{observation}; issues={issues!r}")
 
     try:
-        _activate_configuration(model, CONFIGS[-1][0])
         restore_started = time.perf_counter()
-        restore_rebuilt = bool(model.EditRebuild3())
+        restore = await adapter.set_active_configuration(CONFIGS[-1][0])
         restore_elapsed = time.perf_counter() - restore_started
+        check(f"{phase} restore {CONFIGS[-1][0]}", restore)
+        restore_rebuilt = bool(restore.data.get("rebuilt"))
         _telemetry.info(
             f"{phase} restore {CONFIGS[-1][0]}: "
-            f"EditRebuild3={restore_rebuilt}, elapsed={restore_elapsed:.6f}s"
+            f"set_active_configuration rebuilt={restore_rebuilt}, "
+            f"elapsed={restore_elapsed:.6f}s"
         )
         if not restore_rebuilt:
             failures.append(
-                f"restore {CONFIGS[-1][0]}: EditRebuild3 returned False"
+                f"restore {CONFIGS[-1][0]}: set_active_configuration "
+                "returned rebuilt=False"
             )
     except Exception as exc:
         failures.append(f"restore {CONFIGS[-1][0]}: {exc}")
