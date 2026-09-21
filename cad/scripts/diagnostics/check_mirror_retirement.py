@@ -569,6 +569,22 @@ expect(
 )
 expect(
     DT,
+    "crank-hub-1",
+    [d.X_CRANK, d.Y_CRANK, d.CRANK_HUB_Z0],
+    d.ROT_X_POS90,
+    "crank-hub",
+    **_SOLVED,
+)
+expect(
+    DT,
+    "crank-hub-pin-1",
+    d.CRANK_HUB_PIN_ORIGIN,
+    d.CRANK_HUB_PIN_ROWS,
+    "crank-hub-pin",
+    **_SOLVED,
+)
+expect(
+    DT,
     "crank-pinion-1",
     [d.X_CRANK, d.Y_CRANK, d.PINION_TOOTH_Z - d.PINION_FACE / 2.0],
     d.rot_z_rows(-d.PINION_SEED_DEG),

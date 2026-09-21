@@ -1,15 +1,11 @@
-r"""Reproduction script: crank tapered pin (book ch. 11, pp. 14-15).
+r"""Build removable crank taper pin MHA-024.
 
-The removable tapered pin that affixes the crank arm to the crankshaft —
-pulled to swap the crankshaft gear. Modelled as a plain conical frustum
-(period taper pins run ~1:48; the photo-scaled ends here are a touch
-steeper, both low confidence).
+The custom 1:48 pin secures separate hub MHA-137 to crankshaft MHA-026 and is
+removed to release the matched arm/hub assembly for gear service.  Its brass
+keeper ring passes through the small cross-hole near the big end.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 11" — cross-hole ~Ø5 (small end);
-big end and length scaled from the p.14 photo.
-
-Layout: pin axis along +X from the origin (big end at x=0), profile
-revolved 360 deg about a centerline on the axis.
+Layout: pin axis along +X from the origin (big end at x=0), profile revolved
+360 degrees about a centreline on the axis.
 
 Run (SolidWorks already open)::
 

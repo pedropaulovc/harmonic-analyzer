@@ -5,10 +5,11 @@ dimension layout, cross-hole callout, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The model's shaft axis runs along +Y (outboard/crank end at the origin), so
-the standard side views show the shaft VERTICAL: the crank-end face is the
-``*Bottom`` orientation and the length view is ``*Right`` (outboard end at the
-view bottom, the cross-hole facing the viewer as a circle at station 4).
+The model's shaft axis runs along +Y.  The cylinder begins at the shared
+arm/hub outboard plane; only the integral dome projects outboard.  The
+standard side views therefore show the shaft VERTICAL: the crank-end dome is
+the ``*Bottom`` orientation and the length view is ``*Right`` (dome at the
+view bottom, the hub-to-shaft cross-hole facing the viewer at station 12).
 
 Run with SolidWorks open::
 
@@ -55,6 +56,7 @@ from crankshaft_spec import (
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     SHAFT_DIA,
+    SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
@@ -80,10 +82,10 @@ _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 
 SHEET_SCALE = (1.0, 1.0)
 END_VIEW_SCALE = 2.0
-# Crank-end view (the *Bottom orientation: looking along +Y) at 2:1.
+# Crank-end dome view (the *Bottom orientation: looking along +Y) at 2:1.
 FRONT_CENTER = (0.060, 0.150)
-# Side view (the *Right orientation: shaft vertical, outboard end at the view
-# bottom) at 1:1 -- the 145 length spans sheet y 0.0775..0.2225.
+# Side view (the *Right orientation: shaft vertical, dome at the view bottom)
+# at 1:1.
 RIGHT_CENTER = (0.150, 0.150)
 ISO_CENTER = (0.345, 0.197)
 DATUM_A_RIGHT = (
@@ -91,13 +93,18 @@ DATUM_A_RIGHT = (
     FRONT_CENTER[1],
 )
 
-# Derived sheet anchors (meters).
-_SIDE_BOTTOM = RIGHT_CENTER[1] - SHAFT_LENGTH / 2000.0  # outboard end edge
-# The cross-hole faces the viewer in the side view; its centre sits at station
-# PIN_HOLE_HEIGHT above the outboard (bottom) end.
+# Derived sheet anchors (meters).  The view is centred on the full model bbox
+# from dome tip -DomeHeight through shaft far end +ShaftLength.
+_OUTBOARD_TIP_Y = RIGHT_CENTER[1] - (
+    SHAFT_LENGTH + SHAFT_DOME_HEIGHT
+) / 2000.0
+_CYLINDER_FACE_Y = _OUTBOARD_TIP_Y + SHAFT_DOME_HEIGHT / 1000.0
+_FAR_END_Y = _CYLINDER_FACE_Y + SHAFT_LENGTH / 1000.0
+# The cross-hole faces the viewer in the side view; its station is measured
+# inboard from the common cylinder/arm/hub outboard plane, not the dome tip.
 _PIN_CENTER = (
     RIGHT_CENTER[0],
-    _SIDE_BOTTOM + PIN_HOLE_HEIGHT / 1000.0,
+    _CYLINDER_FACE_Y + PIN_HOLE_HEIGHT / 1000.0,
 )
 
 FRONT_KEEP = {
@@ -112,10 +119,11 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
-    "JournalStart": (RIGHT_CENTER[0] + 0.035, _SIDE_BOTTOM + 0.020),
+    "DomeHeight": (RIGHT_CENTER[0] - 0.022, _OUTBOARD_TIP_Y - 0.007),
+    "JournalStart": (RIGHT_CENTER[0] + 0.035, _CYLINDER_FACE_Y + 0.020),
     "JournalLength": (
         RIGHT_CENTER[0] + 0.052,
-        _SIDE_BOTTOM + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
+        _CYLINDER_FACE_Y + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
     ),
 }
 DIMENSION_CALLOUTS = {}
@@ -296,7 +304,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crankshaft Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crankshaft; drive shaft; taper pin; turned steel",
+            3: "crankshaft; domed nose; hub taper pin; punched fiducial",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -321,6 +329,7 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *right_annotations],
         {
             "ShaftDiaDim": 3,
+            "DomeHeight": 1,
             "JournalDiaDim": 3,
             "JournalStart": 3,
             "JournalLength": 3,
@@ -354,7 +363,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # circular rim is the same cylindrical datum feature and reports truthful
     # sheet-space tag geometry.
     right_end_edges = _visible_shaft_end_edges(adapter, right)
-    crank_end_edge = right_end_edges[0][1]
     far_end_edge = right_end_edges[-1][1]
     add_datum_feature(
         adapter,
@@ -367,10 +375,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_datum_feature(
         adapter,
         right,
-        symbol_xy=(0.175, _SIDE_BOTTOM),
+        symbol_xy=(0.175, _FAR_END_Y),
         datum="B",
-        label="crank-end datum face",
-        entity=crank_end_edge,
+        label="far-end datum face",
+        entity=far_end_edge,
     )
     add_feature_control_frame(
         adapter,
@@ -379,26 +387,27 @@ async def build(adapter: Any) -> dict[str, str]:
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["end-face perpendicularity"],
         datums=("A",),
-        quantity="2X END FACES",
-        label="end-face perpendicularity",
+        quantity="FAR END FACE",
+        label="far-end perpendicularity",
         entity=far_end_edge,
     )
 
     # The tapered-pin cross-hole's associative wizard callout carries the
-    # Ø/THRU specification. The axial station is the imported model-owned
-    # PinHeight dimension above and takes the title-block linear tolerance.
+    # diameter/THRU specification.  Its basic axial station is measured from
+    # the real far-end datum face; the common arm/hub plane at the dome base is
+    # a geometric seam rather than a planar datum feature.
     cross_hole_edge = _visible_cross_hole_edge(adapter, right)
     pin_station = add_edge_dimension(
         adapter,
         right,
-        p0=(RIGHT_CENTER[0] - SHAFT_DIA / 2000.0, _SIDE_BOTTOM),
+        p0=(RIGHT_CENTER[0] - SHAFT_DIA / 2000.0, _FAR_END_Y),
         p1=(RIGHT_CENTER[0], _PIN_CENTER[1] + _PIN_HOLE_DIA / 2000.0),
-        text_xy=(0.125, 0.090),
-        label="cross-hole station",
+        text_xy=(0.125, 0.155),
+        label="cross-hole station from far end",
         orientation="vertical",
     )
-    set_arc_endpoints_to_center(adapter, pin_station, label="cross-hole station")
-    set_basic_dimension(adapter, pin_station, label="cross-hole station")
+    set_arc_endpoints_to_center(adapter, pin_station, label="cross-hole station from far end")
+    set_basic_dimension(adapter, pin_station, label="cross-hole station from far end")
     add_native_hole_callout(
         adapter,
         right,
