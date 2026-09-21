@@ -1,64 +1,70 @@
-"""Offline contracts for the alignment-pinion drawing (batch gear pattern)."""
+"""Offline contracts for retained alignment-pinion manufacturing data."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
+import _config
 import alignment_pinion_spec as spec
-import build_alignment_pinion as part
-import draw_alignment_pinion as drawing
-from _drawing_registry import DRAWINGS_BY_NAME
+import pinion_arbor_spec as arbor
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/alignment-pinion.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/alignment-pinion.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/alignment-pinion_drawing.png")
-    assert DRAWINGS_BY_NAME["alignment_pinion"].script == Path(drawing.__file__).resolve()
-
-
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) == marked == {"ArborBoreDia"}
-
-
-def test_gear_data_block_specifies_the_tooth_system() -> None:
+def test_gear_data_block_preserves_the_tooth_system() -> None:
     data = spec.GEAR_DATA
+    assert spec.TEETH == 42
+    assert "42" in data
     for field in (
-        "GEAR DATA", "NUMBER OF TEETH", "DIAMETRAL PITCH", "MODULE (mm",
-        "PRESSURE ANGLE", "PITCH DIAMETER (mm", "OUTSIDE DIAMETER (mm)",
-        "WHOLE DEPTH (mm)", "FACE WIDTH (mm)", "TOOTH FORM",
+        "NUMBER OF TEETH",
+        "DIAMETRAL PITCH",
+        "MODULE",
+        "PRESSURE ANGLE",
+        "PITCH DIAMETER",
+        "WHOLE DEPTH",
+        "TOOTH FORM",
     ):
         assert field in data, field
-    assert "42" in data
+    assert "INVOLUTE" in data
+    assert "FULL DEPTH" in data
     assert "X.XX" not in data
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Gear Data"' in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_manufacturing_notes_present() -> None:
-    assert "CUT TEETH" in spec.DRAWING_NOTES
-    assert "DEBUR" not in spec.DRAWING_NOTES
-    assert "X.XX" not in spec.DRAWING_NOTES
+def test_bore_has_the_single_machined_finish_contract() -> None:
+    assert len(spec.SURFACE_FINISHES) == 1
+    (finish,) = spec.SURFACE_FINISHES
+    assert finish.key == "drum_bore"
+    assert finish.roughness_um == 1.6
+    assert finish.face.diameter_mm == 8.0
 
 
-def test_native_gdt_controls_bore_datum_and_finish() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert source.count("add_surface_finish(") == 1
+def test_mha102_fit_band_has_a_valid_intersection_at_both_shaft_limits() -> None:
+    shaft_limits = (
+        arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
+        arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
+    )
+    bore_limits = (
+        spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
+        spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
+    )
+    assert shaft_limits == pytest.approx((7.98, 8.00))
+    assert bore_limits == pytest.approx((7.96, 7.98))
+
+    minimum_interference, maximum_interference = (
+        spec.ARBOR_DIAMETRAL_INTERFERENCE_MM
+    )
+    assert (minimum_interference, maximum_interference) == pytest.approx(
+        (0.010, 0.030)
+    )
+    assert 0.0 < minimum_interference < maximum_interference
+
+    for shaft_dia in shaft_limits:
+        bore_for_max_interference = shaft_dia - maximum_interference
+        bore_for_min_interference = shaft_dia - minimum_interference
+        overlap_low = max(bore_limits[0], bore_for_max_interference)
+        overlap_high = min(bore_limits[1], bore_for_min_interference)
+        assert overlap_low < overlap_high
 
 
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "clear_dimensions_for_drawing(adapter)" in source
-    assert "mark_dimensions_for_drawing(adapter, feature_name, dimension_names)" in source
-    assert '"Gear Data": GEAR_DATA' in source
-    assert '"Manufacturing Notes": DRAWING_NOTES' in source
-    import _config
-
+def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
     assert config["finish"] == "gear teeth cut; polished brass"

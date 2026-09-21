@@ -1,9 +1,8 @@
-r"""Create the curated manufacturing drawing for the alignment pinion drum (42T).
+r"""Create the simplicity-policy drawing for the 42T alignment-pinion drum.
 
-Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``), adapted for
-a long drum: the *Front end view carries the bore + tooth datum, and the *Right
-profile view shows the full 143 mm face length. Drawn 1:1, plus the standard
-isometric in the open band below the profile view.
+The end view owns the tooth-tip envelope and matched arbor bore.  The aligned
+profile owns the full tooth-face width, and the standard isometric supplies
+pictorial clarity without replacing either manufacturing view.
 """
 
 from __future__ import annotations
@@ -12,29 +11,31 @@ import argparse
 import sys
 from typing import Any
 
-from alignment_pinion_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from alignment_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA, SURFACE_FINISHES
+from alignment_pinion_spec import (
+    ARBOR_DIAMETRAL_INTERFERENCE_MM,
+    BORE_DIA,
+    DRAWING_PRECISION_BY_NAME,
+    SURFACE_FINISHES,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -55,29 +56,30 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-FRONT_CENTER = (0.150, 0.185)  # toothed end view
-RIGHT_CENTER = (0.285, 0.185)  # long drum profile (143 mm face)
-# The 143.2 x 22.4 mm drum projects to about 117 x 79 mm at 1:1, fitting
-# between the profile view and title block without a custom-scale label.
+FRONT_CENTER = (0.150, 0.185)
+RIGHT_CENTER = (0.285, 0.185)
 ISO_CENTER = (0.320, 0.120)
+GEAR_DATA_POS = (0.018, 0.262)
+MANUFACTURING_NOTES_POS = (0.018, 0.085)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-HALF_FACE = FACE_WIDTH * VIEW_SCALE[0] / 2000.0
-LEFT_END_X = RIGHT_CENTER[0] - HALF_FACE
-RIGHT_END_X = RIGHT_CENTER[0] + HALF_FACE
 
 FRONT_KEEP = {
-    "ArborBoreDia": (FRONT_CENTER[0] - 0.050, FRONT_CENTER[1] - 0.030),
+    "ArborBoreDia": (0.115, 0.175),
+    "OutsideDia": (0.150, 0.230),
 }
+RIGHT_KEEP = {
+    "FaceWidth": (RIGHT_CENTER[0], 0.145),
+}
+MIN_INTERFERENCE, MAX_INTERFERENCE = ARBOR_DIAMETRAL_INTERFERENCE_MM
 DIMENSION_CALLOUTS = {
-    # Light press under the MHA-102 arbor's Ø8.00 +0.00/-0.02 journal: bore
-    # 7.96..7.98 vs shaft 7.98..8.00 guarantees 0.00..0.04 interference. Also
-    # settles which tolerance-block row governs (neither .XX +/-0.51 nor
-    # DRILLED +0.10/0 -- the model dimension's own limits do).
-    "ArborBoreDia": "THRU - REAM\nPRESS FIT",
+    "ArborBoreDia": (
+        "FINISH BORE THRU; MATCH TO\n"
+        "FINISHED MHA-102 PINION ARBOR\n"
+        f"{MIN_INTERFERENCE:.3f}-{MAX_INTERFERENCE:.3f} "
+        "DIAMETRAL INTERFERENCE"
+    ),
+    "FaceWidth": "FULL TOOTH FACE",
 }
-DIMENSION_PRECISION = {"ArborBoreDia": 2}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -128,51 +130,36 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter, front, keep=FRONT_KEEP, view_label="toothed end"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="full tooth face"
+    )
+    annotations = [*front_annotations, *right_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
 
-    # No coordinate-picked face-length dimension on the drum profile: every
-    # pick pair tried snaps to the long horizontal tooth silhouettes (exact
-    # end-edge x picks select the same edge; 0.2 mm inset picks pair a
-    # vertical with a horizontal line and emit a stray 90-degree ANGLE dim).
-    # FACE WIDTH 143.2 is owned by the GEAR DATA block and the drum note.
-
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.025),
-        datum="A",
-        label="drum bore axis",
-        shoulder=True,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=(LEFT_END_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(LEFT_END_X - 0.030, RIGHT_CENTER[1] + HALF_OD + 0.014),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["drum end squareness to bore"],
-        datums=("A",),
-        label="drum end squareness to bore",
-    )
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.014, FRONT_CENTER[1] - 0.050),
+        symbol_xy=(0.180, 0.155),
         control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
         label="drum bore finish",
         entity=bore_edge,
+        leader_attach_xy=(FRONT_CENTER[0], FRONT_CENTER[1] - BORE_DIA / 2000.0),
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.085)
+    add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)
+    add_property_linked_note(
+        adapter,
+        "Manufacturing Notes",
+        *MANUFACTURING_NOTES_POS,
+        char_height=0.0025,
+    )
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,

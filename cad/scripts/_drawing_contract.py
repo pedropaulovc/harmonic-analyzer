@@ -44,6 +44,7 @@ _TOLERANCE_SETTERS = frozenset(
 # The remaining fleet migrates under #766; until then the rule is scoped here.
 PRECISION_MIGRATED_DRAWINGS = frozenset(
     {
+        "draw_alignment_pinion.py",
         "draw_crank_arm.py",
         "draw_cylinder_gear.py",
         "draw_harmonic_base.py",

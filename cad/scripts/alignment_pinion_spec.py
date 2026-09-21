@@ -22,16 +22,36 @@ OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
-ARBOR_BORE_BAND = (-0.020, -0.040)  # light press; (upper, lower) deviations
-FACE_WIDTH = 143.2  # spans all 20 drum stations
+ARBOR_BORE_BAND = (-0.020, -0.040)  # (upper, lower) deviations; matched press
+# Finish the bore to the measured MHA-102 shaft. This is a matched-pair
+# acceptance range, not an interchangeable limit stack across random parts.
+ARBOR_DIAMETRAL_INTERFERENCE_MM = (0.010, 0.030)
+FACE_WIDTH = 143.2  # spans all 20 cylinder-gear stations
+FACE_WIDTH_TOLERANCE_MM = 0.5
+OUTSIDE_DIA_BAND = (0.0, -0.10)  # finished tooth-tip envelope
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "GearBlank": {"FaceWidth"},
+    "GearBlankProfile": {"OutsideDia"},
     "ArborBoreProfile": {"ArborBoreDia"},
 }
+
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "GearBlank": {"FaceWidth": 1},
+    "GearBlankProfile": {"OutsideDia": 2},
+    "ArborBoreProfile": {"ArborBoreDia": 2},
+}
+DRAWING_PRECISION_BY_NAME = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked alignment-pinion dimension needs native precision")
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -46,26 +66,14 @@ GEAR_DATA = gear_data_note(
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("FACE WIDTH (mm)", f"{FACE_WIDTH:.1f}"),
+        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.2f}"),
         ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
     ]
 )
 
 DRAWING_NOTES = "\n".join(
     (
-        "SPUR GEAR: 0 DEG HELIX. CUT TEETH FULL LENGTH PER GEAR DATA.",
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-        f"LONG PINION DRUM: FACE {FACE_WIDTH:.1f} +/-0.5; SPANS ALL 20 CYLINDER-GEAR STATIONS.",
-        "Ø8 STEEL ARBOR (MHA-102, Ø8.00 +0.00/-0.02) LIGHT-PRESSES THRU THE BORE.",
-        "FIT GOVERNS: FINISH BORE FOR 0.01-0.03 PRESS ON THE AS-MADE ARBOR;",
-        "  TABULATED BORE LIMITS ARE THE PRE-FIT TARGET.",
+        "MATES WITH CYLINDER-GEAR BANK MHA-027.",
+        "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
     )
 )
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "drum end squareness to bore": "0.05",
-}
