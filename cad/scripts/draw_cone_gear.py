@@ -42,9 +42,10 @@ from _drawing_common import (
     set_hidden_lines_removed,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from cone_gear_notes import CYLINDER_MATE_NUMBER
+from build_cone_gear import assert_saved_configuration_topology
 from cone_gear_spec import (
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
@@ -109,10 +110,9 @@ SHEET_COUNT_POS = (0.350, 0.263)
 
 DIMENSION_CALLOUTS = {
     "BoreCutDia": "REAM THRU",
-    "ToothThickness": (
-        "CIRCULAR TOOTH THICKNESS AT PITCH DIA; "
-        f"BACKLASH WITH {CYLINDER_MATE_NUMBER} ACCEPT AT ASSEMBLY"
-    ),
+    # Pitch diameter, backlash and mate already live in the Gear Data block.
+    # Repeating them here made the long suffix collide with the bore callout.
+    "ToothThickness": "CIRCULAR TOOTH THICKNESS",
 }
 
 
@@ -140,7 +140,7 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
         ),
         "ToothThickness": (
             FRONT_CENTER[0] + half_od + 0.035,
-            FRONT_CENTER[1] - half_od - 0.010,
+            FRONT_CENTER[1] - half_od - 0.025,
         ),
     }
 
@@ -152,94 +152,6 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
             RIGHT_CENTER[1] + rendered_half_od(teeth) + 0.012,
         )
     }
-
-
-def _tooth_pattern_feature(source_model: Any) -> Any:
-    """Return the one circular feature pattern in the saved cone-gear part."""
-    matches: list[Any] = []
-    raw = source_model.FirstFeature()
-    while raw is not None:
-        feature = _early_bound(raw, "IFeature")
-        if "cirpattern" in str(feature.GetTypeName2()).casefold():
-            matches.append(feature)
-        raw = feature.GetNextFeature()
-    if len(matches) != 1:
-        names = [str(feature.Name) for feature in matches]
-        raise RuntimeError(
-            f"saved cone gear must have one circular pattern; found {names!r}"
-        )
-    return matches[0]
-
-
-def _assert_saved_configuration_topology(
-    adapter: Any, source_model: Any
-) -> None:
-    """Prove every persisted configuration contains its solved tooth pattern."""
-    pattern = _tooth_pattern_feature(source_model)
-    pattern_name = str(pattern.Name)
-    failures: list[str] = []
-    observations: list[str] = []
-    # Positive control first, then the smallest configuration that the drawing
-    # exposed as a smooth blank, then the remainder of the family.
-    ordered = (CONFIGURATION_TEETH[-1], *CONFIGURATION_TEETH[:-1])
-    for teeth in ordered:
-        configuration = f"T{teeth:03d}"
-        if not bool(source_model.ShowConfiguration2(configuration)):
-            failures.append(f"{configuration}: ShowConfiguration2 failed")
-            continue
-        manager = _early_bound(
-            source_model.ConfigurationManager, "IConfigurationManager"
-        )
-        active = _early_bound(manager.ActiveConfiguration, "IConfiguration")
-        observed = str(active.Name)
-        needs_rebuild = bool(active.NeedsRebuild)
-        part = _early_bound(source_model, "IPartDoc")
-        bodies = tuple(part.GetBodies2(0, False) or ())
-        face_count = (
-            int(_early_bound(bodies[0], "IBody2").GetFaceCount())
-            if len(bodies) == 1
-            else 0
-        )
-        states = pattern.IsSuppressed2(3, [configuration])
-        if not isinstance(states, (list, tuple)):
-            states = (states,)
-        suppressed = len(states) != 1 or bool(states[0])
-        definition = _early_bound(
-            pattern.GetDefinition(), "ICircularPatternFeatureData"
-        )
-        instances = int(definition.TotalInstances)
-        error_result = pattern.GetErrorCode2()
-        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
-            raise RuntimeError(
-                f"{configuration}: unreadable {pattern_name} error state "
-                f"{error_result!r}"
-            )
-        error_code = int(error_result[0] or 0)
-        is_warning = bool(error_result[1])
-        observation = (
-            f"{configuration}: active={observed}, needs_rebuild={needs_rebuild}, "
-            f"{pattern_name} instances={instances}, suppressed={suppressed}, "
-            f"error={error_code}, warning={is_warning}, bodies={len(bodies)}, "
-            f"faces={face_count}"
-        )
-        observations.append(observation)
-        if (
-            observed != configuration
-            or needs_rebuild
-            or instances != teeth
-            or suppressed
-            or error_code
-            or len(bodies) != 1
-            or face_count < 2 * teeth + 4
-        ):
-            failures.append(observation)
-    for observation in observations:
-        _telemetry.info(f"saved cone-gear topology: {observation}")
-    if failures:
-        raise RuntimeError(
-            "saved cone-gear configuration topology is invalid: "
-            + "; ".join(failures)
-        )
 
 
 def _configure_views(
@@ -261,6 +173,24 @@ def _configure_views(
             raise RuntimeError(
                 f"view configuration readback {observed!r} != {configuration!r}"
             )
+
+
+def _assert_tooth_geometry(front: Any, configuration: str, teeth: int) -> None:
+    """Prove the view exposes patterned body edges, not a smooth bored blank."""
+    edge_count = len(
+        visible_view_entities(
+            front, 1, label=f"{configuration} front tooth topology"
+        )
+    )
+    minimum = 2 * teeth + 2
+    if edge_count < minimum:
+        raise RuntimeError(
+            f"{configuration} front view exposes {edge_count} model-body edges; "
+            f"expected at least {minimum} for {teeth} visible teeth"
+        )
+    _telemetry.success(
+        f"{configuration} drawing tooth topology: {edge_count} visible body edges"
+    )
 
 
 def _curate_repeated_dimensions(
@@ -331,8 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open cone-gear source", await adapter.open_model(str(SOURCE)))
-    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
-    _assert_saved_configuration_topology(adapter, source_model)
+    await assert_saved_configuration_topology(adapter, phase="drawing source")
     read_required_properties(
         adapter.currentModel,
         (
@@ -390,6 +319,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
+        _assert_tooth_geometry(front, configuration, teeth)
 
         front_annotations = _curate_repeated_dimensions(
             adapter,
@@ -418,7 +348,7 @@ async def build(adapter: Any) -> dict[str, str]:
             edge_xy=(FRONT_CENTER[0] + bore_radius, FRONT_CENTER[1]),
             symbol_xy=(
                 FRONT_CENTER[0] + half_od + 0.015,
-                FRONT_CENTER[1] - 0.025,
+                FRONT_CENTER[1],
             ),
             control=bore_surface_finish(teeth),
             label=f"{configuration} cone-gear bore finish",
