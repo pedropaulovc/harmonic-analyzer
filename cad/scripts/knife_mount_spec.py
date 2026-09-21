@@ -12,60 +12,136 @@ EXACTLY ``DRAWING_DIMENSIONS``.
 NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
 2026-09-02 user re-read: unpainted heat-treated steel, not brass) carries a
 circular bore CLOSE around the mating hex trunnion (Ø12 over the 8.653 x 10.268
-hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
--- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
+hex).  The trunnion's TOP VERTEX LINE contacts the bore crown; every other
+facet clears.  The sharp ridge is on the LEVER trunnion
 (``build_summing_lever``), NOT on this part; this part's critical surface is the
-bore's upper inner wall, whose roundness/finish is called out in the notes.
+bore's upper inner wall.
 """
 
 from __future__ import annotations
 
+import math
+
 from _gtol_spec import CylinderFace
-from _surface_finish import GROUND_UM, SurfaceFinishControl
+from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 BLK_HALF_X = 12.0  # block half-width (24 across)
 SUPPORT_Z_THICK = 14.0  # axial depth straddling the trunnion mid
-BLK_TOP = 14.62  # local block top (hangs 0.25 under the top-frame casting underside)
-BLK_BOT = -14.75  # local block bottom (BORE_CY - R_BORE - 3.0 wall)
-BORE_CY = -5.75  # bore centre below the ridge origin (TopClear 0.25 - R_BORE)
+BLK_TOP = 14.62  # local block top at the hanging-stack envelope
+BORE_CY = -6.0  # bore crown is the knife axis: actual trunnion line contact
+BLK_BOT = -15.0  # BORE_CY - R_BORE - 3.0 wall
+BORE_FROM_TOP = BLK_TOP - BORE_CY
+BORE_DIAMETER_TOLERANCE_MM = 0.20
+BORE_POSITION_DIAMETRAL_TOLERANCE_MM = 0.20
+
+# Native blind hanger-stud tap, shared by the model and its hole callout.  Depth
+# is the 118-degree tap-drill's cylindrical shoulder; ThreadDepth is the full
+# usable thread.  The asymmetric native bands close the crown, tool-lead, and
+# shortened-stud stack without depending on the much looser general tolerance.
+STUD_TAP_DRILL_DEPTH_MM = 10.5
+STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM = (-0.10, 0.0)
+STUD_TAP_THREAD_DEPTH_MM = 6.3
+STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM = (0.0, 0.10)
+STUD_TAP_SPEC = HoleSpec(
+    "tapped_bottoming",
+    "1/2-13",
+    end="blind",
+    depth_mm=STUD_TAP_DRILL_DEPTH_MM,
+    overrides_mm={"ThreadDepth": STUD_TAP_THREAD_DEPTH_MM},
+)
+STUD_TAP_DIA = blind_cut_dia_mm(STUD_TAP_SPEC)
+STUD_TAP_POINT_HEIGHT_MM = 0.5 * STUD_TAP_DIA * DRILL_POINT_H
+STUD_TAP_CROWN_WEB_MM = (
+    BLK_TOP - STUD_TAP_DRILL_DEPTH_MM - STUD_TAP_POINT_HEIGHT_MM
+)
+
+# Adverse crown stack: bore axis may rise by half the diametral position band;
+# the close bore and tap-drill diameter may both finish at their upper limits.
+# The drill-point term also allows a conservative 1-degree included-angle
+# deviation from the conventional 118-degree point.
+DRILLED_HOLE_DIAMETER_PLUS_MM = 0.10
+DRILL_POINT_MIN_INCLUDED_ANGLE_DEG = 117.0
+STUD_TAP_WORST_CASE_CROWN_WEB_MM = (
+    BORE_FROM_TOP
+    - 0.5 * BORE_POSITION_DIAMETRAL_TOLERANCE_MM
+    - (2.0 * R_BORE + BORE_DIAMETER_TOLERANCE_MM) / 2.0
+    - (
+        STUD_TAP_DRILL_DEPTH_MM
+        + STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[1]
+    )
+    - 0.5
+    * (STUD_TAP_DIA + DRILLED_HOLE_DIAMETER_PLUS_MM)
+    / math.tan(math.radians(DRILL_POINT_MIN_INCLUDED_ANGLE_DEG / 2.0))
+)
+STUD_TAP_WORST_CASE_RUNOUT_MM = (
+    STUD_TAP_DRILL_DEPTH_MM
+    + STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[0]
+    - STUD_TAP_THREAD_DEPTH_MM
+    - STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM[1]
+)
 
 SURFACE_FINISHES = (
-    SurfaceFinishControl("knife_bore", GROUND_UM, CylinderFace(2.0 * R_BORE)),
+    SurfaceFinishControl("knife_bore", MACHINED_UM, CylinderFace(2.0 * R_BORE)),
 )
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  The block depth (14) is added on the sheet across the right-view
-# section. ---
+# print imports.  The construction-sketch dimension locates the bore vertically
+# from the top hanger seat; the hanger-tap datum axis supplies its horizontal
+# centre.  Together they feed the one surviving knife-system position control.
+# Its BASIC height and Ø0.20 position frame locate the bore from the hanger seat.
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"BlockWidth", "BlockHeight"},
-    # BoreCz was dropped from the print: the sketch dim measures the centre
-    # from the invisible part origin, which sits 0.25 above the bore top -- on
-    # the sheet it read as a (wrong) 12.45 bore radius (blind review round 2).
-    # The centre height rides the notes, stated from the datum-A top seat.
+    "Block": {"Depth"},
     "BoreProfile": {"BoreDia"},
+    "BoreHeightReference": {"BoreFromTop"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        f"BORE Ø{2.0 * R_BORE:.1f} THRU, CENTRED IN THE {2.0 * BLK_HALF_X:.2f} WIDTH (ON THE BLOCK VERTICAL",
-        f"CENTRELINE), CENTRE {BLK_TOP - BORE_CY:.2f} BELOW THE TOP SEAT",
-        "(DATUM A). THE BORE IS THE KNIFE-EDGE BEARING: THE LEVER TRUNNION",
-        "RIDES ITS UPPER INNER WALL. TWO BLOCKS USED, ONE PER TRUNNION.",
-        "TAP 1/2-13 UNC-2B X 12.0 DEEP IN THE TOP SEAT, ON THE BORE VERTICAL",
-        "CENTRELINE AT MID-DEPTH -- THE KNIFE-HANGER STUD THREADS IN AND",
-        "HANGS THE BLOCK FROM THE TOP-FRAME CASTING'S INTEGRAL CROSSBAR.",
-        "THE TAP-DRILL POINT BREAKS INTO THE BORE CROWN (BEARING CONTACT",
-        "INTERRUPTED ~3 WIDE AT MID-LENGTH): ACCEPTED BY DESIGN.",
-        "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING; LEAVE UNPAINTED.",
-        "THE BORE UPPER WALL IS THE HARDENED KNIFE SEAT.",
-    )
-)
+# Decimal places carry the ordinary size tolerance and therefore live on the
+# model dimensions.  Two places use the title-block .XX band without claiming
+# unsupported fit limits; the knife-bore position is controlled separately by
+# the BASIC dimensions and the surviving position frame.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BlockProfile": {"BlockWidth": 2, "BlockHeight": 2},
+    "Block": {"Depth": 2},
+    "BoreProfile": {"BoreDia": 2},
+    "BoreHeightReference": {"BoreFromTop": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+DRAWING_NOMINALS_MM: dict[str, float] = {
+    "BlockWidth": 2.0 * BLK_HALF_X,
+    "BlockHeight": BLK_TOP - BLK_BOT,
+    "Depth": SUPPORT_Z_THICK,
+    "BoreDia": 2.0 * R_BORE,
+    "BoreFromTop": BORE_FROM_TOP,
+}
+
+# The blind hanger tap must retain solid material between its floor and the
+# functional knife-bearing crown; the model's native tap definition proves it.
+DRAWING_NOTES = "KNIFE-BORE CROWN SHALL BE CONTINUOUS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# The knife-bore position is explicitly allowlisted by drawing-simplicity rule
+# 3. Its BASIC height is read from BoreHeightReference; datum A is the top
+# hanger seat and datum B is the functionally mating hanger-tap axis.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "knife-bore position": "0.20",
+    "knife-bore position": f"{BORE_POSITION_DIAMETRAL_TOLERANCE_MM:.2f}",
 }
