@@ -64,7 +64,7 @@ RIGHT_CENTER = (0.166, FRONT_CENTER[1])
 LEFT_CENTER = (0.238, FRONT_CENTER[1])
 BACK_CENTER = (0.310, FRONT_CENTER[1])
 SECTION_CENTER = (0.190, 0.225)
-ISO_CENTER = (0.320, 0.205)
+ISO_CENTER = (0.350, 0.215)
 
 
 def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
@@ -334,10 +334,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         "PassageCenter": (
             adjuster_center[0],
-            _elevation_y(BLOCK_HEIGHT, adjuster_center) + 0.012,
+            _elevation_y(BLOCK_HEIGHT, adjuster_center) + 0.030,
         ),
         "SlitDepth": (
-            adjuster_center[0] + 0.035,
+            adjuster_center[0] + 0.043,
             _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
         ),
     }
@@ -417,8 +417,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adjuster_view,
         edge=adjuster_edge,
         callout_xy=(
-            adjuster_center[0] + 0.046,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, adjuster_center) + 0.012,
+            adjuster_center[0] + 0.060,
+            0.195,
         ),
         label="blind adjuster thread",
     )
