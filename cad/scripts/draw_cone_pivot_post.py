@@ -157,11 +157,11 @@ FRONT_KEEP = {
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.170),
     "CrankBossDia": (0.170, 0.125),
-    "CrankBoreDia": (0.175, 0.175),
+    "CrankBoreDia": (0.175, 0.172),
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
+    "CrankBossStartZ": (0.035, 0.2305),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.136, _top_y(28.0)),
@@ -171,7 +171,7 @@ SECTION_KEEP = {
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
-    "ConeBossDia": (0.292, 0.184),
+    "ConeBossDia": (0.292, 0.177),
     "JournalBoreDia": (0.292, 0.163),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
