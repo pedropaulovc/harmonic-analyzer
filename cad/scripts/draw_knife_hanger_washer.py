@@ -124,6 +124,16 @@ def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
         raise RuntimeError(f"failed to center washer view caption {text!r}")
     return note
 
+_CAPTION_CLEARANCE_M = 0.010  # 10 mm of paper below each native view outline
+
+
+def _caption_below_view(
+    adapter: Any, text: str, view: Any, x: float
+) -> Any:
+    """Place a centered caption below the view's measured native outline."""
+    outline = _box(view.GetOutline(), label=f"{text} view", kind="view")
+    return _center_caption(adapter, text, x, outline[1] - _CAPTION_CLEARANCE_M)
+
 
 async def build(adapter: Any) -> dict[str, str]:
     stock = fastener(SPEC.artifact_stem)
@@ -219,37 +229,37 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     scale_text = f"{int(scale[0])}:{int(scale[1])}"
+    top_view, front_view, iso_view = views
     notes: list[tuple[Any, str]] = []
     linked_notes: list[tuple[Any, str, str]] = []
     notes.append(
         (
-            _center_caption(
-                adapter, f"TOP  {scale_text}", _VIEW_CELLS[0][1][0], 0.155
+            _caption_below_view(
+                adapter, f"TOP  {scale_text}", top_view, _VIEW_CELLS[0][1][0]
             ),
             f"TOP  {scale_text}",
         )
     )
     notes.append(
         (
-            _center_caption(
-                adapter, f"FRONT  {scale_text}", _VIEW_CELLS[1][1][0], 0.080
+            _caption_below_view(
+                adapter, f"FRONT  {scale_text}", front_view, _VIEW_CELLS[1][1][0]
             ),
             f"FRONT  {scale_text}",
         )
     )
     notes.append(
         (
-            _center_caption(
+            _caption_below_view(
                 adapter,
                 f"ISOMETRIC  {scale_text}  (PICTORIAL)",
+                iso_view,
                 _VIEW_CELLS[2][1][0],
-                0.143,
             ),
             f"ISOMETRIC  {scale_text}  (PICTORIAL)",
         )
     )
 
-    top_view, front_view = views[:2]
     top_annotations = curate_view_dimensions(
         adapter,
         top_view,
