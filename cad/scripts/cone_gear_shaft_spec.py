@@ -3,7 +3,7 @@ r"""Pure-data dimensional contract shared by the cone gear shaft and drawing."""
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
-from _gtol_spec import CylinderFace, GeometricControl, PartDatum
+from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from cone_pivot_post_installation import GEAR_AXIS_SHIFT
@@ -52,15 +52,26 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
 # Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).
-# WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal -- it
-# follows from the 62.2 OD anchor (ch13, low confidence) and is flagged for
-# Phase 3 rebuild validation. It is drawn faithfully, not "fixed" here.
+# The terminal land is 1/16 in, not the 1/32 in a literal "bore = shaft
+# section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
+# is cut as involute flanks closed by a chord on the base circle -- the
+# project's own DXF profile, cut with a self-made form cutter -- so T006's
+# minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
+# 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
+# depth) on a soldered, keyless, near-torque-free gear, and in exchange the
+# 20.675 mm terminal journal goes from L/D 26 to 13 -- 16x the bending
+# stiffness, the difference between a land a manual lathe can turn and one
+# that whips off the tool.  It is also the largest step that keeps the shaft
+# monotonically decreasing: the cone is assembled tip-first, and every gear
+# OD exceeds the next inboard gear's bore (T006 4.08 > T012 bore 3.175;
+# T012 7.14 > T018 6.35; T018 10.20 > T024 9.525), so no single gear can be
+# made integral with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
     (0.375, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),
     (0.25, FRONT_STUB + 148.8 + GEAR_AXIS_SHIFT),
     (0.125, FRONT_STUB + 155.7 + GEAR_AXIS_SHIFT),
-    (0.03125, FRONT_STUB + T006_TIP_STATION),  # shortened tip journal
+    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T006 seat + tip journal
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
@@ -73,36 +84,47 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 # "+0.00/-0.02" typed as sheet callout text.
 SECTION_DIA_BAND = SHAFT_H
 
-# Geometric controls, authored on the model as plain annotations by the part build
-# (_part_pmi.author_part_pmi) and IMPORTED onto the sheet — the sheet types no
-# tolerance strings. The shaft is five distinct-diameter lands, so each
-# control's face resolves by diameter alone; the Ø0.79375 tip needs the
-# tightened match tolerance to stay unique against nothing else that small.
-PART_DATUMS = (
-    # The integral v2-post bearing journal the tip runout is measured against.
-    PartDatum("A", CylinderFace(JOURNAL_DIA)),
-)
-GEOMETRIC_CONTROLS = (
-    GeometricControl(
-        "journal_cylindricity", "cylindricity", "0.01", CylinderFace(JOURNAL_DIA)
-    ),
-    GeometricControl(
-        "tip_runout",
-        "circular_runout",
-        "0.05",
-        CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
-        datums=("A",),
-    ),
-)
+# Shoulder root radius.  Each step sits in the ~0.39 mm axial air gap between
+# two neighbouring gear faces (~0.19 mm per side), so the root can be neither
+# a sharp corner (a stress riser at the smallest section of a slender shaft)
+# nor a radius big enough to touch a gear face: R0.10 is the largest standard
+# tool nose radius that clears.  Modelled as geometry and dimensioned once,
+# not written as a process note.
+FILLET_RADIUS = 0.10
+# Four identical shoulder roots, one fillet feature, one radius dimension.
+FILLET_CALLOUT = "4X"
+
+# Surface texture, on the two lands that RUN: the Ø12.2308 journal turns in
+# the pivot post bore and the terminal land turns in the cone tip bushing.
+# The three intermediate lands only carry soldered gears, so they are left to
+# the title-block process row.
 SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)
-    ),
+    SurfaceFinishControl("pivot_journal", MACHINED_UM, CylinderFace(JOURNAL_DIA)),
     SurfaceFinishControl(
         "tip_journal",
         MACHINED_UM,
         CylinderFace(SECTION_DIAS[-1], tolerance_mm=0.01),
     ),
+)
+
+# What the native dimensions cannot say (drawing-simplicity policy rule 2: a
+# fit or location requirement names its mate).  Line 1-2: the h band on the
+# gear-seat lands is a slip fit into the cone gears' bores -- the gear must
+# pass down the land and seat square before it is soldered, which a land
+# turned to the .XXX grade (+0.13 over a nominal-size bore) would not allow;
+# the acceptance is the printed limits.  Line 3-4: why three shoulder
+# stations print three places.  Neither line adds a check the shop cannot
+# make (codex, 375a122c: a "must fall between the gear faces" clause was
+# uncheckable without gear positions).  No digits but the mate's number, no
+# method words.  Lines stay short: the note block starts 58 mm in and the
+# title block begins at 216 mm.
+DRAWING_NOTES = "\n".join(
+    (
+        "GEAR SEAT DIAMETERS ARE A SLIP FIT",
+        "IN THE CONE GEAR BORES, MHA-013.",
+        "THREE-PLACE SHOULDER STATIONS LOCATE",
+        "THE SOLDERED CONE GEAR SEATS.",
+    )
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -116,30 +138,57 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Sec2": {"Sec2End"},
     "Sec3": {"Sec3End"},
     "Sec4": {"Sec4End"},
+    "ShoulderFillets": {"ShoulderR"},
 }
 
-# Kept to short lines so the block sits clear of the bottom-right title block
-# (a single ~130-char line reached x~0.33 m and overlapped it -- Codex/layout
-# audit). Substrings the test pins (CENTRE MARKS / LARGE-END FACE / FOLLOWER-REST
-# / FRAGILE BY DESIGN) each stay intact on one line.
-DRAWING_NOTES = "\n".join(
-    (
-        "ALL AXIAL STATION DIMENSIONS +/-0.25.",
-        "STEP STATIONS ARE MEASURED FROM THE LARGE-END FACE.",
-        f"DIA {JOURNAL_DIA:.4f} BEARING JOURNAL IS DATUM A.",
-        f"RUNNING FIT IN DIA {JOURNAL_BORE_DIA:.4f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        f"DIA {SECTION_DIAS[1]:.3f}, {SECTION_DIAS[2]:.3f}, "
-        f"{SECTION_DIAS[3]:.3f}, AND {SECTION_DIAS[4]:.3f}",
-        "GEAR-SEAT CYLINDERS HAVE CIRCULAR RUNOUT 0.05 MAX TO A",
-        "AT EVERY CROSS SECTION.",
-        "SHOULDER ROOTS R0.10 MAX OR RELIEF 0.20 WIDE X 0.20 DEEP MAX.",
-        "START FROM DIA 12.5 MIN ROUND BAR; TURN BETWEEN TEMPORARY",
-        "CENTRE EXTENSIONS, THEN REMOVE THEM TO FINISHED LENGTH.",
-        "NO CENTRE HOLE MAY REMAIN ON EITHER FINISHED END.",
-        f"FINISH-TURN THE DIA {SECTION_DIAS[-1]:.3f} TIP LAST "
-        "WITH FOLLOWER-REST SUPPORT --",
-        "SECTION IS FRAGILE BY DESIGN.",
-    )
-)
-END_VIEW_NOTE = "END VIEW SCALE 4:1"
+# Display precision is a MODEL property (drawing-simplicity policy rule 2):
+# the part build stamps it and the sheet only reads it back.
+#
+# Diameters: three places.  All five carry the shared h band, so their places
+# are only the number's spelling.
+#
+# Gear-seat shoulders Sec1End..Sec3End: three places, which is the title-block
+# .XXX general grade (+-0.13) and no explicit band.  This is a location
+# requirement, not a spelling: gears are soldered at the 6.8889 mm seat pitch
+# with 6.5 mm faces, and each of these three steps has to fall inside the
+# ~0.39 mm air gap between two neighbouring gear faces (T024 north 141.72 |
+# step 141.9 | T018 south 142.11, and so on), 0.18..0.21 from either face.
+# +-0.13 keeps the step in the gap; the .XX grade (+-0.51) would let the
+# larger land run up to 0.3 mm under the small-bore gear's face, so that gear
+# could not pass the land to reach its pitch station.  The R0.10 root radius
+# eats a further 0.10 of the outboard margin, which a bore edge break covers.
+#
+# Journal length Sec0End and overall length Sec4End: one place, the routine
+# grade the fleet's plain lengths print.  The journal is 1.0 mm proud of the
+# post front face, the post bore ends flush with its shoulder, and the 64T
+# crank-drive gear beside that shoulder is soldered with ~1.7 mm of air to the
+# step, so +-0.8 on the length touches nothing; the tip end meets an
+# adjustable cup-point screw that takes up any length error.  Shoulder
+# radius: two places; nothing depends on it beyond clearing the gear faces.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "Sec0Profile": {"Sec0Dia": 3},
+    "Sec1Profile": {"Sec1Dia": 3},
+    "Sec2Profile": {"Sec2Dia": 3},
+    "Sec3Profile": {"Sec3Dia": 3},
+    "Sec4Profile": {"Sec4Dia": 3},
+    "Sec0": {"Sec0End": 1},
+    "Sec1": {"Sec1End": 3},
+    "Sec2": {"Sec2End": 3},
+    "Sec3": {"Sec3End": 3},
+    "Sec4": {"Sec4End": 1},
+    "ShoulderFillets": {"ShoulderR": 2},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
