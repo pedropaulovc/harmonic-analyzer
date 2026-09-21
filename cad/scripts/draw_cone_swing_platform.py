@@ -19,11 +19,12 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -48,6 +49,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
+from build_cone_swing_platform import NOTCH_RUN_DEG, SLOT_E_X, SLOT_E_Z
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -83,13 +85,16 @@ PROFILE_KEEP = {
     "PlateLenDim": (0.018, PROFILE_CENTER[1]),
     "NorthEastX": (0.100, 0.258),
     "NorthEdgeZ": (0.120, 0.245),
-    "NorthWestX": (0.050, 0.268),
+    "NorthWestX": (0.050, 0.255),
     "SouthWestX": (0.045, 0.115),
     "SouthEastX": (0.108, 0.105),
-    "CornerNER": (0.118, 0.258),
-    "CornerNWR": (0.030, 0.266),
-    "CornerSWR": (0.028, 0.108),
-    "CornerSER": (0.120, 0.102),
+    # The Top view reverses the authored corner compass.  Place each native
+    # radius beside its actual drawing attachment instead of routing four
+    # leaders diagonally through the plate.
+    "CornerNER": (0.120, 0.102),
+    "CornerNWR": (0.028, 0.108),
+    "CornerSWR": (0.118, 0.258),
+    "CornerSER": (0.030, 0.258),
 }
 FEATURE_KEEP = {
     "PivotBearingReliefDia": (0.225, 0.250),
@@ -97,7 +102,8 @@ FEATURE_KEEP = {
     "PostMountWestZ": (0.145, 0.175),
     "PostMountEastX": (0.220, 0.185),
     "PostMountEastZ": (0.240, 0.175),
-    "NotchRunAngle": (0.155, 0.118),
+    # Replaced from model/view geometry after the feature view exists.
+    "NotchRunAngle": (0.0, 0.0),
     "CapECx": (0.175, 0.112),
     "CapECz": (0.145, 0.138),
     "CapEDia": (0.205, 0.105),
@@ -108,6 +114,25 @@ SECTION_KEEP = {
 }
 
 
+
+
+def _position_section_label(adapter: Any, section: Any) -> None:
+    """Keep the native section caption below, rather than inside, the section."""
+    notes = tuple(_read_member(section, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native section label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    target = (SECTION_CENTER[0], 0.080, 0.0)
+    if not annotation.SetPosition2(*target):
+        raise RuntimeError("failed to position native section label")
+    adapter.currentModel.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if max(abs(actual[i] - target[i]) for i in range(3)) > 1e-8:
+        raise RuntimeError(
+            f"native section label position did not persist: {actual}; "
+            f"requested={target}"
+        )
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -228,6 +253,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(1, 2),
         label="pivot bearing section",
     )
+    _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
 
     profile_annotations = curate_view_dimensions(
@@ -237,10 +263,26 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="profile plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Put the angular text inside the acute notch wedge.  A fixed sheet point
+    # can select the opposite angular region after the view is moved, which
+    # produces the sheet-spanning arc seen in the native drawing.
+    half_angle = NOTCH_RUN_DEG / 2.0
+    notch_angle_xy = model_point_in_view(
+        adapter,
+        feature,
+        (
+            SLOT_E_X + 15.0 * math.cos(math.radians(half_angle)),
+            0.0,
+            SLOT_E_Z + 15.0 * math.sin(math.radians(half_angle)),
+        ),
+        label="notch angular dimension",
+    )
+    feature_keep = dict(FEATURE_KEEP)
+    feature_keep["NotchRunAngle"] = notch_angle_xy
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
-        keep=FEATURE_KEEP,
+        keep=feature_keep,
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -263,21 +305,21 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.255, 0.238),
+        callout_xy=(0.255, 0.150),
         label="pivot close-clearance hole",
         edge=pivot_edge,
     )
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.255, 0.218),
+        callout_xy=(0.255, 0.248),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.300, 0.120),
+        symbol_xy=(0.350, 0.140),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
@@ -286,7 +328,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.300, 0.092),
+        symbol_xy=(0.350, 0.075),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
