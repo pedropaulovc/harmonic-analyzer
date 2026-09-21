@@ -168,6 +168,11 @@ def _add_arm_centerline(adapter: Any, view: Any) -> None:
 
 
 _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
+# The anchor is a tapped blind hole, not a drill-size hole, so ``drill_process``
+# refuses it; its native callout already carries the tap drill, the thread and
+# both depths.  The prefix is the one process word that IS the requirement:
+# 5.5 of full thread in a 6.5 drill leaves lead room for a bottoming tap only.
+ANCHOR_TAP_PROCESS = "BOTTOMING TAP"
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
@@ -312,7 +317,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=anchor_edge,
         callout_xy=(0.100, 0.184),
         label="anchor tap",
-        process=drill_process(ANCHOR_HOLE_SPEC),
+        process=ANCHOR_TAP_PROCESS,
     )
     set_hole_callout_precision(
         anchor_callout,

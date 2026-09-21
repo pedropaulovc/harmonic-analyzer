@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import crank_arm_spec
 import draw_crank_arm as drawing
 import build_crank_arm as arm
@@ -95,7 +97,14 @@ def test_hole_callouts_state_size_and_process() -> None:
     assert 'label="crank-arm cross-hole"' in source
     assert 'label="handle pivot hole"' in source
     assert 'label="anchor tap"' in source
-    assert source.count("process=drill_process(") == 3
+    # The anchor is tapped: a drill-size prefix does not exist for it (this
+    # raised on the farm, iter2) and the requirement it carries is the tap.
+    with pytest.raises(ValueError):
+        drill_process(crank_arm_spec.ANCHOR_HOLE_SPEC)
+    assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
+    assert drawing.ANCHOR_TAP_PROCESS == "BOTTOMING TAP"
+    assert source.count("process=drill_process(") == 2
+    assert "process=ANCHOR_TAP_PROCESS" in source
 
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
