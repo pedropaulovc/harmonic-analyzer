@@ -60,10 +60,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         }
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    # Turned part (rule 7): every diameter sits beside its axial extent on the
-    # side view. The tip circle and bore are native construction-reference
-    # dimensions in the Right-plane boss profile, not numbers authored by the
-    # drawing; the end view is left dimension-free.
+    # Turned part (rules 7 and 12): every diameter sits beside its axial extent
+    # on the longitudinal section. The tip circle and bore are native
+    # construction-reference dimensions in the Right-plane boss profile, not
+    # numbers authored by the drawing; the end view is left dimension-free.
     assert drawing.FRONT_KEEP == {}
     assert set(drawing.RIGHT_KEEP) == {
         "OutsideDia",
@@ -433,8 +433,8 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)  # title-block keep-out
-    # The three views march left to right without overlapping: face view, side
-    # view (half the overall length each side of its centre), isometric.
+    # The three views march left to right without overlapping: face view,
+    # longitudinal section (half the overall length each side), isometric.
     half_len = spec.OVERALL_LENGTH * 4 / 2000.0
     assert (
         drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_len - 0.010

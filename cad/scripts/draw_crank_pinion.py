@@ -1,11 +1,12 @@
 r"""Create the curated manufacturing drawing for the crank pinion (16T).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is three
-views of a toothed disc with a hub boss and six native model dimensions.
-Every turned diameter sits beside its axial extent on the side view: tooth-tip
-blank, reamed bore and boss, with face width, overall length and the boss end
-break. The retention pin's matched-fit hole callout and the gear-data block
-carry the process facts that geometry cannot.
+Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet has an end
+view, longitudinal section and isometric of a toothed disc with a hub boss and
+six native model dimensions. Every turned diameter sits beside its axial
+extent on the longitudinal section: tooth-tip blank, reamed bore and boss, with
+face width, overall length and the boss end break. The retention pin's
+matched-fit hole callout and the gear-data block carry the process facts that
+geometry cannot.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
 removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
@@ -26,7 +27,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -36,6 +37,7 @@ from _drawing_common import (
     add_view_centerline,
     assert_imported_precision,
     check_drawing_layout,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -43,7 +45,6 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -64,7 +65,6 @@ from crank_pinion_spec import (
     PIN_STATION,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -89,112 +89,36 @@ FRONT_CENTER = (0.110, 0.150)
 RIGHT_CENTER = (0.215, 0.150)
 ISO_CENTER = (0.345, 0.150)
 
-# Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
-# radius and the side view's half-height, which every dimension is placed clear
-# of; and half the printed boss, the side view's height past the teeth.
+# Half the printed tooth-tip circle, in sheet metres: the face-view silhouette
+# radius and the section's half-height, which every dimension is placed clear
+# of; and half the printed boss, the section's height past the teeth.
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0  # 0.0356
 HALF_BOSS = BOSS_DIA * VIEW_SCALE[0] / 2000.0  # 0.0270
 
 
 def _side_x(z_mm: float) -> float:
-    """Sheet x of a model-z station in the side view.
+    """Sheet x of a model-z station in the longitudinal section.
 
-    SolidWorks centres a view on its geometry (the crankshaft sheet's
-    ``_SIDE_BOTTOM`` idiom), and a *Right view lays model +Z to the LEFT (the
-    boss end sits nearest the face view), so the toothed south face (z = 0) is
-    the view's right edge and the boss end its left.
+    SolidWorks centres the derived view on its geometry, and the rightward
+    longitudinal section lays model +Z to the LEFT (the boss end sits nearest
+    the face view), so the toothed south face (z = 0) is the view's right edge
+    and the boss end its left.
     """
     return RIGHT_CENTER[0] + (OVERALL_LENGTH / 2.0 - z_mm) * VIEW_SCALE[0] / 1000.0
 
 
-def _simplify_side_gear_edges(adapter: Any, view: Any) -> None:
-    """Hide repeated axial tooth edges while retaining the two OD silhouettes."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-    candidates: list[tuple[float, Any]] = []
-    components = tuple(view.GetVisibleComponents() or ())
-    for component in components:
-        for raw_edge in tuple(view.GetVisibleEntities2(component, 1) or ()):
-            edge = _early_bound(raw_edge, "IEdge")
-            curve = edge.GetCurve()
-            if curve is None:
-                continue
-            curve = _early_bound(curve, "ICurve")
-            if not curve.IsLine():
-                continue
-            raw_vertices = (edge.GetStartVertex(), edge.GetEndVertex())
-            if any(vertex is None for vertex in raw_vertices):
-                continue
-            start, end = (
-                tuple(
-                    float(value)
-                    for value in _early_bound(vertex, "IVertex").GetPoint()
-                )
-                for vertex in raw_vertices
-            )
-            face_end = FACE_WIDTH / 1000.0
-            if not (
-                (abs(start[2]) <= 2e-6 and abs(end[2] - face_end) <= 2e-6)
-                or (abs(end[2]) <= 2e-6 and abs(start[2] - face_end) <= 2e-6)
-            ):
-                continue
-            midpoint = tuple(
-                (a + b) / 2.0 for a, b in zip(start, end, strict=True)
-            )
-            point = _early_bound(
-                math_utility.CreatePoint(double_array(midpoint)),
-                "IMathPoint",
-            )
-            mapped = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-            candidates.append((float(mapped.ArrayData[1]), edge))
-    if len(candidates) < 6:
-        raise RuntimeError(
-            f"side view exposed only {len(candidates)} axial gear edges; "
-            "cannot apply conventional gear representation"
-        )
-    min_y = min(y for y, _edge in candidates)
-    max_y = max(y for y, _edge in candidates)
-    to_hide = [
-        edge
-        for y, edge in candidates
-        if y > min_y + 1e-5 and y < max_y - 1e-5
-    ]
-    if len(to_hide) < 4:
-        raise RuntimeError(
-            f"side view identified only {len(to_hide)} repeated tooth edges to hide"
-        )
-    bound_view = _early_bound(view, "IView")
-    hidden_before = len(tuple(bound_view.HiddenEdges or ()))
-    draw = adapter.currentModel
-    draw.ClearSelection2(True)
-    for edge in to_hide:
-        entity = _early_bound(edge, "IEntity")
-        if not entity.Select4(True, None):
-            raise RuntimeError("failed to select a repeated side-view tooth edge")
-    drawing = _early_bound(draw, "IDrawingDoc")
-    drawing.HideEdge()
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="simplify crank pinion side-view gear")
-    hidden_after = len(tuple(bound_view.HiddenEdges or ()))
-    if hidden_after < hidden_before + len(to_hide):
-        raise RuntimeError(
-            "side-view tooth edges did not remain hidden: "
-            f"{hidden_after - hidden_before} of {len(to_hide)}"
-        )
-
 
 # The end view is pictorial and carries only its center mark. Every turned
-# diameter belongs beside the matching axial extent on the side view (rule 7);
-# ``BossProfile`` supplies the tooth-tip and bore as construction-only native
-# model dimensions so they import without hidden lines or sheet-authored
-# numbers.
+# diameter belongs beside the matching axial extent on the longitudinal section
+# (rule 7); ``BossProfile`` supplies the tooth-tip and bore as construction-only
+# native model dimensions so they import without sheet-authored numbers.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
-# Side view: the tooth-tip diameter sits above its axial span; the bore diameter
-# sits just right of the silhouette, still clear of the isometric. The two
-# lengths stay baseline-stacked below the view from the toothed south face
-# (rule 7: one origin per view, baseline not chained). The boss diameter sits
-# on its vertical dimension line in the clear gap left of the hub, while the
-# end break stays separately above the chamfer.
+# Longitudinal section: the tooth-tip diameter sits above its axial span; the
+# bore diameter sits just right of the silhouette, still clear of the
+# isometric. The two lengths stay baseline-stacked below the view from the
+# toothed south face (rule 7: one origin per view, baseline not chained). The
+# boss diameter sits on its vertical dimension line in the clear gap left of
+# the hub, while the end break stays separately above the chamfer.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 RIGHT_KEEP = {
     "OutsideDia": (
@@ -282,15 +206,19 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    right = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
+        view_xy=RIGHT_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="crank pinion longitudinal centre section",
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    # The side view alone shows hidden lines because it communicates the axial
-    # bore there, as rule 7 requires for a turned part. Repeated axial tooth
-    # edges are hidden separately so the bore and diameter leaders stay legible.
-    for view in (front, iso):
+    for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    set_hidden_lines_visible(adapter, right)
-    _simplify_side_gear_edges(adapter, right)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -299,11 +227,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Whole-model import for the side view (the crankshaft's JournalStart
-    # idiom): the targeted path can select a dimension owner as a SKETCH or
-    # BODYFEATURE, while the keep set prunes every unrequested annotation.
+    # Whole-model import for the longitudinal section (the crankshaft's
+    # JournalStart idiom): the targeted path can select a dimension owner as a
+    # SKETCH or BODYFEATURE, while the keep set prunes every unrequested
+    # annotation.
     right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+        adapter, right, keep=RIGHT_KEEP, view_label="longitudinal section"
     )
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
@@ -315,10 +244,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to pinion bore")
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin cross-hole")
-    # The side view is a turned part's length view: its axis centerline says
-    # which pair of edges is the faced ends (rule 7, turned parts), picked on
-    # the boss's cylindrical face between the tooth face and the pin hole's
-    # rim, a hair above the axis so the pick cannot land in the hole.
+    # The longitudinal section is the turned part's length view: its axis
+    # centerline says which pair of edges is the faced ends (rule 7), while the
+    # cut exposes the bore so its native diameter never lands on hidden lines.
+    # Pick the boss's cylindrical face between the tooth face and pin-hole rim.
     add_view_centerline(
         adapter,
         right,
@@ -341,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
-    # The native side-view diameter remains beside its axial extent (rule 7).
+    # The native section-view diameter remains beside its axial extent (rule 7).
     add_leader_note(
         adapter,
         BORE_FIT_CALLOUT,
