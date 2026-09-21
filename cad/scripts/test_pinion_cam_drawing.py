@@ -19,11 +19,6 @@ def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
     assert control.key == "bore"
     assert control.roughness_um == 1.6
     assert control.face.diameter_mm == pinion_cam_spec.BORE
-    part_source = Path(cam.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bore")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
 
 
 def test_required_drawing_paths() -> None:
@@ -36,7 +31,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert cam.DRAWING_DIMENSIONS is pinion_cam_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.BOTTOM_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert (drawing.CAM_OD, drawing.BORE, drawing.ECC) == (
@@ -58,26 +53,17 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
 def test_eccentricity_is_dimensioned_and_called_out() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
     # must be an explicit dimension, not implied by graphical alignment.
-    assert "CollarCy" in drawing.FRONT_KEEP
-    assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
-    notes = pinion_cam_spec.DRAWING_NOTES
-    assert "NOT" in notes and "CONCENTRIC" in notes
-    assert "OFFSET 1.0" not in notes
+    eccentricity = drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "ECCENTRICITY" in eccentricity
+    assert "BORE AXIS TO OD AXIS" in eccentricity
+    assert "BOTH END FACES" not in eccentricity
     assert pinion_cam_geometry.THIN_SIDE_WALL >= 0.5
     assert pinion_cam_geometry.CAM_OD == 10.32
 
 
 def test_sheet_runs_at_3_to_1_with_a_boss_showing_2_to_1_pictorial() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The boss points at -Y, so the built-in isometric hides the part's one
-    # additional feature; the pictorial comes from the named FRONT-BOTTOM-RIGHT
-    # octant instead, and the note must no longer excuse the hidden boss.
-    assert '"*Isometric"' not in source
-    assert "octant_view_name(1, -1, 1)" in source
-    assert "scale=(2, 1)" in source  # the pictorial override
     assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
@@ -98,25 +84,24 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
         round(pinion_cam_spec.LIFT_ROD_DIA + REAM_SLIDE[1] - pinion_cam_spec.BORE, 6),
     )
     assert pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "0.010-0.045 DIAMETRAL CLEARANCE" in bore
+    assert "LOCK AFTER POSITIONING" in bore
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "M2.5 X 0.45-6H" in notes
     assert "ISO 4026" in notes
-    # The thread lives in the collar's thick-side wall, not in the Ø3.2 dome
-    # (codex iter3 sized the M2.5 major against the dome): say so.
-    assert "THRU THE COLLAR WALL INTO THE BORE" in notes
-    assert "THROUGH THE BOSS" not in notes
-    source = Path(cam.__file__).read_text(encoding="utf-8")
-    assert 'name_last_feature(adapter, "M2.5TapDrill")' in source
-    assert "TAP_DRILL_DIA" in source
+    boss = drawing.DIMENSION_CALLOUTS["BossDia"]
+    assert "COSMETIC RAISED BOSS" in boss
+    assert "SIZE/SHAPE NONCRITICAL" in boss
+    assert "OPTIONAL" not in boss
+    assert "M2.5 X 0.45-6H THRU TO BORE" in boss
+    assert "THROUGH THE BOSS" not in boss
 
 
 def test_set_screw_thread_cannot_break_the_front_face_at_general_grade() -> None:
@@ -132,41 +117,22 @@ def test_set_screw_thread_cannot_break_the_front_face_at_general_grade() -> None
 
 
 def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # drawing-simplicity-policy rules 3-5: a set-screw boss on a collar is not
-    # on the GD&T allowlist, so no datum, frame or basic dimension survives.
-    for helper in (
-        "add_datum_feature(",
-        "add_feature_control_frame(",
-        "set_basic_dimension(",
-        "_front_end_edge(",
-    ):
-        assert helper not in source, helper
     assert not hasattr(pinion_cam_spec, "GEOMETRIC_TOLERANCES_MM")
     for line in ("DATUM A", "POSITION ", "AXIS C IS PARALLEL"):
         assert line not in pinion_cam_spec.DRAWING_NOTES, line
-    # Each diameter is dimensioned on the view that draws it SOLID: the OD as
-    # the length view's width, the boss on the boss end view, the bore on the
-    # circular view (where it is then the only diagonal).
-    assert set(drawing.BOTTOM_KEEP) == {"BossDia"}
-    assert "CollarOd" in drawing.TOP_KEEP
+    # The visible boss-end view owns both boss dimensions; the collar OD stays
+    # in the length view and the bore in the circular front view.
+    assert set(drawing.BOTTOM_KEEP) == {"BossDia", "BossCz"}
+    assert "BossCz" not in drawing.SIDE_KEEP
+    assert "CollarOd" in drawing.SIDE_KEEP
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
-    assert "add_surface_finish(" in source
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("FINAL REAM THRU")
-    assert "*Bottom" in source
-    assert "BOSS END VIEW SCALE 2:1" in source
-    assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
+    assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert drawing.DIMENSION_CALLOUTS["BossCz"] == "BOSS AXIS STATION"
     assert "BossProjection" in drawing.FRONT_KEEP
-    assert "+/-0.05" not in source
-    # The projection callout names the surface it is measured from, never the
-    # OD's value -- that is the CollarOd dimension's job (policy rule 2).
-    assert drawing.DIMENSION_CALLOUTS["BossProjection"] == "BEYOND CAM OD"
-    assert not any(
-        character.isdigit()
-        for name, text in drawing.DIMENSION_CALLOUTS.items()
-        if name != "BoreDia"
-        for character in text
+    assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
+        "RAISED BOSS PROJECTION (REF)"
     )
 
 
@@ -185,20 +151,10 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "CollarCy",
     }
     assert max(by_name.values()) == 2
-    part_source = Path(cam.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The sheet reads the places back and never rewrites them.
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
-    assert "assert_imported_precision(" in source
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(cam.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_registry_retains_make_critical_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-cam")

@@ -20,10 +20,10 @@ import sys
 from typing import Any
 
 import _telemetry
+from _config import title_block
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     create_section_view,
@@ -42,18 +42,21 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from pinion_arbor_spec import SHAFT_DIA as ARBOR_DIA
+from pinion_arbor_spec import SHAFT_DIA_BAND as ARBOR_DIA_BAND
 from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
     GRIP_DIA,
     GRIP_LEN,
     RETENTION_HOLE_CALLOUT,
     ROD_SPAN,
+    TUBE_ID,
     TUBE_LEN,
     TUBE_OD,
     WALL_T,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -80,10 +83,10 @@ ISO_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.075, 0.150)
 RIGHT_CENTER = (0.175, 0.150)
 TOP_CENTER = (0.075, 0.230)
-SECTION_CENTER = (0.295, 0.155)
+SECTION_CENTER = (0.270, 0.145)
 ASSEMBLED_CENTER = (0.115, 0.090)
 ROD_END_CENTER = (0.220, 0.050)
-ISO_CENTER = (0.355, 0.225)
+ISO_CENTER = (0.325, 0.210)
 SECTION_SCALE = (3, 1)
 
 # Import in the actual authoring planes, then MOVE the native dimensions to
@@ -102,24 +105,36 @@ RIGHT_KEEP = {
 }
 TOP_KEEP = {
     "RodHoleDia": (0.104, 0.215),
-    "CapR": (0.048, 0.260),
+    "CapR": (0.020, 0.255),
     "RodHoleZ": (0.122, 0.223),
-    "RetentionHoleDia": (0.132, 0.250),
-    "RetentionPinFromMouth": (0.117, 0.242),
+    "RetentionHoleDia": (0.177, 0.250),
+    "RetentionPinFromMouth": (0.145, 0.223),
 }
 # TubeId's text stands right of the section, under the seating-depth callout:
 # its dimension line runs in the 13 mm between the socket mouth (sheet 0.120)
 # and the SECTION A-A label (top 0.105); the four-line block clears the
 # seating-depth callout above it.  Centred under the view it printed on top of
 # that label and against the assembled view's (Ø6.0) rod reference.
-SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.380, 0.126)}
-SEATING_DEPTH_TEXT_XY = (0.378, 0.151)
+SECTION_KEEP = {"TubeLen": (0.322, 0.135), "TubeId": (0.355, 0.116)}
+SEATING_DEPTH_TEXT_XY = (0.353, 0.141)
 ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
+_HOLE_TOLERANCE = title_block("drilled_hole")
+_SOCKET_CLEARANCE_MIN = (
+    TUBE_ID + float(_HOLE_TOLERANCE["minus_mm"])
+) - (ARBOR_DIA + ARBOR_DIA_BAND[0])
+_SOCKET_CLEARANCE_MAX = (
+    TUBE_ID + float(_HOLE_TOLERANCE["plus_mm"])
+) - (ARBOR_DIA + ARBOR_DIA_BAND[1])
+if _SOCKET_CLEARANCE_MIN < 0.0:
+    raise AssertionError("title-block socket range interferes with the arbor")
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM\nSLIP FIT ON\nARBOR MHA-102",
+    "TubeId": (
+        f"REAM FOR {_SOCKET_CLEARANCE_MIN:.2f}-{_SOCKET_CLEARANCE_MAX:.2f}\n"
+        "DIAMETRAL CLEARANCE ON\nPINION ARBOR MHA-102"
+    ),
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
@@ -131,7 +146,6 @@ DIMENSION_CALLOUTS = {
 HUB_END_Z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
 CROWN_ROOT_Z = -GRIP_LEN / 2.0
 CROWN_TIP_Z = CROWN_ROOT_Z - CAP_SAG
-SHOULDER_Z = GRIP_LEN / 2.0
 
 
 def _source_bodies(model: Any) -> tuple[Any, Any]:
@@ -204,82 +218,166 @@ def _point(
         label="handle dimension pick",
     )
 
-
-def _checked_reference_dimension(
-    adapter: Any,
-    view: Any,
-    *,
-    p0: tuple[float, float, float],
-    p1: tuple[float, float, float],
-    text_xy: tuple[float, float],
-    label: str,
-    expected_mm: float,
-    orientation: str,
-) -> Any:
-    """Add the one SHEET-derived reference dimension and verify it.
-
-    Every controlling dimension is a model dimension whose places the part
-    authored and ``assert_imported_precision`` reads back.  The parenthesised
-    socket-end-to-crown-root station is the single exception: a read-only
-    difference with no model dimension to import, so its places come from
-    the spec's ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a
-    literal.
-    """
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=_point(adapter, view, p0),
-        p1=_point(adapter, view, p1),
-        text_xy=text_xy,
-        label=label,
-        orientation=orientation,
+def _shorten_radius_leader(
+    adapter: Any, annotation: Any, position: tuple[float, float]
+) -> None:
+    """Shorten the spherical-radius leader, then restore its curated position."""
+    native_annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(
+        native_annotation.GetSpecificAnnotation(), "IDisplayDimension"
     )
-    native = _early_bound(display, "IDisplayDimension")
-    measured_mm = (
-        float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    )
-    if abs(measured_mm - expected_mm) > 1e-5:
+    display.ShortenedRadius = True
+    # SolidWorks recentres radial text when ShortenedRadius changes.  Move it
+    # only after that transition so the SR callout stays outside the crown.
+    if native_annotation.SetPosition2(position[0], position[1], 0.0) is not True:
+        raise RuntimeError("failed to restore handle crown-radius position")
+    adapter.currentModel.GraphicsRedraw2()
+    if display.ShortenedRadius is not True:
+        raise RuntimeError("handle crown radius did not retain shortened leader")
+    actual = tuple(float(value) for value in (native_annotation.GetPosition() or ()))
+    if len(actual) < 2 or any(
+        abs(measured - expected) > 1e-6
+        for measured, expected in zip(actual[:2], position, strict=True)
+    ):
         raise RuntimeError(
-            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+            f"handle crown radius position did not persist: {actual!r}"
         )
-    places = DRAWING_REFERENCE_PRECISION[label]
-    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
-    # tolerance places.  The subscript is written out again because
-    # _drawing_contract only accepts a spec lookup here.
-    native.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
-    if int(native.GetPrimaryPrecision2()) != places:
-        raise RuntimeError(
-            f"{label}: sheet dimension prints {native.GetPrimaryPrecision2()} "
-            f"decimal places, not {places}"
-        )
-    native.ShowParenthesis = True
-    if not native.ShowParenthesis:
-        raise RuntimeError(f"{label} was not shown as reference")
-    return display
+
+
+
+
+
 
 
 def _add_body_centerline(adapter: Any, view: Any) -> None:
-    """Use the two visible socket flanks, as in the pen-marker recipe."""
+    """Insert the socket axis from an opposite, overlapping OD-flank pair."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate body centerline view")
+    native_view = _early_bound(view, "IView")
+    native_view.UpdateViewDisplayGeometry()
+    candidates: list[
+        tuple[
+            Any,
+            tuple[float, float, float],
+            tuple[float, float, float],
+            tuple[float, float, float],
+        ]
+    ] = []
+    components = adapter._attempt(native_view.GetVisibleComponents, default=()) or ()
+    for component in components:
+        silhouettes = (
+            adapter._attempt(
+                lambda c=component: native_view.GetVisibleEntities2(c, 4),
+                default=(),
+            )
+            or ()
+        )
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            face = adapter._attempt(silhouette.GetFace)
+            if face is None:
+                continue
+            surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - TUBE_OD / 2000.0) > 1e-7:
+                continue
+            start_point = adapter._attempt(silhouette.GetStartPoint)
+            end_point = adapter._attempt(silhouette.GetEndPoint)
+            if start_point is None or end_point is None:
+                continue
+            start_data = adapter._get_attr_or_call(start_point, "ArrayData")
+            end_data = adapter._get_attr_or_call(end_point, "ArrayData")
+            if start_data is None or end_data is None:
+                continue
+            start = tuple(float(value) for value in start_data[:3])
+            end = tuple(float(value) for value in end_data[:3])
+            length = math.dist(start, end)
+            if length <= 1e-9:
+                continue
+            direction = tuple((b - a) / length for a, b in zip(start, end))
+            candidates.append((silhouette, start, end, direction))
+    pairs: list[tuple[float, float, Any, Any]] = []
+    expected_separation = TUBE_OD / 1000.0
+    for index, (first, first_start, first_end, first_direction) in enumerate(
+        candidates
+    ):
+        for second, second_start, second_end, second_direction in candidates[index + 1 :]:
+            alignment = abs(
+                sum(a * b for a, b in zip(first_direction, second_direction))
+            )
+            if alignment < 1.0 - 1e-6:
+                continue
+            offset = tuple(b - a for a, b in zip(first_start, second_start))
+            axial_offset = sum(
+                value * axis for value, axis in zip(offset, first_direction)
+            )
+            radial_offset = tuple(
+                value - axial_offset * axis
+                for value, axis in zip(offset, first_direction)
+            )
+            separation = math.sqrt(sum(value * value for value in radial_offset))
+            if separation < 0.8 * expected_separation:
+                continue
+            first_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(first_start, first_direction)),
+                    sum(a * b for a, b in zip(first_end, first_direction)),
+                )
+            )
+            second_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(second_start, first_direction)),
+                    sum(a * b for a, b in zip(second_end, first_direction)),
+                )
+            )
+            overlap = min(first_interval[1], second_interval[1]) - max(
+                first_interval[0], second_interval[0]
+            )
+            if overlap > 1e-6:
+                pairs.append(
+                    (
+                        overlap,
+                        abs(separation - expected_separation),
+                        first,
+                        second,
+                    )
+                )
+    if not pairs:
+        raise RuntimeError("socket OD has no opposite overlapping silhouette pair")
+    overlap, separation_error, first, second = max(
+        pairs, key=lambda item: (item[0], -item[1])
+    )
+    if separation_error > 2e-4:
+        raise RuntimeError(
+            f"socket flank separation misses OD by {separation_error * 1000:g} mm"
+        )
+    if overlap < 1e-3:
+        raise RuntimeError("socket flank pair has less than 1 mm axial overlap")
+    flanks = (first, second)
     draw.ClearSelection2(True)
-    station = SHOULDER_Z + WALL_T + TUBE_LEN / 2.0
-    for index, side in enumerate((-1.0, 1.0)):
-        x, y = _point(adapter, view, (0.0, side * TUBE_OD / 2.0, station))
-        if not draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        ):
-            raise RuntimeError("failed to select body centerline socket flank")
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.View = view
+    for index, flank in enumerate(flanks):
+        selectable = _sw_type_info.early_bound_or_flag(
+            flank, "ISilhouetteEdge", "Select2"
+        )
+        if not bool(selectable.Select2(index > 0, selection_data)):
+            raise RuntimeError(
+                f"failed to select enumerated socket flank {index + 1}"
+            )
+    if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
+        raise RuntimeError("body centerline socket-flank selection was not a pair")
     centerline = ddoc.InsertCenterLine2()
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if centerline is None:
         raise RuntimeError("failed to insert centerline between socket flanks")
     # SOLIDWORKS also generates axes for the omitted rod and coaxial body faces.
-    # Retain one native turning axis by its sheet geometry, never annotation IDs.
-    native_view = _early_bound(view, "IView")
     axis_y = _point(adapter, view, (0.0, 0.0, 0.0))[1]
     body_x = sorted(
         _point(adapter, view, (0.0, 0.0, z))[0] for z in (CROWN_TIP_Z, HUB_END_Z)
@@ -466,6 +564,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty rod-dimension donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    cap_radius = [
+        annotation
+        for annotation in top_annotations
+        if dimension_name(adapter, annotation) == "CapR"
+    ]
+    if len(cap_radius) != 1:
+        raise RuntimeError("expected one handle crown-radius dimension")
+    _shorten_radius_leader(adapter, cap_radius[0], TOP_KEEP["CapR"])
     # Every place the part authored (policy rule 2) must have survived the
     # import and the moves: a dimension that fell back to the sheet default
     # would print a band nobody specified.
@@ -473,19 +579,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_reference_dimensions(adapter, annotations, {"RodDia"})
     offset_dimension_text(adapter, annotations, {"TubeLen": SEATING_DEPTH_TEXT_XY})
 
-    # The crown root, measured from the flat socket end like the imported hub
-    # length and body overall it sits between: overall length, sphere radius
-    # and grip diameter already define this junction, so it is reference.
-    _checked_reference_dimension(
-        adapter,
-        right,
-        p0=(0.0, TUBE_OD / 4.0, HUB_END_Z),
-        p1=(0.0, (TUBE_OD + GRIP_DIA) / 4.0, CROWN_ROOT_Z),
-        text_xy=(RIGHT_CENTER[0], 0.202),
-        label="socket end to crown root",
-        expected_mm=HUB_END_Z - CROWN_ROOT_Z,
-        orientation="horizontal",
-    )
 
     for view, label in ((front, "body end"), (top, "cross-hole")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -499,7 +592,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.058, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.196)
+    add_property_linked_note(adapter, "Isometric View Note", 0.292, 0.181)
     return await finalize_drawing(
         adapter,
         OUTPUTS,

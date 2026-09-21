@@ -8,7 +8,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import build_pinion_handle as part
 import draw_pinion_handle as drawing
 import pinion_handle_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
@@ -125,13 +124,6 @@ def rendered_recipe(monkeypatch, tmp_path):
             if annotation.name in positions:
                 annotation.text_xy = positions[annotation.name]
 
-    def reference(_adapter, view, **kwargs):
-        annotation = SimpleNamespace(
-            name=kwargs.pop("label"), view=view, reference=True, **kwargs
-        )
-        annotation.precision = spec.DRAWING_REFERENCE_PRECISION[annotation.name]
-        dimensions.append(annotation)
-        return annotation
 
     def forbidden(*args, **kwargs):
         pytest.fail(
@@ -156,9 +148,11 @@ def rendered_recipe(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "assert_imported_precision", imported_precision)
     monkeypatch.setattr(drawing, "set_reference_dimensions", reference_dimensions)
     monkeypatch.setattr(drawing, "offset_dimension_text", offset)
-    monkeypatch.setattr(drawing, "_checked_reference_dimension", reference)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
     monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_shorten_radius_leader", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(drawing, "add_note", lambda *args: object())
     monkeypatch.setattr(
         drawing, "add_property_linked_note", lambda _a, name, *xy: notes.append(name)
@@ -200,6 +194,7 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     assert (
         bore.view is section and "REAM" in bore.callout and "THRU" not in bore.callout
     )
+    assert "DIAMETRAL CLEARANCE" in bore.callout
     assert package.dimensions["TubeLen"].view is section
     rod = package.dimensions["RodDia"]
     assert rod.view is package.dimensions["RodSpan"].view
@@ -220,11 +215,9 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
 def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe):
     """Rule 7 (one feature origin per view) meets rule 2 (the model owns it).
 
-    The hub length, the body overall, the cross-hole axis and the rod's reach
-    are values no feature dimension carries, so the part's reference sketches
-    own them and each prints in the view whose plane its sketch sits on.  The
-    crown root is the single sheet-derived dimension: a parenthesised
-    reference between the two imported baselines.
+    The hub length, body overall, cross-hole axes and rod reach have no natural
+    feature dimension, so the part's reference sketches own them and each
+    prints in the view whose plane its sketch sits on.
     """
     dimensions = rendered_recipe.dimensions
     right = dimensions["GripDia"].view
@@ -234,22 +227,13 @@ def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe
     assert dimensions["RodHoleZ"].view is top
     assert dimensions["RetentionPinFromMouth"].view is top
     assert dimensions["RodDown"].view is assembled
-    crown = dimensions["socket end to crown root"]
-    assert crown.view is right and crown.reference
-    assert crown.p0 == (0.0, spec.TUBE_OD / 4.0, drawing.HUB_END_Z)
-    assert crown.expected_mm == pytest.approx(21.0)
-    assert crown.orientation == "horizontal"
-    assert (
-        dimensions["HubLen"].text_xy[1]
-        < crown.text_xy[1]
-        < dimensions["BodyLen"].text_xy[1]
-    )
     assert drawing.HUB_END_Z == pytest.approx(16.5)
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked <= dimensions.keys()
     assert "Manufacturing Notes" in rendered_recipe.notes
     assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
     assert "MHA-136" in spec.DRAWING_NOTES
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
     assert "FLUSH" in spec.DRAWING_NOTES
     for forbidden in ("DATUM", "BASIC", "+/-", "MATERIAL", "TOLERANCE", "FINISH"):
         assert forbidden not in spec.DRAWING_NOTES.upper()
@@ -266,10 +250,12 @@ def test_socket_takes_the_title_block_grade_and_names_its_mate():
     assert not [name for name in vars(spec) if name.endswith("_BAND")]
     socket = drawing.DIMENSION_CALLOUTS["TubeId"]
     assert "REAM" in socket and "MHA-102" in socket
+    assert "DIAMETRAL CLEARANCE" in socket
     retention = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
     assert "MATCH-DRILL" in retention
     assert "MHA-102" in retention and "MHA-136" in retention
     assert "LIGHT DRIVE FIT" in retention
+    assert "NOT HAND-REMOVABLE" in retention
 
 
 def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
@@ -283,16 +269,9 @@ def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
     assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
     assert {name for name, places in by_name.items() if places != 1} == {"TubeId"}
     assert by_name["TubeId"] == 2
-    assert spec.DRAWING_REFERENCE_PRECISION == {"socket end to crown root": 1}
     assert rendered_recipe.asserted_places == by_name
     dims = rendered_recipe.dimensions
     assert dims["RodDia"].reference and dims["RodDia"].precision == 1
-    assert dims["socket end to crown root"].precision == 1
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_precision" not in source
-    assert "assert_imported_precision(" in source
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -313,24 +292,6 @@ def test_upper_handle_retention_is_distinct_and_coaxial_with_the_arbor():
     assert spec.RETENTION_PIN_DIA < spec.ROD_DIA
 
 
-def test_wrong_native_edge_measurement_blocks_release(monkeypatch):
-    display = SimpleNamespace(
-        GetDimension2=lambda _index: SimpleNamespace(SystemValue=0.020)
-    )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "_point", lambda _a, _v, xyz: xyz[:2])
-    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *args, **kwargs: display)
-    with pytest.raises(RuntimeError, match="measured 20, expected 21"):
-        drawing._checked_reference_dimension(
-            None,
-            None,
-            p0=(0, 0, 16.5),
-            p1=(0, 0, -4.5),
-            text_xy=(0.1, 0.2),
-            label="socket end to crown root",
-            expected_mm=21.0,
-            orientation="horizontal",
-        )
 
 
 def test_refused_native_dimension_move_blocks_release(monkeypatch):

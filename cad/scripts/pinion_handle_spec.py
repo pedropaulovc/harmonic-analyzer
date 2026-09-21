@@ -108,26 +108,24 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The one sheet-derived dimension: the parenthesised socket-end-to-crown-root
-# station, a read-only difference of the overall and the cap sagitta with no
-# model dimension to import.  Its places are still specification, so the
-# sheet reads them here instead of typing a literal (policy rule 2).
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"socket end to crown root": 1}
 
 # The handle and arbor rotate together. This static socket is not a running
 # bearing, so it has no local roughness requirement under the simplicity policy.
 SURFACE_FINISHES = ()
 
 RETENTION_HOLE_CALLOUT = (
-    "MATCH-DRILL WITH MHA-102\n"
-    "REAM TO ACTUAL MHA-136\n"
-    "LIGHT DRIVE FIT"
+    "MATCH-DRILL WITH PINION ARBOR MHA-102\n"
+    "REAM TO ACTUAL RETENTION PIN MHA-136\n"
+    "LIGHT DRIVE FIT\n"
+    "LIGHT TAPS; NOT HAND-REMOVABLE"
 )
 
 DRAWING_NOTES = "\n".join(
     (
-        "MATCH CROSS ROD TO BODY FOR LIGHT PRESS FIT.",
-        "MHA-136 ENDS FLUSH WITH SOCKET O.D. AFTER ASSEMBLY.",
+        "MATCH-REAM BODY TO ACTUAL CROSS ROD.",
+        "ASSEMBLE WITH LIGHT ARBOR-PRESS FORCE.",
+        "ROD SHALL NOT TURN OR SLIDE BY HAND.",
+        "MHA-136 ENDS FLUSH WITH SOCKET O.D.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -40,7 +40,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 2},
-    "Shaft": {"Depth": 2},
+    "Shaft": {"Depth": 1},
     "BackCapProfile": {"CapSagDim": 1},
     "RetentionHoleProfile": {
         "RetentionHoleDia": 1,
@@ -56,8 +56,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked arbor dimension needs authored places")
 
 RETENTION_HOLE_CALLOUT = (
-    "MATCH-DRILL WITH MHA-058\n"
-    "REAM TO ACTUAL MHA-136\n"
-    "LIGHT DRIVE FIT"
+    "MATCH-DRILL WITH PINION HANDLE MHA-058\n"
+    "REAM TO ACTUAL RETENTION PIN MHA-136\n"
+    "LIGHT DRIVE FIT\n"
+    "LIGHT TAPS; NOT HAND-REMOVABLE"
 )
-DRAWING_NOTES = "MHA-136 ENDS FLUSH WITH MHA-058 SOCKET O.D. AFTER ASSEMBLY."
