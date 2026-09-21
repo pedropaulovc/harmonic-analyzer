@@ -30,6 +30,7 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _drawing_common import (
     DrawingOutputs,
@@ -495,17 +496,26 @@ def _assert_view_geometry(
 def _prepare_cone_section(adapter: Any, view: Any) -> None:
     """Keep only the full cut surface at an explicitly independent 1:2 scale."""
     bound = _early_bound(view, "IView")
+    bound.UseParentScale = False
     bound.UseSheetScale = 0
+    bound.ScaleRatio = double_array(
+        [float(SECTION_SCALE[0]), float(SECTION_SCALE[1])]
+    )
     section = _early_bound(bound.GetSection(), "IDrSection")
     # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
     # dedicated bool getter may be truth-tested.
     section.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="cone boss cut surface")
+    rebuild_drawing(adapter, label="cone boss cut surface and independent scale")
     ratio = tuple(float(value) for value in bound.ScaleRatio)
-    if int(bound.UseSheetScale) != 0 or not math.isclose(
+    uses_parent = bool(bound.UseParentScale)
+    uses_sheet = int(bound.UseSheetScale)
+    if uses_parent or uses_sheet != 0 or not math.isclose(
         ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]
     ):
-        raise RuntimeError(f"independent cone-section scale did not persist: {ratio!r}")
+        raise RuntimeError(
+            "independent cone-section scale did not persist: "
+            f"{ratio=}, {uses_parent=}, {uses_sheet=}"
+        )
     if not bool(section.GetDisplayOnlySurfaceCut()):
         raise RuntimeError("cone boss section retained geometry beyond the cut")
     if bool(section.GetPartialSection()):
