@@ -95,7 +95,7 @@ _SQRT_HALF = 0.5**0.5
 # crossing -- machinist round 2).
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.176),
-    "CollarCy": (0.172, 0.162),
+    "CollarCy": (0.172, 0.190),
     "BossProjection": (0.180, 0.112),
 }
 SIDE_KEEP = {
@@ -114,8 +114,12 @@ DIMENSION_CALLOUTS = {
         "LOCK AFTER POSITIONING"
     ),
     "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
-    "BossProjection": "OPTIONAL BOSS PROJECTION (REF)",
-    "BossDia": "M2.5 X 0.45-6H THRU TO BORE\nCOSMETIC BOSS OPTIONAL",
+    "BossProjection": "RAISED BOSS PROJECTION (REF)",
+    "BossDia": (
+        "M2.5 X 0.45-6H THRU TO BORE\n"
+        "COSMETIC RAISED BOSS;\n"
+        "SIZE/SHAPE NONCRITICAL"
+    ),
     "BossCz": "BOSS AXIS STATION",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
