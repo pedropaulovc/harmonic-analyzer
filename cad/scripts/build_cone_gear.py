@@ -480,9 +480,10 @@ async def _configuration_topology(
         issues.append(f"pattern error {error_code} warning={is_warning}")
     if len(bodies) != 1:
         issues.append(f"solid body count {len(bodies)} != 1")
-    if face_count < 2 * teeth + 4:
+    expected_faces = 4 * teeth + 3
+    if face_count != expected_faces:
         issues.append(
-            f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
+            f"solid face count {face_count} != pristine topology {expected_faces}"
         )
     if abs(volume - expected) > 0.01 * expected:
         issues.append(f"volume {volume:.1f} outside 1% of {expected:.1f}")
@@ -936,15 +937,15 @@ async def build(adapter) -> dict[str, str]:
         )
     pattern = None
     for point in candidates:
-        # geometry_pattern: per-instance re-solve of the global-driven
-        # equation-curve profile produces corrupt sliver cuts (live SW 2026
-        # finding on the removable transgear); verbatim copies are exact.
+        # Persistence discriminator: solve every instance instead of copying
+        # seed faces. Exact pre-save topology guards below reject the sliver
+        # risk previously seen on a different gear rather than assuming it.
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
                 features=[gap_cut_name],
                 count=DEFAULT_TEETH,
-                geometry_pattern=True,
+                geometry_pattern=False,
             )
         )
         if res.is_success:
@@ -1258,6 +1259,10 @@ async def build(adapter) -> dict[str, str]:
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     await assert_saved_configuration_topology(adapter, phase="reopened")
+    raise RuntimeError(
+        "diagnostic complete: GeometryPattern=False persistence evidence captured; "
+        "refusing to publish probe artefacts"
+    )
 
     if findings:
         summary = "; ".join(findings)
