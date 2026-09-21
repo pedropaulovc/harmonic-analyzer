@@ -135,7 +135,7 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "ConeBossLen": (0.160, 0.2167),
+    "ConeBossLen": (0.142, 0.2167),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
@@ -156,7 +156,7 @@ DIMENSION_CALLOUTS = {
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS",
-    "ConeBossLen": "CONE BOSS TOTAL\nMIDPLANE",
+    "ConeBossLen": "BOSS LENGTH\nMIDPLANE",
     "CrankBossStartZ": "TO BOSS SPOT FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
