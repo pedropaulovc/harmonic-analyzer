@@ -105,7 +105,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Arm": {"Depth"},
     "ShaftBoreProfile": {"ShaftBoreDia"},
     "DimpleProfile": {"DimpleX", "DimpleDia"},
-    "StationReference": {"PivotStation", "AnchorStation", "AnchorOffset", "Width"},
+    "StationReference": {
+        "PivotStation",
+        "AnchorStation",
+        "AnchorOffset",
+        "AxisOffset",
+        "Width",
+    },
     "PinStationReference": {"PinStation"},
 }
 
@@ -125,6 +131,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PivotStation": 1,
         "AnchorStation": 1,
         "AnchorOffset": 1,
+        "AxisOffset": 1,
         "Width": 1,
     },
     "PinStationReference": {"PinStation": 1},
@@ -156,18 +163,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
-# Notes: at most four short lines of part-specific facts a machinist cannot
-# read off the views, never a dimension and never a method
-# (drawing-simplicity-policy.md rule 6).  The anchor tap's thread and drill
-# depths are on its hole callout, and both hole positions are dimensioned on
-# the print, so neither needs a line here.  The first line backs the drawn
-# arm centreline the bore, dimple and pivot centre marks sit on (no cross-width
-# location dimension exists for them to carry).
-DRAWING_NOTES = "\n".join(
-    (
-        "SHAFT BORE, DIMPLE AND PIVOT HOLE ARE ON THE ARM CENTRELINE.",
-        "CROSS-HOLE AXIS INTERSECTS SHAFT BORE AXIS.",
-        "DIMPLE AND ANCHOR TAP ARE CUT IN THE HANDLE-SIDE FACE.",
-    )
-)
+# The two same-face features are called out individually; only their shared,
+# otherwise invisible face ownership belongs in the linked note.
+DRAWING_NOTES = "DIMPLE AND ANCHOR TAP ARE CUT IN THE HANDLE-SIDE FACE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
