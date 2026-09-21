@@ -45,7 +45,6 @@ from cone_gear_shaft_spec import (
     FILLET_CALLOUT,
     JOURNAL_DIA,
     SECTION_DIAS,
-    SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
@@ -269,13 +268,17 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
 
     # Leader anchors for the two lands that RUN (sheet metres).  The tip
-    # symbol sits in the corridor between the Sec3End and Sec4End extension
-    # lines, above the Sec4End dimension line, so its leader crosses nothing.
+    # symbol sits above and LEFT of the tip, short of the Ø1.588 dimension
+    # line, and its leader drops onto the tip's top flank inside the first
+    # 2 mm of the land: no length extension line runs up there (they all
+    # drop from the bottom flank) and no diameter line stands left of the
+    # Ø1.588 one.  Below the tip the text ran across the 184.492/177.592/
+    # 170.692 extension lines (codex, a0c249d1).
     big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
     pivot_top = (big_end_x - 0.020, SIDE_CENTER[1] + SECTION_DIAS[0] / 2000.0)
-    tip_bottom = (
-        big_end_x - SECTION_ENDS[-2] / 1000.0 - 0.006,
-        SIDE_CENTER[1] - SECTION_DIAS[-1] / 2000.0,
+    tip_top = (
+        big_end_x - SHAFT_LENGTH / 1000.0 + 0.002,
+        SIDE_CENTER[1] + SECTION_DIAS[-1] / 2000.0,
     )
     add_surface_finish(
         adapter,
@@ -290,12 +293,12 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.0570, 0.1410),
+        symbol_xy=(0.0160, 0.1800),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
         entity=tip_face,
-        leader_attach_xy=tip_bottom,
+        leader_attach_xy=tip_top,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
