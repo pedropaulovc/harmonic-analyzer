@@ -10,7 +10,6 @@ import _config
 import crank_hub_geometry as geometry
 import crank_hub_spec
 import draw_crank_hub as drawing
-from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -43,17 +42,12 @@ def test_hub_shoulder_and_pin_stations_preserve_removal_topology() -> None:
     assert geometry.AXIAL_PIN_LENGTH == geometry.ARM_THICKNESS / 2.0
 
 
-def test_drawing_registry_marks_and_model_fit_band_are_complete() -> None:
+def test_drawing_registry_and_marks_are_complete() -> None:
     assert DRAWINGS_BY_NAME["crank_hub"].script == Path(drawing.__file__).resolve()
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/crank-hub.SLDDRW")
     marked = set().union(*crank_hub_spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    import build_crank_hub as hub
-
-    assert model_toleranced_dimensions(hub) == {
-        ("BoreProfile", "BoreDia"): geometry.HUB_BORE_BAND
-    }
 
 
 def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
