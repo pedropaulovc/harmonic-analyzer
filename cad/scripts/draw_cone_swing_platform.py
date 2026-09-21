@@ -182,7 +182,7 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"expected one native section label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (0.270, 0.080, 0.0)
+    target = (0.300, 0.075, 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native section label")
     adapter.currentModel.EditRebuild3()
@@ -390,7 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.315, 0.085)
+    add_property_linked_note(adapter, "Section View Note", 0.210, 0.075)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
