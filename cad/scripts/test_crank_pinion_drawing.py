@@ -158,9 +158,9 @@ def test_pin_hole_is_match_drilled_with_the_named_mate() -> None:
     assert spec.PIN_HOLE_PROCESS.split("\n") == [
         "MATCH DRILL AT ASSY WITH",
         f"CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
-        "1/8 DRILL",
         f"PIN {spec.PIN_NUMBER} LIGHT DRIVE FIT",
         "FLUSH BOTH SIDES",
+        "1/8 DRILL",
     ]
     # The crankshaft's print says the same match-drill requirement back,
     # naming this pinion; one side carries the shared assembly acceptance.

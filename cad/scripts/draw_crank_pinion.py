@@ -36,7 +36,6 @@ from _drawing_common import (
     assert_imported_precision,
     check_drawing_layout,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -44,6 +43,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -303,25 +303,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
     )
-    pin_station_annotation = next(
-        (
-            annotation
-            for annotation in right_annotations
-            if dimension_name(adapter, annotation) == "PinStation"
-        ),
-        None,
-    )
-    if pin_station_annotation is None:
-        raise RuntimeError("side view lost the PinStation annotation")
-    pin_station_display = adapter._attempt(
-        lambda: pin_station_annotation.GetSpecificAnnotation()
-    )
-    if pin_station_display is None:
-        raise RuntimeError("PinStation has no display annotation")
-    pin_station_display = _early_bound(pin_station_display, "IDisplayDimension")
-    pin_station_display.ShowParenthesis = True
-    if not bool(pin_station_display.ShowParenthesis):
-        raise RuntimeError("PinStation did not retain its reference parentheses")
+    set_reference_dimensions(adapter, right_annotations, ("PinStation",))
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
