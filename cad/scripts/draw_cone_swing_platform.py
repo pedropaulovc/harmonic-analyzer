@@ -111,7 +111,7 @@ NOTCH_KEEP = {
 }
 SECTION_KEEP = {
     "PlateThk": (0.300, 0.120),
-    "PivotBearingReliefDepth": (0.365, 0.125),
+    "PivotBearingReliefDepth": (0.405, 0.125),
 }
 
 
@@ -226,9 +226,11 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     return pivot_edges[0], mount_edges[0]
 
 
-def _horizontal_section_edge(view: Any, y_mm: float, *, label: str) -> Any:
-    """Return the longest section edge lying on one broad-face station."""
-    candidates: list[tuple[float, Any]] = []
+def _horizontal_section_edge(
+    view: Any, y_mm: float, *, label: str, prefer_right: bool = False
+) -> Any:
+    """Return a horizontal section edge on one broad-face station."""
+    candidates: list[tuple[float, float, Any]] = []
     for raw_edge in visible_view_entities(view, 1, label=f"{label} section edges"):
         edge = _early_bound(raw_edge, "IEdge")
         start = edge.GetStartVertex()
@@ -238,10 +240,11 @@ def _horizontal_section_edge(view: Any, y_mm: float, *, label: str) -> Any:
         p0 = tuple(float(value) * 1000.0 for value in _early_bound(start, "IVertex").GetPoint())
         p1 = tuple(float(value) * 1000.0 for value in _early_bound(end, "IVertex").GetPoint())
         if abs(p0[1] - y_mm) <= 0.01 and abs(p1[1] - y_mm) <= 0.01:
-            candidates.append((abs(p1[0] - p0[0]), edge))
+            candidates.append((abs(p1[0] - p0[0]), 0.5 * (p0[0] + p1[0]), edge))
     if not candidates:
         raise RuntimeError(f"pivot section has no {label} edge at y={y_mm:.3f} mm")
-    return max(candidates, key=lambda item: item[0])[1]
+    key_index = 1 if prefer_right else 0
+    return max(candidates, key=lambda item: item[key_index])[2]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -385,7 +388,9 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
-        entity=_horizontal_section_edge(section, 0.0, label="base slide"),
+        entity=_horizontal_section_edge(
+            section, 0.0, label="base slide", prefer_right=True
+        ),
     )
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
