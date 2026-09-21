@@ -96,9 +96,9 @@ _SQRT_HALF = 0.5**0.5
 # pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 FRONT_KEEP = {
-    "BoreDia": (0.055, 0.186),
-    "CollarCy": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.040),
-    "BossProjection": (0.180, 0.122),
+    "BoreDia": (0.055, 0.180),
+    "CollarCy": (0.150, 0.200),
+    "BossProjection": (0.150, 0.105),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.040),
@@ -328,8 +328,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    if add_note(adapter, "RIGHT-SIDE VIEW", 0.225, 0.190) is None:
-        raise RuntimeError("failed to label cam right-side view")
     if add_note(
         adapter, "REMOVED VIEW A - BOSS END - ROTATED 90 DEG", 0.200, 0.075
     ) is None:
