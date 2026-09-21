@@ -1,112 +1,94 @@
-"""Offline contracts for the pinion-arbor drawing."""
+"""Behavioral release contracts for the simplicity-policy pinion arbor."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
-import pinion_arbor_spec
-import _fit_limits
-from _drawing_contract import model_toleranced_dimensions
+import pinion_arbor_spec as spec
+import pinion_handle_pin_spec as pin_spec
+import pinion_handle_spec as handle_spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = pinion_arbor_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
-
-
-def test_required_drawing_paths() -> None:
+def test_required_drawing_paths_and_registry() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-arbor.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-arbor.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-arbor_drawing.png")
     assert DRAWINGS_BY_NAME["pinion_arbor"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is pinion_arbor_spec.DRAWING_DIMENSIONS
-    marked = set().union(*pinion_arbor_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked
-    assert (drawing.SHAFT_DIA, drawing.SHAFT_LEN, drawing.CAP_SAG) == (
-        pinion_arbor_spec.SHAFT_DIA,
-        pinion_arbor_spec.SHAFT_LEN,
-        pinion_arbor_spec.CAP_SAG,
+def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
+    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    kept = set(drawing.DONOR_KEEP) | set(drawing.PROFILE_KEEP) | set(
+        drawing.PIN_VIEW_KEEP
     )
+    assert kept == marked
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_crown_is_dimensioned_and_annotated() -> None:
-    # The crown radius derives from the marked sagitta: R = (r^2 + s^2) / 2s.
-    r, s = pinion_arbor_spec.SHAFT_DIA / 2.0, pinion_arbor_spec.CAP_SAG
-    assert abs(pinion_arbor_spec.CAP_R - (r * r + s * s) / (2.0 * s)) < 1e-9
-    assert "CapSagDim" in drawing.RIGHT_KEEP
-    assert drawing.CAP_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
-    assert "CROWN BACK END SR7.27" in pinion_arbor_spec.DRAWING_NOTES
-
-
-def test_linked_notes_define_remaining_arbor_operations() -> None:
-    notes = pinion_arbor_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS == {}
-    assert pinion_arbor_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
+    assert spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
     }
-    assert "CENTRE MARKS" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
+    (finish,) = spec.SURFACE_FINISHES
+    assert finish.key == "bearing"
+    assert finish.roughness_um == 1.6
+    assert finish.face.diameter_mm == spec.SHAFT_DIA
+    assert not hasattr(spec, "PART_DATUMS")
+    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
 
-def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from pinion_arbor_spec import GEOMETRIC_CONTROLS, PART_DATUMS
+def test_retention_hole_matches_the_handle_and_dedicated_pin() -> None:
+    assert spec.RETENTION_HOLE_DIA == pytest.approx(handle_spec.RETENTION_PIN_DIA)
+    assert spec.RETENTION_HOLE_DIA == pytest.approx(pin_spec.PIN_DIA)
+    assert spec.RETENTION_PIN_STATION == pytest.approx(
+        handle_spec.RETENTION_PIN_STATION_FROM_FLOOR
+    )
+    assert pin_spec.PIN_LEN == pytest.approx(handle_spec.TUBE_OD)
+    assert drawing.PIN_VIEW_KEEP.keys() == {
+        "RetentionHoleDia",
+        "RetentionPinStation",
+    }
+    callout = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
+    assert callout is spec.RETENTION_HOLE_CALLOUT
+    assert "MHA-058" in callout and "MHA-136" in callout
+    assert "LIGHT DRIVE FIT" in callout
+    assert "MHA-136" in spec.DRAWING_NOTES and "FLUSH" in spec.DRAWING_NOTES
 
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"bearing_cylindricity", "flat_tip_perpendicularity"}
-    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
-    assert by_key["bearing_cylindricity"].tolerance == "0.01"
-    # Only the flat front tip is squared to the axis -- the back end is the crown.
-    assert by_key["flat_tip_perpendicularity"].characteristic == "perpendicularity"
-    assert by_key["flat_tip_perpendicularity"].tolerance == "0.05"
-    assert by_key["flat_tip_perpendicularity"].datums == ("A",)
-    assert by_key["flat_tip_perpendicularity"].face.normal == (0, 0, -1)
-    assert by_key["flat_tip_perpendicularity"].face.offset_mm == 0.0
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
-    assert PART_DATUMS[0].face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
 
+def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
+    radius, sag = spec.SHAFT_DIA / 2.0, spec.CAP_SAG
+    assert spec.CAP_R == pytest.approx((radius * radius + sag * sag) / (2.0 * sag))
+    assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
+    assert "CapSagDim" in drawing.PROFILE_KEEP
+
+
+def test_part_authors_every_display_precision() -> None:
+    assert spec.DRAWING_PRECISION_BY_NAME == {
+        "ShaftDia": 2,
+        "Depth": 2,
+        "CapSagDim": 1,
+        "RetentionHoleDia": 1,
+        "RetentionPinStation": 1,
+    }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 1
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
+    assert "assert_imported_precision(" in drawing_source
+    assert "set_dimension_precision" not in drawing_source
+    assert "project_part_pmi" not in drawing_source
 
 
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source
-    assert source.count("scale=(1, 1)") == 1
-    assert "scale=(1, 2)" in source  # 226-long arbor: half-scale isometric
-    assert pinion_arbor_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_registry_retains_make_critical_material_and_finish() -> None:
     import _config
 
     config = _config.parts("pinion-arbor")

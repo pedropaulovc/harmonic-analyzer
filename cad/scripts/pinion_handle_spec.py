@@ -26,12 +26,26 @@ from pinion_handle_geometry import (
     WALL_T as WALL_T,
 )
 
+# Photo-derived reconstruction of the separate handle-to-arbor retention joint.
+# The upper tee's OD10.5 socket shows a small flush pin distinct from the Ø6
+# grip cross rod.  Its diameter and mid-socket station are reconstruction
+# choices within the photographic evidence, not historical measurements.
+RETENTION_PIN_DIA = 2.0
+RETENTION_PIN_STATION_FROM_FLOOR = TUBE_LEN / 2.0
+RETENTION_PIN_STATION_FROM_MOUTH = TUBE_LEN - RETENTION_PIN_STATION_FROM_FLOOR
+RETENTION_PIN_CENTER_Z = (
+    GRIP_LEN / 2.0 + WALL_T + RETENTION_PIN_STATION_FROM_FLOOR
+)
+RETENTION_PIN_LEN = TUBE_OD
+if RETENTION_PIN_STATION_FROM_FLOOR != RETENTION_PIN_STATION_FROM_MOUTH:
+    raise AssertionError("handle retention pin must remain at socket mid-length")
+
 # No local size bands. The socket is a slip clearance over the arbor stub and
 # the seating depth is a turned shoulder: neither is a running fit, a gear
-# feature nor a locating seat, so both take the title-block general grade
-# (drilled holes +0.10/0, linear by decimal place) -- cad/docs/tolerance-policy.md
-# "How a critical-feature tolerance is decided" and drawing-simplicity-policy
-# rule 2. A band that cannot cite a fit class or the error budget is a habit.
+# feature nor a locating seat, so both take the title-block general grade.
+# The retention hole is reamed to the actual MHA-136 pin for a stated light
+# drive fit, so stock variation cannot undermine positive retention and needs
+# no independent band (drawing-simplicity-policy rule 2).
 
 # ``HubReference``, ``CrossHoleReference`` and ``RodReference`` are hidden
 # construction sketches whose one job is to OWN the axial values the sheet
@@ -46,8 +60,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodDia"},
     "Rod": {"RodSpan"},
     "RodHoleProfile": {"RodHoleDia"},
+    "RetentionHoleProfile": {"RetentionHoleDia"},
     "HubReference": {"HubLen", "BodyLen"},
     "CrossHoleReference": {"RodHoleZ"},
+    "RetentionReference": {"RetentionPinFromMouth"},
     "RodReference": {"RodDown"},
 }
 
@@ -64,9 +80,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Tube": {"TubeLen": 1},
     "RodProfile": {"RodDia": 1},
     "Rod": {"RodSpan": 1},
+    "RetentionHoleProfile": {"RetentionHoleDia": 1},
     "RodHoleProfile": {"RodHoleDia": 1},
     "HubReference": {"HubLen": 1, "BodyLen": 1},
     "CrossHoleReference": {"RodHoleZ": 1},
+    "RetentionReference": {"RetentionPinFromMouth": 1},
     "RodReference": {"RodDown": 1},
 }
 
@@ -100,5 +118,16 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"socket end to crown root": 1}
 # bearing, so it has no local roughness requirement under the simplicity policy.
 SURFACE_FINISHES = ()
 
-DRAWING_NOTES = "MATCH CROSS ROD TO BODY FOR LIGHT PRESS FIT."
+RETENTION_HOLE_CALLOUT = (
+    "MATCH-DRILL WITH MHA-102\n"
+    "REAM TO ACTUAL MHA-136\n"
+    "LIGHT DRIVE FIT"
+)
+
+DRAWING_NOTES = "\n".join(
+    (
+        "MATCH CROSS ROD TO BODY FOR LIGHT PRESS FIT.",
+        "MHA-136 ENDS FLUSH WITH SOCKET O.D. AFTER ASSEMBLY.",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

@@ -1,4 +1,10 @@
-r"""Create the curated machinist drawing for the alignment-pinion arbor."""
+r"""Create the pinion-arbor manufacturing drawing under the simplicity policy.
+
+The running journal keeps its native size fit and one bearing-surface finish.
+No datum or geometric-control frame is warranted for this plain shaft.  The
+transverse handle-retention hole is shown directly in a second longitudinal
+view along the hole axis; it is never dimensioned to hidden lines.
+"""
 
 from __future__ import annotations
 
@@ -7,34 +13,39 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     CAP_R,
     CAP_SAG,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    DRAWING_PRECISION_BY_NAME,
+    RETENTION_HOLE_CALLOUT,
     SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    delete_view,
+    iter_views,
     place_view,
 )
 
@@ -52,48 +63,74 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
-# The part spans z 0..SHAFT_LEN+CAP_SAG (shaft + crown), so the side view is
-# OVERALL_LEN wide on the 1:1 sheet and its outline centre is the mid-span.
 OVERALL_LEN = SHAFT_LEN + CAP_SAG
-FRONT_CENTER = (0.055, 0.205)
-RIGHT_CENTER = (
-    FRONT_CENTER[0] + OVERALL_LEN * SHEET_SCALE[0] / 2000.0 + 0.045,
-    FRONT_CENTER[1],
-)
-# 226-long arbor: a 1:1 isometric would run off the ASME B sheet, so 1:2.
-# NOT (0.377, 0.205): even at 1:2 the iso is ~86 x 52, so up there it overran
-# the right zone margin (the border gate measured 2.1 mm) and crowded the side
-# view's right end. The empty band below the side view and right of the notes
-# block takes it whole, clear of the 226.25 dimension line at y=0.180.
-ISO_CENTER = (0.345, 0.145)
+PROFILE_CENTER = (0.205, 0.205)
+PIN_VIEW_CENTER = (0.055, 0.145)
+ISO_CENTER = (0.355, 0.145)
 
-# The shaft's flank in the *Right view: an 8-dia cylinder at 1:1, so its top
-# silhouette runs 4 mm above the view centre. The cylindrical callouts anchor
-# HERE rather than on the front view's end circle -- see the GD&T block below.
-SHAFT_FLANK_Y = RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
-
-FRONT_KEEP = {
-    # x=0.030, not the bbox-derived 0.014: horizontal text made this callout
-    # ~25 mm wide ("+0.00/-0.02"), so centred on 0.014 it ran over the 12.7 mm
-    # zone margin (the border gate measured 2.7 mm). 0.030 clears the margin on
-    # the left and stops short of the end circle at x=0.047 on the right.
-    "ShaftDia": (0.030, 0.220),
-}
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
-    # Held 20 mm clear of the view's left end, not the old 4 mm: horizontal text
-    # makes "SR7.27 CROWN" ~35 mm wide, so a 4 mm offset ran the text's right
-    # half back over the crown dimension's own extension lines.
+# The source ShaftDia was authored in the end-profile sketch.  Move that native
+# dimension into the horizontal turning view rather than replacing it with a
+# sheet-created dimension.  The temporary end view is deleted afterwards.
+DONOR_KEEP = {"ShaftDia": (0.030, 0.220)}
+PROFILE_KEEP = {
+    "Depth": (PROFILE_CENTER[0], 0.180),
     "CapSagDim": (
-        RIGHT_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
-        RIGHT_CENTER[1] + 0.022,
+        PROFILE_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
+        0.228,
     ),
 }
-# The shaft fit lives on the source-model dimension. The crown descriptor is
-# still a sheet layout annotation, not a tolerance override.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-CAP_CALLOUTS = {"CapSagDim": f"SR{CAP_R:.2f} CROWN"}
+PIN_VIEW_KEEP = {
+    "RetentionHoleDia": (0.084, 0.244),
+    "RetentionPinStation": (0.078, 0.232),
+}
+SHAFT_DIAMETER_XY = (PROFILE_CENTER[0] + 0.070, 0.225)
+SHAFT_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA / 2000.0
+DIMENSION_CALLOUTS = {
+    "CapSagDim": f"SR{CAP_R:.2f} CROWN",
+    "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
+}
+
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move a native model dimension and verify its new drawing-view owner."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name,
+        "DIMENSION",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
+    ddoc.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    matches = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -111,7 +148,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
         ),
         required=(
             "Number",
@@ -119,7 +155,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
-            "End View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -132,86 +167,69 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Arbor Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion arbor; zeroing-drum shaft; turned steel",
+            3: "pinion arbor; zeroing-drum shaft; handle retention pin",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    donor = place_view(adapter, str(SOURCE), "*Front", 0.030, 0.205, scale=(2, 1))
+    profile = place_view(
+        adapter, str(SOURCE), "*Right", *PROFILE_CENTER, scale=SHEET_SCALE
+    )
+    # Looking along model Y shows the radial retention hole as a solid circle.
+    # At 1:1 the 226 mm shaft still fits the B-sheet height while remaining a
+    # narrow, non-overlapping evidence view at the left edge.
+    pin_view = place_view(
+        adapter, str(SOURCE), "*Top", *PIN_VIEW_CENTER, scale=SHEET_SCALE
+    )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
-    for view in (front, right, iso):
+    for view in (donor, profile, pin_view, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    donor_annotations = curate_view_dimensions(
+        adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    profile_annotations = curate_view_dimensions(
+        adapter, profile, keep=PROFILE_KEEP, view_label="turned profile"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, right_annotations, CAP_CALLOUTS)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to arbor end view")
-
-    # Screen-right in *Right is model -Z: the flat front tip (z 0) lands on the
-    # RIGHT end of the side view, the crowned back end on the LEFT.
-    flat_end = (RIGHT_CENTER[0] + OVERALL_LEN / 2000.0, RIGHT_CENTER[1])
-    end_top = (
-        FRONT_CENTER[0],
-        FRONT_CENTER[1] + SHAFT_DIA * END_VIEW_SCALE / 2000.0,
+    pin_annotations = curate_view_dimensions(
+        adapter, pin_view, keep=PIN_VIEW_KEEP, view_label="retention-hole profile"
     )
-    # GD&T is model PMI (pinion_arbor_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_pinion_arbor) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch. Only the flat FRONT tip carries perpendicularity
-    # -- the back end is the SR crown, which has no face to square to the axis.
-    project_part_pmi(
+    shaft_diameter = _move_dimension(
         adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=front,
-                position=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
-                attachment_xy=end_top,
-            ),
-            "bearing_cylindricity": PmiDrawingPlacement(
-                view=right,
-                position=(RIGHT_CENTER[0] - 0.050, 0.236),
-                attachment_xy=(RIGHT_CENTER[0] - 0.050, SHAFT_FLANK_Y),
-                attachment_type="SILHOUETTE",
-            ),
-            "flat_tip_perpendicularity": PmiDrawingPlacement(
-                view=right,
-                position=(flat_end[0] + 0.018, 0.228),
-                attachment_xy=flat_end,
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="pinion arbor PMI",
+        donor_annotations[0],
+        profile,
+        SHAFT_DIAMETER_XY,
+        source_view=donor,
     )
-    # Sits right of the cylindricity frame, whose text ends near x=0.184; the
-    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
+    donor_name = view_name(adapter, donor)
+    delete_view(adapter, donor)
+    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
+        raise RuntimeError("failed to delete the empty diameter donor view")
+
+    annotations = [shaft_diameter, *profile_annotations, *pin_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    if not auto_center_marks(adapter, pin_view, holes=True, size=0.0025):
+        raise RuntimeError("failed to add center mark to retention-hole view")
+    add_view_centerline(
+        adapter,
+        profile,
+        face_xy=(PROFILE_CENTER[0], PROFILE_CENTER[1] + 0.001),
+        label="pinion arbor turning axis",
+    )
     add_surface_finish(
         adapter,
-        right,
-        edge_xy=(RIGHT_CENTER[0] + 0.050, SHAFT_FLANK_Y),
-        symbol_xy=(RIGHT_CENTER[0] + 0.050, 0.222),
+        profile,
+        edge_xy=(PROFILE_CENTER[0] + 0.040, SHAFT_FLANK_Y),
+        symbol_xy=(PROFILE_CENTER[0] + 0.040, 0.222),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
     )
 
-    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
-    add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
-
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.085, 0.105)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
