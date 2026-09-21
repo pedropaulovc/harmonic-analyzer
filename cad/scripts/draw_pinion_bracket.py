@@ -46,6 +46,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_surface_finish,
     assert_imported_precision,
+    create_blank_drawing_sheets,
     check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
@@ -89,6 +90,7 @@ OUTPUTS = DrawingOutputs(
     pdf=SPEC.outputs["pdf"],
     png=SPEC.outputs["png"],
 )
+SHEET_NAMES = ("MAIN", "RELIEF")
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
@@ -135,11 +137,11 @@ def _flank_y(model_y_mm: float) -> float:
 # border is too close underneath), and the fence's own letter stays clear of
 # the follower seat on the parent view.
 DETAIL_SCALE = (3.0, 1.0)
-DETAIL_CENTER = (0.058, 0.090)
+DETAIL_CENTER = (0.105, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.125, 0.055)
-DETAIL_LETTER_XY = (0.105, 0.105)
+DETAIL_CAPTION_XY = (0.172, 0.105)
+DETAIL_LETTER_XY = (0.245, 0.100)
 
 
 def _detail_x(model_x_mm: float) -> float:
@@ -177,13 +179,13 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
-    "PivotBoreDia": (0.090, 0.035),
-    "CamReliefParkR": (0.103, 0.115),
-    "CamReliefParkX": (0.068, 0.133),
-    "CamReliefParkY": (0.024, 0.102),
-    "CamReliefEngagedR": (0.103, 0.066),
-    "CamReliefEngagedX": (0.068, 0.124),
-    "CamReliefEngagedY": (0.024, 0.082),
+    "PivotBoreDia": (0.120, 0.085),
+    "CamReliefParkR": (0.160, 0.170),
+    "CamReliefParkX": (0.110, 0.205),
+    "CamReliefParkY": (0.050, 0.160),
+    "CamReliefEngagedR": (0.160, 0.120),
+    "CamReliefEngagedX": (0.110, 0.195),
+    "CamReliefEngagedY": (0.050, 0.130),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -410,6 +412,9 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="pinion bracket drawing package"
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -421,47 +426,17 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    # Explicit per-view scale: a view placed without one can silently
-    # auto-scale, which shifts every coordinate-based pick on it.
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate pinion bracket main sheet")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    detail = _cam_relief_detail(adapter, front)
-    # Only ONE feature on this strap is invisible in outline -- the blind
-    # follower seat -- and only the face view sees it, so only the face view
-    # carries hidden lines.  Both bores and both scallops go clean through,
-    # so nothing else turns dashed; the flank and the scallop detail stay
-    # clean (the seat's nick by the park scallop is a visible edge there).
     set_hidden_lines_visible(adapter, front)
-    for view in (left, iso, detail):
+    for view in (left, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # The complete pivot bore is the relief coordinates' reachable physical
-    # origin. Mark its axis in the enlarged detail before importing the
-    # origin-based scallop dimensions, and identify that physical feature
-    # directly so the four X/Y values cannot read as construction arithmetic.
-    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
-        raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
-    if (
-        add_note(
-            adapter,
-            "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
-            0.065,
-            0.190,
-            height=0.0035,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to identify relief coordinate origin")
-
-    # The detail claims the scallop dimensions before the parent import.
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="scallop detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -469,10 +444,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="strap face",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The seat profile is authored on a Right-parallel plane, so its size and
-    # its station through the bar are native to this flank view; the face
-    # import above rejects the two it does not place, which returns them to
-    # the import pool.
     left_annotations = curate_view_dimensions(
         adapter,
         left,
@@ -480,27 +451,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="seat flank",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*detail_annotations, *front_annotations, *left_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    # Decimal places are the tolerance statement and the part owns them; this
-    # sheet only proves the import kept them (policy rule 2).
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, left)
-
     for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
-
-    # Both bores run: the torque shaft in the lower one, the pinion arbor in
-    # the upper one.  Nothing else on the strap slides, seats or locates.
-    add_surface_finish(
-        adapter,
-        detail,
-        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.108, 0.085),
-        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
-        label="pivot bore finish",
-    )
     add_surface_finish(
         adapter,
         front,
@@ -510,12 +464,54 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor bore finish",
     )
 
-    # Measure the settled native text boxes, view outlines and rendered line
-    # segments before export.  In particular this proves the linked detail
-    # caption is contained and does not sit on the detail geometry or either
-    # relief-radius leader; fixed coordinate spacing alone cannot prove that.
-    rebuild_drawing(adapter, label="pinion bracket pre-export layout")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate pinion bracket relief sheet")
+    detail_parent = place_view(
+        adapter, str(SOURCE), "*Front", 0.285, 0.155, scale=(2, 1)
+    )
+    detail = _cam_relief_detail(adapter, detail_parent)
+    for view in (detail_parent, detail):
+        set_hidden_lines_removed(adapter, view)
+    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
+        raise RuntimeError("failed to mark pivot-bore origin in scallop detail")
+    if (
+        add_note(
+            adapter,
+            "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
+            0.105,
+            0.225,
+            height=0.0035,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to identify relief coordinate origin")
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="scallop detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    add_surface_finish(
+        adapter,
+        detail,
+        edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
+        symbol_xy=(0.160, 0.145),
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
+        label="pivot bore finish",
+    )
+
+    annotations = [*front_annotations, *left_annotations, *detail_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    for index, sheet_name in enumerate(SHEET_NAMES, start=1):
+        if not ddoc.ActivateSheet(sheet_name):
+            raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
+        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", 0.395, 0.260) is None:
+            raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
+        rebuild_drawing(adapter, label=f"pinion bracket {sheet_name} layout")
+        check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
 
     return await finalize_drawing(
         adapter,
@@ -523,6 +519,8 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pinion Swing Bracket Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
     )
 
 
