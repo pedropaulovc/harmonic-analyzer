@@ -1147,6 +1147,56 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
             f"T006 pattern control configurations {names!r} != {(configuration,)!r}"
         )
 
+
+    tip_radius_mm = facts["Ra"] * 25.4
+    check("T006 control create blank sketch", await adapter.create_sketch("Front"))
+    blank_circle = check(
+        "T006 control add blank circle",
+        await adapter.add_circle(0.0, 0.0, tip_radius_mm),
+    )
+    check(
+        "T006 control blank diameter",
+        await adapter.add_sketch_dimension(
+            blank_circle,
+            None,
+            "diameter",
+            2.0 * tip_radius_mm,
+        ),
+    )
+    await ensure_fully_defined(adapter, "T006 pattern-control blank sketch")
+    check("T006 control exit blank sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "T006ControlBlankProfile")
+    check(
+        "T006 control extrude blank",
+        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
+    )
+    name_last_feature(adapter, "T006ControlBlank")
+
+    bore_radius_mm = bore_dia_in(teeth) * 12.7
+    check("T006 control create bore sketch", await adapter.create_sketch("Front"))
+    bore_circle = check(
+        "T006 control add bore circle",
+        await adapter.add_circle(0.0, 0.0, bore_radius_mm),
+    )
+    check(
+        "T006 control bore diameter",
+        await adapter.add_sketch_dimension(
+            bore_circle,
+            None,
+            "diameter",
+            2.0 * bore_radius_mm,
+        ),
+    )
+    await ensure_fully_defined(adapter, "T006 pattern-control bore sketch")
+    check("T006 control exit bore sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "T006ControlBoreProfile")
+    check(
+        "T006 control cut bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=FACE_WIDTH + 2.0)
+        ),
+    )
+    name_last_feature(adapter, "T006ControlBoreCut")
     await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
     await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
     atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
@@ -1205,56 +1255,6 @@ async def _run_single_t006_pattern_control(adapter: Any) -> None:
         f'"Tmax" - {atn_tmax} - "Delta" + "Gamma"',
         facts["ThetaU"],
     )
-
-    tip_radius_mm = facts["Ra"] * 25.4
-    check("T006 control create blank sketch", await adapter.create_sketch("Front"))
-    blank_circle = check(
-        "T006 control add blank circle",
-        await adapter.add_circle(0.0, 0.0, tip_radius_mm),
-    )
-    check(
-        "T006 control blank diameter",
-        await adapter.add_sketch_dimension(
-            blank_circle,
-            None,
-            "diameter",
-            2.0 * tip_radius_mm,
-        ),
-    )
-    await ensure_fully_defined(adapter, "T006 pattern-control blank sketch")
-    check("T006 control exit blank sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "T006ControlBlankProfile")
-    check(
-        "T006 control extrude blank",
-        await adapter.create_extrusion(ExtrusionParameters(depth=FACE_WIDTH)),
-    )
-    name_last_feature(adapter, "T006ControlBlank")
-
-    bore_radius_mm = bore_dia_in(teeth) * 12.7
-    check("T006 control create bore sketch", await adapter.create_sketch("Front"))
-    bore_circle = check(
-        "T006 control add bore circle",
-        await adapter.add_circle(0.0, 0.0, bore_radius_mm),
-    )
-    check(
-        "T006 control bore diameter",
-        await adapter.add_sketch_dimension(
-            bore_circle,
-            None,
-            "diameter",
-            2.0 * bore_radius_mm,
-        ),
-    )
-    await ensure_fully_defined(adapter, "T006 pattern-control bore sketch")
-    check("T006 control exit bore sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "T006ControlBoreProfile")
-    check(
-        "T006 control cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=FACE_WIDTH + 2.0)
-        ),
-    )
-    name_last_feature(adapter, "T006ControlBoreCut")
 
     check("T006 control create gap sketch", await adapter.create_sketch("Front"))
     u = '("Tmax" * t)'
