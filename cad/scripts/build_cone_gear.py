@@ -71,6 +71,9 @@ import sys
 import time
 from typing import Any
 
+import pythoncom
+from win32com.client import VARIANT
+
 import _config
 from _drawing_marks import (
     apply_drawing_precision,
@@ -304,6 +307,49 @@ def pattern_feature_name(configuration: str) -> str:
     return f"{TOOTH_PATTERN_FEATURE}_{configuration}"
 
 
+def _bstr_array(configurations: list[str] | tuple[str, ...]) -> Any:
+    """Marshal names as SAFEARRAY(BSTR), not Python's SAFEARRAY(VARIANT)."""
+    return VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_BSTR,
+        list(configurations),
+    )
+
+
+def assert_configuration_family(model: Any, *, phase: str) -> tuple[str, ...]:
+    """Prove all twenty named family configurations exist and resolve."""
+    raw_names = model.GetConfigurationNames()
+    if raw_names is None:
+        names: tuple[str, ...] = ()
+    elif isinstance(raw_names, (list, tuple)):
+        names = tuple(str(name) for name in raw_names)
+    else:
+        names = (str(raw_names),)
+    expected = tuple(name for name, _teeth in CONFIGS)
+    missing = tuple(name for name in expected if name not in names)
+    if len(set(names)) != len(names) or missing:
+        raise RuntimeError(
+            f"{phase}: configuration enumeration invalid: "
+            f"names={names!r}, missing={missing!r}"
+        )
+
+    lookups: dict[str, str] = {}
+    for name in expected:
+        raw = model.GetConfigurationByName(name)
+        if raw is None:
+            raise RuntimeError(f"{phase}: GetConfigurationByName({name!r}) failed")
+        configuration = _early_bound(raw, "IConfiguration")
+        lookups[name] = str(configuration.Name)
+        if lookups[name] != name:
+            raise RuntimeError(
+                f"{phase}: configuration lookup {name!r} returned "
+                f"{lookups[name]!r}"
+            )
+    _telemetry.info(
+        f"{phase} configuration family: names={names!r}; lookups={lookups!r}"
+    )
+    return names
+
+
 def _pattern_feature(adapter: Any, configuration: str) -> Any:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     part = _early_bound(model, "IPartDoc")
@@ -315,12 +361,12 @@ def _pattern_feature(adapter: Any, configuration: str) -> Any:
 
 
 def _pattern_suppression_states(
-    feature: Any, configurations: list[str]
+    feature: Any, configurations: tuple[str, ...]
 ) -> tuple[bool, ...]:
-    """Read each requested configuration's one-element suppression array."""
+    """Read each named configuration through a typed one-name COM array."""
     states: list[bool] = []
     for configuration in configurations:
-        raw = feature.IsSuppressed2(3, [configuration])
+        raw = feature.IsSuppressed2(3, _bstr_array((configuration,)))
         values = tuple(raw) if isinstance(raw, (list, tuple)) else (raw,)
         if len(values) != 1:
             raise RuntimeError(
@@ -332,7 +378,10 @@ def _pattern_suppression_states(
 
 
 def set_fixed_pattern_scope(
-    adapter: Any, pattern_name: str, owner: str
+    adapter: Any,
+    pattern_name: str,
+    owner: str,
+    configurations: tuple[str, ...],
 ) -> None:
     """Suppress one fixed-count pattern everywhere except its owner."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -341,15 +390,30 @@ def set_fixed_pattern_scope(
     if raw is None:
         raise RuntimeError(f"cannot scope missing pattern {pattern_name}")
     feature = _early_bound(raw, "IFeature")
-    names = [name for name, _teeth in CONFIGS]
-    others = [name for name in names if name != owner]
-    if not bool(feature.SetSuppression2(0, 3, others)):
+    others = tuple(name for name in configurations if name != owner)
+    if not bool(feature.SetSuppression2(0, 3, _bstr_array(others))):
         raise RuntimeError(f"{pattern_name}: failed to suppress non-owner configs")
-    if not bool(feature.SetSuppression2(1, 3, [owner])):
+    if not bool(feature.SetSuppression2(1, 3, _bstr_array((owner,)))):
         raise RuntimeError(f"{pattern_name}: failed to unsuppress owner {owner}")
-    states = _pattern_suppression_states(feature, names)
+
+    if owner == CONFIGS[0][0]:
+        controls = (owner, CONFIGS[-1][0])
+        control_states = _pattern_suppression_states(feature, controls)
+        _telemetry.info(
+            f"{pattern_name}: name-routing control {controls!r} -> "
+            f"{control_states!r}"
+        )
+        if control_states != (False, True):
+            raise RuntimeError(
+                f"{pattern_name}: IsSuppressed2 name-routing control returned "
+                f"{control_states!r}, expected {(False, True)!r}"
+            )
+
+    states = _pattern_suppression_states(feature, configurations)
     unsuppressed = tuple(
-        name for name, suppressed in zip(names, states, strict=True) if not suppressed
+        name
+        for name, suppressed in zip(configurations, states, strict=True)
+        if not suppressed
     )
     _telemetry.info(
         f"{pattern_name}: SetSuppression2 owner={owner}, "
@@ -363,7 +427,8 @@ def set_fixed_pattern_scope(
 
 def assert_fixed_pattern_matrix(adapter: Any, *, phase: str) -> None:
     """Prove one and only one fixed pattern is active per configuration."""
-    names = [name for name, _teeth in CONFIGS]
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = assert_configuration_family(model, phase=phase)
     matrix: dict[str, tuple[str, ...]] = {}
     for owner, _teeth in CONFIGS:
         feature = _pattern_feature(adapter, owner)
@@ -380,7 +445,6 @@ def assert_fixed_pattern_matrix(adapter: Any, *, phase: str) -> None:
                 f"{unsuppressed!r}, expected {(owner,)!r}"
             )
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
     equations = _early_bound(model.GetEquationMgr(), "IEquationMgr")
     count_equations_list: list[str] = []
     for index in range(int(_read_member(equations, "GetCount") or 0)):
@@ -465,9 +529,7 @@ def _configuration_definition_state(
         if raw is None:
             raise RuntimeError(f"{configuration}: diagnostic feature {name} missing")
         feature = _early_bound(raw, "IFeature")
-        states = feature.IsSuppressed2(3, [configuration])
-        if not isinstance(states, (list, tuple)):
-            states = (states,)
+        states = _pattern_suppression_states(feature, (configuration,))
         error_result = feature.GetErrorCode2()
         if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
             raise RuntimeError(
@@ -506,10 +568,8 @@ async def _configuration_topology(
     part = _early_bound(model, "IPartDoc")
     pattern_name = pattern_feature_name(configuration)
     pattern = _pattern_feature(adapter, configuration)
-    states = pattern.IsSuppressed2(3, [configuration])
-    if not isinstance(states, (list, tuple)):
-        states = (states,)
-    suppressed = len(states) != 1 or bool(states[0])
+    states = _pattern_suppression_states(pattern, (configuration,))
+    suppressed = bool(states[0])
     definition = _early_bound(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
@@ -1038,6 +1098,11 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    document_configurations = assert_configuration_family(
+        model,
+        phase="before first fixed-pattern suppression",
+    )
     from solidworks_mcp.adapters.base import (
         CreateAxisParameters,
         SetGlobalVariableParameters,
@@ -1069,7 +1134,6 @@ async def build(adapter) -> dict[str, str]:
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     )
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
     for name, teeth in CONFIGS:
         _activate_configuration(model, name)
         if not bool(model.ForceRebuild3(False)):
@@ -1086,7 +1150,12 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         pattern_name = name_last_feature(adapter, pattern_feature_name(name))
-        set_fixed_pattern_scope(adapter, pattern_name, name)
+        set_fixed_pattern_scope(
+            adapter,
+            pattern_name,
+            name,
+            document_configurations,
+        )
 
     assert_fixed_pattern_matrix(adapter, phase="authored")
     _activate_configuration(model, CONFIGS[-1][0])
