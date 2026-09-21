@@ -53,9 +53,11 @@ from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_HOLE_DIA,
+    PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
 )
+from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -407,6 +409,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (profile, feature, notch, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    if cut.GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError("pivot section lost its cut-only display after annotation")
+    for face_name, model_y in (
+        ("post_seat", PLATE_THICKNESS / 1000.0),
+        ("base_slide", 0.0),
+    ):
+        projected = model_point_in_view(
+            adapter, section, (0.0, model_y, 0.0), label=f"{face_name} projection"
+        )
+        print(
+            f"section face {face_name}: model_y_mm={model_y * 1000:.3f} "
+            f"sheet_xy_mm=({projected[0] * 1000:.3f},{projected[1] * 1000:.3f})"
+        )
+    for sheet_geometry in collect_document(adapter):
+        print(describe_sheet(sheet_geometry))
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
