@@ -98,7 +98,7 @@ _SQRT_HALF = 0.5**0.5
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.180),
     "CollarCy": (0.150, 0.200),
-    "BossProjection": (0.150, 0.105),
+    "BossProjection": (0.120, 0.105),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.040),
