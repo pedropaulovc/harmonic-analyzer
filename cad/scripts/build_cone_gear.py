@@ -521,45 +521,74 @@ def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
-    """Fail closed unless all 20 reopened configurations retain real teeth."""
+    """Rebuild each reopened configuration, then strictly validate its teeth.
+
+    ``ShowConfiguration2`` only switches configurations.  The documented
+    authoritative read sequence is switch -> ``EditRebuild3`` -> inspect.
+    A live b399963e discriminator observed a non-authoritative T006 cold read
+    with pattern error 1 / four faces, while a following definition-state read
+    already reported error 0 before ``EditRebuild3``.  The getters therefore
+    are not an atomic cold-cache snapshot.  Evidence:
+    C:/src/dt-logs/farm-runs/20260921T224631Z-cone-b399-capture/
+    20260921T225446Z-leaf-part-cone_gear/task.log lines 481-493.
+
+    This gate deliberately performs no topology read before the ordinary
+    rebuild.  A failed rebuild or any post-rebuild error, body, face, volume,
+    or monotonicity mismatch remains fatal; there is no ForceRebuild3 repair.
+    """
     failures: list[str] = []
     volumes: dict[str, float] = {}
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
     ordered = (CONFIGS[-1], *CONFIGS[:-1])
+    _telemetry.info(
+        f"{phase}: validating all configurations only after EditRebuild3; "
+        "the saved cold cache is known to be non-authoritative"
+    )
     for configuration, teeth in ordered:
         try:
+            _activate_configuration(model, configuration)
+            rebuild_started = time.perf_counter()
+            rebuilt = bool(model.EditRebuild3())
+            rebuild_elapsed = time.perf_counter() - rebuild_started
+            _telemetry.info(
+                f"{phase} {configuration}: EditRebuild3={rebuilt}, "
+                f"elapsed={rebuild_elapsed:.6f}s"
+            )
+            if not rebuilt:
+                failures.append(
+                    f"{configuration}: EditRebuild3 returned False "
+                    f"after {rebuild_elapsed:.6f}s"
+                )
+                continue
             volume, observation, issues = await _configuration_topology(
                 adapter,
                 configuration,
                 teeth,
-                phase=phase,
+                phase=f"{phase} post-EditRebuild3",
             )
         except Exception as exc:
             failures.append(f"{configuration}: {exc}")
             continue
         volumes[configuration] = volume
         if issues:
-            model = _early_bound(adapter.currentModel, "IModelDoc2")
-            rebuilt = bool(model.ForceRebuild3(False))
-            try:
-                _healed_volume, healed_observation, healed_issues = (
-                    await _configuration_topology(
-                        adapter,
-                        configuration,
-                        teeth,
-                        phase=f"{phase} explicit-rebuild",
-                    )
-                )
-            except Exception as exc:
-                healed_observation = f"measurement failed: {exc}"
-                healed_issues = ("measurement failed",)
+            failures.append(f"{observation}; issues={issues!r}")
+
+    try:
+        _activate_configuration(model, CONFIGS[-1][0])
+        restore_started = time.perf_counter()
+        restore_rebuilt = bool(model.EditRebuild3())
+        restore_elapsed = time.perf_counter() - restore_started
+        _telemetry.info(
+            f"{phase} restore {CONFIGS[-1][0]}: "
+            f"EditRebuild3={restore_rebuilt}, elapsed={restore_elapsed:.6f}s"
+        )
+        if not restore_rebuilt:
             failures.append(
-                f"{observation}; issues={issues!r}; "
-                f"ForceRebuild3={rebuilt}; after={healed_observation}; "
-                f"after_issues={healed_issues!r}"
+                f"restore {CONFIGS[-1][0]}: EditRebuild3 returned False"
             )
-    _activate_configuration(
-        _early_bound(adapter.currentModel, "IModelDoc2"), CONFIGS[-1][0]
-    )
+    except Exception as exc:
+        failures.append(f"restore {CONFIGS[-1][0]}: {exc}")
+
     if len(volumes) == len(CONFIGS):
         family = [volumes[name] for name, _teeth in CONFIGS]
         if not all(a < b for a, b in zip(family, family[1:], strict=False)):
@@ -1257,78 +1286,7 @@ async def build(adapter) -> dict[str, str]:
     adapter.swApp.CloseDoc(part_title)
     adapter.currentModel = None
     check("reopen saved cone-gear", await adapter.open_model(part_path))
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-
-    async def snapshot_reopened(
-        configuration: str,
-        teeth: int,
-        *,
-        phase: str,
-    ) -> dict[str, Any]:
-        started = time.perf_counter()
-        volume, observation, issues = await _configuration_topology(
-            adapter,
-            configuration,
-            teeth,
-            phase=phase,
-        )
-        elapsed = time.perf_counter() - started
-        state = {
-            "configuration": configuration,
-            "volume": volume,
-            "reference_volume": volumes[configuration],
-            "observation": observation,
-            "issues": issues,
-            "snapshot_elapsed_s": elapsed,
-        }
-        _telemetry.info(f"{phase} multi-config discriminator: {state!r}")
-        return state
-
-    t120 = await snapshot_reopened("T120", 120, phase="reopened T120 cold")
-    t006_cold = await snapshot_reopened(
-        "T006",
-        6,
-        phase="reopened T006 cold",
-    )
-
-    rebuild_started = time.perf_counter()
-    edit_rebuild_ok = bool(model.EditRebuild3())
-    edit_rebuild_elapsed = time.perf_counter() - rebuild_started
-    t006_edited = await snapshot_reopened(
-        "T006",
-        6,
-        phase="reopened T006 EditRebuild3",
-    )
-
-    rebuild_started = time.perf_counter()
-    force_rebuild_ok = bool(model.ForceRebuild3(False))
-    force_rebuild_elapsed = time.perf_counter() - rebuild_started
-    t006_forced = await snapshot_reopened(
-        "T006",
-        6,
-        phase="reopened T006 ForceRebuild3",
-    )
-
-    _telemetry.info(
-        "b399963e multi-config discriminator rebuild results: "
-        f"EditRebuild3={edit_rebuild_ok} elapsed={edit_rebuild_elapsed:.6f}s, "
-        f"ForceRebuild3={force_rebuild_ok} elapsed={force_rebuild_elapsed:.6f}s, "
-        f"T120={t120!r}, cold={t006_cold!r}, "
-        f"edited={t006_edited!r}, forced={t006_forced!r}"
-    )
-    if not t006_cold["issues"]:
-        verdict = "T006-cold-clean"
-    elif not t006_edited["issues"]:
-        verdict = "T006-cold-invalid-edit-clean"
-    elif not t006_forced["issues"]:
-        verdict = "T006-cold-edit-invalid-force-clean"
-    else:
-        verdict = "T006-cold-edit-force-invalid"
-    raise RuntimeError(
-        "diagnostic complete: b399963e shared pattern "
-        f"{verdict}; T120_issues={t120['issues']!r}; "
-        "refusing to publish probe artefacts"
-    )
+    await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:
         summary = "; ".join(findings)
