@@ -137,7 +137,7 @@ DETAIL_SCALE = (6.0, 1.0)
 DETAIL_CENTER = (0.105, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.180, 0.085)
+DETAIL_CAPTION_XY = (0.220, 0.085)
 DETAIL_LETTER_XY = (0.245, 0.100)
 
 
@@ -279,8 +279,8 @@ def _cam_relief_detail(adapter: Any, front: Any) -> Any:
 
 
 def _position_detail_caption(adapter: Any, detail: Any) -> None:
-    """Move the native "DETAIL A / SCALE 3:1" caption without replacing its
-    linked fields; SolidWorks drops it under the view, below the border here."""
+    """Move the native detail caption without replacing its linked fields;
+    SolidWorks drops it under the view, below the border here."""
     view = _early_bound(detail, "IView")
     candidates = []
     for raw_note in view.GetNotes() or ():
