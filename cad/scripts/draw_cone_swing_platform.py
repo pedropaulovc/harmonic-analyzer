@@ -19,7 +19,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -50,7 +49,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
-from build_cone_swing_platform import NOTCH_RUN_DEG, SLOT_E_X, SLOT_E_Z
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -95,7 +93,7 @@ PROFILE_KEEP = {
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
     "CornerNER": (0.125, 0.095),
-    "CornerNWR": (0.022, 0.095),
+    "CornerNWR": (0.025, 0.130),
     "CornerSWR": (0.118, 0.258),
     "CornerSER": (0.030, 0.258),
 }
@@ -107,8 +105,8 @@ FEATURE_KEEP = {
     "PostMountEastZ": (0.225, 0.175),
 }
 NOTCH_KEEP = {
-    # Replaced from model/view geometry after the notch view exists.
-    "NotchRunAngle": (0.0, 0.0),
+    # Kept close to the acute notch wedge so SolidWorks uses the minor arc.
+    "NotchRunAngle": (0.300, 0.255),
     "CapECx": (0.250, 0.112),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.105),
@@ -326,22 +324,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _hide_profile_cosmetic_threads(adapter, profile)
-    # Put the angular text inside the acute notch wedge.  A fixed sheet point
-    # can select the opposite angular region after the view is moved, which
-    # produces the sheet-spanning arc seen in the native drawing.
-    half_angle = NOTCH_RUN_DEG / 2.0
-    notch_angle_xy = model_point_in_view(
-        adapter,
-        notch,
-        (
-            (SLOT_E_X + 25.0 * math.cos(math.radians(half_angle))) / 1000.0,
-            0.0,
-            (SLOT_E_Z + 25.0 * math.sin(math.radians(half_angle))) / 1000.0,
-        ),
-        label="notch angular dimension",
-    )
-    notch_keep = dict(NOTCH_KEEP)
-    notch_keep["NotchRunAngle"] = notch_angle_xy
     feature_annotations = curate_view_dimensions(
         adapter,
         feature,
@@ -352,7 +334,7 @@ async def build(adapter: Any) -> dict[str, str]:
     notch_annotations = curate_view_dimensions(
         adapter,
         notch,
-        keep=notch_keep,
+        keep=NOTCH_KEEP,
         view_label="notch plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -408,7 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Plan View Note", 0.145, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.285, 0.145)
+    add_property_linked_note(adapter, "Section View Note", 0.235, 0.120)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
