@@ -271,9 +271,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         feature,
         (
-            SLOT_E_X + 15.0 * math.cos(math.radians(half_angle)),
+            (SLOT_E_X + 15.0 * math.cos(math.radians(half_angle))) / 1000.0,
             0.0,
-            SLOT_E_Z + 15.0 * math.sin(math.radians(half_angle)),
+            (SLOT_E_Z + 15.0 * math.sin(math.radians(half_angle))) / 1000.0,
         ),
         label="notch angular dimension",
     )
@@ -318,8 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
-        section,
-        symbol_xy=(0.350, 0.140),
+        symbol_xy=(0.350, 0.075),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
@@ -327,8 +326,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
-        section,
-        symbol_xy=(0.350, 0.075),
+        symbol_xy=(0.350, 0.140),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
