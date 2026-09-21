@@ -43,6 +43,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
@@ -197,6 +198,26 @@ def _minimum_hex_rock_clearance_mm() -> float:
     return clearance
 
 
+def _hole_dimension_inventory_entry(display, dimension) -> dict[str, object]:
+    """Describe one native Hole Wizard display dimension for failure forensics."""
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    return {
+        "full_name": str(dimension.FullName),
+        "name": str(dimension.Name),
+        "value_mm": float(dimension.SystemValue) * 1000.0,
+        "dimension_type": int(dimension.GetType()),
+        "reference": bool(dimension.IsReference()),
+        "read_only": bool(dimension.ReadOnly),
+        "display_type": int(display.GetType()),
+        "hole_callout": bool(display.IsHoleCallout()),
+        "tolerance_type": int(tolerance.Type),
+        "tolerance_lower_mm": float(tolerance.GetMinValue()) * 1000.0,
+        "tolerance_upper_mm": float(tolerance.GetMaxValue()) * 1000.0,
+        "primary_precision": int(display.GetPrimaryPrecision2()),
+        "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
+    }
+
+
 def _tolerance_hole_depth(
     adapter,
     feature_name: str,
@@ -209,7 +230,12 @@ def _tolerance_hole_depth(
     if feature is None:
         raise RuntimeError(f"missing Hole Wizard feature {feature_name!r}")
     feature = _early_bound(feature, "IFeature")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError(f"{feature_name}: Hole Wizard definition is unavailable")
+    definition = _early_bound(definition, "IWizardHoleFeatureData2")
     matches = []
+    inventory = []
     display = feature.GetFirstDisplayDimension()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
@@ -221,13 +247,26 @@ def _tolerance_hole_depth(
                 for character in str(dimension.FullName).lower()
                 if character.isalnum()
             )
+            inventory.append(_hole_dimension_inventory_entry(display, dimension))
             if dimension_token in normalized:
                 matches.append((display, dimension))
         display = feature.GetNextDisplayDimension(display)
+    evidence = {
+        "event": "native_hole_dimension_inventory",
+        "feature": feature_name,
+        "requested_token": dimension_token,
+        "definition": {
+            "TapDrillDepth_mm": float(definition.TapDrillDepth) * 1000.0,
+            "ThreadDepth_mm": float(definition.ThreadDepth) * 1000.0,
+        },
+        "dimensions": inventory,
+    }
+    _telemetry.info(json.dumps(evidence, sort_keys=True))
     if len(matches) != 1:
         raise RuntimeError(
             f"{feature_name}: expected one {dimension_token} display dimension, "
-            f"found {len(matches)}"
+            f"found {len(matches)}; native evidence: "
+            f"{json.dumps(evidence, sort_keys=True)}"
         )
     display, dimension = matches[0]
     lower_mm, upper_mm = deviations_mm
