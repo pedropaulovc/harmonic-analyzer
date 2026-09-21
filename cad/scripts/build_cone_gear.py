@@ -756,12 +756,290 @@ def _apply_configuration_properties(
             )
 
 
+async def _configuration_cache_control_state(
+    adapter: Any,
+    configuration: str,
+    *,
+    phase: str,
+) -> dict[str, Any]:
+    """Capture one pattern-free configuration without mutating it."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _active_configuration(model)
+    active_name = str(active.Name)
+    needs_rebuild = bool(active.NeedsRebuild)
+    part = _early_bound(model, "IPartDoc")
+    raw_hole = part.FeatureByName("ControlHoleCut")
+    if raw_hole is None:
+        raise RuntimeError("configuration-cache control hole feature is missing")
+    hole = _early_bound(raw_hole, "IFeature")
+    suppressed = _pattern_suppression_states(hole, (configuration,))[0]
+    error_result = hole.GetErrorCode2()
+    if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+        raise RuntimeError(
+            f"{configuration}: unreadable control-hole error {error_result!r}"
+        )
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    face_count = (
+        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+        if len(bodies) == 1
+        else 0
+    )
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(
+            f"{configuration}: control mass properties failed: {mass.error}"
+        )
+    state = {
+        "configuration": active_name,
+        "needs_rebuild": needs_rebuild,
+        "suppressed": suppressed,
+        "error": int(error_result[0] or 0),
+        "warning": bool(error_result[1]),
+        "bodies": len(bodies),
+        "faces": face_count,
+        "volume": float(mass.data.volume),
+    }
+    _telemetry.info(f"{phase} configuration-cache control: {state!r}")
+    if active_name != configuration:
+        raise RuntimeError(
+            f"{phase}: active configuration {active_name!r} != {configuration!r}"
+        )
+    return state
+
+
+def _configuration_cache_states_match(
+    observed: dict[str, Any],
+    reference: dict[str, Any],
+) -> bool:
+    """Compare a cache-control state with a tight floating-volume tolerance."""
+    exact_keys = (
+        "configuration",
+        "needs_rebuild",
+        "suppressed",
+        "error",
+        "warning",
+        "bodies",
+        "faces",
+    )
+    if any(observed[key] != reference[key] for key in exact_keys):
+        return False
+    expected_volume = float(reference["volume"])
+    return abs(float(observed["volume"]) - expected_volume) <= max(
+        1e-6,
+        abs(expected_volume) * 1e-9,
+    )
+
+
+async def _run_configuration_cache_control(adapter: Any) -> None:
+    """Run a pattern-free two-configuration cold/warm persistence control."""
+    from solidworks_mcp.adapters.base import (
+        CreateConfigurationParameters,
+        ExtrusionParameters,
+    )
+
+    names = ("HOLE_ON", "HOLE_OFF")
+    check("control create_part", await adapter.create_part())
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _active_configuration(model)
+    active.Name = names[0]
+    if str(_active_configuration(model).Name) != names[0]:
+        raise RuntimeError("failed to rename Default configuration to HOLE_ON")
+
+    check("control create base sketch", await adapter.create_sketch("Front"))
+    base_circle = check(
+        "control add base circle",
+        await adapter.add_circle(0.0, 0.0, 20.0),
+    )
+    check(
+        "control base diameter",
+        await adapter.add_sketch_dimension(
+            base_circle,
+            None,
+            "diameter",
+            40.0,
+        ),
+    )
+    await ensure_fully_defined(adapter, "configuration-cache base sketch")
+    check("control exit base sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "ControlBaseProfile")
+    check(
+        "control extrude base",
+        await adapter.create_extrusion(ExtrusionParameters(depth=10.0)),
+    )
+    name_last_feature(adapter, "ControlBase")
+
+    check(
+        f"control create_configuration {names[1]}",
+        await adapter.create_configuration(
+            CreateConfigurationParameters(
+                name=names[1],
+                comment="pattern-free configuration cache control",
+            )
+        ),
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    enumerated = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
+    if len(enumerated) != 2 or set(enumerated) != set(names):
+        raise RuntimeError(
+            f"control configurations are {enumerated!r}, expected exactly {names!r}"
+        )
+
+    activation = await adapter.set_active_configuration(names[0])
+    check(f"control activate {names[0]}", activation)
+    if not bool(activation.data.get("rebuilt")):
+        raise RuntimeError(f"control activation did not rebuild {names[0]}")
+    check("control create hole sketch", await adapter.create_sketch("Front"))
+    hole_circle = check(
+        "control add hole circle",
+        await adapter.add_circle(0.0, 0.0, 5.0),
+    )
+    check(
+        "control hole diameter",
+        await adapter.add_sketch_dimension(
+            hole_circle,
+            None,
+            "diameter",
+            10.0,
+        ),
+    )
+    await ensure_fully_defined(adapter, "configuration-cache hole sketch")
+    check("control exit hole sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "ControlHoleProfile")
+    check(
+        "control cut through hole",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=12.0)),
+    )
+    hole_name = name_last_feature(adapter, "ControlHoleCut")
+    raw_hole = _early_bound(model, "IPartDoc").FeatureByName(hole_name)
+    if raw_hole is None:
+        raise RuntimeError("control hole cut was not created")
+    hole = _early_bound(raw_hole, "IFeature")
+    if not bool(hole.SetSuppression2(0, 3, _bstr_array((names[1],)))):
+        raise RuntimeError(f"failed to suppress control hole in {names[1]}")
+    if not bool(hole.SetSuppression2(1, 3, _bstr_array((names[0],)))):
+        raise RuntimeError(f"failed to unsuppress control hole in {names[0]}")
+    states = _pattern_suppression_states(hole, names)
+    if states != (False, True):
+        raise RuntimeError(
+            f"control hole suppression states {states!r} != {(False, True)!r}"
+        )
+
+    OUT_SLDPRT.mkdir(parents=True, exist_ok=True)
+    control_path = (OUT_SLDPRT / "cone-gear-config-cache-control.SLDPRT").resolve()
+    check(
+        f"establish configuration-cache control path -> {control_path}",
+        await adapter.save_file(str(control_path)),
+    )
+
+    references: dict[str, dict[str, Any]] = {}
+    for configuration in names:
+        activation = await adapter.set_active_configuration(configuration)
+        check(f"control reference activate {configuration}", activation)
+        if not bool(activation.data.get("rebuilt")):
+            raise RuntimeError(f"control reference did not rebuild {configuration}")
+        references[configuration] = await _configuration_cache_control_state(
+            adapter,
+            configuration,
+            phase="reference",
+        )
+        reference = references[configuration]
+        if (
+            reference["needs_rebuild"]
+            or reference["error"]
+            or reference["bodies"] != 1
+            or reference["faces"] < 1
+        ):
+            raise RuntimeError(
+                f"{configuration}: control reference is not clean: {reference!r}"
+            )
+        raw_configuration = model.GetConfigurationByName(configuration)
+        if raw_configuration is None:
+            raise RuntimeError(f"control configuration {configuration} disappeared")
+        config = _early_bound(raw_configuration, "IConfiguration")
+        config.AddRebuildSaveMark = True
+        if not bool(config.AddRebuildSaveMark):
+            raise RuntimeError(f"{configuration}: control save mark was not set")
+        _telemetry.info(
+            f"{configuration} control AddRebuildSaveMark="
+            f"{bool(config.AddRebuildSaveMark)}"
+        )
+        _save_active_configuration(adapter, configuration)
+
+    hole_on = references[names[0]]
+    hole_off = references[names[1]]
+    if (
+        hole_on["suppressed"]
+        or not hole_off["suppressed"]
+        or hole_on["faces"] == hole_off["faces"]
+        or abs(float(hole_on["volume"]) - float(hole_off["volume"])) < 1.0
+    ):
+        raise RuntimeError(
+            f"configuration-cache control is vacuous: references={references!r}"
+        )
+
+    title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(title)
+    adapter.currentModel = None
+    check(
+        "reopen configuration-cache control",
+        await adapter.open_model(str(control_path)),
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    comparisons: dict[str, dict[str, Any]] = {}
+    for configuration in names:
+        _activate_configuration(model, configuration)
+        cold = await _configuration_cache_control_state(
+            adapter,
+            configuration,
+            phase="cold",
+        )
+        if not bool(model.ForceRebuild3(False)):
+            raise RuntimeError(f"{configuration}: control ForceRebuild3 failed")
+        warm = await _configuration_cache_control_state(
+            adapter,
+            configuration,
+            phase="rebuilt",
+        )
+        reference = references[configuration]
+        comparisons[configuration] = {
+            "cold_matches": _configuration_cache_states_match(cold, reference),
+            "rebuilt_matches": _configuration_cache_states_match(warm, reference),
+            "reference": reference,
+            "cold": cold,
+            "rebuilt": warm,
+        }
+
+    _telemetry.info(
+        f"configuration-cache control comparisons: {comparisons!r}"
+    )
+    if not all(
+        bool(comparison["rebuilt_matches"])
+        for comparison in comparisons.values()
+    ):
+        raise RuntimeError(
+            "configuration-cache control failed after rebuild: "
+            f"{comparisons!r}"
+        )
+    cold_clean = all(
+        bool(comparison["cold_matches"])
+        for comparison in comparisons.values()
+    )
+    verdict = "cold-and-rebuilt-clean" if cold_clean else "cold-stale-rebuilt-clean"
+    raise RuntimeError(
+        f"diagnostic complete: pattern-free configuration-cache control {verdict}; "
+        "refusing to publish probe artefacts"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
         ExtrusionParameters,
     )
+
+    await _run_configuration_cache_control(adapter)
+    raise RuntimeError("configuration-cache control returned without a verdict")
 
     findings: list[str] = []
 
