@@ -98,7 +98,7 @@ FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
-SECTION_CENTER = (0.325, 0.242)
+SECTION_CENTER = (0.365, 0.242)
 SECTION_SCALE = (1, 2)
 
 # The checked-in landscape template's FINISH value cell, measured between its
@@ -745,8 +745,10 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
-    # Derived section views do not expose selectable feature-sketch instances;
-    # the blank state inherited from their base view is sufficient.
+    # On R2026x, SelectByID2 refused the feature-qualified
+    # ``JournalPlanReference@cone-pivot-post-2@Section View A-A`` path.  The
+    # section derives from the already-blanked Top view, so no second selector
+    # call is made for that one observed derived-view path.
     for view in (front, top, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
