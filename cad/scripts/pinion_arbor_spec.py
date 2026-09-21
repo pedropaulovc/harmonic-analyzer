@@ -56,8 +56,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked arbor dimension needs authored places")
 
 RETENTION_HOLE_CALLOUT = (
-    "MATCH-DRILL WITH MHA-058\n"
-    "REAM TO ACTUAL MHA-136\n"
+    "MATCH-DRILL WITH PINION HANDLE MHA-058\n"
+    "REAM TO ACTUAL RETENTION PIN MHA-136\n"
     "LIGHT DRIVE FIT\n"
     "LIGHT TAPS; NOT HAND-REMOVABLE"
 )

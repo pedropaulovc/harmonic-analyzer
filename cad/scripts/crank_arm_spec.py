@@ -165,5 +165,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
 # The two same-face features are called out individually; only their shared,
 # otherwise invisible face ownership belongs in the linked note.
-DRAWING_NOTES = "DIMPLE AND ANCHOR TAP ARE CUT IN THE HANDLE-SIDE FACE."
+DRAWING_NOTES = (
+    "FIDUCIAL AND ANCHOR TAP ARE ON THE SAME FACE SHOWN IN THE FRONT VIEW."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
