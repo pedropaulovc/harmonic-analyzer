@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import math
 import sys
+import time
 from typing import Any
 
 import _config
@@ -489,6 +490,31 @@ async def _configuration_topology(
             adapter, configuration, phase=phase
         )
     return volume, observation, tuple(issues)
+
+
+def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
+    """Save in place and consume Save3's BOOL/errors/warnings tuple exactly."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    started = time.perf_counter()
+    result = model.Save3(options, 0, 0)
+    if isinstance(result, (list, tuple)):
+        ok = bool(result[0])
+        errors = int(result[1] or 0)
+        warnings = int(result[2] or 0)
+    else:
+        ok = bool(result)
+        errors = 0
+        warnings = 0
+    elapsed = time.perf_counter() - started
+    _telemetry.info(
+        f"{label}: Save3(options={options}) ok={ok}, errors={errors}, "
+        f"warnings={warnings}, elapsed={elapsed:.3f}s"
+    )
+    if not ok or errors:
+        raise RuntimeError(
+            f"{label}: Save3 failed: ok={ok}, errors={errors}, "
+            f"warnings={warnings}"
+        )
 
 
 async def assert_saved_configuration_topology(
@@ -1185,52 +1211,92 @@ async def build(adapter) -> dict[str, str]:
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
 
-    # A single all-configuration save mark rebuilds inactive configurations
-    # inside SaveAs. On SW 2026 that path re-solved this equation-driven seed:
-    # T006..T024 reopened with pattern error 1 even though every active
-    # pre-save rebuild was clean. Persist one active configuration per save so
-    # its already-validated geometry is the configuration data written to disk.
-    for index, (configuration, teeth) in enumerate(CONFIGS):
-        check(
-            f"activate {configuration} for configuration-data save",
-            await adapter.set_active_configuration(configuration),
-        )
-        active = _active_configuration(
-            _early_bound(adapter.currentModel, "IModelDoc2")
-        )
+    # Discriminating persistence probe: keep BOTH marks true to distinguish
+    # that variant from the previous loop, which cleared every inactive mark.
+    # This diagnostic build deliberately fails after reporting both Save3
+    # variants, so no probe state can publish as a successful part artefact.
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for configuration in ("T006", "T120"):
+        _activate_configuration(model, configuration)
+        active = _active_configuration(model)
         active.AddRebuildSaveMark = True
         if not bool(active.AddRebuildSaveMark):
-            raise RuntimeError(
-                f"{configuration}: failed to set active rebuild-save mark"
-            )
-        check(
-            f"save active configuration data {configuration}",
-            await adapter.save_file(part_path),
-        )
-        _volume, observation, issues = await _configuration_topology(
+            raise RuntimeError(f"{configuration}: failed to retain save mark")
+        _save3_with_contract(
             adapter,
-            configuration,
-            teeth,
-            phase="post-save active",
+            1 | 8,
+            label=f"probe keep-marks {configuration}",
         )
-        if issues:
-            raise RuntimeError(f"{observation}; issues={issues!r}")
-        if index + 1 < len(CONFIGS):
-            active.AddRebuildSaveMark = False
-            if bool(active.AddRebuildSaveMark):
-                raise RuntimeError(
-                    f"{configuration}: failed to clear rebuild-save mark"
-                )
-    _telemetry.success(
-        "persisted all cone-gear configuration data while each was active"
+
+    def _reopen_probe() -> None:
+        current = _early_bound(adapter.currentModel, "IModelDoc2")
+        title = str(current.GetTitle())
+        adapter.swApp.CloseDoc(title)
+        adapter.currentModel = None
+
+    _reopen_probe()
+    check("probe reopen after Save3(9)", await adapter.open_model(part_path))
+    t120_volume, t120_observation, t120_issues = await _configuration_topology(
+        adapter, "T120", 120, phase="probe Save3(9) reopened"
     )
-    part_title = str(
-        _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+    t006_volume, t006_observation, t006_issues = await _configuration_topology(
+        adapter, "T006", 6, phase="probe Save3(9) reopened"
     )
-    adapter.swApp.CloseDoc(part_title)
-    adapter.currentModel = None
-    check("reopen saved cone-gear", await adapter.open_model(part_path))
-    await assert_saved_configuration_topology(adapter, phase="reopened")
+    save9_result = (
+        f"T120 volume={t120_volume:.1f} issues={t120_issues!r}; "
+        f"T006 volume={t006_volume:.1f} issues={t006_issues!r}"
+    )
+    if not t120_issues and not t006_issues:
+        raise RuntimeError(
+            "persistence probe complete: keeping T006/T120 marks true with "
+            f"Save3(9) persisted both; {save9_result}"
+        )
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    rebuilt = bool(model.ForceRebuild3(False))
+    _healed_volume, healed_observation, healed_issues = (
+        await _configuration_topology(
+            adapter, "T006", 6, phase="probe Save3(9) explicit-rebuild"
+        )
+    )
+    if not rebuilt or healed_issues:
+        raise RuntimeError(
+            f"Save3(9) probe did not heal cleanly: before={t006_observation}; "
+            f"ForceRebuild3={rebuilt}; after={healed_observation}; "
+            f"after_issues={healed_issues!r}; control={t120_observation}"
+        )
+
+    t120 = _early_bound(
+        model.GetConfigurationByName("T120"), "IConfiguration"
+    )
+    t006 = _early_bound(
+        model.GetConfigurationByName("T006"), "IConfiguration"
+    )
+    t120.AddRebuildSaveMark = False
+    t006.AddRebuildSaveMark = True
+    _save3_with_contract(
+        adapter,
+        1,
+        label="probe active T006 mark with rebuild-on-save",
+    )
+    _reopen_probe()
+    check("probe reopen after Save3(1)", await adapter.open_model(part_path))
+    _t120_volume_2, t120_observation_2, t120_issues_2 = (
+        await _configuration_topology(
+            adapter, "T120", 120, phase="probe Save3(1) reopened"
+        )
+    )
+    _t006_volume_2, t006_observation_2, t006_issues_2 = (
+        await _configuration_topology(
+            adapter, "T006", 6, phase="probe Save3(1) reopened"
+        )
+    )
+    raise RuntimeError(
+        "persistence probe complete: "
+        f"Save3(9)={save9_result}; Save3(1) T120={t120_observation_2}, "
+        f"issues={t120_issues_2!r}; T006={t006_observation_2}, "
+        f"issues={t006_issues_2!r}"
+    )
 
     if findings:
         summary = "; ".join(findings)
