@@ -16,15 +16,17 @@ from _drawing_common import (
     assert_asme_b_sheet,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     property_link,
     read_required_properties,
     set_hidden_lines_removed,
-    set_reference_dimensions,
+    set_reference_dimension,
     sheet_drawable_region,
     stamp_drawing_summary,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
 from _purchased_fastener_drawing import (
@@ -62,18 +64,46 @@ OUTPUTS = DrawingOutputs(
 # thickness, and one pictorial.  The projected pair is deliberately aligned
 # instead of paying for a redundant right view.
 _VIEW_CELLS = (
-    ("*Top", (0.105, 0.218), (0.035, 0.150, 0.175, 0.280)),
-    ("*Front", (0.105, 0.115), (0.035, 0.075, 0.175, 0.145)),
-    ("*Isometric", (0.260, 0.218), (0.190, 0.150, 0.350, 0.280)),
+    ("*Top", (0.125, 0.180), (0.055, 0.120, 0.195, 0.240)),
+    ("*Front", (0.125, 0.115), (0.055, 0.075, 0.195, 0.145)),
+    ("*Isometric", (0.260, 0.180), (0.190, 0.120, 0.350, 0.240)),
 )
 
 # These are native model dimensions imported into their useful receiving views.
 # Their positions are sheet coordinates in metres and are parenthesized below.
 _TOP_KEEP = {
-    OUTER_DIAMETER_DIM: (0.105, 0.275),
-    INNER_DIAMETER_DIM: (0.158, 0.218),
+    OUTER_DIAMETER_DIM: (0.125, 0.225),
+    INNER_DIAMETER_DIM: (0.178, 0.180),
 }
-_FRONT_KEEP = {THICKNESS_DIM: (0.105, 0.138)}
+_FRONT_KEEP = {THICKNESS_DIM: (0.180, 0.115)}
+
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+
+
+def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Keep a native diameter callout as a short, one-sided leader."""
+    display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
+    if display is None:
+        raise RuntimeError(f"{label} has no display annotation")
+    display = _sw_type_info.early_bound_or_flag(
+        display,
+        "IDisplayDimension",
+        "SetSecondArrow",
+        "GetUseDocSecondArrow",
+        "GetSecondArrow",
+        "SetBrokenLeader2",
+        "GetUseDocBrokenLeader",
+        "GetBrokenLeader2",
+    )
+    display.Diametric = True
+    display.ArrowSide = 1
+    display.SetSecondArrow(False, False)
+    display.SolidLeader = False
+    if display.SetBrokenLeader2(False, 2) != 0:
+        raise RuntimeError(f"failed to apply {label} broken leader")
+    display.LeaderVisibility = _LEADER_LINE_NONE
+    if int(display.LeaderVisibility) != _LEADER_LINE_NONE:
+        raise RuntimeError(f"{label} retained its dimension leader line")
 
 
 def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
@@ -185,7 +215,7 @@ async def build(adapter: Any) -> dict[str, str]:
     notes.append(
         (
             _center_caption(
-                adapter, f"TOP  {scale_text}", _VIEW_CELLS[0][1][0], 0.143
+                adapter, f"TOP  {scale_text}", _VIEW_CELLS[0][1][0], 0.155
             ),
             f"TOP  {scale_text}",
         )
@@ -226,22 +256,31 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     imported = [*top_annotations, *front_annotations]
-    set_reference_dimensions(
-        adapter,
-        imported,
-        {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM, THICKNESS_DIM},
-    )
+    for annotation in imported:
+        name = dimension_name(adapter, annotation)
+        if name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}:
+            set_reference_dimension(
+                adapter,
+                annotation,
+                label=f"{name} reference",
+                diameter=True,
+            )
+            _short_diametric_reference(
+                adapter, annotation, label=f"{name} reference"
+            )
+        elif name == THICKNESS_DIM:
+            set_reference_dimension(
+                adapter,
+                annotation,
+                label="washer thickness reference",
+                diameter=False,
+            )
+        else:
+            raise RuntimeError(f"unexpected washer reference dimension {name!r}")
     assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
     set_hidden_lines_removed(adapter, top_view)
     set_hidden_lines_removed(adapter, front_view)
 
-    orientation = _literal_note(
-        adapter,
-        "ORIENTATION: TOP ABOVE FRONT\nISO PICTORIAL",
-        0.195,
-        0.125,
-    )
-    notes.append((orientation, "ORIENTATION: TOP ABOVE FRONT\nISO PICTORIAL"))
 
     purchase_text = (
         "PURCHASED PART / REFERENCE GEOMETRY\n"
