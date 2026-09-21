@@ -33,6 +33,7 @@ from _drawing_common import (
     create_blank_drawing_sheets,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -218,13 +219,16 @@ async def build(adapter: Any) -> dict[str, str]:
         *FORM_TOP_CENTER,
         scale=FORM_TOP_SCALE,
     )
-    place_view(
+    iso = place_view(
         adapter,
         str(SOURCE),
         "*Isometric",
         *ISO_CENTER,
         scale=ISO_SCALE,
     )
+    # Materialize both tap features in the iso before the finalizer asks
+    # SolidWorks for high-quality cosmetic-thread readback.
+    import_cosmetic_threads(adapter, iso)
     for view in (front, top):
         set_hidden_lines_removed(adapter, view)
 
