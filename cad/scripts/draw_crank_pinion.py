@@ -127,7 +127,7 @@ RIGHT_KEEP = {
         (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_BOSS + 0.012,
     ),
-    "BoreDia": (_side_x(0.0) + 0.014, RIGHT_CENTER[1]),
+    "BoreDia": (_side_x(0.0) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
