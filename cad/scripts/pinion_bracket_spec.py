@@ -128,6 +128,13 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
+# The (43.0) overall is a REFERENCE the sheet derives from the outline (C2C
+# plus both end radii), not a model dimension, so no part-side map can hand
+# its decimal places over: the spec owns the digit and the sheet passes it to
+# ``SetPrecision3`` instead of writing a literal (policy rule 2).  One place
+# because the two end radii it sums are one-place dimensions.
+DRAWING_REFERENCE_PRECISION = 1
+
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(

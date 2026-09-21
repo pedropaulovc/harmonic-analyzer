@@ -24,7 +24,7 @@ def test_required_drawing_paths() -> None:
 
 
 def _kept() -> dict[str, tuple[float, float]]:
-    return {**drawing.FRONT_KEEP, **drawing.LEFT_KEEP}
+    return {**drawing.FRONT_KEEP, **drawing.DETAIL_KEEP, **drawing.LEFT_KEEP}
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
@@ -41,7 +41,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert set(kept) == marked
     # Each name is shown exactly once: a dimension repeated across two views is a
     # double specification, and the second copy is what drifts.
-    assert len(kept) == len(drawing.FRONT_KEEP) + len(drawing.LEFT_KEEP)
+    assert len(kept) == (
+        len(drawing.FRONT_KEEP) + len(drawing.DETAIL_KEEP) + len(drawing.LEFT_KEEP)
+    )
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(kept)
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
@@ -105,9 +107,11 @@ def test_callouts_state_processes_and_never_restate_numbers() -> None:
     assert callouts["PinSeatDia"] == "REAM; FLAT-BOTTOM BLIND"
     # The blind seat's depth and the one finely-held location each say what
     # the number alone cannot: where the depth is measured from, and why the
-    # station is held tighter than the title block's general grade.
+    # station is held tighter than the title block's general grade.  The
+    # latter wraps: on one line it ran off the sheet's left border.
     assert callouts["PinSeatDepth"] == "DEPTH FROM ENTRY FACE"
-    assert callouts["PinSeatCy"] == "CAM ENGAGE CLEARANCE - HOLD FINE GRADE"
+    assert callouts["PinSeatCy"] == "CAM ENGAGE CLEARANCE\nHOLD FINE GRADE"
+    assert max(len(line) for line in callouts["PinSeatCy"].splitlines()) <= 20
     joined = "\n".join(callouts.values())
     assert "+/-" not in joined
     assert not any(character.isdigit() for character in joined)
@@ -141,26 +145,31 @@ def test_decimal_places_are_authored_on_the_part_and_only_read_by_the_sheet() ->
     assert max(by_name.values()) == 3
 
 
-def test_overall_length_is_driven_and_never_redrawn() -> None:
-    # 43 is C2C plus the two end radii, so the sheet must not carry a copy of
-    # it: a second overall dimension would be a redundant chain a machinist
-    # could satisfy two ways.
+def test_overall_length_is_a_derived_reference_with_spec_owned_places() -> None:
+    # 43 is C2C plus the two end radii, so the sheet must not carry a driving
+    # copy of it: a second toleranced overall would be a redundant chain a
+    # machinist could satisfy two ways.  It IS printed, parenthesised, so the
+    # bar is not sawn short of the two end radii -- and the decimal places of
+    # that derived reference come from the spec, never a sheet literal.
     assert pinion_bracket_spec.OVERALL_LENGTH == (
         pinion_bracket_spec.C2C + 2.0 * pinion_bracket_spec.R_END
     )
     assert "OverallLength" not in set(pinion_bracket_spec.DRAWING_PRECISION_BY_NAME)
+    assert pinion_bracket_spec.DRAWING_REFERENCE_PRECISION == 1
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension" not in source
+    assert source.count("set_reference_dimension(") == 1
+    assert "SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)" in source
 
 
 def test_only_the_face_view_carries_hidden_lines() -> None:
     # The blind follower seat is the single feature no outline shows, and only
     # the face view looks along its depth -- so it is the only view that may
-    # print a dashed edge. A flank or pictorial view with hidden lines turned
-    # on would dash the two through bores and both scallops for nothing.
+    # print a dashed edge. A flank, detail or pictorial view with hidden lines
+    # turned on would dash the two through bores and both scallops for nothing.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("set_hidden_lines_visible(adapter, front)") == 1
     assert source.count("set_hidden_lines_visible") == 2  # import + the call
+    assert "for view in (left, iso, detail):" in source
     assert "PinSeatDepth" in drawing.FRONT_KEEP
     # Everything else on the strap goes clean through, so nothing else needs
     # the dashed outline the face view now shows.
@@ -168,6 +177,47 @@ def test_only_the_face_view_carries_hidden_lines() -> None:
     # The seat mouth is a solid circle on the flank, which is where its size
     # and its station through the bar are dimensioned.
     assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCz", "Depth"}
+
+
+def test_scallop_detail_encloses_what_it_dimensions() -> None:
+    # The detail carries every scallop dimension, and each of them is measured
+    # from the pivot axis to a centre in the air beside the strap: the fence
+    # must hold the axis, both centres and both bites with a margin, or the
+    # imported dimensions land on geometry the crop does not show.
+    assert set(drawing.DETAIL_KEEP) == (
+        pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefParkProfile"]
+        | pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefEngagedProfile"]
+    )
+    fence_center = drawing.DETAIL_FENCE_CENTER_MM
+    radius = drawing.DETAIL_FENCE_RADIUS_MM
+    for point in (
+        (0.0, 0.0),
+        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
+        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
+    ):
+        assert math.dist(point, fence_center) <= radius - 1.0, point
+    # The bites run down the strap's left edge; both ends of each bite sit
+    # inside the fence.
+    edge = -pinion_bracket_geometry.HALF_WIDTH
+    for cx, cy in (
+        pinion_bracket_geometry.CAM_RELIEF_PARK_CENTER,
+        pinion_bracket_geometry.CAM_RELIEF_ENGAGED_CENTER,
+    ):
+        half_chord = math.sqrt(
+            pinion_bracket_geometry.CAM_RELIEF_RADIUS**2 - (edge - cx) ** 2
+        )
+        for end in ((edge, cy - half_chord), (edge, cy + half_chord)):
+            assert math.dist(end, fence_center) <= radius - 1.0, end
+    # The detail enlarges: at the sheet's 2:1 the six dimensions overprinted.
+    assert drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] > 2.0
+    # It sits below the face view's left column, inside the border with room
+    # for its native caption underneath.
+    sheet_radius = radius * drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
+    assert drawing.DETAIL_CENTER[1] - sheet_radius >= 0.030
+    assert drawing.DETAIL_CENTER[0] - sheet_radius >= 0.020
+    assert drawing.DETAIL_CENTER[0] + sheet_radius < drawing._front_x(
+        -pinion_bracket_geometry.HALF_WIDTH
+    )
 
 
 def test_blind_seat_entry_face_is_solid_flank_where_the_reamer_lands() -> None:
@@ -246,7 +296,9 @@ def test_label_positions_are_on_the_sheet_and_do_not_collide() -> None:
     # unreadable smear in the PDF.
     positions = {
         **{f"front:{k}": v for k, v in drawing.FRONT_KEEP.items()},
+        **{f"detail:{k}": v for k, v in drawing.DETAIL_KEEP.items()},
         **{f"left:{k}": v for k, v in drawing.LEFT_KEEP.items()},
+        "left:overall": drawing.OVERALL_XY,
         "front:pivot-finish": drawing.PIVOT_FINISH_XY,
         "front:arbor-finish": drawing.ARBOR_FINISH_XY,
     }

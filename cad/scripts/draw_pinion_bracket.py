@@ -11,14 +11,21 @@ manufacturing-note block either -- the outline, the four hole/scallop
 callouts, two roughness symbols and the title block say everything.  Three
 bands survive, one per fitted bore, each from a named fit class.
 
-Two orthographic views at the 2:1 sheet scale, plus the isometric:
+Two orthographic views at the 2:1 sheet scale, one enlarged detail, plus the
+isometric:
 
-* FRONT -- the strap face: both bores, both end radii, the two cam-relief
-  scallops, the follower-seat height and the seat's blind depth.  This is
-  the only view carrying hidden lines, and the blind seat is the only
-  feature that needs them: both bores and both scallops go clean through.
+* FRONT -- the strap face: both bores, both end radii, the follower-seat
+  height and the seat's blind depth.  This is the only view carrying hidden
+  lines, and the blind seat is the only feature that needs them: both bores
+  and both scallops go clean through.
+* DETAIL A (3:1) -- the two cam-relief scallops enlarged around the pivot
+  bore, where their centres and cutter radius have room to read: at 2:1 the
+  six scallop dimensions packed into one column and printed on top of each
+  other.
 * LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
-  its size, its station through the bar and the bar thickness.
+  its size, its station through the bar and the bar thickness; plus the
+  (43.0) overall as a reference, so nobody saws the bar short of the two
+  end radii the 28.00 centre distance does not include.
 
 Run with SolidWorks open::
 
@@ -28,23 +35,29 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -53,10 +66,13 @@ from pinion_bracket_spec import (
     C2C,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
+    OVERALL_LENGTH,
     PIVOT_BORE,
     R_END,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -80,11 +96,13 @@ SHEET_SCALE = (2.0, 1.0)
 # Sheet layout (meters).  The strap runs UP the sheet: the front view's model
 # bbox is +/-7.5 in X and -7.5..35.5 in Y, so at 2:1 it is 30 x 86 mm and the
 # left flank view beside it is 16 x 86.  The face view keeps the clear column
-# to its LEFT for everything measured off the pivot axis and the column to its
-# RIGHT for the leadered sizes, so no two dimension lanes cross.  Each end
-# radius is labelled almost straight below/above its own arc while that bore's
-# roughness symbol leads away to the side: the two leaders leave the same
-# crowded corner on diverging paths and never cross.
+# to its LEFT for the two seat dimensions measured off the pivot axis and the
+# column to its RIGHT for the leadered sizes, so no two dimension lanes cross.
+# The scallop detail sits in the empty lower-left quarter, under that left
+# column.  Each end radius is labelled almost straight below/above its own arc
+# while that bore's roughness symbol leads away to the LEFT of it: the two
+# leaders leave the same crowded corner on diverging paths and never cross,
+# and the symbol's text ends before the radius label begins.
 FRONT_BBOX_CY = (C2C + 2.0 * R_END) / 2.0 - R_END
 FRONT_CENTER = (0.150, 0.150)
 LEFT_CENTER = (0.240, 0.150)
@@ -101,10 +119,41 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
+def _flank_y(model_y_mm: float) -> float:
+    """Sheet Y of a model-Y point in the left view (same bbox as the front)."""
+    return LEFT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
+
+
+# DETAIL A: a native detail of the face view, fenced around the pivot bore so
+# it holds the pivot axis (every scallop location is measured from it), both
+# scallop centres (in the air beside the strap) and both bites.  3:1 turns the
+# 6.90 radius into a 21 mm arc the two radius leaders can land on separately.
+DETAIL_SCALE = (3.0, 1.0)
+DETAIL_CENTER = (0.066, 0.064)
+DETAIL_FENCE_CENTER_MM = (-8.0, -0.5)
+DETAIL_FENCE_RADIUS_MM = 9.5
+
+
+def _detail_x(model_x_mm: float) -> float:
+    """Sheet X of a model-X point in the detail (3:1, fence-centred)."""
+    return (
+        DETAIL_CENTER[0]
+        + (model_x_mm - DETAIL_FENCE_CENTER_MM[0]) * DETAIL_SCALE[0] / 1000.0
+    )
+
+
+def _detail_y(model_y_mm: float) -> float:
+    """Sheet Y of a model-Y point in the detail (3:1, fence-centred)."""
+    return (
+        DETAIL_CENTER[1]
+        + (model_y_mm - DETAIL_FENCE_CENTER_MM[1]) * DETAIL_SCALE[0] / 1000.0
+    )
+
+
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  The face features and their locations stay on the front view; the
-# scallop pair is dimensioned on the open (left) side it is cut from, the two
-# bore diameters and the end radii on the closed right side.
+# two bore diameters and the end radii on its closed right side, the seat's
+# height and depth on its open left side.
 FRONT_KEEP = {
     "PivotBoreDia": (0.196, 0.086),
     "ArborBoreDia": (0.196, 0.214),
@@ -113,12 +162,19 @@ FRONT_KEEP = {
     "TopCapRadius": (0.164, 0.238),
     "PinSeatCy": (0.088, 0.134),
     "PinSeatDepth": (0.082, 0.156),
-    "CamReliefParkR": (0.052, 0.130),
-    "CamReliefParkY": (0.074, 0.112),
-    "CamReliefParkX": (0.112, 0.070),
-    "CamReliefEngagedR": (0.052, 0.104),
-    "CamReliefEngagedY": (0.062, 0.096),
-    "CamReliefEngagedX": (0.112, 0.058),
+}
+# The scallop pair is dimensioned in the enlarged detail the way it is cut:
+# each centre from the pivot axis (X stacked above the fence, Y beside it) and
+# each cutter radius leadered from its own visible bite, the park bite above
+# the crossover and the engaged bite below it, so neither leader lands on the
+# virtual circle in the air the way both did at 2:1.
+DETAIL_KEEP = {
+    "CamReliefParkR": (0.100, 0.088),
+    "CamReliefParkX": (0.071, 0.112),
+    "CamReliefParkY": (0.112, 0.073),
+    "CamReliefEngagedR": (0.100, 0.040),
+    "CamReliefEngagedX": (0.071, 0.103),
+    "CamReliefEngagedY": (0.122, 0.054),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -127,23 +183,125 @@ LEFT_KEEP = {
     "PinSeatCz": (0.240, 0.090),
     "PinSeatDia": (0.290, 0.140),
 }
-# Each bore's end-radius label leads out to the LEFT of its arc and that same
-# bore's roughness symbol to the RIGHT, so the two leaders leaving the same
-# crowded corner diverge instead of crossing.
+# The flank's top and bottom edges are the strap's two extreme lines, so the
+# overall reads between straight edges here; the text sits clear of the seat
+# callout's leader, outboard of the flank.
+OVERALL_XY = (0.262, 0.168)
+# Each bore's roughness symbol leads out to the upper/lower LEFT of its arc
+# and that same bore's end-radius label sits to the upper/lower RIGHT, so the
+# two leaders leaving the same crowded corner diverge instead of crossing and
+# the symbol's "Ra" text stops short of the radius label.
 PIVOT_FINISH_EDGE = (_front_x(0.0), _front_y(-PIVOT_BORE / 2.0))
 PIVOT_FINISH_XY = (0.126, 0.080)
 ARBOR_FINISH_EDGE = (_front_x(0.0), _front_y(C2C + ARBOR_BORE / 2.0))
-ARBOR_FINISH_XY = (0.126, 0.220)
+ARBOR_FINISH_XY = (0.108, 0.222)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
-# why it is held there.
+# why it is held there.  The seat-height callout wraps so it stays inside the
+# sheet border to the left of its dimension line.
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "REAM; FLAT-BOTTOM BLIND",
     "PinSeatDepth": "DEPTH FROM ENTRY FACE",
-    "PinSeatCy": "CAM ENGAGE CLEARANCE - HOLD FINE GRADE",
+    "PinSeatCy": "CAM ENGAGE CLEARANCE\nHOLD FINE GRADE",
 }
+
+
+def _cam_relief_detail(adapter: Any, front: Any) -> Any:
+    """Enlarge the scallops as a native detail of the face view.
+
+    The fence is sketched in the parent's own sketch space (its
+    ``ModelToSketchTransform``), the way the cylinder-gear notch and the
+    top-frame underside details are, and the detail is then re-centred on its
+    OUTLINE because SolidWorks places a detail by its parent-relative origin,
+    not by the fenced region.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(front, "IView")
+    if not ddoc.ActivateView(view_name(adapter, front)):
+        raise RuntimeError("failed to activate scallop detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        front,
+        (DETAIL_FENCE_CENTER_MM[0] / 1000.0, DETAIL_FENCE_CENTER_MM[1] / 1000.0, 0.0),
+        label="scallop detail centre",
+    )
+    radius = DETAIL_FENCE_RADIUS_MM * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create native scallop detail fence")
+    detail = ddoc.CreateDetailViewAt4(
+        *DETAIL_CENTER, 0.0, 0, *DETAIL_SCALE, "A", 1, True, False, False, 5
+    )
+    if detail is None:
+        raise RuntimeError("failed to create native scallop detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="_cam_relief_detail")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("native scallop detail has invalid initial bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position native scallop detail")
+    rebuild_drawing(adapter, label="_cam_relief_detail")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(outline) != 4 or len(ratio) != 2:
+        raise RuntimeError("native scallop detail has invalid final bounds")
+    center = tuple((outline[axis] + outline[axis + 2]) / 2 for axis in range(2))
+    if not math.isclose(ratio[0] / ratio[1], DETAIL_SCALE[0] / DETAIL_SCALE[1]):
+        raise RuntimeError("native scallop detail scale did not persist")
+    if math.dist(center, DETAIL_CENTER) > 0.0001:
+        raise RuntimeError(f"native scallop detail centre did not persist: {center}")
+    return detail
+
+
+def _overall_reference(adapter: Any, left: Any) -> None:
+    """The (43.0) overall between the flank's top and bottom edges."""
+    display = add_edge_dimension(
+        adapter,
+        left,
+        p0=(LEFT_CENTER[0], _flank_y(C2C + R_END)),
+        p1=(LEFT_CENTER[0], _flank_y(-R_END)),
+        text_xy=OVERALL_XY,
+        label="overall length reference",
+        orientation="vertical",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_LENGTH) > 1e-5:
+        raise RuntimeError(
+            f"overall length reference measured {measured_mm:g}, "
+            f"expected {OVERALL_LENGTH:g} mm"
+        )
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label="overall length reference"
+    )
+    # A derived reference has no part-side precision to import; the spec owns
+    # the digit (policy rule 2).
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("overall length reference precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -187,14 +345,24 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
+    detail = _cam_relief_detail(adapter, front)
     # Only ONE feature on this strap is invisible in outline -- the blind
     # follower seat -- and only the face view sees it, so only the face view
     # carries hidden lines.  Both bores and both scallops go clean through,
-    # so nothing else turns dashed and the flank view stays clean.
+    # so nothing else turns dashed; the flank and the scallop detail stay
+    # clean (the seat's nick by the park scallop is a visible edge there).
     set_hidden_lines_visible(adapter, front)
-    for view in (left, iso):
+    for view in (left, iso, detail):
         set_hidden_lines_removed(adapter, view)
 
+    # The detail claims the scallop dimensions before the parent import.
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="scallop detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -213,11 +381,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="seat flank",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *left_annotations]
+    annotations = [*detail_annotations, *front_annotations, *left_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Decimal places are the tolerance statement and the part owns them; this
     # sheet only proves the import kept them (policy rule 2).
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _overall_reference(adapter, left)
 
     for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
