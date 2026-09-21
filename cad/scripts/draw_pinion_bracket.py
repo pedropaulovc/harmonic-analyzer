@@ -135,10 +135,10 @@ def _flank_y(model_y_mm: float) -> float:
 # border is too close underneath), and the fence's own letter stays clear of
 # the follower seat on the parent view.
 DETAIL_SCALE = (3.0, 1.0)
-DETAIL_CENTER = (0.058, 0.072)
+DETAIL_CENTER = (0.058, 0.090)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.125, 0.075)
+DETAIL_CAPTION_XY = (0.125, 0.055)
 DETAIL_LETTER_XY = (0.105, 0.105)
 
 
@@ -166,7 +166,7 @@ FRONT_KEEP = {
     "ArborBoreDia": (0.196, 0.214),
     "ArborBoreCz": (0.180, 0.151),
     "BottomCapRadius": (0.190, 0.060),
-    "TopCapRadius": (0.164, 0.238),
+    "TopCapRadius": (0.176, 0.238),
     "PinSeatCy": (0.088, 0.134),
     "PinSeatDepth": (0.100, 0.158),
 }
@@ -177,13 +177,13 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
-    "PivotBoreDia": (0.101, 0.073),
-    "CamReliefParkR": (0.100, 0.090),
-    "CamReliefParkX": (0.068, 0.115),
-    "CamReliefParkY": (0.031, 0.084),
-    "CamReliefEngagedR": (0.100, 0.048),
-    "CamReliefEngagedX": (0.068, 0.106),
-    "CamReliefEngagedY": (0.031, 0.064),
+    "PivotBoreDia": (0.090, 0.035),
+    "CamReliefParkR": (0.103, 0.115),
+    "CamReliefParkX": (0.068, 0.133),
+    "CamReliefParkY": (0.024, 0.102),
+    "CamReliefEngagedR": (0.103, 0.066),
+    "CamReliefEngagedX": (0.068, 0.124),
+    "CamReliefEngagedY": (0.024, 0.082),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -447,7 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             "RELIEF CENTRES X/Y FROM\nØ6.35 PIVOT BORE AXIS",
             0.060,
-            0.131,
+            0.150,
             height=0.0035,
         )
         is None
@@ -497,7 +497,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.100, 0.102),
+        symbol_xy=(0.100, 0.097),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
