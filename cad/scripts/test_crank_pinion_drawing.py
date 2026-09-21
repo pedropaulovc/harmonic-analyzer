@@ -395,9 +395,11 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     for name in ("FaceWidth", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
     # The boss diameter reads on its vertical line left of the hub. The end
-    # break sits separately above and nearer the actual chamfer.
+    # break sits separately above-right, next to the actual chamfer and beyond
+    # the match-drill leader's path.
     chamfer_x, chamfer_y = drawing.RIGHT_KEEP["BossChamfer"]
-    assert boss_x < chamfer_x < drawing._side_x(spec.OVERALL_LENGTH)
+    assert drawing._side_x(spec.OVERALL_LENGTH) < chamfer_x
+    assert chamfer_x < drawing.ISO_CENTER[0] - half_od - 0.010
     assert chamfer_y > drawing.RIGHT_CENTER[1] + half_boss + 0.008
     assert (
         drawing.RIGHT_KEEP["FaceWidth"][1]

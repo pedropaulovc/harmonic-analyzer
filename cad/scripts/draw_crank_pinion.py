@@ -181,7 +181,7 @@ FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # isometric. The two lengths stay baseline-stacked below the view from the
 # toothed south face (rule 7: one origin per view, baseline not chained). The
 # boss diameter sits on its vertical dimension line in the clear gap left of
-# the hub, while the end break stays separately above the chamfer.
+# the hub, while the end break reads separately above-right of the chamfer.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 RIGHT_KEEP = {
     "OutsideDia": (
@@ -196,7 +196,7 @@ RIGHT_KEEP = {
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
     "BossChamfer": (
-        _side_x(OVERALL_LENGTH) - 0.006,
+        _side_x(OVERALL_LENGTH) + 0.025,
         RIGHT_CENTER[1] + HALF_BOSS + 0.010,
     ),
 }
