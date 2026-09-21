@@ -508,7 +508,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             "ALL RELIEF X/Y COORDINATES\nFROM Ø6.35 PIVOT BORE AXIS",
             0.105,
-            0.245,
+            0.255,
             height=0.0035,
         )
         is None
