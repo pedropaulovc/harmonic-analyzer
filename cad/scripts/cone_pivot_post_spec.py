@@ -187,7 +187,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Notes identify mating parts and the geometry relationship that is not
+# Notes identify mating parts and geometry relationships that are not
 # recognizable from silhouette alone; every size, band and finish remains on a
 # dimension or native symbol (drawing-simplicity-policy rules 1 and 6).
 DRAWING_NOTES = "\n".join(
@@ -195,6 +195,7 @@ DRAWING_NOTES = "\n".join(
         "CRANK BORE CARRIES CRANKSHAFT MHA-026.",
         "CONE BORE CARRIES CONE GEAR SHAFT MHA-014.",
         "CRANK AND CONE BORE AXES INTERSECT THE POST AXIS.",
+        "CONE JOURNAL BOSS INTERSECTS THE BODY; FOUR CORNERS STAND PROUD.",
         "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
     )
 )
