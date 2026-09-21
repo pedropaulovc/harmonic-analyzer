@@ -164,7 +164,7 @@ TOP_KEEP = {
     "CrankBossStartZ": (0.1255, 0.2225),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
-    "InclineAngle": (0.136, _top_y(28.0)),
+    "InclineAngle": (0.142, _top_y(28.0)),
 }
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
@@ -824,6 +824,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
+    )
+    offset_dimension_text(
+        adapter,
+        top_annotations,
+        {"CrankBossStartZ": (0.136, 0.2225)},
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
