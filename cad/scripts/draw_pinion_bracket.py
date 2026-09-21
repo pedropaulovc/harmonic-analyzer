@@ -161,7 +161,7 @@ def _detail_y(model_y_mm: float) -> float:
 FRONT_KEEP = {
     "ArborBoreDia": (0.256, 0.214),
     "ArborBoreCz": (0.240, 0.151),
-    "BottomCapRadius": (0.250, 0.060),
+    "BottomCapRadius": (0.250, 0.080),
     "TopCapRadius": (0.236, 0.238),
     "PinSeatCy": (0.148, 0.134),
 }
