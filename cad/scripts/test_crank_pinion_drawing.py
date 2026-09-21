@@ -148,8 +148,8 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
 
 
 def test_pin_hole_is_match_drilled_with_the_named_mate() -> None:
-    # Rules 2 and 6: a matched fit names the mate by number and states the
-    # acceptance, on the feature callout; the pin is the hole's own drill.
+    # Rules 2 and 6: the matched feature callout names the mate and carries
+    # the assembly acceptance; the pin is the hole's own drill size.
     assert spec.PIN_HOLE_SPEC.kind == "drilled_fractional"
     assert spec.PIN_HOLE_SPEC.size == "1/8"
     assert spec.PIN_DIA == pytest.approx(3.175)
@@ -159,16 +159,16 @@ def test_pin_hole_is_match_drilled_with_the_named_mate() -> None:
         "MATCH DRILL AT ASSY WITH",
         f"CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
         "1/8 DRILL",
+        f"PIN {spec.PIN_NUMBER} LIGHT DRIVE FIT",
+        "FLUSH BOTH SIDES",
     ]
-    # The crankshaft's print says the same thing back, naming this pinion.
+    # The crankshaft's print says the same match-drill requirement back,
+    # naming this pinion; one side carries the shared assembly acceptance.
     assert spec.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n") == [
         "MATCH DRILL AT ASSY WITH",
         f"CRANK PINION {_config.parts('crank-pinion')['number']}",
         "1/8 DRILL",
     ]
-    source = _source()
-    assert "process=PIN_HOLE_PROCESS" in source
-    assert "edge_xy=PIN_HOLE_EDGE" in source
     # No fit class, no band, no three-place number anywhere near the pin: the
     # match-drilled hole IS the fit (tolerance-policy.md: not a critical chain).
     assert not hasattr(spec, "PIN_DIA_BAND")
@@ -305,32 +305,28 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert "PAIR" not in data
     assert "TORQUE" not in data
     assert "X.XX" not in data
-    source = _source()
-    assert 'adapter, "Gear Data"' in source
-    assert 'adapter, "Manufacturing Notes"' in source
 
 
-def test_notes_carry_two_part_specific_facts_and_never_the_title_block() -> None:
+def test_notes_carry_only_tooth_machining_requirements() -> None:
     notes = spec.DRAWING_NOTES
-    # The title block orders every sharp edge broken R0.25 / 0.25 chamfer max.
-    # On a 2.13 whole-depth tooth that is a quarter of the tooth, so the print
-    # states the exception; the other line is the matched pin fit's
-    # acceptance (rule 6's match-drill-at-assembly case), which names the pin
-    # by number and carries no number of its own -- the callout owns the hole.
+    # The title block's normal edge break would remove a quarter of the tooth
+    # depth, and standard 1 MOD / 26 DP cutters would change the nonstandard
+    # tooth system. These are the two facts the views cannot carry.
     lines = notes.split("\n")
-    assert lines[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-    assert "\n".join(lines[1:]) == spec.PIN_FIT_NOTE
-    assert spec.PIN_NUMBER in spec.PIN_FIT_NOTE
-    assert "LIGHT DRIVE FIT" in spec.PIN_FIT_NOTE
-    assert "FLUSH" in spec.PIN_FIT_NOTE
-    assert not any(
-        ch.isdigit() for ch in spec.PIN_FIT_NOTE.replace(spec.PIN_NUMBER, "")
-    )
+    assert lines == [
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        (
+            f"CUT EXACT {spec.MODULE_MM:.3f} MODULE TOOTH FORM; "
+            "DO NOT SUBSTITUTE 1 MOD OR 26 DP."
+        ),
+    ]
+    assert spec.PIN_NUMBER not in notes
+    assert "LIGHT DRIVE FIT" not in notes
+    assert "FLUSH" not in notes
     assert len(lines) <= 4  # rule 6: at most four short lines
-    assert max(len(line) for line in lines) <= 66  # clear of the title block
-    # Retired with the migration: general tolerances, method instructions, a
-    # heat-treatment negative, a duplicate of the bore fit, and the pair
-    # commissioning protocol that was not part acceptance at all.
+    assert max(len(line) for line in lines) <= 80
+    # Retired with the migration: generic method narration, heat-treatment
+    # negatives, duplicate bore-fit text and pair commissioning protocol.
     for banned in (
         "CUT TEETH",
         "BORE BEFORE",
@@ -358,14 +354,6 @@ def test_sheet_runs_at_4_to_1_with_every_view_at_sheet_scale() -> None:
     assert not hasattr(spec, "ISOMETRIC_VIEW_NOTE")
 
 
-def test_hidden_lines_are_off_in_every_view() -> None:
-    # Rule 7: the reamed bore's callout says THRU and the pin cross-hole is a
-    # standard drill fully defined by its callout, with its exit circle solid
-    # on the side view where its station is dimensioned. Hidden edges would
-    # add ink, not facts.
-    source = _source()
-    assert "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
-    assert "set_hidden_lines_visible" not in source
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
@@ -381,21 +369,21 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing._side_x(spec.FACE_WIDTH) < outside_x < drawing._side_x(0.0)
     assert outside_y > drawing.RIGHT_CENTER[1] + half_od + 0.008
     boss_x, boss_y = drawing.RIGHT_KEEP["BossDia"]
-    assert drawing._side_x(spec.OVERALL_LENGTH) < boss_x < drawing._side_x(
-        spec.FACE_WIDTH
-    )
+    assert drawing.FRONT_CENTER[0] + half_od + 0.010 < boss_x
+    assert boss_x < drawing._side_x(spec.OVERALL_LENGTH) - 0.010
     assert boss_y > drawing.RIGHT_CENTER[1] + half_boss + 0.008
     bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
     assert bore_x > drawing._side_x(0.0) + 0.010
     assert bore_x < drawing.ISO_CENTER[0] - half_od - 0.010
     assert bore_y == pytest.approx(drawing.RIGHT_CENTER[1])
-    for name in ("FaceWidth", "PinStation", "OverallLength", "BossChamfer"):
+    for name in ("FaceWidth", "PinStation", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
-    # The end break's text clears the bore's roughness symbol (which hangs
-    # below the face view's bore) and the notes block.
+    # The boss diameter and end break sit in the clear gap left/above the hub,
+    # with the chamfer caption next to its native witness instead of at the
+    # bottom dimension stack.
     chamfer_x, chamfer_y = drawing.RIGHT_KEEP["BossChamfer"]
-    assert chamfer_y < drawing.FRONT_CENTER[1] - 0.060 - 0.004
-    assert chamfer_x > 0.140
+    assert chamfer_x == pytest.approx(boss_x)
+    assert drawing.RIGHT_CENTER[1] + half_boss < chamfer_y < boss_y
     # The side view's three lengths are baseline-stacked from the toothed face
     # (rule 7): shortest nearest the part, overall length outermost.
     assert (

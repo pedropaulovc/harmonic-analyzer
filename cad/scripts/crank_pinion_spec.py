@@ -123,11 +123,9 @@ if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - BOSS_CHAMFER - 0.5:
     raise AssertionError("retention pin hole reaches the boss end break")
 # The hole callout on BOTH prints (the pinion's here; the crankshaft's reads
 # its twin below) carries the matched fit the way rules 2 and 6 ask: the
-# drill size and the mate by number on the feature callout (only the process
-# prefix is typed; the size and THRU stay the native Hole Wizard callout's),
-# and the acceptance -- which pin, how it fits, where it ends -- in the one
-# note line rule 6 allows for match-drill at assembly. Three short prefix
-# rows: a single 70-character row would run a 5:1 side view off the sheet.
+# drill size and mate by number stay on the feature callout. The pinion's
+# callout also carries the assembly acceptance -- pin identity, fit and flush
+# condition -- instead of leaving that requirement in a detached general note.
 CRANKSHAFT_NUMBER = _config.parts("crankshaft")["number"]
 PINION_NUMBER = _config.parts("crank-pinion")["number"]
 PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
@@ -142,15 +140,12 @@ BORE_FIT_CALLOUT = "\n".join(
 )
 PIN_HOLE_PROCESS = (
     f"MATCH DRILL AT ASSY WITH\nCRANKSHAFT {CRANKSHAFT_NUMBER}\n"
-    f"{drill_process(PIN_HOLE_SPEC)}"
+    f"{drill_process(PIN_HOLE_SPEC)}\n"
+    f"PIN {PIN_NUMBER} LIGHT DRIVE FIT\nFLUSH BOTH SIDES"
 )
 CRANKSHAFT_PIN_HOLE_PROCESS = (
     f"MATCH DRILL AT ASSY WITH\nCRANK PINION {PINION_NUMBER}\n"
     f"{drill_process(PIN_HOLE_SPEC)}"
-)
-PIN_FIT_NOTE = (
-    f"PIN {PIN_NUMBER} IS A LIGHT DRIVE FIT IN THE MATCH-DRILLED HOLE,\n"
-    "  FLUSH WITH THE BOSS ON BOTH SIDES."
 )
 
 # One roughness, on the one surface whose function depends on it: the bore is
@@ -191,10 +186,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # band. The outside diameter prints two at the general grade. The face width is
 # a free length between two turned faces: one place, so the title block's
 # .X +/-0.8 is the band it claims -- and that is the band it needs, the 64T row
-# it runs in being far wider than this face. The boss diameter and the pin
-# station are routine turned/drilled sizes at the general .XX grade: the boss
-# is not a running surface (no band, no symbol), and the match-drill makes the
-# station's own position immaterial to the fit. The overall length is one
+# it runs in being far wider than this face. The boss diameter is a routine
+# turned size at the general .XX grade: it is not a running surface (no band,
+# no symbol). The match-drilled pin station is displayed parenthetically on
+# the sheet because its position is set at assembly. The overall length is one
 # place like the face width: it only has to leave the shaft end recessed
 # inside the boss (the assembly's recess assert, which uses the nominal), a
 # look, not a fit (codex machinist review, 2026-09-21). The end break is a
@@ -257,9 +252,13 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# Notes: the one part-specific process fact the title block gets wrong for a
-# fine-pitch gear (drawing-simplicity-policy.md rule 6 -- a 0.25 break is a
-# quarter of this tooth's whole depth) and the matched pin fit's acceptance.
-# No digit here is a size: the callout owns the hole, the pin print the pin.
+# Notes: the two part-specific tooth-system facts the title block cannot carry
+# (drawing-simplicity-policy.md rule 6). A 0.25 break is a quarter of this
+# tooth's whole depth, and the nonstandard 0.987 module must not silently become
+# a 1 MOD or 26 DP cutter. The matched-pin acceptance is on its feature callout.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, PIN_FIT_NOTE))
+CUTTER_REQUIREMENT_NOTE = (
+    f"CUT EXACT {MODULE_MM:.3f} MODULE TOOTH FORM; "
+    "DO NOT SUBSTITUTE 1 MOD OR 26 DP."
+)
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_REQUIREMENT_NOTE))
