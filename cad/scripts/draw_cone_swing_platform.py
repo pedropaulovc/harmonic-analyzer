@@ -85,7 +85,7 @@ ISO_CENTER = (0.355, 0.205)
 SECTION_CENTER = (0.325, 0.105)
 
 PROFILE_KEEP = {
-    "PlateLenDim": (0.018, PROFILE_CENTER[1]),
+    "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.100, 0.258),
     "NorthEdgeZ": (0.120, 0.245),
     "NorthWestX": (0.050, 0.255),
@@ -100,7 +100,7 @@ PROFILE_KEEP = {
     "CornerSER": (0.030, 0.258),
 }
 FEATURE_KEEP = {
-    "PivotBearingReliefDia": (0.145, 0.255),
+    "PivotBearingReliefDia": (0.145, 0.260),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.130, 0.175),
     "PostMountEastX": (0.205, 0.185),
@@ -110,7 +110,7 @@ NOTCH_KEEP = {
     # Replaced from model/view geometry after the notch view exists.
     "NotchRunAngle": (0.0, 0.0),
     "CapECx": (0.250, 0.112),
-    "CapECz": (0.225, 0.138),
+    "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.105),
 }
 SECTION_KEEP = {
@@ -334,9 +334,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         notch,
         (
-            (SLOT_E_X + 15.0 * math.cos(math.radians(half_angle))) / 1000.0,
+            (SLOT_E_X + 25.0 * math.cos(math.radians(half_angle))) / 1000.0,
             0.0,
-            (SLOT_E_Z + 15.0 * math.sin(math.radians(half_angle))) / 1000.0,
+            (SLOT_E_Z + 25.0 * math.sin(math.radians(half_angle))) / 1000.0,
         ),
         label="notch angular dimension",
     )
@@ -383,7 +383,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.125, 0.220),
+        callout_xy=(0.200, 0.250),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
