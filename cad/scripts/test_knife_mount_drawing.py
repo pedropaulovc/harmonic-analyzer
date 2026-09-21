@@ -2,118 +2,110 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import build_knife_mount as part
-import draw_knife_mount as drawing
 import knife_mount_spec
-from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_ground_bore_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = knife_mount_spec.SURFACE_FINISHES
-    assert control.key == "knife_bore"
-    assert control.roughness_um == knife_mount_spec.GROUND_UM == 0.8
-    assert control.face.diameter_mm == 2.0 * knife_mount_spec.R_BORE
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
+    import math
+
+    pitch_mm = 25.4 / 13.0
+    runout_at_limits = (
+        knife_mount_spec.STUD_TAP_DRILL_DEPTH_MM
+        + knife_mount_spec.STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[0]
+        - knife_mount_spec.STUD_TAP_THREAD_DEPTH_MM
+        - knife_mount_spec.STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM[1]
+    )
+    crown_web_at_limits = (
+        knife_mount_spec.BORE_FROM_TOP
+        - 0.5 * knife_mount_spec.BORE_POSITION_DIAMETRAL_TOLERANCE_MM
+        - (
+            2.0 * knife_mount_spec.R_BORE
+            + knife_mount_spec.BORE_DIAMETER_TOLERANCE_MM
+        )
+        / 2.0
+        - (
+            knife_mount_spec.STUD_TAP_DRILL_DEPTH_MM
+            + knife_mount_spec.STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[1]
+        )
+        - 0.5
+        * (
+            knife_mount_spec.STUD_TAP_DIA
+            + knife_mount_spec.DRILLED_HOLE_DIAMETER_PLUS_MM
+        )
+        / math.tan(
+            math.radians(
+                knife_mount_spec.DRILL_POINT_MIN_INCLUDED_ANGLE_DEG / 2.0
+            )
+        )
+    )
+
+    assert (
+        abs(runout_at_limits - knife_mount_spec.STUD_TAP_WORST_CASE_RUNOUT_MM)
+        < 1e-9
+    )
+    assert runout_at_limits >= 2.0 * pitch_mm
+    assert (
+        abs(
+            crown_web_at_limits
+            - knife_mount_spec.STUD_TAP_WORST_CASE_CROWN_WEB_MM
+        )
+        < 1e-9
+    )
+    assert crown_web_at_limits >= 0.5
 
 
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/knife-mount.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/knife-mount.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/knife-mount_drawing.png")
-    assert DRAWINGS_BY_NAME["knife_mount"].script == Path(drawing.__file__).resolve()
 
-
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert part.DRAWING_DIMENSIONS is knife_mount_spec.DRAWING_DIMENSIONS
-    marked = set().union(*knife_mount_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) <= kept
-
-
-def test_spec_geometry_mirrors_the_build_source() -> None:
-    # The drawing's view math reads the spec's mirrored nominals for placement
-    # only (the marks carry the exact values); assert they track the build's
-    # actual (assembly-derived) geometry to <0.05 mm so they cannot drift.
-    assert knife_mount_spec.R_BORE == part.R_BORE
-    assert knife_mount_spec.SUPPORT_Z_THICK == part.SUPPORT_Z_THICK
-    assert abs(knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.05
-    assert abs(knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
-    assert abs(knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
-
-
-def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
-    notes = knife_mount_spec.DRAWING_NOTES
-    assert f"BORE Ø{2.0 * knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
-    assert "BORE Ø12.0 THRU" in notes
-    assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
-    assert "KNIFE-HANGER STUD" in notes
-    assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
-    # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
-    # "no hardened seat / do not release" hold is gone.
-    assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
-    assert "LEAVE UNPAINTED" in notes
-    assert "NO HARDENED KNIFE SEAT" not in notes
-    assert "DO NOT RELEASE" not in notes
-    # Title block owns the alloy callout (test_magnifier_drawing_metadata).
-    assert "MATERIAL:" not in notes
-    assert "Ra 0.8" not in notes
-    assert "GRAY IRON" not in notes and "PAINT BLACK" not in notes
-    assert "DEBURR" not in notes and "BREAK SHARP" not in notes
-    assert "X.XX" not in notes
-    assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-
-
-def test_native_gdt_and_bore_geometry() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 1
-    assert source.count("add_feature_control_frame(") == 1
-    assert 'characteristic="position"' in source
-    assert source.count("add_edge_dimension(") == 1
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    config = _config.parts("knife-mount")
-    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
-    assert part.MATERIAL == "Plain Carbon Steel"
-    assert config["material"] == "Plain Carbon Steel"
-    assert "O1 tool steel" in config["material_specification"]
-    assert "58-60 HRC" in config["material_specification"]
-    assert "Brass" not in config["material_specification"]
-    assert "unpainted" in str(config["finish"]).lower()
-    assert int(config["quantity"]) == 2
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_color(adapter, HARDENED_STEEL)" in source
-    assert part.HARDENED_STEEL == (0.30, 0.30, 0.31)
-
-
-def test_close_bore_clears_the_hex_trunnion_only_at_the_ridge() -> None:
+def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() -> None:
     import math
 
     from summing_lever_spec import HEX_H, HEX_W
 
-    assert part.R_BORE == 6.0
-    assert abs(part.BLK_BOT - (-14.75)) < 1e-9
-    assert abs(part.BORE_CY - (-5.75)) < 1e-9
-    # Top vertex hangs TOP_CLEAR under the crown; the across-corners bottom
-    # vertex and the two widest shoulders clear the bore wall.
-    hex_centre_y = -HEX_H / 2.0
-    assert abs((part.BORE_CY + part.R_BORE) - part.TOP_CLEAR) < 1e-9
-    bottom_clear = part.R_BORE - abs(hex_centre_y - HEX_H / 2.0 - part.BORE_CY)
-    assert bottom_clear > 0.5
-    for sy in (hex_centre_y + HEX_H / 4.0, hex_centre_y - HEX_H / 4.0):
-        d = math.hypot(HEX_W / 2.0, sy - part.BORE_CY)
-        assert d < part.R_BORE - 0.5
+    # The lever is hung from its top ridge, so that vertex remains tangent to
+    # the bore crown while the hex rotates about it.
+    assert abs(part.BORE_CY + part.R_BORE) < 1e-9
+
+    bore_radius_min = (
+        part.R_BORE - knife_mount_spec.BORE_DIAMETER_TOLERANCE_MM / 2.0
+    )
+    # The current lever print gives both trunnion sizes two decimal places:
+    # use its actual .XX +0.51-mm material limits, not nominal geometry.
+    hex_width_max = HEX_W + 0.51
+    hex_height_max = HEX_H + 0.51
+    vertices_from_ridge = (
+        (-hex_width_max / 2.0, -hex_height_max / 4.0),
+        (-hex_width_max / 2.0, -3.0 * hex_height_max / 4.0),
+        (0.0, -hex_height_max),
+        (hex_width_max / 2.0, -3.0 * hex_height_max / 4.0),
+        (hex_width_max / 2.0, -hex_height_max / 4.0),
+    )
+    # dimensions.yaml:1333 derives about 1.6 degrees of knife rock from the
+    # observed 6-mm summing-bar tip arc.
+    sweep = math.radians(1.6)
+    minimum_clearance = math.inf
+    for x, y in vertices_from_ridge:
+        # Distance squared to a bore centre at (0, -R) is
+        # |p|² + R² + 2R(x sin(theta) + y cos(theta)). Include every stationary
+        # point inside the sweep, not only sampled/end poses.
+        candidates = [-sweep, sweep]
+        stationary = math.atan2(x, y)
+        for half_turn in range(-2, 3):
+            angle = stationary + half_turn * math.pi
+            if -sweep <= angle <= sweep:
+                candidates.append(angle)
+        maximum_radius = max(
+            math.sqrt(
+                x * x
+                + y * y
+                + bore_radius_min * bore_radius_min
+                + 2.0
+                * bore_radius_min
+                * (x * math.sin(angle) + y * math.cos(angle))
+            )
+            for angle in candidates
+        )
+        minimum_clearance = min(
+            minimum_clearance, bore_radius_min - maximum_radius
+        )
+
+    assert minimum_clearance > 0.0

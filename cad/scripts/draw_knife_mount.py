@@ -19,33 +19,42 @@ import argparse
 import sys
 from typing import Any
 
-from knife_mount_spec import GEOMETRIC_TOLERANCES_MM
+
+from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_edge_dimension,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_basic_dimensions,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from knife_mount_spec import (
+    BORE_DIAMETER_TOLERANCE_MM,
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
+    DRAWING_NOMINALS_MM,
+    DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_MM,
     R_BORE,
+    STUD_TAP_DIA,
+    STUD_TAP_SPEC,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -82,16 +91,99 @@ def _front_y(model_y_mm: float) -> float:
 
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
+    "BlockHeight": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
+    "BoreFromTop": (FRONT_CENTER[0] + 0.043, FRONT_CENTER[1]),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+RIGHT_KEEP = {
+    "Depth": (RIGHT_CENTER[0], _front_y(BLK_BOT) - 0.016),
+}
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
 
-RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
-RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
+
+def _assert_imported_nominals(adapter: Any, annotations: list[Any]) -> None:
+    """Prove every imported model dimension still measures the spec nominal."""
+    remaining = dict(DRAWING_NOMINALS_MM)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        expected_mm = remaining.pop(name, None)
+        if expected_mm is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        actual_mm = abs(float(dimension.SystemValue)) * 1000.0
+        if abs(actual_mm - expected_mm) > 1e-5:
+            raise RuntimeError(
+                f"imported {name} measured {actual_mm:g}, expected {expected_mm:g} mm"
+            )
+    if remaining:
+        raise RuntimeError(f"model dimensions never reached sheet: {sorted(remaining)}")
+
+
+def _assert_imported_bore_tolerance(adapter: Any, annotations: list[Any]) -> None:
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "BoreDia":
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        limit_m = BORE_DIAMETER_TOLERANCE_MM / 1000.0
+        if (
+            int(tolerance.Type) != 4
+            or abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
+            or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
+        ):
+            raise RuntimeError("imported BoreDia lost its native symmetric tolerance")
+        return
+    raise RuntimeError("BoreDia never reached sheet for native tolerance readback")
+
+
+@_telemetry.traced("drawing.knife_mount_tap_readback")
+def _check_tap_callout(display: Any) -> None:
+    """Prove the native callout carries both drill and usable-thread depths."""
+    expected_lengths = {
+        "hw-tapdrldia": STUD_TAP_DIA,
+        "hw-tapdrldepth": STUD_TAP_SPEC.depth_mm,
+        "hw-threaddepth": STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
+    }
+    expected_strings = {
+        "hw-threaddesc": "1/2-13 UNC",
+        "hw-threadclass": STUD_TAP_SPEC.thread_class,
+    }
+    found: set[str] = set()
+    for raw in display.GetHoleCalloutVariables() or ():
+        late = dynamic_dispatch(raw._oleobj_)
+        name = str(late.VariableName)
+        if name in expected_strings:
+            if int(late.Type) != 3:
+                raise RuntimeError(f"knife-mount tap {name} is not a string")
+            actual = str(_early_bound(raw, "ICalloutStringVariable").String or "")
+            if actual.strip(" -") != expected_strings[name]:
+                raise RuntimeError(
+                    f"knife-mount tap {name}: {actual!r} != {expected_strings[name]!r}"
+                )
+            found.add(name)
+            continue
+        if name not in expected_lengths:
+            raise RuntimeError(f"unexpected knife-mount tap variable {name!r}")
+        if int(late.Type) != 1:
+            raise RuntimeError(f"knife-mount tap {name} is not a length")
+        actual_mm = (
+            float(_early_bound(raw, "ICalloutLengthVariable").Length) * 1000.0
+        )
+        if abs(actual_mm - expected_lengths[name]) > 1e-5:
+            raise RuntimeError(
+                f"knife-mount tap {name}: {actual_mm} != "
+                f"{expected_lengths[name]} mm"
+            )
+        found.add(name)
+    required = set(expected_lengths) | set(expected_strings)
+    if found != required:
+        raise RuntimeError(
+            f"knife-mount tap callout is missing native variables: {required - found}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -139,50 +231,68 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # The bore only reads in the front view; show it dashed in the projected
-    # right/top views so the orthographic set carries the thru-hole the
-    # isometric implies (blind-review finding: HLR left them empty rectangles).
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, right, top):
-        set_hidden_lines_visible(adapter, view)
+    # Standard holes are fully defined by their native callouts, so hidden
+    # lines add no manufacturing information on this part.  The shared
+    # finalizer promotes the standard isometric to precise Shaded With Edges.
+    for view in (front, right, top, iso):
+        set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    dimensions = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_basic_dimensions(adapter, front_annotations, ("BoreFromTop",))
+    _assert_imported_nominals(adapter, dimensions)
+    _assert_imported_bore_tolerance(adapter, dimensions)
+    assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to knife bore")
 
-    # Block depth (14): dimension the right view's flat front/back faces.
-    add_edge_dimension(
+    # Native Hole Wizard callout owns the thread size/class and blind depth.
+    tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
+    tap_callout = add_native_hole_callout(
         adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        p1=(RIGHT_CENTER[0] + RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y - 0.014),
-        label="block-depth overall",
+        top,
+        edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
+        callout_xy=(0.175, 0.258),
+        label="hanger-stud blind tap",
     )
+    _check_tap_callout(tap_callout)
 
-    # Datum A = the block top seat (hangs 0.25 under the top-frame casting
-    # underside; carries the 1/2-13 knife-hanger-stud tap); Ra 0.8 on the
-    # bore's working upper wall, tagged on the bore rim (a real circular edge).
+    # Datum A is the hanger seat; datum B is the mating hanger-tap axis.
+    # Together with the imported BASIC height they fully locate the sole
+    # surviving knife-system position control.
     add_datum_feature(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BLK_TOP)),
-        symbol_xy=(FRONT_CENTER[0], _front_y(BLK_TOP) + 0.018),
+        symbol_xy=(FRONT_CENTER[0] + 0.030, _front_y(BLK_TOP) + 0.010),
         datum="A",
         label="block top seat",
+    )
+    add_datum_feature(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
+        symbol_xy=(TOP_CENTER[0] + 0.028, TOP_CENTER[1] - 0.012),
+        datum="B",
+        label="hanger-tap axis",
     )
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
-        frame_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) + 0.040),
+        edge_xy=(
+            FRONT_CENTER[0],
+            _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0,
+        ),
+        frame_xy=(FRONT_CENTER[0] + 0.060, _front_y(BORE_CY) + 0.040),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],
-        datums=("A",),
+        datums=("A", "B"),
         diameter=True,
         label="knife-bore position",
     )
@@ -205,6 +315,8 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+
+
 
 
 def _parse_args() -> argparse.Namespace:
