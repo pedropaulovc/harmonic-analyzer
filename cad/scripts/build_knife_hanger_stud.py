@@ -17,7 +17,7 @@ from _drawing_marks import (
 )
 from _fastener_catalog import fastener
 from _saved_part_guard import require_saved_drawing_properties
-from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _stock_fastener import StockComponent, build_stock_fastener
 from diagnostics.diag_build_91247A720 import (
     GB_HH,
     GB_HW,
@@ -50,7 +50,8 @@ SHANK_DIA = 2.0 * GB_MAJOR_R
 STOCK_SHANK_LEN = GB_LEN
 SHANK_LEN = FINISHED_UNDERHEAD_MM
 UNDERHEAD_LEN = FINISHED_UNDERHEAD_MM
-TRIMMED_TIP_TRANSLATION_MM = FINISHED_UNDERHEAD_MM - (GB_UNDERSIDE - GB_WASHER_T)
+UNDERHEAD_Y_MM = GB_UNDERSIDE - GB_WASHER_T
+THREAD_TIP_Y_MM = UNDERHEAD_Y_MM - UNDERHEAD_LEN
 
 
 def _manufacturing_controls(adapter) -> None:
@@ -111,9 +112,6 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(
                 "91247A720",
                 _prepared_stud,
-                RigidTransform(
-                    translation_mm=(0.0, TRIMMED_TIP_TRANSLATION_MM, 0.0)
-                ),
                 parameters={"finished_underhead_mm": FINISHED_UNDERHEAD_MM},
             ),
         ),
