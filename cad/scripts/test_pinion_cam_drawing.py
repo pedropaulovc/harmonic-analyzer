@@ -130,7 +130,7 @@ def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
     assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
-    assert drawing.DIMENSION_CALLOUTS["BossCz"] == "BOSS AXIS STATION"
+    assert "BossCz" not in drawing.DIMENSION_CALLOUTS
     assert "BossProjection" in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
         "RAISED BOSS PROJECTION (REF)"
