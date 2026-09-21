@@ -297,7 +297,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         text=PIN_HOLE_PROCESS,
-        entity_xy=PIN_HOLE_EDGE,
+        entity=visible_circle_edge(adapter, right, PIN_DIA),
         note_xy=PIN_HOLE_CALLOUT,
         label="retention-pin matched cross-hole",
     )
