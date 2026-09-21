@@ -81,11 +81,11 @@ def test_notes_are_specific_and_never_repeat_the_title_block() -> None:
 
 def test_hole_callouts_state_size_process_and_fit() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert callouts["AnchorOffset"] == "ANCHOR AXIS FROM TOP EDGE"
+    assert callouts["AnchorOffset"] == "TAP AXIS\nFROM TOP EDGE"
     assert callouts["ShaftBoreDia"].startswith("REAM THRU")
     assert "3/8 IN" in callouts["ShaftBoreDia"]
-    assert "0.00-0.12 DIAMETRAL CLEARANCE" in callouts["ShaftBoreDia"]
-    assert "MHA-026" in callouts["ShaftBoreDia"]
+    assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]
+    assert "CLEARANCE ON MHA-026" in callouts["ShaftBoreDia"]
     assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM 0.5 DEEP"
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
