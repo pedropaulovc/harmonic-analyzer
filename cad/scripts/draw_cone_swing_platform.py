@@ -318,6 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
+        section,
         symbol_xy=(0.350, 0.075),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
@@ -326,6 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_surface_finish(
         adapter,
+        section,
         symbol_xy=(0.350, 0.140),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
