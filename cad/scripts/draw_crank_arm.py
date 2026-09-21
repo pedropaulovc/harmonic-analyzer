@@ -69,6 +69,7 @@ from crank_arm_spec import (
     HANDLE_PIVOT_HOLE_SPEC,
     PIN_HOLE_SPEC,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -89,20 +90,18 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _HANDLE_PIVOT_HOLE_DIA = blind_cut_dia_mm(HANDLE_PIVOT_HOLE_SPEC)
 _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
-# swUserPreferenceToggle_e.swEdgesHiddenEdgeSelectionInWireframe, read from
-# the SOLIDWORKS 2026 Constant type library 34.0 generated binding.  The API's
-# Selection options page documents this as the hidden-edge selection switch for
-# wireframe and HLV; the published enum page omits the integer.
-_SW_HLV_HIDDEN_EDGE_SELECTION = 115
+# The top view is cropped around the shaft boss: it retains the HLV evidence
+# that the #14 cross-hole meets the shaft bore without repeating the remote
+# tap, dimple and handle-pivot profiles.
 
 
 SHEET_SCALE = (2.0, 1.0)
 
 # Sheet layout (meters).  The principal (front) view's model bbox runs
 # boss..arm-end in sheet X (93 mm overall, model +X to the right) and +/-8 in
-# Y; at 2:1 the view is 186 x 32 mm. Third angle: the edge-on view (carrying
-# the cross-pin hole) sits above it; the side view (16 x 8 stock section) is
-# to its right.
+# Y; at 2:1 the principal view is 186 x 32 mm. The cropped edge-on view sits
+# above it and carries only the shaft-boss cross-hole evidence; the side view
+# (16 x 8 stock section) is to its right.
 FRONT_CENTER = (0.145, 0.135)
 TOP_CENTER = (0.145, 0.205)
 RIGHT_CENTER = (0.300, 0.135)
@@ -171,219 +170,52 @@ def _add_arm_centerline(adapter: Any, view: Any) -> None:
     if count != 1:
         raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
-def _circle_geometry(edge: Any) -> tuple[float, ...] | None:
-    """Return one model edge's circle parameters, or ``None`` for other curves."""
-    curve = _early_bound(edge.GetCurve(), "ICurve")
-    if not bool(curve.IsCircle()):
-        return None
-    params = list(curve.CircleParams or ())
-    if len(params) < 7:
-        raise RuntimeError("circular crank-arm edge returned incomplete CircleParams")
-    return tuple(float(value) for value in params[:7])
-
-
-def _redundant_top_profile_key(circle: tuple[float, ...]) -> str | None:
-    """Classify a redundant top-view hole profile by stable model geometry.
-
-    The view owns no generated feature names and ``GetEdges`` has no stable
-    ordering.  The blind tap and dimple have source circular edges that map
-    into this view; matching their authored XY centres leaves the shaft-bore
-    and Y-normal cross-hole edges alone.
-    """
-    cx, cy, _cz, nx, ny, nz, _radius = circle
-    if abs(nx) > 1e-6 or abs(ny) > 1e-6 or abs(abs(nz) - 1.0) > 1e-6:
-        return None
-    cx_mm = cx * 1000.0
-    cy_mm = cy * 1000.0
-    candidates = (
-        ("anchor tap", ANCHOR_SCREW_X, ANCHOR_SCREW_Y),
-        ("fiducial dimple", DIMPLE_X, 0.0),
-    )
-    for label, target_x_mm, target_y_mm in candidates:
-        if (
-            abs(cx_mm - target_x_mm) <= 1e-3
-            and abs(cy_mm - target_y_mm) <= 1e-3
-        ):
-            return label
-    return None
-
-
-def _same_entity(app: Any, left: Any, right: Any) -> bool:
-    """Compare two COM entities without relying on wrapper identity."""
-    return int(app.IsSame(left, right)) == 1
-
-
-def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
-    """Hide only the redundant hole profiles and prove the native result.
-
-    ``IView.GetCorrespondingEntity`` maps the blind tap and dimple's source
-    edges into the active drawing view.  The handle-pivot bore is edge-on and
-    contributes only two silhouette generators, so those are selected at
-    geometry-derived sheet points.  ``IDrawingDoc.HideEdge`` suppresses both
-    forms without switching the whole view to HLR and losing the cross-hole /
-    shaft-bore evidence.
-    """
-    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+def _crop_top_view_to_shaft(adapter: Any, view: Any) -> None:
+    """Crop the HLV top view to the shaft boss and prove remote holes are absent."""
+    draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
-    drawing_view = _early_bound(view, "IView")
-    if int(drawing_view.GetDisplayMode2()) != 1:  # swHIDDEN_GREYED / HLV
-        raise RuntimeError("top view must be HLV before selective edge hiding")
-
-    source_document = drawing_view.ReferencedDocument
-    if source_document is None:
-        raise RuntimeError("top view has no referenced part document")
-    source = _early_bound(source_document, "IPartDoc")
-    bodies = [
-        _early_bound(raw_body, "IBody2")
-        for raw_body in (source.GetBodies2(0, False) or ())
-        if raw_body is not None
-    ]
-    if len(bodies) != 1:
-        raise RuntimeError(
-            f"crank arm source has {len(bodies)} solid bodies; expected exactly one"
-        )
-    body = bodies[0]
-    app = adapter.swApp
-
-    targets: list[tuple[str, Any]] = []
-    counts: dict[str, int] = {
-        "anchor tap": 0,
-        "fiducial dimple": 0,
-    }
-    for raw_edge in body.GetEdges() or ():
-        model_edge = _early_bound(raw_edge, "IEdge")
-        circle = _circle_geometry(model_edge)
-        if circle is None:
-            continue
-        label = _redundant_top_profile_key(circle)
-        if label is None:
-            continue
-        mapped = drawing_view.GetCorrespondingEntity(model_edge)
-        if mapped is None:
-            # A source rim or blind floor can project away or merge into its
-            # mate in this edge-on view.  Require a mapped edge per feature
-            # below; an individual source edge need not have a drawing peer.
-            continue
-        drawing_edge = _early_bound(mapped, "IEdge")
-        if any(_same_entity(app, drawing_edge, prior) for _, prior in targets):
-            raise RuntimeError(f"top view mapped duplicate edge for {label}")
-        targets.append((label, drawing_edge))
-        counts[label] += 1
-
-    missing = [label for label, count in counts.items() if count == 0]
-    if missing:
-        raise RuntimeError(
-            "top view did not resolve redundant profile edges: " + ", ".join(missing)
-        )
-    if not targets:
-        raise RuntimeError("top view produced no redundant profile edges")
-
-    hidden_before = list(drawing_view.HiddenEdges or ())
+    native_view = _early_bound(view, "IView")
     if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate top view for selective edge hiding")
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    select_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
-    select_data.View = view
-    for label, drawing_edge in targets:
-        draw.ClearSelection2(True)
-        if not _early_bound(drawing_edge, "IEntity").Select4(False, select_data):
-            raise RuntimeError(f"failed to select redundant top-view edge ({label})")
-        if int(selection_manager.GetSelectedObjectCount2(-1)) != 1:
-            raise RuntimeError(f"top-view edge selection was not singular ({label})")
-        selected = selection_manager.GetSelectedObject6(1, -1)
-        if selected is None or not _same_entity(app, selected, drawing_edge):
-            raise RuntimeError(f"top-view edge selection changed identity ({label})")
-        ddoc.HideEdge()
+        raise RuntimeError("failed to activate top view for shaft-boss crop")
     draw.ClearSelection2(True)
 
-    hidden_after = list(drawing_view.HiddenEdges or ())
-    newly_hidden = [
-        edge
-        for edge in hidden_after
-        if not any(_same_entity(app, edge, prior) for prior in hidden_before)
-    ]
-    if len(newly_hidden) != len(targets):
-        raise RuntimeError(
-            "top-view selective hide changed an unexpected number of edges: "
-            f"expected {len(targets)}, added {len(newly_hidden)}"
-        )
-    if not all(
-        any(_same_entity(app, edge, added) for added in newly_hidden)
-        for _, edge in targets
+    crop_center = (_sheet_x(0.0), TOP_CENTER[1])
+    crop_radius = (HALF_WIDTH + 2.0) * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(native_view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (
+        crop_center,
+        (crop_center[0] + crop_radius, crop_center[1]),
     ):
-        raise RuntimeError("top-view selective hide did not persist every target edge")
-
-    # The through handle-pivot bore has no BREP rim corresponding to this
-    # edge-on view.  SolidWorks exposes its two dashed generators only to
-    # coordinate hit-testing, and that path is disabled unless the documented
-    # HLV hidden-edge selection preference is enabled.  Preserve the seat's
-    # prior setting and prove each native hide by a negative hit-test.
-    handle_points = tuple(
-        (
-            _sheet_x(ARM_C2C + side * _HANDLE_PIVOT_HOLE_DIA / 2.0),
-            TOP_CENTER[1],
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
         )
-        for side in (-1.0, 1.0)
-    )
-    hidden_selection_pref = _SW_HLV_HIDDEN_EDGE_SELECTION
-    selection_before = bool(app.GetUserPreferenceToggle(hidden_selection_pref))
-    app.SetUserPreferenceToggle(hidden_selection_pref, True)
-    if bool(app.GetUserPreferenceToggle(hidden_selection_pref)) is not True:
-        raise RuntimeError("seat refused to enable HLV hidden-edge selection")
-    try:
-        for index, point in enumerate(handle_points):
-            drawing_view.UpdateViewDisplayGeometry()
-            draw.ClearSelection2(True)
-            if not draw.Extension.SelectByID2(
-                "",
-                "EDGE",
-                point[0],
-                point[1],
-                0.0,
-                False,
-                0,
-                null_callout(),
-                0,
-            ):
-                raise RuntimeError(
-                    f"failed to select handle-pivot hidden edge {index + 1}"
-                )
-            if (
-                int(selection_manager.GetSelectedObjectCount2(-1)) != 1
-                or int(selection_manager.GetSelectedObjectType3(1, -1)) != 1
-            ):
-                raise RuntimeError(
-                    f"handle-pivot hidden edge {index + 1} "
-                    "selection was not singular"
-                )
-            ddoc.HideEdge()
-        draw.ClearSelection2(True)
-        draw.EditRebuild3()
-        drawing_view.UpdateViewDisplayGeometry()
-        for index, point in enumerate(handle_points):
-            draw.ClearSelection2(True)
-            if draw.Extension.SelectByID2(
-                "",
-                "EDGE",
-                point[0],
-                point[1],
-                0.0,
-                False,
-                0,
-                null_callout(),
-                0,
-            ):
-                raise RuntimeError(
-                    f"handle-pivot hidden edge {index + 1} "
-                    "remained visible after hiding"
-                )
-        draw.ClearSelection2(True)
-    finally:
-        app.SetUserPreferenceToggle(hidden_selection_pref, selection_before)
-        if bool(app.GetUserPreferenceToggle(hidden_selection_pref)) != selection_before:
-            raise RuntimeError("seat refused to restore HLV hidden-edge selection")
-    if int(drawing_view.GetDisplayMode2()) != 1:  # preserve HLV cross-hole evidence
-        raise RuntimeError("top view left HLV after selective edge hiding")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create shaft-boss crop fence")
+
+    # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
+    if int(native_view.Crop2(False, True, 0)) != 1:
+        raise RuntimeError("failed to crop top view to shaft boss")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    native_view.UpdateViewDisplayGeometry()
+    if not bool(native_view.IsCropped()):
+        raise RuntimeError("top view did not retain its shaft-boss crop")
+    outline = tuple(float(value) for value in native_view.GetOutline())
+    if (
+        len(outline) != 4
+        or not outline[0] < crop_center[0] < outline[2]
+        or outline[2] >= _sheet_x(DIMPLE_X)
+    ):
+        raise RuntimeError(
+            "top-view crop did not isolate the shaft boss: "
+            f"outline={outline!r}, dimple_x={_sheet_x(DIMPLE_X)!r}"
+        )
 
 
 _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
@@ -468,14 +300,14 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines earn their place in the front and top views: the top view
-    # shows the #14 cross-drill meeting the shaft bore, the front the blind
-    # floors of the dimple and the anchor drill.  The 16 x 8 side view carries
-    # one dimension (thickness) and would only repeat already-called-out holes
-    # as overlapping dashed arcs, so it is drawn hidden-lines-removed.
+    # Front-view HLV exposes the blind dimple/tap floors. The cropped top-view
+    # HLV keeps only the #14 cross-drill and shaft-bore intersection; cropping
+    # eliminates the remote profiles instead of relying on unstable hidden-edge
+    # hit-testing. The side view carries only stock thickness and stays HLR.
     for view in (front, top):
         set_hidden_lines_visible(adapter, view)
     set_hidden_lines_removed(adapter, right)
+    _crop_top_view_to_shaft(adapter, top)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -597,10 +429,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
-    # Rebuild HLV after the final top-view annotation, then suppress only the
-    # redundant tap/dimple/pivot profiles by native per-edge visibility.
-    set_hidden_lines_visible(adapter, top)
-    _hide_redundant_top_profiles(adapter, top)
 
     return await finalize_drawing(
         adapter,

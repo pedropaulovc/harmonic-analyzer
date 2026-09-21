@@ -94,16 +94,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# drawing-simplicity-policy rule 6: four short lines of facts the views cannot
-# show.  The eccentricity itself is DIMENSIONED on the sheet, so the note only
-# says what a single dimension cannot -- that it is the same, and in the same
-# direction, at both ends.
-DRAWING_NOTES = "\n".join(
-    (
-        "BORE AND OD ARE NOT CONCENTRIC; THE ECCENTRICITY IS THE SAME",
-        "  AND IN THE SAME DIRECTION AT BOTH ENDS.",
-        "DRILL/TAP M2.5 X 0.45-6H THRU THE COLLAR WALL INTO THE BORE.",
-        "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
-    )
-)
+# The tapped-hole requirement is attached to its boss-end dimension.  The sole
+# linked note carries only the loose purchased hardware supplied with the cam.
+DRAWING_NOTES = "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

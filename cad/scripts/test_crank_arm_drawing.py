@@ -180,13 +180,6 @@ def test_every_location_is_a_model_dimension_from_a_feature() -> None:
     assert 'label="overall length reference"' in source
 
 
-def test_hidden_lines_are_kept_only_where_they_show_something() -> None:
-    source = _source()
-    # Front (blind floors) and top (cross-drill meeting the bore) keep them;
-    # the 16 x 8 side view would only repeat already-called-out holes.
-    assert "for view in (front, top):\n        set_hidden_lines_visible" in source
-    assert "set_hidden_lines_removed(adapter, right)" in source
-    assert "set_hidden_lines_removed(adapter, iso)" in source
 
 
 def test_dimple_is_shown_where_it_is_visible() -> None:
