@@ -162,6 +162,44 @@ def _circle_entity(
         )
     return edge
 
+def _vertical_outline_edge(
+    view: Any,
+    *,
+    coordinate_axis: int,
+    coordinate_mm: float,
+    label: str,
+) -> Any:
+    """Resolve one finished vertical face edge by model-space coordinate."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(start, "IVertex").GetPoint()
+        )
+        p1 = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(end, "IVertex").GetPoint()
+        )
+        if (
+            abs(p0[coordinate_axis] - coordinate_mm) > 0.01
+            or abs(p1[coordinate_axis] - coordinate_mm) > 0.01
+        ):
+            continue
+        span = abs(p1[1] - p0[1])
+        if span > 0.01:
+            candidates.append((span, edge))
+    if not candidates:
+        raise RuntimeError(
+            f"{label} has no vertical edge at model coordinate "
+            f"{coordinate_mm:.3f} mm"
+        )
+    return max(candidates, key=lambda item: item[0])[1]
+
 _COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
 
 
@@ -206,6 +244,7 @@ def _add_reference_location(
     view: Any,
     *,
     face_xy: tuple[float, float],
+    face: Any,
     circle_xy: tuple[float, float],
     circle: Any,
     text_xy: tuple[float, float],
@@ -220,7 +259,7 @@ def _add_reference_location(
         text_xy=text_xy,
         orientation="horizontal",
         entity_types=("EDGE", "EDGE"),
-        entities=(None, circle),
+        entities=(face, circle),
         label=label,
     )
     set_arc_endpoints_to_center(adapter, display, label=label)
@@ -385,6 +424,18 @@ async def build(adapter: Any) -> dict[str, str]:
         center_y_mm=PINCH_HEIGHT,
         label="pinch opposite-jaw thread",
     )
+    front_left_face = _vertical_outline_edge(
+        front,
+        coordinate_axis=0,
+        coordinate_mm=-BLOCK_X / 2.0,
+        label="front left finished face",
+    )
+    right_depth_face = _vertical_outline_edge(
+        right,
+        coordinate_axis=2,
+        coordinate_mm=-BLOCK_Z / 2.0,
+        label="right depth finished face",
+    )
     _add_reference_location(
         adapter,
         front,
@@ -392,6 +443,7 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0] - BLOCK_X * _S / 2.0,
             _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
         ),
+        face=front_left_face,
         circle_xy=(
             FRONT_CENTER[0] - SHAFT_PASSAGE_DIA * _S / 2.0,
             _elevation_y(ADJUSTER_AXIS_HEIGHT, FRONT_CENTER),
@@ -407,6 +459,7 @@ async def build(adapter: Any) -> dict[str, str]:
             RIGHT_CENTER[0] - BLOCK_Z * _S / 2.0,
             _elevation_y(PINCH_HEIGHT, RIGHT_CENTER),
         ),
+        face=right_depth_face,
         circle_xy=(
             RIGHT_CENTER[0],
             _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)
