@@ -53,27 +53,31 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 PRINCIPAL_CENTER = (0.200, 0.170)
-ISO_CENTER = (0.355, 0.225)
+ISO_CENTER = (0.365, 0.225)
 DONOR_KEEP = {
     "HeadDia": (0.030, 0.225),
     "NeckDia": (0.045, 0.185),
     "ShaftDia": (0.030, 0.145),
 }
 PRINCIPAL_KEEP = {
-    "HeadLen": (0.340, 0.120),
-    "NeckLen": (0.320, 0.100),
-    "ExposedShaftLen": (0.205, 0.090),
-    "HeadCapR": (0.305, 0.220),
+    "HeadLen": (0.345, 0.118),
+    "NeckLen": (0.325, 0.100),
+    "BackRimFromHeadRear": (0.205, 0.088),
+    "OverallLen": (0.205, 0.073),
+    "HeadCapR": (0.300, 0.220),
+    "HeadCapSagDim": (0.340, 0.215),
     "BackCapSagDim": (0.055, 0.220),
-    "CrossHoleDia": (0.200, 0.250),
+    "CrossHoleDia": (0.275, 0.250),
+    "CrossHoleFromHeadRear": (0.320, 0.135),
 }
 DIAMETER_POSITIONS = {
     "HeadDia": (0.325, 0.190),
-    "NeckDia": (0.290, 0.208),
+    "NeckDia": (0.307, 0.150),
     "ShaftDia": (0.175, 0.205),
 }
 DIMENSION_CALLOUTS = {
-    "ExposedShaftLen": "EXPOSED SHAFT",
+    "BackRimFromHeadRear": "TO BACK CROWN ROOT",
+    "OverallLen": "OVERALL",
     "BackCapSagDim": f"SR{BACK_CAP_R:.1f} BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
@@ -202,7 +206,9 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*moved_diameters, *principal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
+    set_reference_dimensions(
+        adapter, annotations, {"CrossHoleDia", "HeadCapSagDim", "OverallLen"}
+    )
     sag_matches = [
         annotation
         for annotation in annotations
@@ -232,7 +238,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.255)
+    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
 
     return await finalize_drawing(
         adapter,

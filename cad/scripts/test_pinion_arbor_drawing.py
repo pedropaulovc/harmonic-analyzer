@@ -41,6 +41,8 @@ def test_integral_arbor_preserves_the_released_absolute_envelope() -> None:
     assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
     assert spec.OVERALL_LEN == pytest.approx(241.45)
     assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
+    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(228.25)
+    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(4.5)
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
@@ -53,8 +55,11 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert crossrod.ROD_DIA > spec.CROSS_HOLE_DIA
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert "MHA-058" in callout and "HEAD MIDPLANE" in callout
+    assert "MHA-058" in callout and "MIDPLANE" not in callout
     assert "ARBOR-PRESS" in callout
+    assert spec.DRAWING_DIMENSIONS["CrossHoleReference"] == {
+        "CrossHoleFromHeadRear"
+    }
 
 
 def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
@@ -66,6 +71,8 @@ def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
     assert finish.key == "bearing"
     assert finish.roughness_um == 1.6
     assert finish.face.diameter_mm == spec.SHAFT_DIA
+    assert "MHA-056" in spec.DRAWING_NOTES
+    assert "MHA-002" in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 

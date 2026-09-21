@@ -33,6 +33,8 @@ NECK_LEN = NECK_END_Z - HEAD_REAR_Z
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 CROSS_HOLE_DIA = 6.005
 OVERALL_LEN = SHAFT_LEN + BACK_CAP_SAG - (HEAD_FRONT_Z - HEAD_CAP_SAG)
+BACK_RIM_FROM_HEAD_REAR = SHAFT_LEN - HEAD_REAR_Z
+CROSS_HOLE_FROM_HEAD_REAR = HEAD_REAR_Z - HEAD_CENTER_Z
 
 if HEAD_CENTER_Z != -6.5:
     raise AssertionError("integral head center must preserve the released world station")
@@ -51,10 +53,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "NeckProfile": {"NeckDia"},
     "Neck": {"NeckLen"},
     "ShaftProfile": {"ShaftDia"},
-    "Shaft": {"ExposedShaftLen"},
-    "FrontCapProfile": {"HeadCapR"},
+    "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
+    "BackRimReference": {"BackRimFromHeadRear"},
+    "CrossHoleReference": {"CrossHoleFromHeadRear"},
+    "OverallReference": {"OverallLen"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -63,10 +67,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NeckProfile": {"NeckDia": 1},
     "Neck": {"NeckLen": 1},
     "ShaftProfile": {"ShaftDia": 2},
-    "Shaft": {"ExposedShaftLen": 1},
-    "FrontCapProfile": {"HeadCapR": 1},
+    "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},
     "BackCapProfile": {"BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 1},
+    "BackRimReference": {"BackRimFromHeadRear": 1},
+    "CrossHoleReference": {"CrossHoleFromHeadRear": 1},
+    "OverallReference": {"OverallLen": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -77,15 +83,14 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
 CROSS_HOLE_CALLOUT = (
-    "MATCH-REAM THRU TO ACTUAL GRIP ROD MHA-058\n"
-    "ON HEAD MIDPLANE\n"
+    "MATCH-REAM THRU\n"
+    "TO MHA-058 GRIP ROD\n"
     "LIGHT ARBOR-PRESS FIT"
 )
 DRAWING_NOTES = "\n".join(
     (
-        "TURN HEAD, NECK, AND ARBOR FROM ONE STEEL BLANK.",
-        "MATCH-REAM HEAD CROSS HOLE TO ACTUAL MHA-058 ROD.",
-        "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND.",
+        "DIA 8 SHAFT RUNS IN MHA-056 REAMED BORE AND PRESSES INTO MHA-002.",
+        "INTERNAL SHOULDERS SHARP.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
