@@ -23,7 +23,7 @@ regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
   ranges are kept numeric (t in [0,1]) so only the expression parser
   needs global support.
 * One gap is cut through the blank, then circular-patterned about the gear
-  axis; the pattern instance count is stored natively per configuration.
+  axis; the pattern instance count is equation-linked to ``ToothCount``.
 
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
@@ -324,72 +324,6 @@ def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) ->
     )
 
 
-def set_pattern_counts_by_configuration(
-    adapter: Any, full_name: str
-) -> None:
-    """Write and prove the native instance-count value in every configuration."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    raw_dimension = adapter._attempt(
-        lambda: model.Parameter(full_name), default=None
-    )
-    if raw_dimension is None:
-        raise RuntimeError(f"cannot access pattern-count dimension {full_name}")
-    dimension = _early_bound(raw_dimension, "IDimension")
-    read_only = bool(dimension.ReadOnly)
-    applied_to_all = bool(dimension.IsAppliedToAllConfigurations())
-
-    equation_manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
-    equation_rows = tuple(
-        str(equation_manager.Equation(index) or "")
-        for index in range(int(_read_member(equation_manager, "GetCount") or 0))
-    )
-    count_equations = tuple(
-        equation for equation in equation_rows if full_name in equation
-    )
-    _telemetry.info(
-        f"pattern-count dimension contract: name={full_name!r}, "
-        f"read_only={read_only}, applied_to_all={applied_to_all}, "
-        f"equations={count_equations!r}"
-    )
-    if read_only:
-        raise RuntimeError(f"pattern-count dimension {full_name} is read-only")
-    if count_equations:
-        raise RuntimeError(
-            f"pattern-count dimension {full_name} still has equations: "
-            f"{count_equations!r}"
-        )
-
-    # swSetValue_InSpecificConfigurations=3 and swSpecifyConfiguration=3.
-    # Both APIs accept one configuration name as a BSTR. SetValue3 returns
-    # swSetValueReturnStatus_e, where zero is swSetValue_Successful.
-    for configuration, teeth in CONFIGS:
-        status = int(dimension.SetValue3(float(teeth), 3, configuration))
-        if status != 0:
-            raise RuntimeError(
-                f"{configuration}: SetValue3({teeth:g}) returned status {status}"
-            )
-        raw_values = dimension.GetValue3(3, configuration)
-        values = (
-            tuple(raw_values)
-            if isinstance(raw_values, (list, tuple))
-            else (raw_values,)
-        )
-        if len(values) != 1:
-            raise RuntimeError(
-                f"{configuration}: GetValue3 returned {raw_values!r}"
-            )
-        readback = float(values[0])
-        _telemetry.info(
-            f"{configuration}: native pattern count SetValue3 status={status}, "
-            f"GetValue3={readback:g}"
-        )
-        if abs(readback - teeth) > 1e-9:
-            raise RuntimeError(
-                f"{configuration}: native pattern count reads {readback:g}, "
-                f"expected {teeth}"
-            )
-
-
 def read_dimension(adapter: Any, full_name: str) -> float:
     """Read a dimension's value in the active configuration."""
     param = adapter._attempt(
@@ -475,9 +409,11 @@ def _configuration_definition_state(
     definition = _early_bound(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
+    axis_type = int(definition.GetAxisType())
     _telemetry.info(
         f"{phase} cone-gear definition state {configuration}: "
         f"equations={equations!r}, features={feature_states!r}, "
+        f"axis_type={axis_type}, "
         f"geometry_pattern={bool(definition.GeometryPattern)}, "
         f"instances={int(definition.TotalInstances)}"
     )
@@ -506,6 +442,7 @@ async def _configuration_topology(
         pattern.GetDefinition(), "ICircularPatternFeatureData"
     )
     instances = int(definition.TotalInstances)
+    axis_type = int(definition.GetAxisType())
     error_result = pattern.GetErrorCode2()
     if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
         raise RuntimeError(
@@ -529,7 +466,7 @@ async def _configuration_topology(
     observation = (
         f"{configuration}: active={str(active.Name)}, "
         f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
-        f"{TOOTH_PATTERN_FEATURE} instances={instances}, "
+        f"{TOOTH_PATTERN_FEATURE} instances={instances}, axis_type={axis_type}, "
         f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
         f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
         f"expected={expected:.1f}"
@@ -540,6 +477,8 @@ async def _configuration_topology(
         issues.append("configuration needs rebuild")
     if instances != teeth:
         issues.append(f"pattern instances {instances} != {teeth}")
+    if axis_type != 0:
+        issues.append(f"pattern axis type {axis_type} != reference axis 0")
     if suppressed:
         issues.append("pattern is suppressed")
     if error_code:
@@ -650,6 +589,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
+        CreateEquationParameters,
         ExtrusionParameters,
     )
 
@@ -953,51 +893,38 @@ async def build(adapter) -> dict[str, str]:
     check("cut tooth gap", gap_cut)
     gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
-    # Pattern the gap about the gear axis. The count dimension is stored
-    # natively per configuration below instead of being shared through an
-    # equation. Axis selection is by point (view-projected, flaky for edge-on
-    # cylindrical faces), so walk candidates: a reference axis on Z first,
-    # then OD-face points at several angles away from the seed gap (which sits
-    # at ~0..1.4 degrees).
+    # ------------------------------------------------------------------
+    # Pattern the gap about the gear's permanent Top x Right reference axis;
+    # select the feature by its returned name instead of projecting a point
+    # through the current graphics view.
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
-    check(
+    axis = check(
         "create_axis Z (Top x Right)",
         await adapter.create_axis(
             CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
         ),
     )
-    adapter._zoom_to_fit(adapter.currentModel)
-    ra_default_mm = facts["Ra"] * 25.4
-    candidates = [[0.0, 0.0, FACE_WIDTH / 2.0]]  # on the reference axis
-    for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
-        a = math.radians(angle_deg)
-        candidates.append(
-            [ra_default_mm * math.cos(a), ra_default_mm * math.sin(a), FACE_WIDTH / 2.0]
-        )
-    pattern = None
-    for point in candidates:
-        # Keep the production geometry algorithm unchanged for this
-        # persistence discriminator; only the count's configuration binding
-        # changes from one equation to native per-configuration values.
-        res = await adapter.circular_pattern_feature(
+    check(
+        f"circular pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
             CircularPatternParameters(
-                axis_point=point,
+                axis_name=axis.name,
                 features=[gap_cut_name],
                 count=DEFAULT_TEETH,
                 geometry_pattern=True,
             )
-        )
-        if res.is_success:
-            pattern = res
-            _telemetry.success(f"circular pattern axis via point {point}")
-            break
-        _telemetry.debug(f"axis candidate {point} failed: {res.error}")
-    if pattern is None:
-        raise RuntimeError("circular pattern: no axis candidate selectable")
+        ),
+    )
     pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
     count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
+    check(
+        f"link {count_dim} to ToothCount",
+        await adapter.create_equation(
+            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
+        ),
+    )
 
     # ------------------------------------------------------------------
     # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
@@ -1109,8 +1036,6 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
-
-    set_pattern_counts_by_configuration(adapter, count_dim)
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1297,8 +1222,8 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     await assert_saved_configuration_topology(adapter, phase="reopened")
     raise RuntimeError(
-        "diagnostic complete: native per-configuration pattern-count "
-        "persistence evidence captured; refusing to publish probe artefacts"
+        "diagnostic complete: named reference-axis pattern persistence evidence "
+        "captured; refusing to publish probe artefacts"
     )
 
     if findings:
