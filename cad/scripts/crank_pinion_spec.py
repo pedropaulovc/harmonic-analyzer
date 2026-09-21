@@ -58,14 +58,16 @@ TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
 # The bore over the crankshaft is the part's one critical fit, and the only
 # reason anything here prints a third decimal: a slip fit exists only if the
 # size limits on BOTH mating features are narrower than the clearance band it
-# claims (tolerance-policy.md step 6b). So the band is DERIVED -- never a
-# per-part number -- from the named fit class and the shaft's own published
-# limits: bore_min = shaft_max + clearance_min, bore_max = shaft_min +
-# clearance_max. Move either input and this moves with it.
+# claims (tolerance-policy.md step 6b). The feature callout names the mate and
+# publishes the required diametral-clearance range; the dimensional band is
+# DERIVED -- never a per-part number -- from that named fit class and the
+# shaft's own published limits: bore_min = shaft_max + clearance_min,
+# bore_max = shaft_min + clearance_max. Move either input and this moves with it.
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8" crankshaft)
-_CLEARANCE_MIN, _CLEARANCE_MAX = _config.fit("shaft_in_bushing")[
-    "diametral_clearance_mm"
-]
+BORE_DIAMETRAL_CLEARANCE = tuple(
+    _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
+)
+_CLEARANCE_MIN, _CLEARANCE_MAX = BORE_DIAMETRAL_CLEARANCE
 _SHAFT_UPPER, _SHAFT_LOWER = crankshaft_spec.SHAFT_DIA_BAND
 BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_LOWER + _CLEARANCE_MAX, 3),
@@ -129,6 +131,14 @@ if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - BOSS_CHAMFER - 0.5:
 CRANKSHAFT_NUMBER = _config.parts("crankshaft")["number"]
 PINION_NUMBER = _config.parts("crank-pinion")["number"]
 PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
+BORE_FIT_CALLOUT = "\n".join(
+    (
+        "REAM THRU",
+        f"MATES WITH CRANKSHAFT {CRANKSHAFT_NUMBER}",
+        "REQUIRED DIAMETRAL CLEARANCE",
+        f"{_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
+    )
+)
 PIN_HOLE_PROCESS = (
     f"MATCH DRILL AT ASSY WITH\nCRANKSHAFT {CRANKSHAFT_NUMBER}\n"
     f"{drill_process(PIN_HOLE_SPEC)}"

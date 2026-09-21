@@ -199,6 +199,7 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     # Move either input and the bore must move with it -- that is what this
     # pins, not the literal pair of numbers.
     low, high = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
+    assert spec.BORE_DIAMETRAL_CLEARANCE == pytest.approx((low, high))
     shaft_upper, shaft_lower = crankshaft_spec.SHAFT_DIA_BAND
     assert spec.BORE_DIA == crankshaft_spec.SHAFT_DIA
     assert spec.BORE_DIA_BAND == (
@@ -231,10 +232,19 @@ def test_outside_diameter_stays_at_the_general_grade() -> None:
 
 
 def test_callouts_add_only_what_the_number_cannot_carry() -> None:
-    # Rule 7: the Ø and its limits come from the dimension; the bore's callout
-    # adds the process and how far it goes, the end break's its angle.
+    # Rule 2: the Ø and its limits come from the dimension; the bore's feature
+    # callout adds process, extent, named mate and required clearance. The end
+    # break's callout adds only its angle.
+    low, high = spec.BORE_DIAMETRAL_CLEARANCE
     assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": "REAM THRU",
+        "BoreDia": "\n".join(
+            (
+                "REAM THRU",
+                f"MATES WITH CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
+                "REQUIRED DIAMETRAL CLEARANCE",
+                f"{low:.3f}-{high:.3f} mm",
+            )
+        ),
         "BossChamfer": "X 45 DEG",
     }
 

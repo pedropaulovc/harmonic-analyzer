@@ -9,10 +9,10 @@ gear-data block carry the process facts that geometry cannot.
 
 No datums, no feature control frames, one roughness symbol (the bore): a
 removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
-(rules 3-5), and its bore's own limits already say what the fit is. The
-decimal places are the PART's (``crank_pinion_spec.DRAWING_PRECISION``,
-applied natively by ``build_crank_pinion``); this script only reads them back
-off the sheet.
+(rules 3-5). The bore's native limits and feature callout jointly identify its
+mating crankshaft and required diametral clearance. The decimal places are the
+PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
+``build_crank_pinion``); this script only reads them back off the sheet.
 
 Drawn 4:1 -- the boss makes the part 17.28 long, and at the disc's 5:1 the
 isometric ran off the B sheet's right border.
@@ -46,6 +46,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from crank_pinion_spec import (
     BORE_DIA,
+    BORE_FIT_CALLOUT,
     BOSS_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -130,9 +131,9 @@ RIGHT_KEEP = {
 }
 
 DIMENSION_CALLOUTS = {
-    # The bore's own limits are the fit; the callout only has to say how far it
-    # goes and how it is finished (policy rule 7).
-    "BoreDia": "REAM THRU",
+    # The native value/limits define the bore; the feature callout adds the
+    # process, extent, named mate and acceptance range required by policy rule 2.
+    "BoreDia": BORE_FIT_CALLOUT,
     # The chamfer feature imports its one distance; the angle is the caption.
     "BossChamfer": "X 45 DEG",
 }
@@ -250,17 +251,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
-    # work" case; codex machinist review, 2026-09-20).
+    # work" case). Attach at the bore's 9-o'clock edge with the symbol close
+    # below-left: the short leader cannot be mistaken for the concentric boss
+    # or tooth-root circles (Sonnet machinist review, 2026-09-21).
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.017, FRONT_CENTER[1] - 0.060),
+        symbol_xy=(FRONT_CENTER[0] - HALF_OD - 0.004, FRONT_CENTER[1] - 0.038),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=(
-            FRONT_CENTER[0],
-            FRONT_CENTER[1] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
+            FRONT_CENTER[0] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
+            FRONT_CENTER[1],
         ),
     )
 
