@@ -161,7 +161,7 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.035, 0.2305),
+    "CrankBossStartZ": (0.145, 0.2305),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.136, _top_y(28.0)),
@@ -171,8 +171,8 @@ SECTION_KEEP = {
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
-    "ConeBossDia": (0.292, 0.177),
-    "JournalBoreDia": (0.292, 0.163),
+    "ConeBossDia": (0.292, 0.172),
+    "JournalBoreDia": (0.292, 0.153),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
 # a particular cutting method.  The separate Ø21.93 footprint and 21.3753 mm
