@@ -65,7 +65,7 @@ PRINCIPAL_KEEP = {
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
     "HeadCapR": (0.325, 0.215),
-    "HeadCapSagDim": (0.327, 0.205),
+    "HeadCapSagDim": (0.340, 0.158),
     "BackCapSagDim": (0.055, 0.220),
     "CrossHoleDia": (0.275, 0.250),
     "CrossHoleFromHeadRear": (0.320, 0.135),
