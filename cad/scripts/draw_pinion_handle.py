@@ -2,9 +2,10 @@ r"""Create the pinion-handle manufacturing drawing under the simplicity policy.
 
 The turned body is shown horizontally, with baseline lengths from the flat
 socket end. An axial section exposes the blind socket; the body-only top view
-exposes the transverse reamed hole before the rod is pressed. The assembled
-front view is rotated so the cross rod lies horizontally. Source geometry and
-native model fits remain authoritative; no drawing text substitutes for them.
+exposes the grip cross-hole and the separate handle-to-arbor retention hole.
+The assembled front view is rotated so the cross rod lies horizontally. Source
+geometry and native model fits remain authoritative; no drawing text
+substitutes for them.
 
 Run with SolidWorks open::
 
@@ -47,6 +48,7 @@ from pinion_handle_spec import (
     DRAWING_REFERENCE_PRECISION,
     GRIP_DIA,
     GRIP_LEN,
+    RETENTION_HOLE_CALLOUT,
     ROD_SPAN,
     TUBE_LEN,
     TUBE_OD,
@@ -102,6 +104,8 @@ TOP_KEEP = {
     "RodHoleDia": (0.104, 0.215),
     "CapR": (0.048, 0.260),
     "RodHoleZ": (0.122, 0.223),
+    "RetentionHoleDia": (0.132, 0.250),
+    "RetentionPinFromMouth": (0.117, 0.242),
 }
 # TubeId's text stands right of the section, under the seating-depth callout:
 # its dimension line runs in the 13 mm between the socket mouth (sheet 0.120)
@@ -118,6 +122,7 @@ DIMENSION_CALLOUTS = {
     "TubeId": "REAM\nSLIP FIT ON\nARBOR MHA-102",
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
+    "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
     "RodSpan": "OAL",
 }
 # Decimal places are the part's (pinion_handle_spec.DRAWING_PRECISION, applied
@@ -361,10 +366,10 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
     # Hidden lines are removed from every orthographic view: section A-A
-    # already shows the blind socket and the cross-hole in SOLID lines, so the
-    # dashed bore outlines here only repeat it (drawing-simplicity-policy rule
-    # 7).  The assembled view below keeps them -- it is the only place the
-    # pressed rod's engagement inside the grip is shown.
+    # already shows the blind socket, while the body-only top view shows both
+    # transverse holes directly as solid circles.  The assembled view below
+    # keeps hidden lines because it is the only place the pressed grip rod's
+    # engagement inside the body is shown.
     for view, label in (
         (front, "body end"),
         (right, "body side"),
@@ -488,7 +493,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_body_centerline(adapter, right)
     for text, xy in (
         ("BODY", (0.158, 0.120)),
-        ("BODY CROSS-HOLE", (0.047, 0.195)),
+        ("BODY CROSS-HOLES", (0.047, 0.195)),
         ("CROSS ROD IN BODY", (0.058, 0.068)),
     ):
         if add_note(adapter, text, *xy) is None:
