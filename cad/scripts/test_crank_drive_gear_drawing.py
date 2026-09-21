@@ -293,14 +293,49 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     ) == pytest.approx(math.pi * spec.MODULE_MM - spec.BACKLASH_MM)
 
 
-def test_notes_carry_one_part_specific_fact_and_never_the_title_block() -> None:
+def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None:
     text = notes.DRAWING_NOTES
+    lines = text.splitlines()
     # The title block orders every sharp edge broken R0.25 / 0.25 chamfer max.
     # On a 2.13 whole-depth tooth that is more than a tenth of the tooth, so
-    # the print states the exception -- the only thing this part's notes have
-    # to say.
-    assert text == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-    assert "\n" not in text
+    # the print states the exception.
+    assert lines[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+    # The attachment (rule-11 flag closed 2026-09-21): the bore is the only
+    # attachment feature on the part, so the joint to the shaft land is the
+    # entire torque path -- a machinist who reams the bore and ships it has
+    # made the wrong part. The note must NAME the mate and STATE the joining
+    # methods, which rule 6 allows only because here the process IS the
+    # requirement. Each method is one swappable constant (the user approved a
+    # retaining compound alongside filler metal on 2026-09-21), so this pins
+    # what the sentence has to carry, not the wording of either method.
+    assert "PLAIN BORE, NO KEYWAY" in lines[1]
+    assert notes.ATTACHMENT_PROCESS in lines[1]
+    assert notes.SHAFT_MATE_NUMBER in lines[1]
+    assert notes.ATTACHMENT_ALTERNATIVE in text
+    # Both routes are permitted, so the line that offers the alternative has
+    # to read as a permission, not as a second instruction.
+    assert "ACCEPTABLE" in notes.ATTACHMENT_ALTERNATIVE
+    # The mate is the cone gear shaft, whatever the registry calls it -- and
+    # not this gear's own number.
+    assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
+    assert notes.SHAFT_MATE_NUMBER != _config.parts("crank-drive-gear")["number"]
+    # Rule 6, "never a dimension": the ONLY digits allowed anywhere in the
+    # notes block are the mate's part number and the compound designations. A
+    # size, a limit, a depth or a station typed into a note is what this pins.
+    named = text.replace(notes.SHAFT_MATE_NUMBER, "").replace(
+        notes.ATTACHMENT_ALTERNATIVE, ""
+    )
+    assert not any(ch.isdigit() for ch in named)
+    # Rule 6's budget: at most four short lines, each short enough to clear
+    # the title-block keep-out from the notes anchor at x = 16 mm.
+    assert len(lines) == 3
+    assert all(len(line) <= 90 for line in lines)
+    # The attachment note must not re-print the bore that the face view
+    # already dimensions and bands, and must not invent an axial requirement:
+    # the assembly leaves ~1.1 mm of air to T120 (a frozen 10.0 mm reference
+    # face against the real 8.0), so the station is an assembly fact.
+    for banned in ("9.525", "BUTTED", "T120", "FLUSH"):
+        assert banned not in text, banned
     # Retired with the migration: the general-tolerance restatements, the
     # method instructions, the heat-treatment negative, the duplicate of the
     # bore fit, the hand-of-helix narration the data block now states, and the

@@ -30,8 +30,26 @@ that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floo
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
 
-Layout: gear axis = Z through the origin, disc z = 0..10 mm; the helix
-twist is symmetric about the mid-face plane z = 5 (the assembly's phase
+ATTACHMENT (rule-11 flag closed 2026-09-21, C:/src/dt-logs/geometry-decisions.md):
+the bore is the ONLY attachment feature -- no key, keyway, pin, set screw or
+hub boss -- and that is deliberate, not an omission. Evidence (ch12 p.20
+page003_img03.jpeg; p.21 page003_img02.jpeg's solder blobs on the same shaft's
+small gears; engineerguy v4_t00399/v2_t00069 showing the south face within
+~1 mm of the pivot post, i.e. no room for a boss) says the 64T is fixed like
+the 20 cone gears: soldered or silver-brazed to its 3/8" seat on
+build_cone_gear_shaft's journal, so the brazed joint carries the whole crank
+torque. The bore therefore keeps its slip band (0.025..0.075 diametral
+clearance is inside both the capillary window a silver-braze filler needs and
+the cure gap of a high-strength retaining compound, so the USER also approved
+Loctite 638/648 as an acceptable alternative to filler metal, 2026-09-21);
+the print says so in crank_drive_gear_notes.DRAWING_NOTES. The gear is NOT
+butted against T120: build_drive_train_assembly.GEAR64_STATION holds the
+rederived 19.9 mm centre against a frozen 10.0 mm reference face, so the real
+8.0 mm face leaves ~1.1 mm of axial air each side and the axial station is an
+assembly fact, not a part requirement.
+
+Layout: gear axis = Z through the origin, disc z = 0..8 mm; the helix
+twist is symmetric about the mid-face plane z = 4 (the assembly's phase
 math references the mid-face azimuth).
 
 Run (SolidWorks already open)::

@@ -75,7 +75,12 @@ FRONT_CENTER = (0.135, 0.145)
 RIGHT_CENTER = (0.255, 0.145)
 ISO_CENTER = (0.350, 0.150)
 GEAR_DATA_POS = (0.016, 0.262)
-MANUFACTURING_NOTES_POS = (0.016, 0.030)
+# The notes block grew from one line to three when the attachment note landed
+# (crank_drive_gear_notes.DRAWING_NOTES), so its anchor sits a line-and-a-half
+# higher: the block now ends where the single line used to, clear of the
+# sheet's bottom border, and nothing else lives in this column below the
+# bore callout at y = 0.083.
+MANUFACTURING_NOTES_POS = (0.016, 0.042)
 
 # Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
 # radius and the side view's half-height, which every dimension is placed clear

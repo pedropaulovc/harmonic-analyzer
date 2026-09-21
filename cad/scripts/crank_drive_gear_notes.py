@@ -78,7 +78,42 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# Notes: the one part-specific process fact the title block gets wrong for a
-# fine-pitch gear (drawing-simplicity-policy.md rule 6). A 0.25 break is more
-# than a tenth of this tooth's whole depth.
-DRAWING_NOTES = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
+# How this gear is held to its shaft. The bore is a plain slip fit and the
+# part carries no key, keyway, pin, set screw or hub, so the joint to the
+# shaft land IS the whole torque path -- the case where rule 6 allows a
+# process word on the print. The rule-11 flag closed 2026-09-21
+# (C:/src/dt-logs/geometry-decisions.md) on ch12 p.20/p.21 evidence: fixed
+# like the 20 cone gears. Each permitted method is ONE constant, so
+# re-deciding the joint is a one-line change; the first carries the verb and
+# its preposition so any replacement still reads as a sentence.
+ATTACHMENT_PROCESS = "SOLDER OR SILVER-BRAZE TO"
+
+# The user-approved alternative (2026-09-21): a Ø9.525 H-band slip joint with
+# a 0.025..0.075 mm diametral clearance is inside the cure gap of both
+# high-strength retaining compounds, so the shop may pick either route. It is
+# stated as a permission, not an instruction -- the requirement is that the
+# gear ends up fixed to the seat.
+ATTACHMENT_ALTERNATIVE = "LOCTITE 638 OR 648 RETAINING COMPOUND ACCEPTABLE"
+
+# The seat's owner, quoted only to identify the mate (rule 6). Hard-coded
+# rather than read from ``_config.parts``: this module is in the part's
+# rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
+# a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
+# it against the registry offline, where a cross-check costs nothing.
+SHAFT_MATE_NUMBER = "MHA-014"
+
+# Notes: the part-specific facts a machinist cannot read off the views
+# (drawing-simplicity-policy.md rule 6, budget four short lines). The first is
+# the one thing the title block gets wrong for a fine-pitch gear -- a 0.25
+# break is more than a tenth of this tooth's whole depth. The rest are the
+# attachment. No line carries a dimension: the bore's size and limits print on
+# the face view, and the axial station belongs to the assembly (the model
+# leaves ~1.1 mm of air to T120, so this gear butts nothing).
+DRAWING_NOTES = "\n".join(
+    (
+        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
+        f"PLAIN BORE, NO KEYWAY: {ATTACHMENT_PROCESS} THE {SHAFT_MATE_NUMBER}"
+        " SHAFT SEAT AT ASSEMBLY;",
+        f"{ATTACHMENT_ALTERNATIVE}.",
+    )
+)

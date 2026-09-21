@@ -59,8 +59,12 @@ geometry is casting-shaped, not milling-shaped.
   (1.456D), 9.497 mm usable full-thread depth (0.25 mm tip clearance), and
   15.847 mm cylindrical tap-drill depth (full thread + five 1.27 mm pitches).
   Other receivers are threaded too; the `knife-mount` hanger-stud seat is one
-  example. No keyways anywhere — gears are **soldered** to their shafts (cone)
-  or ride **free on an arbor** (cylinder).
+  example. No keyways anywhere — gears are **soldered** to their shafts (the 20
+  `cone-gear`s, and the 64T `crank-drive-gear`: plain bore, no keyway,
+  soldered or silver-brazed to the cone shaft's 3/8″ seat, with Loctite
+  638/648 retaining compound an approved alternative — the joint is that
+  gear's whole torque path, so it is stated on its print) or ride **free on
+  an arbor** (cylinder).
 
 ### Blind-thread DFM rule
 
