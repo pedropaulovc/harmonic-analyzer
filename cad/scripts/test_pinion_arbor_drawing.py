@@ -25,7 +25,11 @@ def test_required_drawing_paths_and_registry() -> None:
 def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.DONOR_KEEP) | set(drawing.PRINCIPAL_KEEP)
+    kept = (
+        set(drawing.DONOR_KEEP)
+        | set(drawing.PRINCIPAL_KEEP)
+        | set(drawing.DETAIL_KEEP)
+    )
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
@@ -57,6 +61,7 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert callout is spec.CROSS_HOLE_CALLOUT
     assert "MHA-058" in callout and "MIDPLANE" not in callout
     assert "ARBOR-PRESS" in callout
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
     assert spec.DRAWING_DIMENSIONS["CrossHoleReference"] == {
         "CrossHoleFromHeadRear"
     }
