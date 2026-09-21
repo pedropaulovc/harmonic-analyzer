@@ -33,7 +33,6 @@ from pinion_arbor_spec import (
     BACK_CAP_R,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
-    HEAD_DIA,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
