@@ -495,7 +495,7 @@ expect(
     DT,
     "pinion-arbor-1",
     [d.APINION_X, d.APINION_Y, d.ARBOR_Z0],
-    IDENTITY,
+    d.ARBOR_ROWS,
     "pinion-arbor",
 )
 for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
