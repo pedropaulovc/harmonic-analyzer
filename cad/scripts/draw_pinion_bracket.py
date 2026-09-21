@@ -133,10 +133,10 @@ def _flank_y(model_y_mm: float) -> float:
 # border is too close underneath), and the fence's own letter stays clear of
 # the follower seat on the parent view.
 DETAIL_SCALE = (3.0, 1.0)
-DETAIL_CENTER = (0.066, 0.072)
+DETAIL_CENTER = (0.058, 0.072)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
 DETAIL_FENCE_RADIUS_MM = 11.5
-DETAIL_CAPTION_XY = (0.108, 0.075)
+DETAIL_CAPTION_XY = (0.112, 0.075)
 DETAIL_LETTER_XY = (0.116, 0.104)
 
 
