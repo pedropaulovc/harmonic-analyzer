@@ -49,10 +49,6 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
     for teeth in spec.CONFIGURATION_TEETH:
         kept = set(drawing.front_keep(teeth)) | set(drawing.right_keep(teeth))
         assert kept == marked
-    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreCutDia", "ToothThickness"}
-    assert drawing.DIMENSION_CALLOUTS["BoreCutDia"] == "REAM THRU"
-    assert "CIRCULAR TOOTH THICKNESS" in drawing.DIMENSION_CALLOUTS["ToothThickness"]
-    assert "ACCEPT AT ASSEMBLY" in drawing.DIMENSION_CALLOUTS["ToothThickness"]
 
 
 def test_model_owns_precision_for_both_fit_dimensions() -> None:

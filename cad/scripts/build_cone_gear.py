@@ -151,6 +151,7 @@ PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
 CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
 DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
+TOOTH_PATTERN_FEATURE = "ToothGapPattern"
 
 # Model-owned bands, derived live from their named fit inputs.  Bands use the
 # repository's native ``(upper, lower)`` order.
@@ -329,6 +330,150 @@ def read_dimension(adapter: Any, full_name: str) -> float:
     return float(_read_member(param, "Value"))
 
 
+def _active_configuration(model: Any) -> Any:
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    return _early_bound(manager.ActiveConfiguration, "IConfiguration")
+
+
+def _activate_configuration(model: Any, configuration: str) -> Any:
+    """Activate a configuration, accepting SW 2026's already-active False."""
+    active = _active_configuration(model)
+    if str(active.Name) != configuration and not bool(
+        model.ShowConfiguration2(configuration)
+    ):
+        raise RuntimeError(f"failed to activate configuration {configuration}")
+    active = _active_configuration(model)
+    if str(active.Name) != configuration:
+        raise RuntimeError(
+            f"active configuration {str(active.Name)!r} != {configuration!r}"
+        )
+    return active
+
+
+def _expected_configuration_volume(teeth: int) -> float:
+    facts = gear_facts(teeth)
+    radius_mm = facts["Ra"] * 25.4
+    blank_mm3 = math.pi * radius_mm**2 * FACE_WIDTH
+    bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
+    return (
+        blank_mm3
+        - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
+        - bore_mm3
+    )
+
+
+async def _configuration_topology(
+    adapter: Any,
+    configuration: str,
+    teeth: int,
+    *,
+    phase: str,
+    require_save_mark: bool,
+) -> tuple[float, str, tuple[str, ...]]:
+    """Measure one configuration's real pattern and solid-body topology."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = _activate_configuration(model, configuration)
+    part = _early_bound(model, "IPartDoc")
+    raw_pattern = part.FeatureByName(TOOTH_PATTERN_FEATURE)
+    if raw_pattern is None:
+        raise RuntimeError(f"{configuration}: {TOOTH_PATTERN_FEATURE} is missing")
+    pattern = _early_bound(raw_pattern, "IFeature")
+    states = pattern.IsSuppressed2(3, [configuration])
+    if not isinstance(states, (list, tuple)):
+        states = (states,)
+    suppressed = len(states) != 1 or bool(states[0])
+    definition = _early_bound(
+        pattern.GetDefinition(), "ICircularPatternFeatureData"
+    )
+    instances = int(definition.TotalInstances)
+    error_result = pattern.GetErrorCode2()
+    if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+        raise RuntimeError(
+            f"{configuration}: unreadable pattern error state {error_result!r}"
+        )
+    error_code = int(error_result[0] or 0)
+    is_warning = bool(error_result[1])
+    bodies = tuple(part.GetBodies2(0, False) or ())
+    face_count = (
+        int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+        if len(bodies) == 1
+        else 0
+    )
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
+    volume = float(mass.data.volume)
+    expected = _expected_configuration_volume(teeth)
+    needs_rebuild = bool(active.NeedsRebuild)
+    save_mark = bool(active.AddRebuildSaveMark)
+    observation = (
+        f"{configuration}: active={str(active.Name)}, "
+        f"needs_rebuild={needs_rebuild}, save_mark={save_mark}, "
+        f"{TOOTH_PATTERN_FEATURE} instances={instances}, "
+        f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
+        f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
+        f"expected={expected:.1f}"
+    )
+    _telemetry.info(f"{phase} cone-gear topology: {observation}")
+    issues: list[str] = []
+    if needs_rebuild:
+        issues.append("configuration needs rebuild")
+    if require_save_mark and not save_mark:
+        issues.append("configuration lacks rebuild-save mark")
+    if instances != teeth:
+        issues.append(f"pattern instances {instances} != {teeth}")
+    if suppressed:
+        issues.append("pattern is suppressed")
+    if error_code:
+        issues.append(f"pattern error {error_code} warning={is_warning}")
+    if len(bodies) != 1:
+        issues.append(f"solid body count {len(bodies)} != 1")
+    if face_count < 2 * teeth + 4:
+        issues.append(
+            f"solid face count {face_count} < toothed minimum {2 * teeth + 4}"
+        )
+    if abs(volume - expected) > 0.01 * expected:
+        issues.append(f"volume {volume:.1f} outside 1% of {expected:.1f}")
+    return volume, observation, tuple(issues)
+
+
+async def assert_saved_configuration_topology(
+    adapter: Any, *, phase: str = "saved"
+) -> dict[str, float]:
+    """Fail closed unless all 20 reopened configurations retain real teeth."""
+    failures: list[str] = []
+    volumes: dict[str, float] = {}
+    ordered = (CONFIGS[-1], *CONFIGS[:-1])
+    for configuration, teeth in ordered:
+        try:
+            volume, observation, issues = await _configuration_topology(
+                adapter,
+                configuration,
+                teeth,
+                phase=phase,
+                require_save_mark=True,
+            )
+        except Exception as exc:
+            failures.append(f"{configuration}: {exc}")
+            continue
+        volumes[configuration] = volume
+        if issues:
+            failures.append(f"{observation}; issues={issues!r}")
+    _activate_configuration(
+        _early_bound(adapter.currentModel, "IModelDoc2"), CONFIGS[-1][0]
+    )
+    if len(volumes) == len(CONFIGS):
+        family = [volumes[name] for name, _teeth in CONFIGS]
+        if not all(a < b for a, b in zip(family, family[1:], strict=False)):
+            failures.append(f"reopened volumes not monotonic: {volumes!r}")
+    if failures:
+        raise RuntimeError(
+            f"{phase} cone-gear configuration topology is invalid: "
+            + "; ".join(failures)
+        )
+    return volumes
+
+
 def _apply_configuration_properties(
     adapter: Any, configuration: str, properties: dict[str, str]
 ) -> None:
@@ -379,6 +524,21 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     check("create_part", await adapter.create_part())
+    # Configuration-scoped equation updates only work for rows created by
+    # IEquationMgr.Add3. A one-configuration model makes the adapter fall back
+    # to Add2, whose rows later appeared to update transiently but reopened as
+    # 120T in every configuration. Seed T120 before the first equation so every
+    # global is born through Add3; the remaining configurations are added after
+    # the base geometry exists.
+    name, teeth = CONFIGS[-1]
+    check(
+        f"create_configuration {name}",
+        await adapter.create_configuration(
+            CreateConfigurationParameters(
+                name=name, comment=f"{teeth}-tooth cone gear"
+            )
+        ),
+    )
 
     # ------------------------------------------------------------------
     # Equation-manager globals. Probes first: live-verified on SW 2026, the
@@ -695,7 +855,8 @@ async def build(adapter) -> dict[str, str]:
         _telemetry.debug(f"axis candidate {point} failed: {res.error}")
     if pattern is None:
         raise RuntimeError("circular pattern: no axis candidate selectable")
-    count_dim = pattern_count_dimension(adapter, pattern.data.name, DEFAULT_TEETH)
+    pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
+    count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
     check(
         f"link {count_dim} to ToothCount",
         await adapter.create_equation(
@@ -783,7 +944,7 @@ async def build(adapter) -> dict[str, str]:
     # and monotonic growth, then return to the first config and require the
     # volume to reproduce (determinism).
     # ------------------------------------------------------------------
-    for name, teeth in CONFIGS:
+    for name, teeth in CONFIGS[:-1]:
         check(
             f"create_configuration {name}",
             await adapter.create_configuration(
@@ -836,8 +997,9 @@ async def build(adapter) -> dict[str, str]:
         # (T006 read 182.7 vs 108.3 -- a partially re-patterned state -- while
         # standalone it reads 108.2 deterministically). Force a full rebuild so the
         # gap pattern is fully applied for THIS config before any measurement.
-        adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        if not bool(model.ForceRebuild3(False)):
+            raise RuntimeError(f"{name}: ForceRebuild3 reported failure")
 
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
@@ -846,30 +1008,17 @@ async def build(adapter) -> dict[str, str]:
             )
         _telemetry.success(f"{name}: pattern count = {count:g}")
 
-        cfg = gear_facts(teeth)
-        ra_mm = cfg["Ra"] * 25.4
-        mass = await adapter.get_mass_properties()
-        if not mass.is_success:
-            raise RuntimeError(f"{name}: get_mass_properties failed: {mass.error}")
-        volume = float(mass.data.volume)
-        blank_mm3 = math.pi * ra_mm**2 * FACE_WIDTH
-        bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
-        expected = (
-            blank_mm3
-            - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
-            - bore_mm3
+        volume, observation, issues = await _configuration_topology(
+            adapter,
+            name,
+            teeth,
+            phase="pre-save",
+            require_save_mark=False,
         )
-        if abs(volume - expected) > 0.01 * expected:
-            raise RuntimeError(
-                f"{name}: volume {volume:.1f} mm^3, analytic expectation "
-                f"{expected:.1f} (blank {blank_mm3:.1f}) -- regeneration "
-                "produced wrong geometry"
-            )
+        if issues:
+            raise RuntimeError(f"{observation}; issues={issues!r}")
         volumes[name] = volume
-        _telemetry.success(
-            f"{name}: volume {volume:.1f} mm^3 "
-            f"(analytic {expected:.1f}, blank {blank_mm3:.1f})"
-        )
+        cfg = gear_facts(teeth)
 
         # OD check via the equation-driven diameter dimension (selection-free;
         # the measure tool's point selection proved unreliable on the
@@ -962,7 +1111,37 @@ async def build(adapter) -> dict[str, str]:
                 "Material Specification": material_specification(teeth),
             },
         )
+    configuration_manager = _early_bound(
+        adapter.currentModel.ConfigurationManager, "IConfigurationManager"
+    )
+    mark_result = bool(configuration_manager.AddRebuildSaveMark(2, ""))
+    unmarked = [
+        name
+        for name, _teeth in CONFIGS
+        if not bool(
+            _early_bound(
+                adapter.currentModel.GetConfigurationByName(name),
+                "IConfiguration",
+            ).AddRebuildSaveMark
+        )
+    ]
+    if unmarked:
+        raise RuntimeError(
+            f"failed to mark configurations for saved rebuild data: {unmarked!r}"
+        )
+    _telemetry.success(
+        f"all cone-gear configurations carry rebuild-save marks "
+        f"(manager result={mark_result})"
+    )
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    part_path = artefacts["part"]
+    part_title = str(
+        _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
+    )
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check("reopen saved cone-gear", await adapter.open_model(part_path))
+    await assert_saved_configuration_topology(adapter, phase="reopened")
 
     if findings:
         summary = "; ".join(findings)
