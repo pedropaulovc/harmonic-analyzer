@@ -235,6 +235,7 @@ def _tolerance_hole_depth(
         raise RuntimeError(f"{feature_name}: Hole Wizard definition is unavailable")
     definition = _early_bound(definition, "IWizardHoleFeatureData2")
     matches = []
+    thread_depth_candidates = []
     inventory = []
     display = feature.GetFirstDisplayDimension()
     while display is not None:
@@ -242,15 +243,58 @@ def _tolerance_hole_depth(
         dimension = display.GetDimension()
         if dimension is not None:
             dimension = _early_bound(dimension, "IDimension")
+            full_name = str(dimension.FullName)
             normalized = "".join(
-                character
-                for character in str(dimension.FullName).lower()
-                if character.isalnum()
+                character for character in full_name.lower() if character.isalnum()
             )
-            inventory.append(_hole_dimension_inventory_entry(display, dimension))
+            entry = _hole_dimension_inventory_entry(display, dimension)
+            inventory.append(entry)
             if dimension_token in normalized:
                 matches.append((display, dimension))
+            owner = full_name.split("@", 2)
+            if (
+                dimension_token == "fullthreaddepth"
+                and len(owner) >= 2
+                and owner[1].lower().startswith("hole thread")
+                and int(display.GetType()) == 2
+                and not bool(dimension.ReadOnly)
+                and abs(
+                    float(dimension.SystemValue) - float(definition.ThreadDepth)
+                )
+                <= 1e-9
+            ):
+                thread_depth_candidates.append((display, dimension, entry))
         display = feature.GetNextDisplayDimension(display)
+
+    semantic_rename = None
+    if not matches and dimension_token == "fullthreaddepth":
+        if len(thread_depth_candidates) == 1:
+            display, dimension, entry = thread_depth_candidates[0]
+            prior_full_name = str(dimension.FullName)
+            dimension.Name = "Full Thread Depth"
+            renamed_full_name = str(dimension.FullName)
+            renamed_normalized = "".join(
+                character
+                for character in renamed_full_name.lower()
+                if character.isalnum()
+            )
+            if "fullthreaddepth" not in renamed_normalized:
+                raise RuntimeError(
+                    f"{feature_name}: semantic thread-depth rename did not persist: "
+                    f"{renamed_full_name!r}"
+                )
+            entry["renamed_full_name"] = renamed_full_name
+            semantic_rename = {
+                "from": prior_full_name,
+                "to": renamed_full_name,
+            }
+            matches.append((display, dimension))
+        elif thread_depth_candidates:
+            semantic_rename = {
+                "candidate_count": len(thread_depth_candidates),
+                "status": "ambiguous",
+            }
+
     evidence = {
         "event": "native_hole_dimension_inventory",
         "feature": feature_name,
@@ -259,6 +303,7 @@ def _tolerance_hole_depth(
             "TapDrillDepth_mm": float(definition.TapDrillDepth) * 1000.0,
             "ThreadDepth_mm": float(definition.ThreadDepth) * 1000.0,
         },
+        "semantic_rename": semantic_rename,
         "dimensions": inventory,
     }
     _telemetry.info(json.dumps(evidence, sort_keys=True))
@@ -294,6 +339,20 @@ def _tolerance_hole_depth(
     ):
         raise RuntimeError(
             f"{feature_name} {dimension_token}: depth precision did not persist"
+        )
+    readback = feature.GetDefinition()
+    if readback is None:
+        raise RuntimeError(
+            f"{feature_name} {dimension_token}: definition unavailable after tolerance"
+        )
+    readback = _early_bound(readback, "IWizardHoleFeatureData2")
+    if (
+        abs(float(readback.TapDrillDepth) - float(definition.TapDrillDepth)) > 1e-9
+        or abs(float(readback.ThreadDepth) - float(definition.ThreadDepth)) > 1e-9
+    ):
+        raise RuntimeError(
+            f"{feature_name} {dimension_token}: depth nominal changed while "
+            "authoring its tolerance"
         )
 
 
@@ -481,7 +540,7 @@ async def build(adapter) -> dict[str, str]:
     _tolerance_hole_depth(
         adapter,
         "StudTap",
-        "threaddepth",
+        "fullthreaddepth",
         STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
     )
     expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH_MM)
