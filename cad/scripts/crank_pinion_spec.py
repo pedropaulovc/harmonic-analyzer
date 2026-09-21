@@ -43,15 +43,15 @@ PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
 WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
-# The mating MHA-021 gear's accepted base-tangent span has a +0/-0.020 mm
-# band. Give this member the same one-sided tooth-control capability instead
-# of exposing the pair to the title block's +/-0.13 mm: the nominal 0.150 mm
-# tooth thinning then remains the minimum, while both members at minimum
-# thickness produce 0.191 mm after converting MHA-021's normal-span band to
-# transverse thickness. The exact-solid crossed-mesh study proves collision
-# freedom down to 0.100 mm, so this leaves at least 0.050 mm of proven margin.
-TOOTH_THICKNESS_UPPER_DEVIATION = 0.000
-TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
+# MHA-021 contributes 0.150 mm nominal tooth thinning; its accepted
+# base-tangent span can add 0.021091 mm after normal-to-transverse conversion.
+# The exact-solid crank-mesh study proves collision freedom down to 0.100 mm,
+# while the programme-wide gear-mesh policy caps backlash at 0.200 mm. Solving
+# those two worst cases against this pinion's nominal thickness permits
+# 1.521675..1.600584 mm; round inward to measurable three-place limits rather
+# than imposing MHA-021's unnecessarily narrow 0.020 mm manufacturing band.
+TOOTH_THICKNESS_MIN = 1.522
+TOOTH_THICKNESS_MAX = 1.600
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
@@ -259,10 +259,8 @@ GEAR_DATA = gear_data_note(
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
         ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.2f}"),
         (
-            "CIRCULAR TOOTH THICKNESS (mm)",
-            f"{TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
-            f"+{TOOTH_THICKNESS_UPPER_DEVIATION:.3f}/"
-            f"{TOOTH_THICKNESS_LOWER_DEVIATION:.3f}",
+            "CIRCULAR TOOTH THICKNESS LIMITS (mm)",
+            f"{TOOTH_THICKNESS_MIN:.3f}-{TOOTH_THICKNESS_MAX:.3f}",
         ),
         ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-021, 64T"),
