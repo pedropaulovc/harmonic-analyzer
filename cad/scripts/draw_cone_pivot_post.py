@@ -154,7 +154,7 @@ FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
     "MainBodyDia": (0.150, 0.090),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
-    "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
+    "HeadHt": (0.070, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.160),
     "CrankBossDia": (0.170, 0.125),
     "CrankBoreDia": (0.175, 0.172),
@@ -887,7 +887,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.055, 0.145),
+        symbol_xy=(0.055, 0.165),
         leader_attach_xy=model_point_in_view(
             adapter,
             front,
