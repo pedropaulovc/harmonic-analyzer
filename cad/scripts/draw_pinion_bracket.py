@@ -382,7 +382,7 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
     display = add_edge_dimension(
         adapter,
         section,
-        p0=(entry_x, SECTION_CENTER[1]),
+        p0=(entry_x, SECTION_CENTER[1] + 0.009),
         p1=(floor_x, SECTION_CENTER[1]),
         text_xy=SECTION_KEEP["PinSeatDepth"],
         label="follower seat depth",
