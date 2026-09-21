@@ -399,13 +399,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pinion_handle_pin",
-        part="pinion_handle_pin",
-        artifact_stem="pinion-handle-pin",
-        script_name="draw_pinion_handle_pin.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pinion_spring",
         part="pinion_spring",
         artifact_stem="pinion-spring",

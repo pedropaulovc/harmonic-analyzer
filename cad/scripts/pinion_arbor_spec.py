@@ -1,51 +1,72 @@
-r"""Pure-data dimensional contract shared by the pinion arbor and drawing.
+r"""Pure-data dimensional contract for the integral MHA-102 pinion arbor.
 
-The Ø2 retention hole is a reconstruction choice from the upper tee-handle
-photos, not a measured historical dimension.  It is match-drilled through the
-MHA-058 socket and this arbor at the socket's mid-length.
+The turned head, neck, and long shaft are deliberately one piece.  This is an
+approved photo-derived reconstruction choice, not proof of the historical
+joint detail.  The exact released external envelope is preserved while the
+former socket and unsupported radial retention pin are removed.
 """
 
 from __future__ import annotations
 
 from _fit_limits import SHAFT_H
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_spec import CylinderFace
-from pinion_handle_spec import (
-    RETENTION_PIN_DIA,
-    RETENTION_PIN_STATION_FROM_FLOOR,
-)
-
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pinion_handle_spec import ROD_DIA
 
 SHAFT_DIA = 8.0
-SHAFT_LEN = 226.25
+SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
 SHAFT_DIA_BAND = SHAFT_H
-CAP_SAG = 1.2
-CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * CAP_SAG) + CAP_SAG / 2.0  # 7.27
-RETENTION_HOLE_DIA = RETENTION_PIN_DIA
-RETENTION_PIN_STATION = RETENTION_PIN_STATION_FROM_FLOOR
+BACK_CAP_SAG = 1.2
+BACK_CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * BACK_CAP_SAG) + BACK_CAP_SAG / 2.0
 
-# The arbor is a running journal through the drum and strap bores, so the size
-# band and one bearing-surface roughness remain under simplicity-policy rules
-# 2 and 5.  Shafts are not on the geometric-control allowlist.
+# Preserved former handle-body envelope, now turned integrally with the arbor.
+HEAD_DIA = 15.0
+HEAD_LEN = 9.0
+HEAD_CAP_SAG = 3.0
+HEAD_CAP_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_CAP_SAG**2) / (2.0 * HEAD_CAP_SAG)
+HEAD_REAR_Z = -2.0
+HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
+HEAD_CENTER_Z = HEAD_FRONT_Z + HEAD_LEN / 2.0
+NECK_DIA = 10.5
+NECK_END_Z = 10.0
+NECK_LEN = NECK_END_Z - HEAD_REAR_Z
+EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
+CROSS_HOLE_DIA = 6.005
+OVERALL_LEN = SHAFT_LEN + BACK_CAP_SAG - (HEAD_FRONT_Z - HEAD_CAP_SAG)
+
+if HEAD_CENTER_Z != -6.5:
+    raise AssertionError("integral head center must preserve the released world station")
+if abs(ROD_DIA - CROSS_HOLE_DIA - 0.0125) > 1e-12:
+    raise AssertionError("crossrod/head nominal interference changed")
+if min(HEAD_LEN, NECK_LEN, EXPOSED_SHAFT_LEN) <= 0.0:
+    raise AssertionError("integral arbor axial spans must be positive")
+
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "HeadProfile": {"HeadDia"},
+    "Head": {"HeadLen"},
+    "NeckProfile": {"NeckDia"},
+    "Neck": {"NeckLen"},
     "ShaftProfile": {"ShaftDia"},
-    "Shaft": {"Depth"},
-    "BackCapProfile": {"CapSagDim"},
-    "RetentionHoleProfile": {"RetentionHoleDia", "RetentionPinStation"},
+    "Shaft": {"ExposedShaftLen"},
+    "FrontCapProfile": {"HeadCapR"},
+    "BackCapProfile": {"BackCapSagDim"},
+    "CrossHoleProfile": {"CrossHoleDia"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "HeadProfile": {"HeadDia": 1},
+    "Head": {"HeadLen": 1},
+    "NeckProfile": {"NeckDia": 1},
+    "Neck": {"NeckLen": 1},
     "ShaftProfile": {"ShaftDia": 2},
-    "Shaft": {"Depth": 1},
-    "BackCapProfile": {"CapSagDim": 1},
-    "RetentionHoleProfile": {
-        "RetentionHoleDia": 1,
-        "RetentionPinStation": 1,
-    },
+    "Shaft": {"ExposedShaftLen": 1},
+    "FrontCapProfile": {"HeadCapR": 1},
+    "BackCapProfile": {"BackCapSagDim": 1},
+    "CrossHoleProfile": {"CrossHoleDia": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -53,11 +74,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked arbor dimension needs authored places")
+    raise AssertionError("every marked integral-arbor dimension needs authored places")
 
-RETENTION_HOLE_CALLOUT = (
-    "MATCH-DRILL WITH PINION HANDLE MHA-058\n"
-    "REAM TO ACTUAL RETENTION PIN MHA-136\n"
-    "LIGHT DRIVE FIT\n"
-    "LIGHT TAPS; NOT HAND-REMOVABLE"
+CROSS_HOLE_CALLOUT = (
+    "MATCH-REAM THRU TO ACTUAL GRIP ROD MHA-058\n"
+    "ON HEAD MIDPLANE\n"
+    "LIGHT ARBOR-PRESS FIT"
 )
+DRAWING_NOTES = "\n".join(
+    (
+        "TURN HEAD, NECK, AND ARBOR FROM ONE STEEL BLANK.",
+        "MATCH-REAM HEAD CROSS HOLE TO ACTUAL MHA-058 ROD.",
+        "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND.",
+    )
+)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
