@@ -37,6 +37,13 @@ BORE_FROM_TOP = BLK_TOP - BORE_CY
 BORE_DIAMETER_TOLERANCE_MM = 0.20
 BORE_POSITION_DIAMETRAL_TOLERANCE_MM = 0.20
 
+# Mating-interface envelope.  The lever print carries two-place dimensions on
+# both trunnion sizes, hence the title-block +0.51-mm adverse material limit.
+# dimensions.yaml:1329-1335 derives about 1.6 degrees of summing-bar knife rock
+# from the observed 6-mm tip arc.
+MATING_HEX_SIZE_PLUS_MM = 0.51
+REQUIRED_ROCK_SWEEP_DEG = 1.6
+
 # Native blind hanger-stud tap, shared by the model and its hole callout.  Depth
 # is the 118-degree tap-drill's cylindrical shoulder; ThreadDepth is the full
 # usable thread.  The asymmetric native bands close the crown, tool-lead, and
