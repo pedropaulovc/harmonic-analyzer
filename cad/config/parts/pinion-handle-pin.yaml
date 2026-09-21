@@ -1,0 +1,8 @@
+pinion-handle-pin:
+  number: MHA-136
+  material: AISI 1018 cold-finished steel rod
+  material_specification: AISI 1018 cold-finished steel rod or compatible precision low-carbon steel rod
+  finish: bright, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "plain 2 mm straight pin; use actual pin as match-ream gauge, assemble, and trim/fine-face both ends flush with handle socket"

@@ -63,6 +63,9 @@ from pinion_handle_spec import (
     ROD_DOWN,
     ROD_HOLE_DIA,
     ROD_UP,
+    RETENTION_PIN_CENTER_Z,
+    RETENTION_PIN_DIA,
+    RETENTION_PIN_STATION_FROM_MOUTH,
     SURFACE_FINISHES,
     TUBE_ID,
     TUBE_LEN,
@@ -85,6 +88,7 @@ GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
 ROD_HOLE_R = ROD_HOLE_DIA / 2.0
 CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)
+RETENTION_PIN_R = RETENTION_PIN_DIA / 2.0
 
 V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 419.6
@@ -114,8 +118,41 @@ def _grip_intersection(radius: float) -> float:
     return total * h / 3.0
 
 
+
+
+def _annulus_cross_hole_volume(
+    radius: float, outer_radius: float, inner_radius: float
+) -> float:
+    """Volume removed by a radial hole through a concentric annular tube."""
+    n = 2000
+    x0, x1 = -radius, radius
+    h = (x1 - x0) / n
+
+    def strip(x: float) -> float:
+        hole_height = 2.0 * math.sqrt(max(radius**2 - x * x, 0.0))
+        wall_path = 2.0 * (
+            math.sqrt(outer_radius**2 - x * x)
+            - math.sqrt(inner_radius**2 - x * x)
+        )
+        return hole_height * wall_path
+
+    total = strip(x0) + strip(x1)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * strip(x0 + i * h)
+    return total * h / 3.0
 V_ROD_HOLE = _grip_intersection(ROD_HOLE_R)
-V_TOTAL = V_GRIP + V_CAP + V_WALL + V_TUBE - V_ROD_HOLE + V_ROD
+V_RETENTION_HOLE = _annulus_cross_hole_volume(
+    RETENTION_PIN_R, TUBE_OD / 2.0, TUBE_ID / 2.0
+)
+V_TOTAL = (
+    V_GRIP
+    + V_CAP
+    + V_WALL
+    + V_TUBE
+    - V_RETENTION_HOLE
+    - V_ROD_HOLE
+    + V_ROD
+)
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -144,6 +181,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
     await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
     await set_global(adapter, "RodUp", f"{ROD_UP}mm")
+    await set_global(adapter, "RetentionPinDia", f"{RETENTION_PIN_DIA}mm")
+    await set_global(
+        adapter, "RetentionPinCenterZ", f"{RETENTION_PIN_CENTER_Z}mm"
+    )
     await set_global(adapter, "TubeOd", f"{TUBE_OD}mm")
     await set_global(adapter, "TubeId", f"{TUBE_ID}mm")
     await set_global(adapter, "TubeLen", f"{TUBE_LEN}mm")
@@ -296,6 +337,38 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += [(name_dimensions(adapter, "Tube", ["TubeLen"])[0], '"TubeLen"')]
     expected += V_TUBE
     await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
+
+    # Match-drilled handle-to-arbor retention hole.  The upper tee's small
+    # flush pin is distinct from the Ø6 grip cross rod; this reconstructed Ø2
+    # joint sits at the OD10.5 socket's mid-length and is reamed with the arbor
+    # to the actual MHA-136 pin at assembly.
+    retention = SketchDims()
+    check("create_sketch retention hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        0.0,
+        -RETENTION_PIN_CENTER_Z,
+        RETENTION_PIN_R,
+        "retention hole",
+        dims=retention,
+        names=("RetentionHoleCx", "RetentionHoleCenterZ", "RetentionHoleDia"),
+        drives=(None, '-"RetentionPinCenterZ"', '"RetentionPinDia"'),
+    )
+    await ensure_fully_defined(adapter, "retention-hole sketch")
+    check("exit_sketch retention hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RetentionHoleProfile")
+    drive_jobs += retention.apply(adapter, "RetentionHoleProfile")
+    check(
+        "cut retention hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=TUBE_OD + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RetentionHole")
+    expected -= V_RETENTION_HOLE
+    await volume_check(
+        adapter, "retention hole", expected, 0.03 * V_RETENTION_HOLE
+    )
 
     # Reamed cross-hole through the turned body.  The physical press fit is
     # represented by overlapping bodies: this cut removes the hole from the
@@ -457,6 +530,57 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch cross-hole reference", await adapter.exit_sketch())
     name_last_feature(adapter, "CrossHoleReference")
     drive_jobs += cross.apply(adapter, "CrossHoleReference")
+
+    # Top plane, for the retention-hole view: baseline the pin axis from the
+    # faced socket mouth.  The mid-length station is a photo-based
+    # reconstruction choice and remains independent of the Ø6 grip cross rod.
+    retention_ref_dims = SketchDims()
+    check(
+        "create_sketch retention reference",
+        await adapter.create_sketch("Top"),
+    )
+    set_sketch_direct_db(adapter, True)
+    retention_ref = check(
+        "retention station reference line",
+        await adapter.add_line(
+            0.0,
+            -hub_end_z,
+            0.0,
+            -RETENTION_PIN_CENTER_Z,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, retention_ref)
+    check(
+        "retention station reference vertical",
+        await adapter.add_sketch_constraint(retention_ref, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{retention_ref}.start",
+        f"{retention_ref}.end",
+        "vertical_distance",
+        RETENTION_PIN_STATION_FROM_MOUTH,
+        "retention station from socket mouth",
+    )
+    retention_ref_dims.record(
+        "RetentionPinFromMouth", '"TubeLen" - ("RetentionPinCenterZ" '
+        '- ("GripLen" / 2 + "WallT"))'
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{retention_ref}.start",
+        0.0,
+        -hub_end_z,
+        "retention station reference",
+    )
+    retention_ref_dims.record(
+        "RetentionMouthZ", '"GripLen" / 2 + "WallT" + "TubeLen"'
+    )
+    await ensure_fully_defined(adapter, "retention reference sketch")
+    check("exit_sketch retention reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "RetentionReference")
+    drive_jobs += retention_ref_dims.apply(adapter, "RetentionReference")
 
     # Front plane, for the assembled cross-rod view: the rod's reach below
     # the body axis, from the origin (the grip's centre on that view).
