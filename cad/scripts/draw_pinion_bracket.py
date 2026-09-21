@@ -129,15 +129,15 @@ def _flank_y(model_y_mm: float) -> float:
 # axis is the common physical origin for every relief-centre coordinate.  The
 # fence also holds both scallop centres (in the air beside the strap) and both
 # bites.  5:1 separates the near-coincident PARK and ENGAGED X witness lines
-# while fitting a fence that keeps every detail annotation clear.
+# while keeping the coordinate and radius labels inside its native boundary.
 # The native caption goes to the detail's right (the sheet border is too close
 # underneath), and the fence's own letter stays clear of the follower seat on
 # the parent view.
 DETAIL_SCALE = (5.0, 1.0)
-DETAIL_CENTER = (0.120, 0.145)
+DETAIL_CENTER = (0.160, 0.145)
 DETAIL_FENCE_CENTER_MM = (-7.0, -1.5)
-DETAIL_FENCE_RADIUS_MM = 15.0
-DETAIL_CAPTION_XY = (0.255, 0.085)
+DETAIL_FENCE_RADIUS_MM = 11.5
+DETAIL_CAPTION_XY = (0.270, 0.085)
 DETAIL_LETTER_XY = (0.225, 0.100)
 
 
@@ -175,13 +175,13 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
-    "PivotBoreDia": (0.170, 0.155),
-    "CamReliefParkR": (0.220, 0.190),
-    "CamReliefParkX": (0.105, 0.245),
-    "CamReliefParkY": (0.220, 0.220),
-    "CamReliefEngagedR": (0.175, 0.045),
-    "CamReliefEngagedX": (0.105, 0.230),
-    "CamReliefEngagedY": (0.220, 0.075),
+    "PivotBoreDia": (0.230, 0.155),
+    "CamReliefParkR": (0.190, 0.185),
+    "CamReliefParkX": (0.120, 0.235),
+    "CamReliefParkY": (0.065, 0.175),
+    "CamReliefEngagedR": (0.190, 0.090),
+    "CamReliefEngagedX": (0.120, 0.220),
+    "CamReliefEngagedY": (0.065, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -491,7 +491,7 @@ async def build(adapter: Any) -> dict[str, str]:
     seat_section = create_section_view(
         adapter,
         detail_parent,
-        line_start=(0.215, seat_axis_y),
+        line_start=(0.230, seat_axis_y),
         line_end=(0.315, seat_axis_y),
         view_xy=SECTION_CENTER,
         section_label="B",
@@ -537,7 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.200, 0.095),
+        symbol_xy=(0.205, 0.115),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
