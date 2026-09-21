@@ -57,7 +57,6 @@ from _fit_limits import deviations
 from pinion_arbor_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     RETENTION_HOLE_DIA,
     RETENTION_PIN_STATION,
@@ -255,11 +254,7 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Manufacturing Notes": DRAWING_NOTES},
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
