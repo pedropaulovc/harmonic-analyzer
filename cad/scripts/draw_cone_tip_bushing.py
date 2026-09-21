@@ -26,9 +26,11 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
+    check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    rebuild_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -183,6 +185,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS)
+    rebuild_drawing(adapter, label="cone-tip-bushing layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
