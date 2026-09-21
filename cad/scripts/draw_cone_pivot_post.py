@@ -152,11 +152,11 @@ CONE_SECTION_LINE = (
 
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
-    "MainBodyDia": (0.150, 0.090),
+    "MainBodyDia": (0.150, 0.080),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.160),
-    "CrankBossDia": (0.115, 0.120),
+    "CrankBossDia": (0.132, 0.120),
     "CrankBoreDia": (0.155, 0.172),
 }
 TOP_KEEP = {
@@ -179,7 +179,7 @@ JOURNAL_KEEP = {
 # station identify the real local crank spotface without inventing a uniform
 # depth against the curved collar.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "CRANK SPOTFACE DIA",
+    "CrankBossDia": "SPOTFACE",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
