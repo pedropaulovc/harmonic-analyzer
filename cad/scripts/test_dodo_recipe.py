@@ -1822,11 +1822,10 @@ def test_config_deps_are_fine_grained():
     cfg = (REPO_ROOT / "cad" / "config").resolve()
     whole = set(dodo._CONFIG_YAMLS)
 
-    # A gear part reads machine("gear_train", ...) -> machine/gear_train.yaml ONLY
-    # (NOT machine/channels.yaml, where active_count lives) + its own registry row
-    # + title_block.yaml (every part stamps the title-block tolerance properties
-    # from _common.part_properties -> _config.title_block) + release.yaml for the
-    # global CAD Revision.
+    # The cone-gear part reads gear_train plus both named fit bands
+    # (shaft_in_bushing and gear_mesh), its own registry row, title-block
+    # properties and the global release.  ``tolerances.yaml`` is intentionally
+    # live: moving a fit limit must invalidate the native bore/tooth dimensions.
     cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
@@ -1834,6 +1833,7 @@ def test_config_deps_are_fine_grained():
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
+        "tolerances.yaml",
     }, _rel(cone, cfg)
     assert set(cone) <= whole
 
