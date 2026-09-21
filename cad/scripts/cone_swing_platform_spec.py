@@ -1,17 +1,24 @@
 r"""Pure-data dimensional contract shared by the cone swing platform and drawing.
 
 PURE DATA, no SolidWorks/COM imports.  ``build_cone_swing_platform`` imports the
-marked-dimension NAME map + notes from here; ``draw_cone_swing_platform`` keeps
-exactly ``DRAWING_DIMENSIONS`` and imports the plate's plan geometry from
-``build_cone_swing_platform`` for its view math.
+marked-dimension NAME map, the decimal places and the surface-finish controls
+from here; ``draw_cone_swing_platform`` keeps exactly ``DRAWING_DIMENSIONS`` and
+imports the plate's plan geometry from ``build_cone_swing_platform`` for its
+view math.
 """
 
 from __future__ import annotations
 
+from _gtol_spec import PlanarFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
-from cone_pivot_post_spec import BORE_HEIGHT as POST_CONE_BORE_HEIGHT
+import cone_pivot_post_spec
 from crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
+
+POST_ATTACHMENT_SPACING = cone_pivot_post_spec.ATTACHMENT_SPACING
+POST_BLOCK_DIA = cone_pivot_post_spec.BLOCK_DIA
+POST_CONE_BORE_HEIGHT = cone_pivot_post_spec.BORE_HEIGHT
 
 
 PLATE_THICKNESS = 6.35
@@ -19,7 +26,9 @@ PIVOT_BEARING_RELIEF_DIAMETER = 10.50
 PIVOT_BEARING_RELIEF_DEPTH = 0.25
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
-PLATE_LENGTH_TOLERANCE_MM = 0.25
+# The platform swings on the stock 1/4-in shoulder, but this occasional setup
+# pivot has no measured need for a close running bearing fit.  Preserve the
+# established native Hole Wizard close-clearance feature and its table size.
 PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
 PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
@@ -32,48 +41,111 @@ if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
     raise AssertionError("recentered crank gear has under 0.5 mm platform air")
 
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows. Only the overall axial length is marked. The axis-relative edge
-# offsets in the notes define each end without duplicating north/south widths. ---
+# The post's 1/4-in fillister clearance bores mate to these platform threads.
+# The pitch is imported from the post spec; the tapped-hole size is the
+# counterpart required by that purchased screw family.
 POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 
 
+# Only functional sliding/locating surfaces carry roughness.  The existing
+# close-clearance pivot hole needs no bearing-finish control; the top locates
+# the post and tip block, and the underside slides on the harmonic-base deck.
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "post_seat", SEAT_UM, PlanarFace((0, 1, 0), PLATE_THICKNESS)
+    ),
+    SurfaceFinishControl(
+        "base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)
+    ),
+)
+
+# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
+# print shows.  The pivot-hole centre is the layout origin: every plan corner,
+# both post-mount taps and the lock notch are located from it in the plate's own
+# axes (station along the cone axis, offset across it), so a shop lays the whole
+# plate out from one scribed centre.  Corner radii come off their fillets. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "PlateProfile": {"PlateLenDim"},
+    "PlateProfile": {
+        "NorthEastX",
+        "NorthEdgeZ",
+        "NorthWestX",
+        "SouthWestX",
+        "PlateLenDim",
+        "SouthEastX",
+    },
+    "Plate": {"PlateThk"},
+    "PivotBearingReliefProfile": {"PivotBearingReliefDia"},
+    "PivotBearingRelief": {"PivotBearingReliefDepth"},
+    "PostMountHoles": {
+        "PostMountWestX",
+        "PostMountWestZ",
+        "PostMountEastX",
+        "PostMountEastZ",
+    },
+    "LockNotchProfile": {"NotchRunAngle"},
+    "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
+    "CornerNE": {"CornerNER"},
+    "CornerNW": {"CornerNWR"},
+    "CornerSW": {"CornerSWR"},
+    "CornerSE": {"CornerSER"},
 }
 
-DRAWING_NOTES = "\n".join(
-    (
-        "1. PLAN VIEW: PIVOT END IS NORTH; NOTCH SIDE IS WEST. CONE AXIS IS THE",
-        "   CENTRELINE THROUGH THE PIVOT-HOLE AXIS NORMAL TO THE NORTH END PLANE.",
-        "   N/S DISTANCES ARE ALONG AXIS; E/W OFFSETS ARE NORMAL TO AXIS.",
-        "2. END OFFSETS LOCATE VIRTUAL-SHARP INTERSECTIONS OF UNFILLETED END",
-        "   AND STRAIGHT SIDE LINES: N EAST/WEST 12.00 +/-0.10 / 8.00 +/-0.10;",
-        "   S EAST/WEST 24.00 +/-0.10 / 37.00 +/-0.10; SOUTH EDGE 223.354",
-        "   +/-0.10 FROM PIVOT WITH 3.175 MIN POST-RIM CLEARANCE. APPLY RADII.",
-        "3. PIVOT HOLE SIZE PER PLAN-VIEW CALLOUT. CENTRE ON CONE AXIS,",
-        "   7.00 +/-0.10 SOUTH OF NORTH EDGE. HOLD THE AXIS PERPENDICULAR TO THE",
-        "   MACHINED BROAD FACES WITHIN 0.10 DIA.",
-        f"   TOP RELIEF DIA {PIVOT_BEARING_RELIEF_DIAMETER:.2f} X "
-        f"{PIVOT_BEARING_RELIEF_DEPTH:.2f} DEEP;",
-        f"   LOCAL BEARING THICKNESS {PIVOT_BEARING_THICKNESS:.2f} +/-0.05.",
-        f"4. POST MOUNT: 2X {POST_MOUNT_SPEC.size} UNC-2B THRU PER PLAN-VIEW CALLOUT.",
-        "   PAIR CENTROID ON CONE AXIS, 192.174 +/-0.10 SOUTH OF PIVOT; 26.887",
-        "   +/-0.10 PITCH ON A LINE 12.5182 +/-0.10 DEG NORTH OF WEST.",
-        "5. LOCK NOTCH 8.000 +0.100/0 WIDE; FULL-R CLOSED END (R4.000 REF).",
-        "   CLOSED-END CENTRE 33.00 +/-0.10 WEST AND 205.808 +/-0.10 SOUTH",
-        "   OF PIVOT; AXIS 9.11 +/-0.10 DEG NORTH OF WEST. RUN PARALLEL SIDES",
-        "   FROM END TANGENCIES THROUGH THE WEST PROFILE; OPEN THROUGH EDGE.",
-        "6. PLAN CORNER RADII: NE R10.00, NW R8.00, SW R5.00, SE R12.00.",
-        "   HOLD EACH OF THE 2X LONG STRAIGHT PLAN EDGES STRAIGHT WITHIN 0.25.",
-        f"7. CRANK-GEAR SWEPT OD CLEARS THE LOWER BROAD FACE BY "
-        f"{CRANK_GEAR_PLATFORM_CLEARANCE:.3f} REF;",
-        "   KEEP THE PLATE FULL THICKNESS BENEATH THE GEAR.",
-        "8. MACHINE BOTH BROAD FACES; FINISHED THICKNESS 6.35 +/-0.10.",
-        "   HOLD EACH BROAD FACE FLAT WITHIN 0.10 AND THE TWO PARALLEL WITHIN 0.10.",
-    )
-)
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule
+# 2), so the MODEL owns them: build_cone_swing_platform applies this map to the
+# .SLDPRT and draw_cone_swing_platform only reads it back.  Plate geometry,
+# relief, tapped-hole pattern, notch and corner radii use the title block's
+# general two-place grade.  The Hole Wizard owns the pivot-hole size/callout.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {
+        "NorthEastX": 2,
+        "NorthEdgeZ": 2,
+        "NorthWestX": 2,
+        "SouthWestX": 2,
+        "PlateLenDim": 2,
+        "SouthEastX": 2,
+    },
+    "Plate": {"PlateThk": 2},
+    "PivotBearingReliefProfile": {"PivotBearingReliefDia": 2},
+    "PivotBearingRelief": {"PivotBearingReliefDepth": 2},
+    "PostMountHoles": {
+        "PostMountWestX": 2,
+        "PostMountWestZ": 2,
+        "PostMountEastX": 2,
+        "PostMountEastZ": 2,
+    },
+    "LockNotchProfile": {"NotchRunAngle": 2},
+    "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
+    "CornerNE": {"CornerNER": 2},
+    "CornerNW": {"CornerNWR": 2},
+    "CornerSW": {"CornerSWR": 2},
+    "CornerSE": {"CornerSER": 2},
+}
+
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+
+# View scales differ from the sheet scale and therefore remain property-linked
+# labels.  They are not manufacturing-note dimensions.
 PLAN_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
-END_VIEW_NOTE = "END VIEW SCALE 1:2"
+SECTION_VIEW_NOTE = "SECTION A-A SCALE 1:2"

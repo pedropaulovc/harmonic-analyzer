@@ -1,14 +1,15 @@
 r"""Create the curated machinist drawing for the cone swing platform.
 
-The SLDPRT remains authoritative.  This recipe supplies only the platform's
-views, the wedge envelope dimensions, and the machining notes; every shared
-sheet/template, import, curation, and export behavior lives in ``_drawing_common``.
+The SLDPRT remains authoritative.  The plan imports the plate outline,
+post-mount pattern, lock notch and corner radii; the native Hole Wizard callout
+defines the pivot clearance hole; section A-A exposes the shallow pivot-head
+relief and plate thickness in solid lines.  Display precision comes from the
+model.
 
-The platform is machined from black-oxide 5/16 in minimum steel stock to a
-6.35 mm finished plate: an asymmetric wedge (223.35 long, 20 -> 61 wide) with a
-Ø6.76 pivot hole at the narrow tip, paired 1/4-20 post-mount taps, an open
-lock notch through the west edge, and rounded plan corners. The main plan and
-end views run 1:2; the isometric runs 1:3.
+The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
+hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
+west-edge lock notch, and four rounded plan corners.  The main plan and pivot
+section run 1:2; the isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -27,12 +28,16 @@ from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
+    add_surface_finish,
+    assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.com_variant import double_array
@@ -41,7 +46,13 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 from _hole_spec import blind_cut_dia_mm
-from cone_swing_platform_spec import PIVOT_HOLE_SPEC, POST_MOUNT_SPEC
+from _surface_finish import surface_finish_by_key
+from cone_swing_platform_spec import (
+    DRAWING_PRECISION_BY_NAME,
+    PIVOT_HOLE_DIA,
+    POST_MOUNT_SPEC,
+    SURFACE_FINISHES,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["cone_swing_platform"]
@@ -59,15 +70,37 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
 
 # Sheet layout (meters).  The 1:2 plan is the main definition view; the
-# isometric and an end view occupy the open right-hand field.
+# pivot section and isometric occupy the open right-hand field.
 TOP_CENTER = (0.115, 0.195)
 ISO_CENTER = (0.330, 0.175)
-END_CENTER = (0.330, 0.095)
+SECTION_CENTER = (0.330, 0.075)
 
-# Per-view survivor: overall axis length only. Axis-relative end offsets in the
-# notes define both asymmetric end widths without redundant chained dimensions.
+# Parametric model dimensions partition by the view where their geometry is
+# visible.  The plan uses exterior lanes around the long vertical wedge.
 TOP_KEEP = {
-    "PlateLenDim": (0.048, TOP_CENTER[1]),
+    "PlateLenDim": (0.045, TOP_CENTER[1]),
+    "NorthEastX": (0.145, 0.255),
+    "NorthEdgeZ": (0.170, 0.245),
+    "NorthWestX": (0.080, 0.265),
+    "SouthWestX": (0.065, 0.120),
+    "SouthEastX": (0.155, 0.110),
+    "PivotBearingReliefDia": (0.185, 0.225),
+    "PostMountWestX": (0.080, 0.175),
+    "PostMountWestZ": (0.060, 0.165),
+    "PostMountEastX": (0.150, 0.175),
+    "PostMountEastZ": (0.170, 0.165),
+    "NotchRunAngle": (0.065, 0.145),
+    "CapECx": (0.070, 0.130),
+    "CapECz": (0.055, 0.150),
+    "CapEDia": (0.085, 0.115),
+    "CornerNER": (0.160, 0.263),
+    "CornerNWR": (0.060, 0.270),
+    "CornerSWR": (0.050, 0.105),
+    "CornerSER": (0.165, 0.100),
+}
+SECTION_KEEP = {
+    "PlateThk": (0.300, 0.075),
+    "PivotBearingReliefDepth": (0.365, 0.105),
 }
 
 
@@ -98,7 +131,7 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     """Draw the plan-view cone axis through the modeled pivot-hole center."""
     _view_xy = _view_xy_mapper(adapter, view)
 
-    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     pivot_centers: list[tuple[float, float]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
@@ -167,7 +200,7 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     referenced them (see ``build``) -- nothing else on this sheet attaches to
     them.
     """
-    expected_radius_m = blind_cut_dia_mm(PIVOT_HOLE_SPEC) / 2000.0
+    expected_radius_m = PIVOT_HOLE_DIA / 2000.0
     expected_mount_radius_m = blind_cut_dia_mm(POST_MOUNT_SPEC) / 2000.0
     pivot_edges: list[Any] = []
     mount_edges: list[Any] = []
@@ -194,6 +227,24 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     return pivot_edges[0], mount_edges[0]
 
 
+def _horizontal_section_edge(view: Any, y_mm: float, *, label: str) -> Any:
+    """Return the longest section edge lying on one broad-face station."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} section edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = tuple(float(value) * 1000.0 for value in _early_bound(start, "IVertex").GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in _early_bound(end, "IVertex").GetPoint())
+        if abs(p0[1] - y_mm) <= 0.01 and abs(p1[1] - y_mm) <= 0.01:
+            candidates.append((abs(p1[0] - p0[0]), edge))
+    if not candidates:
+        raise RuntimeError(f"pivot section has no {label} edge at y={y_mm:.3f} mm")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -208,20 +259,18 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Plan View Note",
             "Isometric View Note",
-            "End View Note",
+            "Section View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Plan View Note",
             "Isometric View Note",
-            "End View Note",
+            "Section View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -240,21 +289,39 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
-    end = place_view(adapter, str(SOURCE), "*Front", *END_CENTER, scale=(1, 2))
-    for view in (top, iso, end):
+    for view in (top, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
+    pivot_xy = _add_cone_axis_centerline(adapter, top)
+    top_outline = tuple(float(value) for value in top.GetOutline())
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=(top_outline[0] - 0.002, pivot_xy[1]),
+        line_end=(top_outline[2] + 0.002, pivot_xy[1]),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(1, 2),
+        label="pivot bearing section",
+    )
+    set_hidden_lines_removed(adapter, section)
+
+    top_annotations = curate_view_dimensions(
+        adapter, top, keep=TOP_KEEP, view_label="plan"
+    )
+    section_annotations = curate_view_dimensions(
+        adapter, section, keep=SECTION_KEEP, view_label="pivot section"
+    )
+    annotations = [*top_annotations, *section_annotations]
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the pivot hole")
-    _add_cone_axis_centerline(adapter, top)
+        raise RuntimeError("failed to add ASME center mark to the pivot bore")
 
     pivot_edge, mount_edge = _visible_plan_controls(adapter, top)
     add_native_hole_callout(
         adapter,
         top,
-        callout_xy=(0.170, 0.135),
-        label="pivot-hole size",
+        callout_xy=(0.200, 0.215),
+        label="pivot close-clearance hole",
         edge=pivot_edge,
     )
     add_native_hole_callout(
@@ -269,22 +336,33 @@ async def build(adapter: Any) -> dict[str, str]:
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
-    # NO GD&T on this sheet. The datum tags (A/B/C) and the straightness,
-    # perpendicularity, flatness and parallelism frames were removed: the
-    # plan-view cluster packs the pivot rim, the north-end plane and the south
-    # end of the long straight edge into ~1.4 mm of sheet space, so their
-    # leaders cross whenever the wedge is refitted -- and datum B cannot be
-    # moved out of the way (SolidWorks snaps the restricted cylindrical tag
-    # back to the rim, which trips the placement-persistence bound). Every
-    # tolerance those frames carried is now stated in the manufacturing notes
-    # instead, so the sheet keeps the intent without the fragile geometry.
-
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.100, char_height=0.0025
+    add_surface_finish(
+        adapter,
+        section,
+        symbol_xy=(0.285, 0.118),
+        control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
+        label="post and tip-block seat finish",
+        char_height=0.0025,
+        entity=_horizontal_section_edge(section, 6.35, label="top seat"),
     )
+    add_surface_finish(
+        adapter,
+        section,
+        symbol_xy=(0.285, 0.045),
+        control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
+        label="base sliding-face finish",
+        char_height=0.0025,
+        entity=_horizontal_section_edge(section, 0.0, label="base slide"),
+    )
+
     add_property_linked_note(adapter, "Plan View Note", 0.190, 0.205)
     add_property_linked_note(adapter, "Isometric View Note", 0.290, 0.135)
-    add_property_linked_note(adapter, "End View Note", 0.300, 0.125)
+    add_property_linked_note(adapter, "Section View Note", 0.300, 0.115)
+
+    # Annotation insertion can invalidate the exported display geometry.
+    for view in (top, section, iso):
+        set_hidden_lines_removed(adapter, view)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     return await finalize_drawing(
         adapter,
