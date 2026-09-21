@@ -60,7 +60,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
-PRINCIPAL_CENTER = (0.200, 0.170)
+PRINCIPAL_CENTER = (0.200, 0.155)
 ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
@@ -79,7 +79,7 @@ DETAIL_KEEP = {
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
     "CrossHoleDia": (0.245, 0.245),
-    "CrossHoleFromHeadRear": (0.155, 0.268),
+    "CrossHoleFromHeadRear": (0.155, 0.258),
 }
 DIAMETER_POSITIONS = {
     "HeadDia": (0.165, 0.215),
