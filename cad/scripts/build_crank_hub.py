@@ -183,7 +183,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += bore.apply(adapter, "BoreProfile")
     check(
         "cut hub bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=HUB_LENGTH)),
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=HUB_LENGTH, reverse_direction=True)
+        ),
     )
     name_last_feature(adapter, "ThroughBore")
     await volume_check(adapter, "hub through bore", V_BODY - V_BORE, 0.01 * V_BORE)
@@ -208,7 +210,9 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += groove.apply(adapter, "AxialPinGrooveProfile")
     check(
         "cut axial seam groove",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=AXIAL_PIN_LENGTH)),
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=AXIAL_PIN_LENGTH, reverse_direction=True)
+        ),
     )
     name_last_feature(adapter, "AxialPinGroove")
     await volume_check(

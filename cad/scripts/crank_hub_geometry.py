@@ -13,7 +13,7 @@ shaft's spherical dome projects outboard.  Positive station runs inboard.
 
 from __future__ import annotations
 
-from _config import fit
+from _config import fit, title_block
 
 
 MM_PER_IN = 25.4
@@ -60,18 +60,45 @@ FIDUCIAL_MODEL_DEPTH = 0.2
 ARM_FIDUCIAL_RADIUS = (ARM_WIDTH + HUB_SEAT_DIA) / 4.0
 SHAFT_FIDUCIAL_RADIUS = 2.5
 
-# Binding separation checks include all fit-band extremes.  The assembled seam
-# hole's innermost radius must leave a real wall outside the largest hub bore;
-# the largest shaft/dome must pass the smallest finished bore.
-_PIN_TO_BORE_WALL_MIN = (
-    AXIAL_PIN_RADIUS_FROM_AXIS
-    - AXIAL_PIN_DIA / 2.0
-    - (HUB_BORE_DIA + HUB_BORE_BAND[0]) / 2.0
+# The seam is manufactured as a matched arm/hub/pin assembly.  The independent
+# one-place general limits do not guarantee its remaining hub wall, so the
+# drawings carry a coupled inspection acceptance after the general edge break.
+# Keep both envelopes visible here: the nominal design must meet the acceptance,
+# while the independent worst case demonstrates why the matched check is
+# load-bearing rather than decorative.
+GENERAL_1PL_TOL_MM = round(
+    float(title_block("linear_1pl")["value_in"]) * MM_PER_IN, 1
 )
-if _PIN_TO_BORE_WALL_MIN < 0.75:
+EDGE_BREAK_MAX_MM = float(title_block("edge_break")["chamfer_max_mm"])
+SEAM_WEB_MIN_MM = 0.50
+HUB_SEAT_DIA_MIN_GENERAL = HUB_SEAT_DIA - GENERAL_1PL_TOL_MM
+AXIAL_PIN_DIA_MAX_GENERAL = AXIAL_PIN_DIA + GENERAL_1PL_TOL_MM
+HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
+
+
+def seam_web_after_edge_break(
+    seat_dia: float, pin_dia: float, bore_dia: float
+) -> float:
+    """Return radial hub wall between the seam hole and chamfered shaft bore."""
+    return (seat_dia - pin_dia - bore_dia) / 2.0 - EDGE_BREAK_MAX_MM
+
+
+SEAM_WEB_NOMINAL_MM = seam_web_after_edge_break(
+    HUB_SEAT_DIA, AXIAL_PIN_DIA, HUB_BORE_DIA_MAX
+)
+SEAM_WEB_GENERAL_WORST_MM = seam_web_after_edge_break(
+    HUB_SEAT_DIA_MIN_GENERAL,
+    AXIAL_PIN_DIA_MAX_GENERAL,
+    HUB_BORE_DIA_MAX,
+)
+if SEAM_WEB_NOMINAL_MM < SEAM_WEB_MIN_MM:
     raise AssertionError(
-        f"MHA-138 leaves only {_PIN_TO_BORE_WALL_MIN:.3f} mm to the hub bore"
+        f"MHA-138 nominal seam leaves only {SEAM_WEB_NOMINAL_MM:.3f} mm "
+        "of hub wall after edge break"
     )
+SEAM_REQUIRES_MATCHED_INSPECTION = (
+    SEAM_WEB_GENERAL_WORST_MM < SEAM_WEB_MIN_MM
+)
 if SHAFT_DIA + SHAFT_DIA_BAND[0] >= HUB_BORE_DIA + HUB_BORE_BAND[1]:
     raise AssertionError("shaft dome cannot withdraw through the hub bore")
 if HUB_SHOULDER_STATION >= SERVICE_PIN_STATION:

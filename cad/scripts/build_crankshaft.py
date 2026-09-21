@@ -99,7 +99,11 @@ async def _volume(adapter) -> float:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -168,10 +172,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_arc(
             0.0,
             DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
-            DOME_R,
-            0.0,
             0.0,
             -SHAFT_DOME_HEIGHT,
+            DOME_R,
+            0.0,
         ),
     )
     dome_close = check(
@@ -180,10 +184,10 @@ async def build(adapter) -> dict[str, str]:
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
-        ("base-arc", f"{dome_base}.end", f"{dome_arc}.start"),
-        ("arc-close", f"{dome_arc}.end", f"{dome_close}.start"),
+        ("base-arc", f"{dome_base}.end", f"{dome_arc}.end"),
+        ("arc-close", f"{dome_arc}.start", f"{dome_close}.start"),
         ("close-base", f"{dome_close}.end", f"{dome_base}.start"),
-        ("axis start", f"{dome_axis}.start", f"{dome_arc}.end"),
+        ("axis start", f"{dome_axis}.start", f"{dome_arc}.start"),
         ("axis end", f"{dome_axis}.end", f"{dome_base}.start"),
     ):
         check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
@@ -204,7 +208,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "dome height",
         await adapter.add_sketch_dimension(
-            f"{dome_arc}.end", "origin", "vertical_distance", SHAFT_DOME_HEIGHT
+            f"{dome_arc}.start", "origin", "vertical_distance", SHAFT_DOME_HEIGHT
         ),
     )
     dome.record("DomeHeight", '"DomeHeight"')

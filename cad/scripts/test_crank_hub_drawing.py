@@ -62,3 +62,5 @@ def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
     assert "MHA-138" in notes and "SIX O'CLOCK" in notes
     assert "MHA-024" in notes and "MHA-026" in notes
     assert "RADIAL" not in notes
+    assert "SHOULDER SEATED" in notes and "FACES FLUSH" in notes
+    assert "0.50 MIN HUB WALL" in notes and "AFTER EDGE BREAK" in notes
