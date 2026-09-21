@@ -63,7 +63,7 @@ SHEET_SCALE = (1.0, 1.0)
 PRINCIPAL_CENTER = (0.200, 0.170)
 ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
-DETAIL_SCALE = (3, 1)
+DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
 DONOR_KEEP = {
     "ShaftDia": (0.030, 0.145),
@@ -75,16 +75,16 @@ PRINCIPAL_KEEP = {
     "BackCapSagDim": (0.055, 0.220),
 }
 DETAIL_KEEP = {
-    "HeadLen": (0.165, 0.185),
-    "HeadCapR": (0.195, 0.265),
-    "HeadCapSagDim": (0.195, 0.198),
+    "HeadLen": (0.165, 0.205),
+    "HeadCapR": (0.195, 0.262),
+    "HeadCapSagDim": (0.205, 0.210),
     "CrossHoleDia": (0.245, 0.245),
-    "CrossHoleFromHeadRear": (0.155, 0.270),
+    "CrossHoleFromHeadRear": (0.155, 0.268),
 }
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.165, 0.208),
-    "NeckDia": (0.125, 0.208),
-    "ShaftDia": (0.175, 0.205),
+    "HeadDia": (0.165, 0.215),
+    "NeckDia": (0.125, 0.215),
+    "ShaftDia": (0.235, 0.190),
 }
 DIMENSION_CALLOUTS = {
     "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
@@ -383,7 +383,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         principal,
         edge_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
-        symbol_xy=(0.230, 0.195),
+        symbol_xy=(0.265, 0.205),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
