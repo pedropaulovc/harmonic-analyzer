@@ -80,12 +80,12 @@ PROFILE_CENTER = (0.075, 0.190)
 FEATURE_CENTER = (0.180, 0.190)
 NOTCH_CENTER = (0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
-SECTION_CENTER = (0.325, 0.105)
+SECTION_CENTER = (0.335, 0.105)
 
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.100, 0.258),
-    "NorthEdgeZ": (0.120, 0.245),
+    "NorthEdgeZ": (0.105, 0.150),
     "NorthWestX": (0.050, 0.255),
     "SouthWestX": (0.045, 0.115),
     "SouthEastX": (0.108, 0.105),
@@ -312,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_end=(feature_outline[2] + 0.002, pivot_xy[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
-        scale=(1, 2),
+        scale=(2, 1),
         label="pivot bearing section",
     )
     _position_section_label(adapter, section)
