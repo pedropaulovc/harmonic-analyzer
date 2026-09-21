@@ -72,6 +72,7 @@ from crank_arm_spec import (
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
@@ -217,13 +218,9 @@ def _crop_top_view_to_shaft(adapter: Any, view: Any) -> None:
             f"outline={outline!r}, dimple_x={_sheet_x(DIMPLE_X)!r}"
         )
 
-
 _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
-# The anchor is a tapped blind hole, not a drill-size hole, so ``drill_process``
-# refuses it; its native callout already carries the tap drill, the thread and
-# both depths.  The prefix is the one process word that IS the requirement:
-# 5.5 of full thread in a 6.5 drill leaves lead room for a bottoming tap only.
-ANCHOR_TAP_PROCESS = "BOTTOMING TAP"
+
+
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
@@ -236,17 +233,18 @@ FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
-    "AnchorOffset": (0.093, 0.155),
-    "Width": (0.266, FRONT_CENTER[1]),
+    "AnchorOffset": (0.110, 0.158),
+    "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
+    "Width": (0.274, FRONT_CENTER[1]),
     # Left of the boss so its leader and the bore's (above) never cross.
-    "BossRadius": (0.046, 0.100),
+    "BossRadius": (0.035, 0.120),
     "ShaftBoreDia": (0.060, 0.166),
     # Right of the anchor tap so its leader never meets the tap callout's.
     "DimpleDia": (0.178, 0.166),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
-TOP_KEEP = {"PinStation": (0.245, TOP_CENTER[1] + 0.004)}
+TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "REAM THRU (3/8 IN)",
     "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
@@ -299,14 +297,13 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    # Front-view HLV exposes the blind dimple/tap floors. The cropped top-view
-    # HLV keeps only the #14 cross-drill and shaft-bore intersection; cropping
-    # eliminates the remote profiles instead of relying on unstable hidden-edge
-    # hit-testing. The side view carries only stock thickness and stays HLR.
-    for view in (front, top):
-        set_hidden_lines_visible(adapter, view)
-    set_hidden_lines_removed(adapter, right)
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
+    # The cropped top view alone needs HLV: it proves the #14 cross-drill meets
+    # the shaft bore.  The front view's blind-feature depths are fully carried
+    # by their callouts, so HLR keeps same-face dimple/tap evidence consistent
+    # and removes the cross-hole's redundant hidden projection.
+    set_hidden_lines_visible(adapter, top)
     _crop_top_view_to_shaft(adapter, top)
 
     front_annotations = curate_view_dimensions(
@@ -356,8 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Anchor tap: size and both depths on a native Hole Wizard callout; its
     # station from the bore axis and its offset from the top long edge are the
-    # part's StationReference dims imported above (drawing-simplicity-policy
-    # rule 7: every location starts on a feature the shop can pick up).
+    # part's StationReference dims imported above.
     anchor_edge = (
         _sheet_x(ANCHOR_SCREW_X),
         FRONT_CENTER[1]
@@ -369,7 +365,6 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=anchor_edge,
         callout_xy=(0.150, 0.186),
         label="anchor tap",
-        process=ANCHOR_TAP_PROCESS,
     )
     set_hole_callout_precision(
         anchor_callout,
@@ -399,10 +394,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(adapter, overall, "overall length reference")
 
-    # The straight #14 cross-hole, seen in the top view: the native size
-    # callout carrying the drill as its prefix.  Its station from the broad
-    # face is the imported PinStation; the note says its axis passes through
-    # the bore axis.
+    # The straight #14 cross-hole, seen in the cropped top view: the native
+    # size callout carries the drill prefix and PinStation locates it from the
+    # broad face.
     pin_edge = (
         _sheet_x(0.0),
         TOP_CENTER[1] + _PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
@@ -427,6 +421,8 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(HANDLE_PIVOT_HOLE_SPEC),
     )
 
+    if add_note(adapter, "CROPPED TOP VIEW", 0.047, 0.184) is None:
+        raise RuntimeError("failed to label cropped crank-arm top view")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
