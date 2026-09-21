@@ -340,7 +340,7 @@ def test_part_config_is_a_machined_casting() -> None:
     assert "RAL 6005" in finish
     assert "SSPC-SP 3" in finish
     assert "50-75 um DFT" in finish
-    assert "crank-boss spotface" in finish
-    assert "ISO VG 32 oil on bare machined surfaces" in finish
+    assert "MASK MACHINED SURFACES" in finish
+    assert "ISO VG 32 OIL ON BARE SURFACES" in finish
     assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1
