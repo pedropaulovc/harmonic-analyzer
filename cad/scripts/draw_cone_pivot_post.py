@@ -155,8 +155,8 @@ FRONT_KEEP = {
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.170),
-    "CrankBossDia": (0.155, 0.135),
-    "CrankBoreDia": (0.180, 0.160),
+    "CrankBossDia": (0.170, 0.125),
+    "CrankBoreDia": (0.175, 0.175),
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
@@ -166,7 +166,7 @@ TOP_KEEP = {
     "InclineAngle": (0.136, _top_y(28.0)),
 }
 SECTION_KEEP = {
-    "ConeBossLen": (0.235, 0.245),
+    "ConeBossLen": (0.355, 0.252),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -817,7 +817,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         section_annotations,
-        {"ConeBossLen": (0.210, 0.252)},
+        {"ConeBossLen": (0.355, 0.252)},
     )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
