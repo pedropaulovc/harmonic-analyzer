@@ -103,13 +103,19 @@ TOP_KEEP = {
     "CapR": (0.048, 0.260),
     "RodHoleZ": (0.122, 0.223),
 }
-SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.250, 0.114)}
+# TubeId's text stands right of the section, under the seating-depth callout:
+# its dimension line runs in the 13 mm between the socket mouth (sheet 0.120)
+# and the SECTION A-A label (top 0.105); the four-line block clears the
+# seating-depth callout above it.  Centred under the view it printed on top of
+# that label and against the assembled view's (Ø6.0) rod reference.
+SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.380, 0.126)}
+SEATING_DEPTH_TEXT_XY = (0.378, 0.151)
 ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM\nSLIP FIT ON ARBOR MHA-102",
+    "TubeId": "REAM\nSLIP FIT ON\nARBOR MHA-102",
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RodSpan": "OAL",
@@ -460,7 +466,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # would print a band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"RodDia"})
-    offset_dimension_text(adapter, annotations, {"TubeLen": (0.378, 0.145)})
+    offset_dimension_text(adapter, annotations, {"TubeLen": SEATING_DEPTH_TEXT_XY})
 
     # The crown root, measured from the flat socket end like the imported hub
     # length and body overall it sits between: overall length, sphere radius
