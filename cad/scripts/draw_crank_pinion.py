@@ -33,10 +33,12 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
+    check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -272,6 +274,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.082, char_height=0.0025
     )
+    rebuild_drawing(adapter, label="crank pinion layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
