@@ -36,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -154,15 +155,16 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
 
 
 def _configure_views(
-    drawing_model: Any, configuration: str, views: tuple[Any, ...]
+    adapter: Any, configuration: str, views: tuple[Any, ...]
 ) -> None:
     """Select one source configuration on every view and regenerate it."""
-    model = _early_bound(drawing_model, "IModelDoc2")
     bound_views = tuple(_early_bound(view, "IView") for view in views)
     for view in bound_views:
         view.ReferencedConfiguration = configuration
-    if not bool(model.EditRebuild3()):
-        raise RuntimeError(f"failed to rebuild {configuration} drawing views")
+    # Drawing EditRebuild3 legitimately returns False when no model feature
+    # needs rebuilding (observed on the first T006 sheet).  Use the project's
+    # drawing rebuild chokepoint, then verify the authoritative view properties.
+    rebuild_drawing(adapter, label=f"{configuration} view configuration")
     for view in bound_views:
         observed = str(view.ReferencedConfiguration)
         if observed != configuration:
@@ -293,7 +295,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=view_scale
         )
         views = (front, right, iso)
-        _configure_views(drawing_model, configuration, views)
+        _configure_views(adapter, configuration, views)
         for view in views:
             set_hidden_lines_removed(adapter, view)
 
