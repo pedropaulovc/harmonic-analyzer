@@ -231,10 +231,10 @@ def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked <= dimensions.keys()
     assert "Manufacturing Notes" in rendered_recipe.notes
-    assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert "MHA-136" in spec.DRAWING_NOTES
+    assert len(spec.DRAWING_NOTES.splitlines()) == 3
+    assert "MHA-136" not in spec.DRAWING_NOTES
+    assert "ACTUAL Ø6 STEEL CROSS ROD" in spec.DRAWING_NOTES
     assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
-    assert "FLUSH" in spec.DRAWING_NOTES
     for forbidden in ("DATUM", "BASIC", "+/-", "MATERIAL", "TOLERANCE", "FINISH"):
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
@@ -256,6 +256,7 @@ def test_socket_takes_the_title_block_grade_and_names_its_mate():
     assert "MHA-102" in retention and "MHA-136" in retention
     assert "LIGHT DRIVE FIT" in retention
     assert "NOT HAND-REMOVABLE" in retention
+    assert "ENDS FLUSH WITH SOCKET O.D." in retention
 
 
 def test_the_part_owns_every_printed_decimal_place(rendered_recipe):

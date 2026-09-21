@@ -261,7 +261,6 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # The straight #14 cross-hole's station from the broad face, seen edge-on.
 TOP_KEEP = {"PinStation": (0.095, TOP_CENTER[1] + 0.014)}
 DIMENSION_CALLOUTS = {
-    "AnchorOffset": "TOP EDGE",
     "ShaftBoreDia": (
         "REAM THRU (3/8 IN)\n"
         f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"
@@ -285,7 +284,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -293,7 +291,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -383,7 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=anchor_edge,
-        callout_xy=(0.150, 0.186),
+        callout_xy=(0.150, 0.205),
         label="anchor tap",
     )
     set_hole_callout_precision(
@@ -441,9 +438,8 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(HANDLE_PIVOT_HOLE_SPEC),
     )
 
-    if add_note(adapter, "CROPPED TOP VIEW", 0.047, 0.184) is None:
-        raise RuntimeError("failed to label cropped crank-arm top view")
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
+    if add_note(adapter, "PARTIAL TOP VIEW - SHAFT END", 0.047, 0.184) is None:
+        raise RuntimeError("failed to label partial crank-arm top view")
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
     return await finalize_drawing(

@@ -163,9 +163,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
-# The two same-face features are called out individually; only their shared,
-# otherwise invisible face ownership belongs in the linked note.
-DRAWING_NOTES = (
-    "FIDUCIAL AND ANCHOR TAP ARE ON THE SAME FACE SHOWN IN THE FRONT VIEW."
-)
+# All machining requirements are carried by native dimensions and hole
+# callouts; no linked manufacturing note is needed.
+DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
