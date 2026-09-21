@@ -434,7 +434,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.170, 0.185),
+        callout_xy=(0.170, 0.205),
         label="pinch entry-jaw clearance",
         process="DRILL",
     )
