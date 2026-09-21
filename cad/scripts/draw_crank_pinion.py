@@ -278,7 +278,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=VIEW_SCALE,
         label="crank pinion longitudinal centre section",
     )
-    _position_section_caption(adapter, right, (0.290, 0.080))
+    _position_section_caption(adapter, right, (0.290, 0.085))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
