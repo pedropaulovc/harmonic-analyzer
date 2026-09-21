@@ -14,8 +14,8 @@ knife-edge suspension: line contact at the ridge, free to rock, replacing the
 M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
 solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
 ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
-a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex, so the
-across-corners diagonal clears by ~0.87 and the shoulders by ~0.6.
+a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex.  At
+finished-size limits it clears the observed ±1.6-degree rocking sweep.
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -32,8 +32,9 @@ The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
 it, so the lever rocks about the true knife edge (not the cylinder centre).
 
-Dimensions: cad/DIMENSIONS.md ch. 18. Bore/clearance: low confidence (tune vs
-ch30 parity); the only hard constraint is "only the top edge contacts".
+Dimensions: cad/DIMENSIONS.md ch. 18. Bore size remains low-confidence
+photo-derived geometry; its hard constraints are ridge contact and the observed
+rocking sweep at finished-size limits.
 
 Run (SolidWorks already open)::
 
@@ -86,6 +87,8 @@ from knife_mount_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    MATING_HEX_SIZE_PLUS_MM,
+    REQUIRED_ROCK_SWEEP_DEG,
     STUD_TAP_CROWN_WEB_MM,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
@@ -155,6 +158,43 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
         raise RuntimeError(
             f"{full_name} measured {actual_mm:g}, expected {expected_mm:g} mm"
         )
+
+
+
+def _minimum_hex_rock_clearance_mm() -> float:
+    """Return the worst noncontact-vertex clearance over the required sweep."""
+    bore_radius = R_BORE - BORE_DIAMETER_TOLERANCE_MM / 2.0
+    width = HEX_W + MATING_HEX_SIZE_PLUS_MM
+    height = HEX_H + MATING_HEX_SIZE_PLUS_MM
+    vertices = (
+        (-width / 2.0, -height / 4.0),
+        (-width / 2.0, -3.0 * height / 4.0),
+        (0.0, -height),
+        (width / 2.0, -3.0 * height / 4.0),
+        (width / 2.0, -height / 4.0),
+    )
+    sweep = math.radians(REQUIRED_ROCK_SWEEP_DEG)
+    clearance = math.inf
+    for x, y in vertices:
+        candidates = [-sweep, sweep]
+        stationary = math.atan2(x, y)
+        for half_turn in range(-2, 3):
+            angle = stationary + half_turn * math.pi
+            if -sweep <= angle <= sweep:
+                candidates.append(angle)
+        maximum_radius = max(
+            math.sqrt(
+                x * x
+                + y * y
+                + bore_radius * bore_radius
+                + 2.0
+                * bore_radius
+                * (x * math.sin(angle) + y * math.cos(angle))
+            )
+            for angle in candidates
+        )
+        clearance = min(clearance, bore_radius - maximum_radius)
+    return clearance
 
 
 def _tolerance_hole_depth(
@@ -329,14 +369,21 @@ async def build(adapter) -> dict[str, str]:
     contact_error = (BORE_CY + R_BORE) - hex_top
     if abs(contact_error) > 1e-9:
         raise RuntimeError(f"knife contact error is {contact_error:.6f} mm")
-    # widest hex point (shoulder at +-HEX_W/2, y = -RIDGE_Y +- HEX_H/4) must
-    # clear the bore wall.
-    for sy in (-RIDGE_Y + HEX_H / 4.0, -RIDGE_Y - HEX_H / 4.0):
-        d = math.hypot(HEX_W / 2.0, sy - BORE_CY)
-        if d > R_BORE - 0.5:
-            raise RuntimeError(
-                f"hex shoulder {d:.3f} mm too close to Ø{2 * R_BORE} bore"
-            )
+    # Every noncontact vertex must remain inside the minimum finished bore for
+    # the complete observed rock range, with both trunnion sizes at maximum
+    # material.  The former static 0.5-mm shoulder threshold had no mechanical
+    # basis and rejected the valid nominal contact geometry.
+    rock_clearance = _minimum_hex_rock_clearance_mm()
+    if rock_clearance <= 0.0:
+        raise RuntimeError(
+            "hex trunnion interferes with the knife bore over "
+            f"+/-{REQUIRED_ROCK_SWEEP_DEG:g} degrees: "
+            f"{rock_clearance:.6f} mm clearance at limits"
+        )
+    _telemetry.info(
+        "knife trunnion clearance at size and motion limits: "
+        f"{rock_clearance:.6f} mm"
+    )
 
     # Hanger-stud tap: native 1/2-13 blind bottoming tap on the trunnion-axis
     # centreline.  HoleWizard5 reads depth as the cylindrical drill shoulder;
