@@ -75,7 +75,7 @@ FRONT_CENTER = (0.105, 0.140)
 # view.  Its rotated boss-end view projects below it at sheet scale.
 SIDE_CENTER = (0.260, 0.140)
 ISO_CENTER = (0.365, 0.155)
-BOTTOM_CENTER = (0.260, 0.085)
+BOTTOM_CENTER = (0.260, 0.105)
 
 def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
@@ -266,9 +266,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(adapter, "RIGHT-SIDE VIEW", 0.225, 0.210) is None:
         raise RuntimeError("failed to label cam right-side view")
-    if add_note(adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.215, 0.065) is None:
+    if add_note(adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.215, 0.075) is None:
         raise RuntimeError("failed to label rotated cam boss end view")
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.115)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.220)
 
     return await finalize_drawing(
         adapter,
