@@ -814,11 +814,6 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    offset_dimension_text(
-        adapter,
-        section_annotations,
-        {"ConeBossLen": (0.355, 0.243)},
-    )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
