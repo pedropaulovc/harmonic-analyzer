@@ -1349,6 +1349,10 @@ HANDLE_ROWS = [
     [-_HANDLE_S, _HANDLE_C, 0.0],
     [0.0, 0.0, 1.0],
 ]
+# MHA-102's grip bore and MHA-058's rod both run along local +Y.  They share
+# one Rz pose; the circular arbor shaft stays on the same machine-Z journal
+# axis while its cross-hole clocks onto the rod.
+ARBOR_ROWS = HANDLE_ROWS
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -2346,12 +2350,15 @@ async def build(adapter) -> dict[str, str]:
     )
     # MHA-102 is pressed through the brass drum and journaled in both straps'
     # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
+    # Rotate only about the circular shaft axis so its local-Y cross-hole is
+    # coaxial with MHA-058's local-Y rod; every world centre and Z station stays
+    # unchanged.
     pinion_arbor = await place_component(
         adapter,
         "pinion-arbor",
         [APINION_X, APINION_Y, ARBOR_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, HANDLE_TILT_DEG],
+        ARBOR_ROWS,
         ground=False,
         label="pinion-arbor (integral steel arbor and grip head)",
     )
@@ -3753,9 +3760,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Steel arbor (PR7 item 14): pressed through the drum on the same strap
     # bore axis -- coaxial + an axial seat (Front-plane distance, invariant
-    # under the z-parallel engage swing) + a parallel anti-spin to the drum
-    # it is pressed into (both inserted at IDENTITY, so their Right planes
-    # are parallel; riding the same swing group keeps the pair parallel).
+    # under the z-parallel engage swing) + a fixed 65-degree anti-spin phase
+    # to the drum.  The phase clocks its local-Y cross-hole onto the grip rod;
+    # an off-axis head witness distinguishes the two angle-mate branches.
     arb_o = _org(adapter, pinion_arbor)
     await coincident_mate(
         adapter,
@@ -3772,12 +3779,14 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
         verify=(pinion_arbor, arb_o),
     )
-    await parallel_mate(
+    await angle_driver(
         adapter,
         named_ref(f"Right Plane@{pinion_arbor}", "PLANE"),
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
-        label="pinion arbor anti-spin (pressed in the drum)",
+        HANDLE_TILT_DEG,
+        label=f"pinion arbor anti-spin (pressed phase={HANDLE_TILT_DEG:.2f})",
         verify=(pinion_arbor, arb_o),
+        witness_local=[0.0, ARBOR_HEAD_DIA / 2.0, ARBOR_HEAD_CENTER_Z],
     )
     # The separate grip crossrod is press-fitted in MHA-102's match-reamed
     # integral head.  A LOCK records that authored relative pose with no
