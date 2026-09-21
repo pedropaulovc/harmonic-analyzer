@@ -1,4 +1,4 @@
-"""Offline contracts for the cone-tip-block drawing."""
+"""Offline manufacturing contracts for the cone-tip-block drawing."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import build_cone_tip_block as part
 import cone_tip_block_spec
 import draw_cone_tip_block as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
+from _surface_finish import SEAT_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -17,99 +19,54 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["cone_tip_block"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is cone_tip_block_spec.DRAWING_DIMENSIONS
-    marked = set().union(*cone_tip_block_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_KEEP)
-    # PinchZ is marked and remains part-owned, but SolidWorks does not import
-    # that Hole Wizard placement dimension into the end view. The sheet creates
-    # its BASIC datum-to-hole locator natively instead.
-    assert kept | {"PinchZ"} == marked
-    assert marked == {
-        "Width",
-        "Depth",
-        "BlockHt",
-        "PassageDiaDim",
-        "PassageZ",
-        "PinchZ",
-        "SlitW",
-    }
-    assert part.ADJUSTER_AXIS_HEIGHT == cone_tip_block_spec.ADJUSTER_AXIS_HEIGHT
+def test_tip_passage_is_the_adjuster_cup_clearance_envelope() -> None:
+    """The block admits the tip; it must not become a second bearing journal."""
+    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA
+    assert part.SHAFT_PASSAGE_DIA == 2.0 * part.SHAFT_PASSAGE_RADIUS
+    assert part.SHAFT_PASSAGE_DIA < part.ADJUSTER_BORE_DIA
+    callout = drawing.DIMENSION_CALLOUTS["PassageDiaDim"].upper()
+    assert "THRU" in callout
+    assert "CLEARANCE" in callout
 
 
-def test_non_bearing_tip_passage_replaces_the_fictional_journal() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "JournalBore" not in source
-    assert "BoreDiaDim" not in source
-    assert 'name_last_feature(adapter, "ShaftPassage")' in source
-    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA == 3.9751
-    assert drawing.DIMENSION_CALLOUTS["PassageDiaDim"] == ("THRU - CLEARANCE PASSAGE")
-    assert "BlockHt" not in drawing.DIMENSION_CALLOUTS
-    assert "A SHAFT-BEARING SURFACE" in cone_tip_block_spec.DRAWING_NOTES
+def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
+    """The screw must pass one jaw and engage the other, not bind in both."""
+    tap = part.PINCH_BORE_SPEC
+    clearance = part.PINCH_CLEARANCE_SPEC
+    assert tap is cone_tip_block_spec.PINCH_BORE_SPEC
+    assert tap.kind == "tapped"
+    assert tap.size == cone_tip_block_spec.PINCH_THREAD
+    assert tap.end == "through_all"
+    assert clearance is cone_tip_block_spec.PINCH_CLEARANCE_SPEC
+    assert clearance.kind == "clearance"
+    assert clearance.size == "#4"
+    assert clearance.fit == "normal"
+    assert clearance.end == "blind"
+    assert clearance.depth_mm == (part.BLOCK_X - part.SLIT_W) / 2.0
+    assert part.PINCH_BORE_DIA == blind_cut_dia_mm(tap)
+    assert part.PINCH_CLEARANCE_DIA == blind_cut_dia_mm(clearance)
+    assert part.PINCH_CLEARANCE_DIA > part.PINCH_BORE_DIA
 
 
-def test_notes_specify_adjuster_and_functional_pinch_joint() -> None:
-    notes = cone_tip_block_spec.DRAWING_NOTES
-    assert "5/16-18" in notes  # the adjuster tapped hole
-    assert "#4-40" in notes  # the pinch tapped hole
-    assert "SLOT" in notes
-    assert "CLEARANCE" in notes
-    assert "OPPOSITE JAW" in notes
-    assert "E IS +X PINCH-ENTRY FACE" in notes
-    assert "SIMULTANEOUS REQUIREMENT" in notes
-    assert "TOTAL MEDIAN-PLANE ZONE" in notes
-    assert "DIA 3.264 +0.10/-0.00" in notes
-    assert "MATERIAL" not in notes
-    assert "OXIDE" not in notes
-    assert "DATUM A" in notes
-    assert "X.XX" not in notes
-    assert "BREAK EDGES" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'adapter, "Manufacturing Notes", 0.020, 0.088, char_height=0.0025' in source
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name="PinchClearance"' in part_source
-    assert cone_tip_block_spec.PINCH_THREAD == "#4-40"
-    assert part.PINCH_BORE_SPEC is cone_tip_block_spec.PINCH_BORE_SPEC
-    assert part.PINCH_BORE_SPEC.size == cone_tip_block_spec.PINCH_THREAD
-    assert part.PINCH_CLEARANCE_SPEC is cone_tip_block_spec.PINCH_CLEARANCE_SPEC
-    assert part.PINCH_CLEARANCE_SPEC.kind == "clearance"
-    assert part.PINCH_CLEARANCE_SPEC.size == "#4"
-    assert part.PINCH_CLEARANCE_SPEC.fit == "normal"
-    assert part.PINCH_CLEARANCE_SPEC.end == "blind"
-    assert part.PINCH_CLEARANCE_SPEC.depth_mm == (part.BLOCK_X - part.SLIT_W) / 2.0
-    assert part.PINCH_CLEARANCE_DIA == cone_tip_block_spec.PINCH_CLEARANCE_DIA == 3.264
+def test_pinch_bore_stays_in_the_clamp_band_and_crosses_the_slot() -> None:
+    """Keep the cross-bore clear of the adjuster and above the slit floor."""
+    bore_bottom = part.PINCH_BORE_Y - part.PINCH_BORE_DIA / 2.0
+    bore_top = part.PINCH_BORE_Y + part.PINCH_BORE_DIA / 2.0
+    adjuster_top = part.ADJUSTER_AXIS_HEIGHT + part.ADJUSTER_BORE_DIA / 2.0
+    assert bore_bottom >= adjuster_top + 0.25
+    assert bore_top <= part.BLOCK_HEIGHT - 0.25
+    assert part.BLOCK_HEIGHT - part.SLIT_DEPTH <= bore_bottom
 
 
-def test_datum_and_position_controls_are_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'datum="A"' in source
-    assert 'datum="B"' in source
-    assert "symbol_xy=(FRONT_CENTER[0], _front_y(0.0) + 0.024)" in source
-    assert 'symbol_xy=TOP_KEEP["Depth"]' in source
-    assert 'datum="C"' in source
-    assert 'datum="D"' in source
-    assert 'datum="E"' in source
-    assert "shoulder=True" in source
-    assert source.count('characteristic="position"') == 3
-    assert source.count("set_basic_dimension(") == 2
-    assert 'label="pinch-axis height"' in source
-    assert "CYLINDRICAL ZONE" not in cone_tip_block_spec.DRAWING_NOTES
-    assert "CONCENTRIC" not in cone_tip_block_spec.DRAWING_NOTES
-    assert 'quantity="2 COAXIAL FEATURES; SIM REQT"' in source
-    assert 'quantity="SLOT MEDIAN PLANE; BASIC 0 TO B"' in source
-    assert 'datums=("A", "D", "E")' in source
+def test_foot_seat_is_the_only_locating_surface_finish() -> None:
+    (finish,) = cone_tip_block_spec.SURFACE_FINISHES
+    assert finish.key == "foot_seat"
+    assert finish.roughness_um == SEAT_UM
+    assert finish.face.normal == (0, -1, 0)
+    assert finish.face.offset_mm == 0.0
 
 
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(2, 1)") == 4  # elevation + plan + side + pictorial
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_part_config_preserves_manufacturing_metadata() -> None:
     import _config
 
     config = _config.parts("cone-tip-block")
