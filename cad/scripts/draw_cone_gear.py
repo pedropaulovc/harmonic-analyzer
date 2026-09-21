@@ -154,6 +154,94 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
     }
 
 
+def _tooth_pattern_feature(source_model: Any) -> Any:
+    """Return the one circular feature pattern in the saved cone-gear part."""
+    matches: list[Any] = []
+    raw = source_model.FirstFeature()
+    while raw is not None:
+        feature = _early_bound(raw, "IFeature")
+        if "cirpattern" in str(feature.GetTypeName2()).casefold():
+            matches.append(feature)
+        raw = feature.GetNextFeature()
+    if len(matches) != 1:
+        names = [str(feature.Name) for feature in matches]
+        raise RuntimeError(
+            f"saved cone gear must have one circular pattern; found {names!r}"
+        )
+    return matches[0]
+
+
+def _assert_saved_configuration_topology(
+    adapter: Any, source_model: Any
+) -> None:
+    """Prove every persisted configuration contains its solved tooth pattern."""
+    pattern = _tooth_pattern_feature(source_model)
+    pattern_name = str(pattern.Name)
+    failures: list[str] = []
+    observations: list[str] = []
+    # Positive control first, then the smallest configuration that the drawing
+    # exposed as a smooth blank, then the remainder of the family.
+    ordered = (CONFIGURATION_TEETH[-1], *CONFIGURATION_TEETH[:-1])
+    for teeth in ordered:
+        configuration = f"T{teeth:03d}"
+        if not bool(source_model.ShowConfiguration2(configuration)):
+            failures.append(f"{configuration}: ShowConfiguration2 failed")
+            continue
+        manager = _early_bound(
+            source_model.ConfigurationManager, "IConfigurationManager"
+        )
+        active = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+        observed = str(active.Name)
+        needs_rebuild = bool(active.NeedsRebuild)
+        part = _early_bound(source_model, "IPartDoc")
+        bodies = tuple(part.GetBodies2(0, False) or ())
+        face_count = (
+            int(_early_bound(bodies[0], "IBody2").GetFaceCount())
+            if len(bodies) == 1
+            else 0
+        )
+        states = pattern.IsSuppressed2(3, [configuration])
+        if not isinstance(states, (list, tuple)):
+            states = (states,)
+        suppressed = len(states) != 1 or bool(states[0])
+        definition = _early_bound(
+            pattern.GetDefinition(), "ICircularPatternFeatureData"
+        )
+        instances = int(definition.TotalInstances)
+        error_result = pattern.GetErrorCode2()
+        if not isinstance(error_result, (list, tuple)) or len(error_result) < 2:
+            raise RuntimeError(
+                f"{configuration}: unreadable {pattern_name} error state "
+                f"{error_result!r}"
+            )
+        error_code = int(error_result[0] or 0)
+        is_warning = bool(error_result[1])
+        observation = (
+            f"{configuration}: active={observed}, needs_rebuild={needs_rebuild}, "
+            f"{pattern_name} instances={instances}, suppressed={suppressed}, "
+            f"error={error_code}, warning={is_warning}, bodies={len(bodies)}, "
+            f"faces={face_count}"
+        )
+        observations.append(observation)
+        if (
+            observed != configuration
+            or needs_rebuild
+            or instances != teeth
+            or suppressed
+            or error_code
+            or len(bodies) != 1
+            or face_count < 2 * teeth + 4
+        ):
+            failures.append(observation)
+    for observation in observations:
+        _telemetry.info(f"saved cone-gear topology: {observation}")
+    if failures:
+        raise RuntimeError(
+            "saved cone-gear configuration topology is invalid: "
+            + "; ".join(failures)
+        )
+
+
 def _configure_views(
     adapter: Any, configuration: str, views: tuple[Any, ...]
 ) -> None:
@@ -243,6 +331,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open cone-gear source", await adapter.open_model(str(SOURCE)))
+    source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    _assert_saved_configuration_topology(adapter, source_model)
     read_required_properties(
         adapter.currentModel,
         (
