@@ -160,19 +160,20 @@ def test_every_diameter_stands_on_its_own_land() -> None:
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
     """Three lands 6.9 mm apart carry three texts; each line clears the others.
 
-    A line at x rises from the shaft to its own text, so it passes every text
-    that sits lower than it; those texts must lie clear of x by half a text
-    width.  Texts at the same height would collide outright.
+    A dragged diameter's text hangs to the RIGHT of its dimension line, so the
+    text at (x, y) spans x..x+width; any other line inside that span rises
+    from the shaft and must stop below the text.  The first render stepped
+    the texts the other way and three leaders crossed (codex, 18395f30).
     """
-    half_text_width = 0.0075
+    width = drawing.DIAMETER_TEXT_WIDTH
+    text_height = 0.009  # nominal over a stacked two-line band
     items = list(drawing.SIDE_DIAMETERS.values())
     for x_a, y_a in items:
         for x_b, y_b in items:
             if (x_a, y_a) == (x_b, y_b):
                 continue
-            assert abs(y_a - y_b) > 0.004 or abs(x_a - x_b) > 2 * half_text_width
-            if y_b < y_a:
-                assert abs(x_a - x_b) > half_text_width, (x_a, x_b)
+            if x_a < x_b < x_a + width:
+                assert y_b < y_a - text_height, ((x_a, y_a), (x_b, y_b))
 
 
 def test_sections_are_a_monotonic_stepped_shaft() -> None:
@@ -241,10 +242,10 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert 'name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])' in source
     # One feature, one dimension, one quantity prefix -- not four dimensions.
     assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
-    # The old "SHOULDER ROOTS R0.10 MAX" note is gone; the one note left
-    # names the mate behind the three-place stations (rule 2) without adding
-    # a check of its own (no MUST), and carries no number, tolerance, datum
-    # or method word.
+    # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
+    # the mates behind the h band and the three-place stations (rule 2)
+    # without adding a check of its own (no MUST), and carries no number
+    # but the mate's part number, no tolerance, datum or method word.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     # The sheet's note text runs ~2.7 mm per character; a line from the
@@ -253,7 +254,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     assert max(len(line) for line in notes.splitlines()) * 0.0027 < (
         0.216 - drawing.NOTES_XY[0]
     )
-    assert not any(character.isdigit() for character in notes)
+    mate_number = _config.parts("cone-gear")["number"]
+    assert not any(character.isdigit() for character in notes.replace(mate_number, ""))
     for forbidden in (
         "R0.",
         "MAX",
@@ -265,6 +267,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "GRIND",
     ):
         assert forbidden not in notes.upper()
+    assert "SLIP FIT" in notes and f"CONE GEAR BORES, {mate_number}" in notes
     assert "SOLDERED CONE GEAR SEATS" in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'

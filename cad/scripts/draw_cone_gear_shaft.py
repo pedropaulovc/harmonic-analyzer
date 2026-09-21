@@ -3,11 +3,12 @@ r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
 large (faced) end below it and every diameter above it on that same side
 view, each dimension line inside the land it measures.  The three short tip
-lands are 6.9 mm apart, so their diameter texts climb in steps: the line
-nearest the big end rises highest and no line passes through a neighbour's
-text.  A standard isometric supplies pictorial clarity.  Source geometry and
-native model fits stay authoritative: the sheet types no tolerance, no
-precision and no notes.
+lands are 6.9 mm apart, so their diameter texts climb in steps: the tip's
+line rises highest and each text hangs to the RIGHT of its line above every
+line it spans.  A standard isometric supplies pictorial clarity, and one
+note names the gear seats the lands are fitted to.  Source geometry and
+native model fits stay authoritative: the sheet types no tolerance and no
+precision.
 
 Run with SolidWorks open::
 
@@ -101,19 +102,23 @@ SIDE_KEEP = {
     "ShoulderR": (0.2000, 0.2120),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
-# linear dimension's line sits at its text x, so each x lies INSIDE the land
-# it measures (the big end is at sheet x 0.2526; land 1 spans 0.0819..0.2096,
-# land 2 0.0750..0.0819, land 3 0.0681..0.0750, land 4 0.0474..0.0681);
-# Ø12.231 stands just off the faced end.  The three tip lands are only 6.9 mm
-# apart, so their texts step up towards the big end: every line then rises
-# past the LEFT of the lower texts and through none of them.
+# linear dimension's line sits at its text x and the text hangs to the RIGHT
+# of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
+# land it measures (the big end is at sheet x 0.2526; land 1 spans
+# 0.0819..0.2096, land 2 0.0750..0.0819, land 3 0.0681..0.0750, land 4
+# 0.0474..0.0681); Ø12.231 stands just off the faced end.  The three tip
+# lands are only 6.9 mm apart, so a text spans its right-hand neighbours'
+# lines: the tip's text sits highest and each neighbour to the right steps
+# down, so no line rises through a text (codex, 18395f30).
 SIDE_DIAMETERS = {
     "Sec0Dia": (0.2700, 0.1820),
     "Sec1Dia": (0.1400, 0.1930),
-    "Sec2Dia": (0.0810, 0.2220),
-    "Sec3Dia": (0.0690, 0.2040),
-    "Sec4Dia": (0.0520, 0.1860),
+    "Sec2Dia": (0.0810, 0.1960),
+    "Sec3Dia": (0.0690, 0.2080),
+    "Sec4Dia": (0.0520, 0.2200),
 }
+# Sheet width of one diameter text with its stacked band, for the layout test.
+DIAMETER_TEXT_WIDTH = 0.032
 DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
