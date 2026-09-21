@@ -29,6 +29,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from typing import Any
 
@@ -235,6 +236,25 @@ def _crop_top_view_to_shaft(adapter: Any, view: Any) -> None:
 
 _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
+def _omit_title_block_thread_class(display: Any) -> None:
+    """Remove only the redundant Hole Wizard thread-class field."""
+    native = _early_bound(display, "IDisplayDimension")
+    definition = str(native.GetText(5) or "")
+    without_class = re.sub(
+        r"\s*-\s*<hw-threadclass>\s*", " ", definition, flags=re.IGNORECASE
+    )
+    without_class = re.sub(r" {2,}", " ", without_class)
+    if without_class == definition:
+        raise RuntimeError(
+            f"anchor tap callout lacks its thread-class variable: {definition!r}"
+        )
+    # IDisplayDimension.SetText is void; the definition readback is the
+    # authoritative persistence check.
+    native.SetText(1, without_class)
+    if str(native.GetText(5) or "") != without_class:
+        raise RuntimeError("anchor tap callout retained its redundant thread class")
+
+
 
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
@@ -248,7 +268,7 @@ FRONT_KEEP = {
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
-    "AnchorOffset": (0.110, 0.158),
+    "AnchorOffset": (0.095, 0.158),
     "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
     "Width": (0.274, FRONT_CENTER[1]),
     # Left of the boss so its leader and the bore's (above) never cross.
@@ -266,7 +286,7 @@ DIMENSION_CALLOUTS = {
         f"{_SHAFT_CLEARANCE_MIN:.2f}-{_SHAFT_CLEARANCE_MAX:.2f} DIAMETRAL\n"
         f"CLEARANCE ON {_CRANKSHAFT_NUMBER}"
     ),
-    "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
+    "DimpleDia": "FIDUCIAL FLAT-BOTTOM\n0.3 MIN, 1.0 MAX DEEP",
 }
 
 
@@ -383,6 +403,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.150, 0.205),
         label="anchor tap",
     )
+    _omit_title_block_thread_class(anchor_callout)
     set_hole_callout_precision(
         anchor_callout,
         {"hw-tapdrldepth": 1, "hw-threaddepth": 1},

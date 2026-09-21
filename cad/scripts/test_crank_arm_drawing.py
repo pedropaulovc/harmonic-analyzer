@@ -64,7 +64,7 @@ def test_hole_callouts_state_size_process_and_fit() -> None:
     assert "3/8 IN" in callouts["ShaftBoreDia"]
     assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]
     assert "CLEARANCE ON MHA-026" in callouts["ShaftBoreDia"]
-    assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM 0.5 DEEP"
+    assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM\n0.3 MIN, 1.0 MAX DEEP"
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
     assert drawing.PIN_HOLE_CALLOUT_PREFIX == "#14 DRILL\nON SHAFT-BORE CL"
@@ -75,6 +75,28 @@ def test_hole_callouts_state_size_process_and_fit() -> None:
         drill_process(crank_arm_spec.ANCHOR_HOLE_SPEC)
     assert crank_arm_spec.ANCHOR_HOLE_SPEC.kind == "tapped_bottoming"
 
+
+def test_anchor_callout_defers_its_thread_class_to_the_title_block() -> None:
+    class NativeCallout:
+        def __init__(self) -> None:
+            self.definition = (
+                "<hw-threadsize> <hw-threadseries> - <hw-threadclass> "
+                "<hw-threaddepth>"
+            )
+
+        def GetText(self, part: int) -> str:
+            assert part == 5
+            return self.definition
+
+        def SetText(self, part: int, text: str) -> None:
+            assert part == 1
+            self.definition = text
+
+    callout = NativeCallout()
+    drawing._omit_title_block_thread_class(callout)
+    assert callout.definition == (
+        "<hw-threadsize> <hw-threadseries> <hw-threaddepth>"
+    )
 
 def test_print_carries_no_gdt_finish_or_basic_dimensions() -> None:
     # drawing-simplicity-policy.md rule 3-5: a pinned hand-crank lever is not
