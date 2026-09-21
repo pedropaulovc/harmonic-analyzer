@@ -83,7 +83,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PostMountEastX",
         "PostMountEastZ",
     },
-    "LockNotchProfile": {"NotchRunAngle"},
     "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
@@ -102,7 +101,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "NorthEdgeZ": 2,
         "NorthWestX": 2,
         "SouthWestX": 2,
-        "PlateLenDim": 2,
+        "PlateLenDim": 1,
         "SouthEastX": 2,
     },
     "Plate": {"PlateThk": 2},
@@ -114,7 +113,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastX": 2,
         "PostMountEastZ": 2,
     },
-    "LockNotchProfile": {"NotchRunAngle": 2},
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
     "CornerNE": {"CornerNER": 2},
     "CornerNW": {"CornerNWR": 2},
@@ -145,7 +143,10 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 
 
 # View scales differ from the sheet scale and therefore remain property-linked
-# labels.  They are not manufacturing-note dimensions.
-PLAN_VIEW_NOTE = "PLAN VIEWS SCALE 1:2"
+# labels.  The split plans are named so each dimension set has an unambiguous
+# owner; these are view captions, not manufacturing notes.
+PROFILE_VIEW_NOTE = "PLATE PROFILE — SCALE 1:2"
+FEATURE_VIEW_NOTE = "HOLE LOCATIONS — SCALE 1:2"
+NOTCH_VIEW_NOTE = "LOCK NOTCH — SCALE 1:2"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 SECTION_VIEW_NOTE = "SCALE 1:2"

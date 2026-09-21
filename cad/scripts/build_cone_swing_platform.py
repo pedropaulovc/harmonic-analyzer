@@ -88,8 +88,9 @@ from build_cone_lock_knob import HEAD_DIA as LOCK_HEAD_DIA
 from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FEATURE_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
-    SECTION_VIEW_NOTE,
+    NOTCH_VIEW_NOTE,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
@@ -97,11 +98,12 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_SPEC,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
     PLATE_THICKNESS,
-    PLAN_VIEW_NOTE,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
     POST_MOUNT_SPEC,
     POST_MOUNT_TAP_DIA,
+    PROFILE_VIEW_NOTE,
+    SECTION_VIEW_NOTE,
     SURFACE_FINISHES,
 )
 
@@ -902,7 +904,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Plan View Note": PLAN_VIEW_NOTE,
+            "Profile View Note": PROFILE_VIEW_NOTE,
+            "Feature View Note": FEATURE_VIEW_NOTE,
+            "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Section View Note": SECTION_VIEW_NOTE,
         },
