@@ -164,7 +164,7 @@ FRONT_KEEP = {
     "ArborBoreCz": (0.240, 0.151),
     "BottomCapRadius": (0.250, 0.080),
     "TopCapRadius": (0.236, 0.238),
-    "PinSeatCy": (0.148, 0.134),
+    "PinSeatCy": (0.180, 0.125),
 }
 # The scallop pair is dimensioned in the enlarged detail the way it is cut:
 # each centre from the pivot axis (X stacked above the fence, the shorter one
@@ -186,7 +186,7 @@ DETAIL_KEEP = {
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCz": (0.080, 0.090),
-    "PinSeatDia": (0.045, 0.150),
+    "PinSeatDia": (0.040, 0.160),
 }
 SECTION_CENTER = (0.350, 0.115)
 SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
@@ -204,7 +204,7 @@ ARBOR_FINISH_XY = (0.168, 0.222)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT\nREAM; FLAT-BOTTOM BLIND",
+    "PinSeatDia": "FOLLOWER SEAT\nBLIND FLAT-BOTTOM\nREAM",
     "CamReliefParkX": "PARK X",
     "CamReliefParkY": "PARK +Y",
     "CamReliefEngagedX": "ENGAGED X",
