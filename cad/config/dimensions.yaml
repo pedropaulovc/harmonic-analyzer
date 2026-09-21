@@ -1877,8 +1877,8 @@ sections:
       centreline), not in the frustum/64T channel at all. Modeled layout
       (`APINION_*` constants): axis at machine (−16.077, 90.518) =
       X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap);
-      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), steel
-      arbor z −131.912..+94.338, and tee-handle hub at z −138.412. Straps:
+      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), integral
+      steel arbor/head root z −131.912..+94.338, head/crossrod axis z −138.412, and separate MHA-058 crossrod at +65°. Straps:
       15 wide × 5 thick with R7.5 ends (`v4_pinion_018` — the teeth stand
       proud of both flanks), pivot (−12.113, 62.8), bore-to-bore c2c 28.0,
       parked at an 8.139° lean; the swing rides the torque shaft as the p2

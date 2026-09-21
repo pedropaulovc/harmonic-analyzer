@@ -753,8 +753,12 @@ from build_pinion_arbor import (  # noqa: E402
     SHAFT_LEN as ARBOR_LEN,
 )
 from pinion_arbor_spec import (  # noqa: E402
-    RETENTION_HOLE_DIA as ARBOR_RETENTION_HOLE_DIA,
-    RETENTION_PIN_STATION as ARBOR_RETENTION_PIN_STATION,
+    CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
+    HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
+    HEAD_DIA as ARBOR_HEAD_DIA,
+    HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    NECK_END_Z as ARBOR_NECK_END_Z,
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
@@ -803,25 +807,7 @@ from pinion_lever_geometry import (  # noqa: E402
     ROD_TIP_DIA as LEVER_ROD_TIP_DIA,
     WALL_T as LEVER_WALL_T,
 )
-from pinion_handle_geometry import (  # noqa: E402
-    GRIP_DIA as HANDLE_GRIP_DIA,
-    GRIP_LEN as HANDLE_GRIP_LEN,
-    CAP_SAG as HANDLE_CAP_SAG,
-    ROD_DIA as HANDLE_ROD_DIA,
-    TUBE_ID as HANDLE_TUBE_ID,
-    TUBE_LEN as HANDLE_TUBE_LEN,
-    WALL_T as HANDLE_WALL_T,
-)
-from pinion_handle_spec import (  # noqa: E402
-    RETENTION_PIN_CENTER_Z as HANDLE_RETENTION_CENTER_Z,
-    RETENTION_PIN_DIA as HANDLE_RETENTION_PIN_DIA,
-    RETENTION_PIN_LEN as HANDLE_RETENTION_PIN_LEN,
-    RETENTION_PIN_STATION_FROM_FLOOR as HANDLE_RETENTION_PIN_STATION,
-)
-from pinion_handle_pin_spec import (  # noqa: E402
-    PIN_DIA as HANDLE_PIN_DIA,
-    PIN_LEN as HANDLE_PIN_LEN,
-)
+from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
     BLADE_TILT_DEG as SPR_BLADE_TILT_DEG,
@@ -1281,8 +1267,8 @@ for _ARB_Z, _min_gap in _ARB_Z_BANDS:
         )
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
-# The ch30 GT proves the zeroing rig is on the machine (tee handle triangulates
-# to world (-10.2, 104.2, -144.1), back stub end to (-11.4, 106.7, +91.3)) --
+# The ch30 GT proves the zeroing rig is on the machine (grip head triangulates
+# to world (-10.2, 104.2, -144.1), back arbor end to (-11.4, 106.7, +91.3)) --
 # INBOARD of the drum and LEVEL with the drive axis, not the old outboard/low
 # placement the OD-62.2 rescale squeezed out (removal note: git c1ebca3).
 # Level + the book's parked tip gap puts the axis at X_DRUM - 44.32 = 10.38
@@ -1313,8 +1299,8 @@ STRAP_LEAN_DEG = math.degrees(
 )  # the v2 drive line makes the parked strap lean west of vertical
 LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST bores
 # east since the DP40 cram (issue #7 dodged the cone-pivot-post column);
-# the p.68-69 photos put the lever WEST of the tee handle and the cam pins
-# lifting the strap tails' follower pins from the WEST -- an east lift would
+# the p.68-69 photos put the lever WEST of the grip head and the cam pins lift
+# the strap tails' follower pins from the WEST -- an east lift would
 # swing the drum OUT of mesh. The column (x ~-47) is far east of the new spot,
 # and the M6.9 portal south upright that once blocked the west band was
 # replaced by the lone NORTH rocker-arm-support. The recentered p2 rig clears
@@ -1343,14 +1329,12 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 # PR7 -- the PR6 98 was img08's perspective-inflated read)
 LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
 # seats on the translated lift-rod front end; north face stays 2 off the block.
-HANDLE_TILT_DEG = 65.0  # cross rod from vertical
-HANDLE_Z = (-135.0 + MECHANISM_Z_SHIFT) - (HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T)
-# = ARBOR_Z0 - (hub bore floor station): the blind hub's floor seats on the
-# arbor's flat front tip (asserted below), so the grip station follows the
-# grip length (2026-09: the O23 x 14 drum became a O15 x 9 ball-crowned grip).
-# translated with the p2 arbor. The hub is a blind tubular cap
-# (PR7 item 14): its bore floor at local +9 lands on -99.585, where the
-# steel arbor's flat front tip seats flush (build_pinion_arbor)
+HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
+ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
+# Preserve the released MHA-058 component origin at the head/cross-hole axis.
+# The head is now integral with MHA-102, whose local head centre is z=-6.5.
+HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
+HANDLE_ROWS = rot_z_rows(HANDLE_TILT_DEG)
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -1731,30 +1715,27 @@ if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
 
 # --- full-rotation clearance proofs (PR6) -------------------------------------
-# The interference gate sees only the PARKED pose; the tee handle spins full
+# The interference gate sees only the PARKED pose; the grip crossrod spins full
 # circle during zeroing and the lift rod (pins + lever) sweeps the cam throw.
 # Prove every angle clears the in-assembly neighbours: each sweep is a solid
 # of revolution, so a neighbour is cleared by z-band disjointness or, where
 # bands overlap, by radial clearance from the sweep axis. (Cross-assembly
 # neighbours are parked-gated at the top level; the platen/pen hardware sits
 # at y ~390+, far above both sweeps.)
-# Handle geometry is imported (PR7 img07 re-derivation: arms 42/43, the
-# grip a Ø23 cylinder + domed cap, the hub a blind tube over the arbor).
-# The SWEPT geometry splits in two: the Ø6 cross rod sweeps a R43.5 disc
-# (max(HANDLE_ARM_DOWN, HANDLE_ARM_UP) + 0.5; the long arm's flat-end corner
-# reaches hypot(43, 3) = 43.1)
-# in its own thin band; the grip + cap + tube hub stay ON AXIS (R11.5 worst),
-# only their z reach is wider.
-_TEE_DISC_Z = (
+# The separate Ø6 crossrod sweeps a radius set by its 32/33 mm asymmetric
+# reaches.  Its thin axial band remains centred at the released HANDLE_Z.
+# MHA-102's integral Ø15 head, front crown, and Ø10.5 neck stay on the arbor
+# axis; their wider axial band is the exact former handle-body envelope.
+_GRIP_ROD_Z = (
     HANDLE_Z - HANDLE_ROD_DIA / 2.0,
     HANDLE_Z + HANDLE_ROD_DIA / 2.0,
 )
-_TEE_HUB_Z = (
-    HANDLE_Z - HANDLE_GRIP_LEN / 2.0 - HANDLE_CAP_SAG,
-    HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T + HANDLE_TUBE_LEN,
-)  # -153 .. -125: cap, grip, blind wall, tube seat
-# In-assembly bodies near the tee: everything of the swing rig ends well
-# north of the disc band; the crank cluster lives south/east of it.
+_GRIP_HEAD_Z = (
+    ARBOR_Z0 + ARBOR_HEAD_FRONT_Z - ARBOR_HEAD_CAP_SAG,
+    ARBOR_Z0 + ARBOR_NECK_END_Z,
+)
+# In-assembly bodies near the grip: everything of the swing rig ends well
+# north of the crossrod band; the crank cluster lives south/east of it.
 for _lo, _hi, _what in (
     (
         LEVER_Z - LEVER_HUB_LEN / 2.0 - LEVER_CAP_SAG,
@@ -1768,18 +1749,17 @@ for _lo, _hi, _what in (
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
 ):
-    if _TEE_DISC_Z[1] > _lo - 0.25 and _TEE_DISC_Z[0] < _hi + 0.25:
-        raise AssertionError(f"tee-handle sweep disc band reaches the {_what}")
-# The hub's wider z band DOES clip the T12 plane: radial clearance instead
-# (the grip is on-axis, the wheel is on the crank axis). The crank arm+handle
-# sweep entirely south of the arm hub (-175..) -- z-disjoint from the grip.
+    if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
+        raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
+# The head's wider z band clips the T12 plane, so use radial clearance instead.
+# The crank-arm/handle sweep is axially disjoint from the integral head.
 if (
     math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
-    < HANDLE_GRIP_DIA / 2.0 + 16.0 + 0.25
+    < ARBOR_HEAD_DIA / 2.0 + 16.0 + 0.25
 ):  # T12 OD/2 ~14 + margin
-    raise AssertionError("tee-handle grip reaches the T12 chain wheel")
-if _TEE_HUB_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
-    raise AssertionError("tee-handle grip band reaches the crank arm sweep")
+    raise AssertionError("integral grip head reaches the T12 chain wheel")
+if _GRIP_HEAD_Z[0] < CRANK_ARM_Z0 + ARM_THICKNESS + 0.25:
+    raise AssertionError("integral grip-head band reaches the crank arm sweep")
 
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
@@ -1809,64 +1789,24 @@ if (
     raise AssertionError("lever throw plane reaches the front pivot block")
 if _LEV_Z[1] > PIVOT_SHAFT_Z0 - 0.25:
     raise AssertionError("lever throw plane reaches the pivot shaft front end")
-if _LEV_Z[0] < _TEE_HUB_Z[1] + 0.25:
-    raise AssertionError("lever throw plane reaches the tee-handle sweep")
+if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
+    raise AssertionError("lever throw plane reaches the integral grip head")
 
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
 # bounds the collar + boss sweep against the base, spring foot and shaft.)
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
-# The steel Ø8 arbor replaced the drum's integral stubs: it presses through
-# the drum, journals in both straps' top bores, and its flat front tip seats
-# flush on the tee handle's blind-cap bore floor.
-ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
-if abs((HANDLE_Z + HANDLE_GRIP_LEN / 2.0 + HANDLE_WALL_T) - ARBOR_Z0) > 1e-9:
-    raise AssertionError("arbor front tip off the handle cap's bore floor")
+# The steel Ø8 arbor presses through the drum and journals in both straps'
+# top bores.  Its turned head/neck are integral; MHA-058 is only the separate
+# crossrod, placed at the unchanged head/cross-hole station.
+if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
+    raise AssertionError("grip crossrod is not centred in the integral head")
 if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
-if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
-    raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
-
-# Upper MHA-058 tee-handle retention (distinct from the lower MHA-135 lever
-# pin): one dedicated MHA-136 straight pin, match-drilled through the handle
-# socket and arbor at the socket's reconstructed mid-length.  The handle local
-# +Y axis is rotated by HANDLE_TILT_DEG in machine XY; MHA-136 local +Z lies on
-# that axis, with its centre on the arbor.
-if not (
-    HANDLE_PIN_DIA
-    == HANDLE_RETENTION_PIN_DIA
-    == ARBOR_RETENTION_HOLE_DIA
-):
-    raise AssertionError("handle retention pin/hole diameters disagree")
-if abs(HANDLE_PIN_LEN - HANDLE_RETENTION_PIN_LEN) > 1e-9:
-    raise AssertionError("handle retention pin is not flush with the socket OD")
-if abs(HANDLE_RETENTION_PIN_STATION - ARBOR_RETENTION_PIN_STATION) > 1e-9:
-    raise AssertionError("handle and arbor retention-hole stations disagree")
-if abs(
-    HANDLE_Z + HANDLE_RETENTION_CENTER_Z
-    - (ARBOR_Z0 + ARBOR_RETENTION_PIN_STATION)
-) > 1e-9:
-    raise AssertionError("handle and arbor retention holes are not coaxial")
-_HANDLE_PIN_T = math.radians(HANDLE_TILT_DEG)
-_HANDLE_PIN_U = (-math.sin(_HANDLE_PIN_T), math.cos(_HANDLE_PIN_T), 0.0)
-HANDLE_PIN_CENTER = (
-    APINION_X,
-    APINION_Y,
-    ARBOR_Z0 + ARBOR_RETENTION_PIN_STATION,
-)
-HANDLE_PIN_ORIGIN = [
-    HANDLE_PIN_CENTER[0] - HANDLE_PIN_LEN / 2.0 * _HANDLE_PIN_U[0],
-    HANDLE_PIN_CENTER[1] - HANDLE_PIN_LEN / 2.0 * _HANDLE_PIN_U[1],
-    HANDLE_PIN_CENTER[2],
-]
-_HANDLE_PIN_C = math.cos(_HANDLE_PIN_T)
-_HANDLE_PIN_S = math.sin(_HANDLE_PIN_T)
-HANDLE_PIN_ROWS = [
-    [-_HANDLE_PIN_C, -_HANDLE_PIN_S, 0.0],
-    [0.0, 0.0, 1.0],
-    [-_HANDLE_PIN_S, _HANDLE_PIN_C, 0.0],
-]
-HANDLE_PIN_EULER = euler_from_rows(HANDLE_PIN_ROWS)
+if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
+    raise AssertionError("arbor dia disagrees with drum and strap bores")
+if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA - 0.0125) > 1e-9:
+    raise AssertionError("grip crossrod/head nominal interference changed")
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
@@ -2320,10 +2260,9 @@ async def build(adapter) -> dict[str, str]:
     # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
     # the blocks' raised west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
-    # freed pinion_cam DOF). The tee handle is LOCKED to the arbor in
-    # the joints section (cross-pinned in the real machine) so the freed p2
-    # swing carries it with the rig -- it was base-FIXED while the swing was
-    # pinned, which PR8's freed swing would have left hanging in space
+    # freed pinion_cam DOF). The separate MHA-058 grip crossrod is LOCKED to
+    # MHA-102's integral head in the joints section, so the freed p2 swing
+    # carries it with the rig instead of leaving it base-fixed in space
     # (Codex catch, 2026-07-05).
     align_pinion = await place_component(
         adapter,
@@ -2425,18 +2364,17 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
-    tee_handle = await place_component(
+    grip_crossrod = await place_component(
         adapter,
         "pinion-handle",
         [APINION_X, APINION_Y, HANDLE_Z],
         [0.0, 0.0, HANDLE_TILT_DEG],
-        rot_z_rows(HANDLE_TILT_DEG),  # +z spin tips east (-x)
+        HANDLE_ROWS,  # unchanged +z spin tips the local +Y rod toward machine -X
         ground=False,
-        label="pinion-handle (blind cap over the arbor front end)",
+        label="pinion-handle (separate grip crossrod through integral head)",
     )
-    # The steel arbor (PR7 item 14): pressed through the brass drum, journaled
-    # in both straps' Ø8 top bores -- it RIDES the swing group (mated in the
-    # joints section, not located: the engage swing carries it).
+    # MHA-102 is pressed through the brass drum and journaled in both straps'
+    # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
     pinion_arbor = await place_component(
         adapter,
         "pinion-arbor",
@@ -2444,16 +2382,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
-        label="pinion-arbor (steel, through the drum)",
-    )
-    handle_pin = await place_component(
-        adapter,
-        "pinion-handle-pin",
-        HANDLE_PIN_ORIGIN,
-        HANDLE_PIN_EULER,
-        HANDLE_PIN_ROWS,
-        ground=False,
-        label="pinion-handle-pin (match-reamed flush retention)",
+        label="pinion-arbor (integral steel arbor and grip head)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -3879,24 +3808,14 @@ async def build(adapter) -> dict[str, str]:
         label="pinion arbor anti-spin (pressed in the drum)",
         verify=(pinion_arbor, arb_o),
     )
-    # Tee handle: cross-pinned on the arbor front end (the zeroing crank), so
-    # it is RIGID to the arbor -- a LOCK records the authored relative pose
-    # with no branches and no DOF change, and the freed p2 swing carries the
-    # handle with the rig instead of leaving it base-fixed in space.
+    # The separate grip crossrod is press-fitted in MHA-102's match-reamed
+    # integral head.  A LOCK records that authored relative pose with no
+    # branches or added DOF, so the engage swing carries the complete crank.
     await lock_mate(
         adapter,
-        named_ref(f"Front Plane@{tee_handle}", "PLANE"),
+        named_ref(f"Front Plane@{grip_crossrod}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
-        label="tee handle cross-pinned on the arbor",
-    )
-    # The physical MHA-136 pin now records the separate upper-handle joint.
-    # Locking it to MHA-058 preserves the authored coaxial/flush pose while the
-    # existing handle/arbor lock carries the complete rigid zeroing crank.
-    await lock_mate(
-        adapter,
-        named_ref(f"Front Plane@{handle_pin}", "PLANE"),
-        named_ref(f"Front Plane@{tee_handle}", "PLANE"),
-        label="pinion handle retention pin locked to the upper tee",
+        label="grip crossrod press-fitted in the integral arbor head",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at

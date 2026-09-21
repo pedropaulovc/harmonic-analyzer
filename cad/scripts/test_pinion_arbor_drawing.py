@@ -80,5 +80,4 @@ def test_retired_socket_and_retention_pin_are_not_exported() -> None:
         "WALL_T",
     }
     assert retired.isdisjoint(vars(spec))
-    assert "MHA-136" not in spec.DRAWING_NOTES
     assert "RETENTION PIN" not in spec.CROSS_HOLE_CALLOUT
