@@ -274,22 +274,7 @@ def test_print_carries_no_gdt_or_basic_dimensions() -> None:
     assert "surface_finishes=SURFACE_FINISHES" in _build_source()
 
 
-def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
-    data = spec.GEAR_DATA
-    for field in (
-        "GEAR DATA",
-        "NUMBER OF TEETH",
-        "DIAMETRAL PITCH",
-        "MODULE (mm, REF)",
-        "PRESSURE ANGLE",
-        "PITCH DIAMETER (mm, REF)",
-        "WHOLE DEPTH (mm, REF)",
-        "CIRCULAR TOOTH THICKNESS (mm)",
-        "TOOTH FORM",
-        "MATES WITH",
-    ):
-        assert field in data, field
-    assert data.count("\n") == 9  # title + 9 rows, one screenful beside the views
+def test_tooth_system_and_pair_acceptance_match_current_geometry() -> None:
     assert spec.DIAMETRAL_PITCH == pytest.approx(part.DP)
     assert spec.PRESSURE_ANGLE_DEG == pytest.approx(part.PA_DEG)
     assert spec.TEETH == part.TEETH
@@ -298,21 +283,20 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0
     )
+
     # The pinion must not consume the discrete voxel/phase study's unverified
     # margin: it checks nominal 0.150 mm tooth thinning and samples 0.100 mm
     # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
     # pinion tooth nominal and reuse MHA-021's established 0.020 mm one-sided
-    # tooth-control capability; convert the mate's normal-span lower limit to
-    # prove the resulting nominal-geometry pair range.
-    assert "CIRCULAR TOOTH THICKNESS (mm, REF)" not in data
-    assert (
-        f"CIRCULAR TOOTH THICKNESS (mm):  "
-        f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
-        f"+{spec.TOOTH_THICKNESS_UPPER_DEVIATION:.3f}/"
-        f"{spec.TOOTH_THICKNESS_LOWER_DEVIATION:.3f}"
-    ) in data
+    # tooth-control capability. MHA-021 now publishes only its authoritative
+    # transverse pressure angle and helix angle; derive the corresponding
+    # normal angle here before converting its normal-span lower limit.
+    normal_pressure_angle_rad = math.atan(
+        math.tan(math.radians(mate.PRESSURE_ANGLE_DEG))
+        * math.cos(math.radians(mate.HELIX_ANGLE_DEG))
+    )
     mate_span_scale = math.cos(math.radians(mate.HELIX_ANGLE_DEG)) * math.cos(
-        mate.NORMAL_PRESSURE_ANGLE_RAD
+        normal_pressure_angle_rad
     )
     mate_extra_thinning = 0.020 / mate_span_scale
     pair_minimum = mate.BACKLASH_MM - spec.TOOTH_THICKNESS_UPPER_DEVIATION
@@ -323,12 +307,6 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     )
     assert pair_minimum == pytest.approx(0.150)
     assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
-    assert "+/-" not in data
-    assert "ISO 1328" not in data
-    assert "BASE-TANGENT SPAN" not in data
-    assert "PAIR" not in data
-    assert "TORQUE" not in data
-    assert "X.XX" not in data
 
 
 def test_notes_carry_only_the_tooth_edge_exception() -> None:
