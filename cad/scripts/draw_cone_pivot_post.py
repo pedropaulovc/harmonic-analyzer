@@ -1,17 +1,19 @@
 r"""Create the curated machinist drawing for the v2 cone pivot post.
 
 The SLDPRT remains authoritative.  This recipe places the plan, the front
-elevation, a true-shape cone-journal view and a pictorial isometric, and imports
-exactly the model dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks;
-shared sheet/template, import, curation and export behaviour lives in
-``_drawing_common``.
+elevation, a true-shape cone-journal view, a native axial section and a
+pictorial isometric, and imports exactly the model dimensions
+``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared sheet/template,
+import, curation and export behaviour lives in ``_drawing_common``.
 
 The casting has two axes and they are not parallel: the crank journal runs
 along part +Z and the cone journal is yawed 12.5182 degrees about the vertical
 body axis.  The part therefore persists a named view looking exactly down the
 cone axis.  That view retains the boss end face and shows its Ø17.2 OD and
-Ø12.281 bore as separate true-shape circles; the elevation keeps the crank
-journal, whose own sketch plane is parallel to it.
+Ø12.281 bore as separate true-shape circles.  A native section through the
+same axis shows the raised boss, its tangent relationship to the body OD and
+its axial length in solid-line profile; the elevation keeps the crank journal,
+whose own sketch plane is parallel to it.
 
 Run with SolidWorks open::
 
@@ -36,6 +38,7 @@ from _drawing_common import (
     add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
+    create_section_view,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -95,6 +98,8 @@ FRONT_CENTER = (0.098, 0.112)
 TOP_CENTER = (0.098, 0.209)
 JOURNAL_CENTER = (0.240, 0.168)
 ISO_CENTER = (0.360, 0.150)
+SECTION_CENTER = (0.325, 0.242)
+SECTION_SCALE = (1, 2)
 
 # The checked-in landscape template's FINISH value cell, measured between its
 # authored sheet-format rules.  Its linked INote extent is checked natively
@@ -123,6 +128,22 @@ def _top_y(model_z: float) -> float:
     # The *Top orientation looks down -Y: model +Z runs DOWN the sheet.
     return TOP_CENTER[1] + (_TOP_Z_CENTER - model_z) * _S
 
+# The A-A cutting plane contains the post axis and the inclined cone-journal
+# axis.  Its trace spans the whole Ø44 top silhouette, so SolidWorks creates a
+# complete native section rather than an open/partial cut.
+_CONE_SECTION_HALF_SPAN_MM = 25.0
+_CONE_AXIS_RAD = math.radians(INCLINE_DEG)
+CONE_SECTION_LINE = (
+    (
+        _top_x(-_CONE_SECTION_HALF_SPAN_MM * math.sin(_CONE_AXIS_RAD)),
+        _top_y(-_CONE_SECTION_HALF_SPAN_MM * math.cos(_CONE_AXIS_RAD)),
+    ),
+    (
+        _top_x(_CONE_SECTION_HALF_SPAN_MM * math.sin(_CONE_AXIS_RAD)),
+        _top_y(_CONE_SECTION_HALF_SPAN_MM * math.cos(_CONE_AXIS_RAD)),
+    ),
+)
+
 
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
@@ -135,11 +156,13 @@ FRONT_KEEP = {
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "ConeBossLen": (0.1266, 0.2167),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.136, _top_y(28.0)),
+}
+SECTION_KEEP = {
+    "ConeBossLen": (SECTION_CENTER[0], 0.212),
 }
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
@@ -652,10 +675,20 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(1, 1),
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=CONE_SECTION_LINE[0],
+        line_end=CONE_SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=SECTION_SCALE,
+        label="cone boss axial profile",
+    )
     # The named journal view looks exactly down the inclined model axis.  Unlike
-    # the former full section, it retains the boss end face, so its Ø17.2 OD and
+    # the axial section, it retains the boss end face, so its Ø17.2 OD and
     # Ø12.281 bore are two visible concentric circles with unambiguous leaders.
-    for view in (front, top, journal):
+    for view in (front, top, journal, section):
         set_hidden_lines_removed(adapter, view)
     _assert_view_geometry(
         adapter,
@@ -687,7 +720,19 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="cone journal",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *top_annotations, *journal_annotations]
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="cone boss axial section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [
+        *front_annotations,
+        *top_annotations,
+        *journal_annotations,
+        *section_annotations,
+    ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
@@ -697,15 +742,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     offset_dimension_text(
         adapter,
-        top_annotations,
-        {"ConeBossLen": (0.158, 0.220)},
-    )
-    offset_dimension_text(
-        adapter,
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
-    for view in (front, top, journal, iso):
+    for view in (front, top, journal, section, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
