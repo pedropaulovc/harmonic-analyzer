@@ -40,7 +40,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 2},
-    "Shaft": {"Depth": 2},
+    "Shaft": {"Depth": 1},
     "BackCapProfile": {"CapSagDim": 1},
     "RetentionHoleProfile": {
         "RetentionHoleDia": 1,

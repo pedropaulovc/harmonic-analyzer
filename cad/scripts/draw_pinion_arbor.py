@@ -65,25 +65,25 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 OVERALL_LEN = SHAFT_LEN + CAP_SAG
-PRINCIPAL_CENTER = (0.205, 0.205)
+PRINCIPAL_CENTER = (0.205, 0.180)
 ISO_CENTER = (0.355, 0.115)
 
 # ShaftDia is authored in the end-profile sketch, so a temporary end view
 # donates that native dimension to the sole longitudinal manufacturing view.
 DONOR_KEEP = {"ShaftDia": (0.030, 0.220)}
 PRINCIPAL_KEEP = {
-    "Depth": (PRINCIPAL_CENTER[0], 0.180),
+    "Depth": (PRINCIPAL_CENTER[0], PRINCIPAL_CENTER[1] - 0.025),
     "CapSagDim": (
         PRINCIPAL_CENTER[0] - OVERALL_LEN / 2000.0 - 0.020,
-        0.228,
+        PRINCIPAL_CENTER[1] + 0.035,
     ),
-    "RetentionHoleDia": (0.344, 0.246),
-    "RetentionPinStation": (0.310, 0.232),
+    "RetentionHoleDia": (0.344, PRINCIPAL_CENTER[1] + 0.055),
+    "RetentionPinStation": (0.330, PRINCIPAL_CENTER[1] - 0.030),
 }
-SHAFT_DIAMETER_XY = (PRINCIPAL_CENTER[0] + 0.070, 0.225)
+SHAFT_DIAMETER_XY = (PRINCIPAL_CENTER[0] + 0.055, PRINCIPAL_CENTER[1] + 0.025)
 SHAFT_FLANK_Y = PRINCIPAL_CENTER[1] + SHAFT_DIA / 2000.0
 DIMENSION_CALLOUTS = {
-    "CapSagDim": f"SR{CAP_R:.2f} CROWN",
+    "CapSagDim": f"SR{CAP_R:.1f} CROWN",
     "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
 }
 
@@ -207,7 +207,11 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [shaft_diameter, *principal_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"RetentionHoleDia"})
+    set_reference_dimensions(
+        adapter,
+        annotations,
+        {"CapSagDim", "RetentionHoleDia", "RetentionPinStation"},
+    )
 
     if not auto_center_marks(adapter, principal, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to retention-hole view")
@@ -221,7 +225,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         principal,
         edge_xy=(PRINCIPAL_CENTER[0] + 0.040, SHAFT_FLANK_Y),
-        symbol_xy=(PRINCIPAL_CENTER[0] + 0.040, 0.222),
+        symbol_xy=(PRINCIPAL_CENTER[0] + 0.075, PRINCIPAL_CENTER[1] + 0.050),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",
         entity_type="SILHOUETTE",
