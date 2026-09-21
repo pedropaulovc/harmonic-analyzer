@@ -36,6 +36,8 @@ run here.
 from __future__ import annotations
 
 import argparse
+import copy
+import functools
 import getopt
 import json
 import os
@@ -46,6 +48,7 @@ from pathlib import Path, PurePosixPath
 
 from doit.cmd_base import get_loader
 from doit.cmdparse import CmdParseError
+from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -85,7 +88,7 @@ doit's own help follows. `build.py help run` shows the run options (-n, -a,
 
 
 class FarmPreflightError(Exception):
-    """Why a farm run must stop before doit starts; printed as ``farm: <reason>``."""
+    """Why a farm run must stop before task actions; printed as ``farm: <reason>``."""
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -137,26 +140,84 @@ def main(argv: Sequence[str] | None = None) -> int:
         return DoitMain().run(["--help"])
     if options.verbosity is not None:
         os.environ["HARMONIC_VERBOSITY"] = options.verbosity
-    doit = DoitMain()
     if options.leaf_timeout is not None:
         os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
+    # dodo reads the executor while loading the graph; an explicit
+    # --executor must win over an inherited HARMONIC_EXECUTOR.
+    os.environ["HARMONIC_EXECUTOR"] = options.executor
+
+    doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
     if options.executor == "farm":
         executing = _executing_command(doit_args, doit)
         if executing is not None:
-            try:
-                _farm_preflight()
-            except FarmPreflightError as problem:
-                print(f"farm: {problem}", file=sys.stderr)
-                return 2
-            print(
-                "farm: every SolidWorks task runs on the farm (parts, assemblies, "
-                "drawings, verify:*, preflight, export, package:release)"
-            )
             doit_args = _with_farm_parallelism(doit_args, *executing)
-    # dodo reads the executor from the environment; an explicit --executor must
-    # win over an inherited HARMONIC_EXECUTOR.
-    os.environ["HARMONIC_EXECUTOR"] = options.executor
     return doit.run(doit_args)
+
+
+def _isolated_tasks(task_list):
+    """Shallow task copies safe for doit's mutating native selection pass."""
+    isolated = []
+    for task in task_list:
+        task_copy = copy.copy(task)
+        task_copy.task_dep = task.task_dep.copy()
+        if task.loader:
+            task_copy.loader = copy.copy(task.loader)
+            task_copy.loader.regex_groups = task.loader.regex_groups.copy()
+        isolated.append(task_copy)
+    return isolated
+
+
+def _validate_farm_selection(
+    task_list, selection, *, auto_delayed_regex: bool = False
+) -> None:
+    """Parse farm selections exactly as doit will, without consuming real tasks."""
+    control = TaskControl(
+        _isolated_tasks(task_list), auto_delayed_regex=auto_delayed_regex
+    )
+    control.process(selection)
+
+
+def _farm_command(command_class):
+    """Wrap one native task-executing command at its loaded-graph boundary."""
+
+    class FarmCommand(command_class):
+        name = command_class.get_name()
+
+        @functools.wraps(command_class._execute)
+        def _execute(self, *args, **kwargs):
+            try:
+                _validate_farm_selection(
+                    self.task_list,
+                    self.sel_tasks,
+                    auto_delayed_regex=kwargs.get("auto_delayed_regex", False),
+                )
+                _farm_preflight()
+                print(
+                    "farm: every SolidWorks task runs on the farm (parts, "
+                    "assemblies, drawings, verify:*, preflight, export, "
+                    "package:release)"
+                )
+            except BaseException as problem:
+                self.dep_manager.close()
+                if isinstance(problem, FarmPreflightError):
+                    print(f"farm: {problem}", file=sys.stderr)
+                    return 2
+                raise
+            return command_class._execute(self, *args, **kwargs)
+
+    return FarmCommand
+
+
+class _FarmDoitMain(DoitMain):
+    """Doit with preflight wrappers around native action-executing commands."""
+
+    def get_cmds(self):
+        commands = super().get_cmds()
+        for name in commands:
+            command_class = commands.get_plugin(name)
+            if getattr(command_class, "execute_tasks", False):
+                commands[name] = _farm_command(command_class)
+        return commands
 
 
 def _git(*args: str) -> str:

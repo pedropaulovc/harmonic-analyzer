@@ -224,6 +224,12 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         ),
         identity=request.submitter,
     )
+    _telemetry.info(
+        f"Farm workflow requested: {wf_id}",
+        workflow_id=wf_id,
+        task=request.task,
+        commit=request.commit,
+    )
     handle = await client.start_workflow(
         WORKFLOW_BUILD_LEAF,
         request,
@@ -232,6 +238,18 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         result_type=LeafResult,
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         execution_timeout=EXECUTION_TIMEOUT,
+    )
+    _telemetry.info(
+        f"Farm workflow attached: {wf_id}",
+        workflow_id=wf_id,
+        task=request.task,
+        commit=request.commit,
+    )
+    _telemetry.event(
+        "farm.attached",
+        workflow_id=wf_id,
+        task=request.task,
+        commit=request.commit,
     )
     try:
         return await handle.result()

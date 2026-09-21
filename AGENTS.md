@@ -204,6 +204,29 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 SolidWorks seat — either open on this machine (`--executor local`) or on the build
 farm (`--executor farm`, which is how a seatless machine runs them).
 
+**An agent-driven farm build runs under the supervised launcher, never under a
+harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
+is the only sanctioned way for an agent to submit `--executor farm` work; the
+full contract, parameters, run records and recovery procedure live in
+[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Four rules bind every
+such build:
+
+- No finite local timer. A cold leaf has measured 61.5 min and a full closure
+  runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
+  build and leaves the remote workflow running.
+- Task names use underscores (`part:pen_rod`). An unknown or dashed target is
+  refused with doit's invalid-command exit 3, naming the target, before any
+  fleet query or workflow submission; a failed farm preflight exits 2. Neither
+  runs an action.
+- Prove one real remote leaf on the launcher, protocol and pool configuration
+  you are about to use before fanning parallel agents out over the farm. A green
+  `check:math` is local-only and a submitter cache hit dispatches nothing;
+  neither is evidence of dispatch.
+- Hand off the recorded run — launcher path, hub name, run/log/`.done` paths,
+  worktree, pushed HEAD, pool, exact targets and leaf budget — rather than
+  letting a successor recreate the command. A missing `.done` means the local
+  outcome is unknown, never that the remote work was cancelled.
+
 ## Task groups — the prefix tells you if SolidWorks is needed
 
 | group | needs SolidWorks | takes the COM seat lock | farm-dispatchable |

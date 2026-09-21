@@ -7,8 +7,10 @@ SolidWorks-touching task runs on the farm
 
 Read the surrounding rules once, not here: task groups and the seat contract in
 [`../../AGENTS.md`](../../AGENTS.md) ("Task groups", "The COM seat lock", "COM
-watchdog"), cache roles and miss-debugging in
-[`../../DEVELOPING.md`](../../DEVELOPING.md), the doit entry points in
+watchdog"), cache roles, miss-debugging and the supervised farm-launch contract
+in [`../../DEVELOPING.md`](../../DEVELOPING.md)
+("[Supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)"),
+the doit entry points in
 [`BUILDING.md`](BUILDING.md), and drawing-specific session hygiene in
 [`solidworks-drawing-layout-tuning.md`](solidworks-drawing-layout-tuning.md)
 ("Synchronous builds and session hygiene"). This file only covers the
@@ -40,13 +42,28 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
 
 ### Route A — dispatch an existing task
 
+Those forms are the **attended-terminal** shape: you watch the console to the
+end. An agent must not dispatch that way — a farm build outlives any tool
+deadline — so agent-driven submissions go through `scripts/farm-run.ps1` under
+a persistent `hub` process
+([supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)). It
+runs the same `build.py` invocation and records the run so a successor can pick
+it up instead of re-inventing a command.
+
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
 .\build.cmd part:cone_gear            # one leaf on the farm
 .\build.cmd --leaf-timeout 90 build   # whole closure, 90 min per attempt
 ```
 
-`build.py`'s farm preflight (`_farm_preflight`) refuses to start unless:
+Nothing reaches the fleet until the requested task names are known-good.
+`build.py` loads the doit graph, resolves your selection against it, and exits
+3 naming the offending target when a name is unknown — dashed spellings such as
+`part:arbor-pedestal` included, because it never normalizes a dash into an
+underscore. No fleet query, no workflow and no action happen on that path.
+
+Then, once per run and still before the first action, `build.py`'s farm
+preflight (`_farm_preflight`) refuses to start unless:
 
 - the local project inputs are clean, **including submodules** (`git status
   --porcelain=v1 --untracked-files=all` plus `git submodule status
@@ -56,6 +73,9 @@ a `solidworks-pool` operation, not a harmonic-analyzer one. Its invariants
   hands results back **through the cache**, so `off` cannot work;
 - `farm.py agents --json` reports farm protocol 4 and no known worker reports
   an incompatible or unreadable protocol.
+
+A preflight failure prints `farm: <reason>` and exits 2, also before any action
+runs.
 
 The preflight stamps only the committed local `HEAD`; it does not fetch or
 update a shared `origin/*` ref and does not publish source files. Each worker
@@ -107,8 +127,9 @@ throw away afterwards. Non-negotiable shape:
 4. **Produce something cacheable.** A verdict-only task passes `stamp=` and
    that stamp IS the cached artefact. A leaf that stores nothing under its key
    fails `cache_missing` even when the COM work succeeded.
-5. Commit, push the commit to the approved repository, dispatch
-   (`./build <your:task>`), then delete the branch. A fixup means a new commit;
+5. Commit, push the commit to the approved repository, dispatch it the same way
+   as route A (`./build <your:task>` at an attended terminal, the supervised
+   launcher from an agent), then delete the branch. A fixup means a new commit;
    every worker fetches exactly the SHA the new leaf request names.
 
 ## 2. Invariants an ad-hoc COM operation must not break
@@ -215,6 +236,23 @@ characters of the requested commit). From the pool checkout:
 uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status "leaf:part:cone_gear:<64hex>:900s"
 uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs   "leaf:part:cone_gear:<64hex>:900s"
 ```
+
+The submitter logs each ID twice: `Farm workflow requested: <id>` immediately
+before the start call, and `Farm workflow attached: <id>` once the server has
+acknowledged it. A requested ID with no attached line marks the window in which
+the server may already own the workflow while the submitter died, and it is the
+only case where retrying the identical invocation is safe — after an
+authenticated `NOT_FOUND`, never after an authentication, network or CLI
+failure. Follow a leaf that is still running with `farm.py logs "<id>"
+--follow`, and add `--json` to `status` when you want to read the verdict
+programmatically.
+
+Stopping a local submitter cancels nothing: leaves share their workflow by ID
+(`USE_EXISTING`), so only `farm.py cancel` cancels. Recovering an interrupted
+run therefore means querying *every* requested and attached ID in that run's
+log, not one representative leaf, with the worktree, HEAD, targets and leaf
+budget unchanged — the budget is part of the workflow ID. The full procedure is
+in [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs
 `log_blob`, and the worker only publishes one once it has actually run the

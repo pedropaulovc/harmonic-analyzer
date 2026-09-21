@@ -1,13 +1,225 @@
 # Developing — local workflow notes
 
 Practical, machine-local development notes that don't belong in `AGENTS.md`
-(orientation) or the per-topic policy docs. Right now: the remote build cache.
+(orientation) or the per-topic policy docs. Right now: supervised farm launches
+and the remote build cache.
 
 Running ONE SolidWorks operation by hand (this checkout has no local seat, so it
 goes to the farm)? Read
 [`cad/docs/one-off-com-operations.md`](cad/docs/one-off-com-operations.md) first
 — it is the decision tree, the seat/cache invariants and the evidence trail for
 an ad-hoc COM operation, and it links back here for cache detail.
+
+## Supervised farm launches
+
+A farm build outlives every agent turn and every harness deadline: a cold
+`build` closure runs for hours, and one leaf alone has measured 61.5 min. So an
+agent never runs `build.py --executor farm` under a Bash job, a 300 s tool
+deadline or any other finite local timer. It starts the tracked launcher
+[`scripts/farm-run.ps1`](scripts/farm-run.ps1) under a persistent `hub`
+process and hands the recorded run to whoever comes next. An attended terminal
+may still run `build.py` directly; everything below is the contract for an
+agent-driven launch.
+
+The launcher is a foreground runner, not a second scheduler: it validates its
+inputs, writes a startup record, runs exactly one `uv run … build.py` child,
+tees its output to a log outside the worktree, and writes a terminal record
+carrying the child's own exit code. It never retries, never cancels a remote
+workflow, never detaches and never imposes a local deadline. Cancelling a farm
+workflow is always a separate, explicit `farm.py cancel`.
+
+### Prerequisites
+
+- **PowerShell 7.3 or newer** (`#requires -Version 7.3`). The launcher clears
+  `$PSNativeCommandUseErrorActionPreference` for itself so a caller's preference
+  cannot turn a native exit 23 into a PowerShell exception.
+- **The worktree's HEAD is pushed.** Every leaf fetches that exact SHA from the
+  approved repository, so the launcher refuses a HEAD that no locally known
+  `origin/*` ref reaches: `HEAD is not known on origin; fetch and push before
+  launching`. Fetch and push first; the launcher does neither for you.
+- **A clean worktree.** `build.py`'s farm preflight refuses dirty project inputs
+  or dirty initialized submodules.
+- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
+  Azure credentials for the cache (`az login`; `off` is refused).
+- **A log directory outside the worktree.** Run records and logs must never land
+  in the tree whose cleanliness preflight checks.
+
+### Parameters
+
+| parameter | required | meaning |
+|---|:---:|---|
+| `-Worktree` | yes | absolute path to the checkout that supplies `build.py` and the environment; the build runs from here |
+| `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
+| `-LogDirectory` | yes | absolute path for the log and the run records; created if missing, and rejected if it resolves inside `-Worktree` |
+| `-Targets` | yes | doit task names; repeat the parameter or comma-separate them (`part:pen_rod,part:cone_gear`) |
+| `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
+| `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
+
+Targets are *selections*, not variables. The launcher trims each comma-separated
+component and rejects an empty set, an empty component, a token starting with
+`-`, and a token containing `=`. That last rule matters: doit removes a
+`name=value` argument as a command-line variable, so a mistyped target would
+leave no selection at all and silently launch the full default build. Task names
+use underscores (`part:pen_rod`), never dashes — a dashed name is rejected by
+`build.py` before the fleet is contacted.
+
+The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw` and
+`PYTHONUNBUFFERED=1`, then runs, from the worktree:
+
+```
+uv run --frozen python build.py --executor farm --leaf-timeout <minutes> \
+  --verbosity info -n 4 --continue <targets...>
+```
+
+`-n 4` is the submitter's own concurrency and `--continue` collects later
+failures instead of stopping at the first; any failed task still leaves the run
+nonzero.
+
+### Starting one under the supervisor
+
+Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
+the run survive the launching agent's turn and a session handoff; `detached`
+would lose live monitoring, so it is not used.
+
+```jsonc
+{
+  "op": "start",
+  "name": "farm-pen-rod-smoke",            // unique; record it in the brief
+  "application": "pwsh.exe",
+  "args": [
+    "-NoProfile", "-NonInteractive",
+    "-File", "C:/src/harmonic-analyzer/scripts/farm-run.ps1",
+    "-Worktree", "C:/src/harmonic-smoke",
+    "-PoolHome", "C:/src/solidworks-pool",
+    "-LogDirectory", "C:/src/dt-logs/farm-runs",
+    "-Targets", "part:pen_rod",
+    "-LeafTimeout", "90",
+    "-Tag", "smoke"
+  ],
+  "pty": false,
+  "persist": true,
+  "progress": "wake",
+  "ready": { "log": "farm-launch started", "timeout": 120 }
+}
+```
+
+The full closure is the same call with `"-Targets", "build"` and
+`"-Tag", "full-build"`. To hand off, pass the hub name and the record paths on;
+do not `hub stop` a live launcher to quiet the console — retune it with
+`op: "monitor"`, `progress: "ambient"` or `"off"`.
+
+### The two records
+
+Before the child starts, the launcher prints its readiness line and writes
+`<run-id>.run.json`:
+
+```
+farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\dt-logs\farm-runs\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.run.json
+```
+
+```json
+{
+  "run_id": "20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516",
+  "state": "running",
+  "worktree": "C:\\src\\harmonic-smoke",
+  "pool_home": "C:\\src\\solidworks-pool",
+  "commit": "4101ff0fa54988a9f1464a9a0c5833b79a918975",
+  "targets": ["part:pen_rod"],
+  "leaf_timeout_minutes": 90,
+  "started_at": "2026-09-20T17:30:11.4820000Z",
+  "pid": 24680,
+  "log": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.log",
+  "done": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.done",
+  "cache_environment": {
+    "HARMONIC_CACHE_ACCOUNT": null,
+    "HARMONIC_CACHE_CONTAINER": null,
+    "HARMONIC_CACHE_SALT": null
+  },
+  "tag": "smoke",
+  "argv": ["uv", "run", "--frozen", "python", "build.py", "--executor", "farm",
+           "--leaf-timeout", "90", "--verbosity", "info", "-n", "4",
+           "--continue", "part:pen_rod"]
+}
+```
+
+Validation failures happen *before* that record: they print a diagnostic and
+exit nonzero without claiming a build started. Once the startup record exists,
+every catchable outcome writes `<run-id>.done`, which repeats every field above
+and adds the result (the launcher also echoes the finished record to stdout as
+one compressed JSON line):
+
+```json
+{
+  "run_id": "20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516",
+  "state": "succeeded",
+  "...": "the identity fields from the startup record, unchanged",
+  "exit_code": 0,
+  "elapsed_s": 1487.216,
+  "finished_at": "2026-09-20T17:54:58.6980000Z"
+}
+```
+
+Only exit 0 is `succeeded`; a wrapper exception is `failed` with exit 1 and its
+diagnostic in the log. A run ID is
+`yyyyMMddTHHmmssfffZ-<32 lowercase hex GUID characters>`, so it is
+collision-resistant, and the launcher never overwrites an existing record, log
+or marker: the three files for one run are `<run-id>.run.json`, `<run-id>.log`
+and `<run-id>.done`, with `-Tag` recorded inside them rather than in their
+names.
+
+`cache_environment` is in the record because `HARMONIC_CACHE_ACCOUNT`,
+`HARMONIC_CACHE_CONTAINER` and `HARMONIC_CACHE_SALT` move cache keys and
+workflow identity. An unchanged Git commit does not by itself mean an unchanged
+key; compare these before reusing or resuming a run.
+
+### Readiness is not proof of a build
+
+`farm-launch started` means the supervisor is up and the child was spawned. It
+says nothing about the farm. Neither does a green `check:math` (a local,
+SolidWorks-free gate that never contacts the fleet) nor a submitter cache hit (a
+restored blob, with no leaf dispatched). A launch is proven remote only by all
+of: a `.done` with `state: "succeeded"` and `exit_code: 0`, an attached workflow
+ID in the log, a completed `farm.run <task>` span naming a real worker, a
+cache-miss followed by a restored artifact, and the artifact plus its
+`.execution` token on disk.
+
+### Recovering a run across a handoff
+
+Read the records first, in this order:
+
+1. **The supervisor is alive** (`hub ps` shows the name). Attach and monitor it.
+   Do not start a second submitter for the same work.
+2. **`.done` exists.** That is the outcome. `succeeded` with exit 0 is a finished
+   run; anything else is a finished failure to diagnose from the log.
+3. **The supervisor is gone and there is no `.done`.** The local outcome is
+   *unknown*. It is not a cancellation, and it is not permission to relaunch.
+   The remote work is very likely still running: `_farm.run_leaf` shares
+   workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
+   anything.
+
+In case 3, harvest every workflow ID the log recorded — both
+`Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
+*all* leaves, not one representative — and query each from the pool checkout:
+
+```powershell
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status "<workflow-id>" --json
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py logs   "<workflow-id>" --follow
+```
+
+Follow a RUNNING workflow under a supervised monitor until it is terminal, then
+finish the bookkeeping with the *unchanged* worktree, HEAD, targets and leaf
+budget. The leaf budget is part of the workflow ID, so changing it during
+recovery creates a different workflow instead of rejoining the one already
+running. Never cancel a shared workflow automatically.
+
+Relaunching the unchanged invocation is allowed in exactly one case: an
+authenticated `NOT_FOUND` for an ID that was *requested* but never *attached*.
+That pair of log lines exists precisely for the window between server acceptance
+and the submitter's acknowledgement. Everything else stays unresolved and blocks
+an automatic relaunch: `NOT_FOUND` for an attached ID, a missing or unreadable
+identifier, a changed worktree or cache environment, or a `status` call that
+failed on authentication, network or CLI error. An auth or network failure is
+never a `NOT_FOUND`.
 
 ## Remote build-artifact cache
 
