@@ -31,9 +31,14 @@ def test_required_drawing_paths_and_registry() -> None:
 def test_every_marked_model_dimension_has_one_view_and_native_precision() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.TOP_KEEP) | set(drawing.SECTION_KEEP)
+    view_sets = (
+        set(drawing.PROFILE_KEEP),
+        set(drawing.FEATURE_KEEP),
+        set(drawing.SECTION_KEEP),
+    )
+    kept = set().union(*view_sets)
     assert kept == marked
-    assert not set(drawing.TOP_KEEP) & set(drawing.SECTION_KEEP)
+    assert sum(len(names) for names in view_sets) == len(kept)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
 
@@ -123,11 +128,12 @@ def test_sheet_has_no_gdt_or_dimension_bearing_notes() -> None:
 
 def test_pivot_section_exposes_thickness_and_relief_depth() -> None:
     assert drawing.SECTION_KEEP == {
-        "PlateThk": (0.300, 0.075),
-        "PivotBearingReliefDepth": (0.365, 0.105),
+        "PlateThk": (0.285, 0.105),
+        "PivotBearingReliefDepth": (0.365, 0.125),
     }
+    assert drawing.PROFILE_CENTER != drawing.FEATURE_CENTER
     assert spec.SECTION_VIEW_NOTE == "SECTION A-A SCALE 1:2"
-    assert spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
+    assert spec.PLAN_VIEW_NOTE == "PLAN VIEWS SCALE 1:2"
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert drawing.SHEET_SCALE == (1.0, 3.0)
 
