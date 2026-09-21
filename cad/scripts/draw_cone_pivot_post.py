@@ -130,12 +130,12 @@ FRONT_KEEP = {
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.132, _front_y(CRANK_BORE_HEIGHT)),
     "HeadDia": (FRONT_CENTER[0], 0.170),
-    "CrankBossDia": (0.158, _front_y(BLOCK_HEIGHT + 2.0)),
+    "CrankBossDia": (0.161, 0.148),
     "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "ConeBossLen": (0.125, 0.226),
+    "ConeBossLen": (0.1266, 0.2167),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
@@ -152,11 +152,11 @@ JOURNAL_KEEP = {
 # as-cast collar the shop has to know that face is machined back to a station,
 # not left as cast.
 DIMENSION_CALLOUTS = {
-    "CrankBossDia": "CRANK BOSS - FULL-FACE SPOT FACE",
+    "CrankBossDia": "CRANK BOSS\nFULL-FACE SPOT FACE",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS",
-    "ConeBossLen": "CONE BOSS TOTAL - SYMMETRIC",
+    "ConeBossLen": "CONE BOSS TOTAL\nMIDPLANE",
     "CrankBossStartZ": "TO BOSS SPOT FACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
