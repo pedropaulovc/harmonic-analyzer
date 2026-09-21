@@ -46,24 +46,24 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
-from _part_pmi import author_part_pmi
+
 from pinion_arbor_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    DRAWING_PRECISION,
+    RETENTION_HOLE_DIA,
+    RETENTION_PIN_STATION,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
-    SURFACE_FINISHES,
 )
 
 PART_NAME = "pinion-arbor"
@@ -81,6 +81,8 @@ MATERIAL = "Plain Carbon Steel"  # bright steel (p.67; item 14)
 SHAFT_R = SHAFT_DIA / 2.0
 CAP_R = (SHAFT_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 7.27
 V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 31.1
+RETENTION_HOLE_R = RETENTION_HOLE_DIA / 2.0
+V_RETENTION_HOLE = math.pi * RETENTION_HOLE_R**2 * SHAFT_DIA
 V_SHAFT = math.pi * SHAFT_R**2 * SHAFT_LEN
 
 
@@ -94,6 +96,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLen", f"{SHAFT_LEN}mm")
     await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
+    await set_global(adapter, "RetentionHoleDia", f"{RETENTION_HOLE_DIA}mm")
+    await set_global(
+        adapter, "RetentionPinStation", f"{RETENTION_PIN_STATION}mm"
+    )
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -122,6 +128,39 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLen"')]
     volume = await volume_check(adapter, "shaft", V_SHAFT, 0.005 * V_SHAFT)
+
+    # Photo-derived Ø2 handle-to-arbor retention hole, match-drilled at the
+    # socket's mid-length.  Top-plane local v is model -Z, so the arbor's
+    # +5.0 station is authored at sketch v=-5.0.
+    retention = SketchDims()
+    check("create_sketch retention hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        0.0,
+        -RETENTION_PIN_STATION,
+        RETENTION_HOLE_R,
+        "retention hole",
+        dims=retention,
+        names=("RetentionHoleCx", "RetentionPinStation", "RetentionHoleDia"),
+        drives=(None, '-"RetentionPinStation"', '"RetentionHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "retention-hole sketch")
+    check("exit_sketch retention hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RetentionHoleProfile")
+    drive_jobs += retention.apply(adapter, "RetentionHoleProfile")
+    check(
+        "cut retention hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SHAFT_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RetentionHole")
+    volume = await volume_check(
+        adapter,
+        "retention hole",
+        V_SHAFT - V_RETENTION_HOLE,
+        0.02 * V_RETENTION_HOLE,
+    )
 
     # Back-end crown (the pivot-shaft cap idiom; apex -> rim is the minor CCW
     # lobe at a +Z end).
@@ -214,20 +253,12 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-        },
+        {"Manufacturing Notes": DRAWING_NOTES},
     )
     return await save_part_and_images(adapter, PART_NAME)
 

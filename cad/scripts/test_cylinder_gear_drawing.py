@@ -10,7 +10,9 @@ import pytest
 
 import _config
 from _buildgraph import module_deps_of
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from build_cone_gear import gear_facts
+import build_cylinder_gear as part
 import cylinder_gear_shaft_spec as arbor
 import cylinder_gear_spec as spec
 import draw_cylinder_gear as drawing
@@ -60,7 +62,29 @@ def test_every_marked_dimension_has_exactly_one_view_owner() -> None:
     )
     assert ownership == Counter(marked)
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    assert set(drawing.DIMENSION_PRECISION) <= marked
+
+
+def test_the_part_owns_every_printed_decimal_place() -> None:
+    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+
+    Three places only where a three-place band rides the dimension (the
+    matched bore's reference nominal, the cam eccentricity); the overall is
+    the one sheet-derived value, a parenthesised reference.
+    """
+    by_name = spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert {name for name, places in by_name.items() if places == 3} == {
+        "BoreDia",
+        "CamCy",
+    }
+    assert spec.DRAWING_REFERENCE_PRECISION == {"overall axial thickness": 1}
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The sheet reads the places back and never rewrites them.
+    assert "set_dimension_precision" not in source
+    assert "assert_imported_precision(" in source
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
 @pytest.mark.parametrize(

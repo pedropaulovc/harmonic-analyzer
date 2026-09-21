@@ -16,8 +16,10 @@ to paper-right in the principal and top views.
 The print is deliberately plain (cad/docs/drawing-simplicity-policy.md): the
 arm is a pinned hand-crank lever, so it carries no datums, no feature-control
 frames, no roughness symbols and no basic dimensions -- the title block's
-general tolerances govern everything except the reamed bore, whose fit band
-rides the model dimension.
+general tolerances govern everything.  Every printed value is a model
+dimension imported with the part's own decimal places (rule 2); the hole
+stations the Hole Wizard cannot measure from a feature come from the part's
+hidden ``StationReference`` / ``PinStationReference`` sketches.
 
 Run with SolidWorks open::
 
@@ -38,31 +40,36 @@ from _drawing_common import (
     add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
-    find_edge_near,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
+    set_hole_callout_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
-    set_arc_endpoints_to_center,
     set_arc_endpoints_to_max,
     set_reference_dimension,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from crank_arm_spec import (
+    ANCHOR_HOLE_SPEC,
+    ANCHOR_SCREW_X,
+    ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
-    ARM_THICKNESS,
     DIMPLE_X,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     PIN_HOLE_SPEC,
-    SHAFT_BORE_DIA,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -103,25 +110,298 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + (model_x_mm - bbox_center) * SHEET_SCALE[0] / 1000.0
 
 
+def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
+    """Give the one SHEET-derived dimension its PART-authored decimal places.
+
+    Every controlling dimension on this print is a model dimension whose
+    places the part authored and ``assert_imported_precision`` reads back.
+    The parenthesised overall (boss extreme to arm end) is the single
+    exception: a read-only sum with no model dimension to import, so its
+    places come from the spec's ``DRAWING_REFERENCE_PRECISION`` -- never a
+    literal typed here.  ``SetPrecision3`` reports rejection through its
+    return status rather than by raising, so the side effect is read back.
+    """
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display = _early_bound(display, "IDisplayDimension")
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places.  The subscript is written out again because
+    # _drawing_contract only accepts a spec lookup here.
+    adapter._attempt(
+        lambda: display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    )
+    applied = adapter._attempt(display.GetPrimaryPrecision2)
+    if applied != places:
+        raise RuntimeError(
+            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
+        )
+
+
+def _add_arm_centerline(adapter: Any, view: Any) -> None:
+    """Draw the arm's longitudinal centreline between its two long edges.
+
+    The shaft bore, the fiducial dimple and the handle-pivot hole all sit on
+    the arm's mid-width axis and no cross-width location dimension exists to
+    say so; the drawn centreline through their centre marks is the ASME way
+    to state it.  Both picks land on the straight edge run between the
+    dimple and the pivot, clear of every hole.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the front view for its centreline")
+    draw.ClearSelection2(True)
+    x = _sheet_x((DIMPLE_X + ARM_C2C) / 2.0)
+    for index, side in enumerate((-1.0, 1.0)):
+        y = FRONT_CENTER[1] + side * HALF_WIDTH * SHEET_SCALE[0] / 1000.0
+        if not draw.Extension.SelectByID2(
+            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
+        ):
+            raise RuntimeError("failed to select an arm long edge for its centreline")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError("failed to insert the arm centreline between its edges")
+    count = int(_early_bound(view, "IView").GetCenterLineCount())
+    if count != 1:
+        raise RuntimeError(f"front view carries {count} centrelines, expected 1")
+
+def _circle_geometry(edge: Any) -> tuple[float, ...] | None:
+    """Return one model edge's circle parameters, or ``None`` for other curves."""
+    curve = _early_bound(edge.GetCurve(), "ICurve")
+    if not bool(curve.IsCircle()):
+        return None
+    params = list(curve.CircleParams or ())
+    if len(params) < 7:
+        raise RuntimeError("circular crank-arm edge returned incomplete CircleParams")
+    return tuple(float(value) for value in params[:7])
+
+
+def _redundant_top_profile_key(circle: tuple[float, ...]) -> str | None:
+    """Classify a redundant top-view hole profile by stable model geometry.
+
+    The view owns no generated feature names and ``GetEdges`` has no stable
+    ordering.  The blind tap and dimple have source circular edges that map
+    into this view; matching their authored XY centres leaves the shaft-bore
+    and Y-normal cross-hole edges alone.
+    """
+    cx, cy, _cz, nx, ny, nz, _radius = circle
+    if abs(nx) > 1e-6 or abs(ny) > 1e-6 or abs(abs(nz) - 1.0) > 1e-6:
+        return None
+    cx_mm = cx * 1000.0
+    cy_mm = cy * 1000.0
+    candidates = (
+        ("anchor tap", ANCHOR_SCREW_X, ANCHOR_SCREW_Y),
+        ("fiducial dimple", DIMPLE_X, 0.0),
+    )
+    for label, target_x_mm, target_y_mm in candidates:
+        if (
+            abs(cx_mm - target_x_mm) <= 1e-3
+            and abs(cy_mm - target_y_mm) <= 1e-3
+        ):
+            return label
+    return None
+
+
+def _same_entity(app: Any, left: Any, right: Any) -> bool:
+    """Compare two COM entities without relying on wrapper identity."""
+    return int(app.IsSame(left, right)) == 1
+
+
+def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
+    """Hide only the redundant hole profiles and prove the native result.
+
+    ``IView.GetCorrespondingEntity`` maps the blind tap and dimple's source
+    edges into the active drawing view.  The handle-pivot bore is edge-on and
+    contributes only two silhouette generators, so those are selected at
+    geometry-derived sheet points.  ``IDrawingDoc.HideEdge`` suppresses both
+    forms without switching the whole view to HLR and losing the cross-hole /
+    shaft-bore evidence.
+    """
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    drawing_view = _early_bound(view, "IView")
+    if int(drawing_view.GetDisplayMode2()) != 1:  # swHIDDEN_GREYED / HLV
+        raise RuntimeError("top view must be HLV before selective edge hiding")
+
+    source_document = drawing_view.ReferencedDocument
+    if source_document is None:
+        raise RuntimeError("top view has no referenced part document")
+    source = _early_bound(source_document, "IPartDoc")
+    bodies = [
+        _early_bound(raw_body, "IBody2")
+        for raw_body in (source.GetBodies2(0, False) or ())
+        if raw_body is not None
+    ]
+    if len(bodies) != 1:
+        raise RuntimeError(
+            f"crank arm source has {len(bodies)} solid bodies; expected exactly one"
+        )
+    body = bodies[0]
+    app = adapter.swApp
+
+    targets: list[tuple[str, Any]] = []
+    counts: dict[str, int] = {
+        "anchor tap": 0,
+        "fiducial dimple": 0,
+    }
+    for raw_edge in body.GetEdges() or ():
+        model_edge = _early_bound(raw_edge, "IEdge")
+        circle = _circle_geometry(model_edge)
+        if circle is None:
+            continue
+        label = _redundant_top_profile_key(circle)
+        if label is None:
+            continue
+        mapped = drawing_view.GetCorrespondingEntity(model_edge)
+        if mapped is None:
+            # A source rim or blind floor can project away or merge into its
+            # mate in this edge-on view.  Require a mapped edge per feature
+            # below; an individual source edge need not have a drawing peer.
+            continue
+        drawing_edge = _early_bound(mapped, "IEdge")
+        if any(_same_entity(app, drawing_edge, prior) for _, prior in targets):
+            raise RuntimeError(f"top view mapped duplicate edge for {label}")
+        targets.append((label, drawing_edge))
+        counts[label] += 1
+
+    missing = [label for label, count in counts.items() if count == 0]
+    if missing:
+        raise RuntimeError(
+            "top view did not resolve redundant profile edges: " + ", ".join(missing)
+        )
+    if not targets:
+        raise RuntimeError("top view produced no redundant profile edges")
+
+    hidden_before = list(drawing_view.HiddenEdges or ())
+    if not ddoc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate top view for selective edge hiding")
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    select_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    select_data.View = view
+    for label, drawing_edge in targets:
+        draw.ClearSelection2(True)
+        if not _early_bound(drawing_edge, "IEntity").Select4(False, select_data):
+            raise RuntimeError(f"failed to select redundant top-view edge ({label})")
+        if int(selection_manager.GetSelectedObjectCount2(-1)) != 1:
+            raise RuntimeError(f"top-view edge selection was not singular ({label})")
+        selected = selection_manager.GetSelectedObject6(1, -1)
+        if selected is None or not _same_entity(app, selected, drawing_edge):
+            raise RuntimeError(f"top-view edge selection changed identity ({label})")
+        ddoc.HideEdge()
+    draw.ClearSelection2(True)
+
+    hidden_after = list(drawing_view.HiddenEdges or ())
+    newly_hidden = [
+        edge
+        for edge in hidden_after
+        if not any(_same_entity(app, edge, prior) for prior in hidden_before)
+    ]
+    if len(newly_hidden) != len(targets):
+        raise RuntimeError(
+            "top-view selective hide changed an unexpected number of edges: "
+            f"expected {len(targets)}, added {len(newly_hidden)}"
+        )
+    if not all(
+        any(_same_entity(app, edge, added) for added in newly_hidden)
+        for _, edge in targets
+    ):
+        raise RuntimeError("top-view selective hide did not persist every target edge")
+
+    # The through handle-pivot bore has no BREP rim corresponding to this
+    # edge-on view; SolidWorks exposes its two dashed generators to coordinate
+    # hit-testing as EDGE selections rather than SILHOUETTE objects.  Their
+    # midpoints derive from the authored hole station and diameter, with no
+    # other edge at either point.
+    handle_points = tuple(
+        (
+            _sheet_x(ARM_C2C + side * _HANDLE_PIVOT_HOLE_DIA / 2.0),
+            TOP_CENTER[1],
+        )
+        for side in (-1.0, 1.0)
+    )
+    for index, point in enumerate(handle_points):
+        drawing_view.UpdateViewDisplayGeometry()
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            "",
+            "EDGE",
+            point[0],
+            point[1],
+            0.0,
+            False,
+            0,
+            null_callout(),
+            0,
+        ):
+            raise RuntimeError(
+                f"failed to select handle-pivot hidden edge {index + 1}"
+            )
+        if (
+            int(selection_manager.GetSelectedObjectCount2(-1)) != 1
+            or int(selection_manager.GetSelectedObjectType3(1, -1)) != 1
+        ):
+            raise RuntimeError(
+                f"handle-pivot hidden edge {index + 1} selection was not singular"
+            )
+        ddoc.HideEdge()
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    drawing_view.UpdateViewDisplayGeometry()
+    for index, point in enumerate(handle_points):
+        draw.ClearSelection2(True)
+        if draw.Extension.SelectByID2(
+            "",
+            "EDGE",
+            point[0],
+            point[1],
+            0.0,
+            False,
+            0,
+            null_callout(),
+            0,
+        ):
+            raise RuntimeError(
+                f"handle-pivot hidden edge {index + 1} remained visible after hiding"
+            )
+    draw.ClearSelection2(True)
+    if int(drawing_view.GetDisplayMode2()) != 1:  # preserve HLV cross-hole evidence
+        raise RuntimeError("top view left HLV after selective edge hiding")
+
+
+_ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
+# The anchor is a tapped blind hole, not a drill-size hole, so ``drill_process``
+# refuses it; its native callout already carries the tap drill, the thread and
+# both depths.  The prefix is the one process word that IS the requirement:
+# 5.5 of full thread in a 6.5 drill leaves lead room for a bottoming tap only.
+ANCHOR_TAP_PROCESS = "BOTTOMING TAP"
+
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Leadered diameters sit above the arm at each feature's station;
-# the linear chain stacks below the view, smallest span nearest the geometry.
+# the linear chain stacks below the view from the shaft-bore axis, smallest
+# span nearest the geometry (anchor 20, dimple 30, pivot 75, end 85, ref 93).
+# The anchor's offset from the top long edge stands just left of the tap,
+# above the arm; the stock width stands past the arm end.
 FRONT_KEEP = {
-    "ArmEndX": (0.190, 0.086),
-    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.112),
+    "ArmEndX": (0.190, 0.085),
+    "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
+    "DimpleX": (_sheet_x(DIMPLE_X / 2.0), 0.104),
+    "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.112),
+    "AnchorOffset": (0.093, 0.155),
+    "Width": (0.266, FRONT_CENTER[1]),
     # Left of the boss so its leader and the bore's (above) never cross.
-    "BossRadius": (0.052, 0.104),
-    "ShaftBoreDia": (_sheet_x(0.0), 0.172),
-    "DimpleDia": (_sheet_x(DIMPLE_X), 0.172),
+    "BossRadius": (0.046, 0.100),
+    "ShaftBoreDia": (0.060, 0.166),
+    # Right of the anchor tap so its leader never meets the tap callout's.
+    "DimpleDia": (0.178, 0.166),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-TOP_KEEP = {}
+# The straight #14 cross-hole's station from the broad face, seen edge-on.
+TOP_KEEP = {"PinStation": (0.245, TOP_CENTER[1] + 0.004)}
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": "REAM THRU (3/8 IN)",
-    # Two decimals so the block's .XX tolerance governs the depth.
-    "DimpleDia": "FLAT-BOTTOM 0.50 DEEP",
+    "DimpleDia": "FIDUCIAL FLAT-BOTTOM 0.5 DEEP",
 }
-DIMENSION_PRECISION = {"ShaftBoreDia": 3}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -171,72 +451,84 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     set_hidden_lines_removed(adapter, iso)
-    # Hidden lines stay ON in every orthographic view (Harvey #30 / Lipton):
-    # the top view shows the #14 cross-drill meeting the shaft bore, the side
-    # view the bore and pivot hole through the 16 x 8 section.
-    for view in (front, top, right):
+    # Hidden lines earn their place in the front and top views: the top view
+    # shows the #14 cross-drill meeting the shaft bore, the front the blind
+    # floors of the dimple and the anchor drill.  The 16 x 8 side view carries
+    # one dimension (thickness) and would only repeat already-called-out holes
+    # as overlapping dashed arcs, so it is drawn hidden-lines-removed.
+    for view in (front, top):
         set_hidden_lines_visible(adapter, view)
+    set_hidden_lines_removed(adapter, right)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    # Right view: the 16 x 8 stock section.  Thickness is the model Depth dim;
-    # the 16 width is added as an explicit overall across the view's extremes.
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
-    # Top view: cross-drill geometry is visible; its size is a native hole callout.
-    top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
-    )
-    set_dimension_callouts(
-        adapter,
-        [*front_annotations, *top_annotations, *right_annotations],
-        DIMENSION_CALLOUTS,
-    )
-    # The shaft bore is the one fitted feature (reamed 3/8 in, band on the
-    # model dimension): three decimals say "hold it"; everything else stays at
-    # the two-place block tolerance.
-    set_dimension_precision(
-        adapter,
-        [*front_annotations, *top_annotations, *right_annotations],
-        DIMENSION_PRECISION,
-    )
-    # Arm width (16): dimension the principal view's long top/bottom edges,
-    # picked on the straight run clear of every hole, with the dimension
-    # standing right of the boss.  (In the 16 x 8 side view every pick on the
-    # outer faces lands on a hidden arc once hidden lines are shown -- it came
-    # back as a diameter dimension.)
-    add_edge_dimension(
         adapter,
         front,
-        p0=(_sheet_x(ARM_C2C * 0.2), FRONT_CENTER[1] - 0.016),
-        p1=(_sheet_x(ARM_C2C * 0.2), FRONT_CENTER[1] + 0.016),
-        text_xy=(0.266, FRONT_CENTER[1]),
-        label="arm-width overall",
-        orientation="vertical",
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Right view: the 16 x 8 stock section.  Thickness is the model Depth dim;
+    # the 16 width is the model's Width dim on the principal view, standing
+    # past the arm end.
+    right_annotations = curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Top view: cross-drill geometry is visible; its station from the broad
+    # face is the model's PinStation dim and its size a native hole callout.
+    top_annotations = curate_view_dimensions(
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    imported_annotations = [*front_annotations, *top_annotations, *right_annotations]
+    set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
+    # The part authored every decimal place (policy rule 2): three on the
+    # reamed 3/8 in bore alone, one everywhere else.  Read them back; an
+    # import that fell back to the sheet default would print a band nobody
+    # specified.
+    assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
+    _add_arm_centerline(adapter, front)
 
-    # Shaft-to-handle-pivot centres: the one location a machinist sets the DRO
-    # to, read from the bore axis (one origin per view).
+    # Handle-pivot callout attaches at the hole's top rim; the pivot's station
+    # from the bore axis is the part's PivotStation dim imported above.
     handle_edge = (
         _sheet_x(ARM_C2C),
         FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
     )
-    add_edge_dimension(
+    # Anchor tap: size and both depths on a native Hole Wizard callout; its
+    # station from the bore axis and its offset from the top long edge are the
+    # part's StationReference dims imported above (drawing-simplicity-policy
+    # rule 7: every location starts on a feature the shop can pick up).
+    anchor_edge = (
+        _sheet_x(ANCHOR_SCREW_X),
+        FRONT_CENTER[1]
+        + (ANCHOR_SCREW_Y + _ANCHOR_HOLE_DIA / 2.0) * SHEET_SCALE[0] / 1000.0,
+    )
+    anchor_callout = add_native_hole_callout(
         adapter,
         front,
-        p0=(_sheet_x(0.0), FRONT_CENTER[1] + SHAFT_BORE_DIA / 1000.0),
-        p1=(_sheet_x(ARM_C2C), FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA / 1000.0),
-        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.102),
-        label="shaft-to-handle-pivot location",
+        edge_xy=anchor_edge,
+        callout_xy=(0.150, 0.186),
+        label="anchor tap",
+        process=ANCHOR_TAP_PROCESS,
+    )
+    set_hole_callout_precision(
+        anchor_callout,
+        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+        label="anchor tap depths",
     )
     # The true overall (boss extreme to arm end), as a reference below the
-    # 85.00 centre-to-end chain so nobody saws the stock 8 mm short
+    # 85.0 centre-to-end chain so nobody saws the stock 8 mm short
     # (Harvey #25).  Picked at the boss arc's outer extreme so the default
     # tangent arc condition measures the far side, not the centre.
     overall = add_edge_dimension(
@@ -244,7 +536,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=(_sheet_x(-HALF_WIDTH), FRONT_CENTER[1]),
         p1=(_sheet_x(ARM_END_X), FRONT_CENTER[1] - 0.004),
-        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.072),
+        text_xy=(_sheet_x(ARM_C2C / 2.0), 0.073),
         label="overall length reference",
         orientation="horizontal",
     )
@@ -256,37 +548,15 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(overall, "IDisplayDimension").GetAnnotation(),
         label="overall length reference",
     )
+    _set_reference_precision(adapter, overall, "overall length reference")
 
-    # The straight #14 cross-hole, seen in the top view: its station from the
-    # broad face (mid-thickness) plus the native size callout carrying the
-    # drill as its prefix.  The note says its axis passes through the bore axis.
+    # The straight #14 cross-hole, seen in the top view: the native size
+    # callout carrying the drill as its prefix.  Its station from the broad
+    # face is the imported PinStation; the note says its axis passes through
+    # the bore axis.
     pin_edge = (
         _sheet_x(0.0),
         TOP_CENTER[1] + _PIN_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    pin_station = add_edge_dimension(
-        adapter,
-        top,
-        p0=find_edge_near(
-            adapter,
-            top,
-            (
-                _sheet_x(ARM_C2C / 2.0),
-                TOP_CENTER[1] + ARM_THICKNESS * SHEET_SCALE[0] / 2000.0,
-            ),
-            axis="y",
-            label="cross-hole broad face",
-            span_m=0.020,
-            entity_type="EDGE",
-        ),
-        p1=pin_edge,
-        text_xy=(0.245, TOP_CENTER[1] + 0.004),
-        label="cross-hole station from broad face",
-        orientation="vertical",
-        entity_types=("EDGE", "EDGE"),
-    )
-    set_arc_endpoints_to_center(
-        adapter, pin_station, label="cross-hole station from broad face"
     )
     add_native_hole_callout(
         adapter,
@@ -310,6 +580,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
+    # Rebuild HLV after the final top-view annotation, then suppress only the
+    # redundant tap/dimple/pivot profiles by native per-edge visibility.
+    set_hidden_lines_visible(adapter, top)
+    _hide_redundant_top_profiles(adapter, top)
 
     return await finalize_drawing(
         adapter,
@@ -317,6 +591,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Crank Arm Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#4-40 Tapped Hole" note to the front view
+        # once the tap carries a hole callout; that callout already states
+        # the thread, the drill and both depths (iter3 printed both).
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

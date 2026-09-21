@@ -31,11 +31,14 @@ import sys
 
 from _common import (
     SketchDims,
+    _early_bound,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     name_bore_axis,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -45,6 +48,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _hole_spec import blind_cut_dia_mm
@@ -52,12 +56,11 @@ from _holes import wizard_holes
 
 import _telemetry
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from crank_arm_spec import (
     ANCHOR_SCREW_X,
@@ -72,12 +75,12 @@ from crank_arm_spec import (
     DIMPLE_X,
     DRAWING_NOTES,
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
     PIN_HOLE_SPEC,
     ISOMETRIC_VIEW_NOTE,
     SHAFT_BORE_DIA,
-    SHAFT_BORE_BAND,
     SQUARE_END_OVERHANG,
     SURFACE_FINISHES,
 )
@@ -92,6 +95,18 @@ THROUGH_CUT_DEPTH = 40.0  # mid-plane total; > any extent it crosses
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry.
+
+    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
+    derived ISketchLine the entity registry binds -- rebind before the set.
+    """
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -284,6 +299,164 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after pin hole: {vol:.1f} mm^3")
 
+    # Two REFERENCE sketches (policy rule 2): the sheet prints the pivot and
+    # anchor stations from the shaft-bore axis, the anchor's offset from the
+    # top long edge, the stock width and the cross-hole's station from the
+    # broad face, yet no feature dimension carries any of them -- the Hole
+    # Wizard placement sketches measure from the origin and the outline is
+    # pinned by its boss radius. Each value therefore gets a construction line
+    # whose driving dimension IS the value, marked for drawing like any other
+    # dimension. Construction, not blanked: a blanked sketch's dimensions never
+    # reach InsertModelAnnotations3 (build_harmonic_base measured it), and
+    # hiding the sketch in the drawing VIEW takes its imported dimensions with
+    # it (drawing iter4 lost four). Construction lines DO print, as grey
+    # lines, so every one of them lies on the arm's axis or on an edge or
+    # centre-mark line that covers it: the anchor's station runs along the
+    # axis, not diagonally to the tap (that diagonal printed across the front
+    # view in iter3). Direct-to-DB for the geometry: these lines lie on the
+    # axes and on the arm's own edges, so creation-time inference would snap
+    # in exactly the relations the explicit ones below add and leave the
+    # sketch over-defined.
+    stations = SketchDims()
+    check("create_sketch station reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    pivot_ref = check(
+        "pivot station reference line",
+        await adapter.add_line(0.0, 0.0, ARM_C2C, 0.0),
+    )
+    anchor_ref = check(
+        "anchor station reference line",
+        await adapter.add_line(0.0, 0.0, ANCHOR_SCREW_X, 0.0),
+    )
+    offset_ref = check(
+        "anchor offset reference line",
+        await adapter.add_line(
+            ANCHOR_SCREW_X, HALF_WIDTH, ANCHOR_SCREW_X, ANCHOR_SCREW_Y
+        ),
+    )
+    width_ref = check(
+        "arm width reference line",
+        await adapter.add_line(ARM_END_X, -HALF_WIDTH, ARM_END_X, HALF_WIDTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (pivot_ref, anchor_ref, offset_ref, width_ref):
+        _as_construction(adapter, line)
+    for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
+        check(
+            f"{label} station reference horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
+        check(
+            f"{label} station reference starts on the bore axis",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", "origin", "coincident"
+            ),
+        )
+    check(
+        "anchor offset reference vertical",
+        await adapter.add_sketch_constraint(offset_ref, None, "vertical"),
+    )
+    check(
+        "anchor offset reference ends above the anchor station",
+        await adapter.add_sketch_constraint(
+            f"{offset_ref}.end", f"{anchor_ref}.end", "vertical_points"
+        ),
+    )
+    check(
+        "arm width reference vertical",
+        await adapter.add_sketch_constraint(width_ref, None, "vertical"),
+    )
+    # Dimensions in creation order; SketchDims renames them by that order.
+    await dimension_between(
+        adapter,
+        f"{pivot_ref}.start",
+        f"{pivot_ref}.end",
+        "horizontal_distance",
+        ARM_C2C,
+        "pivot station reference",
+    )
+    stations.record("PivotStation", '"ArmC2C"')
+    await dimension_between(
+        adapter,
+        f"{anchor_ref}.start",
+        f"{anchor_ref}.end",
+        "horizontal_distance",
+        ANCHOR_SCREW_X,
+        "anchor station reference",
+    )
+    stations.record("AnchorStation", '"AnchorScrewX"')
+    await dimension_between(
+        adapter,
+        f"{anchor_ref}.end",
+        f"{offset_ref}.end",
+        "vertical_distance",
+        ANCHOR_SCREW_Y,
+        "anchor axis height reference",
+    )
+    stations.record("AnchorY", '"AnchorScrewY"')
+    await dimension_between(
+        adapter,
+        f"{offset_ref}.start",
+        f"{offset_ref}.end",
+        "vertical_distance",
+        HALF_WIDTH - ANCHOR_SCREW_Y,
+        "anchor offset reference",
+    )
+    stations.record("AnchorOffset", '"ArmWidth" / 2 - "AnchorScrewY"')
+    await dimension_between(
+        adapter,
+        f"{width_ref}.start",
+        f"{width_ref}.end",
+        "vertical_distance",
+        ARM_WIDTH,
+        "arm width reference",
+    )
+    stations.record("Width", '"ArmWidth"')
+    await anchor_point_to_origin(
+        adapter, f"{width_ref}.start", ARM_END_X, -HALF_WIDTH, "arm width reference"
+    )
+    stations.record("WidthX", '"ArmEndX"')
+    stations.record("WidthY", '"ArmWidth" / 2')
+    await ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "StationReference")
+    drive_jobs += stations.apply(adapter, "StationReference")
+
+    # Cross-hole station from the z = 0 broad face, on the Top plane so the
+    # edge-on top view imports it: Top sketch (u, v) -> (X, -Z), so the hole
+    # axis at z = ArmThickness / 2 sits at v = -ArmThickness / 2.
+    pin_station = SketchDims()
+    check("create_sketch pin station reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    pin_ref = check(
+        "pin station reference line",
+        await adapter.add_line(0.0, 0.0, 0.0, -ARM_THICKNESS / 2.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, pin_ref)
+    check(
+        "pin station reference vertical",
+        await adapter.add_sketch_constraint(pin_ref, None, "vertical"),
+    )
+    check(
+        "pin station reference starts on the broad face",
+        await adapter.add_sketch_constraint(f"{pin_ref}.start", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter,
+        f"{pin_ref}.start",
+        f"{pin_ref}.end",
+        "vertical_distance",
+        ARM_THICKNESS / 2.0,
+        "pin station reference",
+    )
+    pin_station.record("PinStation", '"ArmThickness" / 2')
+    await ensure_fully_defined(adapter, "pin station reference sketch")
+    check("exit_sketch pin station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinStationReference")
+    drive_jobs += pin_station.apply(adapter, "PinStationReference")
+
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train). Axis1 = shaft bore (on origin);
     # Axis2 = the handle PIVOT bore at +X (ARM_C2C), so the drive-train assembly
@@ -311,12 +484,9 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "ShaftBoreProfile",
-        "ShaftBoreDia",
-        *deviations(SHAFT_BORE_BAND),
-    )
+    # No local size band on the shaft bore: the arm is pinned to its shaft, so
+    # this is no running fit and the title block's drilled-hole row governs it
+    # (cad/docs/tolerance-policy.md).
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =
@@ -329,10 +499,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: mark exactly the print's dimensions (the
     # drawing recipe imports the marked set and must find every one of these),
+    # author their decimal places on the part (policy rule 2: the places are
+    # the tolerance, so the sheet reads them back instead of rewriting them),
     # and stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

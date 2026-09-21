@@ -802,6 +802,10 @@ from build_pinion_arbor import (  # noqa: E402
     SHAFT_DIA as ARBOR_DIA,
     SHAFT_LEN as ARBOR_LEN,
 )
+from pinion_arbor_spec import (  # noqa: E402
+    RETENTION_HOLE_DIA as ARBOR_RETENTION_HOLE_DIA,
+    RETENTION_PIN_STATION as ARBOR_RETENTION_PIN_STATION,
+)
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
     CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
@@ -857,6 +861,16 @@ from pinion_handle_geometry import (  # noqa: E402
     TUBE_ID as HANDLE_TUBE_ID,
     TUBE_LEN as HANDLE_TUBE_LEN,
     WALL_T as HANDLE_WALL_T,
+)
+from pinion_handle_spec import (  # noqa: E402
+    RETENTION_PIN_CENTER_Z as HANDLE_RETENTION_CENTER_Z,
+    RETENTION_PIN_DIA as HANDLE_RETENTION_PIN_DIA,
+    RETENTION_PIN_LEN as HANDLE_RETENTION_PIN_LEN,
+    RETENTION_PIN_STATION_FROM_FLOOR as HANDLE_RETENTION_PIN_STATION,
+)
+from pinion_handle_pin_spec import (  # noqa: E402
+    PIN_DIA as HANDLE_PIN_DIA,
+    PIN_LEN as HANDLE_PIN_LEN,
 )
 from pinion_spring_geometry import (  # noqa: E402
     AXIS_OFFSET as SPRING_AXIS_OFF,
@@ -1862,6 +1876,47 @@ if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
 if not (ARBOR_DIA == DRUM_BORE_DIA == HANDLE_TUBE_ID == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum bore/handle tube/strap bore")
+
+# Upper MHA-058 tee-handle retention (distinct from the lower MHA-135 lever
+# pin): one dedicated MHA-136 straight pin, match-drilled through the handle
+# socket and arbor at the socket's reconstructed mid-length.  The handle local
+# +Y axis is rotated by HANDLE_TILT_DEG in machine XY; MHA-136 local +Z lies on
+# that axis, with its centre on the arbor.
+if not (
+    HANDLE_PIN_DIA
+    == HANDLE_RETENTION_PIN_DIA
+    == ARBOR_RETENTION_HOLE_DIA
+):
+    raise AssertionError("handle retention pin/hole diameters disagree")
+if abs(HANDLE_PIN_LEN - HANDLE_RETENTION_PIN_LEN) > 1e-9:
+    raise AssertionError("handle retention pin is not flush with the socket OD")
+if abs(HANDLE_RETENTION_PIN_STATION - ARBOR_RETENTION_PIN_STATION) > 1e-9:
+    raise AssertionError("handle and arbor retention-hole stations disagree")
+if abs(
+    HANDLE_Z + HANDLE_RETENTION_CENTER_Z
+    - (ARBOR_Z0 + ARBOR_RETENTION_PIN_STATION)
+) > 1e-9:
+    raise AssertionError("handle and arbor retention holes are not coaxial")
+_HANDLE_PIN_T = math.radians(HANDLE_TILT_DEG)
+_HANDLE_PIN_U = (-math.sin(_HANDLE_PIN_T), math.cos(_HANDLE_PIN_T), 0.0)
+HANDLE_PIN_CENTER = (
+    APINION_X,
+    APINION_Y,
+    ARBOR_Z0 + ARBOR_RETENTION_PIN_STATION,
+)
+HANDLE_PIN_ORIGIN = [
+    HANDLE_PIN_CENTER[0] - HANDLE_PIN_LEN / 2.0 * _HANDLE_PIN_U[0],
+    HANDLE_PIN_CENTER[1] - HANDLE_PIN_LEN / 2.0 * _HANDLE_PIN_U[1],
+    HANDLE_PIN_CENTER[2],
+]
+_HANDLE_PIN_C = math.cos(_HANDLE_PIN_T)
+_HANDLE_PIN_S = math.sin(_HANDLE_PIN_T)
+HANDLE_PIN_ROWS = [
+    [-_HANDLE_PIN_C, -_HANDLE_PIN_S, 0.0],
+    [0.0, 0.0, 1.0],
+    [-_HANDLE_PIN_S, _HANDLE_PIN_C, 0.0],
+]
+HANDLE_PIN_EULER = euler_from_rows(HANDLE_PIN_ROWS)
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
@@ -2440,6 +2495,15 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
         label="pinion-arbor (steel, through the drum)",
+    )
+    handle_pin = await place_component(
+        adapter,
+        "pinion-handle-pin",
+        HANDLE_PIN_ORIGIN,
+        HANDLE_PIN_EULER,
+        HANDLE_PIN_ROWS,
+        ground=False,
+        label="pinion-handle-pin (match-reamed flush retention)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
@@ -3894,6 +3958,15 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{tee_handle}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
         label="tee handle cross-pinned on the arbor",
+    )
+    # The physical MHA-136 pin now records the separate upper-handle joint.
+    # Locking it to MHA-058 preserves the authored coaxial/flush pose while the
+    # existing handle/arbor lock carries the complete rigid zeroing crank.
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{handle_pin}", "PLANE"),
+        named_ref(f"Front Plane@{tee_handle}", "PLANE"),
+        label="pinion handle retention pin locked to the upper tee",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at

@@ -11,8 +11,9 @@ in lockstep (``test_pinion_cam_drawing.py``).
 
 from __future__ import annotations
 
-from _gtol_spec import CylinderFace
+from _fit_limits import REAM_SLIDE
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _gtol_spec import CylinderFace
 from pinion_cam_geometry import (
     BORE as BORE,
     BOSS_DIA as BOSS_DIA,
@@ -24,17 +25,31 @@ from pinion_cam_geometry import (
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
-# Ream band about the 6.37 mid nominal: 6.375 MAX / 6.360 MIN (running fit
-# on the Ø6.35 lift rod). Asymmetric because BORE is the model's as-cut
-# nominal, not the band midpoint.
-BORE_BAND = (0.005, -0.010)
+# The bore is a RUNNING fit on the Ø6.35 lift rod (MHA-060), which is exactly
+# what the shared REAM_SLIDE class is for; BORE is the model's as-cut nominal
+# rather than the rod's, so the band is that fit class re-expressed about it
+# and can never drift from the class (cad/docs/tolerance-policy.md).
+LIFT_ROD_DIA = 6.35
+LIFT_ROD_NUMBER = "MHA-060"
+BORE_BAND = (
+    round(LIFT_ROD_DIA + REAM_SLIDE[0] - BORE, 6),
+    round(LIFT_ROD_DIA + REAM_SLIDE[1] - BORE, 6),
+)
+# The cam OD is the working surface the follower rides, and the bore-to-OD
+# offset IS the lift: both are on the drive train's critical list.  Nothing
+# else on this collar mates with anything, so nothing else carries a band.
+# Routine controlling dimensions use the title block's general grade; the
+# purely cosmetic boss projection prints as a reference nominal.
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
-COLLAR_DEPTH_TOLERANCE_MM = 0.05
-BOSS_DIA_TOLERANCE_MM = 0.05
-BOSS_PROJECTION_TOLERANCE_MM = 0.05
 
-SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE)),)
+# "BORE" names the target: the symbol's leader lands on the bore rim 6 mm
+# inside the OD circle, and a blind reviewer read it as the OD (codex iter3).
+SURFACE_FINISHES = (
+    SurfaceFinishControl(
+        "bore", MACHINED_UM, CylinderFace(BORE), production_method="BORE"
+    ),
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
@@ -44,26 +59,51 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPinBossProjection": {"BossProjection"},
 }
 
+# The MODEL owns every printed decimal place: build_pinion_cam applies this
+# map to the .SLDPRT and draw_pinion_cam only reads it back.  Two places on
+# the critical trio -- the reamed running bore (its band rides the dimension),
+# the cam OD and the bore-to-OD eccentricity that IS the lift; one place
+# everywhere else.  Routine controlling dimensions therefore use the title
+# block's .X row, while the cosmetic BossProjection nominal is parenthesized
+# as reference by the drawing recipe.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "CollarProfile": {"CollarOd": 2, "CollarCy": 2},
+    "BoreProfile": {"BoreDia": 2},
+    "Collar": {"Depth": 1},
+    "BossProfile": {"BossDia": 1, "BossCz": 1},
+    "SetPinBossProjection": {"BossProjection": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# drawing-simplicity-policy rule 6: four short lines of facts the views cannot
+# show.  The eccentricity itself is DIMENSIONED on the sheet, so the note only
+# says what a single dimension cannot -- that it is the same, and in the same
+# direction, at both ends.
 DRAWING_NOTES = "\n".join(
     (
-        f"BORE AND OD ARE NOT CONCENTRIC; {ECC:.2f} ECCENTRICITY APPLIES AT BOTH ENDS.",
-        "AXIS C IS PARALLEL TO AXIS B WITHIN 0.03; THE OFFSET DIRECTION IS",
-        "  COMMON TO BOTH ENDS (B AND C ARE COPLANAR WITH THE BOSS AXIS PLANE).",
-        "DATUM A IS THE FRONT END FACE; B IS THE FINAL REAMED BORE AXIS;",
-        f"  C IS THE <MOD-DIAM>{CAM_OD:.2f} OD AXIS; D IS THE BOSS OD AXIS.",
-        "THE SET-SCREW BOSS IS INTEGRAL WITH THE CAM BODY.",
-        "BASIC BOSS/TAP AXES EACH INTERSECT B PERPENDICULAR TO IT AND LIE IN",
-        "  THE PLANE CONTAINING B AND C.",
-        "POSITION BOSS OD AXIS TO A|B|C; POSITION TAP PITCH AXIS TO DATUM D.",
-        "DRILL/TAP M2.5 X 0.45-6H THROUGH BOSS TO BORE; 2.00 MIN FULL THREAD.",
-        "  SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
+        "BORE AND OD ARE NOT CONCENTRIC; THE ECCENTRICITY IS THE SAME",
+        "  AND IN THE SAME DIRECTION AT BOTH ENDS.",
+        "DRILL/TAP M2.5 X 0.45-6H THRU THE COLLAR WALL INTO THE BORE.",
+        "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "cam boss axis position": "0.03",
-    "cam tap pitch axis position": "0.03",
-}
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
