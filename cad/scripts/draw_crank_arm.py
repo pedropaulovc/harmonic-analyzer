@@ -309,9 +309,10 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
         raise RuntimeError("top-view selective hide did not persist every target edge")
 
     # The through handle-pivot bore has no BREP rim corresponding to this
-    # edge-on view; its two dashed generators are drawing silhouettes.  Select
-    # their exact projected midpoints and prove each selected silhouette belongs
-    # to the authored cylindrical hole before hiding it.
+    # edge-on view; SolidWorks exposes its two dashed generators to coordinate
+    # hit-testing as EDGE selections rather than SILHOUETTE objects.  Their
+    # midpoints derive from the authored hole station and diameter, with no
+    # other edge at either point.
     handle_points = tuple(
         (
             _sheet_x(ARM_C2C + side * _HANDLE_PIVOT_HOLE_DIA / 2.0),
@@ -324,7 +325,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
         draw.ClearSelection2(True)
         if not draw.Extension.SelectByID2(
             "",
-            "SILHOUETTE",
+            "EDGE",
             point[0],
             point[1],
             0.0,
@@ -334,39 +335,14 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
             0,
         ):
             raise RuntimeError(
-                f"failed to select handle-pivot silhouette {index + 1}"
+                f"failed to select handle-pivot hidden edge {index + 1}"
             )
-        if int(selection_manager.GetSelectedObjectCount2(-1)) != 1:
-            raise RuntimeError(
-                f"handle-pivot silhouette {index + 1} selection was not singular"
-            )
-        silhouette = _early_bound(
-            selection_manager.GetSelectedObject6(1, -1), "ISilhouetteEdge"
-        )
-        face = _early_bound(silhouette.GetFace(), "IFace2")
-        surface = _early_bound(face.GetSurface(), "ISurface")
-        if not bool(surface.IsCylinder()):
-            raise RuntimeError(
-                f"handle-pivot silhouette {index + 1} is not cylindrical"
-            )
-        cylinder = tuple(float(value) for value in (surface.CylinderParams or ()))
-        expected = (
-            ARM_C2C / 1000.0,
-            0.0,
-            _HANDLE_PIVOT_HOLE_DIA / 2000.0,
-        )
         if (
-            len(cylinder) < 7
-            or abs(cylinder[0] - expected[0]) > 1e-6
-            or abs(cylinder[1] - expected[1]) > 1e-6
-            or abs(cylinder[3]) > 1e-6
-            or abs(cylinder[4]) > 1e-6
-            or abs(abs(cylinder[5]) - 1.0) > 1e-6
-            or abs(cylinder[6] - expected[2]) > 1e-6
+            int(selection_manager.GetSelectedObjectCount2(-1)) != 1
+            or int(selection_manager.GetSelectedObjectType3(1, -1)) != 1
         ):
             raise RuntimeError(
-                "handle-pivot silhouette resolved to unexpected cylinder "
-                f"{cylinder!r}"
+                f"handle-pivot hidden edge {index + 1} selection was not singular"
             )
         ddoc.HideEdge()
     draw.ClearSelection2(True)
@@ -376,7 +352,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
         draw.ClearSelection2(True)
         if draw.Extension.SelectByID2(
             "",
-            "SILHOUETTE",
+            "EDGE",
             point[0],
             point[1],
             0.0,
@@ -386,7 +362,7 @@ def _hide_redundant_top_profiles(adapter: Any, view: Any) -> None:
             0,
         ):
             raise RuntimeError(
-                f"handle-pivot silhouette {index + 1} remained visible after hiding"
+                f"handle-pivot hidden edge {index + 1} remained visible after hiding"
             )
     draw.ClearSelection2(True)
     if int(drawing_view.GetDisplayMode2()) != 1:  # preserve HLV cross-hole evidence
