@@ -51,6 +51,8 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_knife_hanger_stud.py",
         "draw_knife_hanger_washer.py",
         "draw_knife_mount.py",
+        "draw_summing_assembly.py",
+        "draw_summing_lever.py",
         "draw_top_frame.py",
         "draw_tube_frame.py",
     }

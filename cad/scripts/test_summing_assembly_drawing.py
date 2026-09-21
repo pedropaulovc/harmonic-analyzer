@@ -6,7 +6,7 @@ from _buildgraph import references_of
 
 
 def test_bom_tracks_direct_assembly_sources_and_released_part_identities() -> None:
-    direct = set(references_of("summing"))
+    direct = {stem.replace("_", "-") for stem in references_of("summing")}
     assert set(assembly_spec.BOM_QUANTITIES) == direct
     assert assembly_spec.BOM_QUANTITIES == {
         stem: int(_config.parts(stem)["quantity"]) for stem in direct
@@ -18,7 +18,7 @@ def test_bom_tracks_direct_assembly_sources_and_released_part_identities() -> No
 
 
 def test_frame_and_channel_interfaces_are_identified_without_duplication() -> None:
-    direct = set(references_of("summing"))
+    direct = {stem.replace("_", "-") for stem in references_of("summing")}
     interfaces = assembly_spec.EXTERNAL_INTERFACES
     assert set(interfaces) == {
         "top-frame",
