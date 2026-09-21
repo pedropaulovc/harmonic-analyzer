@@ -25,8 +25,8 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
+from build_knife_hanger_stud import THREAD_TIP_Y_MM
 from knife_hanger_stud_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
@@ -54,7 +54,7 @@ SHEET = TrimSheet(
     detail_center=(0.280, 0.115),
     detail_scale=(12.0, 1.0),
     fence_radius_mm=8.0,
-    cut_end_y_mm=0.0,
+    cut_end_y_mm=THREAD_TIP_Y_MM,
     detail_offset_mm=1.0,
     detail_label_xy=(0.360, 0.085),
     parent_letter_offset=(0.020, 0.014),
