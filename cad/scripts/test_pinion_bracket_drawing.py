@@ -26,6 +26,7 @@ def _kept() -> dict[str, tuple[float, float]]:
     return {
         **drawing.FRONT_KEEP,
         **drawing.DETAIL_KEEP,
+        **drawing.DETAIL_RADIUS_XY,
         **drawing.LEFT_KEEP,
         **drawing.SECTION_KEEP,
     }
@@ -50,6 +51,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         for group in (
             drawing.FRONT_KEEP,
             drawing.DETAIL_KEEP,
+            drawing.DETAIL_RADIUS_XY,
             drawing.LEFT_KEEP,
             drawing.SECTION_KEEP,
         )
@@ -142,15 +144,18 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
 
 
 def test_scallop_detail_encloses_what_it_dimensions() -> None:
-    # The detail carries every scallop dimension plus the size of the pivot
-    # bore whose centre is their common, reachable physical origin. The fence
-    # must therefore show the whole pivot bore (so its centre mark reads as a
+    # The detail imports each relief centre coordinate plus the pivot-bore
+    # size. Its two radii are drawing-native dimensions on the visible cut
+    # arcs, so their arrowheads cannot land on the circles' trimmed-away sides.
+    # The fence must show the whole pivot bore (so its centre mark reads as a
     # bore axis), both relief centres, and both bites.
     relief_dimensions = (
         pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefParkProfile"]
         | pinion_bracket_spec.DRAWING_DIMENSIONS["CamReliefEngagedProfile"]
     )
-    assert set(drawing.DETAIL_KEEP) == relief_dimensions | {"PivotBoreDia"}
+    assert set(drawing.DETAIL_KEEP) | set(drawing.DETAIL_RADIUS_XY) == (
+        relief_dimensions | {"PivotBoreDia"}
+    )
     fence_center = drawing.DETAIL_FENCE_CENTER_MM
     radius = drawing.DETAIL_FENCE_RADIUS_MM
     assert (

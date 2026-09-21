@@ -61,11 +61,13 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
+    CAM_RELIEF_RADIUS,
     C2C,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -176,12 +178,14 @@ FRONT_KEEP = {
 # both did at 2:1.
 DETAIL_KEEP = {
     "PivotBoreDia": (0.240, 0.155),
-    "CamReliefParkR": (0.210, 0.185),
     "CamReliefParkX": (0.080, 0.235),
     "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.210, 0.090),
     "CamReliefEngagedX": (0.080, 0.220),
     "CamReliefEngagedY": (0.065, 0.125),
+}
+DETAIL_RADIUS_XY = {
+    "CamReliefParkR": (0.210, 0.185),
+    "CamReliefEngagedR": (0.210, 0.090),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -276,6 +280,75 @@ def _cam_relief_detail(adapter: Any, front: Any) -> Any:
     _position_detail_caption(adapter, detail)
     _position_fence_letter(adapter, detail)
     return detail
+
+def _visible_relief_arcs(adapter: Any, detail: Any) -> list[Any]:
+    """Return the PARK then ENGAGED cut arcs actually visible in Detail A."""
+    by_center: dict[tuple[float, float], Any] = {}
+    for raw_edge in visible_view_entities(
+        detail, 1, label="pinion bracket visible relief arcs"
+    ):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            continue
+        curve = _early_bound(raw_curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        if len(params) != 7 or not math.isclose(
+            params[6] * 1000.0, CAM_RELIEF_RADIUS, abs_tol=0.01
+        ):
+            continue
+        key = (round(params[0], 6), round(params[1], 6))
+        by_center.setdefault(key, edge)
+    if len(by_center) != 2:
+        raise RuntimeError(
+            "expected two visible cam-relief arcs in Detail A, found "
+            f"{len(by_center)} at {sorted(by_center)}"
+        )
+    return [
+        edge
+        for _center, edge in sorted(
+            by_center.items(), key=lambda item: item[0][1], reverse=True
+        )
+    ]
+
+
+def _relief_radius_dimensions(adapter: Any, detail: Any) -> list[Any]:
+    """Dimension each visible cut arc so the radial arrow lands on cut metal."""
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, detail)):
+        raise RuntimeError("failed to activate Detail A for relief radii")
+    annotations: list[Any] = []
+    for name, edge in zip(DETAIL_RADIUS_XY, _visible_relief_arcs(adapter, detail)):
+        draw.ClearSelection2(True)
+        manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        selection_data = manager.CreateSelectData()
+        selection_data.View = detail
+        if not _early_bound(edge, "IEntity").Select4(False, selection_data):
+            raise RuntimeError(f"failed to select visible arc for {name}")
+        position = DETAIL_RADIUS_XY[name]
+        raw_display = draw.AddRadialDimension2(position[0], position[1], 0.0)
+        draw.ClearSelection2(True)
+        if raw_display is None:
+            raise RuntimeError(f"failed to dimension visible arc for {name}")
+        display = _early_bound(raw_display, "IDisplayDimension")
+        digits = DRAWING_PRECISION_BY_NAME[name]
+        display.SetPrecision3(digits, -1, -1, -1)
+        display.ArcExtensionLineOrOppositeSide = False
+        if (
+            int(display.GetPrimaryPrecision2()) != digits
+            or bool(display.ArcExtensionLineOrOppositeSide)
+        ):
+            raise RuntimeError(f"visible-arc radial annotation did not persist for {name}")
+        annotation = display.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"visible-arc radial dimension has no annotation for {name}")
+        annotations.append(annotation)
+    draw.EditRebuild3()
+    return annotations
+
 
 
 def _position_detail_caption(adapter: Any, detail: Any) -> None:
@@ -521,6 +594,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="scallop detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    radius_annotations = _relief_radius_dimensions(adapter, detail)
     _seat_depth_dimension(adapter, seat_section)
     if (
         add_note(
@@ -537,17 +611,22 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.220, 0.105),
+        symbol_xy=(0.130, 0.105),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
 
-    annotations = [*front_annotations, *left_annotations, *detail_annotations]
+    annotations = [
+        *front_annotations,
+        *left_annotations,
+        *detail_annotations,
+        *radius_annotations,
+    ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     imported_precision = {
         name: digits
         for name, digits in DRAWING_PRECISION_BY_NAME.items()
-        if name != "PinSeatDepth"
+        if name != "PinSeatDepth" and name not in DETAIL_RADIUS_XY
     }
     assert_imported_precision(adapter, annotations, imported_precision)
 
