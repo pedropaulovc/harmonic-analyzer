@@ -347,10 +347,11 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "SpringHolePattern")
-    # D3 is the native pattern spacing (D1 is the direction-reference length).
-    # Give it a stable manufacturing name before binding it to the model knob.
+    # The enumerator exposes two display dimensions: the direction-reference
+    # length first and the native pattern spacing second (D3 in SolidWorks).
+    # Give only the latter a stable manufacturing name before binding it.
     pitch_dimension = name_dimensions(
-        adapter, "SpringHolePattern", [None, None, "HolePitch"]
+        adapter, "SpringHolePattern", [None, "HolePitch"]
     )
     drive_jobs.append((pitch_dimension[0], '"ChannelPitch"'))
     await volume_check(
