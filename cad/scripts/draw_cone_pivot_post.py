@@ -131,11 +131,11 @@ FRONT_KEEP = {
     "CrankBoreDia": (0.174, _front_y(CRANK_BORE_HEIGHT)),
 }
 TOP_KEEP = {
-    "MainBodyDia": (0.040, _top_y(0.0)),
+    "MainBodyDia": (0.025, 0.213),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
     "CrankBossStartZ": (0.038, _top_y(CRANK_BOSS_START_Z / 2.0)),
-    "MountEastX": (_top_x(-6.7), 0.2525),
-    "MountWestX": (_top_x(6.7), 0.2525),
+    "MountEastX": (0.075, 0.2525),
+    "MountWestX": (0.110, 0.2525),
     "HeadDia": (0.158, _top_y(0.0)),
     "InclineAngle": (0.136, _top_y(28.0)),
 }
