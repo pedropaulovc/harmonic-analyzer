@@ -177,11 +177,11 @@ FRONT_KEEP = {
 DETAIL_KEEP = {
     "PivotBoreDia": (0.170, 0.155),
     "CamReliefParkR": (0.220, 0.190),
-    "CamReliefParkX": (0.055, 0.220),
-    "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.200, 0.060),
-    "CamReliefEngagedX": (0.055, 0.200),
-    "CamReliefEngagedY": (0.065, 0.125),
+    "CamReliefParkX": (0.105, 0.245),
+    "CamReliefParkY": (0.220, 0.220),
+    "CamReliefEngagedR": (0.175, 0.045),
+    "CamReliefEngagedX": (0.105, 0.230),
+    "CamReliefEngagedY": (0.220, 0.075),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
@@ -507,7 +507,7 @@ async def build(adapter: Any) -> dict[str, str]:
         add_note(
             adapter,
             "ALL RELIEF X/Y COORDINATES\nFROM Ø6.35 PIVOT BORE AXIS",
-            0.105,
+            0.250,
             0.255,
             height=0.0035,
         )
@@ -537,7 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.190, 0.120),
+        symbol_xy=(0.200, 0.095),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
