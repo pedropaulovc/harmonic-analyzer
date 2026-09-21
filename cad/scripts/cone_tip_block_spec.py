@@ -154,4 +154,3 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
             f"DRAWING_PRECISION names unmarked {_feature} dimensions: {_unmarked}"
         )
 
-DRAWING_NOTES = ""

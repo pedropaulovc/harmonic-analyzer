@@ -66,7 +66,6 @@ from cone_tip_block_spec import (
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     MIN_TOP_LIGAMENT_MM,
     PINCH_CLEARANCE_DIA,
@@ -474,11 +473,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Manufacturing Notes": DRAWING_NOTES},
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 
