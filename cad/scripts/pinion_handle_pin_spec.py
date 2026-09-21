@@ -1,9 +1,9 @@
 r"""Pure-data dimensional contract for the pinion-handle retention pin.
 
-The part is a plain straight pin used as the match-ream gauge for the handle
-and arbor joint.  Its nominal diameter and cut length are the only dimensions
-owned here; the part build authors both as native driving dimensions and the
-manufacturing drawing imports those dimensions verbatim.
+The part is a plain straight pin used as the match-ream gauge for the MHA-058
+handle and MHA-102 pinion-arbor joint.  Its nominal diameter and cut length are
+the only dimensions owned here; the part build authors both as native driving
+dimensions and the manufacturing drawing imports those dimensions verbatim.
 """
 
 from __future__ import annotations
@@ -42,9 +42,10 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     raise AssertionError("every marked pin dimension needs authored places")
 
 
-# The hole is match-reamed at assembly and the installed pin is finished flush;
-# these are the only manufacturing facts not readable from the plain cylinder.
+# The MHA-058 handle and MHA-102 arbor holes are match-reamed together on the
+# actual MHA-136 pin for a light drive fit; the installed ends finish flush.
+# These are the only manufacturing facts not readable from the plain cylinder.
 DRAWING_NOTES = (
-    "USE ACTUAL PIN AS MATCH-REAM GAUGE; "
-    "TRIM ENDS FLUSH IN ASSEMBLY."
+    "MATCH-DRILL/REAM MHA-058 HANDLE AND MHA-102 PINION ARBOR TO "
+    "LIGHT DRIVE FIT ON ACTUAL MHA-136 PIN; TRIM ENDS FLUSH IN ASSEMBLY."
 )
