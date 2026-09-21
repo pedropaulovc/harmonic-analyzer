@@ -83,18 +83,17 @@ NOTCH_DETAIL_CENTER = (0.060, 0.155)
 NOTCH_DETAIL_SCALE = (6, 1)
 NOTCH_DETAIL_RADIUS_MM = 4.0
 NOTCH_DETAIL_DIMENSIONS = {
-    "NotchWidth": (0.060, 0.188),
+    "NotchWidth": (0.092, 0.188),
     "NotchDepth": (0.025, 0.155),
 }
 
 # The bore-fit note sits LEFT of the notch's vertical, so its leader leaves
-# the bore diagonally instead of riding the notch-phase extension lines, and
-# the phase text starts clear of those lines with the cam diameter dropped
-# below it (codex iter3: extension lines through the text, arc against the
-# note's underline).
+# the bore clear of the notch-phase extension lines.  The cam diameter is
+# dropped outside the gear's lower-right quadrant: its diagonal no longer
+# crosses the bore-fit leader, and the phase text keeps the clear upper lane.
 FRONT_KEEP = {
     "BoreDia": (0.056, 0.336),
-    "CamDia": (0.175, 0.312),
+    "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
     "NotchPhase": (0.152, 0.334),
 }
