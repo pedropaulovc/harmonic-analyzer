@@ -405,14 +405,14 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         drawing.RIGHT_KEEP["FaceWidth"][1]
         > drawing.RIGHT_KEEP["OverallLength"][1]
     )
-    # The pin-hole callout hangs above the side view, its leader landing on
-    # the hole's rim inside the boss silhouette.
+    # The pin-hole note hangs above-right of the side view so its leader runs
+    # down-left, away from the text, before landing on the hole rim.
     assert drawing.PIN_HOLE_CALLOUT[1] > drawing.RIGHT_CENTER[1] + half_od + 0.040
     assert abs(drawing.PIN_HOLE_EDGE[1] - drawing.RIGHT_CENTER[1]) == pytest.approx(
         spec.PIN_DIA * 4 / 2000.0
     )
     assert drawing.PIN_HOLE_EDGE[0] == pytest.approx(drawing._side_x(spec.PIN_STATION))
-    assert drawing.PIN_HOLE_CALLOUT[0] < drawing.PIN_HOLE_EDGE[0]
+    assert drawing.PIN_HOLE_CALLOUT[0] > drawing._side_x(0.0) + 0.030
     positions = (
         *drawing.FRONT_KEEP.values(),
         *drawing.RIGHT_KEEP.values(),
