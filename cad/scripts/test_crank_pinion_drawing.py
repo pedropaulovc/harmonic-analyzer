@@ -240,8 +240,9 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         "BoreDia": "\n".join(
             (
                 "REAM THRU",
-                f"MATES WITH CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
-                "REQUIRED DIAMETRAL CLEARANCE",
+                "MATES WITH",
+                f"CRANKSHAFT {spec.CRANKSHAFT_NUMBER}",
+                "REQD DIA CLR",
                 f"{low:.3f}-{high:.3f} mm",
             )
         ),

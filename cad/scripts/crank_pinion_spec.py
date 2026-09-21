@@ -134,8 +134,9 @@ PIN_NUMBER = _config.parts("crank-pinion-pin")["number"]
 BORE_FIT_CALLOUT = "\n".join(
     (
         "REAM THRU",
-        f"MATES WITH CRANKSHAFT {CRANKSHAFT_NUMBER}",
-        "REQUIRED DIAMETRAL CLEARANCE",
+        "MATES WITH",
+        f"CRANKSHAFT {CRANKSHAFT_NUMBER}",
+        "REQD DIA CLR",
         f"{_CLEARANCE_MIN:.3f}-{_CLEARANCE_MAX:.3f} mm",
     )
 )

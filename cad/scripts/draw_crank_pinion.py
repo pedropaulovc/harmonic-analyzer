@@ -123,7 +123,7 @@ RIGHT_KEEP = {
         (_side_x(FACE_WIDTH) + _side_x(OVERALL_LENGTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_BOSS + 0.012,
     ),
-    "BoreDia": (_side_x(0.0) + 0.014, RIGHT_CENTER[1]),
+    "BoreDia": (_side_x(0.0) + 0.020, RIGHT_CENTER[1]),
     "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
     "PinStation": ((_side_x(0.0) + _side_x(PIN_STATION)) / 2.0, _SIDE_BOTTOM - 0.026),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
@@ -251,13 +251,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored
     # on the PART and read back here (policy rule 5's "a surface that has to
-    # work" case). Attach at the bore's 9-o'clock edge with the symbol close
-    # below-left: the short leader cannot be mistaken for the concentric boss
-    # or tooth-root circles (Sonnet machinist review, 2026-09-21).
+    # work" case). Attach at the bore's 9-o'clock edge and keep the compact
+    # symbol below-left of the tooth silhouette: the arrow lands on the inner
+    # circle, away from the concentric boss and tooth-root edges.
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] - HALF_OD - 0.004, FRONT_CENTER[1] - 0.038),
+        symbol_xy=(FRONT_CENTER[0] - HALF_OD - 0.019, FRONT_CENTER[1] - 0.055),
         control=surface_finish_by_key(SURFACE_FINISHES, "crank_pinion_bore"),
         label="crank pinion bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
@@ -265,6 +265,7 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0] - BORE_DIA * VIEW_SCALE[0] / 2000.0,
             FRONT_CENTER[1],
         ),
+        char_height=0.0025,
     )
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.258, char_height=0.0025)
