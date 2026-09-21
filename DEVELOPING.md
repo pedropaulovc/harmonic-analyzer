@@ -211,9 +211,13 @@ for following a running workflow or recovering evidence after an interruption.
 Concurrent failures download their logs in parallel, then serialize each complete
 log block with a build-scoped output lock so one task's log cannot nest inside
 another's.
-Farm preflight prepares the pool's locked Python environment. Bounded log retrieval
-runs that interpreter directly, so its timeout terminates the log reader rather
-than a `uv` wrapper. Missing-log and retrieval-error warnings also enter pipeline
+Farm preflight prepares the pool's locked Python environment and checks that its
+local `farm.py` advertises `logs <workflow-id> --log-blob <blob>`. This is a
+local CLI capability check, not a farm protocol bump: a protocol-4 checkout
+that predates exact-log retrieval stops before dispatch. Update the checkout
+selected by `SOLIDWORKS_POOL_HOME`. Bounded log retrieval runs that environment's
+interpreter directly, so its timeout terminates the log reader rather than a
+`uv` wrapper. Missing-log and retrieval-error warnings also enter pipeline
 telemetry with task, workflow, worker, attempt and blob identity.
 
 In case 3, harvest every workflow ID the log recorded — both

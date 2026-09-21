@@ -306,7 +306,7 @@ def _dirty_submodules() -> list[str]:
 
 
 def _farm_preflight() -> None:
-    """Validate local graph inputs, fleet protocol, and stamp committed HEAD."""
+    """Validate local inputs, pool CLI/fleet compatibility, and committed HEAD."""
     status = _git("status", "--porcelain=v1", "--untracked-files=all")
     dirty = [line[3:] for line in status.splitlines()] + _dirty_submodules()
     if dirty:
@@ -322,9 +322,35 @@ def _farm_preflight() -> None:
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
 
-    _require_fleet_protocol(_farm.pool_home(), _farm.FARM_PROTOCOL_VERSION)
+    pool = _farm.pool_home()
+    _require_fleet_protocol(pool, _farm.FARM_PROTOCOL_VERSION)
+    _require_exact_log_cli(pool)
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
+
+
+def _require_exact_log_cli(pool: Path) -> None:
+    """Stop unless failed leaves can retrieve their exact immutable task log."""
+
+    import _farm
+
+    try:
+        result = _farm.run_pool_cli(pool, "logs", "--help")
+    except OSError as exc:
+        raise FarmPreflightError(
+            f"logs --help could not start (uv): {exc}"
+        ) from None
+    if result.returncode != 0:
+        raise FarmPreflightError(
+            f"logs --help failed (exit {result.returncode}){_tail(result.stdout)}"
+        )
+    if "--log-blob" not in result.stdout:
+        raise FarmPreflightError(
+            "pool CLI does not support exact failed-task log retrieval "
+            "(--log-blob). Update SOLIDWORKS_POOL_HOME to a solidworks-pool "
+            "checkout whose farm.py supports 'logs <workflow-id> --log-blob "
+            "<results/.../task.log>'."
+        )
 
 
 def _dissenting_workers(reports: object, protocol: int) -> list[str]:

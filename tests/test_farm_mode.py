@@ -640,8 +640,8 @@ _UNREPORTED_BLOCK = _agents_summary(
 )
 
 
-def _preflight_fakes(monkeypatch, *, agents=None, git=None):
-    """Fake a clean local project and the pool's protocol report."""
+def _preflight_fakes(monkeypatch, *, agents=None, logs_help=None, git=None):
+    """Fake a clean local project and the pool's protocol/capability reports."""
     stdout = {
         "status": "",
         "submodule": "",
@@ -650,6 +650,11 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
     stdout.update(git or {})
     if agents is None:
         agents = _agents_summary()
+    if logs_help is None:
+        logs_help = (
+            "usage: farm.py logs [-h] "
+            "[--log-blob results/.../task.log] [workflow_id]\n"
+        )
     launched = []
 
     def fake_run(argv, **kwargs):
@@ -657,8 +662,9 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
         if argv[0] == "git":
             out = stdout[argv[1]]
         else:
-            assert argv[-2:] == ["agents", "--json"]
-            out = agents
+            command = argv[-2:]
+            assert command in (["agents", "--json"], ["logs", "--help"])
+            out = agents if command == ["agents", "--json"] else logs_help
         if isinstance(out, BaseException):
             raise out
         return subprocess.CompletedProcess(argv, 0, out, "")
@@ -690,7 +696,8 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
     git_commands = [argv[1] for argv in launched if argv[0] == "git"]
     assert git_commands == ["status", "submodule", "rev-parse"]
     assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
+        ["agents", "--json"],
+        ["logs", "--help"],
     ]
     assert capsys.readouterr().out.splitlines()[:2] == [
         "farm: protocol 4 on 1 worker(s)",
@@ -722,7 +729,8 @@ def test_an_uninitialized_excluded_submodule_does_not_block_a_dispatch(
 
     assert build.main(["--executor", "farm", "part:x"]) == 0
     assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
-        ["agents", "--json"]
+        ["agents", "--json"],
+        ["logs", "--help"],
     ]
 
 
@@ -900,6 +908,31 @@ def test_preflight_protocol_faults_exit_2(agents, message, monkeypatch, capsys):
     assert capsys.readouterr().err == message + "\n"
     assert executed == []
     assert os.environ["HARMONIC_EXECUTOR"] == "farm"
+    assert os.environ.get("HARMONIC_FARM_COMMIT") is None
+    assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
+
+
+def test_protocol_four_cli_without_exact_log_capability_stops_before_actions(
+    monkeypatch, capsys
+):
+    launched = _preflight_fakes(
+        monkeypatch,
+        logs_help="usage: farm.py logs [-h] [workflow_id]\n",
+    )
+    _seen, executed = _install_real_doit(monkeypatch)
+
+    assert build.main(["--executor", "farm", "assembly:x"]) == 2
+    assert capsys.readouterr().err == (
+        "farm: pool CLI does not support exact failed-task log retrieval "
+        "(--log-blob). Update SOLIDWORKS_POOL_HOME to a solidworks-pool "
+        "checkout whose farm.py supports 'logs <workflow-id> --log-blob "
+        "<results/.../task.log>'.\n"
+    )
+    assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
+        ["agents", "--json"],
+        ["logs", "--help"],
+    ]
+    assert executed == []
     assert os.environ.get("HARMONIC_FARM_COMMIT") is None
     assert os.environ.get("HARMONIC_SW_AUTOSTART") is None
 
@@ -1502,6 +1535,8 @@ def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error
     ):
         if args == ("agents", "--json"):
             return subprocess.CompletedProcess(args, 0, _agents_summary(), "")
+        if args == ("logs", "--help"):
+            return subprocess.CompletedProcess(args, 0, "--log-blob\n", "")
         if args[-2:] == ("--log-blob", failed.log_blob):
             stdout.write("failed execution log: café\n".encode())
             stdout.write(b"failed log with damaged UTF-8: \xff\n")
