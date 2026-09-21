@@ -1,4 +1,4 @@
-"""Behavioral release contracts for the simplicity-policy pinion arbor."""
+"""Behavioral release contracts for the integral MHA-102 pinion arbor."""
 
 from __future__ import annotations
 
@@ -10,8 +10,7 @@ import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
 import pinion_arbor_spec as spec
-import pinion_handle_pin_spec as pin_spec
-import pinion_handle_spec as handle_spec
+import pinion_handle_spec as crossrod
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -32,6 +31,32 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
+def test_integral_arbor_preserves_the_released_absolute_envelope() -> None:
+    assert spec.HEAD_FRONT_Z == pytest.approx(-11.0)
+    assert spec.HEAD_REAR_Z == pytest.approx(-2.0)
+    assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
+    assert spec.NECK_END_Z == pytest.approx(10.0)
+    assert spec.SHAFT_LEN == pytest.approx(226.25)
+    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.0)
+    assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
+    assert spec.OVERALL_LEN == pytest.approx(241.45)
+    assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
+
+
+def test_integral_head_owns_the_crossrod_interface() -> None:
+    assert spec.HEAD_DIA == pytest.approx(15.0)
+    assert spec.HEAD_LEN == pytest.approx(9.0)
+    assert spec.NECK_DIA == pytest.approx(10.5)
+    assert spec.NECK_LEN == pytest.approx(12.0)
+    assert spec.CROSS_HOLE_DIA == pytest.approx(6.005)
+    assert crossrod.ROD_DIA == pytest.approx(6.0175)
+    assert crossrod.ROD_DIA > spec.CROSS_HOLE_DIA
+    callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
+    assert callout is spec.CROSS_HOLE_CALLOUT
+    assert "MHA-058" in callout and "HEAD MIDPLANE" in callout
+    assert "ARBOR-PRESS" in callout
+
+
 def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
     assert spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
     assert model_toleranced_dimensions(part) == {
@@ -45,43 +70,15 @@ def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
 
-def test_retention_hole_matches_the_handle_and_dedicated_pin() -> None:
-    assert spec.RETENTION_HOLE_DIA == pytest.approx(handle_spec.RETENTION_PIN_DIA)
-    assert spec.RETENTION_HOLE_DIA == pytest.approx(pin_spec.PIN_DIA)
-    assert spec.RETENTION_PIN_STATION == pytest.approx(
-        handle_spec.RETENTION_PIN_STATION_FROM_FLOOR
-    )
-    assert pin_spec.PIN_LEN == pytest.approx(handle_spec.TUBE_OD)
-    callout = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
-    assert callout is spec.RETENTION_HOLE_CALLOUT
-    assert "PINION HANDLE MHA-058" in callout
-    assert "RETENTION PIN MHA-136" in callout
-    assert "LIGHT DRIVE FIT" in callout
-    assert "NOT HAND-REMOVABLE" in callout
-
-
-def test_crown_is_model_dimensioned_without_geometric_frames() -> None:
-    radius, sag = spec.SHAFT_DIA / 2.0, spec.CAP_SAG
-    assert spec.CAP_R == pytest.approx((radius * radius + sag * sag) / (2.0 * sag))
-    assert drawing.DIMENSION_CALLOUTS["CapSagDim"] == "SR7.3 CROWN"
-    assert "CapSagDim" in drawing.PRINCIPAL_KEEP
-    assert drawing.DIMENSION_CALLOUTS["Depth"] == "TO CROWN ROOT"
-
-
-def test_every_printed_dimension_has_authored_precision() -> None:
-    assert spec.DRAWING_PRECISION_BY_NAME == {
-        "ShaftDia": 2,
-        "Depth": 1,
-        "CapSagDim": 1,
-        "RetentionHoleDia": 1,
-        "RetentionPinStation": 1,
+def test_retired_socket_and_retention_pin_are_not_exported() -> None:
+    retired = {
+        "RETENTION_HOLE_DIA",
+        "RETENTION_PIN_STATION",
+        "TUBE_ID",
+        "TUBE_OD",
+        "TUBE_LEN",
+        "WALL_T",
     }
-
-
-def test_registry_retains_make_critical_material_and_finish() -> None:
-    import _config
-
-    config = _config.parts("pinion-arbor")
-    assert "1018" in str(config["material_specification"])
-    assert config["finish"] == "oiled"
-    assert int(config["quantity"]) == 1
+    assert retired.isdisjoint(vars(spec))
+    assert "MHA-136" not in spec.DRAWING_NOTES
+    assert "RETENTION PIN" not in spec.CROSS_HOLE_CALLOUT

@@ -1,17 +1,8 @@
-r"""Reproduction script: pinion turning handle (book ch. 25).
+r"""Build the separate MHA-058 pinion grip crossrod.
 
-The current photo-derived geometry is a short Ø15 grip with a spherical crown
-and a 65 mm press-fit cross rod. The arbor axis is Z; the grip spans
--GRIP_LEN/2..+GRIP_LEN/2, followed by WALL_T and the blind TUBE_LEN socket.
-The cross rod spans -ROD_DOWN..+ROD_UP along Y and remains a separate solid.
-
-Volume gate: grip + spherical cap + wall + annulus - body hole + pressed rod.
-
-Dimensions: cad/config/dimensions.yaml "Chapter 25".
-
-Run (SolidWorks already open)::
-
-    uv run python cad\scripts\build_pinion_handle.py
+The registry slug remains ``pinion-handle`` for the operator-grip component.
+The part is now exactly one cold-finished rod body; MHA-102 owns the integral
+turned head, neck, arbor shaft, and match-reamed cross-hole.
 """
 
 from __future__ import annotations
@@ -23,12 +14,10 @@ from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
     define_circle,
-    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -39,7 +28,6 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -47,34 +35,22 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_prefix,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_handle_spec import (
-    CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    GRIP_DIA,
-    GRIP_LEN,
     ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DOWN,
-    ROD_HOLE_DIA,
-    ROD_UP,
-    RETENTION_PIN_CENTER_Z,
-    RETENTION_PIN_DIA,
-    RETENTION_PIN_STATION_FROM_MOUTH,
+    ROD_SPAN,
     SURFACE_FINISHES,
-    TUBE_ID,
-    TUBE_LEN,
-    TUBE_OD,
-    WALL_T,
 )
 
 PART_NAME = "pinion-handle"
-MATERIAL = "Plain Carbon Steel"  # bright steel (p.67)
+MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
@@ -83,324 +59,26 @@ _SAVED_DRAWING_PROPERTIES = (
     "Manufacturing Notes",
     "Isometric View Note",
 )
-
-GRIP_R = GRIP_DIA / 2.0
 ROD_R = ROD_DIA / 2.0
-ROD_HOLE_R = ROD_HOLE_DIA / 2.0
-CAP_R = (GRIP_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)
-RETENTION_PIN_R = RETENTION_PIN_DIA / 2.0
-
-V_GRIP = math.pi * GRIP_R**2 * GRIP_LEN
-V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 419.6
-V_WALL = math.pi * (TUBE_OD / 2.0) ** 2 * WALL_T
-V_TUBE = math.pi * ((TUBE_OD / 2.0) ** 2 - (TUBE_ID / 2.0) ** 2) * TUBE_LEN
-V_ROD = math.pi * ROD_R**2 * (ROD_DOWN + ROD_UP)
+V_ROD = math.pi * ROD_R**2 * ROD_SPAN
 
 
-def _grip_intersection(radius: float) -> float:
-    """Volume where a Y-axis cylinder of ``radius`` crosses the grip."""
-    n = 2000
-    y0, y1 = -GRIP_R, GRIP_R
-    h = (y1 - y0) / n
-
-    def area(y: float) -> float:
-        chord_half = math.sqrt(max(GRIP_R**2 - y * y, 0.0))
-        if chord_half >= radius:
-            return math.pi * radius**2
-        return 2.0 * (
-            chord_half * math.sqrt(radius**2 - chord_half**2)
-            + radius**2 * math.asin(chord_half / radius)
-        )
-
-    total = area(y0) + area(y1)
-    for i in range(1, n):
-        total += (4.0 if i % 2 else 2.0) * area(y0 + i * h)
-    return total * h / 3.0
-
-
-
-
-def _annulus_cross_hole_volume(
-    radius: float, outer_radius: float, inner_radius: float
-) -> float:
-    """Volume removed by a radial hole through a concentric annular tube."""
-    n = 2000
-    x0, x1 = -radius, radius
-    h = (x1 - x0) / n
-
-    def strip(x: float) -> float:
-        hole_height = 2.0 * math.sqrt(max(radius**2 - x * x, 0.0))
-        wall_path = 2.0 * (
-            math.sqrt(outer_radius**2 - x * x)
-            - math.sqrt(inner_radius**2 - x * x)
-        )
-        return hole_height * wall_path
-
-    total = strip(x0) + strip(x1)
-    for i in range(1, n):
-        total += (4.0 if i % 2 else 2.0) * strip(x0 + i * h)
-    return total * h / 3.0
-V_ROD_HOLE = _grip_intersection(ROD_HOLE_R)
-V_RETENTION_HOLE = _annulus_cross_hole_volume(
-    RETENTION_PIN_R, TUBE_OD / 2.0, TUBE_ID / 2.0
-)
-V_TOTAL = (
-    V_GRIP
-    + V_CAP
-    + V_WALL
-    + V_TUBE
-    - V_RETENTION_HOLE
-    - V_ROD_HOLE
-    + V_ROD
-)
-
-
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch line as construction geometry.
-
-    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
-    derived ISketchLine the entity registry binds -- rebind before the set.
-    """
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
+def _require_one_solid_body(adapter, *, label: str) -> None:
+    """Refuse to release a crossrod that is empty or accidentally multibody."""
+    bodies = tuple(
+        _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
+    )
+    if len(bodies) != 1:
+        raise RuntimeError(f"{label}: expected exactly one solid body, found {len(bodies)}")
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
-
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
-    # document). GripLen/WallT/TubeLen feed extrude DEPTHS (feature params).
-    await set_global(adapter, "GripDia", f"{GRIP_DIA}mm")
-    await set_global(adapter, "GripLen", f"{GRIP_LEN}mm")
-    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
     await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
-    await set_global(adapter, "RodHoleDia", f"{ROD_HOLE_DIA}mm")
+    await set_global(adapter, "RodSpan", f"{ROD_SPAN}mm")
     await set_global(adapter, "RodDown", f"{ROD_DOWN}mm")
-    await set_global(adapter, "RodUp", f"{ROD_UP}mm")
-    await set_global(adapter, "RetentionPinDia", f"{RETENTION_PIN_DIA}mm")
-    await set_global(
-        adapter, "RetentionPinCenterZ", f"{RETENTION_PIN_CENTER_Z}mm"
-    )
-    await set_global(adapter, "TubeOd", f"{TUBE_OD}mm")
-    await set_global(adapter, "TubeId", f"{TUBE_ID}mm")
-    await set_global(adapter, "TubeLen", f"{TUBE_LEN}mm")
-    await set_global(adapter, "WallT", f"{WALL_T}mm")
 
-    drive_jobs: list[tuple[str, str]] = []
-
-    # Cylindrical grip centered on the cross-rod plane.
-    grip = SketchDims()
-    check("create_sketch grip", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        GRIP_R,
-        "grip",
-        dims=grip,
-        names=("GripCx", "GripCz", "GripDia"),
-        drives=(None, None, '"GripDia"'),
-    )
-    await ensure_fully_defined(adapter, "grip sketch")
-    check("exit_sketch grip", await adapter.exit_sketch())
-    name_last_feature(adapter, "GripProfile")
-    drive_jobs += grip.apply(adapter, "GripProfile")
-    extrude_at_offset(adapter, GRIP_LEN, -GRIP_LEN / 2.0)
-    name_last_feature(adapter, "Grip")
-    drive_jobs += [(name_dimensions(adapter, "Grip", ["GripLen"])[0], '"GripLen"')]
-    expected = V_GRIP
-    await volume_check(adapter, "grip", expected, 0.005 * V_GRIP)
-
-    # Domed south cap (sagitta CAP_SAG proud of z -7): Top-plane rim->apex arc
-    # revolved about Z -- the crowned-cap idiom (apex at more-positive sketch
-    # v for a -Z end; rim -> apex is the minor CCW lobe).
-    v_base = GRIP_LEN / 2.0
-    v_apex = GRIP_LEN / 2.0 + CAP_SAG
-    v_centre = GRIP_LEN / 2.0 + CAP_SAG - CAP_R
-    cap = SketchDims()
-    check("create_sketch cap", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    check("cap centerline", await adapter.add_centerline(0.0, v_base, 0.0, v_apex))
-    base = check("cap base", await adapter.add_line(0.0, v_base, GRIP_R, v_base))
-    arc = check(
-        "cap arc",
-        await adapter.add_arc(0.0, v_centre, GRIP_R, v_base, 0.0, v_apex),
-    )
-    close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
-    set_sketch_direct_db(adapter, False)
-    check(
-        "cap base horizontal",
-        await adapter.add_sketch_constraint(base, None, "horizontal"),
-    )
-    check(
-        "cap close vertical",
-        await adapter.add_sketch_constraint(close, None, "vertical"),
-    )
-    check(
-        "cap rim reach",
-        await adapter.add_sketch_dimension(
-            f"{base}.end", "origin", "horizontal_distance", GRIP_R
-        ),
-    )
-    cap.record("CapRim", '"GripDia" / 2')
-    check(
-        "cap sagitta",
-        await adapter.add_sketch_dimension(
-            f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
-        ),
-    )
-    cap.record("CapSagDim", '"CapSag"')
-    check(
-        "cap on axis",
-        await adapter.add_sketch_constraint(
-            f"{base}.start", "origin", "vertical_points"
-        ),
-    )
-    check(
-        "cap station",
-        await adapter.add_sketch_dimension(
-            f"{base}.start", "origin", "vertical_distance", v_base
-        ),
-    )
-    cap.record("CapZ", '"GripLen" / 2')
-    check(
-        "cap radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
-    )
-    cap.record(
-        "CapR",
-        '("GripDia" / 2 * "GripDia" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
-    )
-    await ensure_fully_defined(adapter, "cap sketch")
-    check("exit_sketch cap", await adapter.exit_sketch())
-    name_last_feature(adapter, "CapProfile")
-    drive_jobs += cap.apply(adapter, "CapProfile")
-    check("revolve cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Cap")
-    expected += V_CAP
-    await volume_check(adapter, "cap", expected, 0.03 * V_CAP)
-
-    # Blind wall followed by the annular socket over the arbor stub.
-    wall = SketchDims()
-    check("create_sketch wall", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        TUBE_OD / 2.0,
-        "wall",
-        dims=wall,
-        names=("WallCx", "WallCz", "WallDia"),
-        drives=(None, None, '"TubeOd"'),
-    )
-    await ensure_fully_defined(adapter, "wall sketch")
-    check("exit_sketch wall", await adapter.exit_sketch())
-    name_last_feature(adapter, "WallProfile")
-    drive_jobs += wall.apply(adapter, "WallProfile")
-    extrude_at_offset(adapter, WALL_T, GRIP_LEN / 2.0)
-    name_last_feature(adapter, "Wall")
-    expected += V_WALL
-    await volume_check(adapter, "wall", expected, 0.01 * V_WALL)
-
-    tube = SketchDims()
-    check("create_sketch tube", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        TUBE_OD / 2.0,
-        "tube OD",
-        dims=tube,
-        names=("TubeOdCx", "TubeOdCz", "TubeOd"),
-        drives=(None, None, '"TubeOd"'),
-    )
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        TUBE_ID / 2.0,
-        "tube ID",
-        dims=tube,
-        names=("TubeIdCx", "TubeIdCz", "TubeId"),
-        drives=(None, None, '"TubeId"'),
-    )
-    await ensure_fully_defined(adapter, "tube sketch")
-    check("exit_sketch tube", await adapter.exit_sketch())
-    name_last_feature(adapter, "TubeProfile")
-    drive_jobs += tube.apply(adapter, "TubeProfile")
-    extrude_at_offset(adapter, TUBE_LEN, GRIP_LEN / 2.0 + WALL_T)
-    name_last_feature(adapter, "Tube")
-    drive_jobs += [(name_dimensions(adapter, "Tube", ["TubeLen"])[0], '"TubeLen"')]
-    expected += V_TUBE
-    await volume_check(adapter, "tube", expected, 0.01 * V_TUBE)
-
-    # Match-drilled handle-to-arbor retention hole.  The upper tee's small
-    # flush pin is distinct from the Ø6 grip cross rod; this reconstructed Ø2
-    # joint sits at the OD10.5 socket's mid-length and is reamed with the arbor
-    # to the actual MHA-136 pin at assembly.
-    retention = SketchDims()
-    check("create_sketch retention hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        -RETENTION_PIN_CENTER_Z,
-        RETENTION_PIN_R,
-        "retention hole",
-        dims=retention,
-        names=("RetentionHoleCx", "RetentionHoleCenterZ", "RetentionHoleDia"),
-        drives=(None, '"RetentionPinCenterZ"', '"RetentionPinDia"'),
-    )
-    await ensure_fully_defined(adapter, "retention-hole sketch")
-    check("exit_sketch retention hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "RetentionHoleProfile")
-    drive_jobs += retention.apply(adapter, "RetentionHoleProfile")
-    check(
-        "cut retention hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=TUBE_OD + 2.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "RetentionHole")
-    expected -= V_RETENTION_HOLE
-    await volume_check(
-        adapter, "retention hole", expected, 0.03 * V_RETENTION_HOLE
-    )
-
-    # Reamed cross-hole through the turned body.  The physical press fit is
-    # represented by overlapping bodies: this cut removes the hole from the
-    # turned body before the separate rod body is created below.
-    hole = SketchDims()
-    check("create_sketch rod hole", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        ROD_HOLE_R,
-        "rod hole",
-        dims=hole,
-        names=("RodHoleCx", "RodHoleCz", "RodHoleDia"),
-        drives=(None, None, '"RodHoleDia"'),
-    )
-    await ensure_fully_defined(adapter, "rod-hole sketch")
-    check("exit_sketch rod hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "RodHoleProfile")
-    drive_jobs += hole.apply(adapter, "RodHoleProfile")
-    check(
-        "cut rod hole",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=GRIP_DIA + 2.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "RodHole")
-    expected -= V_ROD_HOLE
-    await volume_check(adapter, "rod hole", expected, 0.01 * V_ROD_HOLE)
-
-    # Cross rod LAST: Top-plane on-axis circle extruded +Y across both arms as
-    # a separate body, matching the released two-piece press-fit construction.
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Top"))
     await define_circle(
@@ -408,230 +86,31 @@ async def build(adapter) -> dict[str, str]:
         0.0,
         0.0,
         ROD_R,
-        "rod",
+        "grip crossrod",
         dims=rod,
         names=("RodCx", "RodCz", "RodDia"),
         drives=(None, None, '"RodDia"'),
     )
-    await ensure_fully_defined(adapter, "rod sketch")
+    await ensure_fully_defined(adapter, "grip-crossrod sketch")
     check("exit_sketch rod", await adapter.exit_sketch())
     name_last_feature(adapter, "RodProfile")
-    drive_jobs += rod.apply(adapter, "RodProfile")
-    extrude_at_offset(
-        adapter,
-        ROD_DOWN + ROD_UP,
-        -ROD_DOWN,
-        merge_result=False,
-    )
+    drive_jobs = rod.apply(adapter, "RodProfile")
+
+    extrude_at_offset(adapter, ROD_SPAN, -ROD_DOWN)
     name_last_feature(adapter, "Rod")
-    drive_jobs += [
-        (name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodDown" + "RodUp"')
-    ]
-    await volume_check(adapter, "handle", V_TOTAL, 0.01 * V_ROD)
+    drive_jobs.append((name_dimensions(adapter, "Rod", ["RodSpan"])[0], '"RodSpan"'))
+    await volume_check(adapter, "grip crossrod", V_ROD, 0.005 * V_ROD)
+    _require_one_solid_body(adapter, label="grip crossrod")
 
-    # Three REFERENCE sketches (policy rule 2): the sheet prints the hub
-    # length and the body overall from the socket end, the cross-hole axis
-    # from the socket end and the rod's reach below the body axis, yet no
-    # feature dimension carries any of them (the extrudes are offset-started
-    # and the circle sketches sit on the origin).  Each value therefore gets a
-    # construction line whose driving dimension IS the value, marked for
-    # drawing like any other dimension.  Construction, not blanked: a blanked
-    # sketch's dimensions never reach InsertModelAnnotations3
-    # (build_harmonic_base measured it), while construction geometry imports
-    # normally and is never drawn in a view.  Each sketch sits on the plane of
-    # the view that prints it.  Direct-to-DB for the geometry: these lines lie
-    # on the axes and on the body's own silhouette, so creation-time inference
-    # would snap in the relations the explicit ones below add.
-    hub_end_z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
-    crown_tip_z = -(GRIP_LEN / 2.0 + CAP_SAG)
-    # Right plane, for the body side view: sketch (u, v) -> (-Z, Y).
-    hub = SketchDims()
-    check("create_sketch hub reference", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    hub_ref = check(
-        "hub length reference line",
-        await adapter.add_line(
-            -hub_end_z, TUBE_OD / 2.0, -GRIP_LEN / 2.0, TUBE_OD / 2.0
-        ),
-    )
-    body_ref = check(
-        "body overall reference line",
-        await adapter.add_line(-hub_end_z, 0.0, -crown_tip_z, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
-    for line in (hub_ref, body_ref):
-        _as_construction(adapter, line)
-        check(
-            "axial reference horizontal",
-            await adapter.add_sketch_constraint(line, None, "horizontal"),
-        )
-    await dimension_between(
-        adapter,
-        f"{hub_ref}.start",
-        f"{hub_ref}.end",
-        "horizontal_distance",
-        WALL_T + TUBE_LEN,
-        "hub length reference",
-    )
-    hub.record("HubLen", '"WallT" + "TubeLen"')
-    await dimension_between(
-        adapter,
-        f"{body_ref}.start",
-        f"{body_ref}.end",
-        "horizontal_distance",
-        hub_end_z - crown_tip_z,
-        "body overall reference",
-    )
-    hub.record("BodyLen", '"GripLen" + "WallT" + "TubeLen" + "CapSag"')
-    await anchor_point_to_origin(
-        adapter, f"{hub_ref}.start", -hub_end_z, TUBE_OD / 2.0, "hub length reference"
-    )
-    hub.record("HubEndZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
-    hub.record("HubRadius", '"TubeOd" / 2')
-    await anchor_point_to_origin(
-        adapter, f"{body_ref}.start", -hub_end_z, 0.0, "body overall reference"
-    )
-    hub.record("BodyEndZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
-    await ensure_fully_defined(adapter, "hub reference sketch")
-    check("exit_sketch hub reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "HubReference")
-    drive_jobs += hub.apply(adapter, "HubReference")
-
-    # Top plane, for the cross-hole view: sketch (u, v) -> (X, -Z), so the
-    # socket end at z = hub_end_z sits at v = -hub_end_z and the hole axis is
-    # the origin.
-    cross = SketchDims()
-    check("create_sketch cross-hole reference", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    cross_ref = check(
-        "cross-hole station reference line",
-        await adapter.add_line(0.0, -hub_end_z, 0.0, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, cross_ref)
-    check(
-        "cross-hole station reference vertical",
-        await adapter.add_sketch_constraint(cross_ref, None, "vertical"),
-    )
-    check(
-        "cross-hole station reference ends on the hole axis",
-        await adapter.add_sketch_constraint(f"{cross_ref}.end", "origin", "coincident"),
-    )
-    await dimension_between(
-        adapter,
-        f"{cross_ref}.start",
-        f"{cross_ref}.end",
-        "vertical_distance",
-        hub_end_z,
-        "cross-hole station reference",
-    )
-    cross.record("RodHoleZ", '"GripLen" / 2 + "WallT" + "TubeLen"')
-    await ensure_fully_defined(adapter, "cross-hole reference sketch")
-    check("exit_sketch cross-hole reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "CrossHoleReference")
-    drive_jobs += cross.apply(adapter, "CrossHoleReference")
-
-    # Top plane, for the retention-hole view: baseline the pin axis from the
-    # faced socket mouth.  The mid-length station is a photo-based
-    # reconstruction choice and remains independent of the Ø6 grip cross rod.
-    retention_ref_dims = SketchDims()
-    check(
-        "create_sketch retention reference",
-        await adapter.create_sketch("Top"),
-    )
-    set_sketch_direct_db(adapter, True)
-    retention_ref = check(
-        "retention station reference line",
-        await adapter.add_line(
-            0.0,
-            -hub_end_z,
-            0.0,
-            -RETENTION_PIN_CENTER_Z,
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, retention_ref)
-    check(
-        "retention station reference vertical",
-        await adapter.add_sketch_constraint(retention_ref, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{retention_ref}.start",
-        f"{retention_ref}.end",
-        "vertical_distance",
-        RETENTION_PIN_STATION_FROM_MOUTH,
-        "retention station from socket mouth",
-    )
-    retention_ref_dims.record(
-        "RetentionPinFromMouth", '"TubeLen" - ("RetentionPinCenterZ" '
-        '- ("GripLen" / 2 + "WallT"))'
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{retention_ref}.start",
-        0.0,
-        -hub_end_z,
-        "retention station reference",
-    )
-    retention_ref_dims.record(
-        "RetentionMouthZ", '"GripLen" / 2 + "WallT" + "TubeLen"'
-    )
-    await ensure_fully_defined(adapter, "retention reference sketch")
-    check("exit_sketch retention reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "RetentionReference")
-    drive_jobs += retention_ref_dims.apply(adapter, "RetentionReference")
-
-    # Front plane, for the assembled cross-rod view: the rod's reach below
-    # the body axis, from the origin (the grip's centre on that view).
-    rod_reach = SketchDims()
-    check("create_sketch rod reference", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    rod_ref = check(
-        "rod reach reference line",
-        await adapter.add_line(0.0, 0.0, 0.0, -ROD_DOWN),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, rod_ref)
-    check(
-        "rod reach reference vertical",
-        await adapter.add_sketch_constraint(rod_ref, None, "vertical"),
-    )
-    check(
-        "rod reach reference starts on the body axis",
-        await adapter.add_sketch_constraint(f"{rod_ref}.start", "origin", "coincident"),
-    )
-    await dimension_between(
-        adapter,
-        f"{rod_ref}.start",
-        f"{rod_ref}.end",
-        "vertical_distance",
-        ROD_DOWN,
-        "rod reach reference",
-    )
-    rod_reach.record("RodDown", '"RodDown"')
-    await ensure_fully_defined(adapter, "rod reference sketch")
-    check("exit_sketch rod reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "RodReference")
-    drive_jobs += rod_reach.apply(adapter, "RodReference")
-
-    # Deferred drive equations, then re-check neutrality (each evaluates to the
-    # as-built value, so the geometry must not move).
     await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
+    for dimension_name, expression in drive_jobs:
+        await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven handle (equations neutral)", V_TOTAL, 0.01 * V_ROD
+        adapter, "driven grip crossrod (equations neutral)", V_ROD, 0.005 * V_ROD
     )
+    _require_one_solid_body(adapter, label="driven grip crossrod")
 
-    # Manufacturing drawing support: mark exactly the print's dimensions,
-    # author their decimal places on the part (policy rule 2: the places are
-    # the tolerance, so the sheet reads them back instead of rewriting them)
-    # and stamp the make-critical title-block properties.  No local size
-    # bands: the socket and its seating depth take the title-block general
-    # grade (cad/docs/tolerance-policy.md).
-    set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
