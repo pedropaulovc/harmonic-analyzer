@@ -262,7 +262,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Feature View Note",
             "Notch View Note",
             "Isometric View Note",
-            "Section View Note",
         ),
         required=(
             "Number",
@@ -273,7 +272,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Feature View Note",
             "Notch View Note",
             "Isometric View Note",
-            "Section View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -394,7 +392,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
     add_property_linked_note(adapter, "Notch View Note", 0.245, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
-    add_property_linked_note(adapter, "Section View Note", 0.285, 0.075)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
