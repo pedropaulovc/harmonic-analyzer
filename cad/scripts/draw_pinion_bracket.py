@@ -187,7 +187,7 @@ LEFT_KEEP = {
     "PinSeatCz": (0.080, 0.090),
     "PinSeatDia": (0.130, 0.140),
 }
-SECTION_KEEP = {"PinSeatDepth": (0.340, 0.115)}
+SECTION_KEEP = {"PinSeatDepth": (0.395, 0.115)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
 # overall on its clear right, between the third-angle left and front views.
 OVERALL_XY = (0.112, 0.168)
@@ -469,7 +469,7 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_parent,
         line_start=(0.265, seat_axis_y),
         line_end=(0.305, seat_axis_y),
-        view_xy=(0.300, 0.115),
+        view_xy=(0.350, 0.115),
         section_label="B",
         scale=(3.0, 1.0),
         label="follower seat depth section",
