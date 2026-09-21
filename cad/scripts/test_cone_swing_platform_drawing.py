@@ -130,7 +130,7 @@ def test_sheet_has_no_gdt_or_dimension_bearing_notes() -> None:
 def test_pivot_section_exposes_thickness_and_relief_depth() -> None:
     assert set(drawing.SECTION_KEEP) == {"PlateThk", "PivotBearingReliefDepth"}
     assert len({drawing.PROFILE_CENTER, drawing.FEATURE_CENTER, drawing.NOTCH_CENTER}) == 3
-    assert spec.SECTION_VIEW_NOTE == "SECTION A-A SCALE 1:2"
+    assert spec.SECTION_VIEW_NOTE == "SCALE 1:2"
     assert spec.PLAN_VIEW_NOTE == "PLAN VIEWS SCALE 1:2"
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
     assert drawing.SHEET_SCALE == (1.0, 3.0)

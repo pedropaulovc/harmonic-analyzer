@@ -92,7 +92,7 @@ PROFILE_KEEP = {
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
-    "CornerNER": (0.125, 0.130),
+    "CornerNER": (0.135, 0.130),
     "CornerNWR": (0.025, 0.130),
     "CornerSWR": (0.118, 0.258),
     "CornerSER": (0.030, 0.258),
@@ -365,7 +365,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.200, 0.250),
+        callout_xy=(0.200, 0.258),
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
