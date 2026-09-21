@@ -176,12 +176,12 @@ FRONT_KEEP = {
 # both did at 2:1.
 DETAIL_KEEP = {
     "PivotBoreDia": (0.170, 0.155),
-    "CamReliefParkR": (0.170, 0.190),
+    "CamReliefParkR": (0.220, 0.190),
     "CamReliefParkX": (0.055, 0.220),
-    "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.160, 0.085),
+    "CamReliefParkY": (0.225, 0.175),
+    "CamReliefEngagedR": (0.200, 0.060),
     "CamReliefEngagedX": (0.055, 0.200),
-    "CamReliefEngagedY": (0.065, 0.125),
+    "CamReliefEngagedY": (0.225, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
 # station through the bar are dimensioned on real geometry.
