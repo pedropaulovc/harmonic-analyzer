@@ -204,7 +204,8 @@ def _tolerance_hole_depth(
     deviations_mm: tuple[float, float],
 ) -> None:
     """Apply and read back one native Hole Wizard depth tolerance in the part."""
-    feature = adapter._model.FeatureByName(feature_name)
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = model.FeatureByName(feature_name)
     if feature is None:
         raise RuntimeError(f"missing Hole Wizard feature {feature_name!r}")
     feature = _early_bound(feature, "IFeature")
