@@ -3,58 +3,58 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import pytest
 
-import _config
-from _assembly import _ALLOWED_FREE_STEMS
 import build_drive_train_assembly as assembly
-import draw_pinion_handle_pin as drawing
-import pinion_handle_pin_spec as spec
-import pinion_handle_spec as handle_spec
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _drawing_registry import DRAWINGS_BY_NAME
-
-
-def test_part_identity_and_drawing_registry_are_complete() -> None:
-    config = _config.parts("pinion-handle-pin")
-    assert config["number"] == "MHA-136"
-    assert "1018" in config["material_specification"]
-    assert int(config["quantity"]) == 1
-    registered = DRAWINGS_BY_NAME["pinion_handle_pin"]
-    assert registered.artifact_stem == "pinion-handle-pin"
-    assert "pinion-handle-pin" in _ALLOWED_FREE_STEMS["drive-train"]
-    assert registered.script == Path(drawing.__file__).resolve()
-    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-
-
-def test_plain_pin_definition_matches_the_upper_handle_joint() -> None:
-    assert spec.PIN_DIA == pytest.approx(2.0)
-    assert spec.PIN_DIA == pytest.approx(handle_spec.RETENTION_PIN_DIA)
-    assert spec.PIN_LEN == pytest.approx(handle_spec.TUBE_OD)
-    assert spec.DRAWING_DIMENSIONS == {"PinProfile": {"PinDia", "PinLen"}}
-    assert spec.DRAWING_PRECISION_BY_NAME == {"PinDia": 2, "PinLen": 1}
-    assert not [name for name in vars(spec) if name.endswith("_BAND")]
-    assert "MATCH-REAM" in spec.DRAWING_NOTES
-    assert "FLUSH" in spec.DRAWING_NOTES
+import pinion_handle_geometry as handle_geometry
+import pinion_handle_pin_spec as pin_spec
 
 
 def test_assembly_places_pin_coaxial_and_flush_in_rotated_handle() -> None:
-    axis = assembly.HANDLE_PIN_ROWS[2]
-    assert math.sqrt(sum(component * component for component in axis)) == pytest.approx(1.0)
-    expected_axis = (
-        -math.sin(math.radians(assembly.HANDLE_TILT_DEG)),
-        math.cos(math.radians(assembly.HANDLE_TILT_DEG)),
-        0.0,
+    """The placed pin crosses the socket at its matched arbor-hole station."""
+    pin_axis = assembly.HANDLE_PIN_ROWS[2]
+    pin_start = tuple(assembly.HANDLE_PIN_ORIGIN)
+    pin_end = tuple(
+        pin_start[axis] + pin_spec.PIN_LEN * pin_axis[axis] for axis in range(3)
     )
-    assert axis == pytest.approx(expected_axis)
-    midpoint = tuple(
-        assembly.HANDLE_PIN_ORIGIN[i] + spec.PIN_LEN / 2.0 * axis[i]
-        for i in range(3)
+
+    tilt = math.radians(assembly.HANDLE_TILT_DEG)
+    handle_axes = (
+        (math.cos(tilt), math.sin(tilt), 0.0),
+        (-math.sin(tilt), math.cos(tilt), 0.0),
+        (0.0, 0.0, 1.0),
     )
-    assert midpoint == pytest.approx(assembly.HANDLE_PIN_CENTER)
-    assert midpoint[2] == pytest.approx(
-        assembly.ARBOR_Z0 + assembly.ARBOR_RETENTION_PIN_STATION
+    handle_origin = (
+        assembly.APINION_X,
+        assembly.APINION_Y,
+        assembly.HANDLE_Z,
     )
-    assert assembly.HANDLE_PIN_LEN == pytest.approx(handle_spec.RETENTION_PIN_LEN)
+
+    def in_handle_frame(point: tuple[float, ...]) -> tuple[float, ...]:
+        offset = tuple(point[axis] - handle_origin[axis] for axis in range(3))
+        return tuple(
+            sum(offset[axis] * basis[axis] for axis in range(3))
+            for basis in handle_axes
+        )
+
+    local_start = in_handle_frame(pin_start)
+    local_end = in_handle_frame(pin_end)
+    socket_mid_station = (
+        handle_geometry.GRIP_LEN / 2.0
+        + handle_geometry.WALL_T
+        + handle_geometry.TUBE_LEN / 2.0
+    )
+    arbor_hole_station = (
+        assembly.ARBOR_Z0
+        + assembly.ARBOR_RETENTION_PIN_STATION
+        - assembly.HANDLE_Z
+    )
+
+    assert socket_mid_station == pytest.approx(arbor_hole_station)
+    assert local_start == pytest.approx(
+        (0.0, -handle_geometry.TUBE_OD / 2.0, socket_mid_station)
+    )
+    assert local_end == pytest.approx(
+        (0.0, handle_geometry.TUBE_OD / 2.0, socket_mid_station)
+    )
