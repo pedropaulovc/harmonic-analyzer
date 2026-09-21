@@ -284,7 +284,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "PRESSURE ANGLE",
         "PITCH DIAMETER (mm, REF)",
         "WHOLE DEPTH (mm, REF)",
-        "CIRCULAR TOOTH THICKNESS LIMITS (mm)",
+        "CIRCULAR TOOTH THICKNESS (mm)",
         "TOOTH FORM",
         "MATES WITH",
     ):
@@ -298,31 +298,31 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0
     )
-    # The explicit limits consume the widest band the pair can tolerate:
-    # MHA-021's span band contributes its worst transverse thinning, the
-    # crank-specific exact-solid study sets the 0.100 mm collision threshold,
-    # and the shared gear-mesh policy sets the 0.200 mm maximum backlash.
-    assert "CIRCULAR TOOTH THICKNESS LIMITS (mm, REF)" not in data
+    # The pinion must not consume the exact-solid study's unverified margin:
+    # that study validates nominal 0.150 mm tooth thinning and samples 0.100 mm
+    # only at the nominal c2c/helix/shaft/offset/bore stack. Keep the maximum
+    # pinion tooth nominal and reuse MHA-021's established 0.020 mm one-sided
+    # tooth-control capability; convert the mate's normal-span lower limit to
+    # prove the resulting nominal-geometry pair range.
+    assert "CIRCULAR TOOTH THICKNESS (mm, REF)" not in data
     assert (
-        f"CIRCULAR TOOTH THICKNESS LIMITS (mm):  "
-        f"{spec.TOOTH_THICKNESS_MIN:.3f}-{spec.TOOTH_THICKNESS_MAX:.3f}"
+        f"CIRCULAR TOOTH THICKNESS (mm):  "
+        f"{spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS:.3f} "
+        f"+{spec.TOOTH_THICKNESS_UPPER_DEVIATION:.3f}/"
+        f"{spec.TOOTH_THICKNESS_LOWER_DEVIATION:.3f}"
     ) in data
     mate_span_scale = math.cos(math.radians(mate.HELIX_ANGLE_DEG)) * math.cos(
         mate.NORMAL_PRESSURE_ANGLE_RAD
     )
     mate_extra_thinning = 0.020 / mate_span_scale
-    pair_minimum = mate.BACKLASH_MM - (
-        spec.TOOTH_THICKNESS_MAX - spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS
-    )
+    pair_minimum = mate.BACKLASH_MM - spec.TOOTH_THICKNESS_UPPER_DEVIATION
     pair_maximum = (
         mate.BACKLASH_MM
-        + (spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS - spec.TOOTH_THICKNESS_MIN)
+        - spec.TOOTH_THICKNESS_LOWER_DEVIATION
         + mate_extra_thinning
     )
-    assert pair_minimum == pytest.approx(0.100584, abs=1e-6)
-    assert pair_maximum == pytest.approx(0.199675, abs=1e-6)
-    assert pair_minimum >= 0.100
-    assert pair_maximum <= _config.fit("gear_mesh")["backlash_mm"][1]
+    assert pair_minimum == pytest.approx(0.150)
+    assert pair_maximum == pytest.approx(0.191091, abs=1e-6)
     assert "+/-" not in data
     assert "ISO 1328" not in data
     assert "BASE-TANGENT SPAN" not in data
