@@ -34,6 +34,7 @@ from knife_hanger_stud_spec import (
     CHAMFER_WIDTH_TOLERANCE_MM,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
+    DRAWING_DIMENSIONS,
     FINISHED_UNDERHEAD_MM,
     FINISHED_UNDERHEAD_TOLERANCE_MM,
 )
@@ -124,10 +125,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, detail)
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="cut end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished under-head length"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="finished under-head length",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *detail_annotations]
     _verify_controls(adapter, annotations)
