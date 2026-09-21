@@ -23,7 +23,7 @@ regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
   ranges are kept numeric (t in [0,1]) so only the expression parser
   needs global support.
 * One gap is cut through the blank, then circular-patterned about the gear
-  axis; the pattern instance count is equation-linked to ``ToothCount``.
+  axis; the pattern instance count is stored natively per configuration.
 
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
@@ -324,6 +324,72 @@ def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) ->
     )
 
 
+def set_pattern_counts_by_configuration(
+    adapter: Any, full_name: str
+) -> None:
+    """Write and prove the native instance-count value in every configuration."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    raw_dimension = adapter._attempt(
+        lambda: model.Parameter(full_name), default=None
+    )
+    if raw_dimension is None:
+        raise RuntimeError(f"cannot access pattern-count dimension {full_name}")
+    dimension = _early_bound(raw_dimension, "IDimension")
+    read_only = bool(dimension.ReadOnly)
+    applied_to_all = bool(dimension.IsAppliedToAllConfigurations())
+
+    equation_manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
+    equation_rows = tuple(
+        str(equation_manager.Equation(index) or "")
+        for index in range(int(_read_member(equation_manager, "GetCount") or 0))
+    )
+    count_equations = tuple(
+        equation for equation in equation_rows if full_name in equation
+    )
+    _telemetry.info(
+        f"pattern-count dimension contract: name={full_name!r}, "
+        f"read_only={read_only}, applied_to_all={applied_to_all}, "
+        f"equations={count_equations!r}"
+    )
+    if read_only:
+        raise RuntimeError(f"pattern-count dimension {full_name} is read-only")
+    if count_equations:
+        raise RuntimeError(
+            f"pattern-count dimension {full_name} still has equations: "
+            f"{count_equations!r}"
+        )
+
+    # swSetValue_InSpecificConfigurations=3 and swSpecifyConfiguration=3.
+    # Both APIs accept one configuration name as a BSTR. SetValue3 returns
+    # swSetValueReturnStatus_e, where zero is swSetValue_Successful.
+    for configuration, teeth in CONFIGS:
+        status = int(dimension.SetValue3(float(teeth), 3, configuration))
+        if status != 0:
+            raise RuntimeError(
+                f"{configuration}: SetValue3({teeth:g}) returned status {status}"
+            )
+        raw_values = dimension.GetValue3(3, configuration)
+        values = (
+            tuple(raw_values)
+            if isinstance(raw_values, (list, tuple))
+            else (raw_values,)
+        )
+        if len(values) != 1:
+            raise RuntimeError(
+                f"{configuration}: GetValue3 returned {raw_values!r}"
+            )
+        readback = float(values[0])
+        _telemetry.info(
+            f"{configuration}: native pattern count SetValue3 status={status}, "
+            f"GetValue3={readback:g}"
+        )
+        if abs(readback - teeth) > 1e-9:
+            raise RuntimeError(
+                f"{configuration}: native pattern count reads {readback:g}, "
+                f"expected {teeth}"
+            )
+
+
 def read_dimension(adapter: Any, full_name: str) -> float:
     """Read a dimension's value in the active configuration."""
     param = adapter._attempt(
@@ -522,54 +588,30 @@ def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
 async def assert_saved_configuration_topology(
     adapter: Any, *, phase: str = "saved"
 ) -> dict[str, float]:
-    """Fail closed unless all 20 reopened configurations retain real teeth."""
-    failures: list[str] = []
+    """Probe sentinels first; scan all 20 only if the discriminator passes."""
+    sentinels = (CONFIGS[-1], CONFIGS[0], CONFIGS[1], CONFIGS[3])
+    ordered = (*sentinels, *(item for item in CONFIGS if item not in sentinels))
     volumes: dict[str, float] = {}
-    ordered = (CONFIGS[-1], *CONFIGS[:-1])
     for configuration, teeth in ordered:
-        try:
-            volume, observation, issues = await _configuration_topology(
-                adapter,
-                configuration,
-                teeth,
-                phase=phase,
-            )
-        except Exception as exc:
-            failures.append(f"{configuration}: {exc}")
-            continue
+        volume, observation, issues = await _configuration_topology(
+            adapter,
+            configuration,
+            teeth,
+            phase=phase,
+        )
         volumes[configuration] = volume
         if issues:
-            model = _early_bound(adapter.currentModel, "IModelDoc2")
-            rebuilt = bool(model.ForceRebuild3(False))
-            try:
-                _healed_volume, healed_observation, healed_issues = (
-                    await _configuration_topology(
-                        adapter,
-                        configuration,
-                        teeth,
-                        phase=f"{phase} explicit-rebuild",
-                    )
-                )
-            except Exception as exc:
-                healed_observation = f"measurement failed: {exc}"
-                healed_issues = ("measurement failed",)
-            failures.append(
-                f"{observation}; issues={issues!r}; "
-                f"ForceRebuild3={rebuilt}; after={healed_observation}; "
-                f"after_issues={healed_issues!r}"
+            raise RuntimeError(
+                f"{phase} cone-gear configuration topology is invalid: "
+                f"{observation}; issues={issues!r}"
             )
+
     _activate_configuration(
         _early_bound(adapter.currentModel, "IModelDoc2"), CONFIGS[-1][0]
     )
-    if len(volumes) == len(CONFIGS):
-        family = [volumes[name] for name, _teeth in CONFIGS]
-        if not all(a < b for a, b in zip(family, family[1:], strict=False)):
-            failures.append(f"reopened volumes not monotonic: {volumes!r}")
-    if failures:
-        raise RuntimeError(
-            f"{phase} cone-gear configuration topology is invalid: "
-            + "; ".join(failures)
-        )
+    family = [volumes[name] for name, _teeth in CONFIGS]
+    if not all(a < b for a, b in zip(family, family[1:], strict=False)):
+        raise RuntimeError(f"reopened volumes not monotonic: {volumes!r}")
     return volumes
 
 
@@ -608,7 +650,6 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
         CreateConfigurationParameters,
-        CreateEquationParameters,
         ExtrusionParameters,
     )
 
@@ -912,12 +953,12 @@ async def build(adapter) -> dict[str, str]:
     check("cut tooth gap", gap_cut)
     gap_cut_name = name_last_feature(adapter, TOOTH_GAP_CUT)
 
-    # ------------------------------------------------------------------
-    # Pattern the gap about the gear axis; link the instance count to
-    # ToothCount. Axis selection is by point (view-projected, flaky for
-    # edge-on cylindrical faces), so walk candidates: a reference axis on
-    # Z first, then OD-face points at several angles away from the seed
-    # gap (which sits at ~0..1.4 degrees).
+    # Pattern the gap about the gear axis. The count dimension is stored
+    # natively per configuration below instead of being shared through an
+    # equation. Axis selection is by point (view-projected, flaky for edge-on
+    # cylindrical faces), so walk candidates: a reference axis on Z first,
+    # then OD-face points at several angles away from the seed gap (which sits
+    # at ~0..1.4 degrees).
     # ------------------------------------------------------------------
     from solidworks_mcp.adapters.base import CreateAxisParameters
 
@@ -937,15 +978,15 @@ async def build(adapter) -> dict[str, str]:
         )
     pattern = None
     for point in candidates:
-        # Persistence discriminator: solve every instance instead of copying
-        # seed faces. Exact pre-save topology guards below reject the sliver
-        # risk previously seen on a different gear rather than assuming it.
+        # Keep the production geometry algorithm unchanged for this
+        # persistence discriminator; only the count's configuration binding
+        # changes from one equation to native per-configuration values.
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,
                 features=[gap_cut_name],
                 count=DEFAULT_TEETH,
-                geometry_pattern=False,
+                geometry_pattern=True,
             )
         )
         if res.is_success:
@@ -957,12 +998,6 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("circular pattern: no axis candidate selectable")
     pattern_name = name_last_feature(adapter, TOOTH_PATTERN_FEATURE)
     count_dim = pattern_count_dimension(adapter, pattern_name, DEFAULT_TEETH)
-    check(
-        f"link {count_dim} to ToothCount",
-        await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{count_dim}" = "ToothCount"')
-        ),
-    )
 
     # ------------------------------------------------------------------
     # Default-config (DEFAULT_TEETH) gear volume, by the same analytic
@@ -1074,6 +1109,8 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+
+    set_pattern_counts_by_configuration(adapter, count_dim)
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1260,8 +1297,8 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     await assert_saved_configuration_topology(adapter, phase="reopened")
     raise RuntimeError(
-        "diagnostic complete: GeometryPattern=False persistence evidence captured; "
-        "refusing to publish probe artefacts"
+        "diagnostic complete: native per-configuration pattern-count "
+        "persistence evidence captured; refusing to publish probe artefacts"
     )
 
     if findings:
