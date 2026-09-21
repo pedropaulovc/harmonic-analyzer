@@ -18,7 +18,7 @@ param(
     [ValidateRange(1, 180)]
     [int]$LeafTimeout,
 
-    [ValidatePattern('^[A-Za-z0-9_-]+$')]
+    [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
     [string]$Tag = 'run'
 )
 
@@ -326,7 +326,7 @@ try {
     $env:PYTHONUNBUFFERED = '1'
     Push-Location -LiteralPath $resolvedWorktree
     try {
-        & uv @buildArgs *>&1 | Tee-Object -FilePath $logPath
+        & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
         $code = $LASTEXITCODE
     }
     finally {

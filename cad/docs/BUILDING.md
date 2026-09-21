@@ -106,7 +106,9 @@ so it also serializes COM across worktrees on the seat. Outputs land in
 The same lock is what bounds a farm worker: it serializes that worker's own COM
 session, not the fleet. Different workers hold different seats and run different
 leaves at the same time, which is why a farm submitter keeps several leaves in
-flight (`-n 8` by default, `HARMONIC_FARM_PARALLELISM`).
+flight. Run `build.py --executor farm` yourself and it adds `-n 8`
+(`HARMONIC_FARM_PARALLELISM`) unless you pass `-n`/`--process`; the supervised
+launcher passes `-n 4` explicitly, so a supervised run keeps four in flight.
 
 ## Forcing a full rebuild of one assembly
 
