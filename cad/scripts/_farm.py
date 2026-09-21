@@ -15,13 +15,18 @@ certificate and the bearer token (``Authorization: Bearer <jwt>``).
 from __future__ import annotations
 
 import asyncio
+import codecs
 import getpass
 import json
 import os
 import socket
+import subprocess
+import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
+from typing import BinaryIO
 
 import _telemetry
 
@@ -39,6 +44,9 @@ EXECUTION_TIMEOUT = timedelta(hours=8)
 LEAF_TIMEOUT_DEFAULT_S = 15 * 60
 LEAF_TIMEOUT_MIN_S = 60
 LEAF_TIMEOUT_MAX_S = 3 * 3600
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FAILED_LOG_TIMEOUT_S = 30.0
 
 
 @dataclass(frozen=True)
@@ -83,6 +91,139 @@ def workflow_id(task: str, cache_key: str | None, commit: str, timeout_s: int) -
 
 def enabled() -> bool:
     return os.environ.get("HARMONIC_EXECUTOR", "local") == "farm"
+
+
+def pool_home() -> Path:
+    """The pool checkout whose operator CLI reads completed leaf logs."""
+
+    return Path(
+        os.environ.get("SOLIDWORKS_POOL_HOME", REPO_ROOT.parent / "solidworks-pool")
+    )
+
+
+def run_pool_cli(
+    pool: Path,
+    *args: str,
+    stdout: int | BinaryIO = subprocess.PIPE,
+    timeout_s: float | None = None,
+) -> subprocess.CompletedProcess:
+    """Run the pool's ``farm.py`` in its own locked environment.
+
+    Captured output is decoded explicitly as UTF-8 for machine-readable callers.
+    A supplied binary sink receives raw stdout instead, allowing callers to spool
+    a task log without requiring the current ``sys.stderr`` to expose ``fileno``.
+    """
+
+    argv = [
+        "uv",
+        "run",
+        "--frozen",
+        "--project",
+        str(pool),
+        "python",
+        str(pool / "farm.py"),
+        *args,
+    ]
+    env = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
+    if stdout == subprocess.PIPE:
+        return subprocess.run(
+            argv,
+            cwd=REPO_ROOT,
+            env=env,
+            stdout=stdout,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout_s,
+        )
+    return subprocess.run(
+        argv,
+        cwd=REPO_ROOT,
+        env=env,
+        stdout=stdout,
+        timeout=timeout_s,
+    )
+
+
+def _write_spooled_utf8(spool: BinaryIO) -> bool:
+    """Copy a binary spool to task stderr incrementally, replacing bad UTF-8."""
+
+    spool.seek(0)
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    wrote = False
+    ends_with_newline = True
+    while chunk := spool.read(64 * 1024):
+        text = decoder.decode(chunk)
+        if text:
+            sys.stderr.write(text)
+            wrote = True
+            ends_with_newline = text.endswith(("\n", "\r"))
+    tail = decoder.decode(b"", final=True)
+    if tail:
+        sys.stderr.write(tail)
+        wrote = True
+        ends_with_newline = tail.endswith(("\n", "\r"))
+    if wrote and not ends_with_newline:
+        sys.stderr.write("\n")
+    sys.stderr.flush()
+    return wrote
+
+
+def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
+    """Print one failed leaf's complete worker log without changing its result."""
+
+    identity = f"{task} ({wf_id})"
+    print(f"--- begin failed farm task log: {identity} ---", file=sys.stderr, flush=True)
+    if result.log_blob is None:
+        print(
+            "no task log was published for this failed leaf",
+            file=sys.stderr,
+            flush=True,
+        )
+    else:
+        warnings = []
+        try:
+            with tempfile.TemporaryFile() as spool:
+                retrieved = None
+                try:
+                    retrieved = run_pool_cli(
+                        pool_home(),
+                        "logs",
+                        wf_id,
+                        "--log-blob",
+                        result.log_blob,
+                        stdout=spool,
+                        timeout_s=FAILED_LOG_TIMEOUT_S,
+                    )
+                except subprocess.TimeoutExpired:
+                    warnings.append(
+                        f"task log retrieval timed out after "
+                        f"{FAILED_LOG_TIMEOUT_S:g}s"
+                    )
+                except OSError as exc:
+                    warnings.append(f"task log retrieval could not start: {exc}")
+                try:
+                    wrote_log = _write_spooled_utf8(spool)
+                except (OSError, ValueError) as exc:
+                    wrote_log = False
+                    warnings.append(f"the retrieved task log could not be read: {exc}")
+                if retrieved is not None:
+                    if retrieved.returncode != 0:
+                        warnings.append(
+                            f"task log retrieval exited {retrieved.returncode}"
+                        )
+                    elif not wrote_log:
+                        warnings.append("task log retrieval returned no output")
+        except OSError as exc:
+            warnings.append(f"task log retrieval could not create its spool: {exc}")
+        for warning in warnings:
+            print(
+                f"warning: {warning}; the original farm failure is unchanged",
+                file=sys.stderr,
+                flush=True,
+            )
+    print(file=sys.stderr, flush=True)
+    print(f"--- end failed farm task log: {identity} ---", file=sys.stderr, flush=True)
 
 
 def config_path() -> Path:
@@ -199,6 +340,8 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         sp.set_attribute("worker", result.worker_id)
         sp.set_attribute("attempt", result.attempt)
         sp.set_attribute("state", result.state)
+        if result.state != "succeeded":
+            _emit_failed_task_log(task, wf_id, result)
         return result
 
 

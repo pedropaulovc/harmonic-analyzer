@@ -322,45 +322,9 @@ def _farm_preflight() -> None:
     if not _artifact_cache.enabled():
         raise FarmPreflightError("HARMONIC_REMOTE_CACHE_MODE must be ro or rw")
 
-    _require_fleet_protocol(_pool_home(), _farm.FARM_PROTOCOL_VERSION)
+    _require_fleet_protocol(_farm.pool_home(), _farm.FARM_PROTOCOL_VERSION)
     os.environ["HARMONIC_FARM_COMMIT"] = sha
     os.environ["HARMONIC_SW_AUTOSTART"] = "0"
-
-
-def _pool_home() -> Path:
-    return Path(
-        os.environ.get("SOLIDWORKS_POOL_HOME", REPO_ROOT.parent / "solidworks-pool")
-    )
-
-
-def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """Run one ``farm.py`` subcommand from the pool checkout, capturing stdout.
-
-    stderr is inherited so the pool's own progress and diagnostics reach the
-    console as they happen; stdout is the machine-readable result. The nested
-    ``uv`` targets the pool's own environment (``--project``); the
-    ``VIRTUAL_ENV`` this process inherited from the outer ``uv run`` names
-    ours, which uv would (correctly) ignore with a warning on every call.
-    """
-    argv = [
-        "uv",
-        "run",
-        "--frozen",
-        "--project",
-        str(pool),
-        "python",
-        str(pool / "farm.py"),
-        *args,
-    ]
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-    try:
-        return subprocess.run(
-            argv, cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, text=True
-        )
-    except OSError as exc:
-        raise FarmPreflightError(
-            f"{args[0]} could not start ({argv[0]}): {exc}"
-        ) from None
 
 
 def _dissenting_workers(reports: object, protocol: int) -> list[str]:
@@ -394,7 +358,12 @@ def _dissenting_workers(reports: object, protocol: int) -> list[str]:
 
 def _require_fleet_protocol(pool: Path, protocol: int) -> None:
     """Stop unless the pool CLI and every known worker support ``protocol``."""
-    result = _pool_farm(pool, "agents", "--json")
+    import _farm
+
+    try:
+        result = _farm.run_pool_cli(pool, "agents", "--json")
+    except OSError as exc:
+        raise FarmPreflightError(f"agents could not start (uv): {exc}") from None
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     if result.returncode != 0 or not lines:
         raise FarmPreflightError(

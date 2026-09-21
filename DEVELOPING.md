@@ -202,6 +202,13 @@ Read the records first, in this order:
    workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
    anything.
 
+When a leaf returns a failed result, the submitter includes its worker `task.log`
+in the build output before exiting, with delimiters naming the task and workflow.
+Log retrieval has a 30-second timeout; an absent or unavailable log produces a
+warning without replacing the original worker failure or changing the nonzero
+exit. Successful leaves do not download logs. The commands below remain useful
+for following a running workflow or recovering evidence after an interruption.
+
 In case 3, harvest every workflow ID the log recorded — both
 `Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
 *all* leaves, not one representative — and query each from the pool checkout:

@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 from datetime import timedelta
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -432,7 +433,7 @@ def _fixture_namespace(executed):
     return {"task_part": task_part, "task_assembly": task_assembly}
 
 
-def _install_real_doit(monkeypatch, namespace=None):
+def _install_real_doit(monkeypatch, namespace=None, *, reporter_output=None):
     """Use doit's real parser, loader and execution boundary with isolated state."""
     seen = []
     executed = []
@@ -449,6 +450,8 @@ def _install_real_doit(monkeypatch, namespace=None):
 
     monkeypatch.setattr(_doit_cmd_base, "JsonDB", MemoryJsonDB)
     config = {"GLOBAL": {"backend": "json", "dep_file": ":memory:"}}
+    if reporter_output is not None:
+        config["GLOBAL"]["outfile"] = reporter_output
 
     class FixtureFarmDoit(_RealFarmDoitMain):
         def __init__(self):
@@ -1391,6 +1394,126 @@ def temporal_boundary(tmp_path, monkeypatch):
         outcome["result"] = result
 
     return calls, resolve
+
+
+def test_exact_failed_leaf_log_is_captured_without_replacing_python_action_error(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF)
+    resolve(failed)
+    _preflight_fakes(monkeypatch)
+    dodo = _load_dodo()
+    expected_wf_id = "leaf:part:x:" + "k" * 64 + ":900s"
+
+    def pool_cli(_pool, *args, stdout=subprocess.PIPE, timeout_s=None):
+        if args == ("agents", "--json"):
+            return subprocess.CompletedProcess(args, 0, _agents_summary(), "")
+        if args[-2:] == ("--log-blob", failed.log_blob):
+            stdout.write("failed execution log: café\n".encode())
+            stdout.write(b"failed log with damaged UTF-8: \xff\n")
+        else:
+            stdout.write(b"newer execution under the same workflow ID\n")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", pool_cli)
+
+    def task_part():
+        yield {
+            "name": "x",
+            "actions": [(dodo._farm_build, ["part:x", "k" * 64, []])],
+            "verbosity": 2,
+        }
+
+    reporter_output = StringIO()
+    _install_real_doit(
+        monkeypatch, {"task_part": task_part}, reporter_output=reporter_output
+    )
+    exit_code = build.main(["--executor", "farm", "part:x"])
+
+    captured = capsys.readouterr()
+    log_output = captured.err
+    report_output = reporter_output.getvalue()
+    begin = log_output.index("--- begin failed farm task log:")
+    worker_log = log_output.index("failed execution log: café")
+    replacement = log_output.index("failed log with damaged UTF-8: \ufffd")
+    end = log_output.index("--- end failed farm task log:")
+    assert begin < worker_log < replacement < end
+    assert expected_wf_id in log_output
+    assert (
+        "part:x failed on sw-01@3 [task_failed] exit 87: "
+        "SolidWorks connect timed out"
+    ) in report_output
+    assert exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("diagnostic_outcome", "warning"),
+    [
+        (
+            subprocess.TimeoutExpired(["uv", "farm.py", "logs"], 30),
+            "task log retrieval timed out after 30s",
+        ),
+        (OSError("operator CLI unavailable"), "task log retrieval could not start"),
+        (
+            subprocess.CompletedProcess(["uv", "farm.py", "logs"], 19),
+            "task log retrieval exited 19",
+        ),
+    ],
+)
+def test_log_retrieval_faults_preserve_the_failed_leaf_result(
+    temporal_boundary, monkeypatch, capsys, diagnostic_outcome, warning
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF)
+    resolve(failed)
+
+    def diagnose(*_args, **_kwargs):
+        if isinstance(diagnostic_outcome, BaseException):
+            raise diagnostic_outcome
+        return diagnostic_outcome
+
+    monkeypatch.setattr(_farm, "run_pool_cli", diagnose)
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    error = capsys.readouterr().err
+    assert f"warning: {warning}" in error
+    assert "the original farm failure is unchanged" in error
+    assert "--- end failed farm task log:" in error
+
+
+def test_failed_leaf_without_a_log_blob_reports_absence_without_a_cli_call(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    failed = _leaf_result(**_FAILED_LEAF, log_blob=None)
+    resolve(failed)
+    monkeypatch.setattr(
+        _farm,
+        "run_pool_cli",
+        lambda *_args, **_kwargs: pytest.fail("queried logs without a log blob"),
+    )
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is failed
+    error = capsys.readouterr().err
+    assert "no task log was published for this failed leaf" in error
+    assert "--- end failed farm task log:" in error
+
+
+def test_successful_leaf_emits_no_task_log_diagnostic(
+    temporal_boundary, monkeypatch, capsys
+):
+    _calls, resolve = temporal_boundary
+    succeeded = _leaf_result()
+    resolve(succeeded)
+    monkeypatch.setattr(
+        _farm,
+        "run_pool_cli",
+        lambda *_args, **_kwargs: pytest.fail("queried logs for a successful leaf"),
+    )
+
+    assert _farm.run_leaf("part:pen_rod", "k" * 64) is succeeded
+    assert capsys.readouterr().err == ""
 
 
 def test_workflow_id_is_logged_before_acceptance_and_attachment_before_wait(
