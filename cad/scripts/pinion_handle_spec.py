@@ -108,11 +108,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The one sheet-derived dimension: the parenthesised socket-end-to-crown-root
-# station, a read-only difference of the overall and the cap sagitta with no
-# model dimension to import.  Its places are still specification, so the
-# sheet reads them here instead of typing a literal (policy rule 2).
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"socket end to crown root": 1}
 
 # The handle and arbor rotate together. This static socket is not a running
 # bearing, so it has no local roughness requirement under the simplicity policy.

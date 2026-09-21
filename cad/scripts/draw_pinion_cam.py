@@ -3,8 +3,8 @@ r"""Create the curated machinist drawing for the pinion lift cam.
 An eccentric steel collar: the Ø6.37 bore is offset 1.4 mm from the Ø10.32 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
-on the Front plane (front view carries OD/bore/eccentricity); the boss and the
-collar length live on the Top plane (top view carries the boss and length).
+on the Front plane (front view carries OD/bore/eccentricity); the collar length
+stays in the top view while the visible boss end owns its diameter and station.
 
 Run with SolidWorks open::
 
@@ -31,7 +31,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
@@ -71,13 +70,12 @@ SHEET_SCALE = (3.0, 1.0)
 # Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
 # is ON the origin, and the boss stub points down.  bbox spans the boss tip.
 FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
-FRONT_CENTER = (0.105, 0.150)
-# Third angle: the length view sits directly above the circular view, so the
-# body and bore axes project vertically between them (machinist round 2).
-TOP_CENTER = (0.105, 0.232)
-ISO_CENTER = (0.350, 0.185)
-BOTTOM_CENTER = (0.270, 0.195)
-
+FRONT_CENTER = (0.105, 0.140)
+# Third angle: the length view sits above the circular view, so the body and
+# bore axes project vertically between them.
+TOP_CENTER = (0.105, 0.217)
+ISO_CENTER = (0.350, 0.175)
+BOTTOM_CENTER = (0.270, 0.185)
 
 def _front_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
@@ -96,21 +94,24 @@ _SQRT_HALF = 0.5**0.5
 # through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 FRONT_KEEP = {
-    "BoreDia": (0.055, 0.186),
-    "CollarCy": (0.172, 0.172),
-    "BossProjection": (0.180, 0.122),
+    "BoreDia": (0.055, 0.176),
+    "CollarCy": (0.172, 0.162),
+    "BossProjection": (0.180, 0.112),
 }
 TOP_KEEP = {
-    "Depth": (0.062, 0.232),
-    "CollarOd": (0.105, 0.205),
-    "BossCz": (0.165, 0.226),
+    "Depth": (0.062, 0.217),
+    "CollarOd": (0.105, 0.190),
 }
-BOTTOM_KEEP = {"BossDia": (0.312, 0.228)}
+BOTTOM_KEEP = {
+    "BossDia": (0.312, 0.218),
+    "BossCz": (0.235, 0.225),
+}
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"FINAL REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-    "CollarCy": "BORE TO OD, BOTH END FACES",
-    "BossProjection": "BEYOND CAM OD",
-    "BossCz": "FRONT FACE TO BOSS AXIS",
+    "BoreDia": f"REAM THRU\nRUNNING FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
+    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS\nBOTH END FACES",
+    "BossProjection": "COSMETIC BOSS PROJECTION",
+    "BossDia": "COSMETIC BOSS\nM2.5 X 0.45-6H THRU TO BORE",
+    "BossCz": "BOSS AXIS STATION",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity, one
@@ -167,13 +168,12 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=(2, 1)
     )
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, top, bottom):
-        set_hidden_lines_visible(adapter, view)
+    for view in (front, top, bottom, iso):
+        set_hidden_lines_removed(adapter, view)
 
-    # The boss end view is curated FIRST so the boss diameter settles on the
-    # view where the boss is a SOLID circle; imported into the length view it
-    # can only attach to a hidden edge (machinist round 2).
+    # The boss end view is curated first so its visible circle owns both the
+    # cosmetic diameter and the 3.0 axial station; either dimension imported
+    # into the opposite length view could attach only to hidden geometry.
     bottom_annotations = curate_view_dimensions(
         adapter, bottom, keep=BOTTOM_KEEP, view_label="boss end"
     )
@@ -186,25 +186,27 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*bottom_annotations, *front_annotations, *top_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The boss projection is cosmetic: its 0.5 mm model value communicates
-    # nominal shape, but must not invent a tight band merely to guarantee that
-    # the dome stays proud at every general-grade limit.  Parentheses make the
-    # imported linear dimension explicitly non-controlling while preserving
-    # the model-owned nominal and BOSS_Z=3.0 station.
-    projection_annotations = [
-        annotation
-        for annotation in front_annotations
-        if dimension_name(adapter, annotation) == "BossProjection"
-    ]
-    if len(projection_annotations) != 1:
-        raise RuntimeError(
-            "expected one cosmetic boss projection reference dimension"
+    # The boss dome is cosmetic: its diameter and projection communicate
+    # nominal shape, but neither controls the functional M2.5 thread, which
+    # runs through the collar's thick wall.  Keep both model-owned nominals
+    # explicitly reference-only while the 3.0 station remains controlling.
+    reference_groups = {
+        "BossProjection": front_annotations,
+        "BossDia": bottom_annotations,
+    }
+    for name, group in reference_groups.items():
+        matches = [
+            annotation
+            for annotation in group
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one cosmetic {name} reference dimension")
+        set_reference_dimension(
+            adapter,
+            matches[0],
+            label=f"cosmetic {name} reference",
         )
-    set_reference_dimension(
-        adapter,
-        projection_annotations[0],
-        label="cosmetic boss projection reference",
-    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
@@ -225,15 +227,15 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=bore_finish_edge,
         # Its BORE label stacks upward from the symbol; 0.190 put the label
         # 4 mm under the boss-station callout's underline (iter4).
-        symbol_xy=(0.150, 0.180),
+        symbol_xy=(0.150, 0.170),
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
         label="cam bore finish",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.174) is None:
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    if add_note(adapter, "BOSS END VIEW SCALE 2:1", 0.245, 0.164) is None:
         raise RuntimeError("failed to label cam boss end view")
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.145)
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.135)
 
     return await finalize_drawing(
         adapter,
