@@ -175,12 +175,12 @@ FRONT_KEEP = {
 # below it, so neither leader lands on the virtual circle in the air the way
 # both did at 2:1.
 DETAIL_KEEP = {
-    "PivotBoreDia": (0.230, 0.155),
-    "CamReliefParkR": (0.190, 0.185),
-    "CamReliefParkX": (0.120, 0.235),
+    "PivotBoreDia": (0.240, 0.155),
+    "CamReliefParkR": (0.165, 0.195),
+    "CamReliefParkX": (0.080, 0.235),
     "CamReliefParkY": (0.065, 0.175),
-    "CamReliefEngagedR": (0.190, 0.090),
-    "CamReliefEngagedX": (0.120, 0.220),
+    "CamReliefEngagedR": (0.145, 0.075),
+    "CamReliefEngagedX": (0.080, 0.220),
     "CamReliefEngagedY": (0.065, 0.125),
 }
 # The seat's own plane: its mouth circle is solid here, so its size and its
@@ -537,7 +537,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_xy=(_detail_x(0.0), _detail_y(-PIVOT_BORE / 2.0)),
-        symbol_xy=(0.205, 0.115),
+        symbol_xy=(0.185, 0.110),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )
