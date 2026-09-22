@@ -254,6 +254,25 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
         )
 
 
+
+
+def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
+    """Prove every dashed isometric annotation is native cosmetic-thread ink."""
+    annotation_types = [
+        int(_early_bound(raw, "IAnnotation").GetType())
+        for raw in (_early_bound(view, "IView").GetAnnotations() or ())
+    ]
+    if not annotation_types or any(kind != 1 for kind in annotation_types):
+        raise RuntimeError(
+            "cone-tip isometric annotation provenance changed: "
+            f"types={annotation_types!r}"
+        )
+    _telemetry.debug(
+        f"cone-tip isometric: {len(annotation_types)} cosmetic-thread annotations"
+    )
+    return len(annotation_types)
+
+
 _COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
 
 
@@ -513,10 +532,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         left,
         edge=pinch_thread_edge,
-        callout_xy=(0.254, 0.181),
+        callout_xy=(0.254, 0.190),
         label="pinch opposite-jaw thread",
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
+    _audit_isometric_annotation_provenance(adapter, iso)
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x, y in (
