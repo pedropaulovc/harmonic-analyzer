@@ -684,9 +684,11 @@ def _checkpoint(output, report):
     temporary.replace(output)
 
 
-async def calibrate(adapter, output):
+async def calibrate(adapter, preset, output):
+    if preset not in PRESETS:
+        raise ValueError(f"unsupported clamp calibration preset: {preset!r}")
     report = {
-        "schema_version": 1, "status": "started", "presets": list(PRESETS), "completed_presets": [],
+        "schema_version": 1, "status": "started", "presets": [preset], "completed_presets": [],
         "counters": {}, "evidence": {}, "source_bodies": {}, "copied_bodies": {},
         "provisional_seed_gap_mm": SEED_GAP, "open_installation_gap_mm": goose.SPRING_SCREW_OPEN_GAP_MM,
         "length_policy": "old length is seed only; refit native pose and catalog preload to channel torque",
@@ -696,32 +698,49 @@ async def calibrate(adapter, output):
         "temporary_solids": [f"cad/out/sldprt/{name}.SLDPRT" for name in ROLE_PARTS.values()],
     }
     _checkpoint(output, report)
+    failure = None
     try:
         table = _config.machine("springs", "presets")
         await _extract_goose(adapter, report)
         _checkpoint(output, report)
-        for preset in PRESETS:
-            evidence = report["evidence"][preset] = {}
-            with _telemetry.span("clamp.calibrate_preset", preset=preset):
-                report["counters"][preset] = await _calibrate_preset(adapter, preset, table, evidence)
-            report["completed_presets"].append(preset)
-            _checkpoint(output, report)
+        evidence = report["evidence"][preset] = {}
+        with _telemetry.span("clamp.calibrate_preset", preset=preset):
+            report["counters"][preset] = await _calibrate_preset(adapter, preset, table, evidence)
+        report["completed_presets"].append(preset)
+        _checkpoint(output, report)
         report["status"] = "completed"
         return {"report": str(output)}
-    except BaseException:
+    except BaseException as exc:
+        failure = exc
         report["status"] = "failed"
         report["error"] = traceback.format_exc()
+        # Failed declared outputs are not published to the success cache. Put
+        # the complete census/brackets in immutable task.log once, not per trial.
+        try:
+            _telemetry.error(
+                "CLAMP_CALIBRATION_FAILED_REPORT_JSON "
+                + json.dumps(report, allow_nan=False)
+            )
+        except BaseException as logging_failure:
+            exc.add_note(f"failed to log calibration report: {logging_failure!r}")
         raise
     finally:
-        _checkpoint(output, report)
+        try:
+            _checkpoint(output, report)
+        except BaseException as checkpoint_failure:
+            if failure is None:
+                raise
+            failure.add_note(f"failed to checkpoint calibration report: {checkpoint_failure!r}")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "cad/out/reports/summing-clamp-calibration.json")
+    parser.add_argument("--preset", required=True, choices=PRESETS)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    output = args.output or ROOT / f"cad/out/reports/summing-clamp-calibration-{args.preset}.json"
     # _cached_com_action is the sole seat owner. No --write mode exists.
-    return run_build(lambda adapter: calibrate(adapter, args.output.resolve()))
+    return run_build(lambda adapter: calibrate(adapter, args.preset, output.resolve()))
 
 
 if __name__ == "__main__":

@@ -2619,9 +2619,8 @@ def task_verify():
     SolidWorks-free ``check:`` tasks).
     """
     # Throwaway native experiment, deliberately in the sanctioned worker graph.
-    # Only this leaf is dispatched; no saved summing assembly or channel refit.
+    # Presets publish independently; the local aggregate never holds a COM seat.
     calibration = SCRIPTS_DIR / "diagnostics" / "calibrate_summing_clamp.py"
-    calibration_report = REPORTS / "summing-clamp-calibration.json"
     anchors = ("boss_hook", "gooseneck")
     calibration_deps = list(
         dict.fromkeys(
@@ -2636,29 +2635,42 @@ def task_verify():
     )
     yield {
         "name": "calibrate_summing_clamp",
-        "task_dep": [f"part:{stem}" for stem in anchors],
-        "file_dep": calibration_deps,
-        "targets": [str(calibration_report)],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "verify:calibrate_summing_clamp",
-                    [
-                        sys.executable,
-                        str(calibration.resolve()),
-                        "--output",
-                        str(calibration_report.resolve()),
-                    ],
-                    calibration_deps,
-                    [calibration_report],
-                    "verify-calibrate-summing-clamp",
-                ],
-            )
+        "task_dep": [
+            f"verify:calibrate_summing_clamp_{preset}"
+            for preset in ("neutral", "square")
         ],
-        "clean": True,
-        "verbosity": 2,
+        "actions": None,
     }
+    for preset in ("neutral", "square"):
+        name = f"calibrate_summing_clamp_{preset}"
+        calibration_report = REPORTS / f"summing-clamp-calibration-{preset}.json"
+        yield {
+            "name": name,
+            "task_dep": [f"part:{stem}" for stem in anchors],
+            "file_dep": calibration_deps,
+            "targets": [str(calibration_report)],
+            "actions": [
+                (
+                    _cached_com_action,
+                    [
+                        f"verify:{name}",
+                        [
+                            sys.executable,
+                            str(calibration.resolve()),
+                            "--preset",
+                            preset,
+                            "--output",
+                            str(calibration_report.resolve()),
+                        ],
+                        calibration_deps,
+                        [calibration_report],
+                        f"verify-calibrate-summing-clamp-{preset}",
+                    ],
+                )
+            ],
+            "clean": True,
+            "verbosity": 2,
+        }
 
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
