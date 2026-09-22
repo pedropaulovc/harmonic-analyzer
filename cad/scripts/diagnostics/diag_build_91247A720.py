@@ -60,6 +60,7 @@ GB_PITCH = 25.4 / 13.0     # stored 1.953846
 GB_MTL = 31.75
 GB_UNDERSIDE = 21.43125    # (L + HH)/2 - HH
 GB_WASHER_T = 0.2
+ROOT_CHAMFER_MM = GB_PITCH * math.sqrt(3.0) / 2.0 * 0.75
 
 # --- raised triangle logo ring -----------------------------------------------
 # The vendor authored this as a mid-plane Extrude-Thin over a 6-segment
@@ -143,13 +144,13 @@ async def build_91247A720(
     major_r = GB_MAJOR_R
     pitch = GB_PITCH
     h_sharp = pitch * math.sqrt(3.0) / 2.0
-    root_r = major_r - 0.75 * h_sharp
+    root_r = major_r - ROOT_CHAMFER_MM
     flat_r = GB_HW / 2.0
     hex_R = flat_r * 2.0 / math.sqrt(3.0)
     tip_y = GB_UNDERSIDE - GB_LEN            # -29.36875
     top_y = GB_UNDERSIDE + GB_HH             # +29.36875
     thread_top = tip_y + GB_MTL              # +2.38125
-    tip_ch = pitch * 0.75                    # 1.465385
+    tip_ch = pitch * 0.75                    # 1.465385, supplier tip only
     tip_flat_r = pitch * 2.5                 # 4.884615 (D1@Sketch2)
     trim_r = GB_HW * 0.925 / 2.0             # 8.81062
     washer_r = flat_r                        # Sketch5 circle 9.525
@@ -327,7 +328,9 @@ async def build_91247A720(
         trim_stock = SimpleNamespace(
             thread_major_radius_mm=major_r,
             thread_major_dia_mm=2.0 * major_r,
-            end_chamfer_mm=tip_ch,
+            # The post-purchase cut is root-derived, not the supplier tip
+            # chamfer: the flat reaches the modeled thread root radius.
+            end_chamfer_mm=ROOT_CHAMFER_MM,
             shank_end_y_mm=stock_tip_y,
             eye_od_mm=2.0 * stock_underhead_y,
         )
