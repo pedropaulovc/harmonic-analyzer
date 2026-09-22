@@ -33,7 +33,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from summing_assembly_spec import (
     BOM_COMPONENTS,
@@ -49,9 +49,14 @@ from build_knife_hanger_stud import THREAD_TIP_ROOT_RADIUS_MM
 from build_knife_mount import STUD_TAP_DIA
 from build_summing_assembly import (
     DRAWING_NUMBER,
+    HANGER_COMPLETE_MALE_START_DEPTH_MM,
     HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM,
+    HANGER_ENGAGEMENT_MAX_MM,
+    HANGER_ENGAGEMENT_MIN_MM,
     HANGER_ENGAGEMENT_PRECISION,
     HANGER_ENGAGEMENT_TARGET_MM,
+    HANGER_TAP_DRILL_SHOULDER_MIN_MM,
+    HANGER_TAP_FULL_THREAD_MIN_MM,
     HEX_Z_MID,
     KNIFE,
     KNIFE_MOUNT_TOP_Y,
@@ -107,6 +112,10 @@ HANGER_DETAIL_CENTER = (0.095, 0.080)
 # reference it; test_summing_assembly_drawing.py pins the cross-reference.
 HANGER_DETAIL_LABEL = "B"
 HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
+# Built-solid readback tolerances: circle y/r agreement, and how far a circle
+# centre may sit off the nominal hanger axis and still belong to that station.
+BUILT_GEOMETRY_TOLERANCE_MM = 1e-4
+BUILT_STATION_TOLERANCE_MM = 0.01
 BOM_ANCHOR = (0.195, 0.258)
 BOM_COLUMN_WIDTHS = {
     "item": 0.020,
@@ -441,23 +450,23 @@ def _curve_kind(curve: Any) -> str:
     return "trimmed-other"
 
 
-def _census_component_geometry(
-    views: tuple[tuple[str, Any], ...],
+def _census_error(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _census_view_edges(
+    view_label: str,
+    raw_view: Any,
     *,
     component_stem: str,
-    target_y_mm: float,
     label: str,
+    brep_components: dict[str, Any],
 ) -> None:
-    """Record, never judge, where a component's circular edges really are.
-
-    Two independent readings: the curve-type mix of the edges each view reports
-    visible, and the circular edges of the component's own B-rep transformed
-    into assembly space. Together they separate an edge the view hides from
-    geometry that is not where the drawing expects it.
-    """
-    brep_components: dict[str, Any] = {}
-    for view_label, raw_view in views:
+    """Record one view's visible-edge curve mix per stem instance (never raises)."""
+    facts: dict[str, Any] = {"label": label, "view": view_label}
+    try:
         view = _early_bound(raw_view, "IView")
+        facts["view_name"] = str(view.GetName2() or "")
         for raw_drawing_component in tuple(view.GetVisibleDrawingComponents() or ()):
             component = _early_bound(
                 _early_bound(raw_drawing_component, "IDrawingComponent").Component,
@@ -466,36 +475,55 @@ def _census_component_geometry(
             if _component_stem(component) == component_stem:
                 name = str(component.Name2 or "").rsplit("/", 1)[-1]
                 brep_components.setdefault(name, component)
-        for raw_component in tuple(view.GetVisibleComponents() or ()):
+        components = tuple(view.GetVisibleComponents() or ())
+    except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
+        facts["error"] = _census_error(exc)
+        _telemetry.event("drawing.visible_edge_kinds", **facts)
+        _telemetry.warn(f"{label} census: {view_label} view unreadable: {facts['error']}")
+        return
+    for raw_component in components:
+        component_facts = dict(facts)
+        kinds: dict[str, int] = {}
+        try:
             component = _early_bound(raw_component, "IComponent2")
             if _component_stem(component) != component_stem:
                 continue
-            name = str(component.Name2 or "").rsplit("/", 1)[-1]
-            kinds: dict[str, int] = {}
+            component_facts["component"] = str(component.Name2 or "").rsplit("/", 1)[-1]
             for raw_edge in tuple(view.GetVisibleEntities2(component, 1) or ()):
                 kind = _curve_kind(_early_bound(raw_edge, "IEdge").GetCurve())
                 kinds[kind] = kinds.get(kind, 0) + 1
-            silhouettes = len(tuple(view.GetVisibleEntities2(component, 4) or ()))
-            facts = {
-                "label": label,
-                "view": view_label,
-                "view_name": str(view.GetName2() or ""),
-                "component": name,
-                "edge_kinds": tuple(sorted(kinds.items())),
-                "silhouette_edges": silhouettes,
-            }
-            _telemetry.event("drawing.visible_edge_kinds", **facts)
-            _telemetry.info(
-                f"{label} census: {view_label} view {facts['view_name']!r} "
-                f"{name} visible edge kinds {dict(sorted(kinds.items()))}, "
-                f"{silhouettes} silhouette edges"
+            component_facts["silhouette_edges"] = len(
+                tuple(view.GetVisibleEntities2(component, 4) or ())
             )
+        except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
+            component_facts["error"] = _census_error(exc)
+        component_facts["edge_kinds"] = tuple(sorted(kinds.items()))
+        _telemetry.event("drawing.visible_edge_kinds", **component_facts)
+        _telemetry.info(
+            f"{label} census: {view_label} view "
+            f"{component_facts.get('view_name')!r} "
+            f"{component_facts.get('component')} visible edge kinds "
+            f"{dict(sorted(kinds.items()))}, "
+            f"{component_facts.get('silhouette_edges')} silhouette edges"
+            + (f"; error {component_facts['error']}" if "error" in component_facts else "")
+        )
 
-    for name, component in sorted(brep_components.items()):
-        circles: dict[tuple[float, float], int] = {}
-        kinds: dict[str, int] = {}
-        y_range = [math.inf, -math.inf]
-        raw_y_range = [math.inf, -math.inf]
+
+def _census_brep_circles(
+    name: str,
+    component: Any,
+    *,
+    target_y_mm: float,
+    label: str,
+) -> None:
+    """Record one instance's B-rep circles in assembly space (never raises)."""
+    circles: dict[tuple[float, float], int] = {}
+    kinds: dict[str, int] = {}
+    y_range = [math.inf, -math.inf]
+    raw_y_range = [math.inf, -math.inf]
+    transform: tuple[float, ...] = ()
+    error = None
+    try:
         transform = tuple(
             float(value)
             for value in _early_bound(component.Transform2, "IMathTransform").ArrayData
@@ -528,33 +556,262 @@ def _census_component_geometry(
                     round(parameters[6] * transform[12] * 1000.0, 5),
                 )
                 circles[key] = circles.get(key, 0) + 1
-        nearest = sorted(circles.items(), key=lambda item: abs(item[0][0] - target_y_mm))
-        _telemetry.event(
-            "drawing.brep_circle_census",
+    except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
+        error = _census_error(exc)
+    nearest = sorted(circles.items(), key=lambda item: abs(item[0][0] - target_y_mm))
+    origin = tuple(value * 1000.0 for value in transform[9:12])
+    axis = transform[3:6]
+    _telemetry.event(
+        "drawing.brep_circle_census",
+        label=label,
+        component=name,
+        target_y_mm=target_y_mm,
+        body_y_range_mm=tuple(y_range),
+        raw_body_y_range_mm=tuple(raw_y_range),
+        origin_mm=origin,
+        part_y_axis=axis,
+        transform=transform,
+        edge_kinds=tuple(sorted(kinds.items())),
+        circles=tuple(f"y={y} r={r} x{count}" for (y, r), count in nearest[:40]),
+        error=error,
+    )
+    _telemetry.info(
+        f"{label} census: {name} origin "
+        f"{tuple(round(value, 5) for value in origin)} mm, part +Y axis "
+        f"{tuple(round(value, 9) for value in axis)}, scale "
+        f"{transform[12] if len(transform) > 12 else None}; B-rep y range "
+        f"{y_range[0]:.4f}..{y_range[1]:.4f} mm (raw "
+        f"{raw_y_range[0]:.4f}..{raw_y_range[1]:.4f}; target tip "
+        f"{target_y_mm:.4f}); edge kinds {dict(sorted(kinds.items()))}; "
+        "circles nearest the target (y, r mm, count): "
+        + "; ".join(f"{y} {r} x{count}" for (y, r), count in nearest[:16])
+        + (f"; error {error}" if error else "")
+    )
+
+
+def _census_component_geometry(
+    views: tuple[tuple[str, Any], ...],
+    *,
+    component_stem: str,
+    target_y_mm: float,
+    label: str,
+) -> None:
+    """Record, never judge, where a component's circular edges really are.
+
+    Two independent readings: the curve-type mix of the edges each view reports
+    visible, and the circular edges of the component's own B-rep transformed
+    into assembly space. Together they separate an edge the view hides from
+    geometry that is not where the drawing expects it. Every section records
+    its own exception and carries on: a diagnostic must never cost a round.
+    """
+    brep_components: dict[str, Any] = {}
+    for view_label, raw_view in views:
+        _census_view_edges(
+            view_label,
+            raw_view,
+            component_stem=component_stem,
             label=label,
-            component=name,
-            target_y_mm=target_y_mm,
-            body_y_range_mm=tuple(y_range),
-            raw_body_y_range_mm=tuple(raw_y_range),
-            origin_mm=tuple(value * 1000.0 for value in transform[9:12]),
-            part_y_axis=transform[3:6],
-            transform=transform,
-            edge_kinds=tuple(sorted(kinds.items())),
-            circles=tuple(f"y={y} r={r} x{count}" for (y, r), count in nearest[:40]),
+            brep_components=brep_components,
         )
-        _telemetry.info(
-            f"{label} census: {name} origin "
-            f"{tuple(round(value * 1000.0, 5) for value in transform[9:12])} mm, "
-            f"part +Y axis {tuple(round(value, 9) for value in transform[3:6])}, "
-            "scale "
-            f"{transform[12]:g}; B-rep y range "
-            f"{y_range[0]:.4f}..{y_range[1]:.4f} mm (raw "
-            f"{raw_y_range[0]:.4f}..{raw_y_range[1]:.4f}; target tip "
-            f"{target_y_mm:.4f}); "
-            f"edge kinds {dict(sorted(kinds.items()))}; circles nearest the "
-            "target (y, r mm, count): "
-            + "; ".join(f"{y} {r} x{count}" for (y, r), count in nearest[:16])
+    for name, component in sorted(brep_components.items()):
+        _census_brep_circles(
+            name, component, target_y_mm=target_y_mm, label=label
         )
+
+
+def hanger_engagement_violations(
+    mouth_y_mm: float,
+    tip_y_mm: float,
+) -> list[str]:
+    """Judge a BUILT tap-mouth/finished-tip pair against the receiver band.
+
+    The assembly's stack gate proves the constants agree; this proves the
+    solids the drawing dimensions do.
+    """
+    engagement = mouth_y_mm - tip_y_mm
+    violations = []
+    if abs(mouth_y_mm - KNIFE_MOUNT_TOP_Y) > BUILT_GEOMETRY_TOLERANCE_MM:
+        violations.append(
+            f"tap mouth y {mouth_y_mm:.5f} mm is not the knife-mount top "
+            f"{KNIFE_MOUNT_TOP_Y:.5f} mm"
+        )
+    if abs(engagement - HANGER_ENGAGEMENT_TARGET_MM) > BUILT_GEOMETRY_TOLERANCE_MM:
+        violations.append(
+            f"built engagement {engagement:.5f} mm is not the stack target "
+            f"{HANGER_ENGAGEMENT_TARGET_MM:.5f} mm"
+        )
+    if not HANGER_ENGAGEMENT_MIN_MM <= engagement <= HANGER_ENGAGEMENT_MAX_MM:
+        violations.append(
+            f"built engagement {engagement:.5f} mm is outside the printed band "
+            f"{HANGER_ENGAGEMENT_MIN_MM:.2f}..{HANGER_ENGAGEMENT_MAX_MM:.2f} mm"
+        )
+    if engagement > HANGER_TAP_FULL_THREAD_MIN_MM:
+        violations.append(
+            f"finished tip {engagement:.5f} mm deep passes the minimum complete "
+            f"female thread {HANGER_TAP_FULL_THREAD_MIN_MM:.4f} mm"
+        )
+    if engagement >= HANGER_TAP_DRILL_SHOULDER_MIN_MM:
+        violations.append(
+            f"finished tip {engagement:.5f} mm deep reaches the tap-drill "
+            f"shoulder {HANGER_TAP_DRILL_SHOULDER_MIN_MM:.4f} mm"
+        )
+    if engagement <= max(0.0, HANGER_COMPLETE_MALE_START_DEPTH_MM):
+        violations.append(
+            f"finished tip {engagement:.5f} mm deep leaves no complete male "
+            "thread inside the receiver"
+        )
+    return violations
+
+
+def _brep_circles(component: Any) -> list[tuple[float, float, float, float]]:
+    """Every circular B-rep edge of one instance as (x, y, z, r) assembly mm."""
+    scale = float(
+        _early_bound(
+            _early_bound(component, "IComponent2").Transform2, "IMathTransform"
+        ).ArrayData[12]
+    )
+    circles = []
+    for raw_body in tuple(_early_bound(component, "IComponent2").GetBodies2(0) or ()):
+        for raw_edge in tuple(_early_bound(raw_body, "IBody2").GetEdges() or ()):
+            raw_curve = _early_bound(raw_edge, "IEdge").GetCurve()
+            if raw_curve is None:
+                continue
+            curve = _early_bound(raw_curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            parameters = tuple(float(value) for value in curve.CircleParams)
+            x, y, z = _component_point_in_assembly(component, parameters[:3])
+            circles.append(
+                (x * 1000.0, y * 1000.0, z * 1000.0, parameters[6] * scale * 1000.0)
+            )
+    return circles
+
+
+def _station_circle(
+    view: Any,
+    *,
+    component_stem: str,
+    radius_mm: float,
+    station_z_mm: float,
+    pick: Literal["highest", "lowest"],
+    label: str,
+) -> tuple[str, tuple[float, float, float, float]]:
+    """The B-rep circle of ``radius_mm`` on the stem instance at the station."""
+    matches = []
+    for raw_drawing_component in tuple(
+        _early_bound(view, "IView").GetVisibleDrawingComponents() or ()
+    ):
+        component = _early_bound(
+            _early_bound(raw_drawing_component, "IDrawingComponent").Component,
+            "IComponent2",
+        )
+        if _component_stem(component) != component_stem:
+            continue
+        name = str(component.Name2 or "").rsplit("/", 1)[-1]
+        for circle in _brep_circles(component):
+            on_station = abs(circle[2] - station_z_mm) <= BUILT_STATION_TOLERANCE_MM
+            on_axis = abs(circle[0] - KNIFE[0]) <= BUILT_STATION_TOLERANCE_MM
+            if not (on_station and on_axis):
+                continue
+            if abs(circle[3] - radius_mm) > BUILT_GEOMETRY_TOLERANCE_MM:
+                continue
+            matches.append((name, circle))
+    if not matches:
+        raise RuntimeError(
+            f"{label}: no {component_stem!r} B-rep circle r={radius_mm:g} mm on "
+            f"the x={KNIFE[0]:g}, z={station_z_mm:g} mm hanger axis"
+        )
+    matches.sort(key=lambda match: match[1][1], reverse=pick == "highest")
+    return matches[0]
+
+
+def _assert_built_hanger_engagement(section: Any, *, station_z_mm: float) -> None:
+    """Measure E between the built mount and stud solids before dimensioning it."""
+    mount_name, mouth = _station_circle(
+        section,
+        component_stem="knife-mount",
+        radius_mm=STUD_TAP_DIA / 2.0,
+        station_z_mm=station_z_mm,
+        pick="highest",
+        label="built MHA-037 tap mouth",
+    )
+    stud_name, tip = _station_circle(
+        section,
+        component_stem="knife-hanger-stud",
+        radius_mm=THREAD_TIP_ROOT_RADIUS_MM,
+        station_z_mm=station_z_mm,
+        pick="lowest",
+        label="built MHA-119 finished tip",
+    )
+    violations = hanger_engagement_violations(mouth[1], tip[1])
+    facts = {
+        "mount": mount_name,
+        "stud": stud_name,
+        "mouth_y_mm": mouth[1],
+        "tip_y_mm": tip[1],
+        "engagement_mm": mouth[1] - tip[1],
+        "violations": tuple(violations),
+    }
+    _telemetry.event("drawing.built_hanger_engagement", **facts)
+    summary = (
+        f"built hanger engagement {stud_name} in {mount_name}: mouth "
+        f"{mouth[1]:.5f}, tip {tip[1]:.5f}, E {mouth[1] - tip[1]:.5f} mm"
+    )
+    if violations:
+        raise RuntimeError(f"{summary}: " + "; ".join(violations))
+    _telemetry.success(summary)
+
+
+def _exclude_fasteners_from_section(
+    adapter: Any,
+    section: Any,
+    *,
+    component_stem: str,
+    label: str,
+) -> None:
+    """Draw the hanger studs unsectioned in the cut (ASME Y14.3 bolt rule).
+
+    A sectioned stud exposes only cut/intersection edges near its tip, so the
+    detail derived from the section never offers the finished-tip rim as a
+    circle (r7 census: 0 circles of 66 visible stud edges in Detail B while
+    the B-rep carries the rim exactly at the expected y and r). Excluded, the
+    stud shows whole inside the cut tap with its real edges.
+    """
+    section = _early_bound(section, "IView")
+    components: dict[str, Any] = {}
+    for raw_drawing_component in tuple(section.GetVisibleDrawingComponents() or ()):
+        component = _early_bound(
+            _early_bound(raw_drawing_component, "IDrawingComponent").Component,
+            "IComponent2",
+        )
+        if _component_stem(component) == component_stem:
+            components[str(component.Name2 or "").rsplit("/", 1)[-1]] = component
+    expected = BOM_QUANTITIES[component_stem]
+    if len(components) != expected:
+        raise RuntimeError(
+            f"{label}: section shows {sorted(components)!r}, expected "
+            f"{expected} {component_stem!r} instances to exclude"
+        )
+    dr_section = _early_bound(section.GetSection(), "IDrSection")
+    if not dr_section.SetExcludedComponents(dispatch_array(list(components.values()))):
+        raise RuntimeError(f"{label}: SetExcludedComponents returned false")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: rebuild after section exclusion failed")
+    excluded = sorted(
+        str(_early_bound(raw, "IComponent2").Name2 or "").rsplit("/", 1)[-1]
+        for raw in tuple(dr_section.GetExcludedComponents() or ())
+    )
+    _telemetry.event(
+        "drawing.section_excluded_components",
+        label=label,
+        requested=tuple(sorted(components)),
+        excluded=tuple(excluded),
+    )
+    if excluded != sorted(components):
+        raise RuntimeError(
+            f"{label}: section excludes {excluded!r}, expected {sorted(components)!r}"
+        )
+    _telemetry.success(f"{label}: drawn unsectioned {', '.join(excluded)}")
 
 
 def _create_hanger_detail(adapter: Any, section: Any) -> Any:
@@ -768,6 +1025,13 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
         visible_stems=visible_stems,
         label="hanger-axis assembly section",
     )
+    _exclude_fasteners_from_section(
+        adapter,
+        section,
+        component_stem="knife-hanger-stud",
+        label="hanger-axis assembly section",
+    )
+    _assert_built_hanger_engagement(section, station_z_mm=SUMMING_Z + HEX_Z_MID)
     detail = _create_hanger_detail(adapter, section)
     set_hidden_lines_removed(adapter, detail)
     _census_component_geometry(
