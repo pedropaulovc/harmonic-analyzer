@@ -5,7 +5,7 @@ elevation, a 2:1 cut-surface section B-B across the post for the tube wall,
 and the standard isometric. Sheet 2 is the arm-end fabrication: a small plan
 view carries cutting line A-A along the arm axis in the plane of the bend; the
 4:1 section shows the separate brazed plug in the tube bore with the screw
-installed, and a 6:1 side view of the screw body alone carries the screw.
+installed, and a 7:1 side view of the screw body alone carries the screw.
 Plug and screw are Front-plane revolves, so their diameters import as
 side-view sizes. Every displayed size is imported from the
 model; every placement is keyed to projected model points, so a mirrored
@@ -32,6 +32,7 @@ from _drawing_common import (
     create_blank_drawing_sheets,
     create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -105,20 +106,27 @@ ISO_CENTER = (0.330, 0.170)
 ISO_SCALE = (1, 3)
 ELEVATION_NOTE_XY = (0.058, 0.048)
 ISO_NOTE_XY = (0.290, 0.085)
-POST_LABEL_BELOW_MM = 32.0  # below the post axis: 16 mm ring + air
+POST_LABEL_BELOW_MM = 44.0  # below the post axis: ring, the Ø12 row, air
+# The two diameters print as LINEAR dimensions above and below the ring:
+# as diameter leaders both run through the centre and cross (farm r5).
+POST_DIAMETER_ROW_MM = 24.0
 
 # Sheet 2. The plan parent is only the carrier of cutting line A-A. Views
 # are placed by where a model point lands, not by outline: a cut-surface
 # section's outline still spans geometry it does not print.
 PLAN_CENTER = (0.085, 0.240)
 PLAN_SCALE = (1, 2)
-JOINT_AXIS_AT_ARM_END = (0.105, 0.140)  # section A-A: arm end face on the axis
+# A diametric dimension parked beyond its extension lines prints its text on a
+# shoulder running the SAME way as the extension lines (feature -> dim line,
+# measured r5). The plug diameter stands left of the plug, so its long fit
+# callout runs left: the arm end sits far enough right to hold it.
+JOINT_AXIS_AT_ARM_END = (0.150, 0.140)  # section A-A: arm end face on the axis
 JOINT_SCALE = (4, 1)
 JOINT_LABEL_BELOW_MM = 62.0
 SCREW_AXIS_AT_HEAD = (0.285, 0.185)  # screw view: head underside on the axis
-SCREW_SCALE = (6, 1)
-SCREW_NOTE_BELOW_MM = 70.0
-NOTES_XY = (0.020, 0.058)
+SCREW_SCALE = (7, 1)
+SCREW_NOTE_BELOW_MM = 80.0
+NOTES_XY = (0.020, 0.052)
 
 
 def _sheet_point(
@@ -211,6 +219,28 @@ def _axis_signs(adapter: Any, view: Any, *, label: str) -> tuple[float, float]:
         raise RuntimeError(f"{label}: arm axis is not horizontal on the sheet")
     _telemetry.info(f"{label}: part +X -> sheet {sx:+.0f} x, part +Y -> sheet {sy:+.0f} y")
     return sx, sy
+
+
+def _diameters_as_linear(
+    adapter: Any, annotations: list[Any], positions: dict[str, tuple[float, float]]
+) -> None:
+    """Print named diameter dimensions as linear ones, then place them."""
+    remaining = dict(positions)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        xy = remaining.pop(name, None)
+        if xy is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.DisplayAsLinear = True
+        if not bool(display.DisplayAsLinear):
+            raise RuntimeError(f"{name}: DisplayAsLinear did not persist")
+        if not annotation.SetPosition2(xy[0], xy[1], 0.0):
+            raise RuntimeError(f"{name}: cannot place linear diameter")
+    if remaining:
+        raise RuntimeError(f"linear diameters not found: {sorted(remaining)}")
+    rebuild_drawing(adapter, label="linear diameters")
 
 
 def _show_only_screw(adapter: Any, view: Any) -> None:
@@ -341,11 +371,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         post,
         keep={
-            "TubeDia": _offset(post_center, 26.0, 22.0),
-            "TubeBoreDia": _offset(post_center, 26.0, -22.0),
+            "TubeDia": _offset(post_center, 0.0, POST_DIAMETER_ROW_MM),
+            "TubeBoreDia": _offset(post_center, 0.0, -POST_DIAMETER_ROW_MM),
         },
         view_label="post wall section",
         dimensions_by_feature=POST_SECTION_DIMENSIONS,
+    )
+    _diameters_as_linear(
+        adapter,
+        post_dimensions,
+        {
+            "TubeDia": _offset(post_center, 0.0, POST_DIAMETER_ROW_MM),
+            "TubeBoreDia": _offset(post_center, 0.0, -POST_DIAMETER_ROW_MM),
+        },
     )
     _place_view_label(
         adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),
@@ -397,8 +435,10 @@ async def build(adapter: Any) -> dict[str, str]:
         joint,
         keep={
             "PlugDepth": joint_at((ARM_END_X + PLUG_END_X) / 2.0, plus_y, dy=12.0),
-            "TapMinorDia": joint_at(PLUG_END_X - 0.8, minus_y, dy=-16.0),
-            "PlugDia": joint_at(ARM_END_X - 1.5, minus_y, dy=-42.0),
+            # Right of the plug's inner face, so its callout runs right,
+            # away from the plug diameter's leftward one: no shared lane.
+            "TapMinorDia": joint_at(PLUG_END_X + 0.8, minus_y, dy=-16.0),
+            "PlugDia": joint_at(ARM_END_X - 1.5, minus_y, dy=-21.0),
         },
         view_label="arm joint section",
         dimensions_by_feature=JOINT_DIMENSIONS,
