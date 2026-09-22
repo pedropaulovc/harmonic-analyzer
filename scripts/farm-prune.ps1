@@ -20,7 +20,7 @@ never touches remote farm workflows; recover those from the launch log as
 DEVELOPING.md describes before relaunching.
 
 .EXAMPLE
-pwsh -NoProfile -File scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs -WhatIf
+pwsh -NoProfile -File scripts/farm-prune.ps1 -LogDirectory "C:/src/dt-logs/farm-runs,C:/src/dt-logs/pinned-control" -WhatIf
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
@@ -67,7 +67,11 @@ function Remove-LeftoverWorktree {
     return -not (Test-Path -LiteralPath $Path)
 }
 
-foreach ($directory in $LogDirectory) {
+# `pwsh -File` binds one token per parameter, so several directories arrive as
+# one comma-separated string, as farm-run.ps1's -Targets do.
+$directories = @($LogDirectory | ForEach-Object { $_.Split(',') } | ForEach-Object { $_.Trim() } |
+    Where-Object { $_ })
+foreach ($directory in $directories) {
     foreach ($recordFile in Get-ChildItem -LiteralPath $directory -Filter '*.run.json' -File) {
         $record = Get-Content -LiteralPath $recordFile.FullName -Raw -Encoding utf8 | ConvertFrom-Json
         $buildWorktree = [string]$record.build_worktree

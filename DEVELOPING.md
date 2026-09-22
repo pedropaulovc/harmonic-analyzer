@@ -351,7 +351,8 @@ pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirect
 ```
 
 It prints one `run_id`/`build_worktree`/`reason`/`removed` object per
-candidate and accepts several `-LogDirectory` values. A directory under
+candidate. Pass several log directories as one comma-separated `-LogDirectory`
+string, as `-Targets` takes its list. A directory under
 `-WorkRoot` with no record in the directories you pass is not touched.
 
 ## Remote build-artifact cache
