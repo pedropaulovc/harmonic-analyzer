@@ -160,54 +160,6 @@ def _attach_radial_leaders(
         raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
 
 
-def _restore_radial_radius_symbol(
-    adapter: Any, annotations: Any, values: dict[str, str], label: str
-) -> None:
-    """Put the native ``R`` back on a prefixed radial dimension.
-
-    A prefix displaces the radius symbol SolidWorks adds on its own: on the R1
-    render ``MidRibArcR`` printed ``R15.2`` while ``EdgeRibFrontArcR``, the one
-    carrying an instance count, printed ``2X 15.2``.  ``GetText(1)`` is the
-    writable prefix and ``GetText(5)`` its definition (the 1-5 / 2-6 / 3-7 / 4-8
-    pairing at ``draw_harmonic_base.py:378``), so extending the DEFINITION keeps
-    the native ``<NUM_INST>`` token associative where a hard-coded "2X " would
-    not.  ``IDisplayDimension::SetText`` reports nothing, so the write is proved
-    by its side effect: the resolved ``GetText(0)`` must start with ``2X R`` and
-    still carry the driven value.  A silent miss here is exactly the defect.
-    """
-    remaining = dict(values)
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name not in remaining:
-            continue
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
-        compartments = {part: str(display.GetText(part) or "") for part in range(9)}
-        definition = compartments[5]
-        updated = f"{definition}R" if definition.strip() else "2X R"
-        display.SetText(1, updated)
-        resolved = str(display.GetText(0) or "")
-        if str(display.GetText(5) or "") != updated:
-            raise RuntimeError(
-                f"{label}: {name} radius-symbol definition did not persist: "
-                f"wrote {updated!r}, read back {str(display.GetText(5) or '')!r}"
-            )
-        driven = remaining.pop(name)
-        if not resolved.startswith("2X R") or driven not in resolved:
-            raise RuntimeError(
-                f"{label}: {name} native R did not survive the prefix: "
-                f"definition={definition!r} resolved={resolved!r} "
-                f"(want it to start with '2X R' and carry {driven!r})"
-            )
-        _telemetry.info(
-            f"radial display text {label} {name}: prefix={compartments[1]!r} "
-            f"definition={definition!r} resolved={resolved!r}"
-        )
-    if remaining:
-        raise RuntimeError(f"{label}: no radial dimension named {sorted(remaining)!r}")
-
-
 FORM_FRONT_KEEP = {
     "CylDia": (0.155, 0.258),
     "AnchorHeight": (0.0980, 0.2300),
@@ -603,16 +555,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _attach_radial_leaders(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
-    )
-    # Spell the R the instance count displaced: extend each dimension's own
-    # definition so the native <NUM_INST> token stays associative, then require
-    # the resolved text to read "2X R15.2" / "2X R138.8" and to still carry the
-    # driven value.  Both the definition and the resolved string are logged.
-    _restore_radial_radius_symbol(
-        adapter, front_dimensions, {"EdgeRibFrontArcR": "15.2"}, "form front"
-    )
-    _restore_radial_radius_symbol(
-        adapter, top_dimensions, {"SummationArcRadius": "138.8"}, "form top"
     )
     # This is a read-only measurement of the actual knife-ridge endpoints,
     # not a second calculated model dimension.  Resolve the two model vertices
