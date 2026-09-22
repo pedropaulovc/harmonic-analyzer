@@ -940,15 +940,20 @@ async def _drawing_reference_sketches(
     )
     pattern.record("PatternRefX", '"HoleX"')
     pattern.record("PatternRefEnd", '"PlateL" / 2')
+    # Both terminal holes are located from the SAME (+Z) plate end -- this and
+    # HoleEndOffsetLast -- so the print baselines the field instead of chaining
+    # end -> first hole -> span (drawing policy rule 7; Codex R5 clarity).
     await dimension_between(
         adapter,
-        f"{pattern_span}.start",
-        f"{pattern_span}.end",
+        f"{first_offset}.end",
+        f"{end_offset}.end",
         "vertical_distance",
-        HOLE_Z[-1] - HOLE_Z[0],
-        "spring-hole total span",
+        PLATE_L / 2.0 - HOLE_Z[0],
+        "first spring-hole from the +Z plate end",
     )
-    pattern.record("PatternSpan", f'{HOLE_COUNT - 1} * "ChannelPitch"')
+    pattern.record(
+        "HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")'
+    )
     await dimension_between(
         adapter,
         f"{end_offset}.start",
@@ -1253,11 +1258,6 @@ async def build(adapter) -> dict[str, str]:
         "SpringHolePattern",
         "HolePitch",
         prefix=f"{HOLE_COUNT - 1} EQ SP ",
-    )
-    _set_parenthetical_dimension(
-        adapter,
-        "PatternReferences",
-        "HoleEndOffsetLast",
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
