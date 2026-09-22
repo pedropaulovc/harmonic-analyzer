@@ -100,6 +100,20 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
     )
+    _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferAngle")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)
+    tolerance.Type = 11  # swTolType_e.swTolGeneral
+    if not tolerance.SetValues(-band, band):
+        raise RuntimeError("ChamferAngle@StockDeburrProfile: general tolerance rejected")
+    if (
+        int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError(
+            "ChamferAngle@StockDeburrProfile: general tolerance readback changed"
+        )
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
