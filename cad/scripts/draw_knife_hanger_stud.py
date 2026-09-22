@@ -649,7 +649,15 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
     if bool(display.OffsetText):
         display.OffsetText = False
     display.ArrowSide = ARROWS_INSIDE
-    vertex = _angle_arc(annotation).center
+    curated = _read_dimension_ink(annotation, "ChamferAngle")
+    if not curated.arcs:
+        raise RuntimeError(f"45 deg dimension draws no arc: {curated.as_mm()!r}")
+    vertex = curated.arcs[0].center
+    # Text parked in the opposite quadrant does NOT flip the dimension: leaf
+    # 20260922T200336Z kept the 0..45 deg arc and ran a second arc round to the
+    # text (216.6..360 deg). The flip is its own documented call.
+    if _span_problem(curated.arcs) is not None and not display.VerticallyOppositeAngle():
+        raise RuntimeError("cannot flip the 45 deg dimension to its opposite span")
     target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
     placed = _early_bound(annotation, "IAnnotation")
     if not placed.SetPosition2(target[0], target[1], 0.0):
