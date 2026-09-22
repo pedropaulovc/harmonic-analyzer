@@ -45,6 +45,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 from _hole_spec import blind_cut_dia_mm
@@ -355,6 +356,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="pivot section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    for annotation in section_annotations:
+        if dimension_name(adapter, annotation) == "PlateThk":
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            print(f"PlateThk witness before: smart={display.SmartWitness} max={display.MaxWitnessLineLength}")
+            display.SmartWitness = True
+            rebuild_drawing(adapter, label="smart plate thickness witness lines")
+            if display.SmartWitness is not True:
+                raise RuntimeError("plate thickness refused smart witness display")
+            print(f"PlateThk witness after: smart={display.SmartWitness} max={display.MaxWitnessLineLength}")
     annotations = [
         *profile_annotations,
         *feature_annotations,
