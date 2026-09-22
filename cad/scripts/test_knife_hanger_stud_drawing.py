@@ -120,15 +120,33 @@ def test_arc_sweep_follows_its_rotation_direction() -> None:
     assert samples[-1] == pytest.approx(minor.end)
 
 
-VERTEX = (0.2575, 0.1431)
+# Leaf 20260922T195516Z: the arc centre (= angle vertex), the cut-end detail
+# outline and its boundary circle, sheet metres.
+VERTEX = (0.25752, 0.13908)
 DETAIL = (0.22323, 0.10823, 0.30677, 0.19177)
+BOUNDARY = ((0.265, 0.150), 0.03015)
 REGION = (0.0127, 0.0127, 0.4191, 0.2667)
+R = drawing.ANGLE_ARC_RADIUS_M
 
 
 def _ink(*arcs, lines=()) -> drawing.DimensionInk:
     return drawing.DimensionInk(
         name="ChamferAngle", lines=tuple(lines), arcs=arcs, triangles=(), arrowheads=2
     )
+
+
+def _ray(deg: float, radius: float) -> tuple[float, float]:
+    return (
+        VERTEX[0] + radius * math.cos(math.radians(deg)),
+        VERTEX[1] + radius * math.sin(math.radians(deg)),
+    )
+
+
+# The 225 deg witness line: from the vertex (past its gap) to past the arc.
+WITNESS = (_ray(225.0, 0.0015), _ray(225.0, R + 0.0015))
+# The offset text off the detail's lower-left corner, leader from its right end.
+SHELF_END = (0.2192, 0.1005)
+SHELF = ((0.125, 0.1005), SHELF_END)
 
 
 def test_stud4_angle_arc_is_rejected() -> None:
@@ -142,37 +160,59 @@ def test_stud4_angle_arc_is_rejected() -> None:
     assert any("long way round" in problem for problem in problems)
 
 
-def test_pinned_angle_arc_with_its_leader_passes() -> None:
-    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
-    leader = (tip, (0.3118, 0.1370))
+def test_pinned_opposite_arc_with_its_leader_passes() -> None:
+    arc = _arc(VERTEX, R, 180.0, 225.0)
+    tip = drawing._bisector_point(VERTEX, R)
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[leader]),
+        _ink(arc, lines=[WITNESS, (tip, SHELF_END), SHELF]),
         owner=DETAIL,
-        obstacles={"isometric note": (0.3373, 0.1467, 0.3720, 0.1515)},
+        obstacles={"manufacturing notes": (0.0158, 0.0694, 0.1868, 0.0851)},
         region=REGION,
+        boundary=BOUNDARY,
     )
     assert problems == []
+    assert drawing._span_problem((arc,)) is None
+
+
+def test_arc_in_the_span_the_chamfer_opens_into_is_rejected() -> None:
+    # stud-6: its 0 deg arrow sat on the undrawn sketch leg, on bare paper.
+    problem = drawing._span_problem((_arc(VERTEX, R, 0.0, 45.0),))
+    assert problem is not None and "outside the 180..225 deg span" in problem
+
+
+def test_leader_from_the_right_through_the_witness_line_is_rejected() -> None:
+    # Any leader from the right-hand pocket must cut the 225 deg witness line.
+    arc = _arc(VERTEX, R, 180.0, 225.0)
+    tip = drawing._bisector_point(VERTEX, R)
+    problems = drawing._dimension_ink_problems(
+        _ink(arc, lines=[WITNESS, (tip, (0.2575, 0.1250))]),
+        owner=DETAIL,
+        obstacles={},
+        region=REGION,
+    )
+    assert len(problems) == 1 and "cross at" in problems[0]
 
 
 def test_leader_across_an_annotation_is_rejected() -> None:
-    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
+    arc = _arc(VERTEX, R, 180.0, 225.0)
+    tip = drawing._bisector_point(VERTEX, R)
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[(tip, (0.360, 0.100))]),
+        _ink(arc, lines=[(tip, (0.200, 0.080))]),
         owner=DETAIL,
-        obstacles={"DETAIL A label": (0.3185, 0.0919, 0.3509, 0.1081)},
+        obstacles={"manufacturing notes": (0.0158, 0.0694, 0.2100, 0.0851)},
         region=REGION,
     )
     assert problems == [
-        "ChamferAngle ink crosses DETAIL A label [318.5,91.9]..[350.9,108.1]mm"
+        "ChamferAngle ink crosses manufacturing notes [15.8,69.4]..[210.0,85.1]mm"
     ]
 
 
-def test_bisector_point_splits_the_chamfer_span() -> None:
+def test_bisector_point_splits_the_opposite_span() -> None:
     x, y = drawing._bisector_point((0.0, 0.0), 0.013)
     assert math.hypot(x, y) == pytest.approx(0.013)
-    assert math.degrees(math.atan2(y, x)) == pytest.approx(drawing.CHAMFER_ANGLE_DEG / 2.0)
+    assert math.degrees(math.atan2(y, x)) % 360.0 == pytest.approx(
+        180.0 + drawing.CHAMFER_ANGLE_DEG / 2.0
+    )
 
 
 def test_segment_box_hits() -> None:
@@ -183,21 +223,22 @@ def test_segment_box_hits() -> None:
     assert not drawing._segment_hits_box((1.5, -1.0), (1.5, 2.0), box)
 
 
-BOUNDARY = ((0.265, 0.150), 0.0383)
+def test_segment_intersection() -> None:
+    assert drawing._segment_intersection((0, 0), (2, 2), (0, 2), (2, 0)) == (
+        pytest.approx(1.0),
+        pytest.approx(1.0),
+    )
+    assert drawing._segment_intersection((0, 0), (1, 1), (0, 2), (1, 3)) is None
+    assert drawing._segment_intersection((0, 0), (1, 0), (2, -1), (2, 1)) is None
 
 
 def test_leader_out_of_the_detail_is_the_one_allowed_boundary_crossing() -> None:
-    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
-    shelf_start = (0.3206, 0.1330)
-    ink = _ink(arc, lines=[(tip, shelf_start), (shelf_start, (0.400, 0.1330))])
-    assert drawing._dimension_ink_problems(
-        ink, owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
-    ) == []
-    # A second exit -- e.g. an extension line stretched past the circle -- fails.
-    stretched = (VERTEX, (0.320, VERTEX[1]))
+    arc = _arc(VERTEX, R, 180.0, 225.0)
+    tip = drawing._bisector_point(VERTEX, R)
+    # A second exit -- e.g. a witness line stretched past the circle -- fails.
+    stretched = (VERTEX, _ray(225.0, 0.050))
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[(tip, shelf_start), stretched]),
+        _ink(arc, lines=[(tip, SHELF_END), SHELF, stretched]),
         owner=DETAIL,
         obstacles={},
         region=REGION,
@@ -205,7 +246,7 @@ def test_leader_out_of_the_detail_is_the_one_allowed_boundary_crossing() -> None
     )
     assert problems == [
         "ChamferAngle ink crosses the detail boundary circle [265.0, 150.0] "
-        "r 38.3 mm 2 time(s); 1 allowed"
+        "r 30.1 mm 2 time(s); 1 allowed"
     ]
 
 

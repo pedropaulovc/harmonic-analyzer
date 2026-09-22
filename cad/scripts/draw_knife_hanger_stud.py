@@ -122,9 +122,16 @@ CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # lines ... do not move", types/IDisplayDimension/OffsetText.md). stud-4
 # curated the dimension at a point 85 mm from the vertex and 8 deg outside the
 # 0-45 deg span, so the arc swept the long way round the sheet at r = 84 mm.
-# The arc is pinned first on the bisector, inside the 15.2 mm (12:1) chamfer
-# leg so its 45 deg arrow lands on the chamfer itself; only then is the text
-# offset to its pocket on a leader.
+# The arc is pinned first, 13 mm out on the bisector of the VERTICALLY
+# OPPOSITE span (180..225 deg: under the cut end, behind the chamfer), and only
+# then is the text offset to its pocket on a leader. Not the 0..45 deg span
+# the chamfer opens into: the dimension's legs are the StockDeburrProfile
+# sketch lines, whose end-face leg runs 15.2 mm (12:1) OUT past the vertex
+# where no edge is drawn, so an arc inside it put its 0 deg arrow on bare paper
+# (leaf 20260922T195516Z: no witness line at all), and an arc beyond it gets a
+# witness stub floating 15 mm from the vertex. Opposite, the 180 deg arrow
+# lands on the drawn end face and the 225 deg one on a witness line that
+# starts at the vertex.
 ANGLE_ARC_RADIUS_M = 0.013
 ANGLE_ARC_RADIUS_TOLERANCE_M = 0.003
 # Gate for every dimension arc on the sheet: stud-4's was 0.084 m.
@@ -133,8 +140,11 @@ ANGLE_ARC_SWEEP_MAX_DEG = 60.0
 ANGLE_ARC_HOLD_M = 0.0003
 ANGLE_VERTEX_TOLERANCE_M = 0.0005
 # The two legs as the cut-end detail draws them: the end face runs outward
-# (+x) and the chamfer climbs outward toward the head at 45 deg.
-ANGLE_BISECTOR_RAD = math.radians(CHAMFER_ANGLE_DEG / 2.0)
+# (+x) and the chamfer climbs outward toward the head at 45 deg; the arc sits
+# in the span opposite them.
+ANGLE_SPAN_DEG = (180.0, 180.0 + CHAMFER_ANGLE_DEG)
+ANGLE_SPAN_SLACK_DEG = 3.0
+ANGLE_BISECTOR_RAD = math.radians(sum(ANGLE_SPAN_DEG) / 2.0)
 CHAMFER_VERTEX_MODEL_M = (
     (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 1000.0,
     THREAD_TIP_Y_MM / 1000.0,
@@ -154,9 +164,15 @@ ARROWS_INSIDE = 0
 # there is no room for the one-line value + suffix (~80 x 5 mm): right of the
 # thread crests (x > 280 mm) the chord is under 24 mm wide, and below the cut
 # end (y < 128 mm) it is at most 63 mm wide and narrows to 36 mm at y = 116.
-# The pocket the chamfer opens toward lies outside the boundary, so reaching
-# the arc from it means crossing the circle once.
+# Every pocket outside the boundary means the leader crosses the circle once.
+# Adjudicated by Main (2026-09-22): one crossing from outside is ordinary
+# practice; enlarging the fence to R >= ~55 mm to hold the text would collide
+# with the pictorial or the notes block. On leaf 20260922T195516Z the circle
+# was r 30.2 mm, making the chords smaller still.
 DETAIL_BOUNDARY_CROSSINGS = {"ChamferAngle": 1}
+# Proper crossings between a dimension's own lines (e.g. its leader through
+# its witness line) are measured apart from shared endpoints by this much.
+SELF_CROSSING_END_M = 0.0005
 
 LAYOUT_REPORT = (
     Path(OUTPUTS.slddrw).parent.parent / "reports" / "layout-audit" / f"{SPEC.name}.json"
@@ -486,6 +502,16 @@ def _dimension_ink_problems(
     for label, box in obstacles.items():
         if any(_segment_hits_box(a, b, box) for a, b in segments):
             problems.append(f"{ink.name} ink crosses {label} {_format_box(box)}")
+    for index, (a, b) in enumerate(ink.lines):
+        for c, d in ink.lines[index + 1:]:
+            point = _segment_intersection(a, b, c, d)
+            if point is not None and min(
+                math.dist(point, end) for end in (a, b, c, d)
+            ) > SELF_CROSSING_END_M:
+                problems.append(
+                    f"{ink.name} lines {[_mm(a), _mm(b)]} and {[_mm(c), _mm(d)]} "
+                    f"cross at {_mm(point)} mm"
+                )
     if boundary is not None:
         crossings = sum(
             _segment_crosses_circle(a, b, *boundary) for a, b in segments
@@ -498,6 +524,34 @@ def _dimension_ink_problems(
                 f"{crossings} time(s); {allowed} allowed"
             )
     return problems
+
+
+def _segment_intersection(a: Point, b: Point, c: Point, d: Point) -> Point | None:
+    """Where segments a-b and c-d meet, or None (parallel or apart)."""
+    r = (b[0] - a[0], b[1] - a[1])
+    q = (d[0] - c[0], d[1] - c[1])
+    denominator = r[0] * q[1] - r[1] * q[0]
+    if denominator == 0.0:
+        return None
+    t = ((c[0] - a[0]) * q[1] - (c[1] - a[1]) * q[0]) / denominator
+    u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / denominator
+    if not (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0):
+        return None
+    return (a[0] + t * r[0], a[1] + t * r[1])
+
+
+def _span_problem(arcs: tuple[DimensionArc, ...]) -> str | None:
+    """Why the arcs do not lie in ``ANGLE_SPAN_DEG``, or None when they do."""
+    low, high = ANGLE_SPAN_DEG
+    for arc in arcs:
+        for point in (arc.start, arc.end):
+            bearing = math.degrees(arc._bearing(point)) % 360.0
+            if not low - ANGLE_SPAN_SLACK_DEG <= bearing <= high + ANGLE_SPAN_SLACK_DEG:
+                return (
+                    f"45 deg arc end {_mm(point)} mm sits at {bearing:.1f} deg, outside "
+                    f"the {low:.0f}..{high:.0f} deg span: {[a.as_mm() for a in arcs]!r}"
+                )
+    return None
 
 
 def _segment_crosses_circle(p0: Point, p1: Point, center: Point, radius: float) -> bool:
@@ -624,6 +678,9 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
         raise RuntimeError(
             f"45 deg arc re-centred from {_mm(vertex)} to {_mm(arc.center)} mm"
         )
+    span = _span_problem(ink.arcs)
+    if span is not None:
+        raise RuntimeError(span)
     if abs(arc.radius - ANGLE_ARC_RADIUS_M) > ANGLE_ARC_RADIUS_TOLERANCE_M:
         raise RuntimeError(
             f"45 deg arc radius {arc.radius * 1000.0:.1f} mm, wanted "
@@ -726,26 +783,24 @@ def _place_angle_text(
     relation to the rendered block is not fixed API behaviour -- so the block is
     measured from the dimension's own ``IDisplayData`` text items, moved as a
     whole, and re-measured after the rebuild. The final position is proven by
-    ``GetPosition`` readback and by clearance to every surrounding box. The
-    block sits as level with the pinned arc as the pocket allows, so the leader
-    back to it is short, and the arc itself must not have moved.
+    ``GetPosition`` readback and by clearance to every surrounding box.
+
+    The pocket is off the detail's lower-left corner: the arc lies under the
+    cut end, left of the 225 deg witness line, so a leader from down-left
+    reaches it through empty paper without crossing that line (a leader from
+    the right or from straight below would have to). The arc itself must not
+    move.
     """
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
     block = _display_text_box(adapter, display)
     gap = ANGLE_TEXT_GAP_M
     park = gap + ANGLE_TEXT_PARK_SLOP_M
-    left = obstacles["cut-end detail"][2] + park
-    bottom = obstacles["DETAIL A label"][3] + park
-    top = min(obstacles["isometric"][1], obstacles["isometric note"][1]) - park
-    height = block[3] - block[1]
-    if top - bottom < height:
-        raise RuntimeError(
-            f"45 deg text pocket {(top - bottom) * 1000.0:.1f} mm is shorter than "
-            f"its {height * 1000.0:.1f} mm block"
-        )
-    level = _bisector_point(arc.center, arc.radius)[1] - height / 2.0
-    target = (left, min(max(level, bottom), top - height))
+    detail = obstacles["cut-end detail"]
+    target = (
+        detail[0] - park - (block[2] - block[0]),
+        detail[1] - park - (block[3] - block[1]),
+    )
     anchor = (anchor[0] + target[0] - block[0], anchor[1] + target[1] - block[1])
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
     block = _display_text_box(adapter, display)
@@ -1000,7 +1055,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Supplier", 0.016, 0.056, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.016, 0.047, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.038, char_height=0.003)
-    add_property_linked_note(
+    manufacturing_notes = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.085, char_height=0.003
     )
     for view in (front, detail):
@@ -1012,19 +1067,29 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(_read_member(detail, "GetNotes")[0], "INote"),
         label="detail label",
     )
+    front_box = _view_box(front, label="front")
+    notes_box = _note_box(
+        _early_bound(manufacturing_notes, "INote"), label="manufacturing notes"
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
     _place_angle_text(
         adapter,
         angle,
         anchor=detail_keep["ChamferAngle"],
         obstacles={
             "cut-end detail": detail_box,
-            "isometric": iso_box,
-            "isometric note": iso_note_box,
+            "front view": front_box,
+            "manufacturing notes": notes_box,
             "DETAIL A label": detail_label_box,
+            "title block": (
+                template.title_block_left_m,
+                0.0,
+                template.width_m,
+                template.title_block_top_m,
+            ),
         },
         arc=arc,
     )
-    front_box = _view_box(front, label="front")
     _audit_sheet_layout(
         adapter,
         {
@@ -1033,6 +1098,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 detail_box,
                 {
                     "front view": front_box,
+                    "manufacturing notes": notes_box,
                     "isometric": iso_box,
                     "isometric note": iso_note_box,
                     "DETAIL A label": detail_label_box,
