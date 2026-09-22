@@ -1272,7 +1272,8 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+# EXPERIMENT BRANCH ONLY: worker admission exports the build/release closure.
+_VERIFY_NAMES = ("soundness", "kinematics", "calibrate_summing_clamp")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -2617,6 +2618,48 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+    # Throwaway native experiment, deliberately in the sanctioned worker graph.
+    # Only this leaf is dispatched; no saved summing assembly or channel refit.
+    calibration = SCRIPTS_DIR / "diagnostics" / "calibrate_summing_clamp.py"
+    calibration_report = REPORTS / "summing-clamp-calibration.json"
+    anchors = ("boss_hook", "gooseneck")
+    calibration_deps = list(
+        dict.fromkeys(
+            [
+                str(Path(__file__).resolve()),
+                *_part_file_deps(calibration, "counter_spring"),
+                _submodule_assembly_dep(),
+                *(_sldprt(stem) for stem in anchors),
+                *(_part_execution_token(stem) for stem in anchors),
+            ]
+        )
+    )
+    yield {
+        "name": "calibrate_summing_clamp",
+        "task_dep": [f"part:{stem}" for stem in anchors],
+        "file_dep": calibration_deps,
+        "targets": [str(calibration_report)],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:calibrate_summing_clamp",
+                    [
+                        sys.executable,
+                        str(calibration.resolve()),
+                        "--output",
+                        str(calibration_report.resolve()),
+                    ],
+                    calibration_deps,
+                    [calibration_report],
+                    "verify-calibrate-summing-clamp",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER
