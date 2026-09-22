@@ -100,3 +100,115 @@ def test_printed_arc_centre_lays_the_arc_onto_the_boss() -> None:
     centre = (-printed_x, base_end[1] + printed_z)
     for end in (tip_end, base_end):
         assert abs(math.dist(centre, end) - printed_r) < 0.8
+
+
+def _synthetic_lever_brep():
+    """The finished lever's locating surfaces, in the shape the B-rep reads them."""
+    import build_summing_lever as build
+
+    hole_r = blind_cut_dia_mm(summing_lever_spec.HOLE_SPEC) / 2.0
+    base_end, tip_end, interior = build._summation_top_arc_points()
+    cx, cy = build._circumcenter(base_end, tip_end, interior)
+    web_r = math.dist((cx, cy), base_end)
+    cylinders = [
+        # Hole axes read at the plate's mid-plane, some with a reversed sense.
+        ((build.HOLE_X, 2.54, z), (0.0, (-1.0) ** j, 0.0), hole_r)
+        for j, z in enumerate(build.HOLE_Z)
+    ]
+    cylinders += [
+        ((build.TIP_X, 9.0, 0.0), (0.0, 1.0, 0.0), build.ANCHOR_R),
+        # The counter tap through the boss: same axis, not a locating feature.
+        ((build.TIP_X, 0.0, 0.0), (0.0, 1.0, 0.0), 1.9),
+        ((0.0, 0.0, -76.2), (0.0, 0.0, 1.0), build.CYL_R),
+        ((0.0, 0.0, 10.0), (0.0, 0.0, -1.0), build.CYL_R),  # split pivot face
+        ((cx, 0.0, -cy), (0.0, 1.0, 0.0), web_r),
+        ((cx, 0.0, cy), (0.0, -1.0, 0.0), web_r),
+    ]
+    planes = [
+        ((0.0, 0.0, s), (5.0, 1.0, s * z))
+        for z in (build.PLATE_L / 2.0, build.HEX_Z_OUTER, build.RIB_OFFSET)
+        for s in (1.0, -1.0)
+    ]
+    return cylinders, planes, (cx, cy)
+
+
+def _top_plane(points):
+    """A Top-plane sketch point (x, y) sits at model (x, 0, -y)."""
+    return [(x, 0.0, -y) for x, y in points]
+
+
+def _pattern_points(station_sign: float):
+    import build_summing_lever as build
+
+    first, last = build.HOLE_Z[0], build.HOLE_Z[-1]
+    half = build.PLATE_L / 2.0
+    return _top_plane(
+        [
+            (build.HOLE_X, half),
+            (build.HOLE_X, station_sign * first),
+            (build.HOLE_X, station_sign * last),
+            (build.HOLE_X, -half),
+            (build.TIP_X, -half),
+            (build.TIP_X, 0.0),
+        ]
+    )
+
+
+def _arc_points(centre):
+    import build_summing_lever as build
+
+    cx, cy = centre
+    return _top_plane(
+        [(0.0, build.SUM_BASE), (0.0, build.HEX_Z_OUTER), (cx, cy), (cx + 20.0, cy)]
+    )
+
+
+def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
+    """Positive control: the R7 authoring (-HOLE_Z on the Top plane) passes."""
+    import build_summing_lever as build
+
+    cylinders, planes, centre = _synthetic_lever_brep()
+    claims = build._reference_claims(cylinders, planes)
+    for name, points in (
+        ("PatternReferences", _pattern_points(-1.0)),
+        ("SummationArcReference", _arc_points(centre)),
+    ):
+        problems, worst = build._reference_misses(points, *claims[name])
+        assert problems == [], (name, problems)
+        assert worst <= build.REFERENCE_COINCIDENCE_TOL_MM
+
+
+def test_reference_gate_rejects_the_r6_mirrored_spring_field() -> None:
+    """Negative control: R1-R6 authored +HOLE_Z, 1.47 mm off both terminal holes."""
+    import build_summing_lever as build
+
+    cylinders, planes, _centre = _synthetic_lever_brep()
+    targets, required, exempt = build._reference_claims(cylinders, planes)[
+        "PatternReferences"
+    ]
+    problems, _worst = build._reference_misses(
+        _pattern_points(1.0), targets, required, exempt
+    )
+    assert sum("1.4735 mm off spring hole" in problem for problem in problems) == 2
+    assert "no point lands on the first spring hole" in problems
+    assert "no point lands on the last spring hole" in problems
+
+
+def test_reference_gate_rejects_an_arc_centre_off_by_a_hundredth_micron() -> None:
+    import build_summing_lever as build
+
+    cylinders, planes, (cx, cy) = _synthetic_lever_brep()
+    claims = build._reference_claims(cylinders, planes)["SummationArcReference"]
+    problems, _worst = build._reference_misses(_arc_points((cx, cy + 1e-5)), *claims)
+    assert "is 1e-05 mm off summation-arc axis" in problems[0], problems
+    assert problems[-1] == "no point lands on a summation-arc centre"
+
+
+def test_reference_gate_refuses_a_brep_missing_a_spring_hole() -> None:
+    import pytest
+
+    import build_summing_lever as build
+
+    cylinders, planes, _centre = _synthetic_lever_brep()
+    with pytest.raises(RuntimeError, match="expected 20 spring-hole axes"):
+        build._reference_claims(cylinders[1:], planes)
