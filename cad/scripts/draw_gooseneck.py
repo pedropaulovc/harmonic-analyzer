@@ -123,10 +123,10 @@ PLAN_SCALE = (1, 2)
 JOINT_AXIS_AT_ARM_END = (0.150, 0.140)  # section A-A: arm end face on the axis
 JOINT_SCALE = (4, 1)
 JOINT_LABEL_BELOW_MM = 62.0
-SCREW_AXIS_AT_HEAD = (0.285, 0.185)  # screw view: head underside on the axis
+SCREW_AXIS_AT_HEAD = (0.300, 0.185)  # screw view: head underside on the axis
 SCREW_SCALE = (7, 1)
 SCREW_NOTE_BELOW_MM = 80.0
-NOTES_XY = (0.020, 0.052)
+NOTES_XY = (0.020, 0.046)
 
 
 def _sheet_point(
@@ -473,15 +473,23 @@ async def build(adapter: Any) -> dict[str, str]:
         screw,
         keep={
             # +Y side: axial lengths (their profile anchors are there).
-            "HeadThickness": screw_at(HEAD_X - SCREW_HEAD_T / 2.0, head_plus, dy=10.0),
+            # Text outside, past the slotted face: between its extension lines
+            # it crowded the shared one at the head underside (farm r6 audit).
+            "HeadThickness": screw_at(SCREW_TIP_X - 1.4, head_plus, dy=10.0),
             "UnderHeadLength": screw_at(
                 (HEAD_X + SHANK_END_X) / 2.0, head_plus, dy=22.0
             ),
-            "SlotWidth": screw_at(SCREW_TIP_X - 2.0, head_plus, dy=10.0),
+            # Slot width and head diameter stand OFF the slotted face: to the
+            # right, the head-diameter line crossed the shank (farm r6). The
+            # slot-width text sits below the head-diameter extension line so
+            # its leader never crosses it.
+            "SlotWidth": screw_at(SCREW_TIP_X - 2.0, head_plus, dy=-17.0),
             # -Y side: diameters and the slot depth (its sketch edge is -Y).
-            "ScrewHeadDia": screw_at(HEAD_X + 1.0, head_minus, dy=-10.0),
+            "ScrewHeadDia": screw_at(SCREW_TIP_X - 4.5, head_minus, dy=-10.0),
+            # Text past the slot floor: between its extension lines it
+            # straddled them (farm r6).
             "SlotDepth": screw_at(
-                SCREW_TIP_X + SCREW_SLOT_DEPTH / 2.0, head_minus, dy=-22.0
+                SCREW_TIP_X + SCREW_SLOT_DEPTH + 1.2, head_minus, dy=-22.0
             ),
             "ScrewShankDia": screw_at(HEAD_X + 7.0, head_minus, dy=-22.0),
         },
