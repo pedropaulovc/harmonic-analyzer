@@ -103,6 +103,7 @@ from _drawing_marks import (
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
+from _visibility import blank_reference_geometry
 from summing_lever_spec import (
     ANCHOR_H,
     CHANNEL_PITCH,
