@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from typing import Any
 
@@ -36,10 +37,12 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
+    rebuild_drawing,
     read_required_properties,
     set_basic_dimensions,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hole_callout_precision,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -142,8 +145,96 @@ def _assert_imported_bore_tolerance(adapter: Any, annotations: list[Any]) -> Non
     raise RuntimeError("BoreDia never reached sheet for native tolerance readback")
 
 
+def _read_source_tap_depth_precisions(adapter: Any) -> dict[str, tuple[int, int]]:
+    """Read the two model-owned depth precisions before opening the drawing."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = model.FeatureByName("StudTap")
+    if feature is None:
+        raise RuntimeError("source part has no StudTap Hole Wizard feature")
+    feature = _early_bound(feature, "IFeature")
+    targets = {
+        "tapdrilldepth": "hw-tapdrldepth",
+        "fullthreaddepth": "hw-threaddepth",
+    }
+    found: dict[str, list[tuple[int, int]]] = {
+        variable: [] for variable in targets.values()
+    }
+    display = feature.GetFirstDisplayDimension()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = display.GetDimension()
+        if dimension is not None:
+            dimension = _early_bound(dimension, "IDimension")
+            normalized = "".join(
+                character
+                for character in str(dimension.FullName).lower()
+                if character.isalnum()
+            )
+            for token, variable in targets.items():
+                if token in normalized:
+                    found[variable].append(
+                        (
+                            int(display.GetPrimaryPrecision2()),
+                            int(display.GetPrimaryTolPrecision2()),
+                        )
+                    )
+        display = feature.GetNextDisplayDimension(display)
+    result: dict[str, tuple[int, int]] = {}
+    for variable, values in found.items():
+        if len(values) != 1:
+            raise RuntimeError(
+                f"source StudTap has {len(values)} native {variable} dimensions"
+            )
+        if values[0] != (2, 2):
+            raise RuntimeError(
+                f"source StudTap {variable} precision is not concrete 2/2: "
+                f"{values[0]!r}"
+            )
+        result[variable] = values[0]
+    return result
+
+
+def _propagate_source_tap_depth_precisions(
+    adapter: Any,
+    display: Any,
+    source_precisions: dict[str, tuple[int, int]],
+) -> None:
+    """Apply only model-read precision to native callout length variables."""
+    set_hole_callout_precision(
+        display,
+        {
+            variable: precision[0]
+            for variable, precision in source_precisions.items()
+        },
+        label="knife-mount tap source precision",
+    )
+    remaining = dict(source_precisions)
+    for raw in display.GetHoleCalloutVariables() or ():
+        late = dynamic_dispatch(raw._oleobj_)
+        name = str(late.VariableName)
+        expected = remaining.pop(name, None)
+        if expected is None:
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        length.TolerancePrecision = expected[1]
+        actual = (int(length.Precision), int(length.TolerancePrecision))
+        if actual != expected:
+            raise RuntimeError(
+                f"knife-mount tap {name}: source precision did not persist; "
+                f"expected={expected!r}, actual={actual!r}"
+            )
+    if remaining:
+        raise RuntimeError(
+            "knife-mount tap lacks native depth precision variables: "
+            f"{sorted(remaining)}"
+        )
+    rebuild_drawing(adapter, label="knife-mount tap source precision")
+
+
 @_telemetry.traced("drawing.knife_mount_tap_readback")
-def _check_tap_callout(display: Any) -> None:
+def _check_tap_callout(
+    display: Any, source_precisions: dict[str, tuple[int, int]]
+) -> None:
     """Prove the native callout carries both drill and usable-thread depths."""
     expected_lengths = {
         "hw-tapdrldia": STUD_TAP_DIA,
@@ -158,8 +249,46 @@ def _check_tap_callout(display: Any) -> None:
         "hw-threaddesc": "1/2-13 UNC",
         "hw-threadclass": STUD_TAP_SPEC.thread_class,
     }
+    variables = tuple(display.GetHoleCalloutVariables() or ())
+    inventory: list[dict[str, object]] = []
+    for raw in variables:
+        late = dynamic_dispatch(raw._oleobj_)
+        entry: dict[str, object] = {
+            "name": str(late.VariableName),
+            "type": int(late.Type),
+            "tolerance_type": int(late.ToleranceType),
+            "tolerance_lower_mm": float(late.ToleranceMin) * 1000.0,
+            "tolerance_upper_mm": float(late.ToleranceMax) * 1000.0,
+        }
+        if int(late.Type) == 1:
+            length = _early_bound(raw, "ICalloutLengthVariable")
+            entry.update(
+                {
+                    "length_mm": float(length.Length) * 1000.0,
+                    "precision": int(length.Precision),
+                    "tolerance_precision": int(length.TolerancePrecision),
+                }
+            )
+        elif int(late.Type) == 3:
+            entry["string"] = str(
+                _early_bound(raw, "ICalloutStringVariable").String or ""
+            )
+        inventory.append(entry)
+    _telemetry.info(
+        json.dumps(
+            {
+                "event": "native_tap_callout_inventory",
+                "text": {
+                    str(index): str(display.GetText(index) or "")
+                    for index in range(6)
+                },
+                "variables": inventory,
+            },
+            sort_keys=True,
+        )
+    )
     found: set[str] = set()
-    for raw in display.GetHoleCalloutVariables() or ():
+    for raw in variables:
         late = dynamic_dispatch(raw._oleobj_)
         name = str(late.VariableName)
         if name in expected_strings:
@@ -191,8 +320,11 @@ def _check_tap_callout(display: Any) -> None:
                 int(late.ToleranceType) != 2
                 or abs(actual_lower_mm - expected_lower_mm) > 1e-6
                 or abs(actual_upper_mm - expected_upper_mm) > 1e-6
-                or int(length.Precision) != 2
-                or int(length.TolerancePrecision) != 2
+                or (
+                    int(length.Precision),
+                    int(length.TolerancePrecision),
+                )
+                != source_precisions[name]
             ):
                 raise RuntimeError(
                     f"knife-mount tap {name}: native tolerance readback "
@@ -236,6 +368,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
+    source_tap_precisions = _read_source_tap_depth_precisions(adapter)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -285,7 +418,10 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.175, 0.258),
         label="hanger-stud blind tap",
     )
-    _check_tap_callout(tap_callout)
+    _propagate_source_tap_depth_precisions(
+        adapter, tap_callout, source_tap_precisions
+    )
+    _check_tap_callout(tap_callout, source_tap_precisions)
 
     # Datum A is the hanger seat; datum B is the mating hanger-tap axis.
     # Together with the imported BASIC height they fully locate the sole
