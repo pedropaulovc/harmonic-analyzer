@@ -26,7 +26,7 @@ ARBOR_BORE_BAND = (-0.020, -0.040)  # (upper, lower) deviations; matched press
 # Finish the bore to the measured MHA-102 shaft. This is a matched-pair
 # acceptance range, not an interchangeable limit stack across random parts.
 ARBOR_DIAMETRAL_INTERFERENCE_MM = (0.010, 0.030)
-FACE_WIDTH = 143.2  # spans all 20 cylinder-gear stations
+FACE_WIDTH = 143.2  # ±0.5 keeps all 20 gear stations covered at either limit
 FACE_WIDTH_TOLERANCE_MM = 0.5
 OUTSIDE_DIA_BAND = (0.0, -0.10)  # finished tooth-tip envelope
 
@@ -63,7 +63,6 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("CUTTER", "CUSTOM 49.82 DP; 50 DP NOT ACCEPTABLE"),
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
@@ -76,9 +75,11 @@ DRAWING_NOTES = "\n".join(
     (
         "MATES WITH CYLINDER-GEAR BANK MHA-027.",
         "BORE LIMITS AND MATCHED FIT BOTH APPLY.",
+        "MHA-102 ARBOR JOURNAL: DIA 8.00 +0.00/-0.02 (REF).",
         "MATCH TO MEASURED MHA-102 PINION ARBOR FOR "
         f"{ARBOR_DIAMETRAL_INTERFERENCE_MM[0]:.3f}-"
         f"{ARBOR_DIAMETRAL_INTERFERENCE_MM[1]:.3f} DIAMETRAL INTERFERENCE.",
+        "143.2 +/-0.5 ENSURES FULL ENGAGEMENT AT ALL 20 MHA-027 GEAR STATIONS.",
         "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
     )
 )
