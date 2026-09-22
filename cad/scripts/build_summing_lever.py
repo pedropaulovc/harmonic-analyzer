@@ -867,22 +867,26 @@ async def _drawing_reference_sketches(
     pattern = SketchDims()
     check("create pattern reference", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
+    # A Top-plane sketch's y is MODEL -Z, while the Hole Wizard seed is placed
+    # in true model Z.  The field is not symmetric (9.90 from the -Z end, 8.43
+    # from the +Z end), so authoring these at +HOLE_Z mirrored every printed
+    # location 1.47 mm off the hole centres (R6 render; Codex R5/R6).
     first_offset = check(
         "first spring-hole offset reference",
         await adapter.add_line(
             HOLE_X,
-            -PLATE_L / 2.0,
+            PLATE_L / 2.0,
             HOLE_X,
-            HOLE_Z[0],
+            -HOLE_Z[0],
         ),
     )
     pattern_span = check(
         "spring-hole total span reference",
-        await adapter.add_line(HOLE_X, HOLE_Z[0], HOLE_X, HOLE_Z[-1]),
+        await adapter.add_line(HOLE_X, -HOLE_Z[0], HOLE_X, -HOLE_Z[-1]),
     )
     end_offset = check(
         "last spring-hole offset reference",
-        await adapter.add_line(HOLE_X, HOLE_Z[-1], HOLE_X, PLATE_L / 2.0),
+        await adapter.add_line(HOLE_X, -HOLE_Z[-1], HOLE_X, -PLATE_L / 2.0),
     )
     boss_location = check(
         "boss axial location reference",
@@ -935,12 +939,12 @@ async def _drawing_reference_sketches(
         adapter,
         f"{first_offset}.start",
         HOLE_X,
-        -PLATE_L / 2.0,
+        PLATE_L / 2.0,
         "first spring-hole offset start",
     )
     pattern.record("PatternRefX", '"HoleX"')
     pattern.record("PatternRefEnd", '"PlateL" / 2')
-    # Both terminal holes are located from the SAME (+Z) plate end -- this and
+    # Both terminal holes are located from the SAME (model +Z) plate end -- this and
     # HoleEndOffsetLast -- so the print baselines the field instead of chaining
     # end -> first hole -> span (drawing policy rule 7; Codex R5 clarity).
     await dimension_between(
@@ -1001,8 +1005,8 @@ async def _summation_arc_reference(
     does not lay the arc out.  The centre is circumcentre-derived (no clean
     global) and already implied by the profile, so it lives here as a reference
     sketch whose two driving dims ARE the printed values, measured from the plate
-    end face on the cylinder axis.  Construction line A is the +Z trunnion's
-    centreline (its start is that datum, its end clears the trunnion for the
+    end face on the cylinder axis.  Construction line A is one trunnion's
+    centreline (sketch +y is model -Z; the arcs are mirror-symmetric) (its start is that datum, its end clears the trunnion for the
     witness line); line B is a short stub from the centre along the witness line
     the vertical dimension draws anyway.  Values restate the model's own
     ``_circumcenter`` of the same three points, so no geometry moves.

@@ -223,9 +223,9 @@ PATTERN_KEEP = {
     "HoleSeedX": (0.190, 0.205),
     # Left of the baseline dimension's line, so that line runs clear of the text.
     "HolePitch": (0.215, 0.128),
-    # Both terminal holes from the +Z plate end.  Above its own arrows: between
-    # them the witness lines ruled through the text.
-    "HoleEndOffsetLast": (0.252, 0.193),
+    # Both terminal holes from the model +Z plate end, the sheet's LOWER end.
+    # Below its own arrows: between them the witness lines ruled through the text.
+    "HoleEndOffsetLast": (0.252, 0.100),
     "HoleFirstFromEnd": (0.2656, 0.147),
 }
 
