@@ -66,6 +66,7 @@ from crankshaft_spec import (
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
+from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -374,6 +375,17 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    assert_signed_circle_center(
+        adapter,
+        "ShaftFiducialProfile",
+        label="MHA-026 punched fiducial",
+        expected_sketch_xy_mm=(FIDUCIAL_MODEL_X, -FIDUCIAL_MODEL_Z),
+        expected_model_xyz_mm=(
+            FIDUCIAL_MODEL_X,
+            FIDUCIAL_SURFACE_Y,
+            FIDUCIAL_MODEL_Z,
+        ),
+    )
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
     )
