@@ -11,8 +11,9 @@ from __future__ import annotations
 
 # Per-view native-dimension partitions. The part marks their union; each drawing
 # view imports only the dimensions whose source plane projects truthfully there.
-# Plug and screw are Front-plane revolves, so the z=0 joint section carries
-# their side-view diameters and lengths; the slot detail enlarges that section.
+# Plug and screw are Front-plane revolves, so a view parallel to the bend plane
+# imports their diameters as side-view sizes: the z=0 joint section carries the
+# plug in the tube bore, and a screw-only side view carries the screw.
 ELEVATION_DIMENSIONS: dict[str, set[str]] = {
     "Leg": {"LegLength"},
     "BendPath": {"BendRadius", "ArmRun"},
@@ -22,14 +23,14 @@ POST_SECTION_DIMENSIONS: dict[str, set[str]] = {
 }
 JOINT_DIMENSIONS: dict[str, set[str]] = {
     "EndPlugProfile": {"PlugDia", "TapMinorDia", "PlugDepth"},
+}
+SCREW_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "ScrewHeadDia",
         "ScrewShankDia",
         "HeadThickness",
         "UnderHeadLength",
     },
-}
-SLOT_DETAIL_DIMENSIONS: dict[str, set[str]] = {
     "ScrewSlotProfile": {"SlotDepth", "SlotWidth"},
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
@@ -37,7 +38,7 @@ for _partition in (
     ELEVATION_DIMENSIONS,
     POST_SECTION_DIMENSIONS,
     JOINT_DIMENSIONS,
-    SLOT_DETAIL_DIMENSIONS,
+    SCREW_DIMENSIONS,
 ):
     for _feature, _names in _partition.items():
         DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
@@ -99,3 +100,4 @@ DRAWING_NOTES = "\n".join(
 # only the unlabelled model views need a caption note.
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
+SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 6:1"

@@ -3,10 +3,11 @@ r"""Create the curated machinist drawing for the gooseneck counter-spring post.
 The SLDPRT remains authoritative. Sheet 1 defines the formed tube: a 1:3
 elevation, a 2:1 cut-surface section B-B across the post for the tube wall,
 and the standard isometric. Sheet 2 is the arm-end fabrication: a small plan
-view carries cutting line A-A along the arm axis in the plane of the bend, the
-4:1 section exposes the separate brazed plug and slotted adjustment screw
-(both Front-plane revolves, so their diameters import as side-view sizes), and
-detail C enlarges the screw slot. Every displayed size is imported from the
+view carries cutting line A-A along the arm axis in the plane of the bend; the
+4:1 section shows the separate brazed plug in the tube bore with the screw
+installed, and a 6:1 side view of the screw body alone carries the screw.
+Plug and screw are Front-plane revolves, so their diameters import as
+side-view sizes. Every displayed size is imported from the
 model; every placement is keyed to projected model points, so a mirrored
 section cannot strand a dimension on the wrong side.
 
@@ -42,8 +43,8 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from gooseneck_geom import (
     ARM_END_X,
@@ -66,7 +67,7 @@ from gooseneck_spec import (
     PLUG_FIT_CALLOUT,
     POST_SECTION_DIMENSIONS,
     SCREW_CALLOUT,
-    SLOT_DETAIL_DIMENSIONS,
+    SCREW_DIMENSIONS,
     TAP_CALLOUT,
 )
 
@@ -98,24 +99,26 @@ JOINT_CUT_END_X = SHANK_END_X + 8.0  # past the screw tip, still in the arm
 # its two diameters sit between it and the isometric, all above the title
 # block (x > 218 mm is title block below y = 65 mm).
 FRONT_CENTER = (0.095, 0.145)
-POST_SECTION_CENTER = (0.175, 0.185)
+POST_SECTION_CENTER = (0.190, 0.175)  # where the post AXIS lands
 POST_SECTION_SCALE = (2, 1)
 ISO_CENTER = (0.330, 0.170)
 ISO_SCALE = (1, 3)
 ELEVATION_NOTE_XY = (0.058, 0.048)
 ISO_NOTE_XY = (0.290, 0.085)
-POST_LABEL_BELOW_MM = 30.0
+POST_LABEL_BELOW_MM = 32.0  # below the post axis: 16 mm ring + air
 
-# Sheet 2. The plan parent is only the carrier of cutting line A-A.
+# Sheet 2. The plan parent is only the carrier of cutting line A-A. Views
+# are placed by where a model point lands, not by outline: a cut-surface
+# section's outline still spans geometry it does not print.
 PLAN_CENTER = (0.085, 0.240)
 PLAN_SCALE = (1, 2)
-JOINT_CENTER = (0.165, 0.140)
+JOINT_AXIS_AT_ARM_END = (0.105, 0.140)  # section A-A: arm end face on the axis
 JOINT_SCALE = (4, 1)
-SLOT_DETAIL_CENTER = (0.340, 0.185)
-SLOT_DETAIL_SCALE = (12, 1)
-SLOT_FENCE_RADIUS_MM = 1.6
-NOTES_XY = (0.250, 0.110)
-LABEL_BELOW_MM = 12.0
+JOINT_LABEL_BELOW_MM = 62.0
+SCREW_AXIS_AT_HEAD = (0.285, 0.185)  # screw view: head underside on the axis
+SCREW_SCALE = (6, 1)
+SCREW_NOTE_BELOW_MM = 70.0
+NOTES_XY = (0.020, 0.058)
 
 
 def _sheet_point(
@@ -173,45 +176,56 @@ def _place_view_label(
         raise RuntimeError(f"{label}: cannot position native view label")
 
 
-def _label_under(view: Any, below_mm: float) -> tuple[float, float]:
-    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
-    return ((outline[0] + outline[2]) / 2.0, outline[1] - below_mm / 1000.0)
+def _move_to(
+    adapter: Any,
+    view: Any,
+    point_mm: tuple[float, float],
+    target: tuple[float, float],
+    *,
+    label: str,
+) -> tuple[float, float]:
+    """Move ``view`` so the part point ``point_mm`` (x, y at z=0) lands on
+    ``target``; returns where it landed (sheet metres)."""
+    bound = _early_bound(view, "IView")
+    for _ in range(2):
+        landed = _sheet_point(adapter, view, *point_mm, label=label)
+        position = tuple(float(value) for value in bound.Position)
+        moved = [position[axis] + target[axis] - landed[axis] for axis in range(2)]
+        if not bound.SetViewPosition(double_array(moved), False):
+            raise RuntimeError(f"{label}: failed to position view")
+        rebuild_drawing(adapter, label=label)
+    landed = _sheet_point(adapter, view, *point_mm, label=label)
+    if math.dist(landed, target) > 1e-4:
+        raise RuntimeError(f"{label}: view point landed at {landed}, wanted {target}")
+    return landed
 
 
-def _slot_detail(adapter: Any, joint: Any) -> Any:
-    """Enlarge the 0.80 x 0.80 screw slot out of section A-A."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(joint, "IView")
-    if not ddoc.ActivateView(view_name(adapter, joint)):
-        raise RuntimeError("cannot activate slot detail parent")
-    draw.ClearSelection2(True)
-    center = _sheet_point(
-        adapter, joint, SCREW_TIP_X + SCREW_SLOT_DEPTH / 2.0, ARM_Y, label="slot detail"
-    )
-    radius = SLOT_FENCE_RADIUS_MM * JOINT_SCALE[0] / JOINT_SCALE[1] / 1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("cannot create slot detail fence")
-    detail = ddoc.CreateDetailViewAt4(
-        *SLOT_DETAIL_CENTER, 0.0, 0, *SLOT_DETAIL_SCALE, "C", 1, True, False, False, 5
-    )
-    if detail is None:
-        raise RuntimeError("cannot create slot detail")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in SLOT_DETAIL_SCALE])
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="slot detail")
-    _center_view(adapter, detail, SLOT_DETAIL_CENTER, label="slot detail")
-    return detail
+def _axis_signs(adapter: Any, view: Any, *, label: str) -> tuple[float, float]:
+    """Sheet direction (+1/-1) of part +X and +Y in ``view``."""
+    origin = _sheet_point(adapter, view, ARM_END_X, ARM_Y, label=label)
+    along_x = _sheet_point(adapter, view, ARM_END_X + 1.0, ARM_Y, label=label)
+    along_y = _sheet_point(adapter, view, ARM_END_X, ARM_Y + 1.0, label=label)
+    sx = 1.0 if along_x[0] > origin[0] else -1.0
+    sy = 1.0 if along_y[1] > origin[1] else -1.0
+    if abs(along_x[1] - origin[1]) > 1e-9 or abs(along_y[0] - origin[0]) > 1e-9:
+        raise RuntimeError(f"{label}: arm axis is not horizontal on the sheet")
+    _telemetry.info(f"{label}: part +X -> sheet {sx:+.0f} x, part +Y -> sheet {sy:+.0f} y")
+    return sx, sy
+
+
+def _show_only_screw(adapter: Any, view: Any) -> None:
+    """Restrict ``view`` to the adjustment-screw body (the body reaching
+    furthest toward -X: the head face sits beyond the arm end)."""
+    bound = _early_bound(view, "IView")
+    model = _early_bound(bound.ReferencedDocument, "IPartDoc")
+    bodies = [_early_bound(raw, "IBody2") for raw in model.GetBodies2(0, True) or ()]
+    if len(bodies) != 3:
+        raise RuntimeError(f"screw view: expected 3 solid bodies, found {len(bodies)}")
+    screw = min(bodies, key=lambda body: float(body.GetBodyBox()[0]))
+    bound.Bodies = dispatch_array([screw])
+    shown = int(bound.GetBodiesCount())
+    if shown != 1:
+        raise RuntimeError(f"screw view shows {shown} bodies, expected the screw alone")
 
 
 def _log_layout(adapter: Any) -> None:
@@ -252,6 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Screw View Note",
         ),
         required=(
             "Number",
@@ -261,6 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Screw View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -318,8 +334,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _cut_surface_only(post, label="post wall section")
     set_hidden_lines_removed(adapter, post)
     rebuild_drawing(adapter, label="post wall section")
-    _center_view(adapter, post, POST_SECTION_CENTER, label="post wall section")
-    post_center = _sheet_point(adapter, post, 0.0, POST_CUT_Y, label="post axis")
+    post_center = _move_to(
+        adapter, post, (0.0, POST_CUT_Y), POST_SECTION_CENTER, label="post wall section"
+    )
     post_dimensions = curate_view_dimensions(
         adapter,
         post,
@@ -331,7 +348,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=POST_SECTION_DIMENSIONS,
     )
     _place_view_label(
-        adapter, post, _label_under(post, POST_LABEL_BELOW_MM), label="section B-B label"
+        adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),
+        label="section B-B label",
     )
     add_property_linked_note(adapter, "Elevation View Note", *ELEVATION_NOTE_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
@@ -350,7 +368,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_end=_sheet_point(
             adapter, plan, JOINT_CUT_END_X, ARM_Y, label="joint cut arm end"
         ),
-        view_xy=JOINT_CENTER,
+        view_xy=JOINT_AXIS_AT_ARM_END,
         section_label="A",
         scale=JOINT_SCALE,
         partial=True,
@@ -359,37 +377,28 @@ async def build(adapter: Any) -> dict[str, str]:
     _cut_surface_only(joint, label="arm and brazed end joint")
     set_hidden_lines_removed(adapter, joint)
     rebuild_drawing(adapter, label="arm and brazed end joint")
-    _center_view(adapter, joint, JOINT_CENTER, label="arm and brazed end joint")
-
-    # +X may print left or right, depending on the cut direction SolidWorks
-    # chose; every horizontal offset follows the projected arm direction.
-    axis_head = _sheet_point(adapter, joint, SCREW_TIP_X, ARM_Y, label="joint head")
-    axis_far = _sheet_point(adapter, joint, SHANK_END_X, ARM_Y, label="joint far")
-    sign = 1.0 if axis_far[0] >= axis_head[0] else -1.0
-    _telemetry.info(f"section A-A prints part +X toward sheet {'right' if sign > 0 else 'left'}")
+    arm_end = _move_to(
+        adapter, joint, (ARM_END_X, ARM_Y), JOINT_AXIS_AT_ARM_END,
+        label="arm and brazed end joint",
+    )
+    jx, jy = _axis_signs(adapter, joint, label="section A-A")
 
     def joint_at(x: float, y: float, dx: float = 0.0, dy: float = 0.0) -> tuple[float, float]:
-        return _offset(
-            _sheet_point(adapter, joint, x, y, label="joint"), sign * dx, dy
-        )
+        """Part point, then an offset in sheet mm along part +X / +Y."""
+        return _offset(_sheet_point(adapter, joint, x, y, label="joint"), jx * dx, jy * dy)
 
-    top = ARM_Y + TUBE_R
-    bottom = ARM_Y - TUBE_R
+    # The profile anchors sit on the +Y side, so the axial length lives there;
+    # every diameter text goes to the -Y side, its callout between it and the
+    # part. The plug diameter's line stands in the open gap left of the tube
+    # end, clear of the tap callout that spans the plug.
+    plus_y, minus_y = ARM_Y + TUBE_R, ARM_Y - TUBE_R
     joint_dimensions = curate_view_dimensions(
         adapter,
         joint,
         keep={
-            # Above: axial lengths, measured off the upper profile edges.
-            "HeadThickness": joint_at((SCREW_TIP_X + HEAD_X) / 2.0, top, dy=10.0),
-            "PlugDepth": joint_at((ARM_END_X + PLUG_END_X) / 2.0, top, dy=10.0),
-            "UnderHeadLength": joint_at((HEAD_X + SHANK_END_X) / 2.0, top, dy=24.0),
-            # Left of the head: its diameter.
-            "ScrewHeadDia": joint_at(SCREW_TIP_X - 3.0, bottom, dy=-12.0),
-            # In the open gap between head and arm end: shank and plug face.
-            "ScrewShankDia": joint_at(HEAD_X + 1.4, bottom, dy=-30.0),
-            "PlugDia": joint_at(ARM_END_X - 1.0, top, dy=44.0),
-            # Past the plug's inner face, beyond the screw tip.
-            "TapMinorDia": joint_at(SHANK_END_X + 3.0, bottom, dy=-12.0),
+            "PlugDepth": joint_at((ARM_END_X + PLUG_END_X) / 2.0, plus_y, dy=12.0),
+            "TapMinorDia": joint_at(PLUG_END_X - 0.8, minus_y, dy=-16.0),
+            "PlugDia": joint_at(ARM_END_X - 1.5, minus_y, dy=-42.0),
         },
         view_label="arm joint section",
         dimensions_by_feature=JOINT_DIMENSIONS,
@@ -397,40 +406,62 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         joint_dimensions,
-        {"PlugDia": PLUG_FIT_CALLOUT},
-        location="above",
-    )
-    set_dimension_callouts(
-        adapter,
-        joint_dimensions,
-        {"TapMinorDia": TAP_CALLOUT, "ScrewShankDia": SCREW_CALLOUT},
+        {"PlugDia": PLUG_FIT_CALLOUT, "TapMinorDia": TAP_CALLOUT},
         location="below",
     )
     set_reference_dimensions(adapter, joint_dimensions, ("PlugDia",))
     _place_view_label(
-        adapter, joint, _label_under(joint, 40.0), label="section A-A label"
+        adapter,
+        joint,
+        (arm_end[0], arm_end[1] - JOINT_LABEL_BELOW_MM / 1000.0),
+        label="section A-A label",
     )
 
-    detail = _slot_detail(adapter, joint)
-    slot_mouth = _sheet_point(adapter, detail, SCREW_TIP_X, ARM_Y, label="slot mouth")
-    slot_dimensions = curate_view_dimensions(
+    screw = place_view(adapter, str(SOURCE), "*Front", *SCREW_AXIS_AT_HEAD, scale=SCREW_SCALE)
+    _show_only_screw(adapter, screw)
+    set_hidden_lines_removed(adapter, screw)
+    rebuild_drawing(adapter, label="screw view")
+    head = _move_to(adapter, screw, (HEAD_X, ARM_Y), SCREW_AXIS_AT_HEAD, label="screw view")
+    sx, sy = _axis_signs(adapter, screw, label="screw view")
+
+    def screw_at(x: float, y: float, dx: float = 0.0, dy: float = 0.0) -> tuple[float, float]:
+        return _offset(_sheet_point(adapter, screw, x, y, label="screw"), sx * dx, sy * dy)
+
+    head_plus, head_minus = ARM_Y + SCREW_HEAD_DIA / 2.0, ARM_Y - SCREW_HEAD_DIA / 2.0
+    screw_dimensions = curate_view_dimensions(
         adapter,
-        detail,
+        screw,
         keep={
-            "SlotWidth": _offset(slot_mouth, -sign * 14.0, 0.0),
-            "SlotDepth": _offset(slot_mouth, sign * 5.0, 16.0),
+            # +Y side: axial lengths (their profile anchors are there).
+            "HeadThickness": screw_at(HEAD_X - SCREW_HEAD_T / 2.0, head_plus, dy=10.0),
+            "UnderHeadLength": screw_at(
+                (HEAD_X + SHANK_END_X) / 2.0, head_plus, dy=22.0
+            ),
+            "SlotWidth": screw_at(SCREW_TIP_X - 2.0, head_plus, dy=10.0),
+            # -Y side: diameters and the slot depth (its sketch edge is -Y).
+            "ScrewHeadDia": screw_at(HEAD_X + 1.0, head_minus, dy=-10.0),
+            "SlotDepth": screw_at(
+                SCREW_TIP_X + SCREW_SLOT_DEPTH / 2.0, head_minus, dy=-22.0
+            ),
+            "ScrewShankDia": screw_at(HEAD_X + 7.0, head_minus, dy=-22.0),
         },
-        view_label="screw slot detail",
-        dimensions_by_feature=SLOT_DETAIL_DIMENSIONS,
+        view_label="adjustment screw",
+        dimensions_by_feature=SCREW_DIMENSIONS,
     )
-    _place_view_label(
-        adapter, detail, _label_under(detail, LABEL_BELOW_MM), label="detail C label"
+    set_dimension_callouts(
+        adapter, screw_dimensions, {"ScrewShankDia": SCREW_CALLOUT}, location="below"
+    )
+    add_property_linked_note(
+        adapter,
+        "Screw View Note",
+        head[0] - 0.040,
+        head[1] - SCREW_NOTE_BELOW_MM / 1000.0,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     assert_imported_precision(
         adapter,
-        [*front_dimensions, *post_dimensions, *joint_dimensions, *slot_dimensions],
+        [*front_dimensions, *post_dimensions, *joint_dimensions, *screw_dimensions],
         DRAWING_PRECISION_BY_NAME,
     )
     _telemetry.info(
