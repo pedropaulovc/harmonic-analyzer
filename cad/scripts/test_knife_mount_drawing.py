@@ -55,19 +55,37 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
     assert crown_web_at_limits >= 0.5
 
 
-def test_midplane_hanger_tap_retains_axial_wall_at_depth_limit() -> None:
+def test_end_located_hanger_tap_retains_axial_wall_at_limits() -> None:
+    """The tap is located 8.00 from ONE end face, so both walls stack.
+
+    Near wall: the location's own band. Far wall: the thickness band plus the
+    location band. Each band is the title-block tolerance of the precision the
+    sheet actually prints for that dimension.
+    """
     import _config
 
-    two_place_mm = round(
-        float(_config.title_block("linear_2pl")["value_in"]) * 25.4, 2
-    )
-    minimum_depth = knife_mount_spec.SUPPORT_Z_THICK - two_place_mm
+    band_mm = {
+        places: round(
+            float(_config.title_block(f"linear_{places}pl")["value_in"]) * 25.4, 2
+        )
+        for places in (1, 2)
+    }
+    precision = knife_mount_spec.DRAWING_PRECISION_BY_NAME
+    depth_band = band_mm[precision["Depth"]]
+    location_band = band_mm[precision["TapFromEnd"]]
+    location = knife_mount_spec.DRAWING_NOMINALS_MM["TapFromEnd"]
     basic_major_radius = 12.7 / 2.0
 
-    assert minimum_depth / 2.0 - basic_major_radius > 0.0
+    near_wall = location - location_band - basic_major_radius
+    far_wall = (
+        knife_mount_spec.SUPPORT_Z_THICK
+        - depth_band
+        - (location + location_band)
+        - basic_major_radius
+    )
 
-
-
+    assert near_wall > 0.0
+    assert far_wall > 0.0
 
 
 def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() -> None:

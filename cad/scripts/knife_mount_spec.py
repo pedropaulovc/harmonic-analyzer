@@ -109,11 +109,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places carry the ordinary size tolerance and therefore live on the
 # actual model dimensions. BoreFromTop has the tighter explicit native band.
+# BoreFromSide prints one place: the bore and the tap share one centreline
+# (the tap's side location is only a reference read of it), and 6-mm walls
+# either side leave nothing for .XX to protect (machinist review, knife-cc-6).
+# TapFromEnd keeps two places: it locates the Ø12.7 thread from ONE end face,
+# so its band stacks with Depth's against the far wall (see
+# test_end_located_hanger_tap_retains_axial_wall_at_limits).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
         "BlockWidth": 1,
         "BlockHeight": 1,
-        "BoreFromSide": 2,
+        "BoreFromSide": 1,
         "BoreFromTop": 2,
         "BoreDia": 2,
     },
@@ -148,7 +154,7 @@ REFERENCE_DIMENSION_NOMINALS_MM = {
     "TapFromSide": BLK_HALF_X,
 }
 DRAWING_REFERENCE_PRECISION = {
-    "TapFromSide": 2,
+    "TapFromSide": 1,  # a read of BoreFromSide's centreline, same precision
 }
 # The native tap definition and the bore-location/size bands close the adverse
 # uninterrupted-crown stack; the drawing's center section shows that geometry.
