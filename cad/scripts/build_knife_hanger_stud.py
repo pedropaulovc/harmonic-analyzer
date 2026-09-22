@@ -17,7 +17,7 @@ from _drawing_marks import (
 )
 from _fastener_catalog import fastener
 from _saved_part_guard import require_saved_drawing_properties
-from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _stock_fastener import StockComponent, build_stock_fastener
 from diagnostics.diag_build_91247A720 import (
     GB_HH,
     GB_HW,
@@ -50,7 +50,8 @@ SHANK_DIA = 2.0 * GB_MAJOR_R
 STOCK_SHANK_LEN = GB_LEN
 SHANK_LEN = FINISHED_UNDERHEAD_MM
 UNDERHEAD_LEN = FINISHED_UNDERHEAD_MM
-TRIMMED_TIP_TRANSLATION_MM = FINISHED_UNDERHEAD_MM - (GB_UNDERSIDE - GB_WASHER_T)
+UNDERHEAD_Y_MM = GB_UNDERSIDE - GB_WASHER_T
+THREAD_TIP_Y_MM = UNDERHEAD_Y_MM - UNDERHEAD_LEN
 
 
 def _manufacturing_controls(adapter) -> None:
@@ -77,12 +78,42 @@ def _manufacturing_controls(adapter) -> None:
     set_dimension_symmetric_tolerance(
         adapter, "StockTrimProfile", "FinishedOverall", FINISHED_UNDERHEAD_TOLERANCE_MM
     )
+    # General tolerance carries the title-block band without a redundant
+    # per-dimension ± callout; retain its numerical acceptance range natively.
+    _, dimension = _named_dimension(adapter, "StockTrimProfile", "FinishedOverall")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = FINISHED_UNDERHEAD_TOLERANCE_MM / 1000
+    tolerance.Type = 11  # swTolType_e.swTolGeneral
+    if not tolerance.SetValues(-band, band):
+        raise RuntimeError("FinishedOverall@StockTrimProfile: general tolerance rejected")
+    if (
+        int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError(
+            "FinishedOverall@StockTrimProfile: general tolerance readback changed"
+        )
     set_dimension_symmetric_tolerance(
         adapter, "StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM
     )
     set_dimension_symmetric_angular_tolerance(
         adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
     )
+    _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferAngle")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)
+    tolerance.Type = 11  # swTolType_e.swTolGeneral
+    if not tolerance.SetValues(-band, band):
+        raise RuntimeError("ChamferAngle@StockDeburrProfile: general tolerance rejected")
+    if (
+        int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError(
+            "ChamferAngle@StockDeburrProfile: general tolerance readback changed"
+        )
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
@@ -111,9 +142,6 @@ async def build(adapter) -> dict[str, str]:
             StockComponent(
                 "91247A720",
                 _prepared_stud,
-                RigidTransform(
-                    translation_mm=(0.0, TRIMMED_TIP_TRANSLATION_MM, 0.0)
-                ),
                 parameters={"finished_underhead_mm": FINISHED_UNDERHEAD_MM},
             ),
         ),

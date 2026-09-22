@@ -24,7 +24,7 @@ if abs(STOCK_UNDERHEAD_MM - TRIM_LENGTH_MM - FINISHED_UNDERHEAD_MM) > 1e-9:
 # Preserve the vendor's 45-degree tip treatment at the new cut end.  The
 # explicit band leaves the cut flat smaller than the receiver tap drill.
 CHAMFER_WIDTH_MM = GB_PITCH * 0.75
-CHAMFER_WIDTH_TOLERANCE_MM = 0.05
+CHAMFER_WIDTH_TOLERANCE_MM = 0.10
 CHAMFER_ANGLE_DEG = 45.0
 CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
 # The nominal drill diameter comes from the shared ANSI hole table. The
@@ -48,5 +48,8 @@ DIMENSION_TOLERANCE_TYPES = {
     "ChamferWidth": 4,
     "ChamferAngle": 11,
 }
-DRAWING_NOTES = "UNDIMENSIONED PURCHASED HEAD/THREAD GEOMETRY IS REFERENCE."
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
+DRAWING_NOTES = (
+    "UNDIMENSIONED PURCHASED HEAD/THREAD GEOMETRY IS REFERENCE; "
+    "1/2-13 UNC THREAD PER McMASTER-CARR 91247A720."
+)
+ISOMETRIC_VIEW_NOTE = "ISO SCALE 2:1"
