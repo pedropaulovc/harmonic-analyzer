@@ -324,11 +324,16 @@ def _visible_component_circle(
         full_components[name] = component
 
     candidates: list[tuple[tuple[float, ...], Any]] = []
+    # Every circle this stem shows in the view, (component, y, r, z) in mm, so
+    # a miss names what the view actually offered instead of just "none".
+    seen_circles: list[tuple[str, float, float, float]] = []
+    edge_counts: dict[str, int] = {}
     for raw_component in tuple(view.GetVisibleComponents() or ()):
         visible_component = _early_bound(raw_component, "IComponent2")
         if _component_stem(visible_component) != component_stem:
             continue
         name = str(visible_component.Name2 or "").rsplit("/", 1)[-1]
+        edge_counts[name] = 0
         full_component = full_components.get(name)
         if full_component is None:
             raise RuntimeError(f"{label}: component {name!r} has no full peer")
@@ -341,6 +346,7 @@ def _visible_component_circle(
         )
         component_scale = transform_values[12]
         for raw_edge in tuple(view.GetVisibleEntities2(visible_component, 1) or ()):
+            edge_counts[name] += 1
             edge = _early_bound(raw_edge, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
             if curve is None or not curve.IsCircle():
@@ -354,6 +360,9 @@ def _visible_component_circle(
             )
             actual_height_mm = center[1] * 1000.0
             actual_radius_mm = parameters[6] * component_scale * 1000.0
+            seen_circles.append(
+                (name, actual_height_mm, actual_radius_mm, center[2] * 1000.0)
+            )
             if abs(actual_height_mm - height_mm) > 1e-5:
                 continue
             if abs(actual_radius_mm - radius_mm) > 1e-5:
@@ -369,10 +378,33 @@ def _visible_component_circle(
                     edge,
                 )
             )
+    nearest = sorted(
+        seen_circles,
+        key=lambda circle: abs(circle[1] - height_mm) + abs(circle[2] - radius_mm),
+    )[:8]
+    _telemetry.event(
+        "drawing.visible_circle_search",
+        label=label,
+        view=str(view.GetName2() or ""),
+        component_stem=component_stem,
+        target_y_mm=height_mm,
+        target_radius_mm=radius_mm,
+        edge_counts=tuple(sorted(edge_counts.items())),
+        circle_count=len(seen_circles),
+        matches=len(candidates),
+        nearest=tuple(
+            f"{name} y={y:.5f} r={r:.5f} z={z:.3f}" for name, y, r, z in nearest
+        ),
+    )
     if not candidates:
         raise RuntimeError(
             f"{label}: no {component_stem!r} circle at y={height_mm:g} mm, "
-            f"radius={radius_mm:g} mm"
+            f"radius={radius_mm:g} mm in view {view.GetName2()!r}; visible "
+            f"edges per component {edge_counts!r}, {len(seen_circles)} circles; "
+            "nearest (component, y, r, z mm): "
+            + "; ".join(
+                f"{name} {y:.5f} {r:.5f} {z:.3f}" for name, y, r, z in nearest
+            )
         )
     candidates.sort(key=lambda item: item[0])
     return candidates[0][1]
@@ -826,13 +858,6 @@ def _validate_summing_bom(
                 f"requested {width * 1000:.3f} mm, "
                 f"actual {actual_width * 1000:.3f} mm"
             )
-    header_count = int(table.GetHeaderCount())
-    # SetRowHeight returns the height SolidWorks applied: never less than the
-    # minimum that fits the row's text, which the header can exceed. The
-    # contract is enforced on the persisted height after the rebuild below.
-    setter_heights = tuple(
-        float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows)
-    )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -897,6 +922,15 @@ def _validate_summing_bom(
                 f"summing BOM quantity for {stem!r} is {quantity!r}, "
                 f"expected {BOM_QUANTITIES[stem]}"
             )
+    header_count = int(table.GetHeaderCount())
+    # Rows are sized after the part-number rewrite, so the long component
+    # stems SolidWorks displays first cannot leave a row wrapped-tall.
+    # SetRowHeight returns the height SolidWorks applied: never less than the
+    # minimum that fits the row's text, which the header can exceed. The
+    # contract is enforced on the persisted height after the rebuild below.
+    setter_heights = tuple(
+        float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows)
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("summing BOM rebuild failed")
     for stem, (row_index, _item, _description, _quantity) in actual.items():
