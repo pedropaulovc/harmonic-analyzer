@@ -148,10 +148,14 @@ def _pattern_points(station_sign: float):
             (build.HOLE_X, station_sign * first),
             (build.HOLE_X, station_sign * last),
             (build.HOLE_X, -half),
-            (build.TIP_X, -half),
-            (build.TIP_X, 0.0),
         ]
     )
+
+
+def _boss_points():
+    import build_summing_lever as build
+
+    return _top_plane([(build.TIP_X, -build.PLATE_L / 2.0), (build.TIP_X, 0.0)])
 
 
 def _arc_points(centre):
@@ -171,6 +175,7 @@ def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
     claims = build._reference_claims(cylinders, planes)
     for name, points in (
         ("PatternReferences", _pattern_points(-1.0)),
+        ("BossAxialReference", _boss_points()),
         ("SummationArcReference", _arc_points(centre)),
     ):
         problems, worst = build._reference_misses(points, *claims[name])

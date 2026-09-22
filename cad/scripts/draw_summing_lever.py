@@ -198,12 +198,11 @@ FORM_TOP_KEEP = {
     "EdgeRibThickness": (0.1900, 0.0590),
     # Below its own arrows: between them the witness lines ruled through the text.
     "MiddleRibThickness": (0.1985, 0.0950),
-    # Beyond the located centre, on the radial through the arc: the leader runs
-    # text -> centre -> arc, so no line passes through the text.  The leader
-    # leaves from the shelf end (about +13 / +3 mm from this anchor), and it is
-    # THAT point that must sit up-left of the centre: on R5 the shelf end sat
-    # up-right and the leader went through the centre to the far side.
-    "SummationArcRadius": (0.0708, 0.1993),
+    # Inside the arc, on the radial 50 deg below the located centre, 0.6 R out:
+    # the dimension line runs from the centre mark to the arc.  Beyond the
+    # centre (R5-R7) the leader crossed the corner where the 2X 123.2 / 2X 64.0
+    # witness lines meet (Main's R7 eye pass).
+    "SummationArcRadius": (0.1251, 0.1431),
     # The R138.8 centre from the plate end face on the cylinder axis; both
     # dimensions sit in the clear field above the web, their witness lines
     # crossing at the centre.
@@ -236,7 +235,9 @@ MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
     ("CLOCK KNIFE RIDGE TO BOSS AXIS", 0.230, 0.255),
     ("NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES", 0.230, 0.246),
     ("KNIFE RIDGES SHARP; NO EDGE BREAK", 0.230, 0.237),
-    ("Ra 1.6 ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS", 0.230, 0.228),
+    # The Ra value lives on the model's finish control (Detail A's symbol); the
+    # note only scopes it, so the sheet never restates a manufacturing value.
+    ("DETAIL A FINISH ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS", 0.230, 0.228),
 )
 
 
@@ -341,10 +342,10 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
     """Hide one model reference sketch in one drawing view that prints none of
     its dimensions.
 
-    ``PatternReferences`` carries the construction line that locates the boss
-    axially, and the isometric printed it as a stray dash-dot stroke off the boss;
-    ``SummationArcReference`` would print its centre stub edge-on beside the boss
-    in the front view.  ``BlankSketch`` is VT_VOID and there is no per-view
+    ``BossAxialReference`` carries the construction line that locates the boss
+    axially, and the isometric and the spring-pattern view printed it as a stray
+    dash-dot stroke from the boss to the plate end; ``SummationArcReference``
+    would print its centre stub edge-on beside the boss in the front view.  ``BlankSketch`` is VT_VOID and there is no per-view
     read-back, so the selection is the gate and the render the proof.
     """
     draw = adapter.currentModel
@@ -361,6 +362,50 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
         raise RuntimeError(f"cannot select {qualified}")
     draw.BlankSketch()
     draw.ClearSelection2(True)
+
+
+def _mark_summation_arc_centres(adapter: Any, view: Any, edges: Any) -> None:
+    """Centre-mark both R138.8 web arcs in the top view.
+
+    The 2X 123.2 / 2X 64.0 reference dimensions locate that centre, and without
+    a mark their witness lines met in empty space (Main's R7 eye pass).  The
+    arcs are picked from the view's own edge scan -- the only circles over
+    100 mm, axis along Y -- so the mark sits on the arc's real centre.  Extended
+    centre-mark lines would rule R138.8 across the view, so they are switched
+    off and read back.
+    """
+    arcs: dict[tuple[float, float], Any] = {}
+    for item in edges.circles:
+        cx, _cy, cz, _nx, ny, _nz, radius = item.circle
+        if radius < 100.0 or abs(abs(ny) - 1.0) > 1e-9:
+            continue
+        arcs.setdefault((round(cx, 3), round(cz, 3)), item)
+    if len(arcs) != 2:
+        raise RuntimeError(
+            f"expected the two R138.8 web arcs in the top view, found {sorted(arcs)}"
+        )
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    bound_view = _early_bound(view, "IView")
+    for centre, item in sorted(arcs.items()):
+        if not ddoc.ActivateView(name):
+            raise RuntimeError(f"failed to activate {name} for the R138.8 centre mark")
+        draw.ClearSelection2(True)
+        if not bound_view.SelectEntity(item.edge, False):
+            raise RuntimeError(f"cannot select the R138.8 arc centred {centre}")
+        mark = ddoc.InsertCenterMark3(2, False, False)  # swCenterMark_Single
+        draw.ClearSelection2(True)
+        if mark is None:
+            raise RuntimeError(f"no centre mark on the R138.8 arc centred {centre}")
+        mark = _early_bound(mark, "ICenterMark")
+        mark.UseDocDisplaySettings = False
+        mark.ShowLines = False
+        if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
+            raise RuntimeError(
+                f"R138.8 centre mark {centre} kept its extended lines"
+            )
+    _telemetry.success(f"centre-marked {len(arcs)} R138.8 web arcs")
 
 
 def _hole_callout_variable_snapshot(
@@ -732,7 +777,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    _hide_view_sketch(adapter, front, "SummationArcReference")
+    for sketch in ("SummationArcReference", "BossAxialReference"):
+        _hide_view_sketch(adapter, front, sketch)
+    _mark_summation_arc_centres(adapter, top, top_edges)
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
@@ -823,7 +870,8 @@ async def build(adapter: Any) -> dict[str, str]:
         "spring-hole pattern",
     )
     for view in (pattern, iso):
-        _hide_view_sketch(adapter, view, "SummationArcReference")
+        for sketch in ("SummationArcReference", "BossAxialReference"):
+            _hide_view_sketch(adapter, view, sketch)
     _hide_view_sketch(adapter, iso, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):

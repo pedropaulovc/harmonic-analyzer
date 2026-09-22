@@ -110,11 +110,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "MiddleRib": {"MiddleRibThickness"},
     "SpringHoleSeed": {"HoleSeedX"},
     "SpringHolePattern": {"HolePitch"},
-    "PatternReferences": {
-        "BossAxialLocation",
-        "HoleEndOffsetLast",
-        "HoleFirstFromEnd",
-    },
+    "PatternReferences": {"HoleEndOffsetLast", "HoleFirstFromEnd"},
+    "BossAxialReference": {"BossAxialLocation"},
 }
 
 # Decimal places carry the title-block tolerance and therefore live on the
@@ -141,11 +138,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MiddleRib": {"MiddleRibThickness": 2},
     "SpringHoleSeed": {"HoleSeedX": 1},
     "SpringHolePattern": {"HolePitch": 2},
-    "PatternReferences": {
-        "BossAxialLocation": 1,
-        "HoleEndOffsetLast": 2,
-        "HoleFirstFromEnd": 2,
-    },
+    "PatternReferences": {"HoleEndOffsetLast": 2, "HoleFirstFromEnd": 2},
+    "BossAxialReference": {"BossAxialLocation": 1},
 }
 
 _PRECISION_NAMES = [
