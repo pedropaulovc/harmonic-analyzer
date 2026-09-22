@@ -98,6 +98,9 @@ ISO_CENTER = (0.345, 0.195)
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+# SolidWorks' Hole Wizard thread description drops the number-size '#':
+# draw_harmonic_base reads "10-32 UNF" back for its #10-32 tap.
+_TAP_THREAD_DESCRIPTION = f"{STUD_TAP_SPEC.size.lstrip('#')} UNC"
 
 
 def _cosmetic_thread_annotations(adapter: Any) -> list[tuple[str, Any]]:
@@ -200,7 +203,7 @@ def _hide_cosmetic_thread_annotations(adapter: Any) -> None:
 def _auto_tapped_hole_notes(adapter: Any) -> dict[str, int]:
     """Delete SolidWorks' own Hole Wizard notes, named per view, on every sheet.
 
-    Importing model items brings SolidWorks' descriptive thread note ("1/2-13
+    Importing model items brings SolidWorks' descriptive thread note ("#10-24
     Tapped Hole") along with the geometry, and this recipe replaces every one of
     them with an associative feature callout that also carries the process. A
     bare count cannot say WHICH view changed, and the count is not one per
@@ -538,7 +541,7 @@ def _check_tap_callout(
         "hw-threaddepth": STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
     }
     expected_strings = {
-        "hw-threaddesc": "1/2-13 UNC",
+        "hw-threaddesc": _TAP_THREAD_DESCRIPTION,
         "hw-threadclass": STUD_TAP_SPEC.thread_class,
     }
     variables = tuple(display.GetHoleCalloutVariables() or ())
@@ -1003,7 +1006,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # so hide every one across all sheets only after all recipe annotations
     # exist -- the hide is the gate, not any census size.
     _hide_cosmetic_thread_annotations(adapter)
-    # SolidWorks' own '1/2-13 Tapped Hole' is an INote, so the swCThread census
+    # SolidWorks' own '#10-24 Tapped Hole' is an INote, so the swCThread census
     # above can never see it: delete it per view here, after every recipe
     # annotation exists and immediately before finalize. The per-view counts
     # are evidence of which views imported the tapped feature this build, never
@@ -1019,7 +1022,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         if record[1] == 3
     }
-    if tap_strings.get("hw-threaddesc", "").strip(" -") != "1/2-13 UNC":
+    if tap_strings.get("hw-threaddesc", "").strip(" -") != _TAP_THREAD_DESCRIPTION:
         raise RuntimeError(
             "hanger-stud blind tap lost its thread description to the "
             f"redundant-note sweep: {tap_strings!r}"

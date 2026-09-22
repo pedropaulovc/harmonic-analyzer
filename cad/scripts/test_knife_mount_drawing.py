@@ -9,7 +9,7 @@ import knife_mount_spec
 def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
     import math
 
-    pitch_mm = 25.4 / 13.0
+    pitch_mm = knife_mount_spec.STUD_TAP_PITCH_MM
     runout_at_limits = (
         knife_mount_spec.STUD_TAP_DRILL_DEPTH_MM
         + knife_mount_spec.STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[0]
@@ -62,7 +62,8 @@ def test_end_located_hanger_tap_retains_axial_wall_at_limits() -> None:
     location band. Each band is the title-block tolerance of the precision the
     sheet actually prints for that dimension. 1.2 mm is the user's floor
     (2026-09-22) for a quench-hardened wall beside a thread root; it is why
-    the block is 18 deep.
+    the block is 18 deep. It was set against the old 1/2-13 thread: the #10-24
+    tap clears it by ~4 mm, and would at Depth 16 too.
     """
     import _config
 
@@ -76,7 +77,7 @@ def test_end_located_hanger_tap_retains_axial_wall_at_limits() -> None:
     depth_band = band_mm[precision["Depth"]]
     location_band = band_mm[precision["TapFromEnd"]]
     location = knife_mount_spec.DRAWING_NOMINALS_MM["TapFromEnd"]
-    basic_major_radius = 12.7 / 2.0
+    basic_major_radius = knife_mount_spec.STUD_TAP_MAJOR_DIA_MM / 2.0
 
     near_wall = location - location_band - basic_major_radius
     far_wall = (
@@ -156,3 +157,27 @@ def test_summing_assembly_imports_the_knife_mount_tap_contract() -> None:
         build_summing_assembly.STUD_TAP_THREAD_DEPTH_MM
         == knife_mount_spec.STUD_TAP_THREAD_DEPTH_MM
     )
+
+
+def test_hanger_joint_meets_one_and_a_half_diameters_of_engagement() -> None:
+    """User ruling 2026-09-22 (machining-dfm.md:73): E >= 1.5D of the engaging thread.
+
+    The seated stud shoulder fixes the engagement at the tip length minus its
+    chamfer allowance. At its longest the tip must stay inside the usable thread
+    so the shoulder seats, and the mount's tap is exactly the interface's.
+    """
+    import knife_hanger_interface as hanger
+
+    assert knife_mount_spec.STUD_TAP_SPEC.size == hanger.THREAD
+    engagement_min = (
+        hanger.STUD_TIP_LENGTH_MM
+        + hanger.STUD_TIP_LENGTH_DEVIATIONS_MM[0]
+        - hanger.STUD_TIP_CHAMFER_MAX_MM
+    )
+    assert engagement_min >= 1.5 * hanger.THREAD_MAJOR_DIA_MM
+    assert (
+        hanger.STUD_TIP_LENGTH_MM + hanger.STUD_TIP_LENGTH_DEVIATIONS_MM[1]
+        <= knife_mount_spec.STUD_TAP_THREAD_DEPTH_MM
+        + knife_mount_spec.STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM[0]
+    )
+    assert abs(hanger.SHOULDER_SEAT_Y - (part.CONTACT_Y + part.BLK_TOP)) < 1e-9
