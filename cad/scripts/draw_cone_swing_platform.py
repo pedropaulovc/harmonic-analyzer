@@ -94,11 +94,10 @@ PROFILE_KEEP = {
     "NorthWestX": (0.100, 0.115),
     "SouthWestX": (0.104, 0.258),
     "SouthEastX": (0.045, 0.259),
-    # The Top view reverses the authored corner compass.  Place each native
-    # radius beside its actual drawing attachment instead of routing four
-    # leaders diagonally through the plate.
-    "CornerNER": (0.135, 0.118),
-    "CornerNWR": (0.045, 0.138),
+    # Radial rays must meet actual trimmed corners, not circle extensions.
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.
+    "CornerNER": (0.045, 0.138),
+    "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.240),
 }
@@ -252,40 +251,43 @@ def _horizontal_section_edge(
     return max(candidates, key=lambda item: item[key_index])[2]
 
 
-def _assert_corner_radius_attachment(adapter: Any, view: Any, annotations: list[Any]) -> None:
-    """Prove the native R5 model dimension's arrow lies on its owned visible arc."""
-    matches = [item for item in annotations if dimension_name(adapter, item) == "CornerSWR"]
+def _assert_corner_radius_attachment(
+    adapter: Any, view: Any, annotations: list[Any], *,
+    name: str, feature_name: str, radius_m: float, station_xy: tuple[float, float],
+) -> None:
+    """Prove a native radius dimension's arrow lies on its owned visible arc."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == name]
     if len(matches) != 1:
-        raise RuntimeError("expected one native CornerSWR radius annotation")
+        raise RuntimeError(f"expected one native {name} radius annotation")
     annotation = _early_bound(matches[0], "IAnnotation")
     # Imported fillet dimensions can return unsupported/null annotation entities.
     # Record that API honestly; model-dimension ownership below is authoritative.
     entities = annotation.GetAttachedEntities3()
     entity_types = annotation.GetAttachedEntityTypes()
     print(
-        f"R5 annotation entities_none={entities is None} "
+        f"{name} annotation entities_none={entities is None} "
         f"entity_nulls={tuple(item is None for item in (entities or ()))} types={entity_types!r}"
     )
     dangling = annotation.IsDangling()
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     owner = _early_bound(dimension.GetFeatureOwner(), "IFeature")
-    print(f"R5 native model dimension owner={owner.Name!r} dangling={dangling!r}")
-    if dangling is not False or str(owner.Name) != "CornerSW":
-        raise RuntimeError("R5 is dangling or is not owned by native CornerSW")
+    print(f"{name} native model dimension owner={owner.Name!r} dangling={dangling!r}")
+    if dangling is not False or str(owner.Name) != feature_name:
+        raise RuntimeError(f"{name} is dangling or is not owned by native {feature_name}")
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
     arrows = [
         tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
         for index in range(int(data.GetArrowHeadCount()))
     ]
     if len(arrows) != 1 or len(arrows[0]) < 3:
-        raise RuntimeError(f"expected one R5 arrow tip, found {arrows}")
+        raise RuntimeError(f"expected one {name} arrow tip, found {arrows}")
     arrow = arrows[0]
-    visible = visible_view_entities(view, 1, label="R5 visible corner edges")
+    visible = visible_view_entities(view, 1, label=f"{name} visible corner edges")
     candidates = []
     for raw_face in owner.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
-        if str(_early_bound(face.GetFeature(), "IFeature").Name) != "CornerSW":
+        if str(_early_bound(face.GetFeature(), "IFeature").Name) != feature_name:
             continue
         for raw_edge in face.GetEdges() or ():
             edge = _early_bound(raw_edge, "IEdge")
@@ -297,22 +299,22 @@ def _assert_corner_radius_attachment(adapter: Any, view: Any, annotations: list[
             if not curve.IsCircle():
                 continue
             circle = tuple(float(value) for value in curve.CircleParams)
-            if abs(circle[6] - 0.005) > 1e-8:
+            if abs(circle[6] - radius_m) > 1e-8:
                 continue
-            center = model_point_in_view(adapter, view, circle[:3], label="R5 owned circle")
-            if abs(center[0] - 0.0875) <= 0.001 and abs(center[1] - 0.2433) <= 0.001:
+            center = model_point_in_view(adapter, view, circle[:3], label=f"{name} owned circle")
+            if all(abs(center[i] - station_xy[i]) <= 0.001 for i in (0, 1)):
                 candidates.append((edge, circle, center))
     if len(candidates) != 1:
-        raise RuntimeError(f"expected one CornerSW-owned visible R5 edge at corner station, found {len(candidates)}")
+        raise RuntimeError(f"expected one {feature_name}-owned visible {name} edge at corner station, found {len(candidates)}")
     edge, circle, center = candidates[0]
     # Invert the measured plan-view X/Z basis at this owned edge's model Y.
-    px = model_point_in_view(adapter, view, (circle[0] + 0.001, circle[1], circle[2]), label="R5 X basis")
-    pz = model_point_in_view(adapter, view, (circle[0], circle[1], circle[2] + 0.001), label="R5 Z basis")
+    px = model_point_in_view(adapter, view, (circle[0] + 0.001, circle[1], circle[2]), label=f"{name} X basis")
+    pz = model_point_in_view(adapter, view, (circle[0], circle[1], circle[2] + 0.001), label=f"{name} Z basis")
     xx, xy = px[0] - center[0], px[1] - center[1]
     zx, zy = pz[0] - center[0], pz[1] - center[1]
     det = xx * zy - zx * xy
     if abs(det) < 1e-12:
-        raise RuntimeError("R5 plan projection is singular")
+        raise RuntimeError(f"{name} plan projection is singular")
     dx, dy = arrow[0] - center[0], arrow[1] - center[1]
     model_tip = (
         circle[0] + 0.001 * (dx * zy - zx * dy) / det,
@@ -324,13 +326,13 @@ def _assert_corner_radius_attachment(adapter: Any, view: Any, annotations: list[
     trim = _early_bound(edge.GetCurveParams3(), "ICurveParamData")
     distance = math.dist(model_tip, closest[:3])
     print(
-        f"R5 owned visible trimmed edge: arrow_sheet_m={arrow[:3]} radius_m={circle[6]} "
+        f"{name} owned visible trimmed edge: arrow_sheet_m={arrow[:3]} radius_m={circle[6]} "
         f"center_model_m={circle[:3]} trim_u=({trim.UMinValue},{trim.UMaxValue}) "
         f"closest_u={closest[3]} arrow_model_m={model_tip} "
         f"closest_model_m={closest[:3]} distance_m={distance}"
     )
     if not distance <= 0.00002:  # 0.01 mm on this 1:2 sheet; unchanged physical-edge bound.
-        raise RuntimeError("R5 arrow does not land on its owned physical corner arc")
+        raise RuntimeError(f"{name} arrow does not land on its owned physical corner arc")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -527,7 +529,15 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")
-    _assert_corner_radius_attachment(adapter, profile, profile_annotations)
+    for name, feature_name, radius_m, station_xy in (
+        ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
+        ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
+        ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
+    ):
+        _assert_corner_radius_attachment(
+            adapter, profile, profile_annotations,
+            name=name, feature_name=feature_name, radius_m=radius_m, station_xy=station_xy,
+        )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
     for face_name, model_y in (
