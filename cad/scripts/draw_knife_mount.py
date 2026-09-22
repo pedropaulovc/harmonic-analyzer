@@ -68,6 +68,7 @@ from knife_mount_spec import (
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -578,11 +579,99 @@ def _assert_model_thread_class(
             f"{label}: model thread class {actual!r} != {expected_class!r}"
         )
 
+
+def _assert_bore_diameter_presentation(display: Any, label: str) -> None:
+    """Pin the bore callout as the same Ø12.00 ±0.2 diametric dimension."""
+    display = _early_bound(display, "IDisplayDimension")
+    if not bool(display.Diametric) or bool(display.DisplayAsLinear):
+        raise RuntimeError(f"{label}: lost its diametric presentation")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    nominal_mm = DRAWING_NOMINALS_MM["BoreDia"]
+    if abs(measured_mm - nominal_mm) > 1e-5:
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {nominal_mm:g} mm"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    limit_m = BORE_DIAMETER_TOLERANCE_MM / 1000.0
+    if (
+        int(tolerance.Type) != 4
+        or abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
+        or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
+    ):
+        raise RuntimeError(f"{label}: lost its native symmetric tolerance")
+
+
+_LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+
+
+def _suppress_dimension_line_pair(display: Any, label: str) -> None:
+    """Leave only the broken-leader shoulder and its near-edge arrow.
+
+    A leader-attached dimension (diametric dim, native hole callout) also draws
+    its dimension LEADER-LINE pair from the feature straight past the text, on
+    top of the broken leader's horizontal shoulder -- the two leaders crossing
+    the Ø12 bore circle and the tap circle are that pair, not a mis-aimed
+    attachment. ``OffsetText`` is unavailable on radial/diametric dimensions
+    (``cad/docs/solidworks-drawing-layout-tuning.md`` refusal (a)), so the pair
+    is hidden outright instead. ``swLeaderLineNone`` keeps the shoulder and its
+    arrow (tube-frame's Ø5 cross-hole callout measured exactly one surviving
+    arrowhead); the arrowhead count is read back here so a leader that vanished
+    whole cannot pass for a cleaned one.
+    """
+    display = _sw_type_info.early_bound_or_flag(
+        display,
+        "IDisplayDimension",
+        "GetAnnotation",
+        "SetSecondArrow",
+        "GetUseDocSecondArrow",
+        "GetSecondArrow",
+        "SetBrokenLeader2",
+        "GetUseDocBrokenLeader",
+        "GetBrokenLeader2",
+    )
+    display.ArrowSide = 1
+    if int(display.ArrowSide) != 1:
+        raise RuntimeError(f"{label}: outside arrow did not persist")
+    display.SetSecondArrow(False, False)
+    if bool(display.GetUseDocSecondArrow()) or bool(display.GetSecondArrow()):
+        raise RuntimeError(f"{label}: kept its opposite-side arrow")
+    display.SolidLeader = False
+    if bool(display.SolidLeader):
+        raise RuntimeError(f"{label}: solid leader did not clear")
+    if display.SetBrokenLeader2(False, 2) != 0:
+        raise RuntimeError(f"{label}: failed to apply broken horizontal leader")
+    if bool(display.GetUseDocBrokenLeader()) or int(display.GetBrokenLeader2()) != 2:
+        raise RuntimeError(f"{label}: broken leader style did not persist")
+    display.LeaderVisibility = _LEADER_LINE_NONE
+    if int(display.LeaderVisibility) != _LEADER_LINE_NONE:
+        raise RuntimeError(f"{label}: kept its dimension leader-line pair")
+    annotation = display.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: dimension has no annotation")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetDisplayData"
+    )
+    data = annotation.GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"{label}: dimension has no rendered display data")
+    data = _sw_type_info.early_bound_or_flag(
+        data, "IDisplayData", "GetArrowHeadCount"
+    )
+    arrowheads = int(data.GetArrowHeadCount())
+    if arrowheads < 1:
+        raise RuntimeError(
+            f"{label}: hiding the leader-line pair took the arrowhead with it "
+            f"({arrowheads} rendered)"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open knife-mount source", await adapter.open_model(str(SOURCE)))
+    source_part = _early_bound(adapter.currentModel, "IPartDoc")
     read_required_properties(
         adapter.currentModel,
         (
@@ -662,6 +751,27 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
+
+    # The Ø12.00 THRU callout is leader-attached, so SOLIDWORKS drew its
+    # dimension leader-line pair straight across the bore circle. Suppress the
+    # pair only after every writer (callout text, precision, tolerance checks)
+    # has run, so nothing re-solves the dimension afterwards.
+    bore_annotation = next(
+        (
+            annotation
+            for annotation in front_annotations
+            if dimension_name(adapter, annotation) == "BoreDia"
+        ),
+        None,
+    )
+    if bore_annotation is None:
+        raise RuntimeError("front view lost its BoreDia dimension")
+    bore_display = _early_bound(
+        bore_annotation.GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    _assert_bore_diameter_presentation(bore_display, "front bore diameter")
+    _suppress_dimension_line_pair(bore_display, "front bore diameter")
+    _assert_bore_diameter_presentation(bore_display, "front bore diameter")
     for view, label in ((front, "knife bore"), (top, "hanger tap")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center mark to {label}")
@@ -696,7 +806,7 @@ async def build(adapter: Any) -> dict[str, str]:
             TOP_CENTER[1] - SUPPORT_Z_THICK * SHEET_SCALE[0] / 2000.0,
         ),
         p1=(TOP_CENTER[0], TOP_CENTER[1] - tap_radius_sheet),
-        text_xy=(TOP_CENTER[0] + 0.035, TOP_CENTER[1]),
+        text_xy=(TOP_CENTER[0] - 0.035, 0.197),
         label="hanger tap from finished end",
         orientation="vertical",
     )
@@ -711,20 +821,45 @@ async def build(adapter: Any) -> dict[str, str]:
     tap_callout = add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] - tap_radius_sheet, TOP_CENTER[1]),
-        callout_xy=(0.078, 0.218),
+        edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
+        callout_xy=(0.195, 0.218),
         label="hanger-stud blind tap",
     )
     _propagate_source_tap_depth_contracts(
         adapter, tap_callout, source_tap_contracts
     )
     _check_tap_callout(tap_callout, source_tap_contracts)
+    # The title block already carries THREADS UNC/UNF CLASS 2A/2B, so the
+    # callout's associative class token is over-spec. It can only be dropped
+    # AFTER `_check_tap_callout`, which still reads the hw-threadclass
+    # variable `_omit_default_thread_class` removes from the definition.
+    _omit_default_thread_class(
+        tap_callout,
+        STUD_TAP_SPEC.thread_class,
+        "hanger-stud blind tap",
+    )
+    _assert_model_thread_class(
+        source_part,
+        "StudTap",
+        STUD_TAP_SPEC.thread_class,
+        "hanger-stud blind tap",
+    )
+    _suppress_dimension_line_pair(tap_callout, "hanger-stud blind tap callout")
 
+    # A surface-finish annotation's sheet position is its LOWER-LEFT corner,
+    # which is also where its leader starts: hung left of the bore the leader
+    # ran up-right through the symbol's own 'Ra 1.6' value text. Attach on the
+    # bore's lower-right rim and hang the symbol below-right of it instead --
+    # the leader then runs up-left, away from its text, and the symbol clears
+    # the block outline, the BoreFromTop witness and the 24.00 width dimension.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] - R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
-        symbol_xy=(FRONT_CENTER[0] - 0.037, _front_y(BORE_CY) - 0.018),
+        edge_xy=(
+            FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] * 0.7071 / 1000.0,
+            _front_y(BORE_CY) - R_BORE * SHEET_SCALE[0] * 0.7071 / 1000.0,
+        ),
+        symbol_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) - 0.026),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
         char_height=0.0025,
