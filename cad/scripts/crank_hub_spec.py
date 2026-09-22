@@ -34,7 +34,7 @@ if AXIAL_PIN_RADIUS_FROM_AXIS != HUB_SEAT_DIA / 2.0:
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HubProfile": {"HubLength", "SeatLength", "SeatDia", "BarrelDia"},
     "BoreProfile": {"BoreDia"},
-    "ServicePinStationPlane": {"ServicePinStation"},
+    "ServicePinStationReference": {"ServicePinStation"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
@@ -44,7 +44,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BarrelDia": 1,
     },
     "BoreProfile": {"BoreDia": 3},
-    "ServicePinStationPlane": {"ServicePinStation": 1},
+    "ServicePinStationReference": {"ServicePinStation": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
