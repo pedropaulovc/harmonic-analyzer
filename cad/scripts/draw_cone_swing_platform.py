@@ -98,7 +98,7 @@ PROFILE_KEEP = {
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
     "CornerNER": (0.135, 0.118),
-    "CornerNWR": (0.025, 0.130),
+    "CornerNWR": (0.045, 0.138),
     "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.240),
 }
