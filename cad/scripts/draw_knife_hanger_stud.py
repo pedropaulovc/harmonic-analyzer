@@ -1,8 +1,10 @@
-"""Create the manufacturing drawing for the modified McMaster 91247A720 stud.
+"""Create the manufacturing drawing for the turned McMaster 91247A720 stud.
 
-The vendor bolt is purchased by SKU and shortened at the threaded end before
-installation. The finished under-head and restored end deburr are native model
-controls; undimensioned purchased head/thread geometry is reference.
+The vendor bolt is purchased by SKU, cut to length and turned at its threaded
+end to a shouldered #10-24 tip, the knife-hanger joint
+(``knife_hanger_interface``). The shoulder-to-end tip length and the tip
+chamfer are native model controls; the overall length is a fit-to-stack
+reference; undimensioned purchased head/thread geometry is reference.
 """
 
 from __future__ import annotations
@@ -24,37 +26,41 @@ from _drawing_common import (
     add_property_linked_note,
     check_drawing_layout,
     collect_layout_elements,
+    curate_view_dimensions,
     finalize_drawing,
-    find_edge_near,
+    import_cosmetic_threads,
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
-from _layout_geometry import estimate_text_box
 from _stock_trim_drawing import TrimSheet
 from build_knife_hanger_stud import (
     HEAD_AF,
     HEAD_H,
     SHANK_DIA,
-    THREAD_TIP_Y_MM,
+    SHOULDER_Y_MM,
+    TIP_END_Y_MM,
+    TIP_RADIUS_MM,
     UNDERHEAD_Y_MM,
 )
+from diagnostics.diag_build_91247A720 import GB_WASHER_T
 from knife_hanger_stud_spec import (
-    CHAMFER_ANGLE_DEG,
-    CHAMFER_ANGLE_TOLERANCE_DEG,
-    CHAMFER_WIDTH_MM,
-    DIMENSION_TOLERANCE_TYPES,
+    DIMENSION_PRECISION,
+    DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
     FINISHED_UNDERHEAD_MM,
+    TIP_CHAMFER_CALLOUT_SUFFIX,
+    TIP_CHAMFER_MM,
+    TIP_CHAMFER_TOLERANCE_TYPE,
+    TIP_LENGTH_DEVIATIONS_MM,
+    TIP_LENGTH_MM,
 )
-from diagnostics.diag_build_91247A720 import GB_WASHER_T
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -63,170 +69,92 @@ SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (2.0, 1.0)
 # 1.5:1, not 2:1: ``GetOutline`` of the pictorial measures 72.4 x 135.2 mm at
-# 2:1 (the rendered ink is only 52 x 99.5 mm -- the outline is NOT the ink),
-# and no keep-in region tall enough for it leaves the 45 deg text block its
-# pocket below. At 1.5:1 the outline is 54.3 x 101.4 mm and everything fits
-# with margin (measured on leaf 20260922T152754Z, which failed loudly at 2:1).
+# 2:1 (the rendered ink is only 52 x 99.5 mm -- the outline is NOT the ink).
+# At 1.5:1 the outline is 54.3 x 101.4 mm and fits its cell with margin
+# (measured on leaf 20260922T152754Z, which failed loudly at 2:1).
 ISO_SCALE = (1.5, 1.0)
-FRONT_CENTER = (0.105, 0.175)
-# The (45.1) is a DRAWING dimension between the drawn washer-face bearing edge
-# and the drawn cut end face, text here. The model's FinishedOverall runs from
-# the stock datum point on the AXIS to a corner of the trim CUTTER sketch at
-# +2r (diagnostics/diag_mcmaster_lib.py): stud-12 drew its witness lines to
-# x = 104.0 (the axis, hidden under the washer face) and x = 129.4 mm (12.7 mm
-# of paper past the thread crest, through the Detail A fence), leaf
-# 20260922T212033Z. It stays the part's driving control and is re-proved.
-FINISHED_TEXT_XY = (0.070, 0.175)
+
+# Policy rule 7: a turned part is drawn as it sits in the lathe -- axis
+# horizontal, the head (chuck end) left, the turned tip right. The part's
+# axis is model +Y, so ``*Front`` is turned until model -Y reads sheet +X.
+# Its keep-in cell: left of the pictorial, above the tip detail and the notes.
+FRONT_REGION = (0.020, 0.150, 0.280, 0.262)
+FRONT_FIT_MARGIN_M = 0.003
+# The projected axis may lean this much (sheet metres per 10 mm of axis).
+AXIS_TOLERANCE_M = 1e-7
+
+# The engagement-critical tip length is ONE direct dimension, shoulder face to
+# faced end, carrying the interface's band (Main, 2026-09-22). Its text sits
+# this far out from the shank's crest, over the tip; its legs are the turn
+# profile's shoulder-crest and faced-end corners, both drawn.
+TIP_LENGTH_TEXT_OUT_M = 0.012
+# The overall bearing-face-to-end length is a fit-to-stack REFERENCE, a
+# DRAWING dimension between the drawn bearing face and the drawn faced end.
+# The model's FinishedOverall runs from the stock datum point on the AXIS to a
+# corner of the trim CUTTER sketch (diagnostics/diag_mcmaster_lib.py): stud-12
+# drew its witness lines into and across the part (leaf 20260922T212033Z).
+# Its text sits this far out beyond the hex head's corners, on the far side.
+FINISHED_TEXT_OUT_M = 0.010
+HEAD_CORNER_MM = HEAD_AF / math.sqrt(3.0)
 MODEL_FINISHED = "FinishedOverall@StockTrimProfile"
 FINISHED_VALUE_TOLERANCE_M = 1e-9
 SW_TOL_NONE = 0  # swTolType_e.swTolNONE: the build clears the native band
+SW_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 # The two drawn edges are the model's circular edges, seen edge-on, found by
-# radius and axial station: the washer face's bearing circle and the cut end
-# face's root circle. Coordinate picks are ambiguous at the bearing face: the
-# hex underside's edge lies 0.2 mm (0.4 mm of sheet) above it all the way
+# radius and axial station: the washer face's bearing circle and the faced
+# end's circle inside the tip chamfer. Coordinate picks are ambiguous at the
+# bearing face: the hex underside's edge lies 0.2 mm above it all the way
 # across, and stud-13 (leaf 20260922T213616Z) picked it and read (45.3).
 BEARING_CIRCLE = (HEAD_AF / 2.0, UNDERHEAD_Y_MM)
-CUT_END_CIRCLE = (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM, THREAD_TIP_Y_MM)
+FACED_END_CIRCLE = (TIP_RADIUS_MM - TIP_CHAMFER_MM, TIP_END_Y_MM)
 CIRCLE_MATCH_MM = 0.01
+
+# The tip chamfer is shown in a detail at 6:1 (Main, 2026-09-22): at 2:1 it
+# is 1 mm of paper. The fence is centred on the axis 1 mm inside the faced
+# end and reaches 3 mm past the tip's crest, so the chamfer's callout keeps
+# ~17 mm of paper inside the boundary above the tip.
+TIP_DETAIL_SCALE = (6.0, 1.0)
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
-    detail_center=(0.265, 0.150),
-    detail_scale=(12.0, 1.0),
-    fence_radius_mm=2.5,
-    cut_end_y_mm=THREAD_TIP_Y_MM,
+    detail_center=(0.250, 0.110),
+    detail_scale=TIP_DETAIL_SCALE,
+    fence_radius_mm=TIP_RADIUS_MM + 3.0,
+    cut_end_y_mm=TIP_END_Y_MM,
     detail_offset_mm=1.0,
-    # Right of the detail outline, never on it. The audit boxes the detail view
-    # from ``GetOutline`` and the label from ``GetExtent``; at (0.310, 0.115) the
-    # label box penetrated the outline's lower-right corner by 8.8 x 3.0 mm --
-    # an overlap finding the layout gate rejects (its slack is 1.5 mm). The
-    # extra drop to y = 0.108 buys the 45 deg text block a 34 mm pocket between
-    # the label's top edge and the linked note below the pictorial.
-    detail_label_xy=(0.335, 0.108),
-    # Up-right of the r 6.35 mm fence, ~2 mm clear of it and ~4 mm right of
-    # the thread crest. It sat 20 mm out while the model (45.1)'s witness ran
-    # through the fence; the drawn-edge witness stops left of the part.
-    parent_letter_offset=(0.0096, 0.0080),
-    detail_center_x_mm=SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM / 2.0,
+    detail_label_xy=(0.290, 0.086),
+    # Right of the fence, just below the axis: clear of the tip length above
+    # the part and of the overall reference's witness line at the faced end.
+    parent_letter_offset=(0.014, -0.004),
+    detail_center_x_mm=0.0,
 )
+# The chamfer's dimension line runs this far out from the tip's crest.
+CHAMFER_TEXT_OUT_M = 0.006
+SUFFIX = 2  # swDimensionTextSuffix
 
 # The free upper-right cell the pictorial lives in, on this 0.4318 x 0.2794 m
-# sheet: the detail outline ends at x = 0.303, the border's inner line is
-# y = 0.2684 and the zone border keeps content under ~x 0.421. Sized for the
-# MEASURED outline at 1.5:1 (54.3 x 101.4 mm) so the fit keeps >= 3 mm to every
-# side and the callout pocket under it stays tall enough for the text block.
+# sheet. Sized for the MEASURED outline at 1.5:1 (54.3 x 101.4 mm) so the fit
+# keeps >= 3 mm to every side.
 ISO_REGION = (0.290, 0.152, 0.415, 0.2625)
 ISO_FIT_MARGIN_M = 0.003
-# The linked "ISO SCALE 1.5:1" renders ~30 mm wide at its default text height and a note's
-# SetPosition2 anchor is the text box's UPPER-LEFT (measured on this sheet), so
-# it is centred under the fitted outline and kept just clear of it.
+# The linked "ISO SCALE 1.5:1" renders ~30 mm wide at its default text height
+# and a note's SetPosition2 anchor is the text box's UPPER-LEFT (measured on
+# this sheet), so it is centred under the fitted outline and kept just clear.
 ISO_NOTE_WIDTH_M = 0.030
 ISO_NOTE_BELOW_M = 0.004
 
-# Clearance the 45 deg text block keeps from every surrounding box.
-ANGLE_TEXT_GAP_M = 0.003
-# How far PAST that clearance the block is parked. SetPosition2's block/anchor
-# relation is not fixed behaviour, so parking exactly AT the limit re-measured
-# 0.04 mm under it and the read-back guard failed a sheet that only needed
-# margin (leaf 20260922T160352Z). The guard still demands ANGLE_TEXT_GAP_M.
-ANGLE_TEXT_PARK_SLOP_M = 0.001
-
-# The root-finish words ride the 45 deg value as its SUFFIX, on one line:
-# "45° CHAMFER TO EXISTING THREAD ROOT". Measured on this dimension (offset
-# angular text): the callout-above lane never renders -- leaf 20260922T181058Z
-# read parts 3 and 7 back intact and the sheet printed only "45°" -- and the
-# two lines stud-4 showed were the PREFIX, which the part-7 write had filled
-# while switching the value off. The value line (prefix/value/suffix) is what
-# prints; draw_tube_frame's chamfer puts its words in the suffix the same way,
-# kept to one line because a multi-line suffix printed only its last line.
-ROOT_FINISH_SUFFIX = " CHAMFER TO EXISTING THREAD ROOT"
-PREFIX = 1  # swDimensionTextPrefix
-SUFFIX = 2  # swDimensionTextSuffix
-CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
-CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
-
-# The sheet's 45 deg is a DRAWING dimension between the drawn chamfer and the
-# drawn end face in Detail A (user decision, 2026-09-22); the model's driving
-# ChamferAngle stays in the part and is re-proved from it, not shown. The
-# model dimension could not be drawn cleanly: its legs are the deburr
-# CUTTER's sketch lines (diagnostics/diag_mcmaster_lib.py), whose end-face leg
-# runs 2c = 30.4 mm (12:1) outward past the vertex through air, so in the
-# 0..45 deg span its 0 deg arrow sat on bare paper (leaf 20260922T195516Z) and
-# IDisplayDimension::VerticallyOppositeAngle returned True and changed nothing
-# (leaf 20260922T203003Z, logged after every step). The drawn end face ends AT
-# the vertex, so a drawing dimension's witness line starts there.
-#
-# The ARC of an angular dimension is laid out by its NON-offset position,
-# centred on the vertex through the text point; a later ``OffsetText`` move
-# carries only the text ("dimension line and extension lines ... do not
-# move", types/IDisplayDimension/OffsetText.md). stud-4 parked the text 85 mm
-# out and 8 deg outside the span, and the arc swept the sheet at r = 84 mm. So
-# the dimension is created with its text 12 mm out on the 0..45 deg bisector
-# -- inside the ~14.4 mm drawn chamfer, so the 45 deg arrow lands on it -- and
-# only then is the text offset to its pocket on a leader.
-ANGLE_ARC_RADIUS_M = 0.012
-ANGLE_ARC_RADIUS_TOLERANCE_M = 0.0015
-# Gate for every dimension arc on the sheet: stud-4's was 0.084 m.
-ANGLE_ARC_RADIUS_MAX_M = 0.030
-ANGLE_ARC_SWEEP_MAX_DEG = 60.0
-ANGLE_ARC_HOLD_M = 0.0003
-ANGLE_VERTEX_TOLERANCE_M = 0.0005
-# The legs as Detail A draws them: the end face runs outward (+x, its witness
-# line) and the chamfer climbs outward toward the head at 45 deg.
-ANGLE_SPAN_DEG = (0.0, CHAMFER_ANGLE_DEG)
-ANGLE_SPAN_SLACK_DEG = 3.0
-ANGLE_BISECTOR_RAD = math.radians(sum(ANGLE_SPAN_DEG) / 2.0)
-# Where each drawn leg is picked, measured from the vertex along the leg: the
-# chamfer at 45 deg, the end face back along 180 deg.
-ANGLE_PICK_M = 0.006
-# A witness line starts within this of the vertex (its gap) and must reach the
-# arc end it carries to within the second.
-WITNESS_START_M = 0.003
-WITNESS_REACH_M = 0.0003
-# A drawing dimension reads the same geometry as the model control: equal
-# within 1e-6 deg or the picks landed on the wrong edges.
-ANGLE_VALUE_TOLERANCE_RAD = math.radians(1e-6)
-MODEL_ANGLE = "ChamferAngle@StockDeburrProfile"
-SW_ANGULAR_DIMENSION = 3  # swDimensionType_e.swAngularDimension
-CHAMFER_ANGLE_PRECISION = DRAWING_REFERENCE_PRECISION["ChamferAngle"]
-# The 45 deg text keeps this much paper below "ISO SCALE 1.5:1" so the two do
-# not read as one stack (stud-6 printed them 4 mm apart).
-ANGLE_TEXT_NOTE_CLEAR_M = 0.010
-CHAMFER_VERTEX_MODEL_M = (
-    (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 1000.0,
-    THREAD_TIP_Y_MM / 1000.0,
-    0.0,
-)
+# Every dimension arc on the sheet: stud-4 exported one of r 84 mm.
+DIMENSION_ARC_RADIUS_MAX_M = 0.030
+DIMENSION_ARC_SWEEP_MAX_DEG = 60.0
 ARC_SAMPLES = 32
-# swDimensionArrowsSide_e.swDimArrowsInside. At the default (smart) the
-# arrows went OUTSIDE the 13 mm arc and SolidWorks drew only two stubs past
-# the legs, leaving the offset leader pointing at empty paper (leaf
-# 20260922T181058Z: arcs at -27..0 and 45..72 deg, nothing between).
-ARROWS_INSIDE = 0
-
-# Ink segments allowed to cross the cut-end detail's boundary circle, per
-# dimension. The 45 deg text's leader is the one allowed crossing. Inside the
-# boundary (centre (265.0, 150.0) mm, r 38.3 mm, measured on the render of
-# leaf 20260922T181058Z)
-# there is no room for the one-line value + suffix (~80 x 5 mm): right of the
-# thread crests (x > 280 mm) the chord is under 24 mm wide, and below the cut
-# end (y < 128 mm) it is at most 63 mm wide and narrows to 36 mm at y = 116.
-# Every pocket outside the boundary means the leader crosses the circle once.
-# Adjudicated by Main (2026-09-22): one crossing from outside is ordinary
-# practice; enlarging the fence to R >= ~55 mm to hold the text would collide
-# with the pictorial or the notes block. On leaf 20260922T195516Z the circle
-# was r 30.2 mm, making the chords smaller still.
-DETAIL_BOUNDARY_CROSSINGS = {"ChamferAngle": 1}
-# Which drawn legs carry the arrows: the chamfer's outline and the end face's
-# edge-on circle. The chamfer is a cone, whose side outline is a silhouette,
-# not a model edge; each pick tries its expected entity first.
-CHAMFER_PICK_TYPES = ("SILHOUETTE", "EDGE")
-END_FACE_PICK_TYPES = ("EDGE", "SILHOUETTE")
+# Ink segments allowed to cross the tip detail's boundary circle, per
+# dimension: none -- the chamfer's callout fits inside the enlarged fence.
+DETAIL_BOUNDARY_CROSSINGS: dict[str, int] = {}
 # Proper crossings between a dimension's own lines (e.g. its leader through
 # its witness line) are measured apart from shared endpoints by this much.
 SELF_CROSSING_END_M = 0.0005
 # An extension line leaves the drawn edge nearest its dimension line with a
 # gap: its far end may reach into the part's silhouette by at most this much.
-# A row of the silhouette carries a line whose height is within the second.
+# A row of the silhouette carries a line whose station is within the second.
 EXTENSION_ENTRY_MAX_M = 0.0005
 EXTENSION_ROW_TOLERANCE_M = 0.0003
 LINE_AXIS_TOLERANCE_M = 1e-5
@@ -239,12 +167,21 @@ LAYOUT_REPORT = (
 )
 # The model's driving FinishedOverall, nominal SI length (no native band).
 MODEL_FINISHED_CONTROL = FINISHED_UNDERHEAD_MM / 1000.0
-# The model's driving ChamferAngle: (nominal, lower, upper) signed SI values.
-MODEL_ANGLE_CONTROL = (
-    math.radians(CHAMFER_ANGLE_DEG),
-    -math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
-    math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
-)
+# The imported machining controls, (nominal, lower, upper) signed SI values.
+TIP_CONTROLS = {
+    "TipLength": (
+        TIP_LENGTH_MM / 1000.0,
+        TIP_LENGTH_DEVIATIONS_MM[0] / 1000.0,
+        TIP_LENGTH_DEVIATIONS_MM[1] / 1000.0,
+    ),
+    "TipChamfer": (TIP_CHAMFER_MM / 1000.0, 0.0, 0.0),
+}
+TIP_TOLERANCE_TYPES = {
+    "TipLength": SW_TOL_BILATERAL,
+    "TipChamfer": TIP_CHAMFER_TOLERANCE_TYPE,
+}
+# The chamfer's radial leg: equal to its axial leg, the 45 deg on the sheet.
+MODEL_CHAMFER_RADIAL = "TipChamferRadial@StudTurnProfile"
 
 
 def _fit_translation(
@@ -275,20 +212,6 @@ def _format_box(box: tuple[float, float, float, float]) -> str:
     )
 
 
-def _clear_of(
-    block: tuple[float, float, float, float],
-    obstacle: tuple[float, float, float, float],
-    gap: float,
-) -> bool:
-    """True when ``block`` keeps ``gap`` between itself and ``obstacle``."""
-    return (
-        block[0] >= obstacle[2] + gap
-        or block[2] <= obstacle[0] - gap
-        or block[1] >= obstacle[3] + gap
-        or block[3] <= obstacle[1] - gap
-    )
-
-
 def _view_box(view: Any, *, label: str) -> tuple[float, float, float, float]:
     """``IView::GetOutline`` as an ``(xmin, ymin, xmax, ymax)`` sheet box."""
     outline = tuple(float(value) for value in (view.GetOutline() or ()))
@@ -310,48 +233,8 @@ def _note_box(note: Any, *, label: str) -> tuple[float, float, float, float]:
     )
 
 
-def _display_text_box(adapter: Any, display: Any) -> tuple[float, float, float, float]:
-    """The dimension's rendered text block, from its own display geometry.
-
-    Each ``IDisplayData`` text item is boxed by :func:`estimate_text_box` at its
-    REAL position, height and anchor corner, so a multi-item callout block is
-    measured rather than guessed; the union is the block to park on the sheet.
-    """
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    total = None
-    for index in range(int(data.GetTextCount())):
-        position = tuple(
-            float(value) for value in (data.GetTextPositionAtIndex(index) or ())
-        )
-        if len(position) < 2:
-            continue
-        box = estimate_text_box(
-            str(data.GetTextAtIndex(index) or ""),
-            anchor=(position[0], position[1]),
-            height=float(data.GetTextHeightAtIndex(index)),
-            reference=int(data.GetTextRefPositionAtIndex(index)),
-            angle=float(data.GetTextAngleAtIndex(index)),
-            line_spacing=1.4,
-        )
-        if box is None:
-            continue
-        candidate = (box.xmin, box.ymin, box.xmax, box.ymax)
-        total = (
-            candidate
-            if total is None
-            else (
-                min(total[0], candidate[0]),
-                min(total[1], candidate[1]),
-                max(total[2], candidate[2]),
-                max(total[3], candidate[3]),
-            )
-        )
-    if total is None:
-        raise RuntimeError("45 deg dimension reports no text to place")
-    return total
-
-
 Point = tuple[float, float]
+
 Box = tuple[float, float, float, float]
 
 
@@ -547,15 +430,15 @@ def _dimension_ink_problems(
     """
     problems = []
     for arc in ink.arcs:
-        if arc.radius > ANGLE_ARC_RADIUS_MAX_M:
+        if arc.radius > DIMENSION_ARC_RADIUS_MAX_M:
             problems.append(
                 f"{ink.name} arc radius {arc.radius * 1000.0:.1f} mm exceeds "
-                f"{ANGLE_ARC_RADIUS_MAX_M * 1000.0:.1f} mm"
+                f"{DIMENSION_ARC_RADIUS_MAX_M * 1000.0:.1f} mm"
             )
-        if math.degrees(arc.sweep) > ANGLE_ARC_SWEEP_MAX_DEG:
+        if math.degrees(arc.sweep) > DIMENSION_ARC_SWEEP_MAX_DEG:
             problems.append(
                 f"{ink.name} arc sweeps {math.degrees(arc.sweep):.1f} deg "
-                f"(> {ANGLE_ARC_SWEEP_MAX_DEG:.0f}): it runs the long way round"
+                f"(> {DIMENSION_ARC_SWEEP_MAX_DEG:.0f}): it runs the long way round"
             )
         if not _inside(arc.center, owner):
             problems.append(
@@ -692,20 +575,6 @@ def _segment_intersection(a: Point, b: Point, c: Point, d: Point) -> Point | Non
     return (a[0] + t * r[0], a[1] + t * r[1])
 
 
-def _span_problem(arcs: tuple[DimensionArc, ...]) -> str | None:
-    """Why the arcs do not lie in ``ANGLE_SPAN_DEG``, or None when they do."""
-    low, high = ANGLE_SPAN_DEG
-    for arc in arcs:
-        for point in (arc.start, arc.end):
-            bearing = math.degrees(arc._bearing(point)) % 360.0
-            if not low - ANGLE_SPAN_SLACK_DEG <= bearing <= high + ANGLE_SPAN_SLACK_DEG:
-                return (
-                    f"45 deg arc end {_mm(point)} mm sits at {bearing:.1f} deg, outside "
-                    f"the {low:.0f}..{high:.0f} deg span: {[a.as_mm() for a in arcs]!r}"
-                )
-    return None
-
-
 def _segment_crosses_circle(p0: Point, p1: Point, center: Point, radius: float) -> bool:
     """True when the segment p0-p1 passes through the circle's outline."""
     d0, d1 = math.dist(p0, center), math.dist(p1, center)
@@ -765,616 +634,6 @@ def _detail_boundary(front: Any, detail_box: Box) -> tuple[Point, float]:
             f"outline {_format_box(detail_box)}"
         )
     return center, radius
-
-
-def _bisector_point(vertex: Point, radius: float) -> Point:
-    """The point ``radius`` from the angle vertex on the 45 deg span's bisector."""
-    return (
-        vertex[0] + radius * math.cos(ANGLE_BISECTOR_RAD),
-        vertex[1] + radius * math.sin(ANGLE_BISECTOR_RAD),
-    )
-
-
-def _angle_arc(annotation: Any) -> DimensionArc:
-    """The 45 deg dimension's arc; an inline value may split it, never re-centre it."""
-    ink = _read_dimension_ink(annotation, "ChamferAngle")
-    if not ink.arcs:
-        raise RuntimeError(f"45 deg dimension draws no arc: {ink.as_mm()!r}")
-    first = ink.arcs[0]
-    for arc in ink.arcs[1:]:
-        if (
-            math.dist(arc.center, first.center) > ANGLE_VERTEX_TOLERANCE_M
-            or abs(arc.radius - first.radius) > ANGLE_VERTEX_TOLERANCE_M
-        ):
-            raise RuntimeError(f"45 deg dimension arcs disagree: {ink.as_mm()!r}")
-    return first
-
-
-def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> DimensionArc:
-    """Lay the 45 deg arc on its bisector, close to the vertex, BEFORE offsetting.
-
-    The arc centre IS the angle vertex, so it is read back: it must be where
-    the model puts the chamfer's root corner, which proves the two picks were
-    the chamfer and the end face. The non-offset text point is then set at
-    ``ANGLE_ARC_RADIUS_M`` along the bisector from it.
-    """
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    if bool(display.OffsetText):
-        display.OffsetText = False
-    display.ArrowSide = ARROWS_INSIDE
-    created = _read_dimension_ink(annotation, "ChamferAngle")
-    if not created.arcs:
-        raise RuntimeError(f"45 deg dimension draws no arc: {created.as_mm()!r}")
-    vertex = created.arcs[0].center
-    if math.dist(vertex, vertex_guess) > ANGLE_VERTEX_TOLERANCE_M:
-        raise RuntimeError(
-            f"45 deg dimension vertex {_mm(vertex)} mm is not the chamfer root "
-            f"corner {_mm(vertex_guess)} mm: the picks missed the drawn legs "
-            f"({created.as_mm()!r})"
-        )
-    target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
-    placed = _early_bound(annotation, "IAnnotation")
-    if not placed.SetPosition2(target[0], target[1], 0.0):
-        raise RuntimeError("cannot pin the 45 deg dimension arc")
-    rebuild_drawing(adapter, label="45 deg arc")
-    arrows = int(
-        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").ArrowSide
-    )
-    if arrows != ARROWS_INSIDE:
-        raise RuntimeError(f"45 deg arrows did not stay inside: ArrowSide {arrows}")
-    ink = _read_dimension_ink(annotation, "ChamferAngle")
-    arc = _angle_arc(annotation)
-    _telemetry.info(
-        "45 deg arc pinned: "
-        + json.dumps(
-            {
-                "vertex_model_projection_mm": _mm(vertex_guess),
-                "vertex_mm": _mm(vertex),
-                "target_mm": _mm(target),
-                "ink": ink.as_mm(),
-            },
-            sort_keys=True,
-        )
-    )
-    if math.dist(arc.center, vertex) > ANGLE_VERTEX_TOLERANCE_M:
-        raise RuntimeError(
-            f"45 deg arc re-centred from {_mm(vertex)} to {_mm(arc.center)} mm"
-        )
-    span = _span_problem(ink.arcs)
-    if span is not None:
-        raise RuntimeError(span)
-    if abs(arc.radius - ANGLE_ARC_RADIUS_M) > ANGLE_ARC_RADIUS_TOLERANCE_M:
-        raise RuntimeError(
-            f"45 deg arc radius {arc.radius * 1000.0:.1f} mm, wanted "
-            f"{ANGLE_ARC_RADIUS_M * 1000.0:.1f} within "
-            f"{ANGLE_ARC_RADIUS_TOLERANCE_M * 1000.0:.1f} mm"
-        )
-    return arc
-
-
-def _model_angle_problems(
-    *, driven_state: int, value: float, tolerance_type: int, lower: float, upper: float
-) -> list[str]:
-    """How the model's ChamferAngle stopped being the driving, banded control."""
-    nominal, low, high = MODEL_ANGLE_CONTROL
-    problems = []
-    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
-        problems.append(f"{MODEL_ANGLE} is no longer driving (state {driven_state})")
-    if not math.isclose(value, nominal, abs_tol=1e-9):
-        problems.append(f"{MODEL_ANGLE} nominal {math.degrees(value)!r} deg changed")
-    if (
-        tolerance_type != DIMENSION_TOLERANCE_TYPES["ChamferAngle"]
-        or not math.isclose(lower, low, abs_tol=1e-9)
-        or not math.isclose(upper, high, abs_tol=1e-9)
-    ):
-        problems.append(
-            f"{MODEL_ANGLE} tolerance changed: type {tolerance_type}, "
-            f"{math.degrees(lower)!r}..{math.degrees(upper)!r} deg"
-        )
-    return problems
-
-
-def _model_chamfer_angle(view: Any) -> float:
-    """Re-prove the part's driving ChamferAngle and return its value (radians).
-
-    The sheet shows a drawing dimension, so the control the shop is held to is
-    read from the model the view references, not from an imported display.
-    """
-    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-    parameter = model.Parameter(MODEL_ANGLE)
-    if parameter is None:
-        raise RuntimeError(f"{MODEL_ANGLE} is missing from the referenced part")
-    dimension = _early_bound(parameter, "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    problems = _model_angle_problems(
-        driven_state=int(dimension.DrivenState),
-        value=float(dimension.SystemValue),
-        tolerance_type=int(tolerance.Type),
-        lower=float(tolerance.GetMinValue()),
-        upper=float(tolerance.GetMaxValue()),
-    )
-    if problems:
-        raise RuntimeError("; ".join(problems))
-    return float(dimension.SystemValue)
-
-
-def _model_finished_problems(
-    *, driven_state: int, value: float, tolerance_type: int
-) -> list[str]:
-    """How the model's FinishedOverall stopped being the driving control."""
-    problems = []
-    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
-        problems.append(f"{MODEL_FINISHED} is no longer driving (state {driven_state})")
-    if not math.isclose(
-        value, MODEL_FINISHED_CONTROL, abs_tol=FINISHED_VALUE_TOLERANCE_M
-    ):
-        problems.append(f"{MODEL_FINISHED} nominal {value * 1000.0!r} mm changed")
-    if tolerance_type != SW_TOL_NONE:
-        problems.append(
-            f"{MODEL_FINISHED} gained a native band (type {tolerance_type})"
-        )
-    return problems
-
-
-def _model_finished_overall(view: Any) -> float:
-    """Re-prove the part's driving FinishedOverall and return it (metres)."""
-    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-    parameter = model.Parameter(MODEL_FINISHED)
-    if parameter is None:
-        raise RuntimeError(f"{MODEL_FINISHED} is missing from the referenced part")
-    dimension = _early_bound(parameter, "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    problems = _model_finished_problems(
-        driven_state=int(dimension.DrivenState),
-        value=float(dimension.SystemValue),
-        tolerance_type=int(tolerance.Type),
-    )
-    if problems:
-        raise RuntimeError("; ".join(problems))
-    return float(dimension.SystemValue)
-
-
-def _near_side_point(
-    adapter: Any, view: Any, x_mm: float, y_mm: float, *, label: str
-) -> Point:
-    """The sheet point of (+/-x, y) on the view's left, the dimension side."""
-    return min(
-        (
-            model_point_in_view(
-                adapter, view, (sign * x_mm / 1000.0, y_mm / 1000.0, 0.0), label=label
-            )
-            for sign in (-1.0, 1.0)
-        ),
-        key=lambda point: point[0],
-    )
-
-
-def _part_silhouette(adapter: Any, front: Any) -> tuple[Box, ...]:
-    """The stud as the front view draws it: head, shank, cut end face rows."""
-    rows = (
-        ("head", HEAD_AF / 2.0, UNDERHEAD_Y_MM, UNDERHEAD_Y_MM + GB_WASHER_T + HEAD_H),
-        ("shank", SHANK_DIA / 2.0, THREAD_TIP_Y_MM + CHAMFER_WIDTH_MM, UNDERHEAD_Y_MM),
-        (
-            "cut end",
-            SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM,
-            THREAD_TIP_Y_MM,
-            THREAD_TIP_Y_MM + CHAMFER_WIDTH_MM,
-        ),
-    )
-    boxes = []
-    for label, half, low, high in rows:
-        corners = [
-            model_point_in_view(
-                adapter,
-                front,
-                (x / 1000.0, y / 1000.0, 0.0),
-                label=f"{label} silhouette",
-            )
-            for x in (-half, half)
-            for y in (low, high)
-        ]
-        xs = [point[0] for point in corners]
-        ys = [point[1] for point in corners]
-        boxes.append((min(xs), min(ys), max(xs), max(ys)))
-    return tuple(boxes)
-
-
-def _circle_edge(view: Any, radius_mm: float, axial_mm: float, *, label: str) -> Any:
-    """The visible circular model edge of ``radius_mm`` at axial station ``axial_mm``."""
-    candidates = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
-        candidates.append((params[6], params[1], edge))
-    if not candidates:
-        raise RuntimeError(f"{label}: the view has no visible circular model edges")
-    radius, axial, edge = min(
-        candidates,
-        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - axial_mm),
-    )
-    if (
-        abs(radius - radius_mm) > CIRCLE_MATCH_MM
-        or abs(axial - axial_mm) > CIRCLE_MATCH_MM
-    ):
-        raise RuntimeError(
-            f"{label}: no circle of r {radius_mm:.3f} mm at y {axial_mm:.3f} mm; "
-            f"nearest is r {radius:.3f} mm at y {axial:.3f} mm"
-        )
-    _telemetry.info(f"{label}: circle r {radius:.3f} mm at y {axial:.3f} mm")
-    return edge
-
-
-def _add_finished_reference(adapter: Any, front: Any) -> Any:
-    """Dimension the drawn bearing face to the drawn cut end, as a reference."""
-    bearing = _circle_edge(front, *BEARING_CIRCLE, label="washer-face bearing edge")
-    cut_end = _circle_edge(front, *CUT_END_CIRCLE, label="cut end face edge")
-    display = _early_bound(
-        add_edge_dimension(
-            adapter,
-            front,
-            p0=_near_side_point(adapter, front, *BEARING_CIRCLE, label="bearing"),
-            p1=_near_side_point(adapter, front, *CUT_END_CIRCLE, label="cut end"),
-            text_xy=FINISHED_TEXT_XY,
-            label="finished under-head length",
-            orientation="vertical",
-            entity_types=("EDGE", "EDGE"),
-            entities=(bearing, cut_end),
-        ),
-        "IDisplayDimension",
-    )
-    # A drawing dimension has no part-authored places: the spec supplies them.
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["FinishedOverall"], -1, -1, -1)
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    set_reference_dimension(
-        adapter, annotation, label="finished under-head length reference"
-    )
-    rebuild_drawing(adapter, label="finished under-head reference")
-    return annotation
-
-
-def _finished_text_problem(
-    places: int, texts: list[str], model_mm: float
-) -> str | None:
-    """Why the (45.1) does not print as the spec's parenthesized reference."""
-    wanted = DRAWING_REFERENCE_PRECISION["FinishedOverall"]
-    if places != wanted:
-        return f"(45.1) prints {places} places, the spec says {wanted}"
-    expected = f"({model_mm:.{wanted}f})"
-    rendered = "".join("".join(texts).split())
-    if rendered != expected:
-        return f"(45.1) renders {texts!r}, expected {expected!r}"
-    return None
-
-
-def _assert_finished_display(annotation: Any, model_value: float) -> None:
-    """Value, places and parentheses of the sheet's (45.1), on a fresh handle."""
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
-    places = int(_read_member(display, "GetPrimaryPrecision2"))
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    texts = [
-        str(data.GetTextAtIndex(index) or "")
-        for index in range(int(data.GetTextCount()))
-    ]
-    state = {
-        "value_mm": value * 1000.0,
-        "model_mm": model_value * 1000.0,
-        "places": places,
-        "texts": texts,
-    }
-    _telemetry.info("(45.1) sheet dimension: " + json.dumps(state, sort_keys=True))
-    if abs(value - model_value) > FINISHED_VALUE_TOLERANCE_M:
-        raise RuntimeError(f"(45.1) disagrees with {MODEL_FINISHED}: {state!r}")
-    problem = _finished_text_problem(places, texts, state["model_mm"])
-    if problem is not None:
-        raise RuntimeError(f"{problem}: {state!r}")
-
-
-def _pick_leg(
-    adapter: Any, view: Any, xy: Point, *, axis: str, types: tuple[str, ...], label: str
-) -> tuple[Point, str]:
-    """Refine a pick onto a drawn leg, trying each entity type in order."""
-    misses = []
-    for entity_type in types:
-        try:
-            found = find_edge_near(
-                adapter, view, xy, axis=axis, label=label, entity_type=entity_type
-            )
-        except RuntimeError as exc:
-            misses.append(f"{entity_type}: {exc}")
-            continue
-        _telemetry.info(
-            f"{label} picked as {entity_type} at {_mm(found)} mm (asked {_mm(xy)})"
-        )
-        return found, entity_type
-    raise RuntimeError(f"{label} not found near {_mm(xy)} mm: {misses}")
-
-
-def _add_chamfer_angle(adapter: Any, detail: Any, vertex: Point) -> tuple[Any, str]:
-    """Dimension the drawn chamfer against the drawn end face, 45 deg span."""
-    chamfer, chamfer_type = _pick_leg(
-        adapter,
-        detail,
-        (
-            vertex[0] + ANGLE_PICK_M * math.cos(math.radians(CHAMFER_ANGLE_DEG)),
-            vertex[1] + ANGLE_PICK_M * math.sin(math.radians(CHAMFER_ANGLE_DEG)),
-        ),
-        axis="x",
-        types=CHAMFER_PICK_TYPES,
-        label="chamfer outline",
-    )
-    end_face, end_face_type = _pick_leg(
-        adapter,
-        detail,
-        (vertex[0] - ANGLE_PICK_M, vertex[1]),
-        axis="y",
-        types=END_FACE_PICK_TYPES,
-        label="cut end face",
-    )
-    display = _early_bound(
-        add_edge_dimension(
-            adapter,
-            detail,
-            p0=chamfer,
-            p1=end_face,
-            text_xy=_bisector_point(vertex, ANGLE_ARC_RADIUS_M),
-            label="chamfer angle",
-            entity_types=(chamfer_type, end_face_type),
-        ),
-        "IDisplayDimension",
-    )
-    kind = int(display.Type2)
-    if kind != SW_ANGULAR_DIMENSION:
-        raise RuntimeError(f"chamfer dimension is type {kind}, not angular")
-    return _early_bound(display.GetAnnotation(), "IAnnotation"), chamfer_type
-
-
-def _witness_covers(
-    lines: tuple[tuple[Point, Point], ...], vertex: Point, end: Point
-) -> bool:
-    """Whether a witness line runs from the vertex out along the end face to ``end``."""
-    for a, b in lines:
-        if max(abs(a[1] - vertex[1]), abs(b[1] - vertex[1])) > WITNESS_REACH_M:
-            continue
-        if (
-            min(a[0], b[0]) <= vertex[0] + WITNESS_START_M
-            and max(a[0], b[0]) >= end[0] - WITNESS_REACH_M
-        ):
-            return True
-    return False
-
-
-def _assert_arrows_on_drawn_edges(
-    adapter: Any, detail: Any, annotation: Any, vertex: Point, chamfer_type: str
-) -> None:
-    """Both arrows must end on ink: the 0 deg one on the end face's witness
-    line, the 45 deg one on the drawn chamfer itself."""
-    ink = _read_dimension_ink(annotation, "ChamferAngle")
-    ends = [point for arc in ink.arcs for point in (arc.start, arc.end)]
-    if not ends:
-        raise RuntimeError(f"45 deg dimension draws no arc: {ink.as_mm()!r}")
-
-    def bearing(point: Point) -> float:
-        return math.degrees(math.atan2(point[1] - vertex[1], point[0] - vertex[0]))
-
-    face_end = min(ends, key=lambda point: abs(bearing(point)))
-    chamfer_end = min(ends, key=lambda point: abs(bearing(point) - CHAMFER_ANGLE_DEG))
-    if not _witness_covers(ink.lines, vertex, face_end):
-        raise RuntimeError(
-            f"0 deg arrow at {_mm(face_end)} mm has no witness line from the "
-            f"vertex {_mm(vertex)} mm: {ink.as_mm()!r}"
-        )
-    find_edge_near(
-        adapter,
-        detail,
-        chamfer_end,
-        axis="x",
-        label="45 deg arrow on the drawn chamfer",
-        span_m=0.0005,
-        entity_type=chamfer_type,
-    )
-    adapter.currentModel.ClearSelection2(True)
-    _telemetry.info(
-        "45 deg arrows on drawn edges: "
-        + json.dumps(
-            {"face_end_mm": _mm(face_end), "chamfer_end_mm": _mm(chamfer_end)},
-            sort_keys=True,
-        )
-    )
-
-
-def _printed_places_problem(
-    places: int, texts: list[str], model_deg: float
-) -> str | None:
-    """Why the 45 deg does not print the spec's places, or None when it does.
-
-    The setting must equal the spec and the rendered value must show exactly
-    those places: stud-11 read the setting -2 (follows the document, whose
-    angular default read 2) while the display data still said "45°".
-    """
-    if places != CHAMFER_ANGLE_PRECISION:
-        return f"45 deg prints {places} places, the spec says {CHAMFER_ANGLE_PRECISION}"
-    expected = f"{model_deg:.{CHAMFER_ANGLE_PRECISION}f}°"
-    rendered = texts[0].split() if texts else []
-    if rendered[:1] != [expected]:
-        return f"45 deg renders {texts[:1]!r}, expected it to lead with {expected!r}"
-    return None
-
-
-def _assert_chamfer_angle_display(annotation: Any, model_value: float) -> None:
-    """Value, parentheses and places of the sheet's 45 deg, on a fresh handle."""
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
-    places = int(_read_member(display, "GetPrimaryPrecision2"))
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    texts = [
-        str(data.GetTextAtIndex(index) or "")
-        for index in range(int(data.GetTextCount()))
-    ]
-    state = {
-        "value_deg": math.degrees(value),
-        "model_deg": math.degrees(model_value),
-        "parenthesis": bool(display.ShowParenthesis),
-        "places": places,
-        "texts": texts,
-    }
-    _telemetry.info("45 deg sheet dimension: " + json.dumps(state, sort_keys=True))
-    if abs(value - model_value) > ANGLE_VALUE_TOLERANCE_RAD:
-        raise RuntimeError(
-            f"45 deg sheet dimension disagrees with {MODEL_ANGLE}: {state!r}"
-        )
-    if state["parenthesis"] or any("(" in text for text in texts):
-        raise RuntimeError(f"SolidWorks forces parentheses on the 45 deg: {state!r}")
-    problem = _printed_places_problem(places, texts, state["model_deg"])
-    if problem is not None:
-        raise RuntimeError(f"{problem}: {state!r}")
-
-
-def _write_root_finish_callout(display: Any, text: str) -> None:
-    """Put the root-finish words after the printed 45 deg value, nowhere else."""
-    for part in (PREFIX, CALLOUT_ABOVE, CALLOUT_BELOW):
-        display.SetText(part, "")
-    display.SetText(SUFFIX, text)
-    display.ShowDimensionValue = True
-
-
-def _callout_text_parts(display: Any) -> dict[str, str]:
-    """Every ``swDimensionTextParts_e`` compartment, as the rebuild left it."""
-    return {str(part): str(display.GetText(part) or "") for part in range(1, 9)}
-
-
-def _assert_root_finish_callout(display: Any, text: str) -> None:
-    """Fail unless the value prints with exactly the suffix after it."""
-    parts = _callout_text_parts(display)
-    shows_value = bool(display.ShowDimensionValue)
-    _telemetry.info(
-        "root-finish text parts: "
-        + json.dumps({**parts, "show_value": shows_value}, sort_keys=True)
-    )
-    if parts[str(SUFFIX)] != text:
-        raise RuntimeError(
-            f"root-finish suffix did not survive the rebuild: "
-            f"{parts[str(SUFFIX)]!r} != {text!r} (all parts: {parts!r})"
-        )
-    for part in (PREFIX, CALLOUT_ABOVE, CALLOUT_BELOW):
-        if parts[str(part)]:
-            raise RuntimeError(
-                f"root-finish text leaked into part {part}: "
-                f"{parts[str(part)]!r} (all parts: {parts!r})"
-            )
-    if not shows_value:
-        raise RuntimeError("the 45 deg dimension value is hidden")
-
-
-def _attach_root_finish_callout(adapter: Any, annotation: Any) -> None:
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    display.ShowParenthesis = False
-    # A drawing dimension has no part-authored places: the spec supplies them.
-    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["ChamferAngle"], -1, -1, -1)
-    _write_root_finish_callout(display, ROOT_FINISH_SUFFIX)
-    rebuild_drawing(adapter, label="root finish callout")
-    # EditRebuild3 can hand out a new IDisplayDimension: probing the old handle
-    # reads the pre-rebuild state, so the proof runs on a FRESH one and both
-    # handles' compartments land in the log for the next diagnosis.
-    _telemetry.info(
-        "root-finish callout parts on the pre-rebuild handle: "
-        + json.dumps(_callout_text_parts(display), sort_keys=True)
-    )
-    fresh = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    _assert_root_finish_callout(fresh, ROOT_FINISH_SUFFIX)
-
-
-def _place_angle_text(
-    adapter: Any,
-    annotation: Any,
-    *,
-    anchor: tuple[float, float],
-    obstacles: dict[str, tuple[float, float, float, float]],
-    arc: DimensionArc,
-) -> tuple[float, float]:
-    """Park the offset 45 deg text block in the free pocket, from measured boxes.
-
-    ``SetPosition2`` on an offset dimension reports the leader attachment, whose
-    relation to the rendered block is not fixed API behaviour -- so the block is
-    measured from the dimension's own ``IDisplayData`` text items, moved as a
-    whole, and re-measured after the rebuild. The final position is proven by
-    ``GetPosition`` readback and by clearance to every surrounding box.
-
-    The pocket is right of the detail, the side the chamfer opens toward:
-    the leader reaches the arc above the 0 deg witness line. The block sits
-    as level with the arc as the pocket allows and ``ANGLE_TEXT_NOTE_CLEAR_M``
-    under the pictorial's scale note. The arc itself must not move.
-    """
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    # A drawing dimension has no model name: move it by its own handle.
-    display.OffsetText = True
-    placed = _early_bound(annotation, "IAnnotation")
-    if not placed.SetPosition2(anchor[0], anchor[1], 0.0):
-        raise RuntimeError("cannot offset the 45 deg text")
-    rebuild_drawing(adapter, label="45 deg offset")
-    block = _display_text_box(adapter, display)
-    gap = ANGLE_TEXT_GAP_M
-    park = gap + ANGLE_TEXT_PARK_SLOP_M
-    left = obstacles["cut-end detail"][2] + park
-    bottom = obstacles["DETAIL A label"][3] + park
-    top = min(
-        obstacles["isometric"][1] - park,
-        obstacles["isometric note"][1] - ANGLE_TEXT_NOTE_CLEAR_M,
-    )
-    height = block[3] - block[1]
-    if top - bottom < height:
-        raise RuntimeError(
-            f"45 deg text pocket {(top - bottom) * 1000.0:.1f} mm is shorter than "
-            f"its {height * 1000.0:.1f} mm block"
-        )
-    level = _bisector_point(arc.center, arc.radius)[1] - height / 2.0
-    target = (left, min(max(level, bottom), top - height))
-    anchor = (anchor[0] + target[0] - block[0], anchor[1] + target[1] - block[1])
-    if not placed.SetPosition2(anchor[0], anchor[1], 0.0):
-        raise RuntimeError("cannot park the 45 deg text")
-    rebuild_drawing(adapter, label="45 deg park")
-    if not bool(
-        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").OffsetText
-    ):
-        raise RuntimeError("45 deg text did not stay offset")
-    block = _display_text_box(adapter, display)
-    for name, obstacle in obstacles.items():
-        if not _clear_of(block, obstacle, gap):
-            raise RuntimeError(
-                f"45 deg text block {_format_box(block)} is not {gap * 1000.0:.1f} mm "
-                f"clear of {name} {_format_box(obstacle)}"
-            )
-    position = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
-    if math.dist(position[:2], anchor) > 0.0001:
-        raise RuntimeError(
-            f"45 deg text position did not persist: {position[:2]!r} != {anchor!r}"
-        )
-    held = _angle_arc(annotation)
-    if (
-        math.dist(held.center, arc.center) > ANGLE_ARC_HOLD_M
-        or abs(held.radius - arc.radius) > ANGLE_ARC_HOLD_M
-    ):
-        raise RuntimeError(
-            f"offsetting the 45 deg text moved its arc: {arc.as_mm()!r} -> "
-            f"{held.as_mm()!r}"
-        )
-    _telemetry.info(
-        "45 deg text block placed: "
-        + json.dumps(
-            {
-                "block_mm": [round(value * 1000.0, 1) for value in block],
-                "anchor_mm": [round(value * 1000.0, 1) for value in anchor],
-            },
-            sort_keys=True,
-        )
-    )
-    return anchor
 
 
 def _audit_sheet_layout(
@@ -1464,38 +723,39 @@ def _audit_sheet_layout(
     check_drawing_layout(adapter, layout=SPEC.layout, stem=SPEC.artifact_stem)
 
 
-def _fit_iso_view(adapter: Any, iso: Any) -> tuple[float, float, float, float]:
-    """Translate the pictorial into ``ISO_REGION`` and prove it stayed there."""
-    rebuild_drawing(adapter, label="isometric extents")
-    box = _view_box(iso, label="isometric")
-    dx, dy = _fit_translation(box, ISO_REGION, ISO_FIT_MARGIN_M)
-    position = tuple(float(value) for value in iso.Position)
+def _fit_view(
+    adapter: Any, view: Any, region: Box, margin: float, *, label: str
+) -> Box:
+    """Translate ``view`` into ``region`` and prove it stayed there."""
+    rebuild_drawing(adapter, label=f"{label} extents")
+    box = _view_box(view, label=label)
+    dx, dy = _fit_translation(box, region, margin)
+    position = tuple(float(value) for value in view.Position)
     if len(position) != 2:
-        raise RuntimeError(f"isometric view has no position: {position!r}")
-    if not iso.SetViewPosition(
+        raise RuntimeError(f"{label} view has no position: {position!r}")
+    if not view.SetViewPosition(
         double_array([position[0] + dx, position[1] + dy]), False
     ):
-        raise RuntimeError("cannot position the isometric view")
-    rebuild_drawing(adapter, label="isometric fit")
-    fitted = _view_box(iso, label="isometric")
-    margin = ISO_FIT_MARGIN_M
+        raise RuntimeError(f"cannot position the {label} view")
+    rebuild_drawing(adapter, label=f"{label} fit")
+    fitted = _view_box(view, label=label)
     if not (
-        fitted[0] >= ISO_REGION[0] + margin
-        and fitted[1] >= ISO_REGION[1] + margin
-        and fitted[2] <= ISO_REGION[2] - margin
-        and fitted[3] <= ISO_REGION[3] - margin
+        fitted[0] >= region[0] + margin
+        and fitted[1] >= region[1] + margin
+        and fitted[2] <= region[2] - margin
+        and fitted[3] <= region[3] - margin
     ):
         raise RuntimeError(
-            f"isometric outline {_format_box(fitted)} escaped ISO_REGION "
-            f"{_format_box(ISO_REGION)} at {margin * 1000.0:.1f} mm clearance"
+            f"{label} outline {_format_box(fitted)} escaped its region "
+            f"{_format_box(region)} at {margin * 1000.0:.1f} mm clearance"
         )
     _telemetry.info(
-        f"isometric outline {_format_box(fitted)} fitted into {_format_box(ISO_REGION)}"
+        f"{label} outline {_format_box(fitted)} fitted into {_format_box(region)}"
     )
     return fitted
 
 
-def _iso_note_xy(iso_box: tuple[float, float, float, float]) -> tuple[float, float]:
+def _iso_note_xy(iso_box: Box) -> Point:
     """The linked note's anchor, centred under the fitted pictorial."""
     return (
         (iso_box[0] + iso_box[2] - ISO_NOTE_WIDTH_M) / 2.0,
@@ -1503,10 +763,318 @@ def _iso_note_xy(iso_box: tuple[float, float, float, float]) -> tuple[float, flo
     )
 
 
+def _station(adapter: Any, view: Any, radial_mm: float, axial_mm: float) -> Point:
+    """Sheet point of the model point (x = radial, y = axial) in ``view``."""
+    return model_point_in_view(
+        adapter,
+        view,
+        (radial_mm / 1000.0, axial_mm / 1000.0, 0.0),
+        label=f"stud r {radial_mm:.3f} y {axial_mm:.3f}",
+    )
+
+
+def _unit(origin: Point, toward: Point) -> Point:
+    length = math.dist(origin, toward)
+    if length == 0.0:
+        raise RuntimeError(f"degenerate sheet direction at {_mm(origin)} mm")
+    return ((toward[0] - origin[0]) / length, (toward[1] - origin[1]) / length)
+
+
+def _tip_axis(adapter: Any, view: Any) -> Point:
+    """Sheet direction of model -Y (head toward tip) in ``view``."""
+    return _unit(_station(adapter, view, 0.0, 0.0), _station(adapter, view, 0.0, -10.0))
+
+
+def _axis_problem(direction: Point) -> str | None:
+    """Why ``direction`` (model -Y on the sheet) is not horizontal, tip right."""
+    if direction[0] <= 0.0 or abs(direction[1]) > AXIS_TOLERANCE_M:
+        return f"stud axis reads {direction!r} on the sheet, not (1, 0): tip must point right"
+    return None
+
+
+def _orient_as_in_the_lathe(adapter: Any, front: Any) -> None:
+    """Turn the front view until the stud's axis reads head left, tip right."""
+    view = _early_bound(front, "IView")
+    direction = _tip_axis(adapter, front)
+    view.Angle = float(view.Angle) - math.atan2(direction[1], direction[0])
+    rebuild_drawing(adapter, label="lathe orientation")
+    direction = _tip_axis(adapter, front)
+    _telemetry.info(
+        f"front view angle {float(view.Angle):.6f} rad, tip axis {direction!r}"
+    )
+    problem = _axis_problem(direction)
+    if problem is not None:
+        raise RuntimeError(problem)
+
+
+def _out_from(
+    adapter: Any, view: Any, radial_mm: float, axial_mm: float, gap: float
+) -> Point:
+    """``gap`` of paper beyond the model point (radial, axial), radially out."""
+    point = _station(adapter, view, radial_mm, axial_mm)
+    axis = _station(adapter, view, 0.0, axial_mm)
+    out = _unit(axis, point)
+    return (point[0] + out[0] * gap, point[1] + out[1] * gap)
+
+
+def _projected_box(
+    adapter: Any, view: Any, half_mm: float, low_mm: float, high_mm: float
+) -> Box:
+    """Sheet box of the model rectangle |x| <= half, low <= y <= high."""
+    corners = [
+        _station(adapter, view, x, y)
+        for x in (-half_mm, half_mm)
+        for y in (low_mm, high_mm)
+    ]
+    xs = [point[0] for point in corners]
+    ys = [point[1] for point in corners]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _part_silhouette(adapter: Any, front: Any) -> tuple[Box, ...]:
+    """The stud as the front view draws it: head, shank, tip and faced-end rows."""
+    rows = (
+        (HEAD_AF / 2.0, UNDERHEAD_Y_MM, UNDERHEAD_Y_MM + GB_WASHER_T + HEAD_H),
+        (SHANK_DIA / 2.0, SHOULDER_Y_MM, UNDERHEAD_Y_MM),
+        (TIP_RADIUS_MM, TIP_END_Y_MM + TIP_CHAMFER_MM, SHOULDER_Y_MM),
+        (TIP_RADIUS_MM - TIP_CHAMFER_MM, TIP_END_Y_MM, TIP_END_Y_MM + TIP_CHAMFER_MM),
+    )
+    return tuple(_projected_box(adapter, front, *row) for row in rows)
+
+
+def _model_dimension(view: Any, name: str) -> Any:
+    """The named dimension of the part ``view`` draws."""
+    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    parameter = model.Parameter(name)
+    if parameter is None:
+        raise RuntimeError(f"{name} is missing from the referenced part")
+    return _early_bound(parameter, "IDimension")
+
+
+def _model_finished_problems(
+    *, driven_state: int, value: float, tolerance_type: int
+) -> list[str]:
+    """How the model's FinishedOverall stopped being the driving control."""
+    problems = []
+    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
+        problems.append(f"{MODEL_FINISHED} is no longer driving (state {driven_state})")
+    if not math.isclose(
+        value, MODEL_FINISHED_CONTROL, abs_tol=FINISHED_VALUE_TOLERANCE_M
+    ):
+        problems.append(f"{MODEL_FINISHED} nominal {value * 1000.0!r} mm changed")
+    if tolerance_type != SW_TOL_NONE:
+        problems.append(
+            f"{MODEL_FINISHED} gained a native band (type {tolerance_type})"
+        )
+    return problems
+
+
+def _model_finished_overall(view: Any) -> float:
+    """Re-prove the part's driving FinishedOverall and return it (metres)."""
+    dimension = _model_dimension(view, MODEL_FINISHED)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    problems = _model_finished_problems(
+        driven_state=int(dimension.DrivenState),
+        value=float(dimension.SystemValue),
+        tolerance_type=int(tolerance.Type),
+    )
+    if problems:
+        raise RuntimeError("; ".join(problems))
+    return float(dimension.SystemValue)
+
+
+def _chamfer_angle_problem(radial_m: float, axial_m: float) -> str | None:
+    """Why the model's tip chamfer does not print as `` X 45°``."""
+    if not math.isclose(radial_m, axial_m, abs_tol=FINISHED_VALUE_TOLERANCE_M):
+        return (
+            f"tip chamfer legs {radial_m * 1000.0!r} (radial) and "
+            f"{axial_m * 1000.0!r} (axial) mm are not a 45 deg chamfer"
+        )
+    return None
+
+
+def _assert_chamfer_is_45(view: Any) -> None:
+    radial = float(_model_dimension(view, MODEL_CHAMFER_RADIAL).SystemValue)
+    problem = _chamfer_angle_problem(radial, TIP_CHAMFER_MM / 1000.0)
+    if problem is not None:
+        raise RuntimeError(problem)
+
+
+def _circle_edge(view: Any, radius_mm: float, axial_mm: float, *, label: str) -> Any:
+    """The visible circular model edge of ``radius_mm`` at axial station ``axial_mm``."""
+    candidates = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[6], params[1], edge))
+    if not candidates:
+        raise RuntimeError(f"{label}: the view has no visible circular model edges")
+    radius, axial, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - axial_mm),
+    )
+    if (
+        abs(radius - radius_mm) > CIRCLE_MATCH_MM
+        or abs(axial - axial_mm) > CIRCLE_MATCH_MM
+    ):
+        raise RuntimeError(
+            f"{label}: no circle of r {radius_mm:.3f} mm at y {axial_mm:.3f} mm; "
+            f"nearest is r {radius:.3f} mm at y {axial:.3f} mm"
+        )
+    _telemetry.info(f"{label}: circle r {radius:.3f} mm at y {axial:.3f} mm")
+    return edge
+
+
+def _add_finished_reference(adapter: Any, front: Any) -> Any:
+    """Dimension the drawn bearing face to the drawn faced end, as a reference.
+
+    It runs on the far side of the axis from the tip length, beyond the hex
+    head's corners, so the two never share a witness line or a text lane.
+    """
+    bearing = _circle_edge(front, *BEARING_CIRCLE, label="washer-face bearing edge")
+    faced_end = _circle_edge(front, *FACED_END_CIRCLE, label="faced end edge")
+    middle = (UNDERHEAD_Y_MM + TIP_END_Y_MM) / 2.0
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            front,
+            p0=_station(adapter, front, -BEARING_CIRCLE[0], BEARING_CIRCLE[1]),
+            p1=_station(adapter, front, -FACED_END_CIRCLE[0], FACED_END_CIRCLE[1]),
+            text_xy=_out_from(
+                adapter, front, -HEAD_CORNER_MM, middle, FINISHED_TEXT_OUT_M
+            ),
+            label="overall bearing-face-to-end reference",
+            orientation="horizontal",
+            entity_types=("EDGE", "EDGE"),
+            entities=(bearing, faced_end),
+        ),
+        "IDisplayDimension",
+    )
+    # A drawing dimension has no part-authored places: the spec supplies them.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["FinishedOverall"], -1, -1, -1)
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    set_reference_dimension(adapter, annotation, label="overall length reference")
+    rebuild_drawing(adapter, label="overall length reference")
+    return annotation
+
+
+def _finished_text_problem(
+    places: int, texts: list[str], model_mm: float
+) -> str | None:
+    """Why the overall reference does not print as the spec's parenthesized value."""
+    wanted = DRAWING_REFERENCE_PRECISION["FinishedOverall"]
+    if places != wanted:
+        return f"overall reference prints {places} places, the spec says {wanted}"
+    expected = f"({model_mm:.{wanted}f})"
+    rendered = "".join("".join(texts).split())
+    if rendered != expected:
+        return f"overall reference renders {texts!r}, expected {expected!r}"
+    return None
+
+
+def _assert_finished_display(annotation: Any, model_value: float) -> None:
+    """Value, places and parentheses of the sheet's overall reference, fresh handle."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    places = int(_read_member(display, "GetPrimaryPrecision2"))
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    texts = [
+        str(data.GetTextAtIndex(index) or "")
+        for index in range(int(data.GetTextCount()))
+    ]
+    state = {
+        "value_mm": value * 1000.0,
+        "model_mm": model_value * 1000.0,
+        "places": places,
+        "texts": texts,
+    }
+    _telemetry.info("overall reference: " + json.dumps(state, sort_keys=True))
+    if abs(value - model_value) > FINISHED_VALUE_TOLERANCE_M:
+        raise RuntimeError(
+            f"overall reference disagrees with {MODEL_FINISHED}: {state!r}"
+        )
+    problem = _finished_text_problem(places, texts, state["model_mm"])
+    if problem is not None:
+        raise RuntimeError(f"{problem}: {state!r}")
+
+
+def _import_tip_controls(adapter: Any, front: Any, detail: Any) -> tuple[Any, Any]:
+    """Import TipChamfer into the tip detail and TipLength into the lathe view.
+
+    The detail claims its control first (as in ``draw_spring_hook``), then
+    both are re-proved as the model's driving, banded controls.
+    """
+    chamfer_mid = TIP_END_Y_MM + TIP_CHAMFER_MM / 2.0
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep={
+            "TipChamfer": _out_from(
+                adapter, detail, TIP_RADIUS_MM, chamfer_mid, CHAMFER_TEXT_OUT_M
+            )
+        },
+        view_label="tip chamfer",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    tip_mid = (SHOULDER_Y_MM + TIP_END_Y_MM) / 2.0
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep={
+            "TipLength": _out_from(
+                adapter, front, SHANK_DIA / 2.0, tip_mid, TIP_LENGTH_TEXT_OUT_M
+            )
+        },
+        view_label="tip length",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    if len(front_annotations) != 1 or len(detail_annotations) != 1:
+        raise RuntimeError(
+            f"expected one tip control per view, got {len(front_annotations)} in the "
+            f"lathe view and {len(detail_annotations)} in the tip detail"
+        )
+    trim_drawing.verify_machining_controls(
+        adapter,
+        [*front_annotations, *detail_annotations],
+        expected=TIP_CONTROLS,
+        tolerance_types=TIP_TOLERANCE_TYPES,
+        precision={name: DIMENSION_PRECISION[name] for name in TIP_CONTROLS},
+    )
+    _assert_chamfer_is_45(detail)
+    chamfer = _early_bound(
+        detail_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    chamfer.SetText(SUFFIX, TIP_CHAMFER_CALLOUT_SUFFIX)
+    rebuild_drawing(adapter, label="tip chamfer callout")
+    fresh = _early_bound(
+        detail_annotations[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    suffix = str(fresh.GetText(SUFFIX) or "")
+    if suffix != TIP_CHAMFER_CALLOUT_SUFFIX:
+        raise RuntimeError(f"tip chamfer callout suffix reads {suffix!r}")
+    return front_annotations[0], detail_annotations[0]
+
+
+def _import_tip_thread(adapter: Any, front: Any) -> None:
+    """The tip's cosmetic #10-24 thread and its callout, on the lathe view."""
+    seeds, instances = import_cosmetic_threads(adapter, front)
+    _telemetry.info(f"tip cosmetic threads: {seeds} seed(s), {instances} instance(s)")
+    if (seeds, instances) != (1, 1):
+        raise RuntimeError(
+            f"expected the tip's one cosmetic thread, got {seeds}/{instances}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-    check("open modified stud", await adapter.open_model(str(SOURCE)))
+    check("open turned stud", await adapter.open_model(str(SOURCE)))
     required = (
         "Number",
         "Material Specification",
@@ -1526,14 +1094,21 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         draw,
         {
-            0: "Knife-Hanger Stud — Modified Stock Drawing",
-            1: "Native controls for modified purchased stock",
+            0: "Knife-Hanger Stud — Turned Stock Drawing",
+            1: "Native controls for turned purchased stock",
             2: "Harmonic Analyzer Project",
             3: "MHA-119; McMaster-Carr 91247A720",
-            4: "Finished under-head and cut-end deburr are native controls",
+            4: "Tip length and tip chamfer are native controls",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
+    front = place_view(
+        adapter,
+        str(SOURCE),
+        "*Front",
+        (FRONT_REGION[0] + FRONT_REGION[2]) / 2.0,
+        (FRONT_REGION[1] + FRONT_REGION[3]) / 2.0,
+        scale=SHEET_SCALE,
+    )
     iso = place_view(
         adapter,
         str(SOURCE),
@@ -1542,16 +1117,17 @@ async def build(adapter: Any) -> dict[str, str]:
         (ISO_REGION[1] + ISO_REGION[3]) / 2.0,
         scale=ISO_SCALE,
     )
-    set_hidden_lines_visible(adapter, front)
+    _orient_as_in_the_lathe(adapter, front)
+    _fit_view(adapter, front, FRONT_REGION, FRONT_FIT_MARGIN_M, label="front")
+    set_hidden_lines_removed(adapter, front)
     detail = trim_drawing.end_detail(adapter, front, SHEET)
-    set_hidden_lines_visible(adapter, detail)
+    set_hidden_lines_removed(adapter, detail)
+    # Import against the new geometry without waiting for a window repaint.
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
-    iso_box = _fit_iso_view(adapter, iso)
+    iso_box = _fit_view(adapter, iso, ISO_REGION, ISO_FIT_MARGIN_M, label="isometric")
     iso_note = add_property_linked_note(
         adapter, "Isometric View Note", *_iso_note_xy(iso_box)
     )
-    detail_box = _view_box(detail, label="cut end detail")
-    model_angle = _model_chamfer_angle(detail)
     model_finished = _model_finished_overall(front)
     add_property_linked_note(adapter, "Supplier", 0.016, 0.056, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.016, 0.047, char_height=0.003)
@@ -1559,16 +1135,8 @@ async def build(adapter: Any) -> dict[str, str]:
     manufacturing_notes = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.085, char_height=0.003
     )
-    for view in (front, detail):
-        set_hidden_lines_removed(adapter, view)
-    # The drawn legs are picked on the final hidden-lines-removed detail.
-    vertex = model_point_in_view(
-        adapter, detail, CHAMFER_VERTEX_MODEL_M, label="chamfer angle vertex"
-    )
-    angle, chamfer_type = _add_chamfer_angle(adapter, detail, vertex)
-    arc = _pin_angle_arc(adapter, angle, vertex)
-    _attach_root_finish_callout(adapter, angle)
-    _assert_chamfer_angle_display(angle, model_angle)
+    tip_length, tip_chamfer = _import_tip_controls(adapter, front, detail)
+    _import_tip_thread(adapter, front)
     finished = _add_finished_reference(adapter, front)
     _assert_finished_display(finished, model_finished)
     silhouette = _part_silhouette(adapter, front)
@@ -1578,42 +1146,35 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
+    front_box = _view_box(front, label="front")
+    detail_box = _view_box(detail, label="tip detail")
     iso_note_box = _note_box(_early_bound(iso_note, "INote"), label="isometric note")
     detail_label_box = _note_box(
-        _early_bound(_read_member(detail, "GetNotes")[0], "INote"),
-        label="detail label",
+        _early_bound(_read_member(detail, "GetNotes")[0], "INote"), label="detail label"
     )
-    front_box = _view_box(front, label="front")
     notes_box = _note_box(
         _early_bound(manufacturing_notes, "INote"), label="manufacturing notes"
     )
-    _place_angle_text(
-        adapter,
-        angle,
-        anchor=_bisector_point(arc.center, arc.radius),
-        obstacles={
-            "cut-end detail": detail_box,
-            "isometric": iso_box,
-            "isometric note": iso_note_box,
-            "DETAIL A label": detail_label_box,
-        },
-        arc=arc,
-    )
-    _assert_arrows_on_drawn_edges(adapter, detail, angle, arc.center, chamfer_type)
-    _assert_chamfer_angle_display(angle, model_angle)
     _assert_finished_display(finished, model_finished)
     _audit_sheet_layout(
         adapter,
         {
-            "ChamferAngle": (
-                angle,
+            "TipLength": (
+                tip_length,
+                front_box,
+                {"tip detail": detail_box, "isometric": iso_box},
+                None,
+                silhouette,
+            ),
+            "TipChamfer": (
+                tip_chamfer,
                 detail_box,
                 {
                     "front view": front_box,
                     "manufacturing notes": notes_box,
                     "isometric": iso_box,
                     "isometric note": iso_note_box,
-                    "DETAIL A label": detail_label_box,
+                    "detail label": detail_label_box,
                 },
                 _detail_boundary(front, detail_box),
                 (),
@@ -1621,7 +1182,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "FinishedOverall": (
                 finished,
                 front_box,
-                {"cut-end detail": detail_box, "isometric": iso_box},
+                {"tip detail": detail_box, "isometric": iso_box},
                 None,
                 silhouette,
             ),
@@ -1630,7 +1191,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Knife-Hanger Stud — Modified Stock Drawing",
+        pdf_title="Knife-Hanger Stud — Turned Stock Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )

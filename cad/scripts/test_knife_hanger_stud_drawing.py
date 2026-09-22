@@ -1,19 +1,218 @@
-"""Offline manufacturing boundaries for the shortened purchased stud."""
+"""Offline manufacturing boundaries for the turned purchased stud."""
 
 import math
 
 import pytest
 
+import build_knife_hanger_stud as build
 import draw_knife_hanger_stud as drawing
+import knife_hanger_interface as joint
 import knife_hanger_stud_spec as spec
-from _hole_spec import TAP_DRILL_MM
-from diagnostics.diag_build_91247A720 import GB_MAJOR_R
+from diagnostics.diag_build_91247A720 import GB_WASHER_T
 
 
-def test_root_chamfer_flat_clears_the_receiving_tap_drill() -> None:
-    tap_drill = TAP_DRILL_MM["1/2-13"]
-    flat_diameter = 2.0 * (GB_MAJOR_R - spec.CHAMFER_WIDTH_MM)
-    assert flat_diameter < tap_drill
+# --- the part is the joint's stud, number for number ---------------------------
+
+
+def test_tip_is_the_interface_tip() -> None:
+    assert spec.TIP_THREAD == joint.THREAD
+    assert spec.TIP_DIA_MM == joint.THREAD_MAJOR_DIA_MM
+    assert spec.TIP_LENGTH_MM == joint.STUD_TIP_LENGTH_MM
+    assert spec.TIP_LENGTH_DEVIATIONS_MM == joint.STUD_TIP_LENGTH_DEVIATIONS_MM
+    assert 0.0 < spec.TIP_CHAMFER_MM <= joint.STUD_TIP_CHAMFER_MAX_MM
+
+
+def test_model_stations_come_from_the_spec() -> None:
+    assert build.TIP_RADIUS_MM == pytest.approx(joint.THREAD_MAJOR_DIA_MM / 2.0)
+    assert build.UNDERHEAD_Y_MM - build.SHOULDER_Y_MM == pytest.approx(
+        spec.SHOULDER_UNDERHEAD_MM
+    )
+    assert build.SHOULDER_Y_MM - build.TIP_END_Y_MM == pytest.approx(
+        joint.STUD_TIP_LENGTH_MM
+    )
+    assert build.UNDERHEAD_LEN == pytest.approx(
+        spec.SHOULDER_UNDERHEAD_MM + joint.STUD_TIP_LENGTH_MM
+    )
+    assert spec.STOCK_UNDERHEAD_MM - spec.TRIM_LENGTH_MM == pytest.approx(
+        build.UNDERHEAD_LEN
+    )
+
+
+def test_turn_profile_steps_down_from_the_shank() -> None:
+    # The shoulder is an annulus from the tip's crest out to the stock crest;
+    # the cutter's outside clears the stock thread and removes no shank.
+    assert build.TIP_RADIUS_MM < build.SHANK_DIA / 2.0 < build.TURN_CUTTER_RADIUS_MM
+    assert build.TIP_RADIUS_MM - spec.TIP_CHAMFER_MM > 0.0
+    assert build.TURN_CUTTER_CLEARANCE_MM > 0.0
+
+
+def test_cosmetic_thread_runs_the_full_tip_above_the_chamfer() -> None:
+    # The build threads TIP_LENGTH - chamfer from the chamfer's top edge: the
+    # whole cylindrical tip up to the shoulder, the chamfer excluded as the
+    # interface excludes it from engagement.
+    depth = spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM
+    start = build.TIP_END_Y_MM + spec.TIP_CHAMFER_MM
+    assert start + depth == pytest.approx(build.SHOULDER_Y_MM)
+    assert depth >= joint.MIN_ENGAGEMENT_MM - 1e-9
+
+
+def test_shoulder_reference_matches_the_assembly_stack() -> None:
+    # Not imported by the build: a top-frame or washer edit must fail here,
+    # not silently re-key the stud.
+    from build_knife_hanger_washer import THICKNESS as WASHER_THICKNESS
+    from build_top_frame import RING_HEIGHT
+
+    bearing_face_y = joint.CASTING_UNDERSIDE_Y + RING_HEIGHT + WASHER_THICKNESS
+    assert spec.SHOULDER_UNDERHEAD_MM == pytest.approx(
+        bearing_face_y - joint.SHOULDER_SEAT_Y, abs=1e-9
+    )
+
+
+# --- the sheet's controls are the model's --------------------------------------
+
+
+def test_drawing_imports_exactly_the_tip_controls() -> None:
+    assert spec.DRAWING_DIMENSIONS == {"StudTurnProfile": set(drawing.TIP_CONTROLS)}
+    assert set(drawing.TIP_TOLERANCE_TYPES) == set(drawing.TIP_CONTROLS)
+
+
+def test_tip_length_carries_the_interface_band() -> None:
+    nominal, lower, upper = drawing.TIP_CONTROLS["TipLength"]
+    assert nominal * 1000.0 == pytest.approx(joint.STUD_TIP_LENGTH_MM)
+    assert (lower * 1000.0, upper * 1000.0) == pytest.approx(
+        joint.STUD_TIP_LENGTH_DEVIATIONS_MM
+    )
+    assert drawing.TIP_TOLERANCE_TYPES["TipLength"] == drawing.SW_TOL_BILATERAL
+    # Rule 2: the value prints as many places as its band needs.
+    places = spec.DIMENSION_PRECISION["TipLength"]
+    for deviation in joint.STUD_TIP_LENGTH_DEVIATIONS_MM:
+        assert round(deviation, places) == pytest.approx(deviation)
+
+
+def test_tip_chamfer_prints_as_the_interface_maximum() -> None:
+    nominal, lower, upper = drawing.TIP_CONTROLS["TipChamfer"]
+    assert nominal * 1000.0 == pytest.approx(joint.STUD_TIP_CHAMFER_MAX_MM)
+    assert (lower, upper) == (0.0, 0.0)
+    assert spec.TIP_CHAMFER_TOLERANCE_TYPE == 6  # swTolType_e.swTolMAX
+    assert drawing.TIP_TOLERANCE_TYPES["TipChamfer"] == spec.TIP_CHAMFER_TOLERANCE_TYPE
+    places = spec.DIMENSION_PRECISION["TipChamfer"]
+    assert round(joint.STUD_TIP_CHAMFER_MAX_MM, places) == pytest.approx(
+        joint.STUD_TIP_CHAMFER_MAX_MM
+    )
+
+
+def test_tip_chamfer_angle_is_proved_by_equal_legs() -> None:
+    assert spec.TIP_CHAMFER_CALLOUT_SUFFIX == " X 45°"
+    legs = spec.TIP_CHAMFER_MM / 1000.0
+    assert drawing._chamfer_angle_problem(legs, legs) is None
+    assert drawing._chamfer_angle_problem(legs * 1.1, legs)
+
+
+def test_model_underhead_control_is_reproved() -> None:
+    good = {
+        "driven_state": 2,
+        "value": spec.FINISHED_UNDERHEAD_MM / 1000.0,
+        "tolerance_type": 0,
+    }
+    assert drawing._model_finished_problems(**good) == []
+    assert drawing._model_finished_problems(**{**good, "driven_state": 1})
+    assert drawing._model_finished_problems(**{**good, "value": 0.0451})
+    assert drawing._model_finished_problems(**{**good, "tolerance_type": 1})
+
+
+def test_overall_prints_as_a_one_place_reference() -> None:
+    places = spec.DRAWING_REFERENCE_PRECISION["FinishedOverall"]
+    assert places == spec.DIMENSION_PRECISION["FinishedOverall"] == 1
+    model = spec.FINISHED_UNDERHEAD_MM
+    text = f"({model:.1f})"
+    assert drawing._finished_text_problem(1, [text], model) is None
+    assert drawing._finished_text_problem(1, ["(", text[1:-1], ")"], model) is None
+    assert drawing._finished_text_problem(-2, [text], model)
+    assert drawing._finished_text_problem(1, [text[1:-1]], model)
+    assert drawing._finished_text_problem(1, [f"({model:.2f})"], model)
+
+
+# --- lathe orientation and sheet layout ----------------------------------------
+
+
+def test_lathe_axis_reads_head_left_tip_right() -> None:
+    assert drawing._axis_problem((1.0, 0.0)) is None
+    assert drawing._axis_problem((-1.0, 0.0))
+    assert drawing._axis_problem((0.0, -1.0))
+    assert drawing._axis_problem((math.cos(0.01), math.sin(0.01)))
+
+
+def _inside(box, region, margin=0.0) -> bool:
+    return (
+        box[0] >= region[0] + margin
+        and box[1] >= region[1] + margin
+        and box[2] <= region[2] - margin
+        and box[3] <= region[3] - margin
+    )
+
+
+def _overlap(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _detail_circle_box() -> tuple[float, float, float, float]:
+    radius = drawing.SHEET.fence_radius_mm * drawing.SHEET.detail_scale[0] / 1000.0
+    x, y = drawing.SHEET.detail_center
+    return (x - radius, y - radius, x + radius, y + radius)
+
+
+def test_lathe_view_with_its_text_lanes_fits_its_cell() -> None:
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    length = (build.HEAD_H + GB_WASHER_T + spec.FINISHED_UNDERHEAD_MM) * scale
+    above = build.SHANK_DIA / 2.0 * scale + drawing.TIP_LENGTH_TEXT_OUT_M + 0.005
+    below = drawing.HEAD_CORNER_MM * scale + drawing.FINISHED_TEXT_OUT_M + 0.005
+    region = drawing.FRONT_REGION
+    assert length < region[2] - region[0] - 2.0 * drawing.FRONT_FIT_MARGIN_M
+    assert above + below < region[3] - region[1]
+
+
+def test_sheet_cells_do_not_collide() -> None:
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    title_block = (
+        template.title_block_left_m,
+        0.0,
+        template.width_m,
+        template.title_block_top_m,
+    )
+    detail = _detail_circle_box()
+    cells = {
+        "front": drawing.FRONT_REGION,
+        "isometric": drawing.ISO_REGION,
+        "tip detail": detail,
+        "title block": title_block,
+    }
+    names = sorted(cells)
+    for index, a in enumerate(names):
+        for b in names[index + 1 :]:
+            assert not _overlap(cells[a], cells[b]), (a, b)
+    sheet = (0.0, 0.0, template.width_m, template.height_m)
+    assert _inside(detail, sheet)
+
+
+def test_tip_detail_frames_the_whole_tip_end() -> None:
+    sheet = drawing.SHEET
+    assert sheet.cut_end_y_mm == build.TIP_END_Y_MM
+    assert sheet.detail_center_x_mm == 0.0
+    # The fence takes in the faced end and the tip's crest with room above it
+    # for the chamfer's dimension line.
+    reach_end = sheet.detail_offset_mm
+    crest = math.hypot(build.TIP_RADIUS_MM, sheet.detail_offset_mm)
+    assert reach_end < sheet.fence_radius_mm
+    assert crest < sheet.fence_radius_mm
+    # The chamfer's text anchor sits inside the boundary, >= 1 mm of model
+    # (6 mm of paper) from it, so its callout needs no crossing.
+    scale = sheet.detail_scale[0] / sheet.detail_scale[1]
+    text = (
+        build.TIP_RADIUS_MM + drawing.CHAMFER_TEXT_OUT_M * 1000.0 / scale,
+        sheet.detail_offset_mm - spec.TIP_CHAMFER_MM / 2.0,
+    )
+    assert math.hypot(*text) <= sheet.fence_radius_mm - 1.0
+    assert drawing.DETAIL_BOUNDARY_CROSSINGS == {}
 
 
 def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
@@ -24,8 +223,7 @@ def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
     moved = (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
     region = drawing.ISO_REGION
     margin = drawing.ISO_FIT_MARGIN_M
-    assert moved[0] >= region[0] + margin and moved[2] <= region[2] - margin
-    assert moved[1] >= region[1] + margin and moved[3] <= region[3] - margin
+    assert _inside(moved, region, margin)
     # Centring splits the remaining slack evenly: no side is starved of margin.
     assert moved[0] - region[0] == pytest.approx(region[2] - moved[2])
     assert moved[1] - region[1] == pytest.approx(region[3] - moved[3])
@@ -38,62 +236,7 @@ def test_iso_fit_rejects_an_outline_that_cannot_fit() -> None:
         )
 
 
-class _FakeDisplay:
-    """Records ``SetText`` part writes the way IDisplayDimension stores them."""
-
-    def __init__(self, parts: dict[int, str], *, shows_value: bool = True) -> None:
-        self.parts = dict(parts)
-        self.writes: list[tuple[int, str]] = []
-        self.ShowDimensionValue = shows_value
-
-    def SetText(self, part: int, text: str) -> None:
-        self.writes.append((part, text))
-        self.parts[part] = text
-
-    def GetText(self, part: int) -> str:
-        return self.parts.get(part, "")
-
-
-def test_root_finish_words_ride_the_value_as_its_suffix() -> None:
-    # stud-4's part-7 write left the prefix filled and the value switched off.
-    display = _FakeDisplay({1: "stale", 3: "stale"}, shows_value=False)
-    drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
-    assert display.writes == [
-        (drawing.PREFIX, ""),
-        (drawing.CALLOUT_ABOVE, ""),
-        (drawing.CALLOUT_BELOW, ""),
-        (drawing.SUFFIX, drawing.ROOT_FINISH_SUFFIX),
-    ]
-    assert display.ShowDimensionValue is True
-    drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
-
-
-def test_root_finish_suffix_is_one_line() -> None:
-    # A multi-line suffix printed only its last line on the tube-frame chamfer.
-    assert "\n" not in drawing.ROOT_FINISH_SUFFIX
-
-
-def test_root_finish_suffix_lost_across_a_rebuild_is_rejected() -> None:
-    display = _FakeDisplay({})
-    with pytest.raises(RuntimeError, match="suffix"):
-        drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
-
-
-def test_root_finish_with_a_hidden_value_is_rejected() -> None:
-    # stud-4: the words printed and the "45" did not.
-    text = drawing.ROOT_FINISH_SUFFIX
-    display = _FakeDisplay({drawing.SUFFIX: text}, shows_value=False)
-    with pytest.raises(RuntimeError, match="value is hidden"):
-        drawing._assert_root_finish_callout(display, text)
-
-
-@pytest.mark.parametrize("part", [1, 3, 4])
-def test_root_finish_text_leaking_into_another_lane_is_rejected(part: int) -> None:
-    # Part 3 read back intact on stud-5 and never printed; part 1 printed twice.
-    text = drawing.ROOT_FINISH_SUFFIX
-    display = _FakeDisplay({drawing.SUFFIX: text, part: text})
-    with pytest.raises(RuntimeError, match="leaked"):
-        drawing._assert_root_finish_callout(display, text)
+# --- the generic ink gates ------------------------------------------------------
 
 
 def _arc(center, radius, start_deg, end_deg, *, ccw=True) -> drawing.DimensionArc:
@@ -122,87 +265,43 @@ def test_arc_sweep_follows_its_rotation_direction() -> None:
     assert samples[-1] == pytest.approx(minor.end)
 
 
-# Leaf 20260922T195516Z: the arc centre (= angle vertex), the cut-end detail
-# outline and its boundary circle, sheet metres.
+# Leaf 20260922T195516Z: a detail outline and its boundary circle, sheet metres.
 VERTEX = (0.25752, 0.13908)
 DETAIL = (0.22323, 0.10823, 0.30677, 0.19177)
 BOUNDARY = ((0.265, 0.150), 0.03015)
 REGION = (0.0127, 0.0127, 0.4191, 0.2667)
-R = drawing.ANGLE_ARC_RADIUS_M
 
 
-def _ink(*arcs, lines=()) -> drawing.DimensionInk:
+def _ink(*arcs, lines=(), name="TipChamfer") -> drawing.DimensionInk:
     return drawing.DimensionInk(
-        name="ChamferAngle", lines=tuple(lines), arcs=arcs, triangles=(), arrowheads=2
+        name=name, lines=tuple(lines), arcs=arcs, triangles=(), arrowheads=2
     )
 
 
-def _ray(deg: float, radius: float) -> tuple[float, float]:
-    return (
-        VERTEX[0] + radius * math.cos(math.radians(deg)),
-        VERTEX[1] + radius * math.sin(math.radians(deg)),
-    )
-
-
-# The 0 deg witness line: out from the vertex (past its gap) along the end face
-# to past the arc.
-WITNESS = (_ray(0.0, 0.0015), _ray(0.0, R + 0.0015))
-# The offset text right of the detail, leader from its shelf's left end.
-SHELF_END = (0.3108, 0.1331)
-SHELF = (SHELF_END, (0.4049, 0.1331))
-
-
-def test_stud4_angle_arc_is_rejected() -> None:
-    # The exported regression: r = 84 mm about the vertex, running from the 45
-    # deg leg the long way round to the -8 deg curate point.
-    ink = _ink(_arc(VERTEX, 0.084, 45.0, -8.0))
+def test_stud4_sweeping_arc_is_rejected() -> None:
+    # The exported regression: r = 84 mm, the long way round.
     problems = drawing._dimension_ink_problems(
-        ink, owner=DETAIL, obstacles={}, region=REGION
+        _ink(_arc(VERTEX, 0.084, 45.0, -8.0)), owner=DETAIL, obstacles={}, region=REGION
     )
-    assert any("radius" in problem for problem in problems)
-    assert any("long way round" in problem for problem in problems)
+    assert any("arc radius 84.0 mm" in problem for problem in problems)
+    assert any("runs the long way round" in problem for problem in problems)
 
 
-def test_pinned_arc_with_its_witness_and_leader_passes() -> None:
-    arc = _arc(VERTEX, R, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, R)
+def test_ink_across_an_annotation_is_rejected() -> None:
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[WITNESS, (tip, SHELF_END), SHELF]),
+        _ink(lines=[(VERTEX, (0.360, 0.100))]),
         owner=DETAIL,
-        obstacles={"isometric note": (0.3373, 0.1467, 0.3720, 0.1515)},
+        obstacles={"detail label": (0.3185, 0.0919, 0.3509, 0.1081)},
         region=REGION,
-        boundary=BOUNDARY,
     )
-    assert problems == []
-    assert drawing._span_problem((arc,)) is None
-    assert drawing._witness_covers((WITNESS,), VERTEX, arc.start)
+    assert problems == [
+        "TipChamfer ink crosses detail label [318.5,91.9]..[350.9,108.1]mm"
+    ]
 
 
-def test_arc_outside_the_chamfer_span_is_rejected() -> None:
-    # stud-7..9: the model dimension kept 0..45 and ran an arc on to 216.6 deg.
-    problem = drawing._span_problem((_arc(VERTEX, R, 216.6, 360.0),))
-    assert problem is not None and "outside the 0..45 deg span" in problem
-
-
-def test_arrow_without_a_witness_line_is_caught() -> None:
-    # stud-6: the model dimension's end-face leg was undrawn sketch geometry,
-    # so the 0 deg arrow ended on bare paper -- no line out of the vertex.
-    arc = _arc(VERTEX, R, 0.0, 45.0)
-    assert not drawing._witness_covers((), VERTEX, arc.start)
-    # A stub that starts 30 mm out (the cutter leg's far end) is no witness.
-    stub = (_ray(0.0, 0.0319), _ray(0.0, 0.034))
-    far = _arc(VERTEX, 0.033, 0.0, 45.0)
-    assert not drawing._witness_covers((stub,), VERTEX, far.start)
-    # One that stops short of the arrow is no witness either.
-    short = (_ray(0.0, 0.0015), _ray(0.0, R - 0.002))
-    assert not drawing._witness_covers((short,), VERTEX, arc.start)
-
-
-def test_leader_through_the_witness_line_is_rejected() -> None:
-    arc = _arc(VERTEX, R, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, R)
+def test_self_crossing_lines_are_rejected() -> None:
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[WITNESS, (tip, (0.2640, 0.1250))]),
+        _ink(lines=[((0.24, 0.13), (0.26, 0.15)), ((0.24, 0.15), (0.26, 0.13))]),
         owner=DETAIL,
         obstacles={},
         region=REGION,
@@ -210,47 +309,15 @@ def test_leader_through_the_witness_line_is_rejected() -> None:
     assert len(problems) == 1 and "cross at" in problems[0]
 
 
-def test_model_angle_control_is_reproved() -> None:
-    nominal, lower, upper = drawing.MODEL_ANGLE_CONTROL
-    good = {
-        "driven_state": 2,
-        "value": nominal,
-        "tolerance_type": spec.DIMENSION_TOLERANCE_TYPES["ChamferAngle"],
-        "lower": lower,
-        "upper": upper,
-    }
-    assert drawing._model_angle_problems(**good) == []
-    assert drawing._model_angle_problems(**{**good, "driven_state": 1})
-    assert drawing._model_angle_problems(**{**good, "value": math.radians(44.0)})
-    assert drawing._model_angle_problems(**{**good, "upper": 0.0})
-
-
-def test_leader_across_an_annotation_is_rejected() -> None:
-    arc = _arc(VERTEX, R, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, R)
+def test_no_dimension_may_cross_the_tip_detail_boundary() -> None:
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[(tip, (0.360, 0.100))]),
+        _ink(lines=[((0.265, 0.150), (0.400, 0.150))]),
         owner=DETAIL,
-        obstacles={"DETAIL A label": (0.3185, 0.0919, 0.3509, 0.1081)},
+        obstacles={},
         region=REGION,
+        boundary=BOUNDARY,
     )
-    assert problems == [
-        "ChamferAngle ink crosses DETAIL A label [318.5,91.9]..[350.9,108.1]mm"
-    ]
-
-
-def test_bisector_point_splits_the_chamfer_span() -> None:
-    x, y = drawing._bisector_point((0.0, 0.0), 0.013)
-    assert math.hypot(x, y) == pytest.approx(0.013)
-    assert math.degrees(math.atan2(y, x)) == pytest.approx(
-        drawing.CHAMFER_ANGLE_DEG / 2.0
-    )
-
-
-def test_pinned_arc_stays_on_the_drawn_chamfer() -> None:
-    # The 45 deg arrow needs no witness line only while the arc is inside the
-    # ~14.4 mm chamfer Detail A draws (stud-6 render).
-    assert drawing.ANGLE_ARC_RADIUS_M + drawing.ANGLE_ARC_RADIUS_TOLERANCE_M < 0.0144
+    assert len(problems) == 1 and "0 allowed" in problems[0]
 
 
 def test_segment_box_hits() -> None:
@@ -270,133 +337,12 @@ def test_segment_intersection() -> None:
     assert drawing._segment_intersection((0, 0), (1, 0), (2, -1), (2, 1)) is None
 
 
-def test_leader_out_of_the_detail_is_the_one_allowed_boundary_crossing() -> None:
-    arc = _arc(VERTEX, R, 0.0, 45.0)
-    tip = drawing._bisector_point(VERTEX, R)
-    # A second exit -- e.g. a witness line stretched past the circle -- fails.
-    stretched = (VERTEX, _ray(45.0, 0.050))
-    problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[(tip, SHELF_END), SHELF, stretched]),
-        owner=DETAIL,
-        obstacles={},
-        region=REGION,
-        boundary=BOUNDARY,
-    )
-    assert problems == [
-        "ChamferAngle ink crosses the detail boundary circle [265.0, 150.0] "
-        "r 30.1 mm 2 time(s); 1 allowed"
-    ]
-
-
-def test_undeclared_dimension_may_not_cross_a_detail_boundary() -> None:
-    ink = drawing.DimensionInk(
-        name="Other",
-        lines=(((0.265, 0.150), (0.400, 0.150)),),
-        arcs=(),
-        triangles=(),
-        arrowheads=0,
-    )
-    problems = drawing._dimension_ink_problems(
-        ink, owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
-    )
-    assert len(problems) == 1 and "0 allowed" in problems[0]
-
-
 def test_segment_circle_crossing() -> None:
     center, radius = (0.0, 0.0), 1.0
     assert drawing._segment_crosses_circle((0.0, 0.0), (2.0, 0.0), center, radius)
     assert drawing._segment_crosses_circle((-2.0, 0.5), (2.0, 0.5), center, radius)
     assert not drawing._segment_crosses_circle((-0.5, 0.0), (0.5, 0.0), center, radius)
     assert not drawing._segment_crosses_circle((-2.0, 1.5), (2.0, 1.5), center, radius)
-
-
-def test_printed_places_follow_the_spec_and_the_render() -> None:
-    texts = [" 45° CHAMFER TO EXISTING THREAD ROOT "]
-    assert drawing.CHAMFER_ANGLE_PRECISION == spec.DIMENSION_PRECISION["ChamferAngle"]
-    assert drawing._printed_places_problem(0, texts, 45.000000000000306) is None
-    # stud-10/11: the drawing dimension followed the document default (-2).
-    problem = drawing._printed_places_problem(-2, texts, 45.0)
-    assert problem is not None and "prints -2 places" in problem
-    stale = [" 45.00° CHAMFER TO EXISTING THREAD ROOT "]
-    problem = drawing._printed_places_problem(0, stale, 45.0)
-    assert problem is not None and "renders" in problem
-    assert drawing._printed_places_problem(0, [], 45.0) is not None
-
-
-def _mm_point(point: list[float]) -> tuple[float, float]:
-    return (point[0] / 1000.0, point[1] / 1000.0)
-
-
-# The pinned 45 deg exactly as leaf 20260922T205428Z (stud-10) logged it: the
-# arc split around the inline value at the bisector, plus the 0 deg witness.
-STUD10_VERTEX = (0.26509, 0.1312)
-STUD10_ARCS = (
-    ([265.09, 131.2], [277.09, 131.2], [276.95, 133.01]),
-    ([265.09, 131.2], [274.56, 138.57], [273.57, 139.69]),
-)
-STUD10_WITNESS = (_mm_point([266.09, 131.2]), _mm_point([278.09, 131.2]))
-STUD10_STATE = {
-    "value_deg": 45.000000000000384,
-    "model_deg": 45.000000000000306,
-    "parenthesis": False,
-    "texts": [" 45° CHAMFER TO EXISTING THREAD ROOT "],
-}
-
-
-def test_stud10_logged_angle_passes_every_option8_gate() -> None:
-    arcs = tuple(
-        drawing.DimensionArc(
-            center=_mm_point(center),
-            start=_mm_point(start),
-            end=_mm_point(end),
-            ccw=True,
-        )
-        for center, start, end in STUD10_ARCS
-    )
-    ink = _ink(*arcs, lines=[STUD10_WITNESS])
-    # _pin_angle_arc: centre on the projected vertex, span, radius, one circle.
-    for arc in arcs:
-        assert math.dist(arc.center, STUD10_VERTEX) <= drawing.ANGLE_VERTEX_TOLERANCE_M
-        assert abs(arc.radius - R) <= drawing.ANGLE_ARC_RADIUS_TOLERANCE_M
-    assert drawing._span_problem(arcs) is None
-    # The ink gate, in the stud-6 detail frame (its outline centre is fixed).
-    box = (0.265 - 0.04177, 0.150 - 0.04177, 0.265 + 0.04177, 0.150 + 0.04177)
-    assert (
-        drawing._dimension_ink_problems(
-            ink, owner=box, obstacles={}, region=REGION, boundary=BOUNDARY
-        )
-        == []
-    )
-    # _assert_arrows_on_drawn_edges: the 0 deg end has its witness from the
-    # vertex; the 45 deg end is the one probed on the drawn chamfer.
-    ends = [point for arc in arcs for point in (arc.start, arc.end)]
-
-    def bearing(point: tuple[float, float]) -> float:
-        return math.degrees(
-            math.atan2(point[1] - STUD10_VERTEX[1], point[0] - STUD10_VERTEX[0])
-        )
-
-    face_end = min(ends, key=lambda point: abs(bearing(point)))
-    chamfer_end = min(ends, key=lambda point: abs(bearing(point) - 45.0))
-    assert drawing._witness_covers(ink.lines, STUD10_VERTEX, face_end)
-    assert bearing(chamfer_end) == pytest.approx(45.0, abs=0.1)
-    # _assert_chamfer_angle_display, with the spec's places now set explicitly.
-    value = math.radians(STUD10_STATE["value_deg"])
-    model = math.radians(STUD10_STATE["model_deg"])
-    assert abs(value - model) <= drawing.ANGLE_VALUE_TOLERANCE_RAD
-    assert not STUD10_STATE["parenthesis"]
-    assert not any("(" in text for text in STUD10_STATE["texts"])
-    places = spec.DRAWING_REFERENCE_PRECISION["ChamferAngle"]
-    assert (
-        drawing._printed_places_problem(
-            places, STUD10_STATE["texts"], STUD10_STATE["model_deg"]
-        )
-        is None
-    )
-    # The stud-10/11 failure itself: the setting read -2 (follows the document).
-    assert drawing._printed_places_problem(
-        -2, STUD10_STATE["texts"], STUD10_STATE["model_deg"]
-    )
 
 
 # The stud as stud-12's front view drew it (leaf 20260922T212033Z, 2:1, axis
@@ -458,66 +404,8 @@ def test_drawn_edge_witnesses_pass() -> None:
         )
         == []
     )
-    # A dimension with no vertical dimension line (an angle) is not judged.
+    # A dimension with no straight dimension line (an angle) is not judged.
     assert drawing._extension_line_problems(_ink(), STUD12_SILHOUETTE) == []
-
-
-def test_model_underhead_control_is_reproved() -> None:
-    good = {
-        "driven_state": 2,
-        "value": spec.FINISHED_UNDERHEAD_MM / 1000.0,
-        "tolerance_type": 0,
-    }
-    assert drawing._model_finished_problems(**good) == []
-    assert drawing._model_finished_problems(**{**good, "driven_state": 1})
-    assert drawing._model_finished_problems(**{**good, "value": 0.0452})
-    assert drawing._model_finished_problems(**{**good, "tolerance_type": 1})
-
-
-def test_underhead_prints_as_a_one_place_reference() -> None:
-    places = spec.DRAWING_REFERENCE_PRECISION["FinishedOverall"]
-    assert places == spec.DIMENSION_PRECISION["FinishedOverall"] == 1
-    assert drawing._finished_text_problem(1, ["(45.1)"], 45.1) is None
-    assert drawing._finished_text_problem(1, ["(", "45.1", ")"], 45.1) is None
-    assert drawing._finished_text_problem(-2, ["(45.1)"], 45.1)
-    assert drawing._finished_text_problem(1, ["45.1"], 45.1)
-    assert drawing._finished_text_problem(1, ["(45.10)"], 45.1)
-
-
-class _FakeCircle:
-    def __init__(
-        self, radius_mm: float, axial_mm: float, *, circle: bool = True
-    ) -> None:
-        self.CircleParams = (
-            0.0,
-            axial_mm / 1000.0,
-            0.0,
-            0.0,
-            1.0,
-            0.0,
-            radius_mm / 1000.0,
-        )
-        self._circle = circle
-
-    def IsCircle(self) -> bool:
-        return self._circle
-
-    def GetCurve(self) -> "_FakeCircle":
-        return self
-
-
-def test_bearing_circle_is_told_from_the_hex_underside(monkeypatch) -> None:
-    # stud-13: a coordinate pick took the hex underside 0.2 mm above the
-    # bearing face and read (45.3); the circle scan keys on the station.
-    radius, axial = drawing.BEARING_CIRCLE
-    hex_underside = _FakeCircle(radius, axial + 0.2)
-    bearing = _FakeCircle(radius, axial)
-    edges = [_FakeCircle(radius, axial, circle=False), hex_underside, bearing]
-    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: edges)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    assert drawing._circle_edge(None, radius, axial, label="bearing") is bearing
-    with pytest.raises(RuntimeError, match="no circle"):
-        drawing._circle_edge(None, radius, axial - 1.0, label="bearing")
 
 
 def _turned(point: tuple[float, float]) -> tuple[float, float]:
@@ -560,14 +448,43 @@ def test_extension_gate_reads_either_orientation() -> None:
     assert drawing._extension_line_problems(good, silhouette) == []
 
 
-def test_shoulder_reference_matches_the_assembly_stack() -> None:
-    # Not imported by the build: a top-frame or washer edit must fail here,
-    # not silently re-key the stud.
-    import knife_hanger_interface as joint
-    from build_knife_hanger_washer import THICKNESS as WASHER_THICKNESS
-    from build_top_frame import RING_HEIGHT
+class _FakeCircle:
+    def __init__(
+        self, radius_mm: float, axial_mm: float, *, circle: bool = True
+    ) -> None:
+        self.CircleParams = (
+            0.0,
+            axial_mm / 1000.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            radius_mm / 1000.0,
+        )
+        self._circle = circle
 
-    bearing_face_y = joint.CASTING_UNDERSIDE_Y + RING_HEIGHT + WASHER_THICKNESS
-    assert spec.SHOULDER_UNDERHEAD_MM == pytest.approx(
-        bearing_face_y - joint.SHOULDER_SEAT_Y, abs=1e-9
-    )
+    def IsCircle(self) -> bool:
+        return self._circle
+
+    def GetCurve(self) -> "_FakeCircle":
+        return self
+
+
+def test_bearing_circle_is_told_from_the_hex_underside(monkeypatch) -> None:
+    # stud-13: a coordinate pick took the hex underside 0.2 mm above the
+    # bearing face and read (45.3); the circle scan keys on the station.
+    radius, axial = drawing.BEARING_CIRCLE
+    hex_underside = _FakeCircle(radius, axial + 0.2)
+    bearing = _FakeCircle(radius, axial)
+    edges = [_FakeCircle(radius, axial, circle=False), hex_underside, bearing]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: edges)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    assert drawing._circle_edge(None, radius, axial, label="bearing") is bearing
+    with pytest.raises(RuntimeError, match="no circle"):
+        drawing._circle_edge(None, radius, axial - 1.0, label="bearing")
+
+
+def test_faced_end_circle_is_inside_the_tip_chamfer() -> None:
+    radius, axial = drawing.FACED_END_CIRCLE
+    assert axial == build.TIP_END_Y_MM
+    assert radius == pytest.approx(build.TIP_RADIUS_MM - spec.TIP_CHAMFER_MM)

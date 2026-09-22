@@ -1,69 +1,60 @@
-"""Native controls for the modified McMaster 91247A720 hanger stud."""
+"""Native controls for the turned-and-threaded McMaster 91247A720 hanger stud."""
 
 from __future__ import annotations
 
-import _config
-from _hole_spec import TAP_DRILL_MM
-from diagnostics.diag_build_91247A720 import (
-    GB_LEN,
-    GB_MAJOR_R,
-    GB_UNDERSIDE,
-    GB_WASHER_T,
-    ROOT_CHAMFER_MM,
-)
+import knife_hanger_interface as joint
+from diagnostics.diag_build_91247A720 import GB_LEN, GB_WASHER_T
 
-# The purchased bolt is cut at the threaded end after its complete supplier
-# geometry is built.  The assembly datum is the lower face of the supplied
-# washer boss, not the hex underside.
+# Stepped turned stud (user decision, 2026-09-22): the purchased 1/2 hex bolt
+# keeps its head and Ø12.7 shank through the casting holes; a shoulder seats on
+# the knife-mount top face (joint.SHOULDER_SEAT_Y) over a turned #10-24 tip.
+# Every joint number comes from knife_hanger_interface, the knife mount's
+# module; none is restated here.
 STOCK_UNDERHEAD_MM = GB_LEN - GB_WASHER_T
-TRIM_LENGTH_MM = 5.5
-FINISHED_UNDERHEAD_MM = 45.100
-if abs(STOCK_UNDERHEAD_MM - TRIM_LENGTH_MM - FINISHED_UNDERHEAD_MM) > 1e-9:
-    raise ValueError("modified stud length does not equal stock length minus trim")
 
-# Stepped turned stud (user decision, 2026-09-22): the shoulder seats on the
-# knife-mount top face, knife_hanger_interface.SHOULDER_SEAT_Y. Its distance
-# under the washer bearing face is the fit-to-stack reference L = T + W + G
-# (MHA-A07 sheet 4): crossbar 36.5 + washer 2.4765 + mount gap 0.25 in the
-# summing assembly. A literal here, so a top-frame or washer edit cannot re-key
-# this part; test_knife_hanger_stud_drawing cross-checks it against those
-# sources and the interface.
+# The shoulder's distance under the washer bearing face is the fit-to-stack
+# reference L = T + W + G (MHA-A07 sheet 4): crossbar 36.5 + washer 2.4765 +
+# mount gap 0.25 in the summing assembly. A literal here, so a top-frame or
+# washer edit cannot re-key this part; test_knife_hanger_stud_drawing
+# cross-checks it against those sources and the interface.
 SHOULDER_UNDERHEAD_MM = 39.2265
 
-# The cut-end deburr reaches the diagnostic recipe's modeled thread root.  This
-# is a native radial control, not an arbitrary fraction of the stock pitch.
-CHAMFER_WIDTH_MM = ROOT_CHAMFER_MM
-CHAMFER_ANGLE_DEG = 45.0
-CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
-# The nominal drill diameter comes from the shared ANSI hole table. The
-# support's drilling depth and full-thread acceptance belong to the mount
-# package, not this modified purchased-bolt sheet.
-TAP_DRILL_DIA_MM = TAP_DRILL_MM["1/2-13"]
-MIN_CHAMFER_WIDTH_MM = (2.0 * GB_MAJOR_R - TAP_DRILL_DIA_MM) / 2.0
-if CHAMFER_WIDTH_MM <= MIN_CHAMFER_WIDTH_MM:
-    raise ValueError("stud root chamfer does not clear the mating tap drill")
+# The tip: shoulder face to the faced end is the ONE engagement-critical
+# length, banded by the interface. The tip is turned to the thread's major
+# diameter and die-cut; its runout next to the shoulder is the interface's
+# relief, so there is no groove.
+TIP_THREAD = joint.THREAD
+TIP_DIA_MM = joint.THREAD_MAJOR_DIA_MM
+TIP_LENGTH_MM = joint.STUD_TIP_LENGTH_MM
+TIP_LENGTH_DEVIATIONS_MM = joint.STUD_TIP_LENGTH_DEVIATIONS_MM
+TIP_CHAMFER_MM = joint.STUD_TIP_CHAMFER_MAX_MM
 
-DRAWING_DIMENSIONS = {
-    "StockTrimProfile": {"FinishedOverall"},
-    "StockDeburrProfile": {"ChamferAngle"},
-}
-DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 2, "ChamferAngle": 0}
-# Rule 2's one exception (see top_frame_spec): the sheet's 45 deg and its
-# (45.1) are DRAWING dimensions between drawn edges -- the model controls'
-# legs are cutter sketch lines that run through air or across the part -- so
-# no model dimension carries their places. Each prints its driving model
-# control's. Left to the drawing default a dimension follows the document
-# (-2), and the document's angular default read 2 places (leaf
-# 20260922T205948Z).
+# The purchased bolt is first cut to the faced end: bearing face to end.
+FINISHED_UNDERHEAD_MM = SHOULDER_UNDERHEAD_MM + TIP_LENGTH_MM
+TRIM_LENGTH_MM = STOCK_UNDERHEAD_MM - FINISHED_UNDERHEAD_MM
+if not 0.0 < TRIM_LENGTH_MM < GB_LEN:
+    raise ValueError("the turned stud must be cut from the purchased bolt")
+
+# The interface bounds the tip chamfer from above only; at one place the title
+# block would read .X +/-0.8 and let it grow past that limit, so it prints
+# "0.5 MAX" (swTolType_e.swTolMAX) with its angle, which the part proves by
+# equal radial and axial legs.
+TIP_CHAMFER_TOLERANCE_TYPE = 6
+TIP_CHAMFER_CALLOUT_SUFFIX = " X 45°"
+
+DRAWING_DIMENSIONS = {"StudTurnProfile": {"TipLength", "TipChamfer"}}
+# Decimal places carry the band (policy rule 2): the tip length prints its
+# interface band's places, the chamfer and the stack reference one place.
+DIMENSION_PRECISION = {"FinishedOverall": 1, "TipLength": 2, "TipChamfer": 1}
+# Rule 2's one exception (see top_frame_spec): the (overall) length is a
+# DRAWING reference between the drawn bearing face and the drawn faced end --
+# the model FinishedOverall's legs are a datum point on the axis and a trim
+# cutter corner -- so no model dimension carries its places.
 DRAWING_REFERENCE_PRECISION = {
-    "ChamferAngle": DIMENSION_PRECISION["ChamferAngle"],
-    "FinishedOverall": DIMENSION_PRECISION["FinishedOverall"],
-}
-DIMENSION_TOLERANCE_TYPES = {
-    "ChamferAngle": 11,
+    "FinishedOverall": DIMENSION_PRECISION["FinishedOverall"]
 }
 DRAWING_NOTES = (
-    "TRIM/INSPECT TO MHA-A07 SHEET 4, HANGER FIT + INSPECTION, DETAIL B.\n"
+    "FIT SHOULDER TO STACK PER MHA-A07 SHEET 4, HANGER FIT + INSPECTION, DETAIL B.\n"
     "MARK EACH BOLT FRONT/REAR AND KEEP WITH ITS MHA-037/MHA-131 HANGER "
     "POSITION.\n"
     "UNDIMENSIONED PURCHASED HEAD/THREAD GEOMETRY IS REFERENCE.\n"
