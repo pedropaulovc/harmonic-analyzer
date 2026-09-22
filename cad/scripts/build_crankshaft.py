@@ -121,8 +121,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "DomeHeight", f"{SHAFT_DOME_HEIGHT}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
-    await set_global(adapter, "FiducialX", f"{FIDUCIAL_MODEL_X}mm")
-    await set_global(adapter, "FiducialZ", f"{FIDUCIAL_MODEL_Z}mm")
+    # Sketch distance dimensions are unsigned magnitudes; the seeded point
+    # coordinates below retain the witness's quadrant.
+    await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_MODEL_X)}mm")
+    await set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -263,7 +265,7 @@ async def build(adapter) -> dict[str, str]:
         "shaft punch witness",
         dims=fiducial,
         names=("FiducialX", "FiducialZ", "FiducialDia"),
-        drives=('"FiducialX"', '-"FiducialZ"', '"FiducialDia"'),
+        drives=('"FiducialX"', '"FiducialZ"', '"FiducialDia"'),
     )
     await ensure_fully_defined(adapter, "shaft fiducial sketch")
     check("exit_sketch shaft fiducial", await adapter.exit_sketch())

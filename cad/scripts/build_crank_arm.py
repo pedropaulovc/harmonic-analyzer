@@ -124,8 +124,10 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "AxialPinLength", f"{AXIAL_PIN_LENGTH}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
     await set_global(adapter, "FiducialDepth", f"{FIDUCIAL_MODEL_DEPTH}mm")
-    await set_global(adapter, "FiducialX", f"{FIDUCIAL_X}mm")
-    await set_global(adapter, "FiducialY", f"{FIDUCIAL_Y}mm")
+    # Sketch distance dimensions are unsigned magnitudes; the negative seeded
+    # X coordinate below retains the witness's intended quadrant.
+    await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_X)}mm")
+    await set_global(adapter, "FiducialY", f"{abs(FIDUCIAL_Y)}mm")
     await set_global(adapter, "AnchorScrewX", f"{ANCHOR_SCREW_X}mm")
     await set_global(adapter, "AnchorScrewY", f"{ANCHOR_SCREW_Y}mm")
     await set_global(adapter, "ArmEndX", '"ArmC2C" + "SquareEndOverhang"')
