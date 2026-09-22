@@ -99,12 +99,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HexKnifeFront": {"HexKnifeFrontDepth"},
     "EdgeRibFront": {"EdgeRibThickness"},
     "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
+    "SummationPlateProfile": {"SummationArcRadius"},
+    "SummationPlate": {"WebThickness"},
     "SummationAnchorProfile": {"AnchorOuterX", "AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
+    "MiddleRibProfile": {"MidRibArcR"},
     "MiddleRib": {"MiddleRibThickness"},
     "SpringHoleSeed": {"HoleSeedX"},
     "SpringHolePattern": {"HolePitch"},
-    "PatternReferences": {"HoleStartOffset", "PatternSpan"},
+    "PatternReferences": {
+        "BossAxialLocation",
+        "HoleStartOffset",
+        "PatternSpan",
+        "HoleEndOffsetLast",
+    },
 }
 
 # Decimal places carry the title-block tolerance and therefore live on the
@@ -117,15 +125,23 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"PlateWidth": 2, "PlateLength": 1},
     "CoefficientsPlate": {"PlateThickness": 2},
     "CylinderProfile": {"CylDia": 1},
-    "HexKnifeFront": {"HexKnifeFrontDepth": 2},
+    "HexKnifeFront": {"HexKnifeFrontDepth": 1},
     "EdgeRibFront": {"EdgeRibThickness": 2},
     "KnifeEnvelopeReference": {"HexWidth": 2, "HexHeight": 2},
+    "SummationPlateProfile": {"SummationArcRadius": 1},
+    "SummationPlate": {"WebThickness": 2},
     "SummationAnchorProfile": {"AnchorOuterX": 1, "AnchorOuterDia": 2},
     "SummationAnchor": {"AnchorHeight": 2},
+    "MiddleRibProfile": {"MidRibArcR": 1},
     "MiddleRib": {"MiddleRibThickness": 2},
-    "SpringHoleSeed": {"HoleSeedX": 2},
+    "SpringHoleSeed": {"HoleSeedX": 1},
     "SpringHolePattern": {"HolePitch": 2},
-    "PatternReferences": {"HoleStartOffset": 2, "PatternSpan": 2},
+    "PatternReferences": {
+        "BossAxialLocation": 1,
+        "HoleStartOffset": 2,
+        "PatternSpan": 2,
+        "HoleEndOffsetLast": 2,
+    },
 }
 
 _PRECISION_NAMES = [
