@@ -26,7 +26,7 @@ from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -67,6 +67,7 @@ from summing_lever_spec import (
     TIP_X,
 )
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -107,6 +108,10 @@ PATTERN_CENTER = (0.165, 0.145)
 DETAIL_CENTER = (0.330, 0.155)
 DETAIL_SCALE = (2.0, 1.0)
 DETAIL_RADIUS_MM = CYL_R + 3.3
+# The parent circle's "A", from the front view's model origin: lower right of the
+# fence, below the edge-rib flank and above the 76.2 / 35.75 chain.  SolidWorks'
+# default seat printed it on that flank.
+DETAIL_LETTER_OFFSET = (0.0115, -0.0125)
 
 
 def _top_xy(
@@ -137,8 +142,11 @@ def _attach_radial_leaders(
 
     ``ArcExtensionLineOrOppositeSide`` defaults to True, which sweeps the R138.8
     summation arc through the top view and trails the R15.2 edge-rib leader
-    across the front view. It is a bool get/set property, so the assignment is
-    only proven by reading it back.
+    across the front view.  ``SolidLeader`` defaults to True on this template,
+    which rules each leader on from the arc to its centre: the R3 render drew the
+    R138.8 leader out to its off-view centre across the (195.83) extension line
+    and the 2X R15.2 leader through the 35.75 dimension line.  Both are bool
+    get/set properties, so each assignment is only proven by reading it back.
     """
     wanted = set(names)
     seen = set()
@@ -154,6 +162,9 @@ def _attach_radial_leaders(
             raise RuntimeError(
                 f"{label}: {name} leader still attaches to the arc extension line"
             )
+        display.SolidLeader = False
+        if bool(display.SolidLeader):
+            raise RuntimeError(f"{label}: {name} leader still runs to the arc centre")
         seen.add(name)
     missing = sorted(wanted - seen)
     if missing:
@@ -161,25 +172,36 @@ def _attach_radial_leaders(
 
 
 FORM_FRONT_KEEP = {
-    "CylDia": (0.155, 0.258),
+    # Upper left, so the diameter line crosses the collar clear of the R15.2 leader
+    # that drops onto the top of the same circle.
+    "CylDia": (0.1425, 0.2470),
     "AnchorHeight": (0.0980, 0.2300),
     "WebThickness": (0.1080, 0.2130),
     "MidRibArcR": (0.1700, 0.2420),
-    "PlateThickness": (0.2050, 0.2200),
-    "MidRibRightX": (0.1413, 0.2020),
-    "MidRibLeftX": (0.1690, 0.2020),
-    "EdgeRibFrontArcR": (0.1950, 0.1950),
+    # Past its own arrows: between them the witness lines ruled through the text.
+    "PlateThickness": (0.2050, 0.2330),
+    "MidRibRightX": (0.1413, 0.1960),
+    "MidRibLeftX": (0.1690, 0.1960),
+    # Lower left, onto the edge rib's own (-X) semicircle, above the 76.2 / 35.75
+    # chain: from the lower right its leader crossed the 35.75 dimension line.
+    "EdgeRibFrontArcR": (0.1350, 0.2080),
 }
 FORM_TOP_KEEP = {
     "PlateWidth": (0.1714, 0.1650),
     "PlateLength": (0.2350, 0.1050),
-    "AnchorOuterDia": (0.1120, 0.1250),
+    # Below the boss, so the counter-tap callout above can reach its hole clear.
+    "AnchorOuterDia": (0.1036, 0.0955),
     "AnchorOuterX": (0.1350, 0.0450),
-    "HexKnifeFrontDepth": (0.1470, 0.1530),
-    "EdgeRibThickness": (0.1900, 0.1418),
-    "MiddleRibThickness": (0.1960, 0.1050),
-    "SummationArcRadius": (0.1430, 0.1270),
-    "BossAxialLocation": (0.1130, 0.0860),
+    # Both "2X" callouts sit beside the -Z instance they measure: parked at the
+    # top, each drew a dimension line the length of the view.
+    "HexKnifeFrontDepth": (0.1470, 0.0617),
+    "EdgeRibThickness": (0.1900, 0.0590),
+    # Below its own arrows: between them the witness lines ruled through the text.
+    "MiddleRibThickness": (0.1985, 0.0950),
+    # Outside the web, on the centre side of the arc and under the (195.83)
+    # extension line; the leader now runs only from the text to the arc.
+    "SummationArcRadius": (0.1263, 0.1397),
+    "BossAxialLocation": (0.0900, 0.0860),
 }
 DETAIL_KEEP = {
     "HexWidth": (0.330, 0.113),
@@ -194,7 +216,8 @@ PATTERN_KEEP = {
     "HolePitch": (0.245, 0.128),
     "HoleStartOffset": (0.250, 0.100),
     "PatternSpan": (0.228, 0.145),
-    "HoleEndOffsetLast": (0.252, 0.181),
+    # Above its own arrows: between them the witness lines ruled through "(8.43)".
+    "HoleEndOffsetLast": (0.252, 0.193),
 }
 
 # The whole general-note block: four lines, sheet 1 upper right beside Detail A.
@@ -286,6 +309,44 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
             f"ratio={ratio!r}, outline={final_outline!r}"
         )
     return detail
+
+
+def _place_detail_letter(adapter: Any, front: Any) -> None:
+    """Seat the parent circle's letter in clear air, proved by read-back."""
+    circles = tuple(_read_member(_early_bound(front, "IView"), "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one knife-detail circle, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    origin = model_point_in_view(
+        adapter, front, (0.0, 0.0, 0.0), label="knife-detail letter reference"
+    )
+    target = tuple(origin[i] + DETAIL_LETTER_OFFSET[i] for i in range(2))
+    circle.SetLabelPosition(*target)  # VT_VOID: the read-back is the proof
+    adapter.currentModel.EditRebuild3()
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, target) > 1e-8:
+        raise RuntimeError(f"knife-detail letter position did not persist: {actual}")
+
+
+def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
+    """Hide one model sketch in one drawing view only.
+
+    ``PatternReferences`` carries the construction line that locates the boss
+    axially; the isometric shows no dimension from it and printed the line as a
+    stray dash-dot stroke off the boss.  ``BlankSketch`` is VT_VOID and there is
+    no per-view read-back, so the selection is the gate and the render the proof.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate {name} to hide {sketch}")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        f"{sketch}@{PART_STEM}@{name}", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"cannot select {sketch} in {name}")
+    draw.BlankSketch()
+    draw.ClearSelection2(True)
 
 
 def _hole_callout_variable_snapshot(
@@ -640,7 +701,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=counter_tap_edge,
-        callout_xy=(0.060, 0.170),
+        # Under the (195.83) extension line so the leader reaches the tap
+        # without crossing it.
+        callout_xy=(0.0719, 0.1390),
         label="counter-spring anchor tap",
     )
     _omit_default_thread_class(
@@ -656,6 +719,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     detail = _knife_detail(adapter, front)
+    _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
     detail_dimensions = curate_view_dimensions(
         adapter,
@@ -743,6 +807,7 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
+    _hide_view_sketch(adapter, iso, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
