@@ -605,7 +605,7 @@ try {
     # reach a cache key, and nothing done to the caller during the run can.
     $buildRequested = $true
     Invoke-Git -Directory $resolvedWorktree -Arguments @(
-        'worktree', 'add', '--detach', $buildWorktree, $commit
+        'worktree', 'add', '--quiet', '--detach', $buildWorktree, $commit
     ) | ForEach-Object { Write-LaunchLine -Path $logPath -Text $_ }
     $buildHead = (Invoke-Git -Directory $buildWorktree -Arguments @(
         'rev-parse', '--verify', 'HEAD'
