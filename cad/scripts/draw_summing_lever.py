@@ -306,9 +306,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(0.145, 0.070),
+        symbol_xy=(0.145, 0.047),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
+        leader_attach_xy=knife_edge,
+        char_height=0.0025,
     )
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
