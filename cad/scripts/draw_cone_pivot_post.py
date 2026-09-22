@@ -180,11 +180,12 @@ JOURNAL_KEEP = {
 # depth against the curved collar.
 DIMENSION_CALLOUTS = {
     "CrankBossDia": "SPOTFACE",
+    "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
-    "CrankBossStartZ": "POST AXIS TO CRANK\nSPOTFACE PLANE",
+    "CrankBossStartZ": "POST AXIS TO CRANK\nGEAR-CLEARANCE SPOTFACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
