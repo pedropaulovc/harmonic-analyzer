@@ -29,7 +29,7 @@ import knife_hanger_interface as knife_hanger
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 BLK_HALF_X = 12.0  # block half-width (24 across)
 SUPPORT_Z_THICK = 18.0  # axial depth (user, 2026-09-22); mirrors build_knife_mount
-BLK_TOP = 14.116  # exact local top from 999.7 - (979.7 + 10.268/2) - 0.75
+BLK_TOP = 13.816  # exact local top from 999.7 - (979.7 + 10.268/2) - 1.05
 BORE_CY = -6.0  # bore crown is the knife axis: actual trunnion line contact
 BLK_BOT = -15.0  # BORE_CY - R_BORE - 3.0 wall
 BORE_FROM_TOP = BLK_TOP - BORE_CY
@@ -142,7 +142,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # BossFromEnd prints one place: it locates the boss (and the tap concentric
 # with it) from ONE end face, and its .X band still leaves both axial walls
 # >= 1.2 mm (test_end_located_hanger_tap_retains_axial_wall_at_limits). The
-# boss diameter and height carry the interface's .XX bands.
+# boss diameter and height print one place too: the interface derives the boss
+# height, gap and clearances from the .X band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
         "BlockWidth": 1,
@@ -152,8 +153,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": 2,
     },
     "Block": {"Depth": 1},
-    "BossProfile": {"BossDia": 2, "BossFromEnd": 1},
-    "Boss": {"BossHeight": 2},
+    "BossProfile": {"BossDia": 1, "BossFromEnd": 1},
+    "Boss": {"BossHeight": 1},
 }
 
 _PRECISION_NAMES = [

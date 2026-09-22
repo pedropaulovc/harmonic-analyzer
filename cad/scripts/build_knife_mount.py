@@ -151,8 +151,8 @@ BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
 # the boss come from knife_hanger_interface (the joint's seat plane).
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNIFE)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.116
-SEAT_TOP = BLK_TOP + BOSS_HEIGHT  # boss top = stud-shoulder seat plane (19.116)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 13.816
+SEAT_TOP = BLK_TOP + BOSS_HEIGHT  # boss top = stud-shoulder seat plane (19.816)
 
 
 # --- hanger-stud tap: #10-24 UNC-2B blind through the boss ------------------

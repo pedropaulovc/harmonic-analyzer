@@ -94,9 +94,12 @@ SHEET_SCALE = (2.0, 1.0)
 # block bottom to the seat-boss top.
 _BLOCK_CY = (SEAT_TOP + BLK_BOT) / 2.0
 
-FRONT_CENTER = (0.145, 0.115)
-SECTION_CENTER = (0.255, 0.115)
-TOP_CENTER = (0.145, 0.205)
+# The seat boss makes the front/section outline 5 mm (10 mm on the sheet)
+# taller; 0.115 put the SECTION A-A caption onto the title block's top rule
+# (knife-cc-12), so the three views rise together, keeping their gaps.
+FRONT_CENTER = (0.145, 0.122)
+SECTION_CENTER = (0.255, 0.122)
+TOP_CENTER = (0.145, 0.212)
 ISO_CENTER = (0.345, 0.195)
 
 
@@ -294,8 +297,10 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
         TOP_CENTER[0] - 0.035,
         TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
     ),
-    # Lower right, clear of the tap callout above and the front view below.
-    "BossDia": (TOP_CENTER[0] + 0.042, TOP_CENTER[1] - 0.026),
+    # Right of the view, below the tap callout: the leader leaves through the
+    # block's right edge at mid-height. Parked lower right (knife-cc-12) it ran
+    # out past the block corner.
+    "BossDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.012),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
@@ -956,7 +961,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
         # 0.200 leaves the callout's second line ~5 mm clear of the block's
         # right outline (sheet x 0.169), which dropping '- 2B' had exposed.
-        callout_xy=(0.200, 0.218),
+        callout_xy=(0.200, TOP_CENTER[1] + 0.013),
         label="hanger-stud blind tap",
     )
     _propagate_source_tap_depth_contracts(
