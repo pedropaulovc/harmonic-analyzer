@@ -197,6 +197,57 @@ def _hide_cosmetic_thread_annotations(adapter: Any) -> None:
             )
 
 
+def _auto_tapped_hole_notes(adapter: Any) -> dict[str, int]:
+    """Delete SolidWorks' own Hole Wizard notes, named per view, on every sheet.
+
+    Importing model items brings SolidWorks' descriptive thread note ("1/2-13
+    Tapped Hole") along with the geometry, and this recipe replaces every one of
+    them with an associative feature callout that also carries the process. A
+    bare count cannot say WHICH view changed, and the count is not one per
+    sheet: a note arrives once per view that imported a tapped feature, so a
+    view added, re-scaled or switched to hidden-lines-removed moves it (the
+    top-frame package printed 7, then 8, then 5 across three builds of the same
+    geometry). This names them, and deletes them here rather than handing the
+    substring to ``finalize_drawing``'s sweep: that sweep re-walked every
+    annotation of every view, sheet by sheet (13 s of a 270 s build), to find
+    the notes this walk -- ``ISheet::GetViews`` off the sheet objects, no sheet
+    activation -- already holds. Each deletion is proved by the view's note list
+    read back. The inventory is evidence, never a gate.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    counts: dict[str, int] = {}
+    for sheet_name in drawing.GetSheetNames() or ():
+        sheet = _early_bound(drawing.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            view = _early_bound(raw_view, "IView")
+            hits = [
+                note for note in (
+                    _early_bound(raw_note, "INote") for raw_note in (view.GetNotes() or ())
+                )
+                if "tapped hole" in str(note.GetText() or "").lower()
+            ]
+            if not hits:
+                continue
+            label = f"{sheet_name}/{view_name(adapter, view)}"
+            for note in hits:
+                draw.ClearSelection2(True)
+                if not _early_bound(note.GetAnnotation(), "IAnnotation").Select2(False, 0):
+                    raise RuntimeError(f"{label}: failed to select an automatic tapped-hole note")
+                draw.EditDelete()  # VT_VOID: the re-read below is the proof
+            draw.ClearSelection2(True)
+            survivors = sum(
+                1 for raw_note in (view.GetNotes() or ())
+                if "tapped hole" in str(_early_bound(raw_note, "INote").GetText() or "").lower()
+            )
+            if survivors:
+                raise RuntimeError(
+                    f"{label}: {survivors} automatic tapped-hole note(s) survived deletion"
+                )
+            counts[label] = len(hits)
+    return counts
+
+
 def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
 
@@ -206,7 +257,10 @@ FRONT_KEEP = {
     "BlockHeight": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
     "BoreFromTop": (FRONT_CENTER[0] + 0.043, FRONT_CENTER[1]),
-    "BoreFromSide": (FRONT_CENTER[0], _front_y(BLK_TOP) + 0.014),
+    # 12.00 at its own dimension-line midpoint (the bore centreline is only
+    # 24 mm from the left edge), so it stops reading as '12.00 ->A' against
+    # the section line's upper arrow.
+    "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(BLK_TOP) + 0.014),
 }
 SECTION_KEEP = {
     "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
@@ -857,7 +911,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
-        callout_xy=(0.195, 0.218),
+        # 0.200 leaves the callout's second line ~5 mm clear of the block's
+        # right outline (sheet x 0.169), which dropping '- 2B' had exposed.
+        callout_xy=(0.200, 0.218),
         label="hanger-stud blind tap",
     )
     _propagate_source_tap_depth_contracts(
@@ -885,8 +941,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # which is also where its leader starts: hung left of the bore the leader
     # ran up-right through the symbol's own 'Ra 1.6' value text. Attach on the
     # bore's lower-right rim and hang the symbol below-right of it instead --
-    # the leader then runs up-left, away from its text, and the symbol clears
-    # the block outline, the BoreFromTop witness and the 24.00 width dimension.
+    # the leader then runs up-left, away from its text. Parked beside the block
+    # rather than under it, the symbol clears the 24.00 width dimension's right
+    # extension line; the leader crossing the block outline itself is normal.
     add_surface_finish(
         adapter,
         front,
@@ -894,7 +951,7 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] * 0.7071 / 1000.0,
             _front_y(BORE_CY) - R_BORE * SHEET_SCALE[0] * 0.7071 / 1000.0,
         ),
-        symbol_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) - 0.026),
+        symbol_xy=(FRONT_CENTER[0] + 0.032, _front_y(BORE_CY) - 0.014),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
         char_height=0.0025,
@@ -906,6 +963,27 @@ async def build(adapter: Any) -> dict[str, str]:
     # so hide every one across all sheets only after all recipe annotations
     # exist -- the hide is the gate, not any census size.
     _hide_cosmetic_thread_annotations(adapter)
+    # SolidWorks' own '1/2-13 Tapped Hole' is an INote, so the swCThread census
+    # above can never see it: delete it per view here, after every recipe
+    # annotation exists and immediately before finalize. The per-view counts
+    # are evidence of which views imported the tapped feature this build, never
+    # a gate -- the count is a lottery.
+    auto_tapped_notes = _auto_tapped_hole_notes(adapter)
+    _telemetry.info(f"knife-mount automatic tapped-hole notes: {auto_tapped_notes!r}")
+    # The sweep deletes SolidWorks' notes, never our associative callout: prove
+    # the tap callout still reads its thread description afterwards.
+    tap_strings = {
+        record[0]: record[2]
+        for record in _hole_callout_variable_snapshot(
+            tap_callout, "hanger-stud blind tap"
+        )
+        if record[1] == 3
+    }
+    if tap_strings.get("hw-threaddesc", "").strip(" -") != "1/2-13 UNC":
+        raise RuntimeError(
+            "hanger-stud blind tap lost its thread description to the "
+            f"redundant-note sweep: {tap_strings!r}"
+        )
 
     return await finalize_drawing(
         adapter,
@@ -913,6 +991,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Knife-Mount Bearing Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # The associative tap callout replaces SolidWorks' own descriptive
+        # thread notes: the automatic "Tapped Hole" notes are already gone,
+        # deleted and proved per view by ``_auto_tapped_hole_notes`` above.
+        redundant_note_substrings=(),
+        expected_redundant_notes=0,
     )
 
 
