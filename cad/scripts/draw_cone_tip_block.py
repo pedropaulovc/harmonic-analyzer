@@ -31,6 +31,7 @@ from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
     BLOCK_HEIGHT,
+    BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -551,15 +552,37 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to label the rotated section")
 
     foot_edge = _foot_edge(adapter, front)
-    add_surface_finish(
+    foot_y = _elevation_y(0.0, FRONT_CENTER)
+    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 2.0, foot_y)
+    foot_finish = add_surface_finish(
         adapter,
         front,
         edge_entity=foot_edge,
-        symbol_xy=(FRONT_CENTER[0] + 0.034, _elevation_y(0.0, FRONT_CENTER) + 0.008),
+        symbol_xy=(FRONT_CENTER[0] + 0.034, foot_y - 0.013),
+        leader_attach_xy=foot_right,
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         char_height=0.003,
         label="swing-platform locating foot seat",
     )
+    finish_annotation = _early_bound(foot_finish.GetAnnotation(), "IAnnotation")
+    if int(finish_annotation.GetLeaderCount()) != 1:
+        raise RuntimeError("foot-seat finish does not have exactly one leader")
+    leader_values = tuple(
+        float(value) for value in finish_annotation.GetLeaderPointsAtIndex(0)
+    )
+    leader_points = tuple(
+        leader_values[index : index + 3] for index in range(0, len(leader_values), 3)
+    )
+    if not any(
+        abs(point[0] - foot_right[0]) < 1e-6
+        and abs(point[1] - foot_right[1]) < 1e-6
+        and abs(point[2]) < 1e-6
+        for point in leader_points
+    ):
+        raise RuntimeError(
+            "foot-seat finish leader missed the verified bottom-edge endpoint: "
+            f"expected={foot_right!r}, points={leader_points!r}"
+        )
 
     # Annotation insertion can regenerate a view with inherited display state;
     # every manufacturing view is explicitly HLR at export.
