@@ -544,7 +544,8 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
         adapter.currentSketchManager = previous_sketch_manager
         if editing:
             model.EditSketch()
-    check("rebuild tap placement", model.EditRebuild3())
+    if not model.EditRebuild3():
+        raise RuntimeError("hanger-stud tap: placement rebuild failed")
     return f"TapFromEnd@{place_name}", '"SupportZThick" / 2'
 
 
