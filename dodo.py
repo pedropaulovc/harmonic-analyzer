@@ -1272,7 +1272,8 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+# EXPERIMENT BRANCH ONLY: worker admission exports the build/release closure.
+_VERIFY_NAMES = ("soundness", "kinematics", "calibrate_summing_clamp")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -2617,6 +2618,77 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+    # Throwaway native experiment, deliberately in the sanctioned worker graph.
+    # Presets publish independently; the local aggregate never holds a COM seat.
+    calibration = SCRIPTS_DIR / "diagnostics" / "calibrate_summing_clamp.py"
+    anchors = ("boss_hook", "gooseneck")
+    calibration_deps = list(
+        dict.fromkeys(
+            [
+                str(Path(__file__).resolve()),
+                *_part_file_deps(calibration, "counter_spring"),
+                _submodule_assembly_dep(),
+                *(_sldprt(stem) for stem in anchors),
+                *(_part_execution_token(stem) for stem in anchors),
+            ]
+        )
+    )
+    yield {
+        "name": "calibrate_summing_clamp",
+        "task_dep": [
+            f"verify:calibrate_summing_clamp_{preset}"
+            for preset in ("neutral", "square")
+        ],
+        "actions": None,
+    }
+    for preset in ("neutral", "square"):
+        name = f"calibrate_summing_clamp_{preset}"
+        calibration_report = REPORTS / f"summing-clamp-calibration-{preset}.json"
+        # Labels are provenance only, not part of the cache key. Represent the
+        # selected CLI recipe as an input, using the existing sidecar convention
+        # so graph export and execution derive identical, preset-specific keys.
+        recipe = "\0".join(
+            [
+                calibration.relative_to(REPO_ROOT).as_posix(),
+                "--preset",
+                preset,
+                "--output",
+                calibration_report.relative_to(REPO_ROOT).as_posix(),
+            ]
+        )
+        recipe_dep = _write_digest_sidecar(
+            CAD_OUT / ".summing-clamp-recipes" / f"{preset}.digest",
+            hashlib.sha256(recipe.encode("utf-8")).hexdigest(),
+        )
+        preset_deps = [*calibration_deps, recipe_dep]
+        yield {
+            "name": name,
+            "task_dep": [f"part:{stem}" for stem in anchors],
+            "file_dep": preset_deps,
+            "targets": [str(calibration_report)],
+            "actions": [
+                (
+                    _cached_com_action,
+                    [
+                        f"verify:{name}",
+                        [
+                            sys.executable,
+                            str(calibration.resolve()),
+                            "--preset",
+                            preset,
+                            "--output",
+                            str(calibration_report.resolve()),
+                        ],
+                        preset_deps,
+                        [calibration_report],
+                        f"verify-calibrate-summing-clamp-{preset}",
+                    ],
+                )
+            ],
+            "clean": True,
+            "verbosity": 2,
+        }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER

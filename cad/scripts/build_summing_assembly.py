@@ -84,7 +84,8 @@ from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
 from build_knife_hanger_stud import (
     SHANK_DIA as BOLT_MAJOR_DIA,
-    UNDERHEAD_LEN,
+    THREAD_TIP_Y_MM,
+    UNDERHEAD_Y_MM,
 )
 from build_knife_hanger_washer import (
     INNER_DIA as HANGER_WASHER_INNER_DIA,
@@ -114,16 +115,17 @@ HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
 # --- knife-hanger hardware (two bolts + two separate washers) ----------------
 # The top-frame crossbar and knife-mount exports own the surrounding stack.
-# Each washer's local origin is its mid-plane. The modified 91247A720 wrapper
-# preserves the legacy bolt frame (thread tip at local Y=0, axis +Y), so its
-# under-head seat on the washer top determines the bolt origin without an
-# independent stud-station assumption.
+# Each washer's local origin is its mid-plane. The modified 91247A720 remains in
+# its supplier-native frame, so its exported under-head and trimmed-tip stations
+# determine seating and engagement without a synthetic tip-zero transform.
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
 HANGER_WASHER_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS / 2.0
 HANGER_WASHER_TOP_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS
-HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_LEN
+HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_Y_MM
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP
-KNIFE_MOUNT_THREAD_ENGAGEMENT = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y
+KNIFE_MOUNT_THREAD_ENGAGEMENT = KNIFE_MOUNT_TOP_Y - (
+    HANGER_STUD_Y + THREAD_TIP_Y_MM
+)
 
 
 def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
@@ -163,7 +165,8 @@ def _assert_knife_hanger_stack() -> None:
 
     washer_lower_y = HANGER_WASHER_Y - HANGER_WASHER_THICKNESS / 2.0
     washer_upper_y = HANGER_WASHER_Y + HANGER_WASHER_THICKNESS / 2.0
-    bolt_under_head_y = HANGER_STUD_Y + UNDERHEAD_LEN
+    bolt_under_head_y = HANGER_STUD_Y + UNDERHEAD_Y_MM
+    bolt_tip_y = HANGER_STUD_Y + THREAD_TIP_Y_MM
     if abs(washer_lower_y - CROSSBAR_TOP_Y) > 1e-9:
         raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
     if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
@@ -177,7 +180,8 @@ def _assert_knife_hanger_stack() -> None:
     log(
         "knife-hanger stack: washer "
         f"{washer_lower_y:.4f}..{washer_upper_y:.4f}, bolt under-head "
-        f"{bolt_under_head_y:.4f}, engagement {KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f}; "
+        f"{bolt_under_head_y:.4f}, tip {bolt_tip_y:.4f}, "
+        f"engagement {KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f}; "
         f"ID clearance {bolt_in_washer_clearance:.4f}, crossbar clearance "
         f"{bolt_in_crossbar_clearance:.4f}, radial seat {washer_crossbar_seat:.4f} mm"
     )
@@ -191,43 +195,58 @@ import summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# The counter spring and gooseneck use complete calibrated placements loaded by
-# ``counter_seat`` before assembly creation.
+# The counter spring uses its complete calibrated placement, and the gooseneck
+# is inserted with the spring eye clamped in its released default screw state.
 
 
 def _assert_counter_spring_top_hang(
     pose: spring_mounts.SpringPose,
     gooseneck_y: float,
 ) -> None:
-    """Bound retention and envelopes at the fixed measured placement.
+    """Bound the clamped upper eye at the fixed measured placement.
 
-    Native body contact is certified separately against actual final component
-    instances. The half-turn clocking keeps the raised end on the open side of
-    the arm.
+    The saved calibration must be based on the released clamped screw geometry,
+    never the former 8 mm setup opening. Native body contact and zero overlap
+    are certified separately against the final component instances.
     """
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + gooseneck_geom.ARM_Y
+    clamped_gap = gooseneck_geom.SPRING_SCREW_CLAMPED_GAP_MM
+    if not math.isclose(
+        clamped_gap,
+        counter_stock.END_OCCUPIED_WIDTH_MM,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise RuntimeError(
+            "gooseneck clamped gap does not match the purchased spring eye band"
+        )
+    clamped_eye_x = spring_mounts.COUNTER_UPPER_EYE_X
+    open_eye_x = (
+        spring_mounts.GOOSENECK_END_X
+        + gooseneck_geom.SPRING_SCREW_OPEN_GAP_MM / 2.0
+    )
+    centre_error = pose.upper_eye_xy[0] - clamped_eye_x
+    if abs(centre_error) >= abs(pose.upper_eye_xy[0] - open_eye_x):
+        raise RuntimeError(
+            "counter spring calibration still uses the obsolete open screw "
+            "position; rerun diagnostics/calibrate_spring_seats.py for the "
+            "clamped gooseneck geometry"
+        )
     retention = (gooseneck_geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
     if retention < 1.0:
         raise RuntimeError(f"counter eye head retention only {retention:.3f} mm radial")
-    band = (
+    projected_band = (
         abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
-        + uy * counter_stock.LOOP_HALF_RISE_MM
+        + abs(uy) * counter_stock.LOOP_HALF_RISE_MM
         + counter_stock.WIRE_RADIUS_MM
     )
-    axial_gap = (
-        min(
-            pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
-            spring_mounts.GOOSENECK_END_X
-            + gooseneck_geom.SCREW_SHANK_LEN
-            - pose.upper_eye_xy[0],
-        )
-        - band
+    arm_side = pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X
+    head_side = (
+        spring_mounts.GOOSENECK_END_X
+        + clamped_gap
+        - pose.upper_eye_xy[0]
     )
-    if axial_gap < spring_mounts.MIN_CLEARANCE_MM:
-        raise RuntimeError(
-            f"double-loop band does not fit exposed shank: {axial_gap:.3f} mm"
-        )
     coil_top = (
         pose.centre_xy[1]
         + uy * counter_stock.coil_end_x_mm(pose.length_mm)
@@ -242,9 +261,11 @@ def _assert_counter_spring_top_hang(
             f"half-turn/tube {tube_gap:.3f}, half-turn/head {head_gap:.3f} mm"
         )
     log(
-        f"counter upper support: head retention {retention:.3f}, "
-        f"eye axial gap {axial_gap:.3f}, main coil {main_coil_gap:.3f}, "
-        f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
+        f"counter upper clamp: head retention {retention:.3f}, "
+        f"centre error {centre_error:.6f}, eye half-band projection "
+        f"{projected_band:.3f}, arm/head spans {arm_side:.3f}/{head_side:.3f}, "
+        f"main coil {main_coil_gap:.3f}, half-turn tube/head "
+        f"{tube_gap:.3f}/{head_gap:.3f} mm"
     )
 
 
@@ -703,8 +724,9 @@ async def build(adapter) -> dict[str, str]:
         )
         washer_lower_y = washer_o[1] - HANGER_WASHER_THICKNESS / 2.0
         washer_upper_y = washer_o[1] + HANGER_WASHER_THICKNESS / 2.0
-        bolt_under_head_y = bolt_o[1] + UNDERHEAD_LEN
-        engagement = KNIFE_MOUNT_TOP_Y - bolt_o[1]
+        bolt_under_head_y = bolt_o[1] + UNDERHEAD_Y_MM
+        bolt_tip_y = bolt_o[1] + THREAD_TIP_Y_MM
+        engagement = KNIFE_MOUNT_TOP_Y - bolt_tip_y
         if radial_offset > 1e-6:
             raise RuntimeError(
                 f"{bolt}: washer/bolt axes offset {radial_offset:.6f} mm"

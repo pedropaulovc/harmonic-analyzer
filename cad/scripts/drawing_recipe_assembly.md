@@ -88,6 +88,11 @@ Top-frame MHA-077, its MHA-118 gooseneck set screw, and the twenty channel
 MHA-090/MHA-011 spring connections are identified as external installation
 interfaces rather than duplicated BOM occurrences.
 
+The released default clamps the MHA-019 upper eye between the MHA-032 retainer
+head and arm end. Loosen that screw only for spring access, then retighten it
+without threadlocker; its open travel is an installation allowance, not a saved
+stand-off or a second assembly configuration.
+
 The source assembly remains saved collapsed in `Default`. Its `lever_rock` DOF
 stays genuinely free, and the package identifies the saved pose as the neutral
 reference; it does not invent parked or engaged assembly configurations.
