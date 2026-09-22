@@ -303,16 +303,50 @@ def _diameters_as_linear(
 _HATCH_NONE = 1
 
 
-def _screw_hatches(view: Any) -> tuple[list[Any], int]:
+def _face_hatches(adapter: Any, view: Any, *, label: str) -> list[Any]:
+    """Every face hatch in ``view``, or RAISE with the counts.
+
+    Farm r10 (swmaker000004) got ``None`` entries from ``GetFaceHatches``
+    straight after a rebuild. A view's display geometry is computed lazily (see
+    ``_drawing_common`` on the HLR flag), so each read is retried once after a
+    display-geometry update and once after a redraw. Every stage is recorded;
+    a ``None`` entry is never skipped.
+    """
+    bound = _early_bound(view, "IView")
+    stages = (
+        ("after rebuild", None),
+        ("after UpdateViewDisplayGeometry", bound.UpdateViewDisplayGeometry),
+        ("after GraphicsRedraw2", adapter.currentModel.GraphicsRedraw2),
+    )
+    readings = []
+    for stage, refresh in stages:
+        if refresh is not None:
+            refresh()
+        count = int(bound.GetFaceHatchCount())
+        raw = tuple(bound.GetFaceHatches() or ())
+        missing = sum(item is None for item in raw)
+        readings.append(f"{stage}: count {count}, returned {len(raw)}, None {missing}")
+        _telemetry.event(
+            "drawing.face_hatches",
+            label=label,
+            stage=stage,
+            count=count,
+            returned=len(raw),
+            missing=missing,
+        )
+        _telemetry.info(f"{label}: face hatches {readings[-1]}")
+        if raw and not missing and len(raw) == count:
+            return [_early_bound(item, "IFaceHatch") for item in raw]
+    raise RuntimeError(f"{label}: face hatches unreadable ({'; '.join(readings)})")
+
+
+def _screw_hatches(adapter: Any, view: Any, *, label: str) -> tuple[list[Any], int]:
     """The view's face hatches on the screw's cut faces, and the total count.
 
     Only the screw reaches beyond the arm end (its head sits a clamped gap
     outboard); tube and plug cut faces both stop at ``ARM_END_X``.
     """
-    hatches = [
-        _early_bound(raw, "IFaceHatch")
-        for raw in _early_bound(view, "IView").GetFaceHatches() or ()
-    ]
+    hatches = _face_hatches(adapter, view, label=label)
     beyond_arm_end = (ARM_END_X - 1.0) / 1000.0
     screw = [
         hatch
@@ -332,13 +366,13 @@ def _leave_screw_unsectioned(adapter: Any, view: Any) -> None:
     unsectioned side-view outline, because the cut runs along the axis.
     """
     label = "section A-A screw hatch"
-    screw, total = _screw_hatches(view)
+    screw, total = _screw_hatches(adapter, view, label=label)
     if not screw or len(screw) == total:
         raise RuntimeError(f"{label}: {len(screw)} of {total} hatches are the screw's")
     for hatch in screw:
         hatch.HatchType = _HATCH_NONE
     rebuild_drawing(adapter, label=label)
-    screw, total = _screw_hatches(view)
+    screw, total = _screw_hatches(adapter, view, label=label)
     kept = [int(hatch.HatchType) for hatch in screw]
     if not screw or any(kind != _HATCH_NONE for kind in kept):
         raise RuntimeError(f"{label}: screw hatch fill did not clear: {kept}")
