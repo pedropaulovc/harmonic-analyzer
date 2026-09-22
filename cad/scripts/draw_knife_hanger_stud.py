@@ -102,21 +102,19 @@ ANGLE_TEXT_GAP_M = 0.003
 # margin (leaf 20260922T160352Z). The guard still demands ANGLE_TEXT_GAP_M.
 ANGLE_TEXT_PARK_SLOP_M = 0.001
 
-ROOT_FINISH_CALLOUT_TEXT = "CHAMFER TO EXISTING\nTHREAD ROOT"
-# swDimensionTextParts_e: writing only the RESOLVED callout (3) leaves the
-# stored definition empty, and the next rebuild re-resolves part 3 from it and
-# the text disappears from the sheet. Write both compartments (the same
-# resolved-vs-definition trap _drawing_common documents for hole-callout
-# prefixes) and prove both survive a rebuild.
-CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove (resolved)
-CALLOUT_ABOVE_DEFINITION = 7  # swDimensionTextCalloutAboveDefinition (stored)
-# The definition write also mirrors the text into the prefix lanes and turns
-# the dimension value OFF (leaf 20260922T161521Z read parts 1/5 == the callout
-# and the sheet printed no "45"). Clearing the resolved prefix clears its
-# definition too (_drawing_common's hole-callout prefix proves 1 writes 5), and
-# the value is switched back on -- the draw_tube_frame chamfer recipe.
-PREFIX = 1  # swDimensionTextPrefix (resolved)
-PREFIX_DEFINITION = 5  # swDimensionTextPrefixDefinition (stored)
+# The root-finish words ride the 45 deg value as its SUFFIX, on one line:
+# "45° CHAMFER TO EXISTING THREAD ROOT". Measured on this dimension (offset
+# angular text): the callout-above lane never renders -- leaf 20260922T181058Z
+# read parts 3 and 7 back intact and the sheet printed only "45°" -- and the
+# two lines stud-4 showed were the PREFIX, which the part-7 write had filled
+# while switching the value off. The value line (prefix/value/suffix) is what
+# prints; draw_tube_frame's chamfer puts its words in the suffix the same way,
+# kept to one line because a multi-line suffix printed only its last line.
+ROOT_FINISH_SUFFIX = " CHAMFER TO EXISTING THREAD ROOT"
+PREFIX = 1  # swDimensionTextPrefix
+SUFFIX = 2  # swDimensionTextSuffix
+CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
+CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 # The angular dimension's ARC is laid out by the NON-offset position: SolidWorks
 # draws it centred on the angle vertex through the text point, and a later
@@ -143,6 +141,22 @@ CHAMFER_VERTEX_MODEL_M = (
     0.0,
 )
 ARC_SAMPLES = 32
+# swDimensionArrowsSide_e.swDimArrowsInside. At the default (smart) the
+# arrows went OUTSIDE the 13 mm arc and SolidWorks drew only two stubs past
+# the legs, leaving the offset leader pointing at empty paper (leaf
+# 20260922T181058Z: arcs at -27..0 and 45..72 deg, nothing between).
+ARROWS_INSIDE = 0
+
+# Ink segments allowed to cross the cut-end detail's boundary circle, per
+# dimension. The 45 deg text's leader is the one allowed crossing. Inside the
+# boundary (centre (265.0, 150.0) mm, r 38.3 mm, measured on the render of
+# leaf 20260922T181058Z)
+# there is no room for the one-line value + suffix (~80 x 5 mm): right of the
+# thread crests (x > 280 mm) the chord is under 24 mm wide, and below the cut
+# end (y < 128 mm) it is at most 63 mm wide and narrows to 36 mm at y = 116.
+# The pocket the chamfer opens toward lies outside the boundary, so reaching
+# the arc from it means crossing the circle once.
+DETAIL_BOUNDARY_CROSSINGS = {"ChamferAngle": 1}
 
 LAYOUT_REPORT = (
     Path(OUTPUTS.slddrw).parent.parent / "reports" / "layout-audit" / f"{SPEC.name}.json"
@@ -436,8 +450,13 @@ def _dimension_ink_problems(
     owner: Box,
     obstacles: dict[str, Box],
     region: Box,
+    boundary: tuple[Point, float] | None = None,
 ) -> list[str]:
-    """Every way ``ink`` escapes its own view or crosses something it must not."""
+    """Every way ``ink`` escapes its own view or crosses something it must not.
+
+    ``boundary`` is a detail view's circle (centre, radius): ink may cross it
+    only as often as ``DETAIL_BOUNDARY_CROSSINGS`` allows for ``ink.name``.
+    """
     problems = []
     for arc in ink.arcs:
         if arc.radius > ANGLE_ARC_RADIUS_MAX_M:
@@ -467,7 +486,79 @@ def _dimension_ink_problems(
     for label, box in obstacles.items():
         if any(_segment_hits_box(a, b, box) for a, b in segments):
             problems.append(f"{ink.name} ink crosses {label} {_format_box(box)}")
+    if boundary is not None:
+        crossings = sum(
+            _segment_crosses_circle(a, b, *boundary) for a, b in segments
+        )
+        allowed = DETAIL_BOUNDARY_CROSSINGS.get(ink.name, 0)
+        if crossings > allowed:
+            problems.append(
+                f"{ink.name} ink crosses the detail boundary circle "
+                f"{_mm(boundary[0])} r {boundary[1] * 1000.0:.1f} mm "
+                f"{crossings} time(s); {allowed} allowed"
+            )
     return problems
+
+
+def _segment_crosses_circle(p0: Point, p1: Point, center: Point, radius: float) -> bool:
+    """True when the segment p0-p1 passes through the circle's outline."""
+    d0, d1 = math.dist(p0, center), math.dist(p1, center)
+    if min(d0, d1) < radius < max(d0, d1):
+        return True
+    if d0 <= radius or d1 <= radius:
+        return False
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    length2 = dx * dx + dy * dy
+    if length2 == 0.0:
+        return False
+    t = ((center[0] - p0[0]) * dx + (center[1] - p0[1]) * dy) / length2
+    t = min(max(t, 0.0), 1.0)
+    return math.dist((p0[0] + t * dx, p0[1] + t * dy), center) < radius
+
+
+def _detail_boundary(front: Any, detail_box: Box) -> tuple[Point, float]:
+    """The cut-end detail's boundary circle on the sheet: (centre, radius).
+
+    The radius is the parent circle's (``IView::GetDetailCircleInfo2`` on the
+    front view: [count, layer, centerPt[3], startPt[3], ...]) times the
+    detail-to-parent scale; ``end_detail`` centres the detail's outline on its
+    circle, so the centre is the outline's.
+    """
+    info = [
+        float(value)
+        for value in (_early_bound(front, "IView").GetDetailCircleInfo2() or ())
+    ]
+    if len(info) < 8 or int(info[0]) != 1:
+        raise RuntimeError(f"expected one parent detail circle: {info!r}")
+    parent_radius = math.dist((info[2], info[3]), (info[5], info[6]))
+    ratio = (SHEET.detail_scale[0] / SHEET.detail_scale[1]) / (
+        SHEET_SCALE[0] / SHEET_SCALE[1]
+    )
+    center = (
+        (detail_box[0] + detail_box[2]) / 2.0,
+        (detail_box[1] + detail_box[3]) / 2.0,
+    )
+    radius = parent_radius * ratio
+    half = min(detail_box[2] - detail_box[0], detail_box[3] - detail_box[1]) / 2.0
+    _telemetry.info(
+        "detail boundary: "
+        + json.dumps(
+            {
+                "parent_center_mm": _mm((info[2], info[3])),
+                "parent_radius_mm": round(parent_radius * 1000.0, 2),
+                "center_mm": _mm(center),
+                "radius_mm": round(radius * 1000.0, 2),
+                "outline_half_mm": round(half * 1000.0, 2),
+            },
+            sort_keys=True,
+        )
+    )
+    if not 0.0 < radius < half:
+        raise RuntimeError(
+            f"detail boundary radius {radius * 1000.0:.1f} mm does not fit its "
+            f"outline {_format_box(detail_box)}"
+        )
+    return center, radius
 
 
 def _bisector_point(vertex: Point, radius: float) -> Point:
@@ -503,12 +594,18 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.OffsetText):
         display.OffsetText = False
+    display.ArrowSide = ARROWS_INSIDE
     vertex = _angle_arc(annotation).center
     target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
     placed = _early_bound(annotation, "IAnnotation")
     if not placed.SetPosition2(target[0], target[1], 0.0):
         raise RuntimeError("cannot pin the 45 deg dimension arc")
     rebuild_drawing(adapter, label="45 deg arc")
+    arrows = int(
+        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").ArrowSide
+    )
+    if arrows != ARROWS_INSIDE:
+        raise RuntimeError(f"45 deg arrows did not stay inside: ArrowSide {arrows}")
     ink = _read_dimension_ink(annotation, "ChamferAngle")
     arc = _angle_arc(annotation)
     _telemetry.info(
@@ -537,19 +634,10 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
 
 
 def _write_root_finish_callout(display: Any, text: str) -> None:
-    """Store the callout in the DEFINITION lane first, then the resolved lane.
-
-    Writing only the resolved lane (3) leaves the stored definition (7) empty
-    and the next rebuild / save re-resolves the lane from it, so the text drops
-    off the sheet -- the same resolved-vs-definition trap _drawing_common
-    documents for hole-callout prefixes. The definition goes in first so no
-    later write can clear what the resolved lane renders from.
-    """
-    display.SetText(CALLOUT_ABOVE_DEFINITION, text)
-    display.SetText(CALLOUT_ABOVE, text)
-    # Undo the definition write's side effects: the prefix copy and the hidden
-    # value (see PREFIX above).
-    display.SetText(PREFIX, "")
+    """Put the root-finish words after the printed 45 deg value, nowhere else."""
+    for part in (PREFIX, CALLOUT_ABOVE, CALLOUT_BELOW):
+        display.SetText(part, "")
+    display.SetText(SUFFIX, text)
     display.ShowDimensionValue = True
 
 
@@ -561,27 +649,26 @@ def _callout_text_parts(display: Any) -> dict[str, str]:
 
 
 def _assert_root_finish_callout(display: Any, text: str) -> None:
-    """Fail unless the callout lanes carry the text and the value still prints."""
+    """Fail unless the value prints with exactly the suffix after it."""
     parts = _callout_text_parts(display)
     shows_value = bool(display.ShowDimensionValue)
     _telemetry.info(
-        "root-finish callout text parts: "
+        "root-finish text parts: "
         + json.dumps({**parts, "show_value": shows_value}, sort_keys=True)
     )
-    for part in (CALLOUT_ABOVE, CALLOUT_ABOVE_DEFINITION):
-        if parts[str(part)] != text:
-            raise RuntimeError(
-                f"root-finish callout did not survive the rebuild in text part "
-                f"{part}: {parts[str(part)]!r} != {text!r} (all parts: {parts!r})"
-            )
-    for part in (PREFIX, PREFIX_DEFINITION):
+    if parts[str(SUFFIX)] != text:
+        raise RuntimeError(
+            f"root-finish suffix did not survive the rebuild: "
+            f"{parts[str(SUFFIX)]!r} != {text!r} (all parts: {parts!r})"
+        )
+    for part in (PREFIX, CALLOUT_ABOVE, CALLOUT_BELOW):
         if parts[str(part)]:
             raise RuntimeError(
-                f"root-finish callout leaked into prefix part {part}: "
+                f"root-finish text leaked into part {part}: "
                 f"{parts[str(part)]!r} (all parts: {parts!r})"
             )
     if not shows_value:
-        raise RuntimeError("the 45 deg dimension value is hidden behind its callout")
+        raise RuntimeError("the 45 deg dimension value is hidden")
 
 
 def _reference_dimension(
@@ -609,7 +696,7 @@ def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
     display = _early_bound(
         matches[0].GetSpecificAnnotation(), "IDisplayDimension"
     )
-    _write_root_finish_callout(display, ROOT_FINISH_CALLOUT_TEXT)
+    _write_root_finish_callout(display, ROOT_FINISH_SUFFIX)
     rebuild_drawing(adapter, label="root finish callout")
     # EditRebuild3 can hand out a new IDisplayDimension: probing the old handle
     # reads the pre-rebuild state, so the proof runs on a FRESH one and both
@@ -621,7 +708,7 @@ def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
     fresh = _early_bound(
         matches[0].GetSpecificAnnotation(), "IDisplayDimension"
     )
-    _assert_root_finish_callout(fresh, ROOT_FINISH_CALLOUT_TEXT)
+    _assert_root_finish_callout(fresh, ROOT_FINISH_SUFFIX)
     return matches[0]
 
 
@@ -697,7 +784,7 @@ def _place_angle_text(
 
 def _audit_sheet_layout(
     adapter: Any,
-    dimensions: dict[str, tuple[Any, Box, dict[str, Box]]],
+    dimensions: dict[str, tuple[Any, Box, dict[str, Box], tuple[Point, float] | None]],
 ) -> None:
     """Census the sheet in millimetres, publish it, then gate the layout.
 
@@ -707,7 +794,8 @@ def _audit_sheet_layout(
     cannot see it -- then ``check_drawing_layout`` holds the sheet to zero
     overlaps, zero border crossings and zero leader crossings.
     ``dimensions`` maps each dimension name to its annotation, its owning
-    view's outline and the boxes its ink must not cross.
+    view's outline, the boxes its ink must not cross and, for a detail
+    view's dimension, the detail boundary circle.
     """
     elements, leaders, region = collect_layout_elements(adapter, layout=SPEC.layout)
     template = DRAWING_TEMPLATES[SPEC.layout]
@@ -720,16 +808,17 @@ def _audit_sheet_layout(
     drawable = (region.xmin, region.ymin, region.xmax, region.ymax)
     inks = {
         name: _read_dimension_ink(annotation, name)
-        for name, (annotation, _owner, _obstacles) in dimensions.items()
+        for name, (annotation, _owner, _obstacles, _boundary) in dimensions.items()
     }
     problems = [
         problem
-        for name, (_annotation, owner, obstacles) in dimensions.items()
+        for name, (_annotation, owner, obstacles, boundary) in dimensions.items()
         for problem in _dimension_ink_problems(
             inks[name],
             owner=owner,
             obstacles={**obstacles, "title block": title_block},
             region=drawable,
+            boundary=boundary,
         )
     ]
     census = {
@@ -948,11 +1037,13 @@ async def build(adapter: Any) -> dict[str, str]:
                     "isometric note": iso_note_box,
                     "DETAIL A label": detail_label_box,
                 },
+                _detail_boundary(front, detail_box),
             ),
             "FinishedOverall": (
                 finished,
                 front_box,
                 {"cut-end detail": detail_box, "isometric": iso_box},
+                None,
             ),
         },
     )

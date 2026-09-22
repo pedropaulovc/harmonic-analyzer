@@ -52,49 +52,45 @@ class _FakeDisplay:
         return self.parts.get(part, "")
 
 
-def test_root_finish_callout_writes_definition_then_resolved() -> None:
-    display = _FakeDisplay({})
-    drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
-    # The stored definition (7) FIRST, then the resolved lane (3) it renders
-    # from -- a definition written last can clear what was just resolved.
-    # ...and the prefix copy the definition write leaves behind is cleared.
-    display = _FakeDisplay({}, shows_value=False)
-    drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
+def test_root_finish_words_ride_the_value_as_its_suffix() -> None:
+    # stud-4's part-7 write left the prefix filled and the value switched off.
+    display = _FakeDisplay({1: "stale", 3: "stale"}, shows_value=False)
+    drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
     assert display.writes == [
-        (drawing.CALLOUT_ABOVE_DEFINITION, drawing.ROOT_FINISH_CALLOUT_TEXT),
-        (drawing.CALLOUT_ABOVE, drawing.ROOT_FINISH_CALLOUT_TEXT),
         (drawing.PREFIX, ""),
+        (drawing.CALLOUT_ABOVE, ""),
+        (drawing.CALLOUT_BELOW, ""),
+        (drawing.SUFFIX, drawing.ROOT_FINISH_SUFFIX),
     ]
-    # The value the definition write switched off is switched back on.
     assert display.ShowDimensionValue is True
-    drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
+    drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
 
 
-def test_root_finish_callout_lost_across_a_rebuild_is_rejected() -> None:
-    text = drawing.ROOT_FINISH_CALLOUT_TEXT
-    # The stored definition empty again: the rebuild re-resolved part 3 away.
-    display = _FakeDisplay({drawing.CALLOUT_ABOVE: text})
-    with pytest.raises(RuntimeError, match="callout"):
-        drawing._assert_root_finish_callout(display, text)
+def test_root_finish_suffix_is_one_line() -> None:
+    # A multi-line suffix printed only its last line on the tube-frame chamfer.
+    assert "\n" not in drawing.ROOT_FINISH_SUFFIX
 
 
-def _callout_parts(text: str) -> dict[int, str]:
-    return {drawing.CALLOUT_ABOVE: text, drawing.CALLOUT_ABOVE_DEFINITION: text}
+def test_root_finish_suffix_lost_across_a_rebuild_is_rejected() -> None:
+    display = _FakeDisplay({})
+    with pytest.raises(RuntimeError, match="suffix"):
+        drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_SUFFIX)
 
 
-def test_root_finish_callout_with_a_hidden_value_is_rejected() -> None:
-    # stud-4: every text part read back correctly and the sheet printed no "45".
-    text = drawing.ROOT_FINISH_CALLOUT_TEXT
-    display = _FakeDisplay(_callout_parts(text), shows_value=False)
+def test_root_finish_with_a_hidden_value_is_rejected() -> None:
+    # stud-4: the words printed and the "45" did not.
+    text = drawing.ROOT_FINISH_SUFFIX
+    display = _FakeDisplay({drawing.SUFFIX: text}, shows_value=False)
     with pytest.raises(RuntimeError, match="value is hidden"):
         drawing._assert_root_finish_callout(display, text)
 
 
-@pytest.mark.parametrize("part", [1, 5])
-def test_root_finish_callout_leaking_into_the_prefix_is_rejected(part: int) -> None:
-    text = drawing.ROOT_FINISH_CALLOUT_TEXT
-    display = _FakeDisplay({**_callout_parts(text), part: text})
-    with pytest.raises(RuntimeError, match="prefix"):
+@pytest.mark.parametrize("part", [1, 3, 4])
+def test_root_finish_text_leaking_into_another_lane_is_rejected(part: int) -> None:
+    # Part 3 read back intact on stud-5 and never printed; part 1 printed twice.
+    text = drawing.ROOT_FINISH_SUFFIX
+    display = _FakeDisplay({drawing.SUFFIX: text, part: text})
+    with pytest.raises(RuntimeError, match="leaked"):
         drawing._assert_root_finish_callout(display, text)
 
 
@@ -185,3 +181,52 @@ def test_segment_box_hits() -> None:
     assert drawing._segment_hits_box((0.2, 0.2), (0.3, 0.3), box)
     assert not drawing._segment_hits_box((-1.0, 2.0), (2.0, 1.5), box)
     assert not drawing._segment_hits_box((1.5, -1.0), (1.5, 2.0), box)
+
+
+BOUNDARY = ((0.265, 0.150), 0.0383)
+
+
+def test_leader_out_of_the_detail_is_the_one_allowed_boundary_crossing() -> None:
+    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
+    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
+    shelf_start = (0.3206, 0.1330)
+    ink = _ink(arc, lines=[(tip, shelf_start), (shelf_start, (0.400, 0.1330))])
+    assert drawing._dimension_ink_problems(
+        ink, owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
+    ) == []
+    # A second exit -- e.g. an extension line stretched past the circle -- fails.
+    stretched = (VERTEX, (0.320, VERTEX[1]))
+    problems = drawing._dimension_ink_problems(
+        _ink(arc, lines=[(tip, shelf_start), stretched]),
+        owner=DETAIL,
+        obstacles={},
+        region=REGION,
+        boundary=BOUNDARY,
+    )
+    assert problems == [
+        "ChamferAngle ink crosses the detail boundary circle [265.0, 150.0] "
+        "r 38.3 mm 2 time(s); 1 allowed"
+    ]
+
+
+def test_undeclared_dimension_may_not_cross_a_detail_boundary() -> None:
+    ink = drawing.DimensionInk(
+        name="Other",
+        lines=(((0.265, 0.150), (0.400, 0.150)),),
+        arcs=(),
+        triangles=(),
+        arrowheads=0,
+    )
+    problems = drawing._dimension_ink_problems(
+        ink, owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
+    )
+    assert len(problems) == 1 and "0 allowed" in problems[0]
+
+
+def test_segment_circle_crossing() -> None:
+    center, radius = (0.0, 0.0), 1.0
+    assert drawing._segment_crosses_circle((0.0, 0.0), (2.0, 0.0), center, radius)
+    assert drawing._segment_crosses_circle((-2.0, 0.5), (2.0, 0.5), center, radius)
+    assert not drawing._segment_crosses_circle((-0.5, 0.0), (0.5, 0.0), center, radius)
+    assert not drawing._segment_crosses_circle((-2.0, 1.5), (2.0, 1.5), center, radius)
+
