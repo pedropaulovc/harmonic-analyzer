@@ -35,7 +35,10 @@ import math
 
 from _hole_spec import CLEARANCE_MM, DRILL_POINT_H, TAP_DRILL_MM, THREAD_MAJOR_MM
 
-TITLE_BLOCK_XX_MM = 0.51  # .XX general tolerance, both directions
+# General tolerances as the title block PRINTS them (cad/config/title_block.yaml).
+TITLE_BLOCK_X_MM = 0.8  # .X
+TITLE_BLOCK_XX_MM = 0.51  # .XX
+X_BAND_MM = (-TITLE_BLOCK_X_MM, TITLE_BLOCK_X_MM)
 XX_BAND_MM = (-TITLE_BLOCK_XX_MM, TITLE_BLOCK_XX_MM)
 _PRINT_STEP_MM = 0.05
 _BOSS_STEP_MM = 0.5
@@ -111,21 +114,24 @@ TAP_DRILL_APEX_DEPTH_MAX_MM = (
 )
 
 # --- mount block top and boss -------------------------------------------------
+# The boss prints one-place (.X): nothing about it needs .XX once the stack
+# below absorbs the looser band (Codex machinist review, knife-cc-12).
+BOSS_DIA_MM = 9.5  # round boss, concentric with the tap
+BOSS_DIA_DEVIATIONS_MM = X_BAND_MM
+BOSS_HEIGHT_DEVIATIONS_MM = X_BAND_MM
 # The block top hangs MOUNT_GAP below the casting underside: the boss-height
-# band plus the original 0.25-class clearance (knife-cc-1..11), so the block
-# top never lands on the casting before the shoulder seats.
-MOUNT_GAP = 0.75
-MOUNT_BLOCK_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 998.95
-BLOCK_TOP_ABOVE_CROWN_MM = MOUNT_BLOCK_TOP_Y - KNIFE_CONTACT_Y  # 14.116
+# band plus the original 0.25 clearance (knife-cc-1..11) held at the short-boss
+# limit, so the block top never lands on the casting before the shoulder seats.
+MOUNT_GAP_MIN_MM_REQUIRED = 0.25
+MOUNT_GAP = _round_up(MOUNT_GAP_MIN_MM_REQUIRED - BOSS_HEIGHT_DEVIATIONS_MM[0])  # 1.05
+MOUNT_BLOCK_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 998.65
+BLOCK_TOP_ABOVE_CROWN_MM = MOUNT_BLOCK_TOP_Y - KNIFE_CONTACT_Y  # 13.816
 # The mount dimensions its bore from the BLOCK top (knife_mount_spec), so the
 # crown's adverse depth below the seat stacks the boss-height band, the
 # BoreFromTop band and half the bore-diameter band.
 BORE_FROM_TOP_TOLERANCE_MM = 0.10
 BORE_DIAMETER_PLUS_MM = 0.20
 CROWN_WEB_TARGET_MM = 2.0
-BOSS_DIA_MM = 9.5  # round boss, concentric with the tap
-BOSS_DIA_DEVIATIONS_MM = XX_BAND_MM
-BOSS_HEIGHT_DEVIATIONS_MM = XX_BAND_MM
 BOSS_HEIGHT_MIN_REQUIRED_MM = (
     TAP_DRILL_APEX_DEPTH_MAX_MM
     + CROWN_WEB_TARGET_MM
@@ -133,12 +139,12 @@ BOSS_HEIGHT_MIN_REQUIRED_MM = (
     - BOSS_HEIGHT_DEVIATIONS_MM[0]
     + BORE_FROM_TOP_TOLERANCE_MM
     + BORE_DIAMETER_PLUS_MM / 2.0
-)  # 4.948
-BOSS_HEIGHT_MM = _round_up(BOSS_HEIGHT_MIN_REQUIRED_MM, _BOSS_STEP_MM)  # 5.0
-SHOULDER_SEAT_Y = MOUNT_BLOCK_TOP_Y + BOSS_HEIGHT_MM  # 1003.95, the seat plane
+)  # 5.538
+BOSS_HEIGHT_MM = _round_up(BOSS_HEIGHT_MIN_REQUIRED_MM, _BOSS_STEP_MM)  # 6.0
+SHOULDER_SEAT_Y = MOUNT_BLOCK_TOP_Y + BOSS_HEIGHT_MM  # 1004.65, the seat plane
 
 # --- knife-bore crown below the seat -------------------------------------------
-KNIFE_BORE_CROWN_DEPTH_MM = SHOULDER_SEAT_Y - KNIFE_CONTACT_Y  # 19.116
+KNIFE_BORE_CROWN_DEPTH_MM = SHOULDER_SEAT_Y - KNIFE_CONTACT_Y  # 19.816
 KNIFE_BORE_CROWN_DEPTH_MIN_MM = (
     KNIFE_BORE_CROWN_DEPTH_MM
     + BOSS_HEIGHT_DEVIATIONS_MM[0]
@@ -204,7 +210,7 @@ if BOSS_WALL_MIN_MM < 1.5:
         f"knife-mount boss wall {BOSS_WALL_MIN_MM:.3f} mm outside the thread "
         "major at minimum size is under 1.5 mm"
     )
-if MOUNT_GAP_MIN_MM < 0.2:
+if MOUNT_GAP_MIN_MM < MOUNT_GAP_MIN_MM_REQUIRED - 1e-9:
     raise AssertionError(
         f"knife-mount block top clears the casting by only {MOUNT_GAP_MIN_MM:.3f} mm "
         "with the boss at its shortest"
