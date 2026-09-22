@@ -57,15 +57,26 @@ def test_cosmetic_thread_runs_the_full_tip_above_the_chamfer() -> None:
 
 
 def test_shoulder_reference_matches_the_assembly_stack() -> None:
-    # Not imported by the build: a top-frame or washer edit must fail here,
-    # not silently re-key the stud.
+    # The seat comes from the interface; the washer is a literal, so a washer
+    # or top-frame edit must fail here, not silently re-key the stud.
     from build_knife_hanger_washer import THICKNESS as WASHER_THICKNESS
     from build_top_frame import RING_HEIGHT
 
-    bearing_face_y = joint.CASTING_UNDERSIDE_Y + RING_HEIGHT + WASHER_THICKNESS
+    assert spec.HANGER_WASHER_THICKNESS_MM == WASHER_THICKNESS
+    assert joint.CASTING_TOP_Y == pytest.approx(joint.CASTING_UNDERSIDE_Y + RING_HEIGHT)
+    bearing_face_y = joint.CASTING_TOP_Y + WASHER_THICKNESS
     assert spec.SHOULDER_UNDERHEAD_MM == pytest.approx(
         bearing_face_y - joint.SHOULDER_SEAT_Y, abs=1e-9
     )
+
+
+def test_runout_note_never_exceeds_the_interface_relief() -> None:
+    printed = float(spec.THREAD_RUNOUT_MAX_TEXT)
+    assert printed <= joint.STUD_THREAD_RELIEF_MAX_MM
+    assert joint.STUD_THREAD_RELIEF_MAX_MM - printed < 0.1
+    line = f"INCOMPLETE THREAD {spec.THREAD_RUNOUT_MAX_TEXT} MAX."
+    assert line in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES.startswith("FIT SHOULDER TO STACK PER MHA-A07 SHEET 4")
 
 
 # --- the sheet's controls are the model's --------------------------------------
@@ -82,7 +93,18 @@ def test_tip_length_carries_the_interface_band() -> None:
     assert (lower * 1000.0, upper * 1000.0) == pytest.approx(
         joint.STUD_TIP_LENGTH_DEVIATIONS_MM
     )
-    assert drawing.TIP_TOLERANCE_TYPES["TipLength"] == drawing.SW_TOL_BILATERAL
+    # The user's loose-tolerance ruling: the band is the title block's .XX,
+    # so the value prints bare (swTolGeneral) at two places.
+    import _config
+
+    title_xx = _config.title_block("linear_2pl")["display"]
+    assert title_xx == f"±{joint.TITLE_BLOCK_XX_MM:.2f}"
+    assert joint.STUD_TIP_LENGTH_DEVIATIONS_MM == (
+        -joint.TITLE_BLOCK_XX_MM,
+        joint.TITLE_BLOCK_XX_MM,
+    )
+    assert spec.TIP_LENGTH_TOLERANCE_TYPE == 11
+    assert drawing.TIP_TOLERANCE_TYPES["TipLength"] == 11
     # Rule 2: the value prints as many places as its band needs.
     places = spec.DIMENSION_PRECISION["TipLength"]
     for deviation in joint.STUD_TIP_LENGTH_DEVIATIONS_MM:

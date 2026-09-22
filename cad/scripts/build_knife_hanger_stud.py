@@ -23,7 +23,6 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
 from _fastener_catalog import fastener
 from _saved_part_guard import require_saved_drawing_properties
@@ -50,6 +49,7 @@ from knife_hanger_stud_spec import (
     TIP_DIA_MM,
     TIP_LENGTH_DEVIATIONS_MM,
     TIP_LENGTH_MM,
+    TIP_LENGTH_TOLERANCE_TYPE,
     TIP_THREAD,
 )
 
@@ -87,20 +87,26 @@ def _clear_native_tolerance(adapter, feature: str, name: str) -> None:
         raise RuntimeError(f"{name}@{feature}: native tolerance did not clear")
 
 
-def _set_max_tolerance(adapter, feature: str, name: str) -> None:
-    """Print the nominal as an upper limit ("MAX"), with no deviations."""
+def _set_tolerance(
+    adapter, feature: str, name: str, kind: int, lower_mm: float, upper_mm: float
+) -> None:
+    """Give one control its swTolType_e ``kind`` and signed deviations."""
     _, dimension = _named_dimension(adapter, feature, name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = TIP_CHAMFER_TOLERANCE_TYPE
-    tolerance.SetValues(0.0, 0.0)
-    if (
-        int(tolerance.Type) != TIP_CHAMFER_TOLERANCE_TYPE
-        or float(tolerance.GetMinValue()) != 0.0
-        or float(tolerance.GetMaxValue()) != 0.0
+    tolerance.Type = kind
+    tolerance.SetValues(lower_mm / 1000.0, upper_mm / 1000.0)
+    state = (
+        int(tolerance.Type),
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if state[0] != kind or not all(
+        math.isclose(read, wanted, abs_tol=1e-6)
+        for read, wanted in zip(state[1:], (lower_mm, upper_mm), strict=True)
     ):
         raise RuntimeError(
-            f"{name}@{feature}: MAX tolerance reads type {int(tolerance.Type)}, "
-            f"{float(tolerance.GetMinValue())!r}/{float(tolerance.GetMaxValue())!r}"
+            f"{name}@{feature}: tolerance reads {state!r}, wanted "
+            f"{(kind, lower_mm, upper_mm)!r}"
         )
 
 
@@ -285,9 +291,15 @@ def _manufacturing_controls(adapter) -> None:
         ):
             raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     _clear_native_tolerance(adapter, "StockTrimProfile", "FinishedOverall")
-    _set_max_tolerance(adapter, "StudTurnProfile", "TipChamfer")
-    set_dimension_bilateral_tolerance(
-        adapter, "StudTurnProfile", "TipLength", *TIP_LENGTH_DEVIATIONS_MM
+    _set_tolerance(
+        adapter, "StudTurnProfile", "TipChamfer", TIP_CHAMFER_TOLERANCE_TYPE, 0.0, 0.0
+    )
+    _set_tolerance(
+        adapter,
+        "StudTurnProfile",
+        "TipLength",
+        TIP_LENGTH_TOLERANCE_TYPE,
+        *TIP_LENGTH_DEVIATIONS_MM,
     )
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)

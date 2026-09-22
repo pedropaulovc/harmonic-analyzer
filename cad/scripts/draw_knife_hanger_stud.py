@@ -60,6 +60,7 @@ from knife_hanger_stud_spec import (
     TIP_CHAMFER_TOLERANCE_TYPE,
     TIP_LENGTH_DEVIATIONS_MM,
     TIP_LENGTH_MM,
+    TIP_LENGTH_TOLERANCE_TYPE,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -99,7 +100,6 @@ HEAD_CORNER_MM = HEAD_AF / math.sqrt(3.0)
 MODEL_FINISHED = "FinishedOverall@StockTrimProfile"
 FINISHED_VALUE_TOLERANCE_M = 1e-9
 SW_TOL_NONE = 0  # swTolType_e.swTolNONE: the build clears the native band
-SW_TOL_BILATERAL = 2  # swTolType_e.swTolBILAT
 # The two drawn edges are the model's circular edges, seen edge-on, found by
 # radius and axial station: the washer face's bearing circle and the faced
 # end's circle inside the tip chamfer. Coordinate picks are ambiguous at the
@@ -184,7 +184,7 @@ TIP_CONTROLS = {
     "TipChamfer": (TIP_CHAMFER_MM / 1000.0, 0.0, 0.0),
 }
 TIP_TOLERANCE_TYPES = {
-    "TipLength": SW_TOL_BILATERAL,
+    "TipLength": TIP_LENGTH_TOLERANCE_TYPE,
     "TipChamfer": TIP_CHAMFER_TOLERANCE_TYPE,
 }
 # The chamfer's radial leg: equal to its axial leg, the 45 deg on the sheet.
