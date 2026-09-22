@@ -1,5 +1,7 @@
 """Offline manufacturing boundaries for the shortened purchased stud."""
 
+import math
+
 import pytest
 
 import draw_knife_hanger_stud as drawing
@@ -37,9 +39,10 @@ def test_iso_fit_rejects_an_outline_that_cannot_fit() -> None:
 class _FakeDisplay:
     """Records ``SetText`` part writes the way IDisplayDimension stores them."""
 
-    def __init__(self, parts: dict[int, str]) -> None:
+    def __init__(self, parts: dict[int, str], *, shows_value: bool = True) -> None:
         self.parts = dict(parts)
         self.writes: list[tuple[int, str]] = []
+        self.ShowDimensionValue = shows_value
 
     def SetText(self, part: int, text: str) -> None:
         self.writes.append((part, text))
@@ -54,10 +57,16 @@ def test_root_finish_callout_writes_definition_then_resolved() -> None:
     drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
     # The stored definition (7) FIRST, then the resolved lane (3) it renders
     # from -- a definition written last can clear what was just resolved.
+    # ...and the prefix copy the definition write leaves behind is cleared.
+    display = _FakeDisplay({}, shows_value=False)
+    drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
     assert display.writes == [
         (drawing.CALLOUT_ABOVE_DEFINITION, drawing.ROOT_FINISH_CALLOUT_TEXT),
         (drawing.CALLOUT_ABOVE, drawing.ROOT_FINISH_CALLOUT_TEXT),
+        (drawing.PREFIX, ""),
     ]
+    # The value the definition write switched off is switched back on.
+    assert display.ShowDimensionValue is True
     drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
 
 
@@ -69,3 +78,110 @@ def test_root_finish_callout_lost_across_a_rebuild_is_rejected() -> None:
         drawing._assert_root_finish_callout(display, text)
 
 
+def _callout_parts(text: str) -> dict[int, str]:
+    return {drawing.CALLOUT_ABOVE: text, drawing.CALLOUT_ABOVE_DEFINITION: text}
+
+
+def test_root_finish_callout_with_a_hidden_value_is_rejected() -> None:
+    # stud-4: every text part read back correctly and the sheet printed no "45".
+    text = drawing.ROOT_FINISH_CALLOUT_TEXT
+    display = _FakeDisplay(_callout_parts(text), shows_value=False)
+    with pytest.raises(RuntimeError, match="value is hidden"):
+        drawing._assert_root_finish_callout(display, text)
+
+
+@pytest.mark.parametrize("part", [1, 5])
+def test_root_finish_callout_leaking_into_the_prefix_is_rejected(part: int) -> None:
+    text = drawing.ROOT_FINISH_CALLOUT_TEXT
+    display = _FakeDisplay({**_callout_parts(text), part: text})
+    with pytest.raises(RuntimeError, match="prefix"):
+        drawing._assert_root_finish_callout(display, text)
+
+
+def _arc(center, radius, start_deg, end_deg, *, ccw=True) -> drawing.DimensionArc:
+    def at(deg):
+        return (
+            center[0] + radius * math.cos(math.radians(deg)),
+            center[1] + radius * math.sin(math.radians(deg)),
+        )
+
+    start, end = at(start_deg), at(end_deg)
+    # The GetArcAtIndex2 layout: color, type, 2 unused, start, end, centre, normal, dir.
+    raw = [0, 0, 0, 0, *start, 0, *end, 0, *center, 0, 0, 0, 1, 1.0 if ccw else 0.0]
+    return drawing.DimensionArc.from_display(raw)
+
+
+def test_arc_sweep_follows_its_rotation_direction() -> None:
+    minor = _arc((0.0, 0.0), 0.013, 0.0, 45.0)
+    assert minor.radius == pytest.approx(0.013)
+    assert math.degrees(minor.sweep) == pytest.approx(45.0)
+    # The same end points drawn clockwise are the long way round.
+    assert math.degrees(_arc((0.0, 0.0), 0.013, 0.0, 45.0, ccw=False).sweep) == (
+        pytest.approx(315.0)
+    )
+    samples = minor.samples()
+    assert samples[0] == pytest.approx(minor.start)
+    assert samples[-1] == pytest.approx(minor.end)
+
+
+VERTEX = (0.2575, 0.1431)
+DETAIL = (0.22323, 0.10823, 0.30677, 0.19177)
+REGION = (0.0127, 0.0127, 0.4191, 0.2667)
+
+
+def _ink(*arcs, lines=()) -> drawing.DimensionInk:
+    return drawing.DimensionInk(
+        name="ChamferAngle", lines=tuple(lines), arcs=arcs, triangles=(), arrowheads=2
+    )
+
+
+def test_stud4_angle_arc_is_rejected() -> None:
+    # The exported regression: r = 84 mm about the vertex, running from the 45
+    # deg leg the long way round to the -8 deg curate point.
+    ink = _ink(_arc(VERTEX, 0.084, 45.0, -8.0))
+    problems = drawing._dimension_ink_problems(
+        ink, owner=DETAIL, obstacles={}, region=REGION
+    )
+    assert any("radius" in problem for problem in problems)
+    assert any("long way round" in problem for problem in problems)
+
+
+def test_pinned_angle_arc_with_its_leader_passes() -> None:
+    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
+    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
+    leader = (tip, (0.3118, 0.1370))
+    problems = drawing._dimension_ink_problems(
+        _ink(arc, lines=[leader]),
+        owner=DETAIL,
+        obstacles={"isometric note": (0.3373, 0.1467, 0.3720, 0.1515)},
+        region=REGION,
+    )
+    assert problems == []
+
+
+def test_leader_across_an_annotation_is_rejected() -> None:
+    arc = _arc(VERTEX, drawing.ANGLE_ARC_RADIUS_M, 0.0, 45.0)
+    tip = drawing._bisector_point(VERTEX, drawing.ANGLE_ARC_RADIUS_M)
+    problems = drawing._dimension_ink_problems(
+        _ink(arc, lines=[(tip, (0.360, 0.100))]),
+        owner=DETAIL,
+        obstacles={"DETAIL A label": (0.3185, 0.0919, 0.3509, 0.1081)},
+        region=REGION,
+    )
+    assert problems == [
+        "ChamferAngle ink crosses DETAIL A label [318.5,91.9]..[350.9,108.1]mm"
+    ]
+
+
+def test_bisector_point_splits_the_chamfer_span() -> None:
+    x, y = drawing._bisector_point((0.0, 0.0), 0.013)
+    assert math.hypot(x, y) == pytest.approx(0.013)
+    assert math.degrees(math.atan2(y, x)) == pytest.approx(drawing.CHAMFER_ANGLE_DEG / 2.0)
+
+
+def test_segment_box_hits() -> None:
+    box = (0.0, 0.0, 1.0, 1.0)
+    assert drawing._segment_hits_box((-1.0, 0.5), (2.0, 0.5), box)
+    assert drawing._segment_hits_box((0.2, 0.2), (0.3, 0.3), box)
+    assert not drawing._segment_hits_box((-1.0, 2.0), (2.0, 1.5), box)
+    assert not drawing._segment_hits_box((1.5, -1.0), (1.5, 2.0), box)

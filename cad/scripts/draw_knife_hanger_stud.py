@@ -11,6 +11,7 @@ import argparse
 import json
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
@@ -34,7 +36,7 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _stock_trim_drawing import TrimSheet
 from build_knife_hanger_stud import SHANK_DIA, THREAD_TIP_Y_MM
@@ -108,6 +110,39 @@ ROOT_FINISH_CALLOUT_TEXT = "CHAMFER TO EXISTING\nTHREAD ROOT"
 # prefixes) and prove both survive a rebuild.
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove (resolved)
 CALLOUT_ABOVE_DEFINITION = 7  # swDimensionTextCalloutAboveDefinition (stored)
+# The definition write also mirrors the text into the prefix lanes and turns
+# the dimension value OFF (leaf 20260922T161521Z read parts 1/5 == the callout
+# and the sheet printed no "45"). Clearing the resolved prefix clears its
+# definition too (_drawing_common's hole-callout prefix proves 1 writes 5), and
+# the value is switched back on -- the draw_tube_frame chamfer recipe.
+PREFIX = 1  # swDimensionTextPrefix (resolved)
+PREFIX_DEFINITION = 5  # swDimensionTextPrefixDefinition (stored)
+
+# The angular dimension's ARC is laid out by the NON-offset position: SolidWorks
+# draws it centred on the angle vertex through the text point, and a later
+# ``OffsetText`` move carries only the text ("dimension line and extension
+# lines ... do not move", types/IDisplayDimension/OffsetText.md). stud-4
+# curated the dimension at a point 85 mm from the vertex and 8 deg outside the
+# 0-45 deg span, so the arc swept the long way round the sheet at r = 84 mm.
+# The arc is pinned first on the bisector, inside the 15.2 mm (12:1) chamfer
+# leg so its 45 deg arrow lands on the chamfer itself; only then is the text
+# offset to its pocket on a leader.
+ANGLE_ARC_RADIUS_M = 0.013
+ANGLE_ARC_RADIUS_TOLERANCE_M = 0.003
+# Gate for every dimension arc on the sheet: stud-4's was 0.084 m.
+ANGLE_ARC_RADIUS_MAX_M = 0.030
+ANGLE_ARC_SWEEP_MAX_DEG = 60.0
+ANGLE_ARC_HOLD_M = 0.0003
+ANGLE_VERTEX_TOLERANCE_M = 0.0005
+# The two legs as the cut-end detail draws them: the end face runs outward
+# (+x) and the chamfer climbs outward toward the head at 45 deg.
+ANGLE_BISECTOR_RAD = math.radians(CHAMFER_ANGLE_DEG / 2.0)
+CHAMFER_VERTEX_MODEL_M = (
+    (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 1000.0,
+    THREAD_TIP_Y_MM / 1000.0,
+    0.0,
+)
+ARC_SAMPLES = 32
 
 LAYOUT_REPORT = (
     Path(OUTPUTS.slddrw).parent.parent / "reports" / "layout-audit" / f"{SPEC.name}.json"
@@ -219,6 +254,288 @@ def _display_text_box(adapter: Any, display: Any) -> tuple[float, float, float, 
     return total
 
 
+Point = tuple[float, float]
+Box = tuple[float, float, float, float]
+
+
+def _mm(point: Point) -> list[float]:
+    return [round(value * 1000.0, 2) for value in point]
+
+
+@dataclass(frozen=True)
+class DimensionArc:
+    """One ``IDisplayData::GetArcAtIndex2`` arc, in sheet metres."""
+
+    center: Point
+    start: Point
+    end: Point
+    ccw: bool
+
+    @classmethod
+    def from_display(cls, raw: Any) -> DimensionArc:
+        # [color, lineType, unused, unused, startPt[3], endPt[3], centerPt[3],
+        #  arcNormal[3], rotationDir (CCW = True)] -- types/IDisplayData/GetArcAtIndex2.md
+        values = [float(value) for value in (raw or ())]
+        if len(values) < 17:
+            raise RuntimeError(f"incomplete dimension arc: {values!r}")
+        return cls(
+            center=(values[10], values[11]),
+            start=(values[4], values[5]),
+            end=(values[7], values[8]),
+            ccw=values[16] != 0.0,
+        )
+
+    @property
+    def radius(self) -> float:
+        return math.dist(self.center, self.start)
+
+    def _bearing(self, point: Point) -> float:
+        return math.atan2(point[1] - self.center[1], point[0] - self.center[0])
+
+    @property
+    def sweep(self) -> float:
+        """Radians drawn from start to end in the arc's own rotation direction."""
+        turn = self._bearing(self.end) - self._bearing(self.start)
+        # Coincident ends are a full circle, not an empty arc.
+        return (turn if self.ccw else -turn) % math.tau or math.tau
+
+    def samples(self) -> list[Point]:
+        start = self._bearing(self.start)
+        step = (self.sweep if self.ccw else -self.sweep) / ARC_SAMPLES
+        return [
+            (
+                self.center[0] + self.radius * math.cos(start + index * step),
+                self.center[1] + self.radius * math.sin(start + index * step),
+            )
+            for index in range(ARC_SAMPLES + 1)
+        ]
+
+    def as_mm(self) -> dict[str, Any]:
+        return {
+            "center_mm": _mm(self.center),
+            "radius_mm": round(self.radius * 1000.0, 2),
+            "start_mm": _mm(self.start),
+            "end_mm": _mm(self.end),
+            "sweep_deg": round(math.degrees(self.sweep), 2),
+            "ccw": self.ccw,
+        }
+
+
+@dataclass(frozen=True)
+class DimensionInk:
+    """A display dimension's RENDERED geometry, which the layout census omits.
+
+    ``collect_layout_elements`` boxes a dimension by its text only (and
+    ``GetExtent`` under-reports a displaced block), so an arc, witness line or
+    leader can sweep the sheet under a clean census -- stud-4 exported an 84 mm
+    arc that way. This is read from ``IDisplayData`` directly.
+    """
+
+    name: str
+    lines: tuple[tuple[Point, Point], ...]
+    arcs: tuple[DimensionArc, ...]
+    triangles: tuple[tuple[Point, Point, Point], ...]
+    arrowheads: int
+
+    def segments(self) -> list[tuple[Point, Point]]:
+        segments = list(self.lines)
+        for arc in self.arcs:
+            points = arc.samples()
+            segments.extend(zip(points, points[1:]))
+        for a, b, c in self.triangles:
+            segments.extend(((a, b), (b, c), (c, a)))
+        return segments
+
+    def bounds(self) -> Box | None:
+        points = [point for segment in self.segments() for point in segment]
+        if not points:
+            return None
+        return (
+            min(point[0] for point in points),
+            min(point[1] for point in points),
+            max(point[0] for point in points),
+            max(point[1] for point in points),
+        )
+
+    def as_mm(self) -> dict[str, Any]:
+        bounds = self.bounds()
+        return {
+            "name": self.name,
+            "bounds_mm": None if bounds is None else [round(v * 1000.0, 2) for v in bounds],
+            "lines_mm": [[_mm(a), _mm(b)] for a, b in self.lines],
+            "arcs": [arc.as_mm() for arc in self.arcs],
+            "triangles": len(self.triangles),
+            "arrowheads": self.arrowheads,
+        }
+
+
+def _read_dimension_ink(annotation: Any, name: str) -> DimensionInk:
+    """Lines, arcs and arrow triangles of one display dimension, on a fresh handle."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    lines = []
+    for index in range(int(data.GetLineCount())):
+        # [color, lineType, unused, unused, startPt[3], endPt[3]]
+        line = [float(value) for value in (data.GetLineAtIndex2(index) or ())]
+        if len(line) < 10:
+            raise RuntimeError(f"{name}: incomplete dimension line {line!r}")
+        lines.append(((line[4], line[5]), (line[7], line[8])))
+    arcs = tuple(
+        DimensionArc.from_display(data.GetArcAtIndex2(index))
+        for index in range(int(data.GetArcCount()))
+    )
+    triangles = []
+    for index in range(int(data.GetTriangleCount())):
+        # [vertexPt1[3], vertexPt2[3], vertexPt3[3], isFilled, lineType]
+        corner = [float(value) for value in (data.GetTriangleAtIndex(index) or ())]
+        if len(corner) < 9:
+            raise RuntimeError(f"{name}: incomplete dimension triangle {corner!r}")
+        triangles.append(
+            ((corner[0], corner[1]), (corner[3], corner[4]), (corner[6], corner[7]))
+        )
+    return DimensionInk(
+        name=name,
+        lines=tuple(lines),
+        arcs=arcs,
+        triangles=tuple(triangles),
+        arrowheads=int(data.GetArrowHeadCount()),
+    )
+
+
+def _inside(point: Point, box: Box) -> bool:
+    return box[0] <= point[0] <= box[2] and box[1] <= point[1] <= box[3]
+
+
+def _segment_hits_box(p0: Point, p1: Point, box: Box) -> bool:
+    """True when the segment p0-p1 touches ``box`` (Liang-Barsky clip)."""
+    low, high = 0.0, 1.0
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    for p, q in (
+        (-dx, p0[0] - box[0]),
+        (dx, box[2] - p0[0]),
+        (-dy, p0[1] - box[1]),
+        (dy, box[3] - p0[1]),
+    ):
+        if p == 0.0:
+            if q < 0.0:
+                return False
+            continue
+        t = q / p
+        if p < 0.0:
+            low = max(low, t)
+        else:
+            high = min(high, t)
+        if low > high:
+            return False
+    return True
+
+
+def _dimension_ink_problems(
+    ink: DimensionInk,
+    *,
+    owner: Box,
+    obstacles: dict[str, Box],
+    region: Box,
+) -> list[str]:
+    """Every way ``ink`` escapes its own view or crosses something it must not."""
+    problems = []
+    for arc in ink.arcs:
+        if arc.radius > ANGLE_ARC_RADIUS_MAX_M:
+            problems.append(
+                f"{ink.name} arc radius {arc.radius * 1000.0:.1f} mm exceeds "
+                f"{ANGLE_ARC_RADIUS_MAX_M * 1000.0:.1f} mm"
+            )
+        if math.degrees(arc.sweep) > ANGLE_ARC_SWEEP_MAX_DEG:
+            problems.append(
+                f"{ink.name} arc sweeps {math.degrees(arc.sweep):.1f} deg "
+                f"(> {ANGLE_ARC_SWEEP_MAX_DEG:.0f}): it runs the long way round"
+            )
+        if not _inside(arc.center, owner):
+            problems.append(
+                f"{ink.name} arc centre {_mm(arc.center)} mm is outside its view "
+                f"{_format_box(owner)}"
+            )
+    bounds = ink.bounds()
+    if bounds is not None and not (
+        _inside(bounds[:2], region) and _inside(bounds[2:], region)
+    ):
+        problems.append(
+            f"{ink.name} ink {_format_box(bounds)} leaves the drawable region "
+            f"{_format_box(region)}"
+        )
+    segments = ink.segments()
+    for label, box in obstacles.items():
+        if any(_segment_hits_box(a, b, box) for a, b in segments):
+            problems.append(f"{ink.name} ink crosses {label} {_format_box(box)}")
+    return problems
+
+
+def _bisector_point(vertex: Point, radius: float) -> Point:
+    """The point ``radius`` from the angle vertex on the 45 deg span's bisector."""
+    return (
+        vertex[0] + radius * math.cos(ANGLE_BISECTOR_RAD),
+        vertex[1] + radius * math.sin(ANGLE_BISECTOR_RAD),
+    )
+
+
+def _angle_arc(annotation: Any) -> DimensionArc:
+    """The 45 deg dimension's arc; an inline value may split it, never re-centre it."""
+    ink = _read_dimension_ink(annotation, "ChamferAngle")
+    if not ink.arcs:
+        raise RuntimeError(f"45 deg dimension draws no arc: {ink.as_mm()!r}")
+    first = ink.arcs[0]
+    for arc in ink.arcs[1:]:
+        if (
+            math.dist(arc.center, first.center) > ANGLE_VERTEX_TOLERANCE_M
+            or abs(arc.radius - first.radius) > ANGLE_VERTEX_TOLERANCE_M
+        ):
+            raise RuntimeError(f"45 deg dimension arcs disagree: {ink.as_mm()!r}")
+    return first
+
+
+def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> DimensionArc:
+    """Lay the 45 deg arc on its bisector, close to the vertex, BEFORE offsetting.
+
+    The arc centre IS the angle vertex, so it is read back rather than trusted
+    from the model projection, and the non-offset text point is set at
+    ``ANGLE_ARC_RADIUS_M`` along the bisector from it.
+    """
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.OffsetText):
+        display.OffsetText = False
+    vertex = _angle_arc(annotation).center
+    target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
+    placed = _early_bound(annotation, "IAnnotation")
+    if not placed.SetPosition2(target[0], target[1], 0.0):
+        raise RuntimeError("cannot pin the 45 deg dimension arc")
+    rebuild_drawing(adapter, label="45 deg arc")
+    ink = _read_dimension_ink(annotation, "ChamferAngle")
+    arc = _angle_arc(annotation)
+    _telemetry.info(
+        "45 deg arc pinned: "
+        + json.dumps(
+            {
+                "vertex_model_projection_mm": _mm(vertex_guess),
+                "vertex_mm": _mm(vertex),
+                "target_mm": _mm(target),
+                "ink": ink.as_mm(),
+            },
+            sort_keys=True,
+        )
+    )
+    if math.dist(arc.center, vertex) > ANGLE_VERTEX_TOLERANCE_M:
+        raise RuntimeError(
+            f"45 deg arc re-centred from {_mm(vertex)} to {_mm(arc.center)} mm"
+        )
+    if abs(arc.radius - ANGLE_ARC_RADIUS_M) > ANGLE_ARC_RADIUS_TOLERANCE_M:
+        raise RuntimeError(
+            f"45 deg arc radius {arc.radius * 1000.0:.1f} mm, wanted "
+            f"{ANGLE_ARC_RADIUS_M * 1000.0:.1f} within "
+            f"{ANGLE_ARC_RADIUS_TOLERANCE_M * 1000.0:.1f} mm"
+        )
+    return arc
+
+
 def _write_root_finish_callout(display: Any, text: str) -> None:
     """Store the callout in the DEFINITION lane first, then the resolved lane.
 
@@ -230,6 +547,10 @@ def _write_root_finish_callout(display: Any, text: str) -> None:
     """
     display.SetText(CALLOUT_ABOVE_DEFINITION, text)
     display.SetText(CALLOUT_ABOVE, text)
+    # Undo the definition write's side effects: the prefix copy and the hidden
+    # value (see PREFIX above).
+    display.SetText(PREFIX, "")
+    display.ShowDimensionValue = True
 
 
 def _callout_text_parts(display: Any) -> dict[str, str]:
@@ -240,20 +561,32 @@ def _callout_text_parts(display: Any) -> dict[str, str]:
 
 
 def _assert_root_finish_callout(display: Any, text: str) -> None:
-    """Fail unless BOTH callout lanes carry the text after the rebuild."""
+    """Fail unless the callout lanes carry the text and the value still prints."""
     parts = _callout_text_parts(display)
-    _telemetry.info("root-finish callout text parts: " + json.dumps(parts, sort_keys=True))
+    shows_value = bool(display.ShowDimensionValue)
+    _telemetry.info(
+        "root-finish callout text parts: "
+        + json.dumps({**parts, "show_value": shows_value}, sort_keys=True)
+    )
     for part in (CALLOUT_ABOVE, CALLOUT_ABOVE_DEFINITION):
         if parts[str(part)] != text:
             raise RuntimeError(
                 f"root-finish callout did not survive the rebuild in text part "
                 f"{part}: {parts[str(part)]!r} != {text!r} (all parts: {parts!r})"
             )
+    for part in (PREFIX, PREFIX_DEFINITION):
+        if parts[str(part)]:
+            raise RuntimeError(
+                f"root-finish callout leaked into prefix part {part}: "
+                f"{parts[str(part)]!r} (all parts: {parts!r})"
+            )
+    if not shows_value:
+        raise RuntimeError("the 45 deg dimension value is hidden behind its callout")
 
 
 def _reference_dimension(
     adapter: Any, annotations: list[Any], name: str, label: str
-) -> None:
+) -> Any:
     matches = [
         annotation
         for annotation in annotations
@@ -262,6 +595,7 @@ def _reference_dimension(
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} reference dimension, found {len(matches)}")
     set_reference_dimension(adapter, matches[0], label=label)
+    return matches[0]
 
 
 def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
@@ -297,6 +631,7 @@ def _place_angle_text(
     *,
     anchor: tuple[float, float],
     obstacles: dict[str, tuple[float, float, float, float]],
+    arc: DimensionArc,
 ) -> tuple[float, float]:
     """Park the offset 45 deg text block in the free pocket, from measured boxes.
 
@@ -304,7 +639,9 @@ def _place_angle_text(
     relation to the rendered block is not fixed API behaviour -- so the block is
     measured from the dimension's own ``IDisplayData`` text items, moved as a
     whole, and re-measured after the rebuild. The final position is proven by
-    ``GetPosition`` readback and by clearance to every surrounding box.
+    ``GetPosition`` readback and by clearance to every surrounding box. The
+    block sits as level with the pinned arc as the pocket allows, so the leader
+    back to it is short, and the arc itself must not have moved.
     """
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
@@ -314,7 +651,14 @@ def _place_angle_text(
     left = obstacles["cut-end detail"][2] + park
     bottom = obstacles["DETAIL A label"][3] + park
     top = min(obstacles["isometric"][1], obstacles["isometric note"][1]) - park
-    target = (left, bottom + ((top - bottom) - (block[3] - block[1])) / 2.0)
+    height = block[3] - block[1]
+    if top - bottom < height:
+        raise RuntimeError(
+            f"45 deg text pocket {(top - bottom) * 1000.0:.1f} mm is shorter than "
+            f"its {height * 1000.0:.1f} mm block"
+        )
+    level = _bisector_point(arc.center, arc.radius)[1] - height / 2.0
+    target = (left, min(max(level, bottom), top - height))
     anchor = (anchor[0] + target[0] - block[0], anchor[1] + target[1] - block[1])
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
     block = _display_text_box(adapter, display)
@@ -329,6 +673,15 @@ def _place_angle_text(
         raise RuntimeError(
             f"45 deg text position did not persist: {position[:2]!r} != {anchor!r}"
         )
+    held = _angle_arc(annotation)
+    if (
+        math.dist(held.center, arc.center) > ANGLE_ARC_HOLD_M
+        or abs(held.radius - arc.radius) > ANGLE_ARC_HOLD_M
+    ):
+        raise RuntimeError(
+            f"offsetting the 45 deg text moved its arc: {arc.as_mm()!r} -> "
+            f"{held.as_mm()!r}"
+        )
     _telemetry.info(
         "45 deg text block placed: "
         + json.dumps(
@@ -342,14 +695,43 @@ def _place_angle_text(
     return anchor
 
 
-def _audit_sheet_layout(adapter: Any) -> None:
+def _audit_sheet_layout(
+    adapter: Any,
+    dimensions: dict[str, tuple[Any, Box, dict[str, Box]]],
+) -> None:
     """Census the sheet in millimetres, publish it, then gate the layout.
 
-    The census is emitted BEFORE the gate so a failing leaf still publishes the
-    numbers its fix is placed from. ``check_drawing_layout`` then holds the
-    sheet to zero overlaps, zero border crossings and zero leader crossings.
+    The census is emitted BEFORE the gates so a failing leaf still publishes
+    the numbers its fix is placed from. Every dimension's rendered ink (arcs,
+    witness lines, leaders, arrows) is gated first -- ``check_drawing_layout``
+    cannot see it -- then ``check_drawing_layout`` holds the sheet to zero
+    overlaps, zero border crossings and zero leader crossings.
+    ``dimensions`` maps each dimension name to its annotation, its owning
+    view's outline and the boxes its ink must not cross.
     """
     elements, leaders, region = collect_layout_elements(adapter, layout=SPEC.layout)
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    title_block = (
+        template.title_block_left_m,
+        0.0,
+        template.width_m,
+        template.title_block_top_m,
+    )
+    drawable = (region.xmin, region.ymin, region.xmax, region.ymax)
+    inks = {
+        name: _read_dimension_ink(annotation, name)
+        for name, (annotation, _owner, _obstacles) in dimensions.items()
+    }
+    problems = [
+        problem
+        for name, (_annotation, owner, obstacles) in dimensions.items()
+        for problem in _dimension_ink_problems(
+            inks[name],
+            owner=owner,
+            obstacles={**obstacles, "title block": title_block},
+            region=drawable,
+        )
+    ]
     census = {
         "stem": SPEC.artifact_stem,
         "elements": [
@@ -379,12 +761,15 @@ def _audit_sheet_layout(adapter: Any) -> None:
             round(value * 1000.0, 3)
             for value in (region.xmin, region.ymin, region.xmax, region.ymax)
         ],
+        "dimension_ink": [ink.as_mm() for ink in inks.values()],
     }
     _telemetry.info("layout census: " + json.dumps(census, sort_keys=True))
     LAYOUT_REPORT.parent.mkdir(parents=True, exist_ok=True)
     LAYOUT_REPORT.write_text(
         json.dumps(census, indent=2, sort_keys=True), encoding="utf-8"
     )
+    if problems:
+        raise RuntimeError("dimension ink:\n" + "\n".join(problems))
     check_drawing_layout(adapter, layout=SPEC.layout, stem=SPEC.artifact_stem)
 
 
@@ -484,12 +869,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Isometric View Note", *_iso_note_xy(iso_box)
     )
     detail_box = _view_box(detail, label="cut end detail")
-    detail_keep = {
-        "ChamferAngle": (
-            detail_box[2] + 0.035,
-            (SHEET.detail_label_xy[1] + iso_box[1]) / 2.0,
-        )
-    }
+    # Curate the 45 deg dimension ON its span, near the vertex: this first,
+    # non-offset position is what fixes the arc radius (_pin_angle_arc).
+    vertex_guess = model_point_in_view(
+        adapter, detail, CHAMFER_VERTEX_MODEL_M, label="chamfer angle vertex"
+    )
+    detail_keep = {"ChamferAngle": _bisector_point(vertex_guess, ANGLE_ARC_RADIUS_M)}
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
@@ -511,8 +896,13 @@ async def build(adapter: Any) -> dict[str, str]:
         if dimension_name(adapter, annotation) == "ChamferAngle"
     ]
     _verify_controls(adapter, angle_annotations)
+    if len(angle_annotations) != 1:
+        raise RuntimeError(
+            f"expected one native angle dimension, found {len(angle_annotations)}"
+        )
+    arc = _pin_angle_arc(adapter, angle_annotations[0], vertex_guess)
     angle = _attach_root_finish_callout(adapter, angle_annotations)
-    _reference_dimension(
+    finished = _reference_dimension(
         adapter,
         front_annotations,
         "FinishedOverall",
@@ -528,6 +918,11 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
+    iso_note_box = _note_box(_early_bound(iso_note, "INote"), label="isometric note")
+    detail_label_box = _note_box(
+        _early_bound(_read_member(detail, "GetNotes")[0], "INote"),
+        label="detail label",
+    )
     _place_angle_text(
         adapter,
         angle,
@@ -535,16 +930,32 @@ async def build(adapter: Any) -> dict[str, str]:
         obstacles={
             "cut-end detail": detail_box,
             "isometric": iso_box,
-            "isometric note": _note_box(
-                _early_bound(iso_note, "INote"), label="isometric note"
+            "isometric note": iso_note_box,
+            "DETAIL A label": detail_label_box,
+        },
+        arc=arc,
+    )
+    front_box = _view_box(front, label="front")
+    _audit_sheet_layout(
+        adapter,
+        {
+            "ChamferAngle": (
+                angle,
+                detail_box,
+                {
+                    "front view": front_box,
+                    "isometric": iso_box,
+                    "isometric note": iso_note_box,
+                    "DETAIL A label": detail_label_box,
+                },
             ),
-            "DETAIL A label": _note_box(
-                _early_bound(_read_member(detail, "GetNotes")[0], "INote"),
-                label="detail label",
+            "FinishedOverall": (
+                finished,
+                front_box,
+                {"cut-end detail": detail_box, "isometric": iso_box},
             ),
         },
     )
-    _audit_sheet_layout(adapter)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
