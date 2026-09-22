@@ -1,5 +1,6 @@
 """Windows contract tests for the tracked, supervised farm launcher."""
 
+import hashlib
 import json
 import os
 import shutil
@@ -46,28 +47,57 @@ def _launcher_fixture(tmp_path: Path) -> dict[str, object]:
     invocation = tmp_path / "uv invocation.json"
     stub = tools / "uv_stub.py"
     stub.write_text(
-        """import json
+        """import hashlib
+import json
 import os
 import sys
 import time
 from pathlib import Path
 
-Path(os.environ["UV_STUB_INVOCATION"]).write_text(
-    json.dumps(
-        {
-            "argv": sys.argv[1:],
-            "environment": {
-                "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
-                "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
-                "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
-            },
-        }
+
+def build_py_digest():
+    return hashlib.sha256(Path("build.py").read_bytes()).hexdigest()
+
+
+invocation = {
+    "argv": sys.argv[1:],
+    "cwd": os.getcwd(),
+    "build_py_sha256": build_py_digest(),
+    "cad_out_present": Path("cad/out").exists(),
+    "submodules_present": sorted(
+        path for path in ("vendored", "excluded") if Path(path, "marker.txt").exists()
     ),
-    encoding="utf-8",
-)
+    "inherited": {
+        name: os.environ.get(name) for name in ("VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT")
+    },
+    "environment": {
+        "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
+        "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
+        "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
+    },
+}
+record = Path(os.environ["UV_STUB_INVOCATION"])
+record.write_text(json.dumps(invocation), encoding="utf-8")
 print("uv-stdout", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
 time.sleep(float(os.environ.get("UV_STUB_SLEEP", "0")))
+invocation["build_py_sha256_after_sleep"] = build_py_digest()
+record.write_text(json.dumps(invocation), encoding="utf-8")
+if os.environ.get("UV_STUB_OUTPUTS"):
+    out = Path("cad/out")
+    for relative, content in {
+        "png/probe.png": "built png",
+        "sldprt/probe.SLDPRT": "built part",
+        "sldprt/.probe.execution": "built token",
+        "reports/telemetry/traces.jsonl": '{"span": "built"}\\n',
+        ".drawing-registry/probe.digest": "build-local sidecar",
+    }.items():
+        (out / relative).parent.mkdir(parents=True, exist_ok=True)
+        (out / relative).write_text(content, encoding="utf-8")
+    (out / ".doit.db").write_text(
+        json.dumps({"part:probe": {"built": True}, "drawing:probe": {"built": True}}),
+        encoding="utf-8",
+    )
 raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 """,
         encoding="utf-8",
@@ -88,6 +118,8 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
     environment["HARMONIC_CACHE_ACCOUNT"] = "fixture-account"
     environment.pop("HARMONIC_CACHE_CONTAINER", None)
     environment["HARMONIC_CACHE_SALT"] = "fixture-salt"
+    environment["VIRTUAL_ENV"] = str(tmp_path / "caller venv")
+    environment["UV_PROJECT_ENVIRONMENT"] = str(tmp_path / "shared env")
 
     return {
         "pwsh": pwsh,
@@ -414,3 +446,275 @@ def test_log_directory_must_be_outside_the_worktree(tmp_path: Path) -> None:
     assert "LogDirectory must be outside the target worktree" in result.stderr
     assert not Path(fixture["invocation"]).exists()
     assert not Path(fixture["log_directory"]).exists()
+
+
+def _registered_worktrees(repo: Path) -> list[Path]:
+    listing = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return [
+        Path(line.removeprefix("worktree ")).resolve()
+        for line in listing.splitlines()
+        if line.startswith("worktree ")
+    ]
+
+
+def _assert_build_worktree_gone(fixture: dict[str, object], finished: dict) -> None:
+    build_worktree = Path(finished["build_worktree"])
+    assert finished["build_worktree_removed"] is True
+    assert not build_worktree.exists()
+    assert build_worktree.resolve() not in _registered_worktrees(Path(fixture["worktree"]))
+
+
+def _committed_digest(fixture: dict[str, object]) -> str:
+    return hashlib.sha256(
+        (Path(fixture["worktree"]) / "build.py").read_bytes()
+    ).hexdigest()
+
+
+def _invocation(fixture: dict[str, object]) -> dict[str, object]:
+    return json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+
+
+def test_build_runs_at_the_pinned_commit_while_the_caller_is_mutated_mid_run(
+    tmp_path: Path,
+) -> None:
+    """Regression for knife-cc-8: an in-worktree edit during the run changed keys."""
+    fixture = _launcher_fixture(tmp_path)
+    committed = _committed_digest(fixture)
+    caller = Path(fixture["worktree"])
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_SLEEP"] = "3"
+
+    process = subprocess.Popen(
+        _command(fixture, "part:pen_rod"),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    deadline = time.monotonic() + 15
+    while not Path(fixture["invocation"]).exists() and time.monotonic() < deadline:
+        assert process.poll() is None
+        time.sleep(0.05)
+    assert Path(fixture["invocation"]).exists()
+    (caller / "build.py").write_text("# edited mid-run\n", encoding="utf-8")
+    (caller / "scratch.txt").write_text("untracked mid-run\n", encoding="utf-8")
+
+    stdout, stderr = process.communicate(timeout=30)
+    assert process.returncode == 0, (stdout, stderr)
+    invocation = _invocation(fixture)
+    assert invocation["build_py_sha256"] == committed
+    assert invocation["build_py_sha256_after_sleep"] == committed
+    assert Path(invocation["cwd"]).resolve() != caller.resolve()
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert Path(invocation["cwd"]).resolve() == Path(finished["build_worktree"]).resolve()
+    assert invocation["inherited"] == {"VIRTUAL_ENV": None, "UV_PROJECT_ENVIRONMENT": None}
+    assert finished["state"] == "succeeded"
+    assert finished["caller_dirty"] == []
+    assert set(finished["phase_s"]) == {"prepare", "build", "harvest", "cleanup"}
+    _assert_build_worktree_gone(fixture, finished)
+    assert (caller / "build.py").read_text(encoding="utf-8") == "# edited mid-run\n"
+
+
+def test_poisoned_caller_doit_state_never_reaches_the_build(tmp_path: Path) -> None:
+    """Regression for knife-cc-9: a stale .doit.db record and artefact skewed keys."""
+    fixture = _launcher_fixture(tmp_path)
+    caller_out = Path(fixture["worktree"]) / "cad" / "out"
+    (caller_out / "sldprt").mkdir(parents=True)
+    (caller_out / "sldprt" / "probe.SLDPRT").write_text("stale part", encoding="utf-8")
+    (caller_out / "sldprt" / ".probe.execution").write_text("stale token", encoding="utf-8")
+    (caller_out / "reports" / "telemetry").mkdir(parents=True)
+    (caller_out / "reports" / "telemetry" / "traces.jsonl").write_text(
+        '{"span": "caller"}\n', encoding="utf-8"
+    )
+    (caller_out / ".doit.db").write_text(
+        json.dumps(
+            {
+                "part:probe": {"poisoned": True},
+                "part:unrelated": {"kept": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    result = subprocess.run(
+        _command(fixture, "part:probe,drawing:probe"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    invocation = _invocation(fixture)
+    assert invocation["cad_out_present"] is False
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert Path(finished["outputs_copied_to"]) == caller_out.resolve()
+    assert finished["outputs_copied"] == 4
+    assert finished["caller_tasks_forgotten"] == ["part:probe"]
+    assert (caller_out / "png" / "probe.png").read_text(encoding="utf-8") == "built png"
+    assert (caller_out / "sldprt" / "probe.SLDPRT").read_text(encoding="utf-8") == "built part"
+    assert (caller_out / "sldprt" / ".probe.execution").read_text(
+        encoding="utf-8"
+    ) == "built token"
+    assert (caller_out / "reports" / "telemetry" / "traces.jsonl").read_text(
+        encoding="utf-8"
+    ) == '{"span": "caller"}\n{"span": "built"}\n'
+    assert not (caller_out / ".drawing-registry").exists()
+    assert json.loads((caller_out / ".doit.db").read_text(encoding="utf-8")) == {
+        "part:unrelated": {"kept": True}
+    }
+    _assert_build_worktree_gone(fixture, finished)
+
+
+def test_dirty_caller_warns_that_its_edits_are_not_built(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    caller = Path(fixture["worktree"])
+    (caller / "build.py").write_text("# uncommitted\n", encoding="utf-8")
+    (caller / "notes.txt").write_text("untracked\n", encoding="utf-8")
+
+    result = subprocess.run(
+        _command(fixture, "part:pen_rod"),
+        env=fixture["environment"],
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "does NOT build" in result.stdout
+    running = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
+    assert sorted(running["caller_dirty"]) == ["build.py", "notes.txt"]
+    assert "does NOT build" in Path(running["log"]).read_text(encoding="utf-8")
+    assert _invocation(fixture)["build_py_sha256"] != hashlib.sha256(
+        b"# uncommitted\n"
+    ).hexdigest()
+
+
+def test_native_failure_still_harvests_and_removes_the_build_worktree(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_EXIT"] = "23"
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    result = subprocess.run(
+        _command(fixture, "part:probe"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 23, (result.stdout, result.stderr)
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert finished["state"] == "failed"
+    assert finished["outputs_copied"] == 4
+    _assert_build_worktree_gone(fixture, finished)
+
+
+def test_concurrent_launches_from_one_caller_use_distinct_build_worktrees(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_SLEEP"] = "2"
+    environment["UV_STUB_INVOCATION"] = str(tmp_path / "ignored invocation.json")
+
+    processes = [
+        subprocess.Popen(
+            _command(fixture, "part:pen_rod", tag=f"twin-{index}"),
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for index in range(2)
+    ]
+    for process in processes:
+        stdout, stderr = process.communicate(timeout=60)
+        assert process.returncode == 0, (stdout, stderr)
+
+    finished = [
+        _record(path) for path in Path(fixture["log_directory"]).glob("*.done")
+    ]
+    assert len(finished) == 2
+    assert finished[0]["build_worktree"] != finished[1]["build_worktree"]
+    for record in finished:
+        _assert_build_worktree_gone(fixture, record)
+
+
+def test_submodules_follow_the_commit_and_its_farm_exclusions(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    caller = Path(fixture["worktree"])
+    for name in ("vendored", "excluded"):
+        source = tmp_path / f"{name} source"
+        source.mkdir()
+        (source / "marker.txt").write_text(name, encoding="utf-8")
+        _git(source, "init", "-q")
+        _git(source, "add", "marker.txt")
+        _git(source, "commit", "-q", "-m", name)
+        _git(
+            caller,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "-q",
+            str(source),
+            name,
+        )
+    (caller / ".farm-sources.json").write_text(
+        json.dumps({"exclude_submodules": ["./excluded/"]}), encoding="utf-8"
+    )
+    _git(caller, "add", ".farm-sources.json")
+    _git(caller, "commit", "-q", "-m", "submodules")
+    _git(caller, "update-ref", "refs/remotes/origin/main", "HEAD")
+    environment = dict(fixture["environment"])
+    environment["GIT_CONFIG_COUNT"] = "1"
+    environment["GIT_CONFIG_KEY_0"] = "protocol.file.allow"
+    environment["GIT_CONFIG_VALUE_0"] = "always"
+
+    result = subprocess.run(
+        _command(fixture, "part:pen_rod"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert _invocation(fixture)["submodules_present"] == ["vendored"]
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert "submodule excluded excluded by .farm-sources.json" in Path(
+        finished["log"]
+    ).read_text(encoding="utf-8")
+    _assert_build_worktree_gone(fixture, finished)
+
+
+@pytest.mark.parametrize("target", ["release", "gallery"])
+def test_submitter_only_targets_are_rejected_before_startup(
+    tmp_path: Path, target: str
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+
+    result = subprocess.run(
+        _command(fixture, f"part:pen_rod,{target}"),
+        env=fixture["environment"],
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+
+    assert result.returncode != 0
+    assert f"Targets cannot include {target}" in result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    assert not list(Path(fixture["log_directory"]).glob("*.run.json"))

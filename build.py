@@ -39,6 +39,7 @@ import argparse
 import copy
 import functools
 import getopt
+import hashlib
 import json
 import os
 import subprocess
@@ -147,11 +148,55 @@ def main(argv: Sequence[str] | None = None) -> int:
     os.environ["HARMONIC_EXECUTOR"] = options.executor
 
     doit = _FarmDoitMain() if options.executor == "farm" else DoitMain()
+    executing = _executing_command(doit_args, doit)
+    if executing is None:
+        return doit.run(doit_args)
     if options.executor == "farm":
-        executing = _executing_command(doit_args, doit)
-        if executing is not None:
-            doit_args = _with_farm_parallelism(doit_args, *executing)
-    return doit.run(doit_args)
+        doit_args = _with_farm_parallelism(doit_args, *executing)
+    before = _tree_state()
+    code = doit.run(doit_args)
+    _warn_on_tree_drift(before, _tree_state())
+    return code
+
+
+def _tree_state() -> tuple[str, ...] | None:
+    """Digests of what a build reads from git: HEAD, status, and the tracked diff.
+
+    doit keys each task lazily, from the files as they are when that task runs,
+    so an edit, checkout or merge in this tree mid-run can leave ``cad/out``
+    and ``.doit.db`` recording a mix of two states. Best effort: a tree git
+    cannot read yields ``None`` and no warning, never a failed build.
+    """
+    commands = (
+        ("rev-parse", "HEAD"),
+        ("status", "--porcelain=v1", "--untracked-files=all"),
+        ("diff", "--no-ext-diff", "--binary", "HEAD"),
+    )
+    try:
+        return tuple(
+            hashlib.sha256(
+                subprocess.run(
+                    ["git", *args], cwd=REPO_ROOT, capture_output=True, check=True
+                ).stdout
+            ).hexdigest()
+            for args in commands
+        )
+    except Exception:
+        return None
+
+
+def _warn_on_tree_drift(
+    before: tuple[str, ...] | None, after: tuple[str, ...] | None
+) -> None:
+    if before is None or after is None or before == after:
+        return
+    print(
+        "build: WARNING the working tree changed while this build ran (HEAD, "
+        "status or tracked content). Outputs and cad/out/.doit.db may record a mix "
+        "of both states: `doit forget` the tasks you touched, then rebuild, before "
+        "trusting them.",
+        file=sys.stderr,
+    )
 
 
 def _isolated_tasks(task_list):

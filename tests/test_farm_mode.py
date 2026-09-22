@@ -572,6 +572,8 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
             out = agents
         if isinstance(out, BaseException):
             raise out
+        if isinstance(out, str) and not kwargs.get("text"):
+            out = out.encode()
         return subprocess.CompletedProcess(argv, 0, out, "")
 
     monkeypatch.setattr(build.subprocess, "run", fake_run)
@@ -599,7 +601,15 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
         }
     ]
     git_commands = [argv[1] for argv in launched if argv[0] == "git"]
-    assert git_commands == ["status", "submodule", "rev-parse"]
+    # preflight, bracketed by the read-only drift snapshots around the run
+    drift_snapshot = ["rev-parse", "status", "diff"]
+    assert git_commands == [
+        *drift_snapshot,
+        "status",
+        "submodule",
+        "rev-parse",
+        *drift_snapshot,
+    ]
     assert [argv[-2:] for argv in launched if argv[0] != "git"] == [
         ["agents", "--json"]
     ]
@@ -740,6 +750,49 @@ def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeyp
     assert len(executed) == 1
     assert executed[0]["HARMONIC_EXECUTOR"] == "local"
     assert not _farm.enabled()
+
+
+def _drift_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "inputs.yaml").write_text("v: 1\n", encoding="utf-8")
+    _git(repo, "add", "inputs.yaml")
+    _git(repo, "commit", "-q", "-m", "init")
+    return repo
+
+
+def test_a_local_build_warns_when_the_tree_changes_mid_run(
+    tmp_path, monkeypatch, capsys
+):
+    """knife-cc-8's failure shape on the local path: doit keys each task from the
+    live tree when it runs, so an edit mid-run leaves mixed state behind."""
+    repo = _drift_repo(tmp_path)
+    monkeypatch.setattr(build, "REPO_ROOT", repo)
+
+    def edit_mid_run():
+        (repo / "inputs.yaml").write_text("v: 2\n", encoding="utf-8")
+
+    def task_part():
+        yield {"name": "x", "actions": [edit_mid_run]}
+
+    _install_real_doit(monkeypatch, {"task_part": task_part})
+
+    assert build.main(["--executor", "local", "part:x"]) == 0
+    assert "working tree changed while this build ran" in capsys.readouterr().err
+
+
+def test_a_local_build_of_an_already_dirty_but_still_tree_stays_quiet(
+    tmp_path, monkeypatch, capsys
+):
+    repo = _drift_repo(tmp_path)
+    (repo / "inputs.yaml").write_text("v: dirty\n", encoding="utf-8")
+    monkeypatch.setattr(build, "REPO_ROOT", repo)
+    _seen, executed = _install_real_doit(monkeypatch)
+
+    assert build.main(["--executor", "local", "part:x"]) == 0
+    assert len(executed) == 1
+    assert "working tree changed" not in capsys.readouterr().err
 
 
 def test_default_build_target_carries_the_verify_gates_under_every_executor(

@@ -19,7 +19,12 @@ param(
     [int]$LeafTimeout,
 
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
-    [string]$Tag = 'run'
+    [string]$Tag = 'run',
+
+    # Parent of the disposable build worktrees. Defaults to `fw` beside the
+    # repository's main checkout (C:\src\fw for C:\src\harmonic-analyzer): git
+    # and SolidWorks paths under it must stay short on Windows.
+    [string]$WorkRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -163,6 +168,219 @@ function New-EmptyFileExclusive {
     $stream.Dispose()
 }
 
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $output = @(& git -C $Directory @Arguments 2>&1 | ForEach-Object { [string]$_ })
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        throw "git $($Arguments -join ' ') failed with exit $code`: $($output -join [System.Environment]::NewLine)"
+    }
+    return $output
+}
+
+function Write-LaunchLine {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Text
+    )
+
+    Add-Content -LiteralPath $Path -Value $Text -Encoding utf8
+    [System.Console]::Out.WriteLine($Text)
+}
+
+function Get-ExcludedSubmodules {
+    param([Parameter(Mandatory)][string]$Checkout)
+
+    # Mirrors build.py `_excluded_submodules`: the commit's declaration, paths
+    # normalized so `references/` and `./references` mean the same thing.
+    $source = Join-Path $Checkout '.farm-sources.json'
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        return @()
+    }
+    $declared = Get-Content -LiteralPath $source -Raw -Encoding utf8 | ConvertFrom-Json -AsHashtable
+    if ($declared -isnot [System.Collections.IDictionary]) {
+        throw '.farm-sources.json must be a JSON object'
+    }
+    $paths = @($declared['exclude_submodules'] | Where-Object { $null -ne $_ })
+    $normalized = foreach ($path in $paths) {
+        if ($path -isnot [string]) {
+            throw '.farm-sources.json: exclude_submodules must be a list of strings'
+        }
+        $clean = $path.Replace('\', '/')
+        while ($clean.StartsWith('./', [System.StringComparison]::Ordinal)) {
+            $clean = $clean.Substring(2)
+        }
+        $clean.TrimEnd('/')
+    }
+    return @($normalized)
+}
+
+function Initialize-BuildSubmodules {
+    param(
+        [Parameter(Mandatory)][string]$Checkout,
+        [Parameter(Mandatory)][string]$Caller,
+        [Parameter(Mandatory)][string]$LogPath
+    )
+
+    if (-not (Test-Path -LiteralPath (Join-Path $Checkout '.gitmodules') -PathType Leaf)) {
+        return
+    }
+    $excluded = Get-ExcludedSubmodules -Checkout $Checkout
+    $declarations = Invoke-Git -Directory $Checkout -Arguments @(
+        'config', '--file', '.gitmodules', '--get-regexp', '^submodule\..*\.path$'
+    )
+    foreach ($declaration in $declarations) {
+        $path = ($declaration -split ' ', 2)[1].Trim()
+        if ($excluded -contains $path) {
+            Write-LaunchLine -Path $LogPath -Text "farm-launch submodule $path excluded by .farm-sources.json"
+            continue
+        }
+        # Borrow objects from the caller's clone when it has one; the checkout
+        # itself is still the gitlink this commit pins.
+        $arguments = @('submodule', 'update', '--init', '--recursive')
+        $callerSubmodule = Join-Path $Caller $path
+        if (Test-Path -LiteralPath (Join-Path $callerSubmodule '.git')) {
+            $reference = (Invoke-Git -Directory $callerSubmodule -Arguments @(
+                'rev-parse', '--absolute-git-dir'
+            ) | Select-Object -Last 1).Trim()
+            $arguments += @('--reference', $reference)
+        }
+        $arguments += @('--', $path)
+        Invoke-Git -Directory $Checkout -Arguments $arguments | ForEach-Object {
+            Write-LaunchLine -Path $LogPath -Text $_
+        }
+    }
+}
+
+function Copy-BuildOutputs {
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination
+    )
+
+    # Top-level dot entries (.doit.db, .drawing-registry) are the build
+    # worktree's own doit state, keyed to its paths: never outputs.
+    if (-not (Test-Path -LiteralPath $Source -PathType Container)) {
+        return 0
+    }
+    $copied = 0
+    foreach ($entry in Get-ChildItem -LiteralPath $Source -Force) {
+        if ($entry.Name.StartsWith('.', [System.StringComparison]::Ordinal)) {
+            continue
+        }
+        $files = if ($entry.PSIsContainer) {
+            @(Get-ChildItem -LiteralPath $entry.FullName -Recurse -File -Force)
+        }
+        else {
+            @($entry)
+        }
+        foreach ($file in $files) {
+            $relative = [System.IO.Path]::GetRelativePath($Source, $file.FullName)
+            $target = Join-Path $Destination $relative
+            [System.IO.Directory]::CreateDirectory((Split-Path -Path $target -Parent)) | Out-Null
+            if ($file.Extension -ne '.jsonl') {
+                Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+                $copied++
+                continue
+            }
+            # Append-only journals (telemetry, cache.jsonl) extend the caller's history.
+            $reader = [System.IO.File]::OpenRead($file.FullName)
+            try {
+                $writer = [System.IO.File]::Open(
+                    $target,
+                    [System.IO.FileMode]::Append,
+                    [System.IO.FileAccess]::Write,
+                    [System.IO.FileShare]::Read
+                )
+                try {
+                    $reader.CopyTo($writer)
+                }
+                finally {
+                    $writer.Dispose()
+                }
+            }
+            finally {
+                $reader.Dispose()
+            }
+            $copied++
+        }
+    }
+    return $copied
+}
+
+function Remove-CallerTaskRecords {
+    param(
+        [Parameter(Mandatory)][string]$BuildDatabase,
+        [Parameter(Mandatory)][string]$CallerDatabase
+    )
+
+    # The copied artefacts now disagree with whatever the caller's .doit.db
+    # recorded for the same tasks. Dropping those records makes the caller's
+    # next local doit re-derive each key from its own inputs instead of
+    # trusting an artefact it did not produce.
+    if (-not (Test-Path -LiteralPath $BuildDatabase -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $CallerDatabase -PathType Leaf)) {
+        return @()
+    }
+    $build = [System.Text.Json.Nodes.JsonNode]::Parse(
+        [System.IO.File]::ReadAllText($BuildDatabase)
+    ).AsObject()
+    $caller = [System.Text.Json.Nodes.JsonNode]::Parse(
+        [System.IO.File]::ReadAllText($CallerDatabase)
+    ).AsObject()
+    [string[]]$tasks = @($build | ForEach-Object { $_.Key })
+    $removed = [System.Collections.Generic.List[string]]::new()
+    foreach ($task in $tasks) {
+        if ($caller.Remove($task)) {
+            $removed.Add($task)
+        }
+    }
+    if ($removed.Count -eq 0) {
+        return @()
+    }
+    $directory = Split-Path -Path $CallerDatabase -Parent
+    $temporary = Join-Path $directory ".doit.db.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        [System.IO.File]::WriteAllText(
+            $temporary,
+            $caller.ToJsonString(),
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        [System.IO.File]::Move($temporary, $CallerDatabase, $true)
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporary) {
+            Remove-Item -LiteralPath $temporary -Force
+        }
+    }
+    return @($removed)
+}
+
+function Remove-BuildWorktree {
+    param(
+        [Parameter(Mandatory)][string]$Caller,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    & git -C $Caller worktree remove --force --force $Path 2>&1 | Out-Null
+    try {
+        if (Test-Path -LiteralPath $Path) {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+        }
+    }
+    catch {
+        [System.Console]::Error.WriteLine(
+            "farm-launch could not remove build worktree $Path`: $($_.Exception.Message)"
+        )
+    }
+    & git -C $Caller worktree prune 2>&1 | Out-Null
+    return -not (Test-Path -LiteralPath $Path)
+}
+
 $logCreated = $false
 $startupRecordWritten = $false
 try {
@@ -187,6 +405,13 @@ try {
             }
             if ($target.Contains('=')) {
                 throw "Targets accepts task selections, not doit variables: $target"
+            }
+            if ($target -ceq 'release' -or $target -ceq 'gallery') {
+                throw (
+                    "Targets cannot include $target`: it runs on the submitter, reads the " +
+                    'excluded references submodule, and release bumps a tracked file the ' +
+                    'disposable build worktree would discard; run it from an attended terminal'
+                )
             }
             $targetList.Add($target)
         }
@@ -244,6 +469,31 @@ try {
         throw 'HEAD is not known on origin; fetch and push before launching'
     }
 
+    if ([string]::IsNullOrEmpty($WorkRoot)) {
+        $commonDirectory = (Invoke-Git -Directory $resolvedWorktree -Arguments @(
+            'rev-parse', '--path-format=absolute', '--git-common-dir'
+        ) | Select-Object -Last 1).Trim()
+        $mainCheckout = Split-Path -Path $commonDirectory -Parent
+        $WorkRoot = Join-Path (Split-Path -Path $mainCheckout -Parent) 'fw'
+    }
+    $resolvedWorkRoot = Resolve-FutureDirectory -Path $WorkRoot -ParameterName 'WorkRoot'
+    if (Test-PathWithin -Candidate $resolvedWorkRoot -Root $resolvedWorktree) {
+        throw "WorkRoot must be outside the target worktree: $resolvedWorkRoot"
+    }
+    [System.IO.Directory]::CreateDirectory($resolvedWorkRoot) | Out-Null
+    $resolvedWorkRoot = Resolve-PhysicalDirectory -Path $resolvedWorkRoot
+    if (Test-PathWithin -Candidate $resolvedWorkRoot -Root $resolvedWorktree) {
+        throw "WorkRoot must be outside the target worktree: $resolvedWorkRoot"
+    }
+
+    # The build never sees these edits; they are recorded so nobody mistakes
+    # the run for a build of them.
+    [string[]]$callerDirty = @(
+        Invoke-Git -Directory $resolvedWorktree -Arguments @(
+            'status', '--porcelain=v1', '--untracked-files=all'
+        ) | Where-Object { $_.Length -gt 3 } | ForEach-Object { $_.Substring(3) }
+    )
+
     $cacheEnvironment = [ordered]@{
         HARMONIC_CACHE_ACCOUNT = [System.Environment]::GetEnvironmentVariable('HARMONIC_CACHE_ACCOUNT', 'Process')
         HARMONIC_CACHE_CONTAINER = [System.Environment]::GetEnvironmentVariable('HARMONIC_CACHE_CONTAINER', 'Process')
@@ -261,19 +511,22 @@ try {
     [string[]]$nativeArgv = @('uv') + $buildArgs
 
     do {
+        $runGuid = [guid]::NewGuid().ToString('N')
         $runId = '{0}-{1}' -f (
             [System.DateTime]::UtcNow.ToString(
                 'yyyyMMddTHHmmssfffZ',
                 [System.Globalization.CultureInfo]::InvariantCulture
             )
-        ), ([guid]::NewGuid().ToString('N'))
+        ), $runGuid
         $recordPath = Join-Path $resolvedLogDirectory "$runId.run.json"
         $logPath = Join-Path $resolvedLogDirectory "$runId.log"
         $donePath = Join-Path $resolvedLogDirectory "$runId.done"
+        $buildWorktree = Join-Path $resolvedWorkRoot $runGuid.Substring(0, 8)
         $hasConflict = (
             (Test-Path -LiteralPath $recordPath) -or
             (Test-Path -LiteralPath $logPath) -or
-            (Test-Path -LiteralPath $donePath)
+            (Test-Path -LiteralPath $donePath) -or
+            (Test-Path -LiteralPath $buildWorktree)
         )
     } while ($hasConflict)
 
@@ -296,6 +549,8 @@ try {
         cache_environment = $cacheEnvironment
         tag = $Tag
         argv = @($nativeArgv)
+        build_worktree = $buildWorktree
+        caller_dirty = @($callerDirty)
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
     $startupRecordWritten = $true
@@ -317,43 +572,151 @@ catch {
     exit 1
 }
 
+function Write-WrapperDiagnostic {
+    param([Parameter(Mandatory)][string]$Diagnostic)
+
+    try {
+        Add-Content -LiteralPath $logPath -Value $Diagnostic -Encoding utf8
+    }
+    catch {
+        [System.Console]::Error.WriteLine(
+            "$Diagnostic; additionally failed to append the diagnostic to $logPath`: $($_.Exception.Message)"
+        )
+    }
+    [System.Console]::Error.WriteLine($Diagnostic)
+}
+
 $exitCode = 1
-$terminalState = 'failed'
+$buildRequested = $false
+$phaseSeconds = [ordered]@{}
+$phaseTimer = [System.Diagnostics.Stopwatch]::StartNew()
 try {
     Write-Output "farm-launch started $runId $([System.IO.Path]::GetFullPath($recordPath))"
+    if ($callerDirty.Count -gt 0) {
+        Write-LaunchLine -Path $logPath -Text (
+            "farm-launch WARNING: $($resolvedWorktree) has $($callerDirty.Count) uncommitted " +
+            "path(s) that this run does NOT build; it builds commit $commit only: " +
+            ($callerDirty -join ', ')
+        )
+    }
+
+    # The submitter runs in a disposable worktree at the pinned commit with an
+    # empty cad/out: no caller edit, .doit.db record or local artefact can
+    # reach a cache key, and nothing done to the caller during the run can.
+    $buildRequested = $true
+    Invoke-Git -Directory $resolvedWorktree -Arguments @(
+        'worktree', 'add', '--detach', $buildWorktree, $commit
+    ) | ForEach-Object { Write-LaunchLine -Path $logPath -Text $_ }
+    $buildHead = (Invoke-Git -Directory $buildWorktree -Arguments @(
+        'rev-parse', '--verify', 'HEAD'
+    ) | Select-Object -Last 1).Trim()
+    if ($buildHead -ne $commit) {
+        throw "build worktree HEAD $buildHead is not the pinned commit $commit"
+    }
+    Initialize-BuildSubmodules -Checkout $buildWorktree -Caller $resolvedWorktree -LogPath $logPath
+    Write-LaunchLine -Path $logPath -Text "farm-launch building $commit in $buildWorktree"
+    $phaseSeconds['prepare'] = [System.Math]::Round($phaseTimer.Elapsed.TotalSeconds, 3)
+    $phaseTimer.Restart()
+
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
-    Push-Location -LiteralPath $resolvedWorktree
+    # uv must sync the build worktree's own .venv: the editable
+    # SolidworksMCP-python source resolves against the checkout that syncs it.
+    Remove-Item -Path Env:VIRTUAL_ENV, Env:UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
+    Push-Location -LiteralPath $buildWorktree
+    # Tee-Object cannot append to a -LiteralPath, and the log already holds
+    # the preparation lines.
+    $logStream = [System.IO.File]::Open(
+        $logPath,
+        [System.IO.FileMode]::Append,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::ReadWrite
+    )
+    $logWriter = [System.IO.StreamWriter]::new($logStream, [System.Text.UTF8Encoding]::new($false))
+    $logWriter.AutoFlush = $true
     try {
-        & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
+        & uv @buildArgs *>&1 | ForEach-Object {
+            $line = [string]$_
+            $logWriter.WriteLine($line)
+            $line
+        }
         $code = $LASTEXITCODE
     }
     finally {
+        $logWriter.Dispose()
         Pop-Location
+        $phaseSeconds['build'] = [System.Math]::Round($phaseTimer.Elapsed.TotalSeconds, 3)
+        $phaseTimer.Restart()
     }
     if ($null -eq $code) {
         throw 'uv did not report a native exit code'
     }
     $exitCode = [int]$code
-    if ($exitCode -eq 0) {
-        $terminalState = 'succeeded'
-    }
 }
 catch {
     $exitCode = 1
-    $terminalState = 'failed'
-    $diagnostic = "farm-launch wrapper failed: $($_.Exception.Message)"
+    Write-WrapperDiagnostic -Diagnostic "farm-launch wrapper failed: $($_.Exception.Message)"
+}
+
+$harvest = [ordered]@{
+    outputs_copied_to = $null
+    outputs_copied = 0
+    caller_tasks_forgotten = @()
+    build_worktree_changes = @()
+    build_worktree_removed = $false
+}
+$harvestFailed = $false
+if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Container)) {
     try {
-        Add-Content -LiteralPath $logPath -Value $diagnostic -Encoding utf8
-    }
-    catch {
-        [System.Console]::Error.WriteLine(
-            "$diagnostic; additionally failed to append the diagnostic to $logPath`: $($_.Exception.Message)"
+        # A tracked or untracked change inside the build worktree means some
+        # task wrote outside cad/out; it is recorded, never carried back.
+        $harvest['build_worktree_changes'] = @(
+            Invoke-Git -Directory $buildWorktree -Arguments @(
+                'status', '--porcelain=v1', '--untracked-files=all'
+            ) | Where-Object { $_.Length -gt 3 } | ForEach-Object { $_.Substring(3) }
+        )
+        if ($harvest['build_worktree_changes'].Count -gt 0) {
+            Write-LaunchLine -Path $logPath -Text (
+                'farm-launch WARNING: the build changed files outside cad/out, which are ' +
+                'discarded with the build worktree: ' + ($harvest['build_worktree_changes'] -join ', ')
+            )
+        }
+        $buildOut = Join-Path $buildWorktree 'cad/out'
+        $callerOut = Join-Path $resolvedWorktree 'cad/out'
+        $harvest['outputs_copied_to'] = $callerOut
+        $harvest['outputs_copied'] = Copy-BuildOutputs -Source $buildOut -Destination $callerOut
+        $harvest['caller_tasks_forgotten'] = @(
+            Remove-CallerTaskRecords `
+                -BuildDatabase (Join-Path $buildOut '.doit.db') `
+                -CallerDatabase (Join-Path $callerOut '.doit.db')
+        )
+        Write-LaunchLine -Path $logPath -Text (
+            "farm-launch copied $($harvest['outputs_copied']) output file(s) to $callerOut; " +
+            "forgot $($harvest['caller_tasks_forgotten'].Count) caller doit record(s)"
         )
     }
-    [System.Console]::Error.WriteLine($diagnostic)
+    catch {
+        $harvestFailed = $true
+        if ($exitCode -eq 0) {
+            $exitCode = 1
+        }
+        Write-WrapperDiagnostic -Diagnostic (
+            "farm-launch failed to copy outputs back; keeping $buildWorktree for inspection: " +
+            $_.Exception.Message
+        )
+    }
+    $phaseSeconds['harvest'] = [System.Math]::Round($phaseTimer.Elapsed.TotalSeconds, 3)
+    $phaseTimer.Restart()
 }
+if ($buildRequested -and -not $harvestFailed) {
+    $harvest['build_worktree_removed'] = Remove-BuildWorktree -Caller $resolvedWorktree -Path $buildWorktree
+    if (-not $harvest['build_worktree_removed']) {
+        Write-WrapperDiagnostic -Diagnostic "farm-launch WARNING: build worktree $buildWorktree was not removed"
+    }
+    $phaseSeconds['cleanup'] = [System.Math]::Round($phaseTimer.Elapsed.TotalSeconds, 3)
+}
+$terminalState = if ($exitCode -eq 0) { 'succeeded' } else { 'failed' }
 
 $timer.Stop()
 $doneRecord = [ordered]@{}
@@ -367,6 +730,10 @@ $doneRecord['finished_at'] = [System.DateTime]::UtcNow.ToString(
     'o',
     [System.Globalization.CultureInfo]::InvariantCulture
 )
+foreach ($entry in $harvest.GetEnumerator()) {
+    $doneRecord[$entry.Key] = $entry.Value
+}
+$doneRecord['phase_s'] = $phaseSeconds
 
 try {
     Write-JsonAtomic -Path $donePath -Value $doneRecord
