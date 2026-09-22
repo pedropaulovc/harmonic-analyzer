@@ -14,12 +14,14 @@ import sys
 
 import _telemetry
 from _common import (
+    _early_bound,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -222,8 +224,12 @@ async def build(adapter) -> dict[str, str]:
         V_BODY - V_BORE - V_SEAM_GROOVE,
         max(0.5, 0.02 * V_SEAM_GROOVE),
     )
-
-    # Inboard shoulder and the existing MHA-024 match-ream station.
+    # Inboard shoulder and the plane locating the existing MHA-024 match-ream
+    # station.  The plane offset remains the physical station dimension, driven
+    # by the single ServicePinStation global.  It is not printable through a
+    # drawing view (targeted import selects sketches/body features), so the
+    # sheet-facing dimension is a second readout of that same global on the
+    # construction sketch below.
     for plane_name, station in (
         ("ArmShoulder", HUB_SEAT_LENGTH),
         ("ServicePinStationPlane", SERVICE_PIN_STATION),
@@ -236,7 +242,7 @@ async def build(adapter) -> dict[str, str]:
         )
         name_last_feature(adapter, plane_name)
         if plane_name == "ServicePinStationPlane":
-            dimensions = name_dimensions(adapter, plane_name, ["ServicePinStation"])
+            dimensions = name_dimensions(adapter, plane_name, ["ServicePinStationPlaneOffset"])
             drive_jobs.append((dimensions[0], '"ServicePinStation"'))
 
     wizard_hole_on_cylinder(
@@ -252,6 +258,42 @@ async def build(adapter) -> dict[str, str]:
         f"volume after {blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC):.3f} service pilot: "
         f"{final_volume:.1f} mm^3"
     )
+    # Drawing-only station reference, coincident with the hub axis.  Keeping
+    # the construction line under the view centreline avoids extra printed
+    # geometry while giving targeted model-item import a real sketch owner.
+    station = SketchDims()
+    check("create_sketch service pin station", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    station_line = check(
+        "service pin station reference line",
+        await adapter.add_line(0.0, 0.0, 0.0, SERVICE_PIN_STATION),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("service pin station reference did not take construction flag")
+    check(
+        "service pin station reference vertical",
+        await adapter.add_sketch_constraint(station_line, None, "vertical"),
+    )
+    check(
+        "service pin station reference starts at origin",
+        await adapter.add_sketch_constraint(f"{station_line}.start", "origin", "coincident"),
+    )
+    await dimension_between(
+        adapter,
+        f"{station_line}.start",
+        f"{station_line}.end",
+        "vertical_distance",
+        SERVICE_PIN_STATION,
+        "service pin station reference",
+    )
+    station.record("ServicePinStation", '"ServicePinStation"')
+    await ensure_fully_defined(adapter, "service pin station reference sketch")
+    check("exit_sketch service pin station", await adapter.exit_sketch())
+    name_last_feature(adapter, "ServicePinStationReference")
+    drive_jobs += station.apply(adapter, "ServicePinStationReference")
 
     # Axis1 is the shaft/hub axis; Axis2 is the axial seam-pin axis.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
