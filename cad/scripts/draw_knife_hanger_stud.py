@@ -80,8 +80,8 @@ ISO_SCALE = (1.5, 1.0)
 # Its keep-in cell: left of the pictorial, above the tip detail and the notes.
 FRONT_REGION = (0.020, 0.150, 0.280, 0.262)
 FRONT_FIT_MARGIN_M = 0.003
-# The projected axis may lean this much (sheet metres per 10 mm of axis).
-AXIS_TOLERANCE_M = 1e-7
+# The projected unit axis may lean this much off horizontal (float residue).
+AXIS_TOLERANCE_M = 1e-6
 
 # The engagement-critical tip length is ONE direct dimension, shoulder face to
 # faced end, carrying the interface's band (Main, 2026-09-22). Its text sits
@@ -111,24 +111,31 @@ CIRCLE_MATCH_MM = 0.01
 
 # The tip chamfer is shown in a detail at 6:1 (Main, 2026-09-22): at 2:1 it
 # is 1 mm of paper. The fence is centred on the axis 1 mm inside the faced
-# end and reaches 3 mm past the tip's crest, so the chamfer's callout keeps
-# ~17 mm of paper inside the boundary above the tip.
+# end and reaches past the tip's crest far enough to hold the chamfer's
+# dimension line. The detail's ``GetOutline`` is padded well past its fence:
+# stud-14 (leaf 20260922T214220Z) measured an outline half of 51.56 mm for a
+# 2.5 mm fence at 12:1, 1.72 x the nominal fence on the sheet (stud-4/6/12
+# measured 1.39 x). The cell is sized for 1.72 x, between the notes block
+# (right edge x 186.8 mm), the title block (top 66 mm), the lathe view's cell
+# and the pictorial's note (y 147 mm).
 TIP_DETAIL_SCALE = (6.0, 1.0)
+DETAIL_OUTLINE_PER_FENCE = 1.72
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
-    detail_center=(0.250, 0.110),
+    detail_center=(0.235, 0.109),
     detail_scale=TIP_DETAIL_SCALE,
-    fence_radius_mm=TIP_RADIUS_MM + 3.0,
+    fence_radius_mm=TIP_RADIUS_MM + 1.2,
     cut_end_y_mm=TIP_END_Y_MM,
     detail_offset_mm=1.0,
-    detail_label_xy=(0.290, 0.086),
+    # Centred right of the padded outline; the anchor is the label's top.
+    detail_label_xy=(0.295, 0.105),
     # Right of the fence, just below the axis: clear of the tip length above
     # the part and of the overall reference's witness line at the faced end.
     parent_letter_offset=(0.014, -0.004),
     detail_center_x_mm=0.0,
 )
 # The chamfer's dimension line runs this far out from the tip's crest.
-CHAMFER_TEXT_OUT_M = 0.006
+CHAMFER_TEXT_OUT_M = 0.004
 SUFFIX = 2  # swDimensionTextSuffix
 
 # The free upper-right cell the pictorial lives in, on this 0.4318 x 0.2794 m
@@ -147,7 +154,7 @@ DIMENSION_ARC_RADIUS_MAX_M = 0.030
 DIMENSION_ARC_SWEEP_MAX_DEG = 60.0
 ARC_SAMPLES = 32
 # Ink segments allowed to cross the tip detail's boundary circle, per
-# dimension: none -- the chamfer's callout fits inside the enlarged fence.
+# dimension: none -- the chamfer's dimension line runs inside the fence.
 DETAIL_BOUNDARY_CROSSINGS: dict[str, int] = {}
 # Proper crossings between a dimension's own lines (e.g. its leader through
 # its witness line) are measured apart from shared endpoints by this much.

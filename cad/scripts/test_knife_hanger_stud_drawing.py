@@ -155,10 +155,37 @@ def _overlap(a, b) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
-def _detail_circle_box() -> tuple[float, float, float, float]:
-    radius = drawing.SHEET.fence_radius_mm * drawing.SHEET.detail_scale[0] / 1000.0
-    x, y = drawing.SHEET.detail_center
-    return (x - radius, y - radius, x + radius, y + radius)
+def _detail_outline_box() -> tuple[float, float, float, float]:
+    """The tip detail's padded ``GetOutline`` at the worst measured ratio."""
+    sheet = drawing.SHEET
+    half = (
+        drawing.DETAIL_OUTLINE_PER_FENCE
+        * sheet.fence_radius_mm
+        * sheet.detail_scale[0]
+        / sheet.detail_scale[1]
+        / 1000.0
+    )
+    x, y = sheet.detail_center
+    return (x - half, y - half, x + half, y + half)
+
+
+# stud-14's census (leaf 20260922T214220Z), sheet metres: the detail label is
+# 32.7 x 16.4 mm, centred on its anchor's x with the anchor at its top; the
+# notes block and the pictorial's note are placed by this script unchanged.
+LABEL_SIZE = (0.0327, 0.0164)
+NOTES_BOX = (0.0158, 0.0694, 0.1868, 0.0851)
+ISO_NOTE_BOX = (0.3372, 0.1470, 0.3717, 0.1512)
+# check_drawing_layout's overlap slack is 1.5 mm; keep clear of it.
+CELL_GAP = 0.002
+
+
+def _label_box() -> tuple[float, float, float, float]:
+    x, top = drawing.SHEET.detail_label_xy
+    return (x - LABEL_SIZE[0] / 2.0, top - LABEL_SIZE[1], x + LABEL_SIZE[0] / 2.0, top)
+
+
+def _grown(box, gap):
+    return (box[0] - gap, box[1] - gap, box[2] + gap, box[3] + gap)
 
 
 def test_lathe_view_with_its_text_lanes_fits_its_cell() -> None:
@@ -179,19 +206,24 @@ def test_sheet_cells_do_not_collide() -> None:
         template.width_m,
         template.title_block_top_m,
     )
-    detail = _detail_circle_box()
     cells = {
         "front": drawing.FRONT_REGION,
         "isometric": drawing.ISO_REGION,
-        "tip detail": detail,
+        "tip detail": _detail_outline_box(),
+        "detail label": _label_box(),
+        "notes": NOTES_BOX,
+        "isometric note": ISO_NOTE_BOX,
         "title block": title_block,
     }
     names = sorted(cells)
     for index, a in enumerate(names):
         for b in names[index + 1 :]:
-            assert not _overlap(cells[a], cells[b]), (a, b)
-    sheet = (0.0, 0.0, template.width_m, template.height_m)
-    assert _inside(detail, sheet)
+            if {a, b} in ({"isometric", "isometric note"},):
+                continue  # the note is placed under the fitted pictorial
+            assert not _overlap(_grown(cells[a], CELL_GAP), cells[b]), (a, b)
+    drawable = (0.0127, 0.0127, template.width_m - 0.0127, template.height_m - 0.0127)
+    assert _inside(_detail_outline_box(), drawable)
+    assert _inside(_label_box(), drawable)
 
 
 def test_tip_detail_frames_the_whole_tip_end() -> None:
@@ -204,14 +236,14 @@ def test_tip_detail_frames_the_whole_tip_end() -> None:
     crest = math.hypot(build.TIP_RADIUS_MM, sheet.detail_offset_mm)
     assert reach_end < sheet.fence_radius_mm
     assert crest < sheet.fence_radius_mm
-    # The chamfer's text anchor sits inside the boundary, >= 1 mm of model
-    # (6 mm of paper) from it, so its callout needs no crossing.
+    # The chamfer's dimension line sits inside the boundary, >= 0.3 mm of
+    # model (1.8 mm of paper) from it, so its ink needs no crossing.
     scale = sheet.detail_scale[0] / sheet.detail_scale[1]
     text = (
         build.TIP_RADIUS_MM + drawing.CHAMFER_TEXT_OUT_M * 1000.0 / scale,
         sheet.detail_offset_mm - spec.TIP_CHAMFER_MM / 2.0,
     )
-    assert math.hypot(*text) <= sheet.fence_radius_mm - 1.0
+    assert math.hypot(*text) <= sheet.fence_radius_mm - 0.3
     assert drawing.DETAIL_BOUNDARY_CROSSINGS == {}
 
 
