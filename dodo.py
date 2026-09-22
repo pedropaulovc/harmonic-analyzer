@@ -2644,10 +2644,27 @@ def task_verify():
     for preset in ("neutral", "square"):
         name = f"calibrate_summing_clamp_{preset}"
         calibration_report = REPORTS / f"summing-clamp-calibration-{preset}.json"
+        # Labels are provenance only, not part of the cache key. Represent the
+        # selected CLI recipe as an input, using the existing sidecar convention
+        # so graph export and execution derive identical, preset-specific keys.
+        recipe = "\0".join(
+            [
+                calibration.relative_to(REPO_ROOT).as_posix(),
+                "--preset",
+                preset,
+                "--output",
+                calibration_report.relative_to(REPO_ROOT).as_posix(),
+            ]
+        )
+        recipe_dep = _write_digest_sidecar(
+            CAD_OUT / ".summing-clamp-recipes" / f"{preset}.digest",
+            hashlib.sha256(recipe.encode("utf-8")).hexdigest(),
+        )
+        preset_deps = [*calibration_deps, recipe_dep]
         yield {
             "name": name,
             "task_dep": [f"part:{stem}" for stem in anchors],
-            "file_dep": calibration_deps,
+            "file_dep": preset_deps,
             "targets": [str(calibration_report)],
             "actions": [
                 (
@@ -2662,7 +2679,7 @@ def task_verify():
                             "--output",
                             str(calibration_report.resolve()),
                         ],
-                        calibration_deps,
+                        preset_deps,
                         [calibration_report],
                         f"verify-calibrate-summing-clamp-{preset}",
                     ],
