@@ -397,3 +397,82 @@ def test_stud10_logged_angle_passes_every_option8_gate() -> None:
     assert drawing._printed_places_problem(
         -2, STUD10_STATE["texts"], STUD10_STATE["model_deg"]
     )
+
+
+# The stud as stud-12's front view drew it (leaf 20260922T212033Z, 2:1, axis
+# at x = 104.0 mm, cut end at y = 122.46 mm): head, shank and cut-end rows.
+STUD12_SILHOUETTE = (
+    (0.08495, 0.21266, 0.12305, 0.228935),
+    (0.0913, 0.125, 0.1167, 0.21266),
+    (0.09384, 0.12246, 0.11416, 0.125),
+)
+STUD12_DIMENSION_LINE = (
+    ((0.070, 0.21266), (0.070, 0.17778)),
+    ((0.070, 0.12246), (0.070, 0.17222)),
+)
+
+
+def _finished_ink(*witnesses) -> drawing.DimensionInk:
+    return drawing.DimensionInk(
+        name="FinishedOverall",
+        lines=(*witnesses, *STUD12_DIMENSION_LINE),
+        arcs=(),
+        triangles=(),
+        arrowheads=2,
+    )
+
+
+def test_stud12_model_underhead_witnesses_are_rejected() -> None:
+    # The model FinishedOverall's legs: the axis datum and the cutter's +2r
+    # corner, so one witness ran to the axis and the other across the tip.
+    ink = _finished_ink(
+        ((0.104, 0.21266), (0.069, 0.21266)),
+        ((0.1294, 0.12246), (0.069, 0.12246)),
+    )
+    problems = drawing._extension_line_problems(ink, STUD12_SILHOUETTE)
+    assert len(problems) == 2
+    assert "19.0 mm into the part" in problems[0]
+    assert "through the part and 15.2 mm past it" in problems[1]
+
+
+def test_drawn_edge_witnesses_pass() -> None:
+    # Each stops 1.5 mm short of the drawn edge nearest the dimension line.
+    ink = _finished_ink(
+        ((0.069, 0.21266), (0.08345, 0.21266)),
+        ((0.069, 0.12246), (0.09234, 0.12246)),
+    )
+    assert drawing._extension_line_problems(ink, STUD12_SILHOUETTE) == []
+    assert (
+        drawing._dimension_ink_problems(
+            ink,
+            owner=(0.0804, 0.1151, 0.1296, 0.2349),
+            obstacles={},
+            region=REGION,
+            silhouette=STUD12_SILHOUETTE,
+        )
+        == []
+    )
+    # A dimension with no vertical dimension line (an angle) is not judged.
+    assert drawing._extension_line_problems(_ink(), STUD12_SILHOUETTE) == []
+
+
+def test_model_underhead_control_is_reproved() -> None:
+    good = {
+        "driven_state": 2,
+        "value": spec.FINISHED_UNDERHEAD_MM / 1000.0,
+        "tolerance_type": 0,
+    }
+    assert drawing._model_finished_problems(**good) == []
+    assert drawing._model_finished_problems(**{**good, "driven_state": 1})
+    assert drawing._model_finished_problems(**{**good, "value": 0.0452})
+    assert drawing._model_finished_problems(**{**good, "tolerance_type": 1})
+
+
+def test_underhead_prints_as_a_one_place_reference() -> None:
+    places = spec.DRAWING_REFERENCE_PRECISION["FinishedOverall"]
+    assert places == spec.DIMENSION_PRECISION["FinishedOverall"] == 1
+    assert drawing._finished_text_problem(1, ["(45.1)"], 45.1) is None
+    assert drawing._finished_text_problem(1, ["(", "45.1", ")"], 45.1) is None
+    assert drawing._finished_text_problem(-2, ["(45.1)"], 45.1)
+    assert drawing._finished_text_problem(1, ["45.1"], 45.1)
+    assert drawing._finished_text_problem(1, ["(45.10)"], 45.1)

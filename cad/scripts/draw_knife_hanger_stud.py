@@ -24,8 +24,6 @@ from _drawing_common import (
     add_property_linked_note,
     check_drawing_layout,
     collect_layout_elements,
-    curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     find_edge_near,
     model_point_in_view,
@@ -40,15 +38,22 @@ from _drawing_common import (
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _stock_trim_drawing import TrimSheet
-from build_knife_hanger_stud import SHANK_DIA, THREAD_TIP_Y_MM
+from build_knife_hanger_stud import (
+    HEAD_AF,
+    HEAD_H,
+    SHANK_DIA,
+    THREAD_TIP_Y_MM,
+    UNDERHEAD_Y_MM,
+)
 from knife_hanger_stud_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
     CHAMFER_WIDTH_MM,
     DIMENSION_TOLERANCE_TYPES,
-    DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
+    FINISHED_UNDERHEAD_MM,
 )
+from diagnostics.diag_build_91247A720 import GB_WASHER_T
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -63,7 +68,21 @@ SHEET_SCALE = (2.0, 1.0)
 # with margin (measured on leaf 20260922T152754Z, which failed loudly at 2:1).
 ISO_SCALE = (1.5, 1.0)
 FRONT_CENTER = (0.105, 0.175)
-FRONT_KEEP = {"FinishedOverall": (0.070, 0.175)}
+# The (45.1) is a DRAWING dimension between the drawn washer-face bearing edge
+# and the drawn cut end face, text here. The model's FinishedOverall runs from
+# the stock datum point on the AXIS to a corner of the trim CUTTER sketch at
+# +2r (diagnostics/diag_mcmaster_lib.py): stud-12 drew its witness lines to
+# x = 104.0 (the axis, hidden under the washer face) and x = 129.4 mm (12.7 mm
+# of paper past the thread crest, through the Detail A fence), leaf
+# 20260922T212033Z. It stays the part's driving control and is re-proved.
+FINISHED_TEXT_XY = (0.070, 0.175)
+MODEL_FINISHED = "FinishedOverall@StockTrimProfile"
+FINISHED_VALUE_TOLERANCE_M = 1e-9
+SW_TOL_NONE = 0  # swTolType_e.swTolNONE: the build clears the native band
+# Where each drawn edge is picked, in model mm off the axis: the washer face
+# just outside the shank, the cut end face midway across its flat.
+UNDERHEAD_PICK_X_MM = SHANK_DIA / 2.0 + 1.0
+END_FACE_PICK_X_MM = (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 2.0
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
     detail_center=(0.265, 0.150),
@@ -78,7 +97,10 @@ SHEET = TrimSheet(
     # extra drop to y = 0.108 buys the 45 deg text block a 34 mm pocket between
     # the label's top edge and the linked note below the pictorial.
     detail_label_xy=(0.335, 0.108),
-    parent_letter_offset=(0.020, 0.014),
+    # Up-right of the r 6.35 mm fence, ~2 mm clear of it and ~4 mm right of
+    # the thread crest. It sat 20 mm out while the model (45.1)'s witness ran
+    # through the fence; the drawn-edge witness stops left of the part.
+    parent_letter_offset=(0.0096, 0.0080),
     detail_center_x_mm=SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM / 2.0,
 )
 
@@ -197,6 +219,12 @@ END_FACE_PICK_TYPES = ("EDGE", "SILHOUETTE")
 # Proper crossings between a dimension's own lines (e.g. its leader through
 # its witness line) are measured apart from shared endpoints by this much.
 SELF_CROSSING_END_M = 0.0005
+# An extension line leaves the drawn edge nearest its dimension line with a
+# gap: its far end may reach into the part's silhouette by at most this much.
+# A row of the silhouette carries a line whose height is within the second.
+EXTENSION_ENTRY_MAX_M = 0.0005
+EXTENSION_ROW_TOLERANCE_M = 0.0003
+LINE_AXIS_TOLERANCE_M = 1e-5
 
 LAYOUT_REPORT = (
     Path(OUTPUTS.slddrw).parent.parent
@@ -204,6 +232,8 @@ LAYOUT_REPORT = (
     / "layout-audit"
     / f"{SPEC.name}.json"
 )
+# The model's driving FinishedOverall, nominal SI length (no native band).
+MODEL_FINISHED_CONTROL = FINISHED_UNDERHEAD_MM / 1000.0
 # The model's driving ChamferAngle: (nominal, lower, upper) signed SI values.
 MODEL_ANGLE_CONTROL = (
     math.radians(CHAMFER_ANGLE_DEG),
@@ -501,11 +531,14 @@ def _dimension_ink_problems(
     obstacles: dict[str, Box],
     region: Box,
     boundary: tuple[Point, float] | None = None,
+    silhouette: tuple[Box, ...] = (),
 ) -> list[str]:
     """Every way ``ink`` escapes its own view or crosses something it must not.
 
     ``boundary`` is a detail view's circle (centre, radius): ink may cross it
     only as often as ``DETAIL_BOUNDARY_CROSSINGS`` allows for ``ink.name``.
+    ``silhouette`` is the part as drawn, row by row: extension lines must stop
+    at its edge (``_extension_line_problems``).
     """
     problems = []
     for arc in ink.arcs:
@@ -557,6 +590,55 @@ def _dimension_ink_problems(
                 f"{_mm(boundary[0])} r {boundary[1] * 1000.0:.1f} mm "
                 f"{crossings} time(s); {allowed} allowed"
             )
+    problems.extend(_extension_line_problems(ink, silhouette))
+    return problems
+
+
+def _extension_line_problems(
+    ink: DimensionInk, silhouette: tuple[Box, ...]
+) -> list[str]:
+    """Extension lines of a vertical linear dimension that enter the part.
+
+    The dimension line is the vertical ink; every horizontal line is an
+    extension line whose far end (away from the dimension line) must stop at
+    the silhouette row it points into, not run into or across the part.
+    """
+    uprights = [
+        (a, b) for a, b in ink.lines if abs(a[0] - b[0]) <= LINE_AXIS_TOLERANCE_M
+    ]
+    if not uprights or not silhouette:
+        return []
+    dimension_x = sum(a[0] for a, _b in uprights) / len(uprights)
+    problems = []
+    for a, b in ink.lines:
+        if abs(a[1] - b[1]) > LINE_AXIS_TOLERANCE_M or (a, b) in uprights:
+            continue
+        near, far = sorted((a, b), key=lambda point: abs(point[0] - dimension_x))
+        toward = 1.0 if far[0] >= near[0] else -1.0
+        worst = None
+        for box in silhouette:
+            if not (
+                box[1] - EXTENSION_ROW_TOLERANCE_M
+                <= far[1]
+                <= box[3] + EXTENSION_ROW_TOLERANCE_M
+            ):
+                continue
+            near_side, far_side = (box[0], box[2]) if toward > 0 else (box[2], box[0])
+            entry = (far[0] - near_side) * toward
+            if entry > EXTENSION_ENTRY_MAX_M and (worst is None or entry > worst[0]):
+                worst = (entry, (far[0] - far_side) * toward, box)
+        if worst is None:
+            continue
+        entry, past, box = worst
+        where = (
+            f"through the part and {past * 1000.0:.1f} mm past it"
+            if past > 0.0
+            else f"{entry * 1000.0:.1f} mm into the part"
+        )
+        problems.append(
+            f"{ink.name} extension line {[_mm(near), _mm(far)]} runs {where} "
+            f"(silhouette row {_format_box(box)})"
+        )
     return problems
 
 
@@ -780,6 +862,170 @@ def _model_chamfer_angle(view: Any) -> float:
     return float(dimension.SystemValue)
 
 
+def _model_finished_problems(
+    *, driven_state: int, value: float, tolerance_type: int
+) -> list[str]:
+    """How the model's FinishedOverall stopped being the driving control."""
+    problems = []
+    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
+        problems.append(f"{MODEL_FINISHED} is no longer driving (state {driven_state})")
+    if not math.isclose(
+        value, MODEL_FINISHED_CONTROL, abs_tol=FINISHED_VALUE_TOLERANCE_M
+    ):
+        problems.append(f"{MODEL_FINISHED} nominal {value * 1000.0!r} mm changed")
+    if tolerance_type != SW_TOL_NONE:
+        problems.append(
+            f"{MODEL_FINISHED} gained a native band (type {tolerance_type})"
+        )
+    return problems
+
+
+def _model_finished_overall(view: Any) -> float:
+    """Re-prove the part's driving FinishedOverall and return it (metres)."""
+    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    parameter = model.Parameter(MODEL_FINISHED)
+    if parameter is None:
+        raise RuntimeError(f"{MODEL_FINISHED} is missing from the referenced part")
+    dimension = _early_bound(parameter, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    problems = _model_finished_problems(
+        driven_state=int(dimension.DrivenState),
+        value=float(dimension.SystemValue),
+        tolerance_type=int(tolerance.Type),
+    )
+    if problems:
+        raise RuntimeError("; ".join(problems))
+    return float(dimension.SystemValue)
+
+
+def _near_side_point(
+    adapter: Any, view: Any, x_mm: float, y_mm: float, *, label: str
+) -> Point:
+    """The sheet point of (+/-x, y) on the view's left, the dimension side."""
+    return min(
+        (
+            model_point_in_view(
+                adapter, view, (sign * x_mm / 1000.0, y_mm / 1000.0, 0.0), label=label
+            )
+            for sign in (-1.0, 1.0)
+        ),
+        key=lambda point: point[0],
+    )
+
+
+def _part_silhouette(adapter: Any, front: Any) -> tuple[Box, ...]:
+    """The stud as the front view draws it: head, shank, cut end face rows."""
+    rows = (
+        ("head", HEAD_AF / 2.0, UNDERHEAD_Y_MM, UNDERHEAD_Y_MM + GB_WASHER_T + HEAD_H),
+        ("shank", SHANK_DIA / 2.0, THREAD_TIP_Y_MM + CHAMFER_WIDTH_MM, UNDERHEAD_Y_MM),
+        (
+            "cut end",
+            SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM,
+            THREAD_TIP_Y_MM,
+            THREAD_TIP_Y_MM + CHAMFER_WIDTH_MM,
+        ),
+    )
+    boxes = []
+    for label, half, low, high in rows:
+        corners = [
+            model_point_in_view(
+                adapter,
+                front,
+                (x / 1000.0, y / 1000.0, 0.0),
+                label=f"{label} silhouette",
+            )
+            for x in (-half, half)
+            for y in (low, high)
+        ]
+        xs = [point[0] for point in corners]
+        ys = [point[1] for point in corners]
+        boxes.append((min(xs), min(ys), max(xs), max(ys)))
+    return tuple(boxes)
+
+
+def _add_finished_reference(adapter: Any, front: Any) -> Any:
+    """Dimension the drawn bearing face to the drawn cut end, as a reference."""
+    underhead, underhead_type = _pick_leg(
+        adapter,
+        front,
+        _near_side_point(
+            adapter, front, UNDERHEAD_PICK_X_MM, UNDERHEAD_Y_MM, label="bearing face"
+        ),
+        axis="y",
+        types=END_FACE_PICK_TYPES,
+        label="washer-face bearing edge",
+    )
+    tip, tip_type = _pick_leg(
+        adapter,
+        front,
+        _near_side_point(
+            adapter, front, END_FACE_PICK_X_MM, THREAD_TIP_Y_MM, label="cut end face"
+        ),
+        axis="y",
+        types=END_FACE_PICK_TYPES,
+        label="cut end face edge",
+    )
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            front,
+            p0=underhead,
+            p1=tip,
+            text_xy=FINISHED_TEXT_XY,
+            label="finished under-head length",
+            orientation="vertical",
+            entity_types=(underhead_type, tip_type),
+        ),
+        "IDisplayDimension",
+    )
+    # A drawing dimension has no part-authored places: the spec supplies them.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["FinishedOverall"], -1, -1, -1)
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    set_reference_dimension(
+        adapter, annotation, label="finished under-head length reference"
+    )
+    rebuild_drawing(adapter, label="finished under-head reference")
+    return annotation
+
+
+def _finished_text_problem(
+    places: int, texts: list[str], model_mm: float
+) -> str | None:
+    """Why the (45.1) does not print as the spec's parenthesized reference."""
+    wanted = DRAWING_REFERENCE_PRECISION["FinishedOverall"]
+    if places != wanted:
+        return f"(45.1) prints {places} places, the spec says {wanted}"
+    expected = f"({model_mm:.{wanted}f})"
+    rendered = "".join("".join(texts).split())
+    if rendered != expected:
+        return f"(45.1) renders {texts!r}, expected {expected!r}"
+    return None
+
+
+def _assert_finished_display(annotation: Any, model_value: float) -> None:
+    """Value, places and parentheses of the sheet's (45.1), on a fresh handle."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    places = int(_read_member(display, "GetPrimaryPrecision2"))
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    texts = [
+        str(data.GetTextAtIndex(index) or "")
+        for index in range(int(data.GetTextCount()))
+    ]
+    state = {
+        "value_mm": value * 1000.0,
+        "model_mm": model_value * 1000.0,
+        "places": places,
+        "texts": texts,
+    }
+    _telemetry.info("(45.1) sheet dimension: " + json.dumps(state, sort_keys=True))
+    if abs(value - model_value) > FINISHED_VALUE_TOLERANCE_M:
+        raise RuntimeError(f"(45.1) disagrees with {MODEL_FINISHED}: {state!r}")
+    problem = _finished_text_problem(places, texts, state["model_mm"])
+    if problem is not None:
+        raise RuntimeError(f"{problem}: {state!r}")
+
+
 def _pick_leg(
     adapter: Any, view: Any, xy: Point, *, axis: str, types: tuple[str, ...], label: str
 ) -> tuple[Point, str]:
@@ -976,22 +1222,6 @@ def _assert_root_finish_callout(display: Any, text: str) -> None:
         raise RuntimeError("the 45 deg dimension value is hidden")
 
 
-def _reference_dimension(
-    adapter: Any, annotations: list[Any], name: str, label: str
-) -> Any:
-    matches = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"expected one {name} reference dimension, found {len(matches)}"
-        )
-    set_reference_dimension(adapter, matches[0], label=label)
-    return matches[0]
-
-
 def _attach_root_finish_callout(adapter: Any, annotation: Any) -> None:
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.ShowParenthesis = False
@@ -1099,7 +1329,10 @@ def _place_angle_text(
 
 def _audit_sheet_layout(
     adapter: Any,
-    dimensions: dict[str, tuple[Any, Box, dict[str, Box], tuple[Point, float] | None]],
+    dimensions: dict[
+        str,
+        tuple[Any, Box, dict[str, Box], tuple[Point, float] | None, tuple[Box, ...]],
+    ],
 ) -> None:
     """Census the sheet in millimetres, publish it, then gate the layout.
 
@@ -1110,7 +1343,8 @@ def _audit_sheet_layout(
     overlaps, zero border crossings and zero leader crossings.
     ``dimensions`` maps each dimension name to its annotation, its owning
     view's outline, the boxes its ink must not cross and, for a detail
-    view's dimension, the detail boundary circle.
+    view's dimension, the detail boundary circle, and the part silhouette
+    its extension lines must stop at.
     """
     elements, leaders, region = collect_layout_elements(adapter, layout=SPEC.layout)
     template = DRAWING_TEMPLATES[SPEC.layout]
@@ -1123,17 +1357,20 @@ def _audit_sheet_layout(
     drawable = (region.xmin, region.ymin, region.xmax, region.ymax)
     inks = {
         name: _read_dimension_ink(annotation, name)
-        for name, (annotation, _owner, _obstacles, _boundary) in dimensions.items()
+        for name, (annotation, *_rest) in dimensions.items()
     }
     problems = [
         problem
-        for name, (_annotation, owner, obstacles, boundary) in dimensions.items()
+        for name, (_annotation, owner, obstacles, boundary, silhouette) in (
+            dimensions.items()
+        )
         for problem in _dimension_ink_problems(
             inks[name],
             owner=owner,
             obstacles={**obstacles, "title block": title_block},
             region=drawable,
             boundary=boundary,
+            silhouette=silhouette,
         )
     ]
     census = {
@@ -1265,19 +1502,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     detail_box = _view_box(detail, label="cut end detail")
     model_angle = _model_chamfer_angle(detail)
-    front_annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="finished under-head length",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    finished = _reference_dimension(
-        adapter,
-        front_annotations,
-        "FinishedOverall",
-        "finished under-head length reference",
-    )
+    model_finished = _model_finished_overall(front)
     add_property_linked_note(adapter, "Supplier", 0.016, 0.056, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.016, 0.047, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.038, char_height=0.003)
@@ -1294,9 +1519,13 @@ async def build(adapter: Any) -> dict[str, str]:
     arc = _pin_angle_arc(adapter, angle, vertex)
     _attach_root_finish_callout(adapter, angle)
     _assert_chamfer_angle_display(angle, model_angle)
+    finished = _add_finished_reference(adapter, front)
+    _assert_finished_display(finished, model_finished)
+    silhouette = _part_silhouette(adapter, front)
     # Refusal (e) of the layout-tuning doc: re-assert the mode after the last
-    # annotation lands on the view.
-    set_hidden_lines_removed(adapter, detail)
+    # annotation lands on each view.
+    for view in (front, detail):
+        set_hidden_lines_removed(adapter, view)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
     iso_note_box = _note_box(_early_bound(iso_note, "INote"), label="isometric note")
@@ -1322,6 +1551,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _assert_arrows_on_drawn_edges(adapter, detail, angle, arc.center, chamfer_type)
     _assert_chamfer_angle_display(angle, model_angle)
+    _assert_finished_display(finished, model_finished)
     _audit_sheet_layout(
         adapter,
         {
@@ -1336,12 +1566,14 @@ async def build(adapter: Any) -> dict[str, str]:
                     "DETAIL A label": detail_label_box,
                 },
                 _detail_boundary(front, detail_box),
+                (),
             ),
             "FinishedOverall": (
                 finished,
                 front_box,
                 {"cut-end detail": detail_box, "isometric": iso_box},
                 None,
+                silhouette,
             ),
         },
     )
