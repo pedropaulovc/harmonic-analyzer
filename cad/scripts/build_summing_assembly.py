@@ -650,17 +650,54 @@ def _create_summing_explode(adapter: Any) -> None:
         raise RuntimeError(f"{EXPLODED_VIEW_NAME}: duplicate component identities")
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
 
-    supports = sorted(
-        groups["knife-mount"],
-        key=lambda component: baseline[str(component.Name2)][11],
+    def by_station(stem: str) -> list[Any]:
+        """One stem's two hanger-station instances, back (-z) first."""
+        group = sorted(
+            groups[stem],
+            key=lambda component: baseline[str(component.Name2)][11],
+        )
+        if len(group) != 2:
+            raise RuntimeError(
+                f"{EXPLODED_VIEW_NAME}: expected two {stem} instances, "
+                f"found {len(group)}"
+            )
+        return group
+
+    supports = by_station("knife-mount")
+    washers = by_station("knife-hanger-washer")
+    bolts = by_station("knife-hanger-stud")
+
+    def station_z(component: Any) -> float:
+        return baseline[str(component.Name2)][11]
+
+    _telemetry.event(
+        "assembly.summing_explode.stations",
+        **{
+            f"{stem}_z_mm": [station_z(component) * 1000.0 for component in group]
+            for stem, group in (
+                ("support", supports),
+                ("washer", washers),
+                ("bolt", bolts),
+            )
+        },
     )
-    if len(supports) != 2:
-        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: expected two knife supports")
+    for index, support in enumerate(supports):
+        other = supports[1 - index]
+        for fastener in (washers[index], bolts[index]):
+            own = abs(station_z(fastener) - station_z(support))
+            if own >= abs(station_z(fastener) - station_z(other)):
+                raise RuntimeError(
+                    f"{EXPLODED_VIEW_NAME}: {fastener.Name2} is not at "
+                    f"{support.Name2}'s station"
+                )
+    # Each support withdraws WITH its own washer and bolt, so both stay on
+    # that support's tap axis when they lift off it (r9 eye pass: the bolts
+    # hung over the vacated stations).
     plans = (
-        ("hanger bolts lift", groups["knife-hanger-stud"], "y", 0.080),
-        ("hanger washers lift", groups["knife-hanger-washer"], "y", 0.040),
-        ("front support withdraws", [supports[1]], "z", 0.050),
-        ("back support withdraws", [supports[0]], "z", -0.050),
+        ("front support withdraws", [supports[1], washers[1], bolts[1]], "z", 0.050),
+        ("back support withdraws", [supports[0], washers[0], bolts[0]], "z", -0.050),
+        ("hanger bolts lift", bolts, "y", 0.080),
+        ("hanger washers lift", washers, "y", 0.040),
         ("counter anchor lifts", groups["boss-hook"], "y", 0.035),
         ("counter spring moves clear", groups["counter-spring"], "x", -0.060),
         ("gooseneck lifts", groups["gooseneck"], "y", 0.080),
