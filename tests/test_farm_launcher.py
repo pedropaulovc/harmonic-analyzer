@@ -888,3 +888,43 @@ def test_prune_never_deletes_a_path_git_does_not_vouch_for(tmp_path: Path) -> No
     assert (precious / "keep.txt").exists()
     assert misnamed.exists()
     assert branched.exists()
+
+
+def test_a_copy_back_that_fails_midway_has_already_dropped_the_stale_records(
+    tmp_path: Path,
+) -> None:
+    """Second Codex pass on #827: records must go before files are replaced,
+    or a half-finished harvest pairs a new artefact with an old record."""
+    fixture = _launcher_fixture(tmp_path)
+    caller_out = Path(fixture["worktree"]) / "cad" / "out"
+    # A directory where the build's journal wants to append makes the copy
+    # fail after png/probe.png has already landed.
+    (caller_out / "reports" / "telemetry" / "traces.jsonl").mkdir(parents=True)
+    (caller_out / ".doit.db").write_text(
+        json.dumps({"part:probe": {"stale": True}, "part:unrelated": {"kept": True}}),
+        encoding="utf-8",
+    )
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    result = subprocess.run(
+        _command(fixture, "part:probe"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "failed to copy outputs back" in result.stderr
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert finished["state"] == "failed"
+    assert finished["caller_tasks_forgotten"] == ["part:probe"]
+    assert (caller_out / "png" / "probe.png").read_text(encoding="utf-8") == "built png"
+    assert json.loads((caller_out / ".doit.db").read_text(encoding="utf-8")) == {
+        "part:unrelated": {"kept": True}
+    }
+    build_worktree = Path(finished["build_worktree"])
+    assert finished["build_worktree_removed"] is False
+    assert build_worktree.exists()
+    _git(Path(fixture["worktree"]), "worktree", "remove", "--force", str(build_worktree))

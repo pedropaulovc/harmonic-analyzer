@@ -256,58 +256,64 @@ function Initialize-BuildSubmodules {
     }
 }
 
-function Copy-BuildOutputs {
-    param(
-        [Parameter(Mandatory)][string]$Source,
-        [Parameter(Mandatory)][string]$Destination
-    )
+function Get-BuildOutputFiles {
+    param([Parameter(Mandatory)][string]$Source)
 
     # Top-level dot entries (.doit.db, .drawing-registry) are the build
     # worktree's own doit state, keyed to its paths: never outputs.
     if (-not (Test-Path -LiteralPath $Source -PathType Container)) {
-        return 0
+        return @()
     }
-    $copied = 0
-    foreach ($entry in Get-ChildItem -LiteralPath $Source -Force) {
+    $files = foreach ($entry in Get-ChildItem -LiteralPath $Source -Force) {
         if ($entry.Name.StartsWith('.', [System.StringComparison]::Ordinal)) {
             continue
         }
-        $files = if ($entry.PSIsContainer) {
-            @(Get-ChildItem -LiteralPath $entry.FullName -Recurse -File -Force)
+        if ($entry.PSIsContainer) {
+            Get-ChildItem -LiteralPath $entry.FullName -Recurse -File -Force
+            continue
         }
-        else {
-            @($entry)
+        $entry
+    }
+    return @($files)
+}
+
+function Copy-BuildOutputs {
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.IO.FileInfo[]]$Files
+    )
+
+    $copied = 0
+    foreach ($file in $Files) {
+        $relative = [System.IO.Path]::GetRelativePath($Source, $file.FullName)
+        $target = Join-Path $Destination $relative
+        [System.IO.Directory]::CreateDirectory((Split-Path -Path $target -Parent)) | Out-Null
+        if ($file.Extension -ne '.jsonl') {
+            Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+            $copied++
+            continue
         }
-        foreach ($file in $files) {
-            $relative = [System.IO.Path]::GetRelativePath($Source, $file.FullName)
-            $target = Join-Path $Destination $relative
-            [System.IO.Directory]::CreateDirectory((Split-Path -Path $target -Parent)) | Out-Null
-            if ($file.Extension -ne '.jsonl') {
-                Copy-Item -LiteralPath $file.FullName -Destination $target -Force
-                $copied++
-                continue
-            }
-            # Append-only journals (telemetry, cache.jsonl) extend the caller's history.
-            $reader = [System.IO.File]::OpenRead($file.FullName)
+        # Append-only journals (telemetry, cache.jsonl) extend the caller's history.
+        $reader = [System.IO.File]::OpenRead($file.FullName)
+        try {
+            $writer = [System.IO.File]::Open(
+                $target,
+                [System.IO.FileMode]::Append,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::Read
+            )
             try {
-                $writer = [System.IO.File]::Open(
-                    $target,
-                    [System.IO.FileMode]::Append,
-                    [System.IO.FileAccess]::Write,
-                    [System.IO.FileShare]::Read
-                )
-                try {
-                    $reader.CopyTo($writer)
-                }
-                finally {
-                    $writer.Dispose()
-                }
+                $reader.CopyTo($writer)
             }
             finally {
-                $reader.Dispose()
+                $writer.Dispose()
             }
-            $copied++
         }
+        finally {
+            $reader.Dispose()
+        }
+        $copied++
     }
     return $copied
 }
@@ -734,17 +740,22 @@ if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Contai
         $harvestLock = Enter-CallerOutputLock `
             -CallerOutput $callerOut -LogPath $logPath -TimeoutSeconds 600
         try {
-            $harvest['outputs_copied'] = Copy-BuildOutputs -Source $buildOut -Destination $callerOut
+            # Records go BEFORE any file is overwritten: a harvest that dies
+            # halfway then leaves the caller missing records (a re-probe),
+            # never a stale record beside a replaced artefact.
+            [System.IO.FileInfo[]]$outputFiles = @(Get-BuildOutputFiles -Source $buildOut)
             $harvest['caller_tasks_forgotten'] = @(
                 Remove-CallerTaskRecords `
                     -BuildDatabase (Join-Path $buildOut '.doit.db') `
                     -CallerDatabase (Join-Path $callerOut '.doit.db') `
                     -Scope $(
-                        # Only a failed build that copied something back can
-                        # have overwritten a caller artefact its db misnames.
-                        if ($exitCode -ne 0 -and $harvest['outputs_copied'] -gt 0) { 'All' } else { 'Recorded' }
+                        # Only a failed build with outputs to copy back can
+                        # overwrite a caller artefact its db misnames.
+                        if ($exitCode -ne 0 -and $outputFiles.Count -gt 0) { 'All' } else { 'Recorded' }
                     )
             )
+            $harvest['outputs_copied'] = Copy-BuildOutputs `
+                -Source $buildOut -Destination $callerOut -Files $outputFiles
         }
         finally {
             $harvestLock.Dispose()

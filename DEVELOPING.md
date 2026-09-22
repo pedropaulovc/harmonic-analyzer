@@ -56,20 +56,23 @@ So the submitter no longer runs in the caller's worktree. The launcher:
    (`--reference`) when it has one; the checkout is still the pinned gitlink;
 4. clears `VIRTUAL_ENV` and `UV_PROJECT_ENVIRONMENT` and runs the child from
    that worktree, so `uv run --frozen` syncs the worktree's own `.venv`;
-5. copies every non-dot entry of the build's `cad/out` into the caller's
+5. deletes, from the caller's `cad/out/.doit.db`, the records of every task the
+   run touched. The artefacts about to be copied may disagree with what the
+   caller had recorded for them, which is exactly the second failure above;
+   without a record, the caller's next local `doit` re-derives those keys from
+   its own inputs and restores or rebuilds. After a failed build that has
+   outputs to copy back, every caller record goes, because doit drops a failed
+   task's record and the build database can no longer name every task whose
+   outputs come back. A failure before any output existed (a submodule or `uv`
+   that would not start) leaves the caller's records alone. This happens
+   *before* any file is replaced, so a copy-back that dies halfway leaves
+   missing records (a cache re-probe), never a stale record beside a new
+   artefact;
+6. copies every non-dot entry of the build's `cad/out` into the caller's
    `cad/out`, dotfiles within them included (`.execution` tokens, `.dof.json`
    sidecars). `*.jsonl` journals (telemetry, `cache.jsonl`) are appended rather
    than overwritten. The build's `.doit.db` and `.drawing-registry/` are never
    copied: they are doit state keyed to the build worktree's absolute paths;
-6. deletes, from the caller's `cad/out/.doit.db`, the records of every task the
-   run touched. The copied artefacts may disagree with what the caller had
-   recorded for them, which is exactly the second failure above; without a
-   record, the caller's next local `doit` re-derives those keys from its own
-   inputs and restores or rebuilds. After a failed build that copied anything
-   back, every caller record goes, because doit drops a failed task's record
-   and the build database can no longer name every task whose outputs came
-   back. A failure before any output existed (a submodule or `uv` that would
-   not start) leaves the caller's records alone;
 7. removes the build worktree (`git worktree remove --force`, then `prune`).
 
 Nothing in the caller's worktree (uncommitted edits, `.doit.db`, `cad/out`)
