@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined, heat-treated steel block (24 wide x ~29.4 tall x 16 deep) with a
+A machined, heat-treated steel block (24 wide x ~29.6 tall x 18 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
@@ -288,7 +288,7 @@ DIMENSION_CALLOUTS = {
 
 
 def _assert_tap_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
-    """The imported 8.00 is a controlling dimension, not a reference read.
+    """The imported 9.00 is a controlling dimension, not a reference read.
 
     The model's TapFromEnd reads swDimensionDriven once its equation owns it,
     exactly like BlockWidth/Depth (knife-cc-5), so DrivenState cannot tell a
@@ -920,7 +920,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # edges and the actual Hole Wizard circle: a sheet-side location with no
     # second driving acceptance requirement. Its thickness-direction location
     # is the model's own equation-owned TapFromEnd (kept in TOP_KEEP above), so
-    # the sheet prints its 8.00 as a controlling dimension instead of '(8.00)'.
+    # the sheet prints its 9.00 as a controlling dimension instead of '(9.00)'.
     tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_from_side = add_edge_dimension(
         adapter,

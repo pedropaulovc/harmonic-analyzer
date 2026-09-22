@@ -56,11 +56,13 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
 
 
 def test_end_located_hanger_tap_retains_axial_wall_at_limits() -> None:
-    """The tap is located 8.00 from ONE end face, so both walls stack.
+    """The tap is located Depth/2 from ONE end face, so both walls stack.
 
     Near wall: the location's own band. Far wall: the thickness band plus the
     location band. Each band is the title-block tolerance of the precision the
-    sheet actually prints for that dimension.
+    sheet actually prints for that dimension. 1.2 mm is the user's floor
+    (2026-09-22) for a quench-hardened wall beside a thread root; it is why
+    the block is 18 deep.
     """
     import _config
 
@@ -84,8 +86,8 @@ def test_end_located_hanger_tap_retains_axial_wall_at_limits() -> None:
         - basic_major_radius
     )
 
-    assert near_wall > 0.0
-    assert far_wall > 0.0
+    assert near_wall >= 1.2
+    assert far_wall >= 1.2
 
 
 def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() -> None:
