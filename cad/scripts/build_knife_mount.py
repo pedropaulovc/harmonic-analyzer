@@ -46,6 +46,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from typing import Any
 
 from _common import (
     SketchDims,
@@ -70,8 +71,9 @@ from _common import (
     volume_check,
 )
 from summing_lever_spec import HEX_H, HEX_W
-from _holes import blind_hole_volume_mm3, wizard_holes
+from _holes import blind_hole_volume_mm3, find_planar_face, wizard_holes
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -338,6 +340,227 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success else float("nan")
 
 
+# swDimensionDrivenState_e.swDimensionDriving: the sheet prints the tap's 8.00
+# plain only while its model dimension drives the geometry. A demoted (driven)
+# dimension satisfies every build gate and still prints the machinist's
+# parenthesized complaint, so the state is read back, never assumed.
+_DIMENSION_DRIVING = 2
+
+
+def _tap_placement(adapter: Any) -> tuple[Any, Any, Any, str]:
+    """The StudTap wizard's placement subfeature and sketch.
+
+    The same subfeature walk ``_holes`` uses to place the wizard points: Hole
+    Wizard placement dimensions live one level below the recipe-named feature.
+    """
+    model = adapter.currentModel
+    part = _early_bound(model, "IPartDoc")
+    feature = part.FeatureByName("StudTap")
+    if feature is None:
+        raise RuntimeError("hanger-stud tap: StudTap feature not found")
+    sub = _early_bound(feature, "IFeature").GetFirstSubFeature()
+    while sub is not None:
+        sub = _early_bound(sub, "IFeature")
+        if str(sub.GetTypeName2()) == "ProfileFeature":
+            sketch = _early_bound(sub.GetSpecificFeature2(), "ISketch")
+            if len(sketch.GetSketchPoints2() or []) == 1:
+                return model, sub, sketch, str(sub.Name)
+        sub = sub.GetNextSubFeature()
+    raise RuntimeError("hanger-stud tap: wizard placement sketch not found")
+
+
+def _model_point_in_placement(
+    adapter: Any, sketch: Any, model_point_mm: list[float]
+) -> tuple[float, float, float]:
+    """Forward-map a model point into the placement sketch's coordinates.
+
+    The same ``ModelToSketchTransform`` product ``_holes`` derives for the
+    wizard points, so the tap's solved position and its intended model station
+    are compared in one coordinate space instead of trusted.
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    array = VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_R8,
+        [value / 1000.0 for value in model_point_mm],
+    )
+    mapped = _early_bound(
+        _early_bound(math_util.CreatePoint(array), "IMathPoint").MultiplyTransform(xform),
+        "IMathPoint",
+    )
+    return tuple(float(value) for value in mapped.ArrayData)[:3]
+
+
+def _assert_tap_station(adapter: Any, sketch: Any) -> None:
+    """The tap must still sit at x=0 on the extrusion mid-plane.
+
+    The solved placement point against the model station (0, BLK_TOP, 0)
+    mapped into the same sketch -- one space, no assumption about the sketch
+    origin's model position.
+    """
+    point = _early_bound((sketch.GetSketchPoints2() or [None])[0], "ISketchPoint")
+    solved = adapter._point_xyz(point)
+    expected = _model_point_in_placement(adapter, sketch, [0.0, BLK_TOP, 0.0])
+    if solved is None or any(
+        abs(got - want) > 1e-7 for got, want in zip(solved, expected, strict=True)
+    ):
+        raise RuntimeError(
+            f"hanger-stud tap: placement moved off the mid-plane station: "
+            f"solved {solved}, expected {expected}"
+        )
+
+
+def _assert_tap_from_end(dimension: Any) -> None:
+    """A DRIVING 8.00 mm dimension -- read back, never assumed."""
+    state = int(dimension.DrivenState)
+    if state != _DIMENSION_DRIVING:
+        raise RuntimeError(
+            "hanger-stud tap: tap-from-end dimension came back "
+            f"{'driven (reference)' if state == 1 else f'state {state}'}, not driving"
+        )
+    measured_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - SUPPORT_Z_THICK / 2.0) > 1e-5:
+        raise RuntimeError(
+            f"hanger-stud tap: tap-from-end reads {measured_mm:.4f} mm, "
+            f"expected {SUPPORT_Z_THICK / 2.0:.4f} mm"
+        )
+
+
+async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
+    """Author the tap's thickness-direction location as a DRIVING model dim.
+
+    The wizard's placement sketch sits on the top face with its origin on the
+    model origin's projection -- the tap's own station, since the block
+    extrudes symmetrically about it -- so ``_holes`` cannot dimension the
+    placement (a zero coordinate may not carry a distance dimension), which is
+    why the sheet had to print ``(8.00)`` as a reference. Hold the tap on the
+    bore centreline with the one axis relation and dimension the point from
+    the block's near END edge instead: 8.00 mm, driving, from the outer face
+    the machinist asked for, owned by the model like every other marked dim.
+    """
+    from _common import check
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+    from solidworks_mcp.adapters.solidworks.sketch import (
+        _add_sketch_constraint_impl,
+    )
+
+    model, _sub, sketch, place_name = _tap_placement(adapter)
+    point = _early_bound((sketch.GetSketchPoints2() or [None])[0], "ISketchPoint")
+
+    # The 8.00 measures from the block's OUTER (near) end face: pick its edge
+    # inside the top face by endpoint midpoint -- never by coordinate
+    # SelectByID2, which mis-resolves on end faces (see _holes's header).
+    top_face = find_planar_face(model, (0.0, 1.0, 0.0), [[0.0, BLK_TOP, 0.0]])
+    near_edge = None
+    for raw_edge in top_face.GetEdges() or ():
+        edge = _early_bound(raw_edge, "IEdge")
+        ends = [
+            tuple(float(value) for value in _early_bound(v, "IVertex").GetPoint())
+            for v in (edge.GetStartVertex(), edge.GetEndVertex())
+            if v is not None
+        ]
+        if len(ends) != 2:
+            continue
+        mid = [sum(pair) / 2.0 for pair in zip(*ends)]
+        if abs(mid[0]) < 1e-7 and abs(mid[2] + SUPPORT_Z_THICK / 2000.0) < 1e-7:
+            near_edge = edge
+            break
+    if near_edge is None:
+        raise RuntimeError("hanger-stud tap: block near end edge not found")
+
+    sm = _early_bound(model.SketchManager, "ISketchManager")
+    previous_sketch_manager = adapter.currentSketchManager
+    adapter.currentSketchManager = sm
+    adapter._sketch_origin_point = None
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"hanger-stud tap: cannot edit {place_name}")
+    editing = False
+    try:
+        model.EditSketch()
+        editing = True
+        # SolidWorks resets swInputDimValOnCreate on every sketch entry: the
+        # Modify dialog would block the unattended session (the same per-call
+        # re-assert the adapter's add_sketch_dimension makes).
+        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(10, False))
+        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(372, False))
+        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(520, False))
+        point_id = adapter._register_sketch_entity("Point", point)
+        check(
+            "tap on the bore centreline",
+            _add_sketch_constraint_impl(adapter, point_id, "origin", "vertical_points"),
+        )
+        # Raw COM, narrowly: adapter.add_sketch_dimension cannot dimension a
+        # point against an EDGE -- its distance types hard-require two point
+        # refs (sketch.py:1467-1490) and this 8.00 must measure to the block's
+        # near end edge. Mixed selection is the same shape as that helper's own
+        # _try_create_angular_dimension (sketch.py:1508-1548).
+        model.ClearSelection2(True)
+        if not adapter._select_sketch_entity(point, append=False):
+            raise RuntimeError("hanger-stud tap: placement point selection failed")
+        if not _early_bound(near_edge, "IEntity").Select2(True, 0):
+            raise RuntimeError("hanger-stud tap: near end edge selection failed")
+        text = (0.0, BLK_TOP / 1000.0, -SUPPORT_Z_THICK / 4000.0)
+        display = adapter._attempt(lambda: model.AddDimension2(*text), default=None)
+        if display is None:
+            display = adapter._attempt(
+                lambda: model.Extension.AddDimension(
+                    *text, adapter.constants["swSmartDimensionDirectionUp"]
+                ),
+                default=None,
+            )
+        if display is None:
+            raise RuntimeError("hanger-stud tap: tap-from-end dimension did not insert")
+        dimension = (
+            adapter._attempt(lambda: display.GetDimension2(0), default=None)
+            or adapter._attempt(lambda: display.GetDimension(), default=None)
+            or display
+        )
+        dimension = _early_bound(dimension, "IDimension")
+        target_m = SUPPORT_Z_THICK / 2000.0
+        if (
+            adapter._attempt(
+                lambda: dimension.SetSystemValue3(target_m, 1, None), default=None
+            )
+            is None
+            and adapter._attempt(
+                lambda: dimension.SetSystemValue2(target_m, 1), default=None
+            )
+            is None
+        ):
+            dimension.SystemValue = target_m
+        dimension.Name = "TapFromEnd"
+        if str(dimension.Name) != "TapFromEnd":
+            raise RuntimeError("hanger-stud tap: tap-from-end rename did not persist")
+        _assert_tap_from_end(dimension)
+        _assert_tap_station(adapter, sketch)
+        await ensure_fully_defined(adapter, "hanger-stud tap placement")
+    finally:
+        adapter.currentSketchManager = previous_sketch_manager
+        if editing:
+            model.EditSketch()
+    check("rebuild tap placement", model.EditRebuild3())
+    return f"TapFromEnd@{place_name}", '"SupportZThick" / 2'
+
+
+def _assert_tap_from_end_contract(adapter: Any) -> None:
+    """After the deferred equations and the final rebuild.
+
+    The volume gates prove the cut did not move; this proves the placement
+    dimension still drives at 8.00 mm and the tap still sits on the mid-plane
+    station.
+    """
+    _, _, sketch, _ = _tap_placement(adapter)
+    _display, dimension = _named_dimension(adapter, "StudTap", "TapFromEnd")
+    _assert_tap_from_end(dimension)
+    _assert_tap_station(adapter, sketch)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -501,12 +724,17 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 1.0, 0.0),
         "hanger-stud tapped hole (1/2-13)",
         name="StudTap",
-        placement_dims=[((None, None), (None, None))],
+        # No placement_dims: _holes' zero-coordinate relation would pin the
+        # tap coincident to the sketch origin (the tap IS that station -- the
+        # block extrudes symmetrically about it), leaving no free coordinate
+        # for the driving 8.00 the sheet must print. _dimension_tap_from_end
+        # authors it right below, from the block's near end face.
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);
         # the pinned dia is what HoleWizard5 was handed, and the volume
         # gate below proves the cut.
     )
+    drive_jobs.append(await _dimension_tap_from_end(adapter))
     _tolerance_hole_depth(
         adapter,
         "StudTap",
@@ -539,6 +767,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
+    _assert_tap_from_end_contract(adapter)
 
 
     await apply_material(adapter, MATERIAL)

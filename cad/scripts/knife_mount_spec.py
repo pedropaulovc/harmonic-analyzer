@@ -104,6 +104,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BoreDia",
     },
     "Block": {"Depth"},
+    "StudTap": {"TapFromEnd"},
 }
 
 # Decimal places carry the ordinary size tolerance and therefore live on the
@@ -117,6 +118,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": 2,
     },
     "Block": {"Depth": 1},
+    "StudTap": {"TapFromEnd": 2},
 }
 
 _PRECISION_NAMES = [
@@ -140,14 +142,13 @@ DRAWING_NOMINALS_MM: dict[str, float] = {
     "BoreDia": 2.0 * R_BORE,
     "BoreFromTop": BORE_FROM_TOP,
     "BoreFromSide": BLK_HALF_X,
+    "TapFromEnd": SUPPORT_Z_THICK / 2.0,
 }
 REFERENCE_DIMENSION_NOMINALS_MM = {
     "TapFromSide": BLK_HALF_X,
-    "TapFromEnd": SUPPORT_Z_THICK / 2.0,
 }
 DRAWING_REFERENCE_PRECISION = {
     "TapFromSide": 2,
-    "TapFromEnd": 2,
 }
 # The native tap definition and the bore-location/size bands close the adverse
 # uninterrupted-crown stack; the drawing's center section shows that geometry.
