@@ -368,13 +368,17 @@ class Fixture:
             bodies = []
             census = evidence["native_part_body_census"][body_role] = []
             for index, body in enumerate(solids):
-                faces = [face for face, _ in _face_rows(body)]
-                volume = _values(body.GetMassProperties(1.0), 12, "witness body mass")[3]
+                face_rows = _face_rows(body)
+                faces = [face for face, _ in face_rows]
+                properties = _values(body.GetMassProperties(1.0), 12, "witness body mass")
+                volume = properties[3]
                 if volume <= 0.0:
                     raise RuntimeError(f"{body_role}: witness body has no positive native volume")
-                bodies.append({"body": body, "index": index, "volume_si": volume, "faces": faces})
+                bodies.append({"body": body, "index": index, "volume_si": volume, "faces": faces,
+                               "mass_properties_si": properties,
+                               "face_areas_mm2": [row["area_mm2"] for _, row in face_rows]})
                 census.append({"index": index, "name": body.Name, "volume_mm3": volume * 1e9,
-                               "face_count": len(faces)})
+                               "face_count": len(faces), "mass_properties_si_density_1": properties})
             self.part_contexts[body_role] = {"document": document, "bodies": bodies}
         self.counter_faces = [
             face for body in self.part_contexts["counter"]["bodies"] for face in body["faces"]
@@ -486,7 +490,87 @@ class Fixture:
         # Read the native transforms, not the requested placement dictionary.
         return {name: component_transform(self.adapter, self.names[name]) for name in (body_role, "counter")}
 
-    def _face_proof(self, body_role, face):
+    def _geometry_diagnostic(self, body_role, face, body, properties, source_proof, stage, triggering_proof=None):
+        """Record native observations before refusal; never repair or re-pose."""
+        baseline = body["mass_properties_si"]
+        record = {
+            "stage": stage, "body_role": body_role, "component": self.names[body_role],
+            "api_context": "part IComponent2.GetModelDoc2/IPartDoc.GetBodies2; current IFace2.GetBody",
+            "owner_body_index": body["index"], "relative_guard": 1e-12, "absolute_guard": 0.0,
+            "baseline_mass_properties_si_density_1": baseline,
+            "failing_mass_properties_si_density_1": properties,
+            "baseline_volume_mm3": baseline[3] * 1e9, "failing_volume_mm3": properties[3] * 1e9,
+            "volume_delta_mm3": (properties[3] - baseline[3]) * 1e9,
+            "volume_relative_delta": (properties[3] - baseline[3]) / baseline[3],
+            "source_face_proof": source_proof,
+            "triggering_current_face_proof": triggering_proof,
+        }
+        self.evidence.setdefault("local_geometry_guard_diagnostics", []).append(record)
+
+        def capture(key, operation):
+            try:
+                record[key] = operation()
+            except Exception as exc:
+                record[key] = {"diagnostic_error": repr(exc)}
+
+        app = _early_bound(self.adapter.swApp, "ISldWorks")
+        context = self.part_contexts[body_role]
+        owner = _early_bound(face.GetBody(), "IBody2")
+        capture("actual_component_transforms", lambda: {
+            name: component_transform(self.adapter, component) for name, component in self.names.items()
+        })
+        capture("same_census_owner", lambda: app.IsSame(body["body"], owner))
+        capture("repeated_owner_mass_properties_si_density_1", lambda: [
+            _values(owner.GetMassProperties(1.0), 12, "repeated owner mass") for _ in range(3)
+        ])
+        capture("census_object_mass_properties_si_density_1", lambda: [
+            _values(body["body"].GetMassProperties(1.0), 12, "census body mass") for _ in range(3)
+        ])
+
+        def areas():
+            same = [app.IsSame(candidate, face) for candidate in body["faces"]]
+            values = [float(face.GetArea()) * 1e6 for _ in range(3)]
+            return {
+                "same_census_faces": same, "current_area_mm2_repeated": values,
+                "baseline_area_mm2_matches": [
+                    area for state, area in zip(same, body["face_areas_mm2"], strict=True)
+                    if type(state) is int and state == 1
+                ],
+                "source_area_mm2": None if source_proof is None else source_proof["area_mm2"],
+                "delta_from_source_mm2": None if source_proof is None else values[0] - source_proof["area_mm2"],
+            }
+        capture("face_area", areas)
+
+        def part_identity():
+            proof = {}
+            proof["persist_hex"] = _face_identity(self.adapter, context["document"], face, owner, proof)
+            return proof
+        capture("current_part_face_identity", part_identity)
+        capture("fresh_part_body_census", lambda: [
+            {"index": index, "name": candidate.Name, "same_as_owner": app.IsSame(candidate, owner),
+             "mass_properties_si_density_1": _values(candidate.GetMassProperties(1.0), 12, "fresh part mass")}
+            for index, candidate in enumerate(_solids(context["document"]))
+        ])
+
+        def assembly_context():
+            mapped = _early_bound(self.component(body_role).GetCorrespondingEntity(face), "IFace2")
+            if mapped is None:
+                raise RuntimeError("diagnostic face did not map to assembly context")
+            mapped_owner = _early_bound(mapped.GetBody(), "IBody2")
+            if mapped_owner is None:
+                raise RuntimeError("diagnostic assembly face has no owner")
+            row = {"api_context": "IComponent2.GetCorrespondingEntity(IFace2).GetBody",
+                   "same_as_part_owner": app.IsSame(mapped_owner, owner),
+                   "mass_properties_si_density_1_repeated": [
+                       _values(mapped_owner.GetMassProperties(1.0), 12, "assembly owner mass") for _ in range(3)
+                   ],
+                   "face_area_mm2_repeated": [float(mapped.GetArea()) * 1e6 for _ in range(3)]}
+            identity = row["identity"] = {}
+            row["persist_hex"] = _face_identity(self.adapter, self.model, mapped, mapped_owner, identity)
+            return row
+        capture("mapped_assembly_context", assembly_context)
+
+    def _face_proof(self, body_role, face, source_proof=None):
         context = self.part_contexts[body_role]
         owner = _early_bound(face.GetBody(), "IBody2")
         if owner is None:
@@ -502,15 +586,18 @@ class Fixture:
         if len(matches) != 1:
             raise RuntimeError(f"{body_role}: witness owner must match exactly one native body-census member")
         body = matches[0]
-        volume = _values(owner.GetMassProperties(1.0), 12, "witness owner mass")[3]
+        properties = _values(owner.GetMassProperties(1.0), 12, "witness owner mass")
+        volume = properties[3]
         if not math.isclose(volume, body["volume_si"], rel_tol=1e-12, abs_tol=0.0):
-            raise RuntimeError(f"{body_role}: native witness owner changed local geometry")
+            self._geometry_diagnostic(body_role, face, body, properties, source_proof, "body_volume_invariance")
+            raise RuntimeError(f"{body_role}: native witness owner volume invariance guard failed")
         proof = {"owner_body_index": body["index"], "owner_census_count": len(context["bodies"])}
         proof["persist_hex"] = _face_identity(
             self.adapter, context["document"], face, body["body"], proof
         )
         proof["area_mm2"] = float(face.GetArea()) * 1e6
         proof["body_volume_si"] = volume
+        proof["body_mass_properties_si_density_1"] = properties
         return proof
 
     def _on_face(self, face, point):
@@ -546,7 +633,7 @@ class Fixture:
             (body_role, "counter"), witness["faces"], witness["owner_bodies"],
             witness["local_points_mm"], witness["proofs"], strict=True
         ):
-            proof = self._face_proof(name, face)
+            proof = self._face_proof(name, face, original)
             same_owner = _early_bound(self.adapter.swApp, "ISldWorks").IsSame(
                 owner, _early_bound(face.GetBody(), "IBody2")
             )
@@ -556,7 +643,12 @@ class Fixture:
             if proof["persist_hex"] != original["persist_hex"] or not math.isclose(
                 proof["area_mm2"], original["area_mm2"], rel_tol=1e-12, abs_tol=0.0
             ):
-                raise RuntimeError(f"{role}: transported witness changed native face identity/geometry")
+                body = self.part_contexts[name]["bodies"][proof["owner_body_index"]]
+                self._geometry_diagnostic(
+                    name, face, body, proof["body_mass_properties_si_density_1"], original,
+                    "face_identity_or_area_invariance", triggering_proof=proof,
+                )
+                raise RuntimeError(f"{role}: native witness face identity/area invariance guard failed")
             projected = self._on_face(face, local)
             if math.dist(projected, local) > self.resolution:
                 raise RuntimeError(f"{role}: transported local witness lost native finite-face membership")
