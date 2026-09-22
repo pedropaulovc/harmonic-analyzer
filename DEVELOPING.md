@@ -121,8 +121,10 @@ trusting `cad/out`.
   `caller_dirty`. (`build.py`'s own dirty-tree preflight still runs, inside the
   build worktree, where it always passes.)
 - **Nothing else writing the caller's `cad/out` while the run finishes.** The
-  copy-back overwrites outputs and edits `cad/out/.doit.db`; a local `doit` in
-  the caller at that moment would race both.
+  copy-back overwrites outputs and edits `cad/out/.doit.db` without a lock; a
+  local `doit` in the caller, or a second launch from the same caller finishing
+  at the same moment, would race both (the later writer can restore records
+  the earlier one dropped). Concurrent launches are otherwise independent.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
 - **A log directory outside the worktree.** Run records and logs must never land
