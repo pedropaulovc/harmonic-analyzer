@@ -1,11 +1,15 @@
 r"""Pure-data dimensional contract shared by the alignment pinion and its drawing.
 
-The long 42T brass drum pinion (ch.25) that engages the whole cylinder-gear
+The long 32T brass drum pinion (ch.25) that engages the whole cylinder-gear
 train to zero the machine to sines or cosines. See the batch gear-drawing
 pattern in ``cylinder_gear_spec``.
 """
 
 from __future__ import annotations
+
+import math
+
+import _config
 
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -13,13 +17,25 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
-TEETH = 42  # cad/config/machine/alignment_pinion.yaml
-DIAMETRAL_PITCH = 49.82  # meshes the cylinder train (gear_train.yaml)
+TEETH = int(_config.machine("alignment_pinion", "teeth"))
+DIAMETRAL_PITCH = float(_config.machine("gear_train", "diametral_pitch"))
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
+_PRESSURE_ANGLE_RAD = math.radians(PRESSURE_ANGLE_DEG)
+_BASE_RADIUS = (
+    TEETH * MODULE_MM * math.cos(_PRESSURE_ANGLE_RAD) / 2.0
+)
+_BASE_TOOTH_HALF_ANGLE = (
+    math.pi / (2.0 * TEETH)
+    + math.tan(_PRESSURE_ANGLE_RAD)
+    - _PRESSURE_ANGLE_RAD
+)
+_HALF_GAP_ANGLE = math.pi / TEETH - _BASE_TOOTH_HALF_ANGLE
+MIN_CHORD_FLOOR_DIA = 2.0 * _BASE_RADIUS * math.cos(_HALF_GAP_ANGLE)
+AS_CUT_RADIAL_TOOTH_DEPTH = OUTSIDE_DIA / 2.0 - MIN_CHORD_FLOOR_DIA / 2.0
+BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
 ARBOR_BORE_BAND = (-0.020, -0.040)  # (upper, lower) deviations; matched press
@@ -66,8 +82,15 @@ GEAR_DATA = gear_data_note(
         ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{WHOLE_DEPTH:.2f}"),
-        ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
+        (
+            "MIN CHORD-FLOOR DIAMETER (mm, REF)",
+            f"{MIN_CHORD_FLOOR_DIA:.3f}",
+        ),
+        (
+            "AS-CUT RADIAL TOOTH DEPTH (mm, REF)",
+            f"{AS_CUT_RADIAL_TOOTH_DEPTH:.3f}",
+        ),
+        ("TOOTH FORM", BASE_CHORD_ROOT_FORM),
     ]
 )
 

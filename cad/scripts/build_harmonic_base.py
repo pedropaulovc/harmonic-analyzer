@@ -345,13 +345,14 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
-# (2026-09 short-strap rig, the blocks right under the drum) and three #4-40
-# seats under the spring foot and both arbor-pedestal flanges.
+# and three #4-40 seats under the spring foot and both arbor-pedestal flanges.
+# The block and spring seats follow the user-authoritative 32T rig's coherent
+# 2 mm parked-gap shift; the drum-axis pedestal seats remain unchanged.
 _FORMER_BLOCK_SCREW_XZ = (
-    (-13.669764612476252, -98.0),  # front block, east screw
-    (13.33023538752375, -98.0),  # front block, west screw
-    (-13.669764612476252, 82.0),  # back block, east screw
-    (13.33023538752375, 82.0),  # back block, west screw
+    (-16.218941649810656, -98.0),  # front block, east screw
+    (10.781058350189346, -98.0),  # front block, west screw
+    (-16.218941649810656, 82.0),  # back block, east screw
+    (10.781058350189346, 82.0),  # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
@@ -361,7 +362,7 @@ BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
 BLOCK_SCREW_DRILL_DEPTH = 10.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
+    (10.630093216467879, 70.95),  # spring foot follows the shifted 32T swing rig
     # clear of the unchanged rocker-arm-support casting after the rig recenter
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the

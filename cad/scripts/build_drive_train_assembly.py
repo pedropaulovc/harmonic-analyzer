@@ -32,7 +32,7 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
   holes here, while the released drawings require their shared 1:48 taper to
   be match-reamed at assembly.)
-* alignment pinion (ch. 25): the 42T zeroing drum + its swing rig, parked
+* alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
 TRUE-CONE MESH GEOMETRY (M6.7; supersedes the M6.6 canted-vertical
@@ -1265,21 +1265,25 @@ for _ARB_Z, _min_gap in _ARB_Z_BANDS:
         )
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
-# The ch30 GT proves the zeroing rig is on the machine (grip head triangulates
-# to world (-10.2, 104.2, -144.1), back arbor end to (-11.4, 106.7, +91.3)) --
-# INBOARD of the drum and LEVEL with the drive axis, not the old outboard/low
-# placement the OD-62.2 rescale squeezed out (removal note: git c1ebca3).
-# Level + the book's parked tip gap puts the axis at X_DRUM - 44.32 = 10.38
-# authored = world -10.38, 0.2 sigma from GT. Parked DISENGAGED (p.68 "gap");
-# the engage swing is the p2 setup DOF, park-driven and never suppressed in
-# `free` builds (it is a setup motion, not an operational DOF).
-APINION_TEETH = _config.machine("alignment_pinion", "teeth")  # 42 (ch25 plate)
-TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0  # 11.22
-TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0  # 31.10: cylinder-gear tip radius
-APINION_GAP = _config.machine("alignment_pinion", "disengaged_tip_gap_mm")  # 2.0
-ENGAGED_C2C = (120.0 + APINION_TEETH) / 2.0 * 25.4 / DP_TRAIN  # 41.30 engaged
-APINION_X = X_DRUM + (TIP_DRUM120 + TIP_APINION + APINION_GAP)  # -10.38: INBOARD,
-# tip circles backed off to the parked gap at Delta-y = 0 (axis dead level)
+# The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
+# drum retains the train's DP 49.82 and the documented 2 mm parked tip gap, so
+# the drum, pivot blocks and lift axis move together when tooth count changes;
+# no superseded world coordinate is frozen into this placement.
+APINION_TEETH = int(_config.machine("alignment_pinion", "teeth"))
+TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0
+TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0
+APINION_GAP = float(_config.machine("alignment_pinion", "disengaged_tip_gap_mm"))
+ENGAGED_C2C = (120.0 + APINION_TEETH) / 2.0 * 25.4 / DP_TRAIN
+_CONFIG_ENGAGED_C2C = float(
+    _config.machine("alignment_pinion", "engaged_center_distance_mm")
+)
+if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
+    raise AssertionError(
+        "alignment-pinion configured and derived engaged centre distances disagree: "
+        f"{_CONFIG_ENGAGED_C2C:.6f} vs {ENGAGED_C2C:.6f} mm"
+    )
+APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
+# Tip circles retain their configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
 APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = -75.0 + MECHANISM_Z_SHIFT
@@ -1598,7 +1602,7 @@ _N_ENG = (
 )
 _S_CAM_ENG = (_FPIN_C_ENG[0] - LIFT_X) / _N_ENG[0]
 _FPIN_Y_AT_CAM_ENG = _FPIN_C_ENG[1] - _S_CAM_ENG * _N_ENG[1]
-_NEED_LIFT = _FPIN_Y_AT_CAM_ENG - _FPIN_Y_AT_CAM  # ~1.07 up
+_NEED_LIFT = _FPIN_Y_AT_CAM_ENG - _FPIN_Y_AT_CAM  # ~1.57 up for the 32T rig
 if _NEED_LIFT <= 0.2:
     raise AssertionError("engage swing does not RAISE the follower over the cam")
 # Drive authority: with the collar rotated ecc-UP, its surface must reach at

@@ -9,22 +9,23 @@ import alignment_pinion_spec as spec
 import pinion_arbor_spec as arbor
 
 
-def test_gear_data_block_preserves_the_tooth_system() -> None:
+def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
     data = spec.GEAR_DATA
-    assert spec.TEETH == 42
-    assert "42" in data
+    assert spec.TEETH == 32
+    assert spec.TEETH == int(_config.machine("alignment_pinion", "teeth"))
+    assert "NUMBER OF TEETH:  32" in data
     for field in (
-        "NUMBER OF TEETH",
         "DIAMETRAL PITCH",
         "MODULE",
         "PRESSURE ANGLE",
         "PITCH DIAMETER",
-        "WHOLE DEPTH",
-        "TOOTH FORM",
+        "MIN CHORD-FLOOR DIAMETER (mm, REF):  15.780",
+        "AS-CUT RADIAL TOOTH DEPTH (mm, REF):  0.777",
+        f"TOOTH FORM:  {spec.BASE_CHORD_ROOT_FORM}",
     ):
         assert field in data, field
-    assert "INVOLUTE" in data
-    assert "FULL DEPTH" in data
+    assert "FULL DEPTH" not in data
+    assert "WHOLE DEPTH" not in data
     assert "X.XX" not in data
 
 

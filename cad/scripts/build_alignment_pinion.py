@@ -2,13 +2,13 @@ r"""Reproduction script: alignment pinion drum (book ch. 25).
 
 The long brass pinion used to set the machine to sines or cosines: with
 the cone set swung clear, a lever engages this drum with the cylinder
-train so turning it "moves all the cylinder gears as one" (p. 66). 42
-teeth (counted on the p. 67 plate), cut at the SAME diametral pitch as
-the cylinder gears it must mesh with -- the train DP from machine.yaml
+train so turning it "moves all the cylinder gears as one" (p. 66). The
+user-authoritative 32 teeth are cut at the SAME diametral pitch as the
+cylinder gears they must mesh with -- the train DP from machine.yaml
 (49.82 since the OD-62.2 re-anchor; ch25's book-era DP 30 predates that
-rescale and over-sizes the teeth ~66%, burying the drum 5.4 mm into
-every cylinder gear) -- and a drum long enough to span all 20 stations
-at once. PR7 (review item 14): ONLY the drum is brass -- the integral
+rescale and is not the mating train pitch) -- and the drum is long enough
+to span all 20 stations at once.
+PR7 (review item 14): ONLY the drum is brass -- the integral
 Ø6.35 stubs are retired for a separate thicker STEEL arbor
 (build_pinion_arbor.py, Ø8) pressed through the drum's new through-bore;
 the arbor rides the swing brackets' top bores and carries its integral turned

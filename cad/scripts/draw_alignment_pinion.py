@@ -1,4 +1,4 @@
-r"""Create the simplicity-policy drawing for the 42T alignment-pinion drum.
+r"""Create the simplicity-policy drawing for the alignment-pinion drum.
 
 The end view owns the tooth-tip envelope and matched arbor bore.  The aligned
 profile owns the full tooth-face width, and the standard isometric supplies
@@ -23,11 +23,11 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
+    property_link,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
@@ -35,7 +35,6 @@ from _surface_finish import surface_finish_by_key
 from alignment_pinion_spec import (
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
-    FACE_WIDTH,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -83,44 +82,52 @@ DIMENSION_CALLOUTS = {
 }
 
 
-def _hide_profile_tooth_edges(adapter: Any, view: Any) -> None:
-    """Reduce the axial view to its useful gear envelope and end profiles."""
-    draw = _early_bound(adapter.currentModel, "IDrawingDoc")
-    hidden = 0
-    for raw_edge in visible_view_entities(view, 1, label="alignment tooth edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if (
-            curve is None
-            or start is None
-            or end is None
-            or not _early_bound(curve, "ICurve").IsLine()
-        ):
+def _bind_title_material_specification(
+    drawing_model: Any, material_specification: str
+) -> None:
+    """Retarget this sheet's material cell to the make-critical stock grade."""
+    if not material_specification.strip():
+        raise RuntimeError("alignment-pinion material specification is blank")
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    sheet_view = drawing.GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError("alignment-pinion drawing template has no sheet view")
+    sheet_view = _early_bound(sheet_view, "IView")
+    generic_link = property_link("Material")
+    specification_link = property_link("Material Specification")
+    matched = 0
+    binding: tuple[Any, str, str] | None = None
+    for raw_annotation in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
             continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        start_xyz = tuple(float(value) for value in start.GetPoint())
-        end_xyz = tuple(float(value) for value in end.GetPoint())
-        span_mm = (
-            sum((left - right) ** 2 for left, right in zip(start_xyz, end_xyz))
-            ** 0.5
-            * 1000.0
-        )
-        if span_mm < FACE_WIDTH - 0.1:
+        raw_note = annotation.GetSpecificAnnotation()
+        if raw_note is None:
+            raise RuntimeError("alignment-pinion title-block note has no INote")
+        note = _early_bound(raw_note, "INote")
+        raw = str(note.PropertyLinkedText)
+        occurrences = raw.count(generic_link)
+        if not occurrences:
             continue
-        adapter.currentModel.ClearSelection2(True)
-        if not view.SelectEntity(raw_edge, False):
-            raise RuntimeError("failed to select an axial tooth edge for hiding")
-        draw.HideEdge()
-        hidden += 1
-    adapter.currentModel.ClearSelection2(True)
-    if hidden < TEETH:
+        matched += occurrences
+        linked_text = raw.replace(generic_link, specification_link)
+        resolved_text = raw.replace(generic_link, material_specification)
+        note.PropertyLinkedText = linked_text
+        if str(note.PropertyLinkedText) != linked_text:
+            raise RuntimeError("alignment-pinion material title link did not persist")
+        binding = (note, linked_text, resolved_text)
+    if matched != 1 or binding is None:
         raise RuntimeError(
-            f"found only {hidden} axial tooth edges; expected at least {TEETH}"
+            "alignment-pinion template must contain exactly one Material "
+            f"property link, found {matched}"
         )
-    view.UpdateViewDisplayGeometry()
+    drawing_model.ForceRebuild3(False)
+    note, linked_text, resolved_text = binding
+    if str(note.PropertyLinkedText) != linked_text or str(note.GetText()) != resolved_text:
+        raise RuntimeError(
+            "alignment-pinion material title link did not resolve to "
+            f"{material_specification!r}"
+        )
 
 
 def _use_single_arrow_od_leader(adapter: Any, annotations: list[Any]) -> None:
@@ -168,7 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open alignment-pinion source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -194,6 +201,9 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _bind_title_material_specification(
+        drawing_model, properties["Material Specification"]
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -201,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Alignment Pinion Drum Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "alignment pinion; brass drum; 42T; zeroing drive",
+            3: f"alignment pinion; brass drum; {TEETH}T; zeroing drive",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -217,7 +227,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
-    _hide_profile_tooth_edges(adapter, right)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="toothed end"
