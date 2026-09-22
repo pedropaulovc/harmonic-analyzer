@@ -525,6 +525,7 @@ async def _edge_rib(
     )
 
 
+
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0), two
     curved sides, short tip edge at the anchor (x=TIP_X)."""
@@ -541,7 +542,7 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, top_c, _ = await _three_point_arc(
+    top_arc, _top_c, top_r = await _three_point_arc(
         adapter, p2, p3, top_int, "summation top"
     )
     tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
@@ -586,16 +587,16 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         "summation tip",
     )
     sd.record("SumTipHeight", '2 * "AnchorR"')
-    # The base/tip lines pin all four corners; each curved side is then defined
-    # by anchoring its (circumcentre) centre -- endpoints already lie on the arc,
-    # so the radius is implied and a radial dim would over-define (cf. the
-    # magnifying-lever dome caps). Both centres are general points (x, y both
-    # nonzero) -> two dims each, no clean global knob, left auto-named.
-    await anchor_point_to_origin(
-        adapter, f"{top_arc}.center", *top_c, "summation top centre"
+    # The top side is controlled directly by its actual three-point-derived
+    # radius plus the fixed base/tip endpoints.  This turns the shape the shop
+    # cuts into a native driving model dimension; no duplicate reference curve
+    # or post-hoc calculated nominal is involved.  The mirrored lower side keeps
+    # its existing fixed circumcentre because both endpoints already define it.
+    check(
+        "summation side profile radius",
+        await adapter.add_sketch_dimension(top_arc, None, "radial", top_r),
     )
-    sd.record(None, None)
-    sd.record(None, None)
+    sd.record("SummationArcRadius")
     await anchor_point_to_origin(
         adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
     )
@@ -869,8 +870,16 @@ async def _drawing_reference_sketches(
         "spring-hole total span reference",
         await adapter.add_line(HOLE_X, HOLE_Z[0], HOLE_X, HOLE_Z[-1]),
     )
+    end_offset = check(
+        "last spring-hole offset reference",
+        await adapter.add_line(HOLE_X, HOLE_Z[-1], HOLE_X, PLATE_L / 2.0),
+    )
+    boss_location = check(
+        "boss axial location reference",
+        await adapter.add_line(TIP_X, -PLATE_L / 2.0, TIP_X, 0.0),
+    )
     set_sketch_direct_db(adapter, False)
-    for entity in (first_offset, pattern_span):
+    for entity in (first_offset, pattern_span, end_offset, boss_location):
         _as_construction(adapter, entity)
     check(
         "first spring-hole offset vertical",
@@ -881,9 +890,23 @@ async def _drawing_reference_sketches(
         await adapter.add_sketch_constraint(pattern_span, None, "vertical"),
     )
     check(
+        "last spring-hole offset vertical",
+        await adapter.add_sketch_constraint(end_offset, None, "vertical"),
+    )
+    check(
+        "boss axial location vertical",
+        await adapter.add_sketch_constraint(boss_location, None, "vertical"),
+    )
+    check(
         "spring-hole span starts at first station",
         await adapter.add_sketch_constraint(
             f"{pattern_span}.start", f"{first_offset}.end", "coincident"
+        ),
+    )
+    check(
+        "last spring-hole offset starts at last station",
+        await adapter.add_sketch_constraint(
+            f"{end_offset}.start", f"{pattern_span}.end", "coincident"
         ),
     )
     await dimension_between(
@@ -916,6 +939,37 @@ async def _drawing_reference_sketches(
         "spring-hole total span",
     )
     pattern.record("PatternSpan", f'{HOLE_COUNT - 1} * "ChannelPitch"')
+    await dimension_between(
+        adapter,
+        f"{end_offset}.start",
+        f"{end_offset}.end",
+        "vertical_distance",
+        PLATE_L / 2.0 - HOLE_Z[-1],
+        "last spring-hole offset",
+    )
+    pattern.record(
+        "HoleEndOffsetLast",
+        f'"PlateL" / 2 - ("ChannelZ0" + {HOLE_COUNT - 1} * '
+        '"ChannelPitch" + "HoleZOffset")',
+    )
+    await dimension_between(
+        adapter,
+        f"{boss_location}.start",
+        f"{boss_location}.end",
+        "vertical_distance",
+        PLATE_L / 2.0,
+        "boss axial location",
+    )
+    pattern.record("BossAxialLocation", '"PlateL" / 2')
+    await anchor_point_to_origin(
+        adapter,
+        f"{boss_location}.start",
+        TIP_X,
+        -PLATE_L / 2.0,
+        "boss axial location start",
+    )
+    pattern.record("BossRefX", '"SumH"')
+    pattern.record("BossRefEnd", '"PlateL" / 2')
     await ensure_fully_defined(adapter, "pattern reference sketch")
     check("exit pattern reference", await adapter.exit_sketch())
     name_last_feature(adapter, "PatternReferences")
@@ -1061,14 +1115,32 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_prefix(adapter, "CoefficientsPlate", "PlateThickness", "2X ")
+    set_dimension_prefix(adapter, "SummationPlate", "WebThickness", "WEB THK ")
+    set_dimension_prefix(adapter, "SummationAnchor", "AnchorHeight", "BOSS LENGTH ")
     set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
+    set_dimension_prefix(adapter, "KnifeEnvelopeReference", "HexWidth", "HEX A/F ")
+    set_dimension_prefix(adapter, "KnifeEnvelopeReference", "HexHeight", "HEX A/C ")
+    set_dimension_prefix(
+        adapter, "SummationPlateProfile", "SummationArcRadius", "SIDE PROFILE "
+    )
+    set_dimension_prefix(adapter, "MiddleRibProfile", "MidRibArcR", "GUSSET ")
     _set_parenthetical_dimension(
         adapter,
         "SpringHolePattern",
         "HolePitch",
         prefix=f"{HOLE_COUNT - 1} EQ SP ",
+    )
+    _set_parenthetical_dimension(
+        adapter,
+        "PatternReferences",
+        "BossAxialLocation",
+        prefix="BOSS C/L ",
+    )
+    _set_parenthetical_dimension(
+        adapter,
+        "PatternReferences",
+        "HoleEndOffsetLast",
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
