@@ -88,7 +88,7 @@ SECTION_KEEP = {
 }
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        RIGHT_CENTER[0] + 0.049,
+        RIGHT_CENTER[0],
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.003,
     )
 }
