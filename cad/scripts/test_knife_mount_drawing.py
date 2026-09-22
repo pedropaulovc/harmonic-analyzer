@@ -225,6 +225,7 @@ def test_hanger_interface_matches_its_model_sources() -> None:
     # depth below the seat is the mount model's local seat height.
     assert abs(part.BORE_CY + part.R_BORE) < 1e-9
     assert abs(hanger.KNIFE_BORE_CROWN_DEPTH_MM - part.SEAT_TOP) < 1e-9
+    assert abs(hanger.KNIFE_CONTACT_Y - part.CONTACT_Y) < 1e-9
     assert abs(hanger.MOUNT_GAP - part.MOUNT_GAP) < 1e-9
     assert abs(knife_mount_spec.BLK_TOP - part.BLK_TOP) < 1e-9
 
