@@ -72,6 +72,7 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
+    view_name,
 )
 
 
@@ -99,10 +100,47 @@ ISO_CENTER = (0.345, 0.195)
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 
 
-def _hide_cosmetic_thread_annotations(
-    adapter: Any, views: tuple[Any, ...]
-) -> None:
-    """Hide every view-owned cosmetic thread, never a native hole callout."""
+def _cosmetic_thread_annotations(adapter: Any) -> list[tuple[str, Any]]:
+    """Every swCThread in the drawing, named by sheet/view, skipping no view.
+
+    SolidWorks attaches a feature's auto cosmetic 'Tapped Hole' annotation to
+    whichever view imports that feature FIRST, and how many arrive is a lottery
+    (7/8/5 across identical builds of one geometry -- draw_top_frame's measured
+    case), so this walk inventories what THIS build produced and names it. It
+    is evidence, never a gate on a count, and it never touches a native hole
+    callout or note (``GetType()`` is ``swCThread`` only).
+    """
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    found: list[tuple[str, Any]] = []
+    for sheet_name in drawing.GetSheetNames() or ():
+        sheet = _early_bound(drawing.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            view = _early_bound(raw_view, "IView")
+            label = f"{sheet_name}/{view_name(adapter, view)}"
+            for raw in view.GetAnnotations() or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                if int(annotation.GetType()) != 1:  # swCThread, not swNote/hole callout
+                    continue
+                if int(annotation.OwnerType) != 0:  # swAnnotationOwner_DrawingView
+                    raise RuntimeError(
+                        f"{label}: cosmetic thread is not owned by its drawing view"
+                    )
+                if annotation.GetSpecificAnnotation() is None:
+                    raise RuntimeError(
+                        f"{label}: cosmetic thread has no native ICThread object"
+                    )
+                found.append((label, annotation))
+    return found
+
+
+def _hide_cosmetic_thread_annotations(adapter: Any) -> None:
+    """Hide every cosmetic thread; the HIDE is the gate, never a census size.
+
+    A build whose import produced no cosmetic thread is legal and passes. What
+    must hold after the rebuild is that zero swCThread annotations remain on a
+    printing layer, anywhere on any sheet -- so the proof re-walks every sheet
+    and view and names whatever still refuses the hidden layer.
+    """
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -124,23 +162,12 @@ def _hide_cosmetic_thread_annotations(
     if bool(layer.Visible) or bool(layer.Printable):
         raise RuntimeError("cosmetic-thread layer is not hidden and non-printing")
 
-    cosmetic_threads = []
-    for view in views:
-        for raw in _early_bound(view, "IView").GetAnnotations() or ():
-            annotation = _early_bound(raw, "IAnnotation")
-            if int(annotation.GetType()) != 1:  # swCThread, not swNote/hole callout
-                continue
-            if int(annotation.OwnerType) != 0:  # swAnnotationOwner_DrawingView
-                raise RuntimeError("cosmetic thread is not owned by its drawing view")
-            if annotation.GetSpecificAnnotation() is None:
-                raise RuntimeError("cosmetic thread has no native ICThread object")
-            cosmetic_threads.append(annotation)
-    if not cosmetic_threads:
-        raise RuntimeError("drawing has no cosmetic-thread annotations to hide")
-    for annotation in cosmetic_threads:
+    for label, annotation in _cosmetic_thread_annotations(adapter):
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("cosmetic-thread annotation refused hidden layer")
+            raise RuntimeError(
+                f"{label}: cosmetic-thread annotation refused hidden layer"
+            )
 
     rebuild_drawing(adapter, label="hide redundant cosmetic threads")
     persisted_layer = _early_bound(
@@ -148,18 +175,26 @@ def _hide_cosmetic_thread_annotations(
     )
     if bool(persisted_layer.Visible) or bool(persisted_layer.Printable):
         raise RuntimeError("cosmetic-thread layer flags changed after rebuild")
-    persisted = []
-    for view in views:
-        persisted.extend(
-            _early_bound(raw, "IAnnotation")
-            for raw in (_early_bound(view, "IView").GetAnnotations() or ())
-            if int(_early_bound(raw, "IAnnotation").GetType()) == 1
-        )
-    if len(persisted) != len(cosmetic_threads) or any(
-        str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER
-        for annotation in persisted
-    ):
-        raise RuntimeError("cosmetic-thread census changed after rebuild")
+
+    unhidden = [
+        (label, annotation)
+        for label, annotation in _cosmetic_thread_annotations(adapter)
+        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER
+    ]
+    if unhidden:
+        for _label, annotation in unhidden:
+            annotation.Layer = _COSMETIC_THREAD_LAYER
+        refused = [
+            (label, str(annotation.Layer or ""))
+            for label, annotation in _cosmetic_thread_annotations(adapter)
+            if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER
+        ]
+        if refused:
+            raise RuntimeError(
+                "cosmetic-thread annotations refused the hidden layer after a "
+                "second hide: "
+                + "; ".join(f"{label} on layer {name!r}" for label, name in refused)
+            )
 
 
 def _front_y(model_y_mm: float) -> float:
@@ -866,9 +901,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.160)
-    # Cosmetic-thread imports can be regenerated by dimension/callout rebuilds.
-    # Census every authored view only after all recipe annotations exist.
-    _hide_cosmetic_thread_annotations(adapter, (front, section, top, iso))
+    # Cosmetic-thread imports can be regenerated by dimension/callout rebuilds,
+    # and SolidWorks attaches each to whichever view imports its feature first,
+    # so hide every one across all sheets only after all recipe annotations
+    # exist -- the hide is the gate, not any census size.
+    _hide_cosmetic_thread_annotations(adapter)
 
     return await finalize_drawing(
         adapter,
