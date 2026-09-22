@@ -14,8 +14,8 @@ knife-edge suspension: line contact at the ridge, free to rock, replacing the
 M6.4 "diamond knife-bar in the lever tube bore" (which clashed with the lever's
 solid pivot cylinder once the bore was removed). 2026-09-02 user re-read of
 ch18 p.42: the block is an UNPAINTED HEAT-TREATED STEEL block (not brass) with
-a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex, so the
-across-corners diagonal clears by ~0.87 and the shoulders by ~0.6.
+a CLOSE bore around the trunnion -- Ø12 over the 8.653 x 10.268 hex.  At
+finished-size limits it clears the observed ±1.6-degree rocking sweep.
 
 There are TWO supports, one per trunnion (placed front/back in the assembly at
 |z| ~ 87). This single part is built once and placed twice.
@@ -32,8 +32,9 @@ The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
 it, so the lever rocks about the true knife edge (not the cylinder centre).
 
-Dimensions: cad/DIMENSIONS.md ch. 18. Bore/clearance: low confidence (tune vs
-ch30 parity); the only hard constraint is "only the top edge contacts".
+Dimensions: cad/DIMENSIONS.md ch. 18. Bore size remains low-confidence
+photo-derived geometry; its hard constraints are ridge contact and the observed
+rocking sweep at finished-size limits.
 
 Run (SolidWorks already open)::
 
@@ -42,6 +43,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
@@ -49,11 +51,9 @@ from _common import (
     SketchDims,
     _early_bound,
     add_line_chain,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
@@ -81,11 +81,14 @@ from _drawing_marks import (
 from _part_pmi import author_part_pmi
 from knife_mount_spec import (
     BORE_DIAMETER_TOLERANCE_MM,
+    BORE_FROM_TOP_TOLERANCE_MM,
     BORE_FROM_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    MATING_HEX_SIZE_PLUS_MM,
+    REQUIRED_ROCK_SWEEP_DEG,
     STUD_TAP_CROWN_WEB_MM,
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
@@ -116,7 +119,7 @@ TOP_CLEAR = 0.0  # bore crown is tangent to the lever's top-vertex knife ridge
 BORE_CY = TOP_CLEAR - R_BORE  # -6.0; upper inner wall lies on the knife axis
 
 # --- block (bearing body, held to the crossbar) ----------------------------
-SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
+SUPPORT_Z_THICK = 16.0  # axial depth; centred tap retains wall at .XX limits
 BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
@@ -128,33 +131,69 @@ KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNI
 CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
 MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.616
 
-THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
 # --- hanger-stud tap: 1/2-13 UNC-2B blind in the block top ------------------
 # A conventional 118-degree drill and bottoming tap accept the 5.5-mm-shortened
 # hanger stud while their native depth bands preserve an uninterrupted crown.
 
 
-def _as_construction(adapter, entity_id: str) -> None:
-    """Make a reference-sketch line construction geometry and verify it."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
-
-def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None:
-    """Prove a creation-order rename landed on the intended reference value."""
-    dimension = adapter.currentModel.Parameter(full_name)
-    if dimension is None:
-        raise RuntimeError(f"missing model dimension {full_name!r}")
-    actual_mm = abs(float(_early_bound(dimension, "IDimension").SystemValue)) * 1000.0
-    if abs(actual_mm - expected_mm) > 1e-6:
-        raise RuntimeError(
-            f"{full_name} measured {actual_mm:g}, expected {expected_mm:g} mm"
+def _minimum_hex_rock_clearance_mm() -> float:
+    """Return the worst noncontact-vertex clearance over the required sweep."""
+    bore_radius = R_BORE - BORE_DIAMETER_TOLERANCE_MM / 2.0
+    width = HEX_W + MATING_HEX_SIZE_PLUS_MM
+    height = HEX_H + MATING_HEX_SIZE_PLUS_MM
+    vertices = (
+        (-width / 2.0, -height / 4.0),
+        (-width / 2.0, -3.0 * height / 4.0),
+        (0.0, -height),
+        (width / 2.0, -3.0 * height / 4.0),
+        (width / 2.0, -height / 4.0),
+    )
+    sweep = math.radians(REQUIRED_ROCK_SWEEP_DEG)
+    clearance = math.inf
+    for x, y in vertices:
+        candidates = [-sweep, sweep]
+        stationary = math.atan2(x, y)
+        for half_turn in range(-2, 3):
+            angle = stationary + half_turn * math.pi
+            if -sweep <= angle <= sweep:
+                candidates.append(angle)
+        maximum_radius = max(
+            math.sqrt(
+                x * x
+                + y * y
+                + bore_radius * bore_radius
+                + 2.0
+                * bore_radius
+                * (x * math.sin(angle) + y * math.cos(angle))
+            )
+            for angle in candidates
         )
+        clearance = min(clearance, bore_radius - maximum_radius)
+    return clearance
+
+
+def _hole_dimension_inventory_entry(display, dimension) -> dict[str, object]:
+    """Describe one native Hole Wizard display dimension for failure forensics."""
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    return {
+        "full_name": str(dimension.FullName),
+        "name": str(dimension.Name),
+        "value_mm": float(dimension.SystemValue) * 1000.0,
+        "dimension_type": int(dimension.GetType()),
+        "reference": bool(dimension.IsReference()),
+        "read_only": bool(dimension.ReadOnly),
+        "display_type": int(display.GetType()),
+        "hole_callout": bool(display.IsHoleCallout()),
+        "tolerance_type": int(tolerance.Type),
+        "tolerance_lower_mm": float(tolerance.GetMinValue()) * 1000.0,
+        "tolerance_upper_mm": float(tolerance.GetMaxValue()) * 1000.0,
+        "primary_precision": int(display.GetPrimaryPrecision2()),
+        "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
+    }
 
 
 def _tolerance_hole_depth(
@@ -164,29 +203,93 @@ def _tolerance_hole_depth(
     deviations_mm: tuple[float, float],
 ) -> None:
     """Apply and read back one native Hole Wizard depth tolerance in the part."""
-    feature = adapter._model.FeatureByName(feature_name)
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = model.FeatureByName(feature_name)
     if feature is None:
         raise RuntimeError(f"missing Hole Wizard feature {feature_name!r}")
     feature = _early_bound(feature, "IFeature")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError(f"{feature_name}: Hole Wizard definition is unavailable")
+    definition = _early_bound(definition, "IWizardHoleFeatureData2")
     matches = []
+    thread_depth_candidates = []
+    inventory = []
     display = feature.GetFirstDisplayDimension()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
         dimension = display.GetDimension()
         if dimension is not None:
             dimension = _early_bound(dimension, "IDimension")
+            full_name = str(dimension.FullName)
             normalized = "".join(
-                character
-                for character in str(dimension.FullName).lower()
-                if character.isalnum()
+                character for character in full_name.lower() if character.isalnum()
             )
+            entry = _hole_dimension_inventory_entry(display, dimension)
+            inventory.append(entry)
             if dimension_token in normalized:
                 matches.append((display, dimension))
+            owner = full_name.split("@", 2)
+            if (
+                dimension_token == "fullthreaddepth"
+                and len(owner) >= 2
+                and owner[1].lower().startswith("hole thread")
+                and int(display.GetType()) == 2
+                and not bool(dimension.ReadOnly)
+                and abs(
+                    float(dimension.SystemValue) - float(definition.ThreadDepth)
+                )
+                <= 1e-9
+            ):
+                thread_depth_candidates.append((display, dimension, entry))
         display = feature.GetNextDisplayDimension(display)
+
+    semantic_rename = None
+    if not matches and dimension_token == "fullthreaddepth":
+        if len(thread_depth_candidates) == 1:
+            display, dimension, entry = thread_depth_candidates[0]
+            prior_full_name = str(dimension.FullName)
+            dimension.Name = "Full Thread Depth"
+            renamed_full_name = str(dimension.FullName)
+            renamed_normalized = "".join(
+                character
+                for character in renamed_full_name.lower()
+                if character.isalnum()
+            )
+            if "fullthreaddepth" not in renamed_normalized:
+                raise RuntimeError(
+                    f"{feature_name}: semantic thread-depth rename did not persist: "
+                    f"{renamed_full_name!r}"
+                )
+            entry["renamed_full_name"] = renamed_full_name
+            semantic_rename = {
+                "from": prior_full_name,
+                "to": renamed_full_name,
+            }
+            matches.append((display, dimension))
+        elif thread_depth_candidates:
+            semantic_rename = {
+                "candidate_count": len(thread_depth_candidates),
+                "status": "ambiguous",
+            }
+
+    evidence = {
+        "event": "native_hole_dimension_inventory",
+        "feature": feature_name,
+        "requested_token": dimension_token,
+        "definition": {
+            "TapDrillDepth_mm": float(definition.TapDrillDepth) * 1000.0,
+            "ThreadDepth_mm": float(definition.ThreadDepth) * 1000.0,
+        },
+        "semantic_rename": semantic_rename,
+        "dimensions": inventory,
+    }
+    _telemetry.info(json.dumps(evidence, sort_keys=True))
     if len(matches) != 1:
         raise RuntimeError(
             f"{feature_name}: expected one {dimension_token} display dimension, "
-            f"found {len(matches)}"
+            f"found {len(matches)}; native evidence: "
+            f"{json.dumps(evidence, sort_keys=True)}"
         )
     display, dimension = matches[0]
     lower_mm, upper_mm = deviations_mm
@@ -198,7 +301,11 @@ def _tolerance_hole_depth(
         )
     lower = float(tolerance.GetMinValue()) * 1000.0
     upper = float(tolerance.GetMaxValue()) * 1000.0
-    if abs(lower - lower_mm) > 1e-9 or abs(upper - upper_mm) > 1e-9:
+    if (
+        int(tolerance.Type) != 2
+        or abs(lower - lower_mm) > 1e-6
+        or abs(upper - upper_mm) > 1e-6
+    ):
         raise RuntimeError(
             f"{feature_name} {dimension_token}: tolerance readback "
             f"{lower:+.3f}/{upper:+.3f} mm"
@@ -210,6 +317,20 @@ def _tolerance_hole_depth(
     ):
         raise RuntimeError(
             f"{feature_name} {dimension_token}: depth precision did not persist"
+        )
+    readback = feature.GetDefinition()
+    if readback is None:
+        raise RuntimeError(
+            f"{feature_name} {dimension_token}: definition unavailable after tolerance"
+        )
+    readback = _early_bound(readback, "IWizardHoleFeatureData2")
+    if (
+        abs(float(readback.TapDrillDepth) - float(definition.TapDrillDepth)) > 1e-9
+        or abs(float(readback.ThreadDepth) - float(definition.ThreadDepth)) > 1e-9
+    ):
+        raise RuntimeError(
+            f"{feature_name} {dimension_token}: depth nominal changed while "
+            "authoring its tolerance"
         )
 
 
@@ -243,13 +364,13 @@ async def build(adapter) -> dict[str, str]:
     # batch at the end (every target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Bearing block: Front-plane rectangle, mid-plane extrude along Z (the
-    #    bore/trunnion axis), straddling the trunnion mid. Asymmetric in Y (not
-    #    origin-centred), so a generic rectilinear chain, not define_centered_*.
-    #    Emission order (anchor vertex 0 at (-BlkHalfX, BlkBot)): the width dim
-    #    (seg 0), the height dim (seg 1), then the anchor dims (x, then z).
+    # 1. Bearing block and knife bore: one actual Front-plane profile with an
+    # outer rectangle and inner circle, extruded symmetrically about the tap's
+    # axial centre plane. BoreFromSide and BoreFromTop directly drive the real
+    # bore centre relative to the real block profile; there are no detached
+    # manufacturing-dimension replicas.
     block_dims = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Front"))
+    check("create_sketch block and bore", await adapter.create_sketch("Front"))
     block_rect = [
         (-BLK_HALF_X, BLK_BOT),
         (BLK_HALF_X, BLK_BOT),
@@ -263,7 +384,7 @@ async def build(adapter) -> dict[str, str]:
         block_rect,
         label="block",
         dims=block_dims,
-        names=["BlockWidth", "BlockHeight", "BlockAnchorX", "BlockAnchorZ"],
+        names=["BlockWidth", "BlockHeight", "BoreFromSide", "BlockAnchorZ"],
         drives=[
             '2 * "BlkHalfX"',
             '"BlkTop" - "BlkBot"',
@@ -271,12 +392,40 @@ async def build(adapter) -> dict[str, str]:
             '-"BlkBot"',
         ],
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    set_sketch_direct_db(adapter, True)
+    try:
+        bore_result = await adapter.add_circle(0.0, BORE_CY, R_BORE)
+    finally:
+        set_sketch_direct_db(adapter, False)
+    bore = check("add actual knife-bore circle", bore_result)
+    check(
+        "align knife-bore and hanger-tap centreline",
+        await adapter.add_sketch_constraint(
+            f"{bore}.center", "origin", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{block[2]}.start",
+        f"{bore}.center",
+        "vertical_distance",
+        BORE_FROM_TOP,
+        "actual bore from top seat",
+    )
+    block_dims.record("BoreFromTop", '"BlkTop" - "BoreCy"')
+    check(
+        "dimension actual knife-bore diameter",
+        await adapter.add_sketch_dimension(
+            bore, None, "diameter", 2.0 * R_BORE
+        ),
+    )
+    block_dims.record("BoreDia", '2 * "RBore"')
+    await ensure_fully_defined(adapter, "block and bore profile")
+    check("exit_sketch block and bore", await adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block_dims.apply(adapter, "BlockProfile")
     check(
-        "extrude block",
+        "extrude block with knife bore",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=SUPPORT_Z_THICK, both_directions=True)
         ),
@@ -284,44 +433,14 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Block")
     depth_dim = name_dimensions(adapter, "Block", ["Depth"])
     drive_jobs += [(depth_dim[0], '"SupportZThick"')]
-    expected = 2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT) * SUPPORT_Z_THICK
+    expected = (
+        2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT)
+        - math.pi * R_BORE**2
+    ) * SUPPORT_Z_THICK
     vol = await _volume(adapter)
-    _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
-
-    # 2. Circular bore through the block (the trunnion rides inside; only the
-    #    hex top vertex nears the upper inner wall). Centred TOP_CLEAR below the
-    #    ridge so the rest of the hex clears. On the Y-axis (x 0): only the
-    #    centre-Z + diameter are dims (the X is a relation).
-    bore_dims = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        BORE_CY,
-        R_BORE,
-        "knife bore",
-        dims=bore_dims,
-        names=("BoreCx", "BoreCz", "BoreDia"),
-        drives=(None, '-"BoreCy"', '2 * "RBore"'),
-    )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore_dims.apply(adapter, "BoreProfile")
-    check(
-        "cut knife bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "KnifeBore")
-    expected -= math.pi * R_BORE**2 * SUPPORT_Z_THICK
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after block and bore: {vol:.1f} mm^3")
     if abs(vol - expected) > 0.01 * expected:
-        raise RuntimeError(f"bore volume {vol:.1f} != {expected:.1f}")
+        raise RuntimeError(f"block-and-bore volume {vol:.1f} != {expected:.1f}")
 
     # The bore crown and lever ridge share the named knife axis: actual contact,
     # not the former 0.25-mm modeled gap.
@@ -329,14 +448,21 @@ async def build(adapter) -> dict[str, str]:
     contact_error = (BORE_CY + R_BORE) - hex_top
     if abs(contact_error) > 1e-9:
         raise RuntimeError(f"knife contact error is {contact_error:.6f} mm")
-    # widest hex point (shoulder at +-HEX_W/2, y = -RIDGE_Y +- HEX_H/4) must
-    # clear the bore wall.
-    for sy in (-RIDGE_Y + HEX_H / 4.0, -RIDGE_Y - HEX_H / 4.0):
-        d = math.hypot(HEX_W / 2.0, sy - BORE_CY)
-        if d > R_BORE - 0.5:
-            raise RuntimeError(
-                f"hex shoulder {d:.3f} mm too close to Ø{2 * R_BORE} bore"
-            )
+    # Every noncontact vertex must remain inside the minimum finished bore for
+    # the complete observed rock range, with both trunnion sizes at maximum
+    # material.  The former static 0.5-mm shoulder threshold had no mechanical
+    # basis and rejected the valid nominal contact geometry.
+    rock_clearance = _minimum_hex_rock_clearance_mm()
+    if rock_clearance <= 0.0:
+        raise RuntimeError(
+            "hex trunnion interferes with the knife bore over "
+            f"+/-{REQUIRED_ROCK_SWEEP_DEG:g} degrees: "
+            f"{rock_clearance:.6f} mm clearance at limits"
+        )
+    _telemetry.info(
+        "knife trunnion clearance at size and motion limits: "
+        f"{rock_clearance:.6f} mm"
+    )
 
     # Hanger-stud tap: native 1/2-13 blind bottoming tap on the trunnion-axis
     # centreline.  HoleWizard5 reads depth as the cylindrical drill shoulder;
@@ -376,6 +502,7 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 1.0, 0.0),
         "hanger-stud tapped hole (1/2-13)",
         name="StudTap",
+        placement_dims=[((None, None), (None, None))],
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);
         # the pinned dia is what HoleWizard5 was handed, and the volume
@@ -390,7 +517,7 @@ async def build(adapter) -> dict[str, str]:
     _tolerance_hole_depth(
         adapter,
         "StudTap",
-        "threaddepth",
+        "fullthreaddepth",
         STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
     )
     expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH_MM)
@@ -414,49 +541,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
 
-    # Model-owned BASIC height for the knife-bore position control.  This
-    # construction sketch adds no material and imports normally into the front
-    # drawing view; unlike a drawing-native dimension, its nominal and decimal
-    # places persist in the SLDPRT.
-    check("create bore-height reference", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    bore_height_ref = check(
-        "bore-height reference line",
-        await adapter.add_line(0.0, BLK_TOP, 0.0, BORE_CY),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, bore_height_ref)
-    check(
-        "bore-height reference vertical",
-        await adapter.add_sketch_constraint(bore_height_ref, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{bore_height_ref}.start",
-        f"{bore_height_ref}.end",
-        "vertical_distance",
-        BORE_FROM_TOP,
-        "bore height from top seat",
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{bore_height_ref}.start",
-        0.0,
-        BLK_TOP,
-        "bore height reference",
-    )
-    await ensure_fully_defined(adapter, "bore-height reference sketch")
-    check("exit bore-height reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreHeightReference")
-    name_dimensions(adapter, "BoreHeightReference", ["BoreFromTop"])
-    _verify_named_dimension(
-        adapter, "BoreFromTop@BoreHeightReference", BORE_FROM_TOP
-    )
-
-    await force_rebuild(adapter)
-    await volume_check(
-        adapter, "knife mount after reference sketches", expected, 0.01 * expected
-    )
 
     await apply_material(adapter, MATERIAL)
     # ch18 p.42: heat-treated and left unpainted -- a dark grey, not the
@@ -472,9 +556,15 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_symmetric_tolerance(
         adapter,
-        "BoreProfile",
+        "BlockProfile",
         "BoreDia",
         BORE_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BlockProfile",
+        "BoreFromTop",
+        BORE_FROM_TOP_TOLERANCE_MM,
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(

@@ -18,7 +18,7 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
     )
     crown_web_at_limits = (
         knife_mount_spec.BORE_FROM_TOP
-        - 0.5 * knife_mount_spec.BORE_POSITION_DIAMETRAL_TOLERANCE_MM
+        - knife_mount_spec.BORE_FROM_TOP_TOLERANCE_MM
         - (
             2.0 * knife_mount_spec.R_BORE
             + knife_mount_spec.BORE_DIAMETER_TOLERANCE_MM
@@ -55,6 +55,20 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
     assert crown_web_at_limits >= 0.5
 
 
+def test_midplane_hanger_tap_retains_axial_wall_at_depth_limit() -> None:
+    import _config
+
+    two_place_mm = round(
+        float(_config.title_block("linear_2pl")["value_in"]) * 25.4, 2
+    )
+    minimum_depth = knife_mount_spec.SUPPORT_Z_THICK - two_place_mm
+    basic_major_radius = 12.7 / 2.0
+
+    assert minimum_depth / 2.0 - basic_major_radius > 0.0
+
+
+
+
 
 def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() -> None:
     import math
@@ -68,10 +82,9 @@ def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() ->
     bore_radius_min = (
         part.R_BORE - knife_mount_spec.BORE_DIAMETER_TOLERANCE_MM / 2.0
     )
-    # The current lever print gives both trunnion sizes two decimal places:
-    # use its actual .XX +0.51-mm material limits, not nominal geometry.
-    hex_width_max = HEX_W + 0.51
-    hex_height_max = HEX_H + 0.51
+    # Use the lever print's actual adverse material limits, not nominal geometry.
+    hex_width_max = HEX_W + knife_mount_spec.MATING_HEX_SIZE_PLUS_MM
+    hex_height_max = HEX_H + knife_mount_spec.MATING_HEX_SIZE_PLUS_MM
     vertices_from_ridge = (
         (-hex_width_max / 2.0, -hex_height_max / 4.0),
         (-hex_width_max / 2.0, -3.0 * hex_height_max / 4.0),
@@ -79,9 +92,9 @@ def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() ->
         (hex_width_max / 2.0, -3.0 * hex_height_max / 4.0),
         (hex_width_max / 2.0, -hex_height_max / 4.0),
     )
-    # dimensions.yaml:1333 derives about 1.6 degrees of knife rock from the
-    # observed 6-mm summing-bar tip arc.
-    sweep = math.radians(1.6)
+    # dimensions.yaml:1333 derives the required summing-bar knife rock from the
+    # observed 6-mm tip arc.
+    sweep = math.radians(knife_mount_spec.REQUIRED_ROCK_SWEEP_DEG)
     minimum_clearance = math.inf
     for x, y in vertices_from_ridge:
         # Distance squared to a bore centre at (0, -R) is
