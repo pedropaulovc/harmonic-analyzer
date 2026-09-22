@@ -48,6 +48,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _config
 import _telemetry
 
 from _common import (
@@ -84,7 +85,13 @@ from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
 from build_knife_hanger_stud import (
     SHANK_DIA as BOLT_MAJOR_DIA,
+    THREAD_MAJOR_RADIUS_MM,
+    THREAD_TIP_CHAMFER_ANGLE_DEG,
+    THREAD_TIP_CHAMFER_AXIAL_MM,
+    THREAD_TIP_CHAMFER_RADIAL_MM,
+    THREAD_TIP_ROOT_RADIUS_MM,
     THREAD_TIP_Y_MM,
+    UNDERHEAD_LEN,
     UNDERHEAD_Y_MM,
 )
 from build_knife_hanger_washer import (
@@ -95,9 +102,15 @@ from build_knife_hanger_washer import (
 from build_knife_mount import (
     CASTING_UNDERSIDE_Y,
     MOUNT_GAP,
+    STUD_TAP_DIA,
+    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_DRILL_DEPTH_MM,
+    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
     STUD_TAP_THREAD_DEPTH_MM,
 )
 from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
+from diagnostics.diag_build_91247A720 import GB_LEN, GB_MTL, GB_UNDERSIDE
+from knife_hanger_stud_spec import CHAMFER_ANGLE_TOLERANCE_DEG
 from summing_assembly_spec import (
     BOM_QUANTITIES,
     EXPLODED_VIEW_NAME,
@@ -114,18 +127,106 @@ from summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
 # --- knife-hanger hardware (two bolts + two separate washers) ----------------
-# The top-frame crossbar and knife-mount exports own the surrounding stack.
-# Each washer's local origin is its mid-plane. The modified 91247A720 remains in
-# its supplier-native frame, so its exported under-head and trimmed-tip stations
-# determine seating and engagement without a synthetic tip-zero transform.
+# The physical fit is made from the actual crossbar, washer, and mount gap:
+# E = L - T_crossbar - W_washer - G_mount.  The saved CAD uses the released
+# nominals below; the fitter measures T/W/G for each identified side and trims
+# that side's stud to retain the same E target.  UNDERHEAD_LEN is therefore a
+# nominal/reference representation, never a fixed finished-length acceptance.
 CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
 HANGER_WASHER_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS / 2.0
 HANGER_WASHER_TOP_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS
 HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_Y_MM
 KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP
-KNIFE_MOUNT_THREAD_ENGAGEMENT = KNIFE_MOUNT_TOP_Y - (
-    HANGER_STUD_Y + THREAD_TIP_Y_MM
+HANGER_STACK_NOMINAL_MM = CROSSBAR_HEIGHT + HANGER_WASHER_THICKNESS + MOUNT_GAP
+HANGER_ENGAGEMENT_TARGET_MM = 5.8735
+HANGER_ENGAGEMENT_PRECISION = 2
+# The actual associative geometry retains 5.8735. The shop reads the printed
+# two-place nominal and title-block band: 5.87 +/- 0.51, hence 5.36..6.38.
+HANGER_ENGAGEMENT_DISPLAY_MM = round(
+    HANGER_ENGAGEMENT_TARGET_MM,
+    HANGER_ENGAGEMENT_PRECISION,
 )
+HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM = round(
+    float(_config.title_block("linear_2pl")["value_in"]) * 25.4,
+    HANGER_ENGAGEMENT_PRECISION,
+)
+HANGER_ENGAGEMENT_MIN_MM = (
+    HANGER_ENGAGEMENT_DISPLAY_MM - HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM
+)
+HANGER_ENGAGEMENT_MAX_MM = (
+    HANGER_ENGAGEMENT_DISPLAY_MM + HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM
+)
+
+# The purchased bolt is partially threaded.  Its complete-thread start is a
+# source-geometry station retained from the stock model, not a guessed "turns"
+# threshold.  In receiver-depth coordinates it begins at M - S, where M is the
+# under-head-to-complete-thread-start distance and S is the measured stack.
+HANGER_COMPLETE_THREAD_START_Y_MM = GB_UNDERSIDE - GB_LEN + GB_MTL
+HANGER_UNDERHEAD_TO_COMPLETE_THREAD_MM = (
+    UNDERHEAD_Y_MM - HANGER_COMPLETE_THREAD_START_Y_MM
+)
+HANGER_COMPLETE_MALE_START_DEPTH_MM = (
+    HANGER_UNDERHEAD_TO_COMPLETE_THREAD_MM - HANGER_STACK_NOMINAL_MM
+)
+HANGER_TAP_FULL_THREAD_MIN_MM = (
+    STUD_TAP_THREAD_DEPTH_MM + STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM[0]
+)
+HANGER_TAP_DRILL_SHOULDER_MIN_MM = (
+    STUD_TAP_DRILL_DEPTH_MM + STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[0]
+)
+HANGER_TAP_DRILL_RADIUS_MIN_MM = STUD_TAP_DIA / 2.0
+# The native angle is measured from the radial tip plane. The purchased stock
+# does not guarantee a radial root tolerance, so these are explicitly NOMINAL
+# CAD-envelope checks; the drawing separately requires actual finished-root
+# inspection and conservatively keeps the tip within actual complete threads.
+HANGER_CHAMFER_ALPHA_MIN_DEG = (
+    THREAD_TIP_CHAMFER_ANGLE_DEG - CHAMFER_ANGLE_TOLERANCE_DEG
+)
+HANGER_CHAMFER_ALPHA_MAX_DEG = (
+    THREAD_TIP_CHAMFER_ANGLE_DEG + CHAMFER_ANGLE_TOLERANCE_DEG
+)
+HANGER_NOMINAL_CHAMFER_AXIAL_MAX_MM = (
+    THREAD_TIP_CHAMFER_RADIAL_MM
+    * math.tan(math.radians(HANGER_CHAMFER_ALPHA_MAX_DEG))
+)
+HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM = max(
+    0.0,
+    min(
+        HANGER_TAP_FULL_THREAD_MIN_MM,
+        HANGER_ENGAGEMENT_MIN_MM - HANGER_NOMINAL_CHAMFER_AXIAL_MAX_MM,
+    )
+    - max(0.0, HANGER_COMPLETE_MALE_START_DEPTH_MM),
+)
+HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM = (
+    HANGER_TAP_DRILL_SHOULDER_MIN_MM - HANGER_ENGAGEMENT_MAX_MM
+)
+HANGER_NOMINAL_CONE_RADIUS_AT_FULL_THREAD_MAX_MM = min(
+    THREAD_MAJOR_RADIUS_MM,
+    THREAD_TIP_ROOT_RADIUS_MM
+    + max(0.0, HANGER_ENGAGEMENT_MAX_MM - HANGER_TAP_FULL_THREAD_MIN_MM)
+    / math.tan(math.radians(HANGER_CHAMFER_ALPHA_MIN_DEG)),
+)
+HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM = (
+    HANGER_TAP_DRILL_RADIUS_MIN_MM
+    - HANGER_NOMINAL_CONE_RADIUS_AT_FULL_THREAD_MAX_MM
+)
+if not math.isclose(
+    THREAD_TIP_CHAMFER_AXIAL_MM,
+    THREAD_TIP_CHAMFER_RADIAL_MM
+    * math.tan(math.radians(THREAD_TIP_CHAMFER_ANGLE_DEG)),
+    abs_tol=1e-9,
+):
+    raise RuntimeError("knife-hanger tip chamfer exports use inconsistent axes")
+
+if not math.isclose(
+    UNDERHEAD_LEN - HANGER_STACK_NOMINAL_MM,
+    HANGER_ENGAGEMENT_TARGET_MM,
+    abs_tol=1e-9,
+):
+    raise RuntimeError(
+        "knife-hanger reference length no longer retains the assembly "
+        f"engagement target: {UNDERHEAD_LEN - HANGER_STACK_NOMINAL_MM:.4f} mm"
+    )
 
 
 def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
@@ -143,7 +244,7 @@ def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
 
 
 def _assert_knife_hanger_stack() -> None:
-    """Gate the purchased washer/bolt stack before any COM insertion."""
+    """Gate the source stack and bounded geometric fit before COM insertion."""
     bolt_in_washer_clearance = HANGER_WASHER_INNER_DIA - BOLT_MAJOR_DIA
     bolt_in_crossbar_clearance = STUD_HOLE_DIA - BOLT_MAJOR_DIA
     washer_crossbar_seat = (HANGER_WASHER_OUTER_DIA - STUD_HOLE_DIA) / 2.0
@@ -167,23 +268,48 @@ def _assert_knife_hanger_stack() -> None:
     washer_upper_y = HANGER_WASHER_Y + HANGER_WASHER_THICKNESS / 2.0
     bolt_under_head_y = HANGER_STUD_Y + UNDERHEAD_Y_MM
     bolt_tip_y = HANGER_STUD_Y + THREAD_TIP_Y_MM
+    engagement = KNIFE_MOUNT_TOP_Y - bolt_tip_y
     if abs(washer_lower_y - CROSSBAR_TOP_Y) > 1e-9:
         raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
     if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
         raise RuntimeError("knife-hanger bolt under-head face is not seated on washer")
-    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_THREAD_DEPTH_MM:
+    if not math.isclose(
+        engagement,
+        HANGER_ENGAGEMENT_TARGET_MM,
+        abs_tol=1e-9,
+    ):
         raise RuntimeError(
-            "knife-hanger bolt misses the knife-mount full-thread envelope: "
-            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement, "
-            f"{STUD_TAP_THREAD_DEPTH_MM:.4f} mm usable thread"
+            "knife-hanger CAD stack no longer retains the bounded engagement "
+            f"target: {engagement:.4f} mm"
+        )
+    if HANGER_COMPLETE_MALE_OVERLAP_MIN_MM <= 0.0:
+        raise RuntimeError(
+            "knife-hanger allowed fit window has no complete male/female "
+            "thread overlap"
+        )
+    if HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM <= 0.0:
+        raise RuntimeError(
+            "knife-hanger allowed fit window lets the finished tip reach the "
+            "tap-drill cylindrical shoulder"
+        )
+    if HANGER_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM <= 0.0:
+        raise RuntimeError(
+            "knife-hanger finished root cone cannot enter the receiver runout "
+            "at the allowed maximum engagement"
         )
     log(
         "knife-hanger stack: washer "
         f"{washer_lower_y:.4f}..{washer_upper_y:.4f}, bolt under-head "
         f"{bolt_under_head_y:.4f}, tip {bolt_tip_y:.4f}, "
-        f"engagement {KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f}; "
-        f"ID clearance {bolt_in_washer_clearance:.4f}, crossbar clearance "
-        f"{bolt_in_crossbar_clearance:.4f}, radial seat {washer_crossbar_seat:.4f} mm"
+        f"engagement target {engagement:.4f} "
+        f"(allowed {HANGER_ENGAGEMENT_MIN_MM:.4f}.."
+        f"{HANGER_ENGAGEMENT_MAX_MM:.4f}); complete-thread overlap "
+        f"{HANGER_COMPLETE_MALE_OVERLAP_MIN_MM:.4f}, drill-shoulder clearance "
+        f"{HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM:.4f}, runout radial clearance "
+        f"{HANGER_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM:.4f}; ID clearance "
+        f"{bolt_in_washer_clearance:.4f}, crossbar clearance "
+        f"{bolt_in_crossbar_clearance:.4f}, radial seat "
+        f"{washer_crossbar_seat:.4f} mm"
     )
 
 
@@ -707,10 +833,10 @@ async def build(adapter) -> dict[str, str]:
                 f"{stem}: expected exactly two inserted instances, got {sorted(live)}"
             )
 
-    # Read back both physical stacks.  This catches a per-instance station
-    # typo that the shared scalar derivation alone cannot: each washer must
-    # remain coaxial with its bolt, on the crossbar, with zero axial gap at
-    # the under-head face and the exact residual tap engagement.
+    # Read back both physical CAD-reference stacks.  This catches a per-instance
+    # station typo that the scalar fit proof alone cannot: each washer remains
+    # coaxial with its bolt, seated on the crossbar, with zero under-head gap
+    # and the assembly-owned nominal engagement measurement.
     for washer, bolt in zip(hanger_washers, hanger_bolts, strict=True):
         washer_transform = component_transform(adapter, washer)
         bolt_transform = component_transform(adapter, bolt)
@@ -741,9 +867,10 @@ async def build(adapter) -> dict[str, str]:
                 f"{bolt}: under-head/washer gap "
                 f"{bolt_under_head_y - washer_upper_y:.6f} mm"
             )
-        if abs(engagement - KNIFE_MOUNT_THREAD_ENGAGEMENT) > 1e-6:
+        if abs(engagement - HANGER_ENGAGEMENT_TARGET_MM) > 1e-6:
             raise RuntimeError(
-                f"{bolt}: knife-mount engagement drifted to {engagement:.6f} mm"
+                f"{bolt}: knife-mount engagement measurement drifted to "
+                f"{engagement:.6f} mm"
             )
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,

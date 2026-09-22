@@ -79,11 +79,13 @@ Inspect every page and complete the blind machinist review before release.
 
 ## Summing package
 
-`draw_summing_assembly.py` uses three landscape ASME B sheets: collapsed
+`draw_summing_assembly.py` uses four landscape ASME B sheets: collapsed
 assembled Front/Right HLR views with a standard Shaded With Edges isometric,
 the builder-owned persisted `SUMMING_EXPLODED` presentation with a native
-seven-row BOM and one balloon per row, and ordered assembly/setup instructions
-with functional checks. The BOM contains the ten direct instances only.
+seven-row BOM and one balloon per row, ordered assembly/setup instructions
+with functional checks, and an associative hanger-axis section/detail carrying
+the actual MHA-037 tap-mouth to MHA-119 finished-tip fit dimension. The BOM
+contains the ten direct instances only.
 Top-frame MHA-077, its MHA-118 gooseneck set screw, and the twenty channel
 MHA-090/MHA-011 spring connections are identified as external installation
 interfaces rather than duplicated BOM occurrences.
@@ -96,6 +98,14 @@ plane normal to the knife axis. Transfer the actual MHA-037 tap centres, remove
 the fitted set, and only then pilot and drill the MHA-077 clearance holes;
 never enter the mount taps or recenter to CAD marks. Retain the identified
 front/rear MHA-077/MHA-037 set as non-interchangeable.
+
+Each identified MHA-119/MHA-131 station is fitted from its actual crossbar
+thickness, washer thickness, and mount gap; 45.10 mm remains a reference, not a
+fixed cut acceptance. The fourth sheet keeps the engagement target and its
+general `.XX` window on the native actual-edge measurement, and gives the
+as-built root-cone, drill-shoulder, and positive complete-thread-overlap checks.
+Those checks establish geometric fit only; they do not claim a load rating or
+invent a minimum number of turns.
 
 The released default clamps the MHA-019 upper eye between the MHA-032 retainer
 head and arm end. Loosen that screw only for spring access, then retighten it
@@ -110,4 +120,4 @@ the MHA-077 guide before tightening MHA-118, rather than treating the computed
 CAD spring placement as a fitter tolerance.
 
 Use `uv run python -m doit drawing:summing_assembly` to regenerate the package.
-Inspect all three pages and complete the blind machinist review before release.
+Inspect all four pages and complete the blind machinist review before release.

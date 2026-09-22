@@ -146,9 +146,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and tapped clearance features: .X (+/-0.8) is the band they need, and a
 # second place claimed a tolerance nothing on the part requires. The matched
 # hanger-hole positions carry no independent coordinate tolerance. Two places
-# appear only where a fit lives there -- the cap recess diameter and depth
-# carry the bilateral bands above, and the gooseneck bore prints the clearance
-# a purchased post is set into.
+# appear only where a fit lives there: the cap-recess diameter and depth carry
+# their bilateral bands. The gooseneck bore is a drilled clearance feature and
+# therefore uses the routine one-place casting band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": 1},
@@ -159,7 +159,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubBossProfile": {"HubDia": 1},
     "RibProfile": {"RibWidth": 1},
     "SetPocketProfile": {"PocketRise": 1},
-    "GooseneckProfile": {"GnDia": 2},
+    "GooseneckProfile": {"GnDia": 1},
     "CapRecessProfile": {"CapRecessDia": 2},
     "CapRecesses": {"CapRecessDepth": 2},
 }
@@ -201,15 +201,14 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "overall casting width": 1,
     "overall casting depth": 1,
     "side flange width": 1,
-    "left window clear width": 1,
+    "central web centre from upper-left socket axis": 1,
     "right window clear width": 1,
     "central web width": 1,
-    "rail web thickness": 1,
+    "central web section width": 1,
     "front rear flange width": 1,
     "top flange thickness": 1,
     "top rim chamfer": 1,
     "T rail root radius": 1,
-    "side rail web thickness": 1,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, and MHA-035 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.

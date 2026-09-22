@@ -1,33 +1,39 @@
-r"""Create the native three-sheet summing assembly drawing package.
+r"""Create the native four-sheet summing assembly drawing package.
 
 The released ``summing.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``SUMMING_EXPLODED``
-presentation for one native drawing view; it never authors or saves source
-assembly presentation features.
+presentation and adds drawing-native associative fit measurements; it never
+authors or saves source-assembly presentation or construction features.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import hashlib
 import sys
 from pathlib import Path
 from typing import Any, Callable
 
 import _telemetry
-from _common import _early_bound, check, run_build
+from _common import _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
     create_blank_drawing_sheets,
+    create_section_view,
     finalize_drawing,
     insert_bom_table,
+    isolate_drawing_view_components,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from summing_assembly_spec import (
     BOM_COMPONENTS,
@@ -39,6 +45,17 @@ from summing_assembly_spec import (
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
 )
+from build_knife_hanger_stud import THREAD_TIP_ROOT_RADIUS_MM
+from build_knife_mount import STUD_TAP_DIA
+from build_summing_assembly import (
+    HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM,
+    HANGER_ENGAGEMENT_PRECISION,
+    HANGER_ENGAGEMENT_TARGET_MM,
+    HEX_Z_MID,
+    KNIFE,
+    KNIFE_MOUNT_TOP_Y,
+)
+from cone_pivot_post_installation import SUMMING_Z
 
 
 SPEC = DRAWINGS_BY_NAME["summing_assembly"]
@@ -57,6 +74,7 @@ SHEET_NAMES = (
     "ASSEMBLED VIEWS",
     "EXPLODED VIEW + BOM",
     "ASSEMBLY + SETUP",
+    "HANGER FIT + INSPECTION",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -65,10 +83,15 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
 ASSEMBLED_SCALE = (1.0, 4.0)
 EXPLODED_SCALE = (1.0, 4.0)
 INSTRUCTION_SCALE = (1.0, 6.0)
+HANGER_FIT_SHEET_SCALE = (1.0, 1.0)
+HANGER_PARENT_SCALE = (1.0, 2.0)
+HANGER_SECTION_SCALE = (1.0, 1.0)
+HANGER_DETAIL_SCALE = (4.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: EXPLODED_SCALE,
     SHEET_NAMES[2]: INSTRUCTION_SCALE,
+    SHEET_NAMES[3]: HANGER_FIT_SHEET_SCALE,
 }
 
 ASSEMBLED_FRONT_CENTER = (0.065, 0.158)
@@ -76,8 +99,11 @@ ASSEMBLED_RIGHT_CENTER = (0.185, 0.158)
 ASSEMBLED_ISO_CENTER = (0.330, 0.158)
 EXPLODED_ISO_CENTER = (0.105, 0.158)
 INSTRUCTION_ISO_CENTER = (0.345, 0.190)
+HANGER_PARENT_CENTER = (0.060, 0.205)
+HANGER_SECTION_CENTER = (0.300, 0.205)
+HANGER_DETAIL_CENTER = (0.095, 0.080)
+HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
 BOM_ANCHOR = (0.195, 0.258)
-
 # Only assembly-level requirements live here. Part drawings own component
 # manufacture, and calculated native placements remain evidence rather than
 # fitter tolerances. Keeping these drawing notes out of the assembly spec also
@@ -98,9 +124,9 @@ ASSEMBLY_STEPS = "\n".join(
         "   TRANSFERRED CENTERS; NEVER ENTER THE MHA-037 TAPS. DO NOT",
         "   RECENTER TO CAD COORDINATES OR PRE-DRILLED MARKS. DEBURR;",
         "   RETAIN PAIR, FRONT/REAR, AND ORIENTATION MATCH MARKS.",
-        "4. REASSEMBLE THE IDENTIFIED SET. FIT MODIFIED MHA-119 WITH",
-        "   MHA-131 FROM ABOVE; SEAT WASHER ON CROSSBAR AND HEAD ON WASHER.",
-        "   TIGHTEN WITHOUT BOTTOMING OR FORCING EITHER STUD.",
+        "4. KEEP EACH MHA-119/MHA-131 WITH ITS IDENTIFIED SIDE. MEASURE,",
+        "   TRIM, AND INSPECT EACH ACTUAL STACK PER SHEET 4; THEN ASSEMBLE",
+        "   FROM ABOVE WITH WASHER ON CROSSBAR AND HEAD FULLY ON WASHER.",
         "5. THREAD MHA-005 DIRECTLY INTO THE MHA-073 COUNTER BOSS; NO NUT.",
         "   CLOCK THE OPEN EYE TO THE PULL PLANE AND APPLY REMOVABLE",
         "   MEDIUM-STRENGTH THREADLOCKER.",
@@ -125,7 +151,7 @@ ASSEMBLY_CHECKS = "\n".join(
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
         "1. MHA-077/MHA-037 PAIR AND FRONT/REAR MATCH MARKS ALIGN.",
         "   BOTH MHA-119 PASS FREELY; HEADS AND MHA-131 WASHERS BEAR FULLY.",
-        "   SCREWS HAVE POSITIVE MHA-037 ENGAGEMENT AND DO NOT BOTTOM.",
+        "   EACH AS-BUILT FIT MEETS SHEET 4; NEITHER STUD FORCES OR BOTTOMS.",
         "2. MHA-073 COUNTER-BOSS TAP AND MHA-077 GUIDE-BORE AXES SHARE",
         "   ONE PLANE NORMAL TO THE KNIFE AXIS. BOTH KNIFE CONTACTS ARE",
         "   SEATED; MHA-073 IS CENTERED AND ROCKS FREELY WITHOUT AXIAL RUB,",
@@ -163,6 +189,34 @@ INTERFACE_NOTES = "\n".join(
         "MHA-077 SUPPORTS THE HANGERS AND GUIDES MHA-032.",
         "MHA-118 LOCKS MHA-032 AFTER THE NEUTRAL SETUP.",
         "20X MHA-090 AND 20X MHA-011 BELONG TO THE CHANNEL ASSEMBLY.",
+    )
+)
+
+HANGER_FIT_CONSTRUCTION = "\n".join(
+    (
+        "HANGER STUD CONSTRUCTION - MEASURE EACH IDENTIFIED SIDE",
+        "T = ACTUAL MHA-077 THICKNESS AT THE TRANSFERRED HANGER HOLE.",
+        "W = ACTUAL ASSIGNED MHA-131 THICKNESS; G = ACTUAL MOUNT GAP.",
+        "E = TAP-MOUTH-TO-FINISHED-TIP DEPTH SHOWN IN DETAIL B.",
+        "CUT ACTUAL UNDER-HEAD LENGTH L = T + W + G + E.",
+        "MHA-119'S 45.10 UNDER-HEAD LENGTH IS REFERENCE ONLY; DO NOT CUT",
+        "BOTH STUDS TO ONE ASSUMED STACK. CHAMFER EACH CUT TO THE EXISTING",
+        "THREAD ROOT PER MHA-119; MEASURE THE FINISHED TIP AND CONE.",
+        "MARK EACH BOLT FRONT/REAR; KEEP IT WITH ITS MHA-037/MHA-131 STATION.",
+    )
+)
+
+HANGER_FIT_INSPECTION = "\n".join(
+    (
+        "AS-BUILT GEOMETRIC FIT - NOT A LOAD OR STRENGTH RATING",
+        "USE ACTUAL VALUES: S=T+W+G; M=UNDER-HEAD TO COMPLETE-MALE START;",
+        "F=COMPLETE MHA-037 FEMALE DEPTH; D=TAP-DRILL SHOULDER DEPTH.",
+        "A=(RMAJ-RTIP)/TAN(ALPHA);",
+        "O=MAX(0, MIN(F,E-A) - MAX(0,M-S)).",
+        "REQUIRE E WITHIN DETAIL B'S GENERAL .XX BAND, O>0, AND E<D.",
+        "IF E>F, REQUIRE MIN(RMAJ,RTIP+(E-F)/TAN(ALPHA))+Q<RDRILL;",
+        "Q IS ACTUAL AXIS OFFSET. VERIFY FULL HEAD/WASHER SEATING, THE",
+        "SPECIFIED GAP, BOTH KNIFE CONTACTS, AND FREE ROCK WITHOUT AXIAL RUB.",
     )
 )
 
@@ -208,6 +262,344 @@ def _add_note_block(
         )
     return note
 
+
+def _component_point_in_assembly(
+    component: Any,
+    point: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    """Transform one component-local point through its native assembly transform."""
+    values = tuple(
+        float(value)
+        for value in _early_bound(
+            _early_bound(component, "IComponent2").Transform2,
+            "IMathTransform",
+        ).ArrayData
+    )
+    if len(values) != 16:
+        raise RuntimeError("summing drawing component transform is incomplete")
+    x, y, z = point
+    scale = values[12]
+    return (
+        scale * (x * values[0] + y * values[3] + z * values[6]) + values[9],
+        scale * (x * values[1] + y * values[4] + z * values[7]) + values[10],
+        scale * (x * values[2] + y * values[5] + z * values[8]) + values[11],
+    )
+
+
+def _visible_component_circle(
+    view: Any,
+    *,
+    component_stem: str,
+    height_mm: float,
+    radius_mm: float,
+    target_z_mm: float,
+    label: str,
+) -> Any:
+    """Resolve one actual component edge by identity and native circle geometry."""
+    view = _early_bound(view, "IView")
+    full_components: dict[str, Any] = {}
+    for raw_drawing_component in tuple(view.GetVisibleDrawingComponents() or ()):
+        drawing_component = _early_bound(raw_drawing_component, "IDrawingComponent")
+        component = _early_bound(drawing_component.Component, "IComponent2")
+        name = str(component.Name2 or "").rsplit("/", 1)[-1]
+        if name in full_components:
+            raise RuntimeError(f"{label}: duplicate visible component {name!r}")
+        full_components[name] = component
+
+    candidates: list[tuple[tuple[float, ...], Any]] = []
+    for raw_component in tuple(view.GetVisibleComponents() or ()):
+        visible_component = _early_bound(raw_component, "IComponent2")
+        if _component_stem(visible_component) != component_stem:
+            continue
+        name = str(visible_component.Name2 or "").rsplit("/", 1)[-1]
+        full_component = full_components.get(name)
+        if full_component is None:
+            raise RuntimeError(f"{label}: component {name!r} has no full peer")
+        transform_values = tuple(
+            float(value)
+            for value in _early_bound(
+                full_component.Transform2,
+                "IMathTransform",
+            ).ArrayData
+        )
+        component_scale = transform_values[12]
+        for raw_edge in tuple(view.GetVisibleEntities2(visible_component, 1) or ()):
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve is None or not curve.IsCircle():
+                continue
+            parameters = tuple(float(value) for value in curve.CircleParams)
+            if len(parameters) < 7:
+                raise RuntimeError(f"{label}: circular edge parameters are incomplete")
+            center = _component_point_in_assembly(
+                full_component,
+                (parameters[0], parameters[1], parameters[2]),
+            )
+            actual_height_mm = center[1] * 1000.0
+            actual_radius_mm = parameters[6] * component_scale * 1000.0
+            if abs(actual_height_mm - height_mm) > 1e-5:
+                continue
+            if abs(actual_radius_mm - radius_mm) > 1e-5:
+                continue
+            candidates.append(
+                (
+                    (
+                        abs(center[2] * 1000.0 - target_z_mm),
+                        abs(center[0] * 1000.0 - KNIFE[0]),
+                        center[2],
+                        *parameters[:3],
+                    ),
+                    edge,
+                )
+            )
+    if not candidates:
+        raise RuntimeError(
+            f"{label}: no {component_stem!r} circle at y={height_mm:g} mm, "
+            f"radius={radius_mm:g} mm"
+        )
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
+def _create_hanger_detail(adapter: Any, section: Any) -> Any:
+    """Create a native enlarged detail around one real hanger/receiver interface."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    section = _early_bound(section, "IView")
+    if not drawing.ActivateView(str(section.GetName2() or "")):
+        raise RuntimeError("failed to activate hanger section for detail")
+    draw.ClearSelection2(True)
+    tip_y = KNIFE_MOUNT_TOP_Y - HANGER_ENGAGEMENT_TARGET_MM
+    detail_point_mm = (
+        KNIFE[0],
+        (KNIFE_MOUNT_TOP_Y + tip_y) / 2.0,
+        SUMMING_Z + HEX_Z_MID,
+    )
+    center = model_point_in_view(
+        adapter,
+        section,
+        tuple(value / 1000.0 for value in detail_point_mm),
+        label="hanger engagement detail center",
+    )
+    radius = 0.012 * HANGER_SECTION_SCALE[0] / HANGER_SECTION_SCALE[1]
+    sketch = _early_bound(section.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create native hanger detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *HANGER_DETAIL_CENTER,
+        0.0,
+        0,
+        *HANGER_DETAIL_SCALE,
+        "B",
+        1,
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create native hanger fit detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array(list(HANGER_DETAIL_SCALE))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("hanger detail has invalid bounds")
+    target = [
+        position[index]
+        + HANGER_DETAIL_CENTER[index]
+        - (outline[index] + outline[index + 2]) / 2.0
+        for index in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position hanger fit detail")
+    draw.EditRebuild3()
+    if tuple(float(value) for value in detail.ScaleRatio) != HANGER_DETAIL_SCALE:
+        raise RuntimeError("hanger detail scale did not persist")
+
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"hanger detail has {len(notes)} native labels")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    if not annotation.SetPosition2(*HANGER_DETAIL_LABEL_XY, 0.0):
+        raise RuntimeError("failed to position hanger detail label")
+    circles = tuple(_read_member(section, "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"hanger section has {len(circles)} detail fences")
+    detail_circle = _early_bound(circles[0], "IDetailCircle")
+    parent_label = (center[0] + 0.014, center[1] + 0.010)
+    detail_circle.SetLabelPosition(*parent_label)
+    draw.EditRebuild3()
+    if math.dist(
+        tuple(float(value) for value in detail_circle.GetLabelPosition()),
+        parent_label,
+    ) > 1e-8:
+        raise RuntimeError("hanger detail parent label position did not persist")
+    return detail
+
+
+def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
+    """Add and verify the associative tap-mouth-to-finished-tip measurement."""
+    tip_y = KNIFE_MOUNT_TOP_Y - HANGER_ENGAGEMENT_TARGET_MM
+    station_z = SUMMING_Z + HEX_Z_MID
+    mouth = _visible_component_circle(
+        detail,
+        component_stem="knife-mount",
+        height_mm=KNIFE_MOUNT_TOP_Y,
+        radius_mm=STUD_TAP_DIA / 2.0,
+        target_z_mm=station_z,
+        label="actual MHA-037 tap mouth",
+    )
+    tip = _visible_component_circle(
+        detail,
+        component_stem="knife-hanger-stud",
+        height_mm=tip_y,
+        radius_mm=THREAD_TIP_ROOT_RADIUS_MM,
+        target_z_mm=station_z,
+        label="actual MHA-119 finished tip",
+    )
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    detail = _early_bound(detail, "IView")
+    if not drawing.ActivateView(str(detail.GetName2() or "")):
+        raise RuntimeError("failed to activate hanger fit detail")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for append, raw_entity in ((False, mouth), (True, tip)):
+        selection_data = _early_bound(
+            selection_manager.CreateSelectData(),
+            "ISelectData",
+        )
+        selection_data.View = detail
+        if not _early_bound(raw_entity, "IEntity").Select4(append, selection_data):
+            raise RuntimeError("failed to select actual hanger fit edge")
+    display = draw.AddVerticalDimension2(0.150, 0.082, 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError("failed to add native hanger engagement measurement")
+    display = set_arc_endpoints_to_center(
+        adapter,
+        display,
+        label="hanger engagement actual-edge measurement",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - HANGER_ENGAGEMENT_TARGET_MM) > 1e-5:
+        raise RuntimeError(
+            "hanger engagement actual-edge measurement is "
+            f"{measured_mm:g} mm, expected {HANGER_ENGAGEMENT_TARGET_MM:g} mm"
+        )
+    if int(
+        display.SetPrecision3(HANGER_ENGAGEMENT_PRECISION, -1, -1, -1)
+    ) < 0:
+        raise RuntimeError("failed to set hanger engagement precision")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM / 1000.0
+    tolerance.Type = 11
+    if not tolerance.SetValues(-band, band):
+        raise RuntimeError("hanger engagement general tolerance was rejected")
+    draw.EditRebuild3()
+    if int(display.GetPrimaryPrecision2()) != HANGER_ENGAGEMENT_PRECISION:
+        raise RuntimeError("hanger engagement precision did not persist")
+    if (
+        int(tolerance.Type) != 11
+        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
+        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+    ):
+        raise RuntimeError("hanger engagement general tolerance did not persist")
+    return display
+
+
+def _place_hanger_fit_sheet(adapter: Any) -> None:
+    """Place the real assembly section/detail and its as-built fit instructions."""
+    parent = place_view(
+        adapter,
+        str(SOURCE),
+        "*Front",
+        *HANGER_PARENT_CENTER,
+        scale=HANGER_PARENT_SCALE,
+    )
+    _set_exploded_state(adapter, parent, False, label="hanger fit parent")
+    set_hidden_lines_removed(adapter, parent)
+    visible_stems = frozenset(
+        {"knife-mount", "knife-hanger-washer", "knife-hanger-stud"}
+    )
+    isolate_drawing_view_components(
+        adapter,
+        parent,
+        visible_stems=visible_stems,
+        label="hanger fit parent",
+    )
+    parent = _early_bound(parent, "IView")
+    outline = tuple(float(value) for value in parent.GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError("hanger fit parent has invalid outline")
+    cut_x = model_point_in_view(
+        adapter,
+        parent,
+        (KNIFE[0] / 1000.0, KNIFE_MOUNT_TOP_Y / 1000.0, SUMMING_Z / 1000.0),
+        label="hanger-axis section station",
+    )[0]
+    section = create_section_view(
+        adapter,
+        parent,
+        line_start=(cut_x, outline[1] - 0.002),
+        line_end=(cut_x, outline[3] + 0.002),
+        view_xy=HANGER_SECTION_CENTER,
+        section_label="A",
+        scale=HANGER_SECTION_SCALE,
+        label="hanger-axis assembly section",
+    )
+    set_hidden_lines_removed(adapter, section)
+    isolate_drawing_view_components(
+        adapter,
+        section,
+        visible_stems=visible_stems,
+        label="hanger-axis assembly section",
+    )
+    detail = _create_hanger_detail(adapter, section)
+    set_hidden_lines_removed(adapter, detail)
+    _add_hanger_engagement_dimension(adapter, detail)
+    _add_note_block(
+        adapter,
+        "MHA-A07 - HANGER FIT + INSPECTION\n"
+        "MHA-119 / MHA-131 / MHA-037 MATCHED TO MHA-077",
+        (0.018, 0.263),
+        label="hanger fit sheet identity",
+    )
+    _add_note_block(
+        adapter,
+        "DETAIL B - E IS ACTUAL TAP MOUTH TO FINISHED BOLT TIP",
+        (0.030, 0.150),
+        label="hanger engagement detail heading",
+    )
+    _add_note_block(
+        adapter,
+        HANGER_FIT_CONSTRUCTION,
+        (0.165, 0.145),
+        label="hanger fit construction",
+    )
+    _add_note_block(
+        adapter,
+        HANGER_FIT_INSPECTION,
+        (0.165, 0.100),
+        label="hanger fit inspection",
+    )
 
 def _set_exploded_state(
     adapter: Any,
@@ -599,7 +991,7 @@ def _place_package(adapter: Any) -> None:
     )
     _add_note_block(
         adapter,
-        "SEE SHEET 3 FOR INSTALLATION ORDER AND FUNCTIONAL CHECKS",
+        "SEE SHEET 3 FOR ASSEMBLY; SHEET 4 FOR HANGER FIT/INSPECTION",
         (0.060, 0.075),
         label="exploded-view caption",
     )
@@ -653,6 +1045,9 @@ def _place_package(adapter: Any) -> None:
         (0.315, 0.145),
         label="instruction-isometric caption",
     )
+
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    _place_hanger_fit_sheet(adapter)
 
 
 async def build(adapter: Any) -> dict[str, str]:
