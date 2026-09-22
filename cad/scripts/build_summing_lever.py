@@ -894,12 +894,8 @@ async def _drawing_reference_sketches(
         "last spring-hole offset reference",
         await adapter.add_line(HOLE_X, -HOLE_Z[-1], HOLE_X, -PLATE_L / 2.0),
     )
-    boss_location = check(
-        "boss axial location reference",
-        await adapter.add_line(TIP_X, -PLATE_L / 2.0, TIP_X, 0.0),
-    )
     set_sketch_direct_db(adapter, False)
-    for entity in (first_offset, pattern_span, end_offset, boss_location):
+    for entity in (first_offset, pattern_span, end_offset):
         _as_construction(adapter, entity)
     check(
         "first spring-hole offset vertical",
@@ -912,10 +908,6 @@ async def _drawing_reference_sketches(
     check(
         "last spring-hole offset vertical",
         await adapter.add_sketch_constraint(end_offset, None, "vertical"),
-    )
-    check(
-        "boss axial location vertical",
-        await adapter.add_sketch_constraint(boss_location, None, "vertical"),
     )
     check(
         "spring-hole span starts at first station",
@@ -977,6 +969,27 @@ async def _drawing_reference_sketches(
         f'"PlateL" / 2 - ("ChannelZ0" + {HOLE_COUNT - 1} * '
         '"ChannelPitch" + "HoleZOffset")',
     )
+    await ensure_fully_defined(adapter, "pattern reference sketch")
+    check("exit pattern reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PatternReferences")
+    drive_jobs += pattern.apply(adapter, "PatternReferences")
+
+    # The boss's axial location is its own sketch so the spring-pattern view can
+    # hide its construction line: it prints no boss dimension, and R7 showed the
+    # line there as a stray dash-dot stroke from the boss to the plate end.
+    boss = SketchDims()
+    check("create boss axial reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    boss_location = check(
+        "boss axial location reference",
+        await adapter.add_line(TIP_X, -PLATE_L / 2.0, TIP_X, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, boss_location)
+    check(
+        "boss axial location vertical",
+        await adapter.add_sketch_constraint(boss_location, None, "vertical"),
+    )
     await dimension_between(
         adapter,
         f"{boss_location}.start",
@@ -985,7 +998,7 @@ async def _drawing_reference_sketches(
         PLATE_L / 2.0,
         "boss axial location",
     )
-    pattern.record("BossAxialLocation", '"PlateL" / 2')
+    boss.record("BossAxialLocation", '"PlateL" / 2')
     await anchor_point_to_origin(
         adapter,
         f"{boss_location}.start",
@@ -993,12 +1006,12 @@ async def _drawing_reference_sketches(
         -PLATE_L / 2.0,
         "boss axial location start",
     )
-    pattern.record("BossRefX", '"SumH"')
-    pattern.record("BossRefEnd", '"PlateL" / 2')
-    await ensure_fully_defined(adapter, "pattern reference sketch")
-    check("exit pattern reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "PatternReferences")
-    drive_jobs += pattern.apply(adapter, "PatternReferences")
+    boss.record("BossRefX", '"SumH"')
+    boss.record("BossRefEnd", '"PlateL" / 2')
+    await ensure_fully_defined(adapter, "boss axial reference sketch")
+    check("exit boss axial reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossAxialReference")
+    drive_jobs += boss.apply(adapter, "BossAxialReference")
 
 
 async def _summation_arc_reference(
@@ -1200,12 +1213,19 @@ def _reference_claims(
     pivot_target = {"pivot axis": ("axis", (pivot[0], pivot[1]))}
     return {
         "PatternReferences": (
-            {**hole_targets, **plate_targets, **boss_target},
+            {**hole_targets, **plate_targets},
             [
                 ("the first spring hole", {first_hole}),
                 ("the last spring hole", {last_hole}),
-                ("the summation-anchor axis", set(boss_target)),
                 *((name, {name}) for name in plate_targets),
+            ],
+            0,
+        ),
+        "BossAxialReference": (
+            {**plate_targets, **boss_target},
+            [
+                ("the summation-anchor axis", set(boss_target)),
+                ("a plate end", set(plate_targets)),
             ],
             0,
         ),
