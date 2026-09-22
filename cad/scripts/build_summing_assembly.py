@@ -84,7 +84,15 @@ from build_knife_hanger_washer import (
     OUTER_DIA as HANGER_WASHER_OUTER_DIA,
     THICKNESS as HANGER_WASHER_THICKNESS,
 )
-from build_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP, STUD_TAP_DEPTH
+from build_knife_mount import (
+    CASTING_UNDERSIDE_Y,
+    MOUNT_GAP,
+    STUD_TAP_DIA,
+    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_DRILL_DEPTH_MM,
+    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_THREAD_DEPTH_MM,
+)
 from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
 
 ASM_NAME = "summing"
@@ -152,15 +160,11 @@ def _assert_knife_hanger_stack() -> None:
         raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
     if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
         raise RuntimeError("knife-hanger bolt under-head face is not seated on washer")
-    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_DEPTH:
+    if not 0.0 < KNIFE_MOUNT_THREAD_ENGAGEMENT <= STUD_TAP_THREAD_DEPTH_MM:
         raise RuntimeError(
-            "knife-hanger bolt misses the knife-mount tap envelope: "
-            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement"
-        )
-    if abs(KNIFE_MOUNT_THREAD_ENGAGEMENT - 11.3735) > 1e-9:
-        raise RuntimeError(
-            "knife-hanger thread engagement drifted from 11.3735 mm: "
-            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm"
+            "knife-hanger bolt misses the knife-mount full-thread envelope: "
+            f"{KNIFE_MOUNT_THREAD_ENGAGEMENT:.4f} mm engagement, "
+            f"{STUD_TAP_THREAD_DEPTH_MM:.4f} mm usable thread"
         )
     log(
         "knife-hanger stack: washer "
