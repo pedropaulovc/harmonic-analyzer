@@ -99,13 +99,16 @@ the fitted set, and only then pilot and drill the MHA-077 clearance holes;
 never enter the mount taps or recenter to CAD marks. Retain the identified
 front/rear MHA-077/MHA-037 set as non-interchangeable.
 
-Each identified MHA-119/MHA-131 station is fitted from its actual crossbar
-thickness, washer thickness, and mount gap; 45.10 mm remains a reference, not a
-fixed cut acceptance. The fourth sheet keeps the engagement target and its
-general `.XX` window on the native actual-edge measurement, and gives the
-as-built root-cone, drill-shoulder, and positive complete-thread-overlap checks.
-Those checks establish geometric fit only; they do not claim a load rating or
-invent a minimum number of turns.
+Each identified MHA-119/MHA-131 station is fitted from its actual MHA-077
+thickness, assigned-washer thickness, and positive mount-to-frame clearance;
+the MHA-119 under-head length remains a reference, not a fixed cut acceptance.
+The fourth sheet keeps the engagement target and its printed general `.XX`
+window on the native actual-edge measurement. It then requires the finished
+tip to remain within the actual MHA-037 complete-thread depth, positive
+complete-thread overlap, full seating, positive clearance, and free rock
+without axial rub or bottoming. The assembly source separately gates its
+nominal root-cone, drill-shoulder, and runout envelope. Neither route claims a
+load rating or invents a minimum number of turns.
 
 The released default clamps the MHA-019 upper eye between the MHA-032 retainer
 head and arm end. Loosen that screw only for spring access, then retighten it

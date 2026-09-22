@@ -244,7 +244,7 @@ def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
 
 
 def _assert_knife_hanger_stack() -> None:
-    """Gate the source stack and bounded geometric fit before COM insertion."""
+    """Gate the nominal source stack and its physical envelope before insertion."""
     bolt_in_washer_clearance = HANGER_WASHER_INNER_DIA - BOLT_MAJOR_DIA
     bolt_in_crossbar_clearance = STUD_HOLE_DIA - BOLT_MAJOR_DIA
     washer_crossbar_seat = (HANGER_WASHER_OUTER_DIA - STUD_HOLE_DIA) / 2.0
@@ -279,12 +279,12 @@ def _assert_knife_hanger_stack() -> None:
         abs_tol=1e-9,
     ):
         raise RuntimeError(
-            "knife-hanger CAD stack no longer retains the bounded engagement "
+            "knife-hanger CAD stack no longer retains the nominal engagement "
             f"target: {engagement:.4f} mm"
         )
-    if HANGER_COMPLETE_MALE_OVERLAP_MIN_MM <= 0.0:
+    if HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM <= 0.0:
         raise RuntimeError(
-            "knife-hanger allowed fit window has no complete male/female "
+            "knife-hanger nominal fit envelope has no complete male/female "
             "thread overlap"
         )
     if HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM <= 0.0:
@@ -292,10 +292,10 @@ def _assert_knife_hanger_stack() -> None:
             "knife-hanger allowed fit window lets the finished tip reach the "
             "tap-drill cylindrical shoulder"
         )
-    if HANGER_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM <= 0.0:
+    if HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM <= 0.0:
         raise RuntimeError(
-            "knife-hanger finished root cone cannot enter the receiver runout "
-            "at the allowed maximum engagement"
+            "knife-hanger nominal finished root cone cannot enter the receiver "
+            "runout at the shop window's maximum engagement"
         )
     log(
         "knife-hanger stack: washer "
@@ -303,10 +303,12 @@ def _assert_knife_hanger_stack() -> None:
         f"{bolt_under_head_y:.4f}, tip {bolt_tip_y:.4f}, "
         f"engagement target {engagement:.4f} "
         f"(allowed {HANGER_ENGAGEMENT_MIN_MM:.4f}.."
-        f"{HANGER_ENGAGEMENT_MAX_MM:.4f}); complete-thread overlap "
-        f"{HANGER_COMPLETE_MALE_OVERLAP_MIN_MM:.4f}, drill-shoulder clearance "
-        f"{HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM:.4f}, runout radial clearance "
-        f"{HANGER_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM:.4f}; ID clearance "
+        f"{HANGER_ENGAGEMENT_MAX_MM:.4f}); nominal complete-thread overlap "
+        f"{HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM:.4f}, "
+        f"drill-shoulder clearance {HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM:.4f}, "
+        f"nominal runout radial clearance "
+        f"{HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM:.4f}; "
+        "ID clearance "
         f"{bolt_in_washer_clearance:.4f}, crossbar clearance "
         f"{bolt_in_crossbar_clearance:.4f}, radial seat "
         f"{washer_crossbar_seat:.4f} mm"
