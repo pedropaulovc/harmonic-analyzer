@@ -79,6 +79,7 @@ from crank_arm_spec import (
     SQUARE_END_OVERHANG,
     SURFACE_FINISHES,
 )
+from crank_native_acceptance import assert_signed_circle_center
 
 PART_NAME = "crank-arm"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -512,6 +513,22 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    assert_signed_circle_center(
+        adapter,
+        "AxialPinGrooveProfile",
+        label="MHA-020 six-o'clock seam",
+        expected_sketch_xy_mm=(AXIAL_PIN_X, AXIAL_PIN_Y),
+        expected_model_xyz_mm=(AXIAL_PIN_X, AXIAL_PIN_Y, ARM_THICKNESS),
+        axis_name=seam_axis,
+        axis_expected_components_mm={0: AXIAL_PIN_X, 1: AXIAL_PIN_Y},
+    )
+    assert_signed_circle_center(
+        adapter,
+        "FiducialProfile",
+        label="MHA-020 punched fiducial",
+        expected_sketch_xy_mm=(FIDUCIAL_X, FIDUCIAL_Y),
+        expected_model_xyz_mm=(FIDUCIAL_X, FIDUCIAL_Y, ARM_THICKNESS),
+    )
     # The assigned actual hub governs the final match-fit bore; no independent
     # local band is authored on MHA-020.
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)

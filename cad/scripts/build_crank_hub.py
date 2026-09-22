@@ -51,6 +51,7 @@ from crank_hub_geometry import (
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
 )
+from crank_native_acceptance import assert_signed_circle_center
 from crank_hub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -254,7 +255,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Axis1 is the shaft/hub axis; Axis2 is the axial seam-pin axis.
     await name_bore_axis(adapter, "Front Plane", 0.0, "Right Plane", 0.0, "hub axis")
-    await name_bore_axis(
+    seam_axis = await name_bore_axis(
         adapter,
         "Front Plane",
         AXIAL_PIN_RADIUS_FROM_AXIS,
@@ -269,6 +270,15 @@ async def build(adapter) -> dict[str, str]:
     for dimension, expression in drive_jobs:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
+    assert_signed_circle_center(
+        adapter,
+        "AxialPinGrooveProfile",
+        label="MHA-137 six-o'clock seam",
+        expected_sketch_xy_mm=(0.0, -AXIAL_PIN_RADIUS_FROM_AXIS),
+        expected_model_xyz_mm=(0.0, 0.0, AXIAL_PIN_RADIUS_FROM_AXIS),
+        axis_name=seam_axis,
+        axis_expected_components_mm={0: 0.0, 2: AXIAL_PIN_RADIUS_FROM_AXIS},
+    )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND)
     )
