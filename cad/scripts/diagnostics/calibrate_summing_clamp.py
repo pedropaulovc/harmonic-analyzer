@@ -313,6 +313,24 @@ def _matrix(rows, position):
     return [x for row in rows for x in row] + [x / 1000.0 for x in position] + [1.0, 0.0, 0.0, 0.0]
 
 
+def _world_point(local_mm, transform):
+    return [
+        sum(local_mm[j] * transform[3*j+i] for j in range(3)) + transform[9+i] * 1000.0
+        for i in range(3)
+    ]
+
+
+def _local_point(world_mm, transform):
+    delta = [world_mm[i] - transform[9+i] * 1000.0 for i in range(3)]
+    return [sum(delta[i] * transform[3*j+i] for i in range(3)) for j in range(3)]
+
+
+def _face_point(face, local_mm):
+    # IFace2 (not ISurface): METHOD, three R8 inputs, VARIANT xyzuv result.
+    point = _values(face.GetClosestPointOn(*(v / 1000.0 for v in local_mm)), 5, "finite face projection")
+    return [v * 1000.0 for v in point[:3]]
+
+
 class Fixture:
     def __init__(self, adapter, names, evidence):
         self.adapter = adapter
@@ -337,6 +355,21 @@ class Fixture:
         self.distance_limit = self.guard + self.allowance + self.resolution
         self.trials = {"tilt": 0, "head": 0, "seat_iterations": 0, "native_predicates": 0, "distance_queries": 0}
         self.faces = {}
+        self.part_contexts = {}
+        self.part_faces = {}
+        self.witnesses = {}
+        evidence["witness_sources"] = {}
+        for body_role in ("counter", "plug", "screw"):
+            document = _early_bound(self.component(body_role).GetModelDoc2(), "IModelDoc2")
+            solids = _solids(document)
+            if len(solids) != 1:
+                raise RuntimeError(f"{body_role}: witness needs one native solid")
+            body = solids[0]
+            self.part_contexts[body_role] = {
+                "document": document, "body": body,
+                "volume_si": _values(body.GetMassProperties(1.0), 12, "witness body mass")[3],
+            }
+        self.counter_faces = [face for face, _ in _face_rows(self.part_contexts["counter"]["body"])]
         evidence["faces"] = {}
         for role, body_role in (("plug", "plug"), ("head", "screw"), ("shank", "screw")):
             component = self.component(body_role)
@@ -347,6 +380,7 @@ class Fixture:
             if len(solids) != 1:
                 raise RuntimeError(f"{role}: ambiguous fixture solid")
             face, row = _select_face(solids[0], role)
+            self.part_faces[role] = face
             corresponding = _early_bound(component.GetCorrespondingEntity(face), "IFace2")
             if corresponding is None:
                 raise RuntimeError(f"{role}: face did not map to assembly context")
@@ -363,6 +397,25 @@ class Fixture:
             record["assembly_face_persist_hex"] = _face_identity(
                 adapter, self.model, corresponding, assembly_body, assembly_control
             )
+        evidence["finite_trim_controls"] = self._trim_controls()
+
+    def _trim_controls(self):
+        controls = {}
+        for role, local_x, inner, outer in (
+            ("plug", goose.ARM_END_X, goose.SCREW_TAP_MINOR_DIA / 2.0, goose.PLUG_DIA / 2.0),
+            ("head", HEAD_X, goose.SCREW_THREAD_MAJOR_DIA / 2.0, goose.SCREW_HEAD_DIA / 2.0),
+        ):
+            rows = {}
+            for name, radius, expected in (("hole", 0.0, inner), ("outside", outer + 1.0, outer)):
+                input_point = [local_x, goose.ARM_Y + radius, 0.0]
+                point = _face_point(self.part_faces[role], input_point)
+                measured = math.hypot(point[1] - goose.ARM_Y, point[2])
+                if abs(point[0] - local_x) > IDENTITY_MM or abs(measured - expected) > IDENTITY_MM:
+                    raise RuntimeError(f"{role}: IFace2 projection did not respect annulus {name} trim: {point!r}")
+                rows[name] = {"input_local_mm": input_point, "point_local_mm": point,
+                              "expected_radius_mm": expected, "measured_radius_mm": measured}
+            controls[role] = rows
+        return controls
 
     def component(self, role):
         result = _early_bound(self.assembly.GetComponentByName(self.names[role]), "IComponent2")
@@ -418,16 +471,111 @@ class Fixture:
         self.assert_poses()
         return {"distance_mm": distance, "point1_mm": [v*1000 for v in p], "point2_mm": [v*1000 for v in q]}
 
-    def face_distance(self, role):
-        row = self.distance(self.faces[role], self.component("counter"))
+    def _witness_poses(self, role):
+        self.assert_poses()
         body_role = "plug" if role == "plug" else "screw"
-        transform = self.expected[body_role]
+        # Read the native transforms, not the requested placement dictionary.
+        return {name: component_transform(self.adapter, self.names[name]) for name in (body_role, "counter")}
+
+    def _face_proof(self, body_role, face):
+        context = self.part_contexts[body_role]
+        volume = _values(context["body"].GetMassProperties(1.0), 12, "witness body mass")[3]
+        if not math.isclose(volume, context["volume_si"], rel_tol=1e-12, abs_tol=0.0):
+            raise RuntimeError(f"{body_role}: native witness solid changed local geometry")
+        proof = {}
+        proof["persist_hex"] = _face_identity(
+            self.adapter, context["document"], face, context["body"], proof
+        )
+        proof["area_mm2"] = float(face.GetArea()) * 1e6
+        proof["body_volume_si"] = volume
+        return proof
+
+    def _on_face(self, face, point):
+        projected = _face_point(face, point)
+        repeated = _face_point(face, projected)
+        if math.dist(projected, repeated) > self.resolution:
+            raise RuntimeError("native finite-face projection failed membership roundtrip")
+        return projected
+
+    def _raw_witness(self, role, raw, poses):
+        body_role = "plug" if role == "plug" else "screw"
+        clamp_face = self.part_faces[role]
+        # Native Measure may return the cylinder axis: follow the documented
+        # face-distance example and project the OTHER entity's point instead.
+        clamp_seed = raw["point2_mm"] if role == "shank" else raw["point1_mm"]
+        clamp_point = self._on_face(clamp_face, _local_point(clamp_seed, poses[body_role]))
+        source = _local_point(raw["point2_mm"], poses["counter"])
+        candidates = [(math.dist(point, source), face, point) for face in self.counter_faces
+                      for point in [_face_point(face, source)]]
+        _, spring_face, spring_point = min(candidates, key=lambda value: value[0])
+        spring_point = self._on_face(spring_face, spring_point)
+        return {
+            "faces": (clamp_face, spring_face), "local_points_mm": (clamp_point, spring_point),
+            "proofs": (self._face_proof(body_role, clamp_face), self._face_proof("counter", spring_face)),
+            "source_actual_transforms": poses, "source_raw_distance": raw,
+        }
+
+    def _transport_witness(self, role, witness, poses):
+        body_role = "plug" if role == "plug" else "screw"
+        points, proofs, changes = [], [], []
+        for name, face, local, original in zip(
+            (body_role, "counter"), witness["faces"], witness["local_points_mm"], witness["proofs"], strict=True
+        ):
+            proof = self._face_proof(name, face)
+            if proof["persist_hex"] != original["persist_hex"] or not math.isclose(
+                proof["area_mm2"], original["area_mm2"], rel_tol=1e-12, abs_tol=0.0
+            ):
+                raise RuntimeError(f"{role}: transported witness changed native face identity/geometry")
+            projected = self._on_face(face, local)
+            if math.dist(projected, local) > self.resolution:
+                raise RuntimeError(f"{role}: transported local witness lost native finite-face membership")
+            points.append(_world_point(projected, poses[name]))
+            proofs.append(proof)
+            changes.append(math.dist(projected, local))
+        self.assert_poses()
+        return {
+            "distance_mm": math.dist(*points), "point1_mm": points[0], "point2_mm": points[1],
+            "distance_kind": "native_finite_witness_upper_bound",
+            "actual_component_transforms": poses, "face_proofs": proofs,
+            "reprojection_change_mm": changes,
+        }
+
+    def face_distance(self, role, *, certify=False):
+        raw = self.distance(self.faces[role], self.component("counter"))
+        body_role = "plug" if role == "plug" else "screw"
+        poses = self._witness_poses(role)
         if role != "shank":
             local_x = goose.ARM_END_X if role == "plug" else HEAD_X
-            world_x = transform[9] * 1000.0 - local_x
-            if abs(row["point1_mm"][0] - world_x) > self.guard:
+            world_x = poses[body_role][9] * 1000.0 - local_x
+            if abs(raw["point1_mm"][0] - world_x) > self.guard:
                 raise RuntimeError(f"{role}: closest point is not on the transformed clamp face")
-        return row
+        previous = self.witnesses.get(role)
+        candidates = []
+        if previous is not None:
+            candidates.append((self._transport_witness(role, previous, poses), previous))
+        if certify or raw["distance_mm"] <= self.distance_limit:
+            source = self._raw_witness(role, raw, poses)
+            candidates.append((self._transport_witness(role, source, poses), source))
+        if not candidates:
+            return {**raw, "distance_kind": "raw_closest_distance"}
+        result, chosen = min(candidates, key=lambda value: value[0]["distance_mm"])
+        if chosen is not previous and result["distance_mm"] <= self.distance_limit:
+            record = {key: value for key, value in chosen.items() if key != "faces"}
+            sources = self.evidence["witness_sources"].setdefault(role, [])
+            chosen["source_index"] = len(sources)
+            record["source_index"] = chosen["source_index"]
+            sources.append(record)
+            self.witnesses[role] = chosen
+        result["source_index"] = chosen.get("source_index")
+        result["raw_closest_distance"] = raw
+        discrepancy = raw["distance_mm"] - result["distance_mm"]
+        if discrepancy > self.guard:
+            _telemetry.warn(
+                f"{role}: ClosestDistance exceeds certified native finite witness upper bound",
+                raw_distance_mm=raw["distance_mm"], witness_upper_bound_mm=result["distance_mm"],
+                discrepancy_mm=discrepancy,
+            )
+        return result
 
     def seat(self, moving, fixed, direction):
         result = solve_component_contact(
@@ -440,9 +588,14 @@ class Fixture:
         return asdict(result)
 
     def require_contact(self, role):
-        result = self.face_distance(role)
+        result = self.face_distance(role, certify=True)
         if result["distance_mm"] > self.distance_limit:
             raise RuntimeError(f"{role}: finite face not in contact ({result!r}); a shank/body contact is insufficient")
+        body_role = "plug" if role == "plug" else "screw"
+        native = self.state(body_role)
+        if native["state"] != "clear" or native["volume_mm3"] != 0.0:
+            raise RuntimeError(f"{role}: finite witness has nonzero or uncertified native overlap: {native!r}")
+        result["native_overlap"] = native
         return result
 
 
@@ -486,7 +639,8 @@ def _tilt_trial(fixture, seed, travel):
     fixture.put({role: _matrix(ROT_Y_180, [mounts.COLUMN_X, y, SUMMING_Z]) for role in ("tube", "plug")})
     shank = fixture.require_contact("shank")
     open_head = fixture.face_distance("head")
-    if open_head["distance_mm"] <= fixture.distance_limit:
+    open_head_raw = open_head.get("raw_closest_distance", open_head)
+    if min(open_head["distance_mm"], open_head_raw["distance_mm"]) <= fixture.distance_limit:
         raise RuntimeError("8 mm installation position does not leave the finite head clear")
     state = fixture.state("plug")
     result = {"parameter_mm": travel, "state": state["state"], "native": state,
@@ -580,11 +734,16 @@ def _positive_controls(fixture, final_gap):
     original = {key: list(value) for key, value in fixture.expected.items()}
     try:
         for face_role, body_role, direction in (("head", "screw", 1.0), ("plug", "plug", -1.0)):
-            at_contact = fixture.face_distance(face_role)
+            at_contact = fixture.require_contact(face_role)
             fixture.shift(body_role, (direction, 0.0, 0.0), 0.05)
-            withdrawn = fixture.face_distance(face_role)
+            withdrawn = fixture.face_distance(face_role, certify=True)
             native = fixture.state(body_role)
-            if native["state"] != "clear" or withdrawn["distance_mm"] < 0.04:
+            # An upper bound alone cannot prove separation: retain the
+            # independent raw distance channel as well as refusing the same
+            # transported finite-contact certificate after the real movement.
+            if (native["state"] != "clear" or native["volume_mm3"] != 0.0
+                    or withdrawn["distance_mm"] < 0.04
+                    or withdrawn["raw_closest_distance"]["distance_mm"] < 0.04):
                 raise RuntimeError(f"{face_role}: finite-face withdrawal positive control failed")
             controls[face_role] = {"contact": at_contact, "withdrawn_0_05_mm": withdrawn, "native": native}
             fixture.put(original)
