@@ -40,6 +40,7 @@ from _drawing_common import (
     model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -88,11 +89,11 @@ SECTION_CENTER = (0.335, 0.105)
 
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
-    "NorthEastX": (0.100, 0.105),
+    "NorthEastX": (0.045, 0.105),
     "NorthEdgeZ": (0.078, 0.150),
-    "NorthWestX": (0.050, 0.115),
-    "SouthWestX": (0.045, 0.258),
-    "SouthEastX": (0.112, 0.259),
+    "NorthWestX": (0.100, 0.115),
+    "SouthWestX": (0.104, 0.258),
+    "SouthEastX": (0.045, 0.259),
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
@@ -104,14 +105,14 @@ PROFILE_KEEP = {
 FEATURE_KEEP = {
     "PivotBearingReliefDia": (0.150, 0.155),
     "PostMountWestX": (0.150, 0.185),
-    "PostMountWestZ": (0.130, 0.175),
+    "PostMountWestZ": (0.225, 0.175),
     "PostMountEastX": (0.205, 0.185),
-    "PostMountEastZ": (0.225, 0.175),
+    "PostMountEastZ": (0.130, 0.175),
 }
 NOTCH_KEEP = {
     "CapECx": (0.250, 0.258),
     "CapECz": (0.305, 0.180),
-    "CapEDia": (0.285, 0.105),
+    "CapEDia": (0.285, 0.259),
 }
 SECTION_KEEP = {
     "PlateThk": (0.300, 0.120),
@@ -350,6 +351,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Feature View Note",
             "Notch View Note",
             "Isometric View Note",
+            "Pivot Relief Fit",
         ),
         required=(
             "Number",
@@ -360,6 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Feature View Note",
             "Notch View Note",
             "Isometric View Note",
+            "Pivot Relief Fit",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -456,6 +459,15 @@ async def build(adapter: Any) -> dict[str, str]:
                     raise RuntimeError("plate thickness witness gap did not persist")
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
+    relief_annotations = [
+        item for item in section_annotations
+        if dimension_name(adapter, item) == "PivotBearingReliefDepth"
+    ]
+    if len(relief_annotations) != 1:
+        raise RuntimeError("expected one native pivot relief depth")
+    relief_reference = set_reference_dimension(
+        adapter, relief_annotations[0], label="matched pivot relief reference depth"
+    )
     annotations = [
         *profile_annotations,
         *feature_annotations,
@@ -505,11 +517,16 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
     add_property_linked_note(adapter, "Notch View Note", 0.245, 0.085)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    add_property_linked_note(
+        adapter, "Pivot Relief Fit", 0.020, 0.065, char_height=0.0025
+    )
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
+        raise RuntimeError("pivot relief reference state did not persist")
     _assert_corner_radius_attachment(adapter, profile, profile_annotations)
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
