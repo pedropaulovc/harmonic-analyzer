@@ -1272,8 +1272,11 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-# EXPERIMENT BRANCH ONLY: worker admission exports the build/release closure.
-_VERIFY_NAMES = ("soundness", "kinematics", "calibrate_summing_clamp")
+# EXPERIMENT BRANCH ONLY: worker admission exports the build/release closure --
+# only its task_dep closure, so an unreferenced verify leaf is refused as
+# "execute task is not in the exported graph"; naming calibrate_summing_clamp and
+# calibrate_spring_seats here is what admits their leaves to the worker graph.
+_VERIFY_NAMES = ("soundness", "kinematics", "calibrate_summing_clamp", "calibrate_spring_seats")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
