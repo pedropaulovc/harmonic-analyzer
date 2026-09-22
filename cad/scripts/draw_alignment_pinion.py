@@ -31,7 +31,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from alignment_pinion_spec import (
-    ARBOR_DIAMETRAL_INTERFERENCE_MM,
     BORE_DIA,
     DRAWING_PRECISION_BY_NAME,
     SURFACE_FINISHES,
@@ -73,15 +72,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
-MIN_INTERFERENCE, MAX_INTERFERENCE = ARBOR_DIAMETRAL_INTERFERENCE_MM
-BORE_CALLOUT = (
-    "THRU; BORE LIMITS AND MATCHED FIT BOTH APPLY\n"
-    "MATCH TO MEASURED MHA-102 PINION ARBOR\n"
-    f"{MIN_INTERFERENCE:.3f}-{MAX_INTERFERENCE:.3f} "
-    "DIAMETRAL INTERFERENCE"
-)
 DIMENSION_CALLOUTS = {
-    "ArborBoreDia": BORE_CALLOUT,
+    "ArborBoreDia": "THRU",
     "FaceWidth": "FULL TOOTH FACE",
 }
 
@@ -148,12 +140,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, keep=RIGHT_KEEP, view_label="full tooth face"
     )
     annotations = [*front_annotations, *right_annotations]
-    set_dimension_callouts(
-        adapter, front_annotations, {"ArborBoreDia": BORE_CALLOUT}, location="above"
-    )
-    set_dimension_callouts(
-        adapter, right_annotations, {"FaceWidth": "FULL TOOTH FACE"}
-    )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
