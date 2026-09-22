@@ -594,7 +594,7 @@ class Fixture:
             return row
         capture("mapped_assembly_context", assembly_context)
 
-    def _face_proof(self, body_role, face, source_proof=None):
+    def _face_proof(self, body_role, face):
         context = self.part_contexts[body_role]
         owner = _early_bound(face.GetBody(), "IBody2")
         if owner is None:
@@ -663,7 +663,7 @@ class Fixture:
             (body_role, "counter"), witness["faces"], witness["owner_bodies"],
             witness["local_points_mm"], witness["proofs"], strict=True
         ):
-            proof = self._face_proof(name, face, original)
+            proof = self._face_proof(name, face)
             same_owner = _early_bound(self.adapter.swApp, "ISldWorks").IsSame(
                 owner, _early_bound(face.GetBody(), "IBody2")
             )
