@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import draw_summing_lever
 import summing_lever_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
@@ -57,3 +58,24 @@ def test_knife_profile_is_the_nonregular_hex_detail_a_states() -> None:
         "HexKnifeFrontSideFlat"
         in summing_lever_spec.DRAWING_PRECISION["HexKnifeFrontProfile"]
     )
+
+
+def test_midrib_right_end_is_in_the_specs_marked_set() -> None:
+    """The gusset's right-hand rib end reaches the print as a model dimension.
+
+    ``DRAWING_PRECISION_BY_NAME`` is derived from the marked set, and the spec
+    refuses to import while the two disagree, so this one membership check
+    covers both the marking and the decimal places that go with it.
+    """
+    assert "MidRibRightX" in summing_lever_spec.DRAWING_PRECISION_BY_NAME
+
+
+def test_manufacturing_note_block_stays_four_lines() -> None:
+    """The general-note block is the print's only prose and it must not grow.
+
+    The drawing simplicity policy names a lengthening note block as the disease
+    the migration cures, so the block stays at the four statements the review
+    rounds settled on. Collapsing them into one multi-line note is the same
+    failure and trips this too.
+    """
+    assert len(draw_summing_lever.MANUFACTURING_NOTES) == 4
