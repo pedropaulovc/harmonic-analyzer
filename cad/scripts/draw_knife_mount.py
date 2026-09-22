@@ -16,7 +16,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 from collections import Counter
 import sys
 from typing import Any, NamedTuple
@@ -66,6 +65,7 @@ from knife_mount_spec import (
     STUD_TAP_SPEC,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
     STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -266,44 +266,53 @@ SECTION_KEEP = {
     "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {
-    # The tap's thickness-direction location is a real driving model dimension
-    # now (see _dimension_tap_from_end in build_knife_mount): kept in the top
-    # view, with its text parked between the two witness lines at the
-    # dimension's midpoint instead of sitting on one of them.
-    "TapFromEnd": (TOP_CENTER[0] - 0.035, 0.197),
+    # The tap's thickness-direction location is the model's own equation-owned
+    # dimension (see _dimension_tap_from_end in build_knife_mount), measured
+    # from the block's near end edge, which the top view draws as its UPPER
+    # outline. Text at the midpoint of that span (tap centreline -> upper
+    # edge), between the witness lines: knife-cc-5 parked it at the old
+    # centre->lower-edge midpoint and the dimension line ran out past its own
+    # witness line to reach the text.
+    "TapFromEnd": (
+        TOP_CENTER[0] - 0.035,
+        TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
+    ),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
 
 
-def _log_tap_from_end_sheet_state(adapter: Any, annotations: list[Any]) -> None:
-    """TEMP-PROBE: what the sheet does with the model's TapFromEnd.
+def _assert_tap_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
+    """The imported 8.00 is a controlling dimension, not a reference read.
 
-    Pairs with build_knife_mount's tap-state probe: the imported dimension's
-    DrivenState and its printed text parts show whether a model dimension
-    reading swDimensionDriven still prints plain (equation ownership) or in
-    parentheses (a real reference dimension).
+    The model's TapFromEnd reads swDimensionDriven once its equation owns it,
+    exactly like BlockWidth/Depth (knife-cc-5), so DrivenState cannot tell a
+    reference from an equation-owned dimension. What the machinist reads can:
+    no reference flag, no parentheses flag, no "(" / ")" text around the value.
     """
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        if name not in ("TapFromEnd", "Depth", "BlockWidth"):
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        _telemetry.info(
-            json.dumps(
-                {
-                    "event": "tap_from_end_sheet_state",
-                    "name": name,
-                    "driven_state": int(dimension.DrivenState),
-                    "is_reference": bool(dimension.IsReference()),
-                    "text": {
-                        part: str(display.GetText(part) or "") for part in range(1, 9)
-                    },
-                },
-                sort_keys=True,
-            )
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "TapFromEnd"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"top view carries {len(matches)} TapFromEnd dimensions")
+    display = _early_bound(matches[0].GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    suffix = str(display.GetText(2) or "")  # swDimensionTextSuffix
+    if (
+        bool(dimension.IsReference())
+        or bool(display.ShowParenthesis)
+        or "(" in prefix
+        or ")" in suffix
+    ):
+        raise RuntimeError(
+            "TapFromEnd prints as a reference dimension: "
+            f"is_reference={bool(dimension.IsReference())}, "
+            f"show_parenthesis={bool(display.ShowParenthesis)}, "
+            f"prefix={prefix!r}, suffix={suffix!r}"
         )
 
 
@@ -876,7 +885,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
-    _log_tap_from_end_sheet_state(adapter, dimensions)
+    _assert_tap_from_end_prints_plain(adapter, top_annotations)
 
     # The Ø12.00 THRU callout is leader-attached, so SOLIDWORKS drew its
     # dimension leader-line pair straight across the bore circle. Suppress the
@@ -906,8 +915,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # common-axis/mid-plane construction, derived from the actual finished
     # edges and the actual Hole Wizard circle: a sheet-side location with no
     # second driving acceptance requirement. Its thickness-direction location
-    # is the model's own driving TapFromEnd (kept in TOP_KEEP above), so the
-    # sheet prints its 8.00 as a controlling dimension instead of '(8.00)'.
+    # is the model's own equation-owned TapFromEnd (kept in TOP_KEEP above), so
+    # the sheet prints its 8.00 as a controlling dimension instead of '(8.00)'.
     tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_from_side = add_edge_dimension(
         adapter,
@@ -917,7 +926,12 @@ async def build(adapter: Any) -> dict[str, str]:
             TOP_CENTER[1],
         ),
         p1=(TOP_CENTER[0] - tap_radius_sheet, TOP_CENTER[1]),
-        text_xy=(TOP_CENTER[0], TOP_CENTER[1] + 0.027),
+        # Text at the dimension line's midpoint: centred on the tap (the old
+        # TOP_CENTER x) the tap's own centreline ran up into '(12.00)'.
+        text_xy=(
+            TOP_CENTER[0] - BLK_HALF_X * SHEET_SCALE[0] / 2000.0,
+            TOP_CENTER[1] + 0.027,
+        ),
         label="hanger tap from finished side",
         orientation="horizontal",
     )
