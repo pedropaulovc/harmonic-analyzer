@@ -43,8 +43,10 @@ Prototype scope notes:
   to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
   smallest gears; no evidence supports a key, pin, set screw, or hub.
 * Circular tooth thickness is a native DRIVING dimension in a construction
-  authoring sketch.  Its asymmetric band is derived from the configured
-  ``gear_mesh`` backlash; it is not a drawing/model reference-status dimension.
+  authoring sketch.  Its witness is centred on the bottom pitch chord so the
+  imported extension lines begin at the tooth flanks instead of crossing the
+  bore.  Its asymmetric band is derived from the configured ``gear_mesh``
+  backlash; it is not a drawing/model reference-status dimension.
 * Root geometry is simplified: the gap floor is the chord at the base circle,
   not the true root circle + trochoid fillet (for N >= 96 the base circle is
   slightly inside root; the 6T gear is severely undercut at standard
@@ -88,6 +90,7 @@ from cone_gear_spec import (
     DRAWING_PRECISION,
     SURFACE_FINISHES,
     TOOTH_THICKNESS,
+    base_chord_root_radius_mm,
     bore_dia_mm,
     material_specification,
 )
@@ -366,6 +369,67 @@ def _expected_configuration_volume(teeth: int) -> float:
     )
 
 
+def _native_minimum_chord_floor_radius_mm(
+    body: Any, *, teeth: int
+) -> tuple[float, int]:
+    """Measure the minimum radius of the planar BREP root-chord edges.
+
+    Root candidates lie on one end plane and have both endpoints on the
+    equation-driven base circle.  This topology filter excludes axial edges
+    and the vertex-free cylindrical bore.  ``IEdge.GetClosestPointOn`` then
+    measures the persisted edge itself without assuming the equation curve was
+    simplified to an analytic line, using screen-space selection, approximate
+    boxes, or substituting a volume proxy.
+    """
+    pressure_angle = math.radians(PA_DEG)
+    base_radius_mm = (
+        teeth / DP * math.cos(pressure_angle) / 2.0 * 25.4
+    )
+    candidates: list[float] = []
+    for raw_edge in tuple(_early_bound(body, "IBody2").GetEdges() or ()):
+        edge = _early_bound(raw_edge, "IEdge")
+        raw_start = edge.GetStartVertex()
+        raw_end = edge.GetEndVertex()
+        if raw_start is None or raw_end is None:
+            continue
+        start = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(raw_start, "IVertex").GetPoint()
+        )
+        end = tuple(
+            float(value) * 1000.0
+            for value in _early_bound(raw_end, "IVertex").GetPoint()
+        )
+        if abs(start[2] - end[2]) > 1e-6:
+            continue
+        start_radius = math.hypot(start[0], start[1])
+        end_radius = math.hypot(end[0], end[1])
+        if max(
+            abs(start_radius - base_radius_mm),
+            abs(end_radius - base_radius_mm),
+        ) > 0.002:
+            continue
+        closest = tuple(
+            float(value) * 1000.0
+            for value in edge.GetClosestPointOn(
+                0.0,
+                0.0,
+                start[2] / 1000.0,
+            )
+        )
+        if len(closest) < 3:
+            raise RuntimeError(
+                f"T{teeth:03d}: unreadable root-edge closest point "
+                f"{closest!r}"
+            )
+        candidates.append(math.hypot(closest[0], closest[1]))
+    if not candidates:
+        raise RuntimeError(
+            f"T{teeth:03d}: no planar base-circle chord edge in solid BREP"
+        )
+    return min(candidates), len(candidates)
+
+
 def _configuration_definition_state(
     adapter: Any, configuration: str, *, phase: str
 ) -> None:
@@ -453,6 +517,37 @@ async def _configuration_topology(
         if len(bodies) == 1
         else 0
     )
+    root_observation = ""
+    root_issues: list[str] = []
+    if teeth == CONFIGS[0][1] and len(bodies) == 1:
+        native_root, chord_edges = _native_minimum_chord_floor_radius_mm(
+            bodies[0], teeth=teeth
+        )
+        expected_root = base_chord_root_radius_mm(teeth)
+        maximum_bore_radius = (
+            bore_dia_mm(teeth) + BORE_DIA_BAND[0]
+        ) / 2.0
+        minimum_web = native_root - maximum_bore_radius
+        root_observation = (
+            f", native_chord_floor_radius={native_root:.6f}, "
+            f"equivalent_diameter={2.0 * native_root:.6f}, "
+            f"expected_chord_floor_radius={expected_root:.6f}, "
+            f"minimum_bore_web={minimum_web:.6f}, "
+            f"chord_edges={chord_edges}"
+        )
+        if abs(native_root - expected_root) > 0.002:
+            root_issues.append(
+                f"native chord-floor radius {native_root:.6f} differs from "
+                f"source equation {expected_root:.6f}"
+            )
+        if chord_edges < teeth:
+            root_issues.append(
+                f"native chord-edge count {chord_edges} < tooth count {teeth}"
+            )
+        if minimum_web <= 0.0:
+            root_issues.append(
+                f"native minimum bore web is nonpositive: {minimum_web:.6f}"
+            )
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"{configuration}: get_mass_properties failed: {mass.error}")
@@ -466,10 +561,11 @@ async def _configuration_topology(
         f"{TOOTH_PATTERN_FEATURE} instances={instances}, "
         f"suppressed={suppressed}, error={error_code}, warning={is_warning}, "
         f"bodies={len(bodies)}, faces={face_count}, volume={volume:.1f}, "
-        f"expected={expected:.1f}"
+        f"expected={expected:.1f}{root_observation}"
     )
     _telemetry.info(f"{phase} cone-gear topology: {observation}")
     issues: list[str] = []
+    issues.extend(root_issues)
     if needs_rebuild:
         issues.append("configuration needs rebuild")
     if instances != teeth:
@@ -1021,23 +1117,68 @@ async def build(adapter) -> dict[str, str]:
     # Native tooth-system acceptance size.  The involute is generated from the
     # gear equations and exposes no stable feature dimension for circular tooth
     # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
-    # print one DRIVING model dimension.  Construction geometry is not drawn,
-    # but its dimension imports; a blanked sketch would suppress the dimension.
+    # print one DRIVING model dimension.  The horizontal witness is centred at
+    # the bottom pitch radius: the imported extension lines consequently start
+    # on the tooth flanks instead of running from the model origin through the
+    # bore and body.  Both construction lines remain volume-neutral and hidden,
+    # but blanking the sketch would also suppress the dimension.
     tooth_reference = SketchDims()
     check(
         "create_sketch tooth-thickness reference",
         await adapter.create_sketch("Front"),
     )
+    pitch_radius_mm = DEFAULT_TEETH / DIAMETRAL_PITCH * 25.4 / 2.0
     set_sketch_direct_db(adapter, True)
+    pitch_radius_line = check(
+        "tooth-thickness pitch-radius witness",
+        await adapter.add_line(0.0, 0.0, 0.0, -pitch_radius_mm),
+    )
     tooth_line = check(
         "tooth-thickness reference line",
-        await adapter.add_line(0.0, 0.0, TOOTH_THICKNESS, 0.0),
+        await adapter.add_line(
+            -TOOTH_THICKNESS / 2.0,
+            -pitch_radius_mm,
+            TOOTH_THICKNESS / 2.0,
+            -pitch_radius_mm,
+        ),
     )
     set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, pitch_radius_line)
     _as_construction(adapter, tooth_line)
+    check(
+        "tooth-thickness pitch radius vertical",
+        await adapter.add_sketch_constraint(
+            pitch_radius_line, None, "vertical"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{pitch_radius_line}.start",
+        0.0,
+        0.0,
+        "tooth-thickness pitch radius",
+    )
+    check(
+        "tooth-thickness reference centred on pitch radius",
+        await adapter.add_sketch_constraint(
+            f"{pitch_radius_line}.end", tooth_line, "midpoint"
+        ),
+    )
     check(
         "tooth-thickness reference horizontal",
         await adapter.add_sketch_constraint(tooth_line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{pitch_radius_line}.start",
+        f"{pitch_radius_line}.end",
+        "vertical_distance",
+        pitch_radius_mm,
+        "tooth-thickness pitch radius",
+    )
+    tooth_reference.record(
+        "ToothPitchRadius",
+        '"ToothCount" / "DP" / 2',
     )
     await dimension_between(
         adapter,
@@ -1048,13 +1189,6 @@ async def build(adapter) -> dict[str, str]:
         "circular tooth thickness",
     )
     tooth_reference.record("ToothThickness", '"ToothThickness"')
-    await anchor_point_to_origin(
-        adapter,
-        f"{tooth_line}.start",
-        0.0,
-        0.0,
-        "tooth-thickness reference",
-    )
     await ensure_fully_defined(adapter, "tooth-thickness reference sketch")
     check(
         "exit_sketch tooth-thickness reference",

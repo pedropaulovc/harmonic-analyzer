@@ -36,11 +36,37 @@ PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
 OUTSIDE_DIA = (TEETH + 2) * MODULE_MM
-WHOLE_DEPTH = 2.157 * MODULE_MM
+BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 FACE_WIDTH = 6.5
+
+
+def base_chord_root_radius_mm(teeth: int) -> float:
+    """Return the minimum radius of the equation-driven gap-floor chord.
+
+    This mirrors ``build_cone_gear.gear_facts`` and its A2-to-A1 equation
+    curve exactly.  It is deliberately not the standard full-depth dedendum:
+    every configured solid is cut by involute flanks closed with this chord.
+    """
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    pressure_angle = math.radians(PRESSURE_ANGLE_DEG)
+    base_radius = teeth * MODULE_MM * math.cos(pressure_angle) / 2.0
+    delta = (
+        math.pi / (2.0 * teeth)
+        + math.tan(pressure_angle)
+        - pressure_angle
+    )
+    half_gap_angle = math.pi / teeth - delta
+    return base_radius * math.cos(half_gap_angle)
+
+
+def as_cut_tooth_depth_mm(teeth: int) -> float:
+    """Return tip radius minus the configured base-chord root radius."""
+    tip_radius = (teeth + 2.0) * MODULE_MM / 2.0
+    return tip_radius - base_chord_root_radius_mm(teeth)
 
 def bore_dia_mm(teeth: int) -> float:
     """Return the configured bore that fits the matching stepped-shaft land."""

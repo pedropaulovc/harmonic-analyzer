@@ -111,8 +111,19 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert f"PITCH DIAMETER (mm, REF):  {teeth * spec.MODULE_MM:.2f}" in data
         assert "DIAMETRAL PITCH" in data
         assert "PRESSURE ANGLE" in data
-        assert "STRAIGHT SPUR INVOLUTE" in data
+        assert "INVOLUTE FLANKS" in data
         assert f"CYLINDER GEAR {notes.CYLINDER_MATE_NUMBER}" in data
+        assert (
+            f"MIN CHORD-FLOOR DIAMETER (mm, REF):  "
+            f"{2.0 * spec.base_chord_root_radius_mm(teeth):.3f}"
+        ) in data
+        assert (
+            f"AS-CUT RADIAL TOOTH DEPTH (mm, REF):  "
+            f"{spec.as_cut_tooth_depth_mm(teeth):.3f}"
+        ) in data
+        assert spec.BASE_CHORD_ROOT_FORM in data
+        assert "FULL DEPTH" not in data
+        assert "WHOLE DEPTH" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
         assert f"{part.BACKLASH_MM[0]:.2f} TO {part.BACKLASH_MM[1]:.2f}" in data
         # These values are native imported dimensions, never parallel typed rows.
@@ -126,11 +137,20 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
             assert duplicate not in data
 
 
+def test_t006_root_contract_uses_the_current_base_chord_recipe() -> None:
+    root = spec.base_chord_root_radius_mm(6)
+    assert root == pytest.approx(1.4324343141)
+    assert spec.as_cut_tooth_depth_mm(6) == pytest.approx(0.6069073155)
+    maximum_bore = spec.bore_dia_mm(6) + part.BORE_DIA_BAND[0]
+    assert root - maximum_bore / 2.0 == pytest.approx(0.6111843141)
+
+
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
     registry = _config.parts("cone-gear")
     assert spec.BODY_MATERIAL_SPEC == registry["material_specification"]
     assert spec.TIP_MATERIAL_SPEC == registry["material_tip_specification"]
     assert spec.TIP_MATERIAL_SPEC != spec.BODY_MATERIAL_SPEC
+    assert registry["finish"] == "NONE"
     for teeth in spec.CONFIGURATION_TEETH:
         assert part.bore_dia_in(teeth) * spec.MM_PER_IN == pytest.approx(
             spec.bore_dia_mm(teeth)
@@ -145,13 +165,12 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
     assert len(lines) == 4
     assert all(len(line) <= 90 for line in lines)
     assert "PLAIN BORE, NO KEYWAY" in text
-    assert notes.ATTACHMENT_PROCESS == "SOLDER OR SILVER-BRAZE TO"
+    assert "BOND TO MHA-014 SHAFT SEAT AT ASSEMBLY" in text
+    assert notes.ATTACHMENT_PROCESS == "SOLDER OR SILVER-BRAZE"
     assert notes.ATTACHMENT_PROCESS in text
-    assert notes.ATTACHMENT_ALTERNATIVE == (
-        "LOCTITE 638 OR 648 RETAINING COMPOUND ACCEPTABLE"
-    )
+    assert notes.ATTACHMENT_ALTERNATIVE == "LOCTITE 638 OR LOCTITE 648"
     assert notes.ATTACHMENT_ALTERNATIVE in text
-    assert "; OR USE " in text
+    assert "ACCEPTABLE BONDS:" in text
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("cylinder-gear")["number"]
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     for unsupported in ("PIN", "SET SCREW", "HUB"):
@@ -187,12 +206,25 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
         assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
         assert front["BoreCutDia"][0] < drawing.FRONT_CENTER[0] - half_od
+        assert front["BoreCutDia"][0] == pytest.approx(
+            drawing.BORE_CALLOUT_LANE_X
+        )
+        assert (
+            drawing.FRONT_CENTER[0]
+            - half_od
+            - drawing.BORE_CALLOUT_LANE_X
+            >= 0.008
+        )
         assert front["ToothThickness"][0] > drawing.FRONT_CENTER[0] + half_od
 
 
 def test_invalid_family_member_is_rejected() -> None:
     with pytest.raises(ValueError):
         spec.bore_dia_mm(7)
+    with pytest.raises(ValueError):
+        spec.base_chord_root_radius_mm(7)
+    with pytest.raises(ValueError):
+        spec.as_cut_tooth_depth_mm(7)
     with pytest.raises(ValueError):
         spec.material_specification(7)
     with pytest.raises(ValueError):
