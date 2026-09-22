@@ -27,6 +27,8 @@ def test_tip_passage_is_the_adjuster_cup_clearance_envelope() -> None:
     callout = drawing.DIMENSION_CALLOUTS["PassageDiaDim"].upper()
     assert "THRU" in callout
     assert "CLEARANCE" in callout
+    assert "COAXIAL WITH" in callout
+    assert "ADJUSTER BORE" in callout
 
 def test_adjuster_tap_has_lead_beyond_the_required_full_thread() -> None:
     """A blind tap cannot deliver full threads to its drill shoulder."""

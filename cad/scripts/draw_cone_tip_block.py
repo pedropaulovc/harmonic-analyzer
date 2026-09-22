@@ -94,7 +94,7 @@ RIGHT_KEEP = {
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
-    "PassageDiaDim": "DRILL THRU\nCLEARANCE",
+    "PassageDiaDim": "DRILL THRU\nCLEARANCE\nCOAXIAL WITH\nADJUSTER BORE",
     "SlitDepth": "SLOT DEPTH",
 }
 
@@ -187,7 +187,7 @@ def _preferred_entry_circle(
     # caller's candidate order supplies a stable sheet-side preference.
     return matches[0]
 
-_PINCH_THREAD_QUALIFIER = "LEFT JAW — COAXIAL CLEARANCE"
+_PINCH_THREAD_QUALIFIER = "LEFT-JAW THREAD\nCOAXIAL WITH CLEARANCE"
 _PINCH_THREAD_NATIVE_TOKENS = frozenset(
     {"<hw-thrutapdrldia>", "<hw-threaddesc>", "<hw-threadclass>"}
 )
