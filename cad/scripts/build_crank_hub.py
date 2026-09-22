@@ -202,7 +202,7 @@ async def build(adapter) -> dict[str, str]:
         "axial seam groove",
         dims=groove,
         names=("GrooveX", "GrooveZ", "GrooveDia"),
-        drives=(None, '"SeatDia" / -2', '"AxialPinDia"'),
+        drives=(None, '"SeatDia" / 2', '"AxialPinDia"'),
     )
     await ensure_fully_defined(adapter, "axial seam groove sketch")
     check("exit_sketch axial seam groove", await adapter.exit_sketch())
