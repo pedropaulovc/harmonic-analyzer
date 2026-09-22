@@ -55,6 +55,22 @@ def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
     assert part.PINCH_CLEARANCE_DIA > part.PINCH_BORE_DIA
 
 
+def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -> None:
+    """The print must describe the remaining threaded jaw, not the pre-clearance cut."""
+    original = {
+        5: "<hw-threaddesc> <hw-threadclass> <hw-thru>",
+        6: "",
+        7: "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>",
+        8: "",
+    }
+    rewritten = drawing._pinch_thread_callout_definitions(original)
+    text = "\n".join(rewritten.values())
+    assert "THRU ALL" not in text
+    assert text.count("TO SLOT") == 2
+    assert drawing._PINCH_THREAD_QUALIFIER in text
+    assert all(token in text for token in drawing._PINCH_THREAD_NATIVE_TOKENS)
+
+
 def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     """The user-approved relative axis control prevents both breakout and collision."""
     assert abs(part.PINCH_BORE_Y - part.ADJUSTER_AXIS_HEIGHT - part.PINCH_RISE) < 1e-12

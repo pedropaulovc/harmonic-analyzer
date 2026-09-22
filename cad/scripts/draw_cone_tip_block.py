@@ -187,6 +187,72 @@ def _preferred_entry_circle(
     # caller's candidate order supplies a stable sheet-side preference.
     return matches[0]
 
+_PINCH_THREAD_QUALIFIER = "LEFT JAW — COAXIAL CLEARANCE"
+_PINCH_THREAD_NATIVE_TOKENS = frozenset(
+    {"<hw-thrutapdrldia>", "<hw-threaddesc>", "<hw-threadclass>"}
+)
+
+
+def _pinch_thread_callout_definitions(
+    definitions: dict[int, str],
+) -> dict[int, str]:
+    """Replace only the native extent words; keep every associative variable."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected pinch callout definition parts: {definitions!r}")
+    original = "\n".join(definitions.values())
+    missing = _PINCH_THREAD_NATIVE_TOKENS - {
+        token for token in _PINCH_THREAD_NATIVE_TOKENS if token in original
+    }
+    if missing or original.count("<hw-thru>") != 2:
+        raise RuntimeError(
+            "unexpected native pinch-thread callout definition: "
+            f"missing={sorted(missing)!r}, definitions={definitions!r}"
+        )
+    updated = {
+        part: text.replace("<hw-thru>", "TO SLOT")
+        for part, text in definitions.items()
+    }
+    updated[5] = (
+        f"{_PINCH_THREAD_QUALIFIER}\n{updated[5].lstrip()}"
+        if updated[5].strip()
+        else _PINCH_THREAD_QUALIFIER
+    )
+    rewritten = "\n".join(updated.values())
+    if (
+        "THRU ALL" in rewritten
+        or rewritten.count("TO SLOT") != 2
+        or any(token not in rewritten for token in _PINCH_THREAD_NATIVE_TOKENS)
+    ):
+        raise RuntimeError(f"pinch-thread callout rewrite lost semantics: {updated!r}")
+    return updated
+
+
+def _set_pinch_thread_callout_text(display: Any) -> None:
+    """State the final two-jaw extent without severing Hole Wizard variables."""
+    definitions = {
+        part: str(display.GetText(part) or "")
+        for part in (5, 6, 7, 8)
+    }
+    updated = _pinch_thread_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {
+        part: str(display.GetText(part) or "")
+        for part in (5, 6, 7, 8)
+    }
+    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
+    if (
+        persisted != updated
+        or "THRU ALL" in resolved
+        or resolved.count("TO SLOT") != 2
+        or _PINCH_THREAD_QUALIFIER not in resolved
+    ):
+        raise RuntimeError(
+            "pinch-thread native extent override did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
+
 
 _COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
 
@@ -443,13 +509,14 @@ async def build(adapter: Any) -> dict[str, str]:
         {"hw-depth": 1},
         label="pinch clearance depth",
     )
-    add_native_hole_callout(
+    pinch_thread_callout = add_native_hole_callout(
         adapter,
         left,
         edge=pinch_thread_edge,
         callout_xy=(0.254, 0.181),
         label="pinch opposite-jaw thread",
     )
+    _set_pinch_thread_callout_text(pinch_thread_callout)
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x, y in (
