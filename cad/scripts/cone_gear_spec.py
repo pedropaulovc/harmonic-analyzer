@@ -72,8 +72,8 @@ def bore_dia_mm(teeth: int) -> float:
     """Return the configured bore that fits the matching stepped-shaft land."""
     if teeth not in CONFIGURATION_TEETH:
         raise ValueError(f"unsupported cone-gear tooth count {teeth}")
-    # T006 is 1/16", not 1/32": its as-cut base-chord root still leaves a
-    # 0.543 mm rim, while the shaft tip improves from L/D 26 to 13.
+    # T006 is 1/16", not 1/32": its native-verified base-chord root leaves
+    # 0.638684 mm nominal web (0.611184 mm at maximum bore); shaft-tip L/D is 13.
     if teeth == 6:
         return 0.0625 * MM_PER_IN
     if teeth == 12:
