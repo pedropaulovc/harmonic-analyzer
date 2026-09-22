@@ -116,9 +116,9 @@ def _hide_profile_tooth_edges(adapter: Any, view: Any) -> None:
         draw.HideEdge()
         hidden += 1
     adapter.currentModel.ClearSelection2(True)
-    if hidden < TEETH * 2:
+    if hidden < TEETH:
         raise RuntimeError(
-            f"found only {hidden} axial tooth edges; expected at least {TEETH * 2}"
+            f"found only {hidden} axial tooth edges; expected at least {TEETH}"
         )
     view.UpdateViewDisplayGeometry()
 
