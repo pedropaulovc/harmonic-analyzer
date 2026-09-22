@@ -19,6 +19,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -88,20 +89,20 @@ SECTION_CENTER = (0.335, 0.105)
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.100, 0.105),
-    "NorthEdgeZ": (0.105, 0.150),
+    "NorthEdgeZ": (0.078, 0.150),
     "NorthWestX": (0.050, 0.115),
     "SouthWestX": (0.045, 0.258),
-    "SouthEastX": (0.108, 0.253),
+    "SouthEastX": (0.112, 0.259),
     # The Top view reverses the authored corner compass.  Place each native
     # radius beside its actual drawing attachment instead of routing four
     # leaders diagonally through the plate.
-    "CornerNER": (0.135, 0.130),
+    "CornerNER": (0.135, 0.118),
     "CornerNWR": (0.025, 0.130),
-    "CornerSWR": (0.118, 0.235),
+    "CornerSWR": (0.110, 0.249),
     "CornerSER": (0.040, 0.240),
 }
 FEATURE_KEEP = {
-    "PivotBearingReliefDia": (0.215, 0.130),
+    "PivotBearingReliefDia": (0.150, 0.155),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.130, 0.175),
     "PostMountEastX": (0.205, 0.185),
@@ -114,7 +115,7 @@ NOTCH_KEEP = {
 }
 SECTION_KEEP = {
     "PlateThk": (0.300, 0.120),
-    "PivotBearingReliefDepth": (0.375, 0.115),
+    "PivotBearingReliefDepth": (0.365, 0.115),
 }
 
 
@@ -248,6 +249,75 @@ def _horizontal_section_edge(
         raise RuntimeError(f"pivot section has no {label} edge at y={y_mm:.3f} mm")
     key_index = 1 if prefer_right else 0
     return max(candidates, key=lambda item: item[key_index])[2]
+
+
+def _assert_corner_radius_attachment(adapter: Any, view: Any, annotations: list[Any]) -> None:
+    """Prove the R5 arrow lies on its attached trimmed edge, not its circle extension."""
+    matches = [item for item in annotations if dimension_name(adapter, item) == "CornerSWR"]
+    if len(matches) != 1:
+        raise RuntimeError("expected one native CornerSWR radius annotation")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    entity_types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+    if not entities or len(entities) != len(entity_types) or any(item is None for item in entities):
+        raise RuntimeError("R5 has missing or dangling native attachments")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    arrows = [
+        tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
+        for index in range(int(data.GetArrowHeadCount()))
+    ]
+    if len(arrows) != 1 or len(arrows[0]) < 3:
+        raise RuntimeError(f"expected one R5 arrow tip, found {arrows}")
+    arrow = arrows[0]
+    edges = []
+    for entity_type, entity in zip(entity_types, entities):
+        if entity_type == 1:  # swSelEDGES
+            edges.append(_early_bound(entity, "IEdge"))
+        elif entity_type == 2:  # swSelFACES
+            face = _early_bound(entity, "IFace2")
+            owner = _early_bound(face.GetFeature(), "IFeature")
+            if str(owner.Name) != "CornerSW":
+                raise RuntimeError(f"R5 attached to the wrong feature: {owner.Name}")
+            edges.extend(_early_bound(edge, "IEdge") for edge in (face.GetEdges() or ()))
+        else:
+            raise RuntimeError(f"unsupported R5 attachment entity type: {entity_type}")
+    print(f"R5 native attachment types={entity_types} arrow_sheet_m={arrow[:3]}")
+    for edge in edges:
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        circle = tuple(float(value) for value in curve.CircleParams)
+        if abs(circle[6] - 0.005) > 1e-8:
+            continue
+        center = model_point_in_view(adapter, view, circle[:3], label="R5 attached circle")
+        if abs(center[0] - 0.0875) > 0.001 or abs(center[1] - 0.2433) > 0.001:
+            continue
+        # Invert the measured plan-view X/Z basis at this edge's model Y.
+        px = model_point_in_view(adapter, view, (circle[0] + 0.001, circle[1], circle[2]), label="R5 X basis")
+        pz = model_point_in_view(adapter, view, (circle[0], circle[1], circle[2] + 0.001), label="R5 Z basis")
+        xx, xy = px[0] - center[0], px[1] - center[1]
+        zx, zy = pz[0] - center[0], pz[1] - center[1]
+        det = xx * zy - zx * xy
+        if abs(det) < 1e-12:
+            raise RuntimeError("R5 plan projection is singular")
+        dx, dy = arrow[0] - center[0], arrow[1] - center[1]
+        model_tip = (
+            circle[0] + 0.001 * (dx * zy - zx * dy) / det,
+            circle[1],
+            circle[2] + 0.001 * (xx * dy - dx * xy) / det,
+        )
+        # IEdge, not ICurve: the closest point is on the trimmed physical edge.
+        closest = tuple(float(value) for value in edge.GetClosestPointOn(*model_tip))
+        trim = _early_bound(edge.GetCurveParams3(), "ICurveParamData")
+        distance = math.dist(model_tip, closest[:3])
+        print(
+            f"R5 trimmed edge: radius_m={circle[6]} center_model_m={circle[:3]} "
+            f"trim_u=({trim.UMinValue},{trim.UMaxValue}) closest_u={closest[3]} "
+            f"arrow_model_m={model_tip} closest_model_m={closest[:3]} distance_m={distance}"
+        )
+        if distance <= 0.00002:  # 0.01 mm on this 1:2 sheet; not an arc-extension allowance.
+            return
+    raise RuntimeError("R5 arrow does not land on its attached physical corner arc")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -428,6 +498,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (profile, feature, notch, section, iso):
         set_hidden_lines_removed(adapter, view)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_corner_radius_attachment(adapter, profile, profile_annotations)
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
     for face_name, model_y in (
