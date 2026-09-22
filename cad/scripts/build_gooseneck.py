@@ -456,7 +456,7 @@ async def build(adapter) -> dict[str, str]:
 
     plug = SketchDims()
     check("create_sketch end plug", await adapter.create_sketch("Right"))
-    await define_circle(
+    plug_circle = await define_circle(
         adapter,
         0.0,
         ARM_Y,
@@ -466,16 +466,27 @@ async def build(adapter) -> dict[str, str]:
         names=("PlugCz", "PlugCy", "PlugDia"),
         drives=(None, '"ArmY"', '"PlugDia"'),
     )
-    await define_circle(
-        adapter,
-        0.0,
-        ARM_Y,
-        TAP_MINOR_R,
-        "plug tap minor",
-        dims=plug,
-        names=("TapCz", "TapCy", "TapMinorDia"),
-        drives=(None, '"ArmY"', '"TapMinorDia"'),
+    set_sketch_direct_db(adapter, True)
+    try:
+        tap_circle = check(
+            "add_circle plug tap minor",
+            await adapter.add_circle(0.0, ARM_Y, TAP_MINOR_R),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    check(
+        "plug tap minor concentric",
+        await adapter.add_sketch_constraint(
+            f"{tap_circle}.center", f"{plug_circle}.center", "coincident"
+        ),
     )
+    check(
+        "dimension plug tap minor diameter",
+        await adapter.add_sketch_dimension(
+            tap_circle, None, "diameter", 2.0 * TAP_MINOR_R
+        ),
+    )
+    plug.record("TapMinorDia", '"TapMinorDia"')
     await ensure_fully_defined(adapter, "end plug sketch")
     check("exit_sketch end plug", await adapter.exit_sketch())
     name_last_feature(adapter, "EndPlugProfile")
