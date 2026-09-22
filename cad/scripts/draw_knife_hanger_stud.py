@@ -50,7 +50,7 @@ ISO_SCALE = (2.0, 1.0)
 FRONT_CENTER = (0.120, 0.165)
 ISO_CENTER = (0.350, 0.210)
 FRONT_KEEP = {"FinishedOverall": (0.045, 0.165)}
-DETAIL_KEEP = {"ChamferWidth": (0.235, 0.125), "ChamferAngle": (0.320, 0.175)}
+DETAIL_KEEP = {"ChamferWidth": (0.235, 0.125), "ChamferAngle": (0.315, 0.155)}
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
     detail_center=(0.280, 0.145),
@@ -146,7 +146,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Supplier", 0.016, 0.056, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.016, 0.047, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.038, char_height=0.003)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.145)
+    add_property_linked_note(adapter, "Isometric View Note", 0.345, 0.145)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.085, char_height=0.003
     )
