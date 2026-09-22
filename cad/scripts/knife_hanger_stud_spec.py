@@ -39,6 +39,12 @@ DRAWING_DIMENSIONS = {
     "StockDeburrProfile": {"ChamferAngle"},
 }
 DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 2, "ChamferAngle": 0}
+# Rule 2's one exception (see top_frame_spec): the sheet's 45 deg is a DRAWING
+# dimension between the drawn chamfer and end face, so no model dimension
+# carries its places. It prints the driving ChamferAngle's. Left to the
+# drawing default it follows the document (-2), and the document's angular
+# default read 2 places (leaf 20260922T205948Z).
+DRAWING_REFERENCE_PRECISION = {"ChamferAngle": DIMENSION_PRECISION["ChamferAngle"]}
 DIMENSION_TOLERANCE_TYPES = {
     "ChamferAngle": 11,
 }

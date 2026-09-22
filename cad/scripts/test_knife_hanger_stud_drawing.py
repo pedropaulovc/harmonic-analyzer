@@ -310,16 +310,90 @@ def test_segment_circle_crossing() -> None:
     assert not drawing._segment_crosses_circle((-2.0, 1.5), (2.0, 1.5), center, radius)
 
 
-def test_document_precision_resolves_the_printed_places() -> None:
-    # stud-10: the drawing dimension read -2 (follows the drawing default) and
-    # rendered "45°"; the default resolves the setting, the render confirms it.
+def test_printed_places_follow_the_spec_and_the_render() -> None:
     texts = [" 45° CHAMFER TO EXISTING THREAD ROOT "]
-    follows = drawing.PRECISION_FOLLOWS_DOCUMENT
-    assert drawing._printed_places_problem(follows, 0, texts, 45.0) is None
-    assert drawing._printed_places_problem(0, 2, texts, 45.0) is None
-    problem = drawing._printed_places_problem(follows, 2, texts, 45.0)
-    assert problem is not None and "prints 2 places" in problem
+    assert drawing.CHAMFER_ANGLE_PRECISION == spec.DIMENSION_PRECISION["ChamferAngle"]
+    assert drawing._printed_places_problem(0, texts, 45.000000000000306) is None
+    # stud-10/11: the drawing dimension followed the document default (-2).
+    problem = drawing._printed_places_problem(-2, texts, 45.0)
+    assert problem is not None and "prints -2 places" in problem
     stale = [" 45.00° CHAMFER TO EXISTING THREAD ROOT "]
-    problem = drawing._printed_places_problem(follows, 0, stale, 45.0)
+    problem = drawing._printed_places_problem(0, stale, 45.0)
     assert problem is not None and "renders" in problem
-    assert drawing._printed_places_problem(follows, 0, [], 45.0) is not None
+    assert drawing._printed_places_problem(0, [], 45.0) is not None
+
+
+def _mm_point(point: list[float]) -> tuple[float, float]:
+    return (point[0] / 1000.0, point[1] / 1000.0)
+
+
+# The pinned 45 deg exactly as leaf 20260922T205428Z (stud-10) logged it: the
+# arc split around the inline value at the bisector, plus the 0 deg witness.
+STUD10_VERTEX = (0.26509, 0.1312)
+STUD10_ARCS = (
+    ([265.09, 131.2], [277.09, 131.2], [276.95, 133.01]),
+    ([265.09, 131.2], [274.56, 138.57], [273.57, 139.69]),
+)
+STUD10_WITNESS = (_mm_point([266.09, 131.2]), _mm_point([278.09, 131.2]))
+STUD10_STATE = {
+    "value_deg": 45.000000000000384,
+    "model_deg": 45.000000000000306,
+    "parenthesis": False,
+    "texts": [" 45° CHAMFER TO EXISTING THREAD ROOT "],
+}
+
+
+def test_stud10_logged_angle_passes_every_option8_gate() -> None:
+    arcs = tuple(
+        drawing.DimensionArc(
+            center=_mm_point(center),
+            start=_mm_point(start),
+            end=_mm_point(end),
+            ccw=True,
+        )
+        for center, start, end in STUD10_ARCS
+    )
+    ink = _ink(*arcs, lines=[STUD10_WITNESS])
+    # _pin_angle_arc: centre on the projected vertex, span, radius, one circle.
+    for arc in arcs:
+        assert math.dist(arc.center, STUD10_VERTEX) <= drawing.ANGLE_VERTEX_TOLERANCE_M
+        assert abs(arc.radius - R) <= drawing.ANGLE_ARC_RADIUS_TOLERANCE_M
+    assert drawing._span_problem(arcs) is None
+    # The ink gate, in the stud-6 detail frame (its outline centre is fixed).
+    box = (0.265 - 0.04177, 0.150 - 0.04177, 0.265 + 0.04177, 0.150 + 0.04177)
+    assert (
+        drawing._dimension_ink_problems(
+            ink, owner=box, obstacles={}, region=REGION, boundary=BOUNDARY
+        )
+        == []
+    )
+    # _assert_arrows_on_drawn_edges: the 0 deg end has its witness from the
+    # vertex; the 45 deg end is the one probed on the drawn chamfer.
+    ends = [point for arc in arcs for point in (arc.start, arc.end)]
+
+    def bearing(point: tuple[float, float]) -> float:
+        return math.degrees(
+            math.atan2(point[1] - STUD10_VERTEX[1], point[0] - STUD10_VERTEX[0])
+        )
+
+    face_end = min(ends, key=lambda point: abs(bearing(point)))
+    chamfer_end = min(ends, key=lambda point: abs(bearing(point) - 45.0))
+    assert drawing._witness_covers(ink.lines, STUD10_VERTEX, face_end)
+    assert bearing(chamfer_end) == pytest.approx(45.0, abs=0.1)
+    # _assert_chamfer_angle_display, with the spec's places now set explicitly.
+    value = math.radians(STUD10_STATE["value_deg"])
+    model = math.radians(STUD10_STATE["model_deg"])
+    assert abs(value - model) <= drawing.ANGLE_VALUE_TOLERANCE_RAD
+    assert not STUD10_STATE["parenthesis"]
+    assert not any("(" in text for text in STUD10_STATE["texts"])
+    places = spec.DRAWING_REFERENCE_PRECISION["ChamferAngle"]
+    assert (
+        drawing._printed_places_problem(
+            places, STUD10_STATE["texts"], STUD10_STATE["model_deg"]
+        )
+        is None
+    )
+    # The stud-10/11 failure itself: the setting read -2 (follows the document).
+    assert drawing._printed_places_problem(
+        -2, STUD10_STATE["texts"], STUD10_STATE["model_deg"]
+    )

@@ -45,9 +45,9 @@ from knife_hanger_stud_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
     CHAMFER_WIDTH_MM,
-    DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
+    DRAWING_REFERENCE_PRECISION,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -160,16 +160,7 @@ WITNESS_REACH_M = 0.0003
 ANGLE_VALUE_TOLERANCE_RAD = math.radians(1e-6)
 MODEL_ANGLE = "ChamferAngle@StockDeburrProfile"
 SW_ANGULAR_DIMENSION = 3  # swDimensionType_e.swAngularDimension
-CHAMFER_ANGLE_PRECISION = DIMENSION_PRECISION["ChamferAngle"]
-# swDimensionPrecisionSettings_e.swPrecisionFollowsDocumentSetting: a drawing
-# dimension prints the drawing's own angular default (leaf 20260922T205428Z
-# read -2 and rendered "45°"). That default is read back under the
-# angle-dimension scope: swUserPreferenceIntegerValue_e.
-# swDetailingAngularDimPrecision and swUserPreferenceOption_e.
-# swDetailingAngleDimension, values from swconst.tlb v34 (the docs print none).
-PRECISION_FOLLOWS_DOCUMENT = -2
-ANGULAR_DIM_PRECISION = 28
-ANGLE_DIMENSION_SCOPE = 201
+CHAMFER_ANGLE_PRECISION = DRAWING_REFERENCE_PRECISION["ChamferAngle"]
 # The 45 deg text keeps this much paper below "ISO SCALE 1.5:1" so the two do
 # not read as one stack (stud-6 printed them 4 mm apart).
 ANGLE_TEXT_NOTE_CLEAR_M = 0.010
@@ -903,20 +894,16 @@ def _assert_arrows_on_drawn_edges(
 
 
 def _printed_places_problem(
-    places: int, document_places: int, texts: list[str], model_deg: float
+    places: int, texts: list[str], model_deg: float
 ) -> str | None:
     """Why the 45 deg does not print the spec's places, or None when it does.
 
-    The resolved setting must equal the spec, and the rendered value must show
-    exactly those places: the setting alone would not catch a stale render.
+    The setting must equal the spec and the rendered value must show exactly
+    those places: stud-11 read the setting -2 (follows the document, whose
+    angular default read 2) while the display data still said "45°".
     """
-    printed = document_places if places == PRECISION_FOLLOWS_DOCUMENT else places
-    if printed != CHAMFER_ANGLE_PRECISION:
-        return (
-            f"45 deg prints {printed} places (setting {places}, drawing default "
-            f"{document_places}), the spec says {CHAMFER_ANGLE_PRECISION}; a "
-            "DRAWING_REFERENCE_PRECISION would be needed"
-        )
+    if places != CHAMFER_ANGLE_PRECISION:
+        return f"45 deg prints {places} places, the spec says {CHAMFER_ANGLE_PRECISION}"
     expected = f"{model_deg:.{CHAMFER_ANGLE_PRECISION}f}°"
     rendered = texts[0].split() if texts else []
     if rendered[:1] != [expected]:
@@ -924,17 +911,11 @@ def _printed_places_problem(
     return None
 
 
-def _assert_chamfer_angle_display(
-    adapter: Any, annotation: Any, model_value: float
-) -> None:
+def _assert_chamfer_angle_display(annotation: Any, model_value: float) -> None:
     """Value, parentheses and places of the sheet's 45 deg, on a fresh handle."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
     places = int(_read_member(display, "GetPrimaryPrecision2"))
-    extension = _early_bound(adapter.currentModel, "IModelDoc2").Extension
-    document_places = int(
-        extension.GetUserPreferenceInteger(ANGULAR_DIM_PRECISION, ANGLE_DIMENSION_SCOPE)
-    )
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
     texts = [
         str(data.GetTextAtIndex(index) or "")
@@ -945,7 +926,6 @@ def _assert_chamfer_angle_display(
         "model_deg": math.degrees(model_value),
         "parenthesis": bool(display.ShowParenthesis),
         "places": places,
-        "document_places": document_places,
         "texts": texts,
     }
     _telemetry.info("45 deg sheet dimension: " + json.dumps(state, sort_keys=True))
@@ -955,9 +935,7 @@ def _assert_chamfer_angle_display(
         )
     if state["parenthesis"] or any("(" in text for text in texts):
         raise RuntimeError(f"SolidWorks forces parentheses on the 45 deg: {state!r}")
-    problem = _printed_places_problem(
-        places, document_places, texts, state["model_deg"]
-    )
+    problem = _printed_places_problem(places, texts, state["model_deg"])
     if problem is not None:
         raise RuntimeError(f"{problem}: {state!r}")
 
@@ -1017,6 +995,8 @@ def _reference_dimension(
 def _attach_root_finish_callout(adapter: Any, annotation: Any) -> None:
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.ShowParenthesis = False
+    # A drawing dimension has no part-authored places: the spec supplies them.
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["ChamferAngle"], -1, -1, -1)
     _write_root_finish_callout(display, ROOT_FINISH_SUFFIX)
     rebuild_drawing(adapter, label="root finish callout")
     # EditRebuild3 can hand out a new IDisplayDimension: probing the old handle
@@ -1313,7 +1293,7 @@ async def build(adapter: Any) -> dict[str, str]:
     angle, chamfer_type = _add_chamfer_angle(adapter, detail, vertex)
     arc = _pin_angle_arc(adapter, angle, vertex)
     _attach_root_finish_callout(adapter, angle)
-    _assert_chamfer_angle_display(adapter, angle, model_angle)
+    _assert_chamfer_angle_display(angle, model_angle)
     # Refusal (e) of the layout-tuning doc: re-assert the mode after the last
     # annotation lands on the view.
     set_hidden_lines_removed(adapter, detail)
@@ -1341,7 +1321,7 @@ async def build(adapter: Any) -> dict[str, str]:
         arc=arc,
     )
     _assert_arrows_on_drawn_edges(adapter, detail, angle, arc.center, chamfer_type)
-    _assert_chamfer_angle_display(adapter, angle, model_angle)
+    _assert_chamfer_angle_display(angle, model_angle)
     _audit_sheet_layout(
         adapter,
         {
