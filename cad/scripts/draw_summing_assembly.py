@@ -13,7 +13,7 @@ import math
 import hashlib
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import _telemetry
 from _common import _early_bound, _read_member, check, run_build
@@ -32,7 +32,7 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
 )
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from summing_assembly_spec import (
@@ -108,6 +108,18 @@ HANGER_DETAIL_CENTER = (0.095, 0.080)
 HANGER_DETAIL_LABEL = "B"
 HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
 BOM_ANCHOR = (0.195, 0.258)
+BOM_COLUMN_WIDTHS = {
+    "item": 0.020,
+    "part": 0.034,
+    "description": 0.145,
+    "quantity": 0.020,
+}
+# Requested row height. SolidWorks raises any row to the minimum that fits its
+# text, so a row may persist taller (the header, legitimately); never shorter.
+BOM_ROW_HEIGHT = 0.006
+BOM_HEIGHT_TOLERANCE = 1e-6
+# Paper clearance kept between the table and the sheet edge / title block.
+BOM_SHEET_CLEARANCE = 0.003
 # Only assembly-level requirements live here. Part drawings own component
 # manufacture, and calculated native placements remain evidence rather than
 # fitter tolerances. Keeping these drawing notes out of the assembly spec also
@@ -706,6 +718,51 @@ def _normalized_bom_identity(text: str) -> str:
     return BOM_NORMALIZED_ALIASES.get(normalized, normalized)
 
 
+def bom_row_fit(requested: float, actual: float) -> Literal["short", "exact", "grown"]:
+    """Classify a persisted BOM row height against the requested height."""
+    if actual < requested - BOM_HEIGHT_TOLERANCE:
+        return "short"
+    if actual <= requested + BOM_HEIGHT_TOLERANCE:
+        return "exact"
+    return "grown"
+
+
+def bom_extent_violations(
+    anchor: tuple[float, float],
+    width: float,
+    height: float,
+) -> list[str]:
+    """Name every way a top-left-anchored BOM box leaves its paper budget."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    left, top = anchor
+    right = left + width
+    bottom = top - height
+    clearance = BOM_SHEET_CLEARANCE
+    violations = []
+    if left < clearance:
+        violations.append(f"left edge {left * 1000:.3f} mm is off the sheet")
+    if right > template.width_m - clearance:
+        violations.append(
+            f"right edge {right * 1000:.3f} mm passes "
+            f"{(template.width_m - clearance) * 1000:.3f} mm"
+        )
+    if top > template.height_m - clearance:
+        violations.append(
+            f"top edge {top * 1000:.3f} mm passes "
+            f"{(template.height_m - clearance) * 1000:.3f} mm"
+        )
+    title_block_floor = template.title_block_top_m + clearance
+    over_title_block = right > template.title_block_left_m
+    if over_title_block and bottom < title_block_floor:
+        violations.append(
+            f"bottom edge {bottom * 1000:.3f} mm enters the title block "
+            f"(floor {title_block_floor * 1000:.3f} mm)"
+        )
+    if bottom < clearance:
+        violations.append(f"bottom edge {bottom * 1000:.3f} mm is off the sheet")
+    return violations
+
+
 def _validate_summing_bom(
     adapter: Any,
     table: Any,
@@ -757,22 +814,25 @@ def _validate_summing_bom(
         "QTY.",
     )
     for column, width in (
-        (item_column, 0.020),
-        (part_column, 0.034),
-        (description_column, 0.145),
-        (quantity_column, 0.020),
+        (item_column, BOM_COLUMN_WIDTHS["item"]),
+        (part_column, BOM_COLUMN_WIDTHS["part"]),
+        (description_column, BOM_COLUMN_WIDTHS["description"]),
+        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
     ):
         actual_width = float(table.SetColumnWidth(column, width, 0))
         if abs(actual_width - width) > 1e-6:
             raise RuntimeError(
-                f"summing BOM column width did not persist: {column}"
+                f"summing BOM column {column} width did not persist: "
+                f"requested {width * 1000:.3f} mm, "
+                f"actual {actual_width * 1000:.3f} mm"
             )
-    for row in range(rows):
-        actual_height = float(table.SetRowHeight(row, 0.006, 0))
-        if abs(actual_height - 0.006) > 1e-6:
-            raise RuntimeError(
-                f"summing BOM row height did not persist: {row}"
-            )
+    header_count = int(table.GetHeaderCount())
+    # SetRowHeight returns the height SolidWorks applied: never less than the
+    # minimum that fits the row's text, which the header can exceed. The
+    # contract is enforced on the persisted height after the rebuild below.
+    setter_heights = tuple(
+        float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows)
+    )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -848,7 +908,114 @@ def _validate_summing_bom(
                 f"summing BOM part number for {stem!r} "
                 f"reverted to {applied!r}"
             )
+    _check_bom_extents(
+        adapter,
+        table,
+        contents=contents,
+        header_count=header_count,
+        setter_heights=setter_heights,
+    )
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
+
+
+def _bom_row_text_heights(
+    adapter: Any,
+    table: Any,
+    row: int,
+    columns: int,
+) -> tuple[float | None, ...]:
+    """Character height per cell, for telemetry only (None when unreadable)."""
+    return tuple(
+        adapter._attempt(
+            lambda column=column: float(
+                _early_bound(
+                    table.GetCellTextFormat(row, column),
+                    "ITextFormat",
+                ).CharHeight
+            )
+        )
+        for column in range(columns)
+    )
+
+
+def _check_bom_extents(
+    adapter: Any,
+    table: Any,
+    *,
+    contents: tuple[tuple[str, ...], ...],
+    header_count: int,
+    setter_heights: tuple[float, ...],
+) -> None:
+    """Hold the persisted BOM rows to their floor and the table to the sheet.
+
+    Row heights are read back after the rebuild -- the layout audit boxes the
+    table from the same ``GetRowHeight`` values -- so nothing downstream rests
+    on the requested 6 mm.
+    """
+    columns = int(table.ColumnCount)
+    heights: list[float] = []
+    for row, setter_height in enumerate(setter_heights):
+        row_kind = "header" if row < header_count else "data"
+        height = float(table.GetRowHeight(row))
+        heights.append(height)
+        fit = bom_row_fit(BOM_ROW_HEIGHT, height)
+        gap = adapter._attempt(lambda row=row: float(table.GetRowVerticalGap(row)))
+        text_heights = _bom_row_text_heights(adapter, table, row, columns)
+        facts = {
+            "row": row,
+            "row_kind": row_kind,
+            "fit": fit,
+            "requested_mm": BOM_ROW_HEIGHT * 1000.0,
+            "setter_mm": setter_height * 1000.0,
+            "actual_mm": height * 1000.0,
+            "vertical_gap_mm": None if gap is None else gap * 1000.0,
+            "char_heights_mm": tuple(
+                None if value is None else value * 1000.0 for value in text_heights
+            ),
+            "cells": contents[row],
+        }
+        _telemetry.event("drawing.bom_row_height", **facts)
+        summary = (
+            f"summing BOM {row_kind} row {row}: requested "
+            f"{BOM_ROW_HEIGHT * 1000:.3f} mm, setter returned "
+            f"{setter_height * 1000:.3f} mm, persisted {height * 1000:.3f} mm "
+            f"(vertical gap {facts['vertical_gap_mm']}, "
+            f"char heights {facts['char_heights_mm']}, cells {contents[row]!r})"
+        )
+        if fit == "short":
+            raise RuntimeError(f"{summary} is below the requested height")
+        if fit == "exact":
+            _telemetry.debug(summary)
+            continue
+        if row_kind == "header":
+            _telemetry.info(f"{summary} -- native header minimum")
+            continue
+        _telemetry.warn(f"{summary} -- data row grew; check for wrapped text")
+
+    width = sum(float(table.GetColumnWidth(column)) for column in range(columns))
+    height = sum(heights)
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    anchor = (position[0], position[1])
+    violations = bom_extent_violations(anchor, width, height)
+    _telemetry.event(
+        "drawing.bom_extents",
+        anchor_mm=tuple(value * 1000.0 for value in anchor),
+        width_mm=width * 1000.0,
+        height_mm=height * 1000.0,
+        row_heights_mm=tuple(value * 1000.0 for value in heights),
+        violations=tuple(violations),
+    )
+    if violations:
+        raise RuntimeError(
+            f"summing BOM at {anchor!r} ({width * 1000:.3f} x "
+            f"{height * 1000:.3f} mm): " + "; ".join(violations)
+        )
+    _telemetry.info(
+        f"summing BOM extents {width * 1000:.3f} x {height * 1000:.3f} mm "
+        f"from top-left {anchor!r}; rows "
+        f"{tuple(round(value * 1000, 3) for value in heights)} mm"
+    )
 
 
 def _create_package_sheets(adapter: Any) -> None:
