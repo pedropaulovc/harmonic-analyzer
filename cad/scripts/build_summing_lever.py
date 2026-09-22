@@ -63,13 +63,11 @@ from __future__ import annotations
 import math
 import sys
 
-import _telemetry
 from _common import (
     CASTING_GREEN,
     IN,
     SketchDims,
     _early_bound,
-    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
@@ -119,42 +117,6 @@ from summing_lever_spec import (
     HOLE_Z_OFFSET,
     SURFACE_FINISHES,
 )
-
-# GetTypeName2 classes that describe construction geometry rather than material.
-# The plane/axis members are blanked out of every saved render; the two profile
-# classes are inventoried beside them because they are the other reference
-# shapes a reader sees as clutter, and deliberately NOT blanked -- hiding a
-# sketch hides the dimensions that describe it.
-_REFERENCE_GEOMETRY_TYPES = (
-    "RefPlane",
-    "RefAxis",
-    "ProfileFeature",
-    "3DProfileFeature",
-)
-_BLANKABLE_SELECT_TYPE = {"RefPlane": "PLANE", "RefAxis": "AXIS"}
-
-
-def _reference_geometry_inventory(adapter) -> tuple[tuple[str, str, object], ...]:
-    """Name, type and current visibility of every reference/sketch feature.
-
-    Walked through ``_read_member`` only, with no in-place method flagging:
-    ``mark_dimensions_for_drawing`` walks the same shared ``IFeature`` wrappers
-    later in this build and a flagged wrapper flips ``GetTypeName2`` to method
-    dispatch for it.  Visibility is logged verbatim, never interpreted.
-    """
-    found: list[tuple[str, str, object]] = []
-    pending = [_read_member(adapter.currentModel, "FirstFeature")]
-    while pending:
-        feature = pending.pop()
-        while feature:
-            name = str(_read_member(feature, "Name"))
-            kind = str(_read_member(feature, "GetTypeName2"))
-            if kind in _REFERENCE_GEOMETRY_TYPES:
-                found.append((name, kind, _read_member(feature, "Visible")))
-            pending.append(_read_member(feature, "GetFirstSubFeature"))
-            feature = _read_member(feature, "GetNextFeature")
-    return tuple(found)
-
 
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -1145,24 +1107,21 @@ async def build(adapter) -> dict[str, str]:
     knife_axis = await name_bore_axis(
         adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
     )
-    # Blank EVERY plane and axis out of the saved renders, not only the three
-    # named mates: the unnamed offset planes name_bore_axis stacks up print as
-    # clutter too.  All of them stay selectable -- BlankRefGeom hides, it does
-    # not suppress -- so the three named axes still carry their mates.
-    named_axes = tuple((name, "AXIS") for name in (pivot_axis, anchor_axis, knife_axis))
-    reference_geometry = _reference_geometry_inventory(adapter)
-    _telemetry.info(f"reference-geometry inventory: {list(reference_geometry)!r}")
+    # Blank the three named axes and the two unnamed offset planes that
+    # name_bore_axis leaves behind (hard-named, per build_cone_swing_platform):
+    # the pivot axis intersects two base planes at offset 0 and creates none;
+    # the anchor axis creates Plane1 (Right Plane - 76.2, the stray dashed line
+    # at the tip in the top and isometric views); the knife axis creates Plane2
+    # (Top Plane + 5.134).  All stay selectable -- BlankRefGeom hides, it does
+    # not suppress -- so the named axes still carry their mates.
     blank_reference_geometry(
         adapter,
-        tuple(
-            dict.fromkeys(
-                named_axes
-                + tuple(
-                    (name, _BLANKABLE_SELECT_TYPE[kind])
-                    for name, kind, _visible in reference_geometry
-                    if kind in _BLANKABLE_SELECT_TYPE
-                )
-            )
+        (
+            ("Plane1", "PLANE"),
+            ("Plane2", "PLANE"),
+            (pivot_axis, "AXIS"),
+            (anchor_axis, "AXIS"),
+            (knife_axis, "AXIS"),
         ),
     )
 
