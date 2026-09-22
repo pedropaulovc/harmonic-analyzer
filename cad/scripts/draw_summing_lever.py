@@ -237,26 +237,53 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
     return detail
 
 
+def _hole_callout_variable_snapshot(
+    display: Any, label: str
+) -> dict[str, tuple[Any, ...]]:
+    """Read the native variables referenced by the current callout definition."""
+    display = _early_bound(display, "IDisplayDimension")
+    variables: dict[str, tuple[Any, ...]] = {}
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        kind = int(variable.Type)
+        if name in variables:
+            raise RuntimeError(f"{label}: duplicate native callout variable {name!r}")
+        if kind == 1:  # swCalloutVariableType_Length
+            value = _early_bound(raw, "ICalloutLengthVariable")
+            variables[name] = (
+                kind,
+                float(value.Length),
+                int(value.Precision),
+                int(value.TolerancePrecision),
+            )
+        elif kind == 2:  # swCalloutVariableType_Angle
+            value = _early_bound(raw, "ICalloutAngleVariable")
+            variables[name] = (kind, float(value.Angle), int(value.Precision))
+        elif kind == 3:  # swCalloutVariableType_String
+            value = _early_bound(raw, "ICalloutStringVariable")
+            variables[name] = (kind, str(value.String or ""))
+        else:
+            raise RuntimeError(
+                f"{label}: unsupported native callout variable type {kind} for {name!r}"
+            )
+    return variables
+
+
 def _omit_default_thread_class(display: Any, expected_class: str, label: str) -> None:
     """Hide only the associative class token already covered by the title block."""
     display = _early_bound(display, "IDisplayDimension")
-    class_variables = []
-    for raw in display.GetHoleCalloutVariables() or ():
-        variable = dynamic_dispatch(raw._oleobj_)
-        if str(variable.VariableName) != "hw-threadclass":
-            continue
-        if int(variable.Type) != 3:
-            raise RuntimeError(f"{label}: native thread-class variable is not a string")
-        value = str(_early_bound(raw, "ICalloutStringVariable").String or "")
-        if value.strip(" -") != expected_class:
-            raise RuntimeError(
-                f"{label}: native thread class {value!r} != {expected_class!r}"
-            )
-        class_variables.append(raw)
-    if len(class_variables) != 1:
+    variables_before = _hole_callout_variable_snapshot(display, label)
+    class_variable = variables_before.get("hw-threadclass")
+    if class_variable is None:
+        raise RuntimeError(f"{label}: native thread-class variable is missing")
+    if (
+        class_variable[0] != 3
+        or str(class_variable[1]).strip(" -") != expected_class
+    ):
         raise RuntimeError(
-            f"{label}: expected one native thread-class variable, "
-            f"found {len(class_variables)}"
+            f"{label}: native thread class {class_variable!r} != "
+            f"string {expected_class!r}"
         )
 
     definitions = {
@@ -297,17 +324,28 @@ def _omit_default_thread_class(display: Any, expected_class: str, label: str) ->
         if part != definition_part
     ):
         raise RuntimeError(f"{label}: unrelated native callout definition changed")
-    surviving_classes = []
-    for raw in display.GetHoleCalloutVariables() or ():
-        variable = dynamic_dispatch(raw._oleobj_)
-        if str(variable.VariableName) == "hw-threadclass":
-            surviving_classes.append(
-                str(_early_bound(raw, "ICalloutStringVariable").String or "").strip(" -")
-            )
-    if surviving_classes != [expected_class]:
+
+    expected_variables = dict(variables_before)
+    del expected_variables["hw-threadclass"]
+    variables_after = _hole_callout_variable_snapshot(display, label)
+    if variables_after != expected_variables:
         raise RuntimeError(
-            f"{label}: native thread-class association changed: "
-            f"{surviving_classes!r}"
+            f"{label}: native callout associations changed beyond thread class: "
+            f"before={variables_before!r}, after={variables_after!r}"
+        )
+
+
+def _assert_model_thread_class(
+    source_part: Any, feature_name: str, expected_class: str, label: str
+) -> None:
+    """Verify the drawing-only format edit did not alter Hole Wizard metadata."""
+    feature = _early_bound(source_part.FeatureByName(feature_name), "IFeature")
+    definition = _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    actual = str(definition.ThreadClass or "")
+    if actual != expected_class:
+        raise RuntimeError(
+            f"{label}: model Hole Wizard thread class {actual!r} != "
+            f"{expected_class!r}"
         )
 
 
@@ -317,6 +355,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
+    source_part = _early_bound(adapter.currentModel, "IPartDoc")
     read_required_properties(
         adapter.currentModel,
         (
@@ -522,6 +561,12 @@ async def build(adapter: Any) -> dict[str, str]:
         COUNTER_HOLE_SPEC.thread_class,
         "counter-spring anchor tap",
     )
+    _assert_model_thread_class(
+        source_part,
+        "CounterAnchorTap",
+        COUNTER_HOLE_SPEC.thread_class,
+        "counter-spring anchor tap",
+    )
 
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate summing-lever spring-pattern sheet")
@@ -555,6 +600,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _omit_default_thread_class(
         spring_callout,
+        HOLE_SPEC.thread_class,
+        "spring-hole pattern",
+    )
+    _assert_model_thread_class(
+        source_part,
+        "SpringHoleSeed",
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
