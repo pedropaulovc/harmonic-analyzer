@@ -28,6 +28,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -150,9 +151,10 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     # this keeps the centerline coincident with the projected model axis.
     drawing.EditSheet()
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
-    )
+    with direct_sketch(sketch_manager):
+        centerline = sketch_manager.CreateCenterLine(
+            north[0], north[1], 0.0, south[0], south[1], 0.0
+        )
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)

@@ -16,9 +16,8 @@ import math
 from typing import Any
 
 from _common import _early_bound, _read_member
-from _drawing_common import dimension_name, model_point_in_view
+from _drawing_common import create_detail_view, dimension_name, model_point_in_view
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 
 @dataclass(frozen=True)
@@ -41,13 +40,9 @@ class TrimSheet:
 
 
 def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
-    """Crop the real cut end; transform the fence as in the cylinder-gear recipe."""
+    """Crop the real cut end with an exact, snap-free fence (see
+    ``_drawing_common.create_detail_view``)."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(front, "IView")
-    if not ddoc.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("cannot activate cut-end detail parent")
-    draw.ClearSelection2(True)
     center = model_point_in_view(
         adapter,
         front,
@@ -55,25 +50,16 @@ def end_detail(adapter: Any, front: Any, sheet: TrimSheet) -> Any:
         label="cut end detail center",
     )
     radius = sheet.fence_radius_mm * sheet.sheet_scale[0] / sheet.sheet_scale[1] / 1000
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(
-            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("cannot create native cut-end detail fence")
-    detail = ddoc.CreateDetailViewAt4(
-        *sheet.detail_center, 0.0, 0, *sheet.detail_scale, "A", 1, True, False, False, 5
+    detail = create_detail_view(
+        adapter,
+        front,
+        center=center,
+        radius=radius,
+        view_xy=sheet.detail_center,
+        scale=sheet.detail_scale,
+        letter="A",
+        label="cut-end detail",
     )
-    if detail is None:
-        raise RuntimeError("cannot create native cut-end detail")
-    detail = _early_bound(detail, "IView")
     detail.ScaleRatio = double_array(list(sheet.detail_scale))
     draw.ClearSelection2(True)
     draw.EditRebuild3()

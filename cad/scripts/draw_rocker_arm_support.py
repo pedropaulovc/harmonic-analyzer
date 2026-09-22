@@ -31,6 +31,7 @@ from _drawing_common import (
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     insert_hole_table,
     new_project_drawing,
@@ -226,11 +227,7 @@ def _create_view_centerline(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate centerline view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
-    sketch_manager.DisplayWhenAdded = True
-    try:
+    with direct_sketch(sketch_manager):
         centerline = sketch_manager.CreateCenterLine(
             start_xy[0],
             start_xy[1],
@@ -239,9 +236,6 @@ def _create_view_centerline(
             end_xy[1],
             0.0,
         )
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-        sketch_manager.DisplayWhenAdded = previous_display
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if centerline is None:

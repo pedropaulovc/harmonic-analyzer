@@ -15,6 +15,7 @@ from _drawing_common import (
     add_surface_finish,
     add_native_hole_callout,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -279,7 +280,8 @@ def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
     for x in (-bore_radius, bore_radius):
         for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
             draw.ClearSelection2(True)
-            segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
+            with direct_sketch(sketch_manager):
+                segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
             if segment is None:
                 raise RuntimeError("failed to create an arbor bore hidden line")
             segment = _early_bound(segment, "ISketchSegment")
