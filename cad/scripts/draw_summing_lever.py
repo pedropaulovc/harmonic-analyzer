@@ -35,6 +35,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    scan_view_edges,
     stamp_drawing_summary,
     set_reference_dimension,
 )
@@ -47,7 +48,8 @@ from summing_lever_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HEX_DEPTH,
-    HEX_W,
+    HEX_H,
+    HEX_Z_OUTER,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_LAST,
@@ -219,31 +221,49 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="form top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The parenthesized overall is an actual projected-geometry readback, not
-    # a duplicate calculated construction dimension.  Pick inside each
-    # outboard end edge rather than at its knife-ridge vertex junction.
+    # This is a read-only measurement of the actual knife-ridge endpoints,
+    # not a second calculated model dimension.  Resolve the two model vertices
+    # from one native visible-edge sweep and select those exact entities; sheet
+    # hit-testing near the end edges can otherwise choose a perpendicular edge
+    # and silently create an angular dimension.
+    top_edges = scan_view_edges(top, label="form top overall reference")
+    overall_vertices = tuple(
+        top_edges.exact_vertex_at(
+            (0.0, HEX_H / 2.0, z),
+            label=f"knife-ridge endpoint z={z:g}",
+        )
+        for z in (-HEX_Z_OUTER, HEX_Z_OUTER)
+    )
     overall = _early_bound(
         add_edge_dimension(
             adapter,
             top,
             p0=_top_xy(
-                HEX_W / 4.0,
-                -(PLATE_L / 2.0 + HEX_DEPTH),
+                0.0,
+                -HEX_Z_OUTER,
                 center=FORM_TOP_CENTER,
                 scale=FORM_TOP_SCALE,
             ),
             p1=_top_xy(
-                HEX_W / 4.0,
-                PLATE_L / 2.0 + HEX_DEPTH,
+                0.0,
+                HEX_Z_OUTER,
                 center=FORM_TOP_CENTER,
                 scale=FORM_TOP_SCALE,
             ),
             text_xy=(0.075, FORM_TOP_CENTER[1]),
             label="overall trunnion length reference",
             orientation="vertical",
+            entity_types=("VERTEX", "VERTEX"),
+            entities=overall_vertices,
         ),
         "IDisplayDimension",
     )
+    dimension_type = int(overall.Type2)
+    if dimension_type not in (2, 11, 12):
+        raise RuntimeError(
+            "overall trunnion reference is not linear: "
+            f"IDisplayDimension.Type2={dimension_type}"
+        )
     set_reference_dimension(
         adapter,
         overall.GetAnnotation(),
@@ -254,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("overall trunnion reference precision did not persist")
     overall_dimension = _early_bound(overall.GetDimension2(0), "IDimension")
     measured_overall_mm = abs(float(overall_dimension.SystemValue) * 1000.0)
-    expected_overall_mm = PLATE_L + 2.0 * HEX_DEPTH
+    expected_overall_mm = 2.0 * HEX_Z_OUTER
     if abs(measured_overall_mm - expected_overall_mm) > 1e-5:
         raise RuntimeError(
             "overall trunnion reference measured "
