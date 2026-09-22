@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import sys
 from typing import Any, NamedTuple
 
@@ -97,15 +98,17 @@ ISO_CENTER = (0.345, 0.195)
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 
 
-def _hide_top_cosmetic_thread_annotation(adapter: Any, view: Any) -> None:
-    """Hide exactly the view-owned cosmetic thread, never the hole callout."""
+def _hide_cosmetic_thread_annotations(
+    adapter: Any, views: tuple[Any, ...]
+) -> None:
+    """Hide every view-owned cosmetic thread, never a native hole callout."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
     if layer is None:
         status = manager.AddLayer(
             _COSMETIC_THREAD_LAYER,
-            "redundant cosmetic thread annotation hidden",
+            "redundant cosmetic thread annotations hidden",
             0,
             0,
             0,
@@ -121,37 +124,41 @@ def _hide_top_cosmetic_thread_annotation(adapter: Any, view: Any) -> None:
         raise RuntimeError("cosmetic-thread layer is not hidden and non-printing")
 
     cosmetic_threads = []
-    for raw in _early_bound(view, "IView").GetAnnotations() or ():
-        annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 1:  # swCThread, not swNote/hole callout
-            continue
-        if int(annotation.OwnerType) != 0:  # swAnnotationOwner_DrawingView
-            raise RuntimeError("top cosmetic thread is not owned by its drawing view")
-        if annotation.GetSpecificAnnotation() is None:
-            raise RuntimeError("top cosmetic thread has no native ICThread object")
-        cosmetic_threads.append(annotation)
-    if len(cosmetic_threads) != 1:
-        raise RuntimeError(
-            f"top view has {len(cosmetic_threads)} cosmetic-thread annotations; "
-            "expected one"
-        )
-    cosmetic_threads[0].Layer = _COSMETIC_THREAD_LAYER
-    if str(cosmetic_threads[0].Layer or "") != _COSMETIC_THREAD_LAYER:
-        raise RuntimeError("top cosmetic-thread annotation refused hidden layer")
+    for view in views:
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.GetType()) != 1:  # swCThread, not swNote/hole callout
+                continue
+            if int(annotation.OwnerType) != 0:  # swAnnotationOwner_DrawingView
+                raise RuntimeError("cosmetic thread is not owned by its drawing view")
+            if annotation.GetSpecificAnnotation() is None:
+                raise RuntimeError("cosmetic thread has no native ICThread object")
+            cosmetic_threads.append(annotation)
+    if not cosmetic_threads:
+        raise RuntimeError("drawing has no cosmetic-thread annotations to hide")
+    for annotation in cosmetic_threads:
+        annotation.Layer = _COSMETIC_THREAD_LAYER
+        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("cosmetic-thread annotation refused hidden layer")
 
-    rebuild_drawing(adapter, label="hide redundant top cosmetic thread")
+    rebuild_drawing(adapter, label="hide redundant cosmetic threads")
     persisted_layer = _early_bound(
         manager.GetLayer(_COSMETIC_THREAD_LAYER), "ILayer"
     )
     if bool(persisted_layer.Visible) or bool(persisted_layer.Printable):
         raise RuntimeError("cosmetic-thread layer flags changed after rebuild")
-    persisted = [
-        _early_bound(raw, "IAnnotation")
-        for raw in (_early_bound(view, "IView").GetAnnotations() or ())
-        if int(_early_bound(raw, "IAnnotation").GetType()) == 1
-    ]
-    if len(persisted) != 1 or str(persisted[0].Layer or "") != _COSMETIC_THREAD_LAYER:
-        raise RuntimeError("cosmetic-thread annotation layer changed after rebuild")
+    persisted = []
+    for view in views:
+        persisted.extend(
+            _early_bound(raw, "IAnnotation")
+            for raw in (_early_bound(view, "IView").GetAnnotations() or ())
+            if int(_early_bound(raw, "IAnnotation").GetType()) == 1
+        )
+    if len(persisted) != len(cosmetic_threads) or any(
+        str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER
+        for annotation in persisted
+    ):
+        raise RuntimeError("cosmetic-thread census changed after rebuild")
 
 
 def _front_y(model_y_mm: float) -> float:
@@ -166,7 +173,7 @@ FRONT_KEEP = {
     "BoreFromSide": (FRONT_CENTER[0], _front_y(BLK_TOP) + 0.014),
 }
 SECTION_KEEP = {
-    "Depth": (SECTION_CENTER[0], _front_y(BLK_BOT) - 0.016),
+    "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
@@ -454,6 +461,123 @@ def _check_tap_callout(
         )
 
 
+def _hole_callout_variable_snapshot(
+    display: Any, label: str
+) -> Counter[tuple[Any, ...]]:
+    """Read a multiset of every native variable in a hole-callout definition."""
+    display = _early_bound(display, "IDisplayDimension")
+    variables: Counter[tuple[Any, ...]] = Counter()
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        name = str(variable.VariableName)
+        kind = int(variable.Type)
+        if kind == 1:
+            value = _early_bound(raw, "ICalloutLengthVariable")
+            record = (
+                name,
+                kind,
+                float(value.Length),
+                int(value.Precision),
+                int(value.TolerancePrecision),
+            )
+        elif kind == 2:
+            value = _early_bound(raw, "ICalloutAngleVariable")
+            record = (name, kind, float(value.Angle), int(value.Precision))
+        elif kind == 3:
+            value = _early_bound(raw, "ICalloutStringVariable")
+            record = (name, kind, str(value.String or ""))
+        else:
+            raise RuntimeError(
+                f"{label}: unsupported native variable type {kind} for {name!r}"
+            )
+        variables[record] += 1
+    return variables
+
+
+def _omit_default_thread_class(display: Any, expected_class: str, label: str) -> None:
+    """Hide only the associative class token already covered by the title block."""
+    display = _early_bound(display, "IDisplayDimension")
+    variables_before = _hole_callout_variable_snapshot(display, label)
+    class_records = [
+        (record, count)
+        for record, count in variables_before.items()
+        if record[0] == "hw-threadclass"
+    ]
+    if sum(count for _record, count in class_records) != 1:
+        raise RuntimeError(
+            f"{label}: expected one thread-class occurrence, found {class_records!r}"
+        )
+    class_record = class_records[0][0]
+    if class_record[1] != 3 or str(class_record[2]).strip(" -") != expected_class:
+        raise RuntimeError(
+            f"{label}: native thread class {class_record!r} != {expected_class!r}"
+        )
+
+    definitions = {
+        part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)
+    }
+    matches = [
+        part
+        for part, definition in definitions.items()
+        if "<hw-threadclass>" in definition
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one associative class token: {definitions!r}"
+        )
+    definition_part = matches[0]
+    updated = definitions[definition_part]
+    for fragment in (
+        " - <hw-threadclass>",
+        "- <hw-threadclass>",
+        "-<hw-threadclass>",
+        " <hw-threadclass>",
+        "<hw-threadclass>",
+    ):
+        if fragment in updated:
+            updated = updated.replace(fragment, "", 1)
+            break
+    if "<hw-threadclass>" in updated or updated == definitions[definition_part]:
+        raise RuntimeError(f"{label}: failed to remove only the class token")
+    display.SetText(definition_part - 4, updated)
+    if str(display.GetText(definition_part) or "") != updated:
+        raise RuntimeError(f"{label}: associative definition did not persist")
+    if any(
+        expected_class in str(display.GetText(part) or "")
+        for part in (1, 2, 3, 4)
+    ):
+        raise RuntimeError(f"{label}: default thread class still prints")
+    if any(
+        str(display.GetText(part) or "") != definition
+        for part, definition in definitions.items()
+        if part != definition_part
+    ):
+        raise RuntimeError(f"{label}: unrelated callout definition changed")
+
+    expected_variables = variables_before.copy()
+    expected_variables[class_record] -= 1
+    if not expected_variables[class_record]:
+        del expected_variables[class_record]
+    variables_after = _hole_callout_variable_snapshot(display, label)
+    if variables_after != expected_variables:
+        raise RuntimeError(
+            f"{label}: associations changed beyond thread class: "
+            f"before={variables_before!r}, after={variables_after!r}"
+        )
+
+
+def _assert_model_thread_class(
+    source_part: Any, feature_name: str, expected_class: str, label: str
+) -> None:
+    """Verify drawing formatting did not alter Hole Wizard source metadata."""
+    feature = _early_bound(source_part.FeatureByName(feature_name), "IFeature")
+    definition = _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2")
+    actual = str(definition.ThreadClass or "")
+    if actual != expected_class:
+        raise RuntimeError(
+            f"{label}: model thread class {actual!r} != {expected_class!r}"
+        )
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -572,7 +696,7 @@ async def build(adapter: Any) -> dict[str, str]:
             TOP_CENTER[1] - SUPPORT_Z_THICK * SHEET_SCALE[0] / 2000.0,
         ),
         p1=(TOP_CENTER[0], TOP_CENTER[1] - tap_radius_sheet),
-        text_xy=(TOP_CENTER[0] - 0.035, TOP_CENTER[1]),
+        text_xy=(TOP_CENTER[0] + 0.035, TOP_CENTER[1]),
         label="hanger tap from finished end",
         orientation="vertical",
     )
@@ -587,8 +711,8 @@ async def build(adapter: Any) -> dict[str, str]:
     tap_callout = add_native_hole_callout(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
-        callout_xy=(0.195, 0.218),
+        edge_xy=(TOP_CENTER[0] - tap_radius_sheet, TOP_CENTER[1]),
+        callout_xy=(0.078, 0.218),
         label="hanger-stud blind tap",
     )
     _propagate_source_tap_depth_contracts(
@@ -608,8 +732,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.160)
     # Cosmetic-thread imports can be regenerated by dimension/callout rebuilds.
-    # Hide the one native swCThread only after every recipe annotation exists.
-    _hide_top_cosmetic_thread_annotation(adapter, top)
+    # Census every authored view only after all recipe annotations exist.
+    _hide_cosmetic_thread_annotations(adapter, (front, section, top, iso))
 
     return await finalize_drawing(
         adapter,
