@@ -36,6 +36,7 @@ from _drawing_common import (
     assert_imported_precision,
     create_blank_drawing_sheets,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -101,7 +102,11 @@ FORM_FRONT_CENTER = (0.150, 0.220)
 FORM_TOP_CENTER = (0.150, 0.105)  # same X: true third-angle projection
 ISO_CENTER = (0.335, 0.165)
 PATTERN_CENTER = (0.165, 0.145)
-DETAIL_CENTER = (0.335, 0.095)
+DETAIL_CENTER = (0.300, 0.150)
+# Detail A lives on sheet 2. A detail view cannot be moved across sheets
+# (IView::Sheet is get-only and no view-move API exists), so its *Front parent is
+# re-created here and hidden once the detail it feeds is fully annotated.
+DETAIL_PARENT_CENTER = (0.300, 0.245)
 DETAIL_SCALE = (2.0, 1.0)
 DETAIL_RADIUS_MM = CYL_R + 3.3
 
@@ -127,34 +132,69 @@ def _assert_uses_sheet_scale(view: Any, label: str) -> None:
         raise RuntimeError(f"{label} does not use its native sheet scale")
 
 
+def _attach_radial_leaders(
+    adapter: Any, annotations: Any, names: tuple[str, ...], label: str
+) -> None:
+    """Attach radial leaders to their own arcs instead of extending across the view.
+
+    ``ArcExtensionLineOrOppositeSide`` defaults to True, which sweeps the R138.8
+    summation arc through the top view and trails the R15.2 edge-rib leader
+    across the front view. It is a bool get/set property, so the assignment is
+    only proven by reading it back.
+    """
+    wanted = set(names)
+    seen = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = _early_bound(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.ArcExtensionLineOrOppositeSide = False
+        if bool(display.ArcExtensionLineOrOppositeSide):
+            raise RuntimeError(
+                f"{label}: {name} leader still attaches to the arc extension line"
+            )
+        seen.add(name)
+    missing = sorted(wanted - seen)
+    if missing:
+        raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
+
+
 FORM_FRONT_KEEP = {
     "CylDia": (0.155, 0.258),
-    "PlateThickness": (0.205, 0.215),
-    "WebThickness": (0.218, 0.198),
-    "AnchorHeight": (0.112, 0.215),
-    "MidRibArcR": (0.225, 0.245),
+    "PlateThickness": (0.1880, 0.2200),
+    "WebThickness": (0.1240, 0.2145),
+    "AnchorHeight": (0.1120, 0.2248),
+    "MidRibArcR": (0.1780, 0.2300),
+    "MidRibLeftX": (0.1690, 0.2065),
+    "EdgeRibFrontArcR": (0.1930, 0.2130),
 }
 FORM_TOP_KEEP = {
-    "PlateWidth": (0.205, 0.145),
-    "PlateLength": (0.225, FORM_TOP_CENTER[1]),
-    "AnchorOuterDia": (0.112, 0.125),
-    "AnchorOuterX": (0.135, 0.045),
-    "HexKnifeFrontDepth": (0.158, 0.170),
-    "EdgeRibThickness": (0.190, 0.165),
-    "MiddleRibThickness": (0.205, 0.085),
-    "SummationArcRadius": (0.105, 0.150),
-    "BossAxialLocation": (0.095, 0.085),
+    "PlateWidth": (0.1714, 0.1650),
+    "PlateLength": (0.2350, 0.1050),
+    "AnchorOuterDia": (0.1120, 0.1250),
+    "AnchorOuterX": (0.1350, 0.0450),
+    "HexKnifeFrontDepth": (0.1470, 0.1530),
+    "EdgeRibThickness": (0.1900, 0.1418),
+    "MiddleRibThickness": (0.1960, 0.1050),
+    "SummationArcRadius": (0.1285, 0.1385),
+    "BossAxialLocation": (0.1130, 0.0860),
 }
 DETAIL_KEEP = {
-    "HexWidth": (DETAIL_CENTER[0], 0.128),
-    "HexHeight": (0.370, DETAIL_CENTER[1]),
+    "HexWidth": (0.300, 0.108),
+    "HexHeight": (0.348, 0.150),
+    # Clear of the detail circle (x 0.268-0.332) so the text stays outside the
+    # depicted silhouette; only its extension lines cross geometry.
+    "HexKnifeFrontSideFlat": (0.2500, 0.1500),
 }
 PATTERN_KEEP = {
-    "HoleSeedX": (0.240, 0.230),
-    "HolePitch": (0.230, 0.125),
-    "HoleStartOffset": (0.260, 0.090),
-    "PatternSpan": (0.275, 0.155),
-    "HoleEndOffsetLast": (0.285, 0.205),
+    "HoleSeedX": (0.190, 0.205),
+    "HolePitch": (0.212, 0.128),
+    "HoleStartOffset": (0.228, 0.104),
+    "PatternSpan": (0.228, 0.145),
+    "HoleEndOffsetLast": (0.235, 0.181),
 }
 
 
@@ -358,6 +398,70 @@ def _assert_model_thread_class(
 
 
 
+# SolidWorks attaches one of its own automatic "Tapped Hole" notes to a view
+# that imports a tapped feature's marked dimensions.  Neither the COUNT nor the
+# SET of views is specification: draw_top_frame measured 7, then 8, then 5
+# across three builds of the same geometry, and a change that only moved three
+# annotation texts attached one to a different view -- SolidWorks attaches a
+# feature's note to whichever view imports that feature FIRST, and which
+# instance a re-pick lands on is not ours to choose.  So this inventory is
+# evidence, not a gate.  The invariant that reaches the print is the deletion:
+# exactly the inventoried notes must go, each proved by a read-back of its view.
+
+
+@_telemetry.traced("drawing.auto_tapped_hole_notes")
+def _auto_tapped_hole_notes(adapter: Any) -> dict[str, int]:
+    """Delete SolidWorks' own Hole Wizard notes, named per view, on every sheet.
+
+    The sheet states each thread in its own associative feature callout, which
+    carries the process too.  Deleting here rather than handing the substring to
+    ``finalize_drawing`` skips that sweep's re-walk of every annotation of every
+    view, sheet by sheet, for notes this walk -- ``ISheet::GetViews`` off the
+    sheet objects, no sheet activation -- already holds.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    counts: dict[str, int] = {}
+    for sheet_name in drawing.GetSheetNames() or ():
+        sheet = _early_bound(drawing.Sheet(str(sheet_name)), "ISheet")
+        for raw_view in sheet.GetViews() or ():
+            view = _early_bound(raw_view, "IView")
+            hits = [
+                note
+                for note in (
+                    _early_bound(raw_note, "INote")
+                    for raw_note in (view.GetNotes() or ())
+                )
+                if "tapped hole" in str(note.GetText() or "").lower()
+            ]
+            if not hits:
+                continue
+            label = f"{sheet_name}/{view_name(adapter, view)}"
+            for note in hits:
+                draw.ClearSelection2(True)
+                if not _early_bound(note.GetAnnotation(), "IAnnotation").Select2(
+                    False, 0
+                ):
+                    raise RuntimeError(
+                        f"{label}: failed to select an automatic tapped-hole note"
+                    )
+                draw.EditDelete()  # VT_VOID: the re-read below is the proof
+            draw.ClearSelection2(True)
+            survivors = sum(
+                1
+                for raw_note in (view.GetNotes() or ())
+                if "tapped hole"
+                in str(_early_bound(raw_note, "INote").GetText() or "").lower()
+            )
+            if survivors:
+                raise RuntimeError(
+                    f"{label}: {survivors} automatic tapped-hole note(s) "
+                    f"survived deletion"
+                )
+            counts[label] = len(hits)
+    return counts
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -439,44 +543,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="form top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    detail = _knife_detail(adapter, front)
-    set_hidden_lines_removed(adapter, detail)
-    detail_dimensions = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="knife-end detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
+    # Radial leaders attach to their own arcs: on the default setting the R138.8
+    # summation arc sweeps through the top view and the R15.2 edge-rib leader
+    # trails across the front view.
+    _attach_radial_leaders(
+        adapter, front_dimensions, ("MidRibArcR", "EdgeRibFrontArcR"), "form front"
     )
-    knife_surface_mm = (HEX_W / 4.0, 3.0 * HEX_H / 8.0, HEX_Z_OUTER)
-    detail_edges = scan_view_edges(detail, label="knife-end detail finish")
-    knife_surface_edge = detail_edges.exact_line_through(
-        knife_surface_mm,
-        label="upper-right knife face at outboard end",
-    ).edge
-    knife_surface_xy = model_point_in_view(
-        adapter,
-        detail,
-        tuple(value / 1000.0 for value in knife_surface_mm),
-        label="knife-ridge finish attachment",
+    _attach_radial_leaders(
+        adapter, top_dimensions, ("SummationArcRadius",), "form top"
     )
-    add_surface_finish(
-        adapter,
-        detail,
-        edge_entity=knife_surface_edge,
-        symbol_xy=(0.382, 0.095),
-        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
-        label="knife-edge ridge finish",
-        leader_attach_xy=knife_surface_xy,
-        char_height=0.0025,
-    )
-    if add_note(
-        adapter,
-        "CLOCK KNIFE RIDGE TO BOSS AXIS",
-        0.285,
-        0.060,
-    ) is None:
-        raise RuntimeError("failed to label knife-ridge clocking")
     # This is a read-only measurement of the actual knife-ridge endpoints,
     # not a second calculated model dimension.  Resolve the two model vertices
     # from one native visible-edge sweep and select those exact entities; sheet
@@ -599,11 +674,13 @@ async def build(adapter: Any) -> dict[str, str]:
         center=PATTERN_CENTER,
         scale=PATTERN_SCALE,
     )
+    # Clears both the (8.43) reference and the Detail A circle (x 0.268-0.332,
+    # y 0.118-0.182).
     spring_callout = add_native_hole_callout(
         adapter,
         pattern,
         edge_xy=seed_rim_right,
-        callout_xy=(0.275, 0.200),
+        callout_xy=(0.245, 0.222),
         label="spring-hole pattern",
     )
     _omit_default_thread_class(
@@ -617,6 +694,82 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
+
+    # Detail A sits here with the spring field it belongs to. A detail view
+    # cannot be moved across sheets, so its *Front parent is re-created at its
+    # own coordinates and hidden once the detail is fully annotated. The parent
+    # carries no curated dimensions.
+    detail_parent = place_view(
+        adapter,
+        str(SOURCE),
+        "*Front",
+        *DETAIL_PARENT_CENTER,
+    )
+    _assert_uses_sheet_scale(detail_parent, "detail-A parent")
+    set_hidden_lines_removed(adapter, detail_parent)
+    detail = _knife_detail(adapter, detail_parent)
+    set_hidden_lines_removed(adapter, detail)
+    detail_dimensions = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="knife-end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    knife_surface_mm = (HEX_W / 4.0, 3.0 * HEX_H / 8.0, HEX_Z_OUTER)
+    detail_edges = scan_view_edges(detail, label="knife-end detail finish")
+    knife_surface_edge = detail_edges.exact_line_through(
+        knife_surface_mm,
+        label="upper-right knife face at outboard end",
+    ).edge
+    knife_surface_xy = model_point_in_view(
+        adapter,
+        detail,
+        tuple(value / 1000.0 for value in knife_surface_mm),
+        label="knife-ridge finish attachment",
+    )
+    add_surface_finish(
+        adapter,
+        detail,
+        edge_entity=knife_surface_edge,
+        symbol_xy=(0.330, 0.196),
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
+        label="knife-edge ridge finish",
+        leader_attach_xy=knife_surface_xy,
+        char_height=0.0025,
+    )
+    if (
+        add_note(
+            adapter,
+            "CLOCK KNIFE RIDGE TO BOSS AXIS",
+            0.255,
+            0.100,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to label knife-ridge clocking")
+    if (
+        add_note(
+            adapter,
+            "NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES",
+            0.255,
+            0.090,
+        )
+        is None
+    ):
+        raise RuntimeError("failed to state the nonregular knife profile")
+
+    # IView::SetVisible is VT_VOID -- the effect is only proven by GetVisible,
+    # and hiding the parent must not take the detail it feeds with it.
+    _early_bound(detail_parent, "IView").SetVisible(False, False)
+    drawing_model.EditRebuild3()
+    parent_hidden = bool(_early_bound(detail_parent, "IView").GetVisible())
+    detail_visible = bool(_early_bound(detail, "IView").GetVisible())
+    if parent_hidden is not False or detail_visible is not True:
+        raise RuntimeError(
+            f"detail-A visibility did not persist: "
+            f"parent.GetVisible()={parent_hidden!r}, detail.GetVisible()={detail_visible!r}"
+        )
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
@@ -632,6 +785,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
 
+    tap_notes = _auto_tapped_hole_notes(adapter)
+    _telemetry.info(f"automatic tapped-hole notes per view: {tap_notes!r}")
     assert_imported_precision(
         adapter,
         [*front_dimensions, *top_dimensions, *detail_dimensions, *pattern_dimensions],
@@ -643,11 +798,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Summing Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # Native readback inventories six view-owned descriptive INotes from
-        # the two tap families across this four-view package. The associative
-        # IDisplayDimension hole callouts are a separate annotation type.
-        redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=6,
+        # The automatic "Tapped Hole" notes are already gone, deleted and proved
+        # per view by _auto_tapped_hole_notes above: the sheet states each thread
+        # in its own associative feature callout, which carries the process too.
+        redundant_note_substrings=(),
+        expected_redundant_notes=0,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
