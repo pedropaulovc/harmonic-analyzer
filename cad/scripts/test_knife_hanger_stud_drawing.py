@@ -142,11 +142,12 @@ def _ray(deg: float, radius: float) -> tuple[float, float]:
     )
 
 
-# The 225 deg witness line: from the vertex (past its gap) to past the arc.
-WITNESS = (_ray(225.0, 0.0015), _ray(225.0, R + 0.0015))
-# The offset text off the detail's lower-left corner, leader from its right end.
-SHELF_END = (0.2192, 0.1005)
-SHELF = ((0.125, 0.1005), SHELF_END)
+# The 0 deg witness line: out from the vertex (past its gap) along the end face
+# to past the arc.
+WITNESS = (_ray(0.0, 0.0015), _ray(0.0, R + 0.0015))
+# The offset text right of the detail, leader from its shelf's left end.
+SHELF_END = (0.3108, 0.1331)
+SHELF = (SHELF_END, (0.4049, 0.1331))
 
 
 def test_stud4_angle_arc_is_rejected() -> None:
@@ -160,32 +161,46 @@ def test_stud4_angle_arc_is_rejected() -> None:
     assert any("long way round" in problem for problem in problems)
 
 
-def test_pinned_opposite_arc_with_its_leader_passes() -> None:
-    arc = _arc(VERTEX, R, 180.0, 225.0)
+def test_pinned_arc_with_its_witness_and_leader_passes() -> None:
+    arc = _arc(VERTEX, R, 0.0, 45.0)
     tip = drawing._bisector_point(VERTEX, R)
     problems = drawing._dimension_ink_problems(
         _ink(arc, lines=[WITNESS, (tip, SHELF_END), SHELF]),
         owner=DETAIL,
-        obstacles={"manufacturing notes": (0.0158, 0.0694, 0.1868, 0.0851)},
+        obstacles={"isometric note": (0.3373, 0.1467, 0.3720, 0.1515)},
         region=REGION,
         boundary=BOUNDARY,
     )
     assert problems == []
     assert drawing._span_problem((arc,)) is None
+    assert drawing._witness_covers((WITNESS,), VERTEX, arc.start)
 
 
-def test_arc_in_the_span_the_chamfer_opens_into_is_rejected() -> None:
-    # stud-6: its 0 deg arrow sat on the undrawn sketch leg, on bare paper.
-    problem = drawing._span_problem((_arc(VERTEX, R, 0.0, 45.0),))
-    assert problem is not None and "outside the 180..225 deg span" in problem
+def test_arc_outside_the_chamfer_span_is_rejected() -> None:
+    # stud-7..9: the model dimension kept 0..45 and ran an arc on to 216.6 deg.
+    problem = drawing._span_problem((_arc(VERTEX, R, 216.6, 360.0),))
+    assert problem is not None and "outside the 0..45 deg span" in problem
 
 
-def test_leader_from_the_right_through_the_witness_line_is_rejected() -> None:
-    # Any leader from the right-hand pocket must cut the 225 deg witness line.
-    arc = _arc(VERTEX, R, 180.0, 225.0)
+def test_arrow_without_a_witness_line_is_caught() -> None:
+    # stud-6: the model dimension's end-face leg was undrawn sketch geometry,
+    # so the 0 deg arrow ended on bare paper -- no line out of the vertex.
+    arc = _arc(VERTEX, R, 0.0, 45.0)
+    assert not drawing._witness_covers((), VERTEX, arc.start)
+    # A stub that starts 30 mm out (the cutter leg's far end) is no witness.
+    stub = (_ray(0.0, 0.0319), _ray(0.0, 0.034))
+    far = _arc(VERTEX, 0.033, 0.0, 45.0)
+    assert not drawing._witness_covers((stub,), VERTEX, far.start)
+    # One that stops short of the arrow is no witness either.
+    short = (_ray(0.0, 0.0015), _ray(0.0, R - 0.002))
+    assert not drawing._witness_covers((short,), VERTEX, arc.start)
+
+
+def test_leader_through_the_witness_line_is_rejected() -> None:
+    arc = _arc(VERTEX, R, 0.0, 45.0)
     tip = drawing._bisector_point(VERTEX, R)
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[WITNESS, (tip, (0.2575, 0.1250))]),
+        _ink(arc, lines=[WITNESS, (tip, (0.2640, 0.1250))]),
         owner=DETAIL,
         obstacles={},
         region=REGION,
@@ -193,26 +208,45 @@ def test_leader_from_the_right_through_the_witness_line_is_rejected() -> None:
     assert len(problems) == 1 and "cross at" in problems[0]
 
 
+def test_model_angle_control_is_reproved() -> None:
+    nominal, lower, upper = drawing.MODEL_ANGLE_CONTROL
+    good = {
+        "driven_state": 2,
+        "value": nominal,
+        "tolerance_type": spec.DIMENSION_TOLERANCE_TYPES["ChamferAngle"],
+        "lower": lower,
+        "upper": upper,
+    }
+    assert drawing._model_angle_problems(**good) == []
+    assert drawing._model_angle_problems(**{**good, "driven_state": 1})
+    assert drawing._model_angle_problems(**{**good, "value": math.radians(44.0)})
+    assert drawing._model_angle_problems(**{**good, "upper": 0.0})
+
+
 def test_leader_across_an_annotation_is_rejected() -> None:
-    arc = _arc(VERTEX, R, 180.0, 225.0)
+    arc = _arc(VERTEX, R, 0.0, 45.0)
     tip = drawing._bisector_point(VERTEX, R)
     problems = drawing._dimension_ink_problems(
-        _ink(arc, lines=[(tip, (0.200, 0.080))]),
+        _ink(arc, lines=[(tip, (0.360, 0.100))]),
         owner=DETAIL,
-        obstacles={"manufacturing notes": (0.0158, 0.0694, 0.2100, 0.0851)},
+        obstacles={"DETAIL A label": (0.3185, 0.0919, 0.3509, 0.1081)},
         region=REGION,
     )
     assert problems == [
-        "ChamferAngle ink crosses manufacturing notes [15.8,69.4]..[210.0,85.1]mm"
+        "ChamferAngle ink crosses DETAIL A label [318.5,91.9]..[350.9,108.1]mm"
     ]
 
 
-def test_bisector_point_splits_the_opposite_span() -> None:
+def test_bisector_point_splits_the_chamfer_span() -> None:
     x, y = drawing._bisector_point((0.0, 0.0), 0.013)
     assert math.hypot(x, y) == pytest.approx(0.013)
-    assert math.degrees(math.atan2(y, x)) % 360.0 == pytest.approx(
-        180.0 + drawing.CHAMFER_ANGLE_DEG / 2.0
-    )
+    assert math.degrees(math.atan2(y, x)) == pytest.approx(drawing.CHAMFER_ANGLE_DEG / 2.0)
+
+
+def test_pinned_arc_stays_on_the_drawn_chamfer() -> None:
+    # The 45 deg arrow needs no witness line only while the arc is inside the
+    # ~14.4 mm chamfer Detail A draws (stud-6 render).
+    assert drawing.ANGLE_ARC_RADIUS_M + drawing.ANGLE_ARC_RADIUS_TOLERANCE_M < 0.0144
 
 
 def test_segment_box_hits() -> None:
@@ -233,10 +267,10 @@ def test_segment_intersection() -> None:
 
 
 def test_leader_out_of_the_detail_is_the_one_allowed_boundary_crossing() -> None:
-    arc = _arc(VERTEX, R, 180.0, 225.0)
+    arc = _arc(VERTEX, R, 0.0, 45.0)
     tip = drawing._bisector_point(VERTEX, R)
     # A second exit -- e.g. a witness line stretched past the circle -- fails.
-    stretched = (VERTEX, _ray(225.0, 0.050))
+    stretched = (VERTEX, _ray(45.0, 0.050))
     problems = drawing._dimension_ink_problems(
         _ink(arc, lines=[(tip, SHELF_END), SHELF, stretched]),
         owner=DETAIL,

@@ -20,15 +20,16 @@ import _telemetry
 from _common import _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_note,
     check_drawing_layout,
     collect_layout_elements,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    find_edge_near,
     model_point_in_view,
     new_project_drawing,
-    offset_dimension_text,
     read_required_properties,
     rebuild_drawing,
     set_hidden_lines_removed,
@@ -116,35 +117,53 @@ SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
-# The angular dimension's ARC is laid out by the NON-offset position: SolidWorks
-# draws it centred on the angle vertex through the text point, and a later
-# ``OffsetText`` move carries only the text ("dimension line and extension
-# lines ... do not move", types/IDisplayDimension/OffsetText.md). stud-4
-# curated the dimension at a point 85 mm from the vertex and 8 deg outside the
-# 0-45 deg span, so the arc swept the long way round the sheet at r = 84 mm.
-# The arc is pinned first, 13 mm out on the bisector of the VERTICALLY
-# OPPOSITE span (180..225 deg: under the cut end, behind the chamfer), and only
-# then is the text offset to its pocket on a leader. Not the 0..45 deg span
-# the chamfer opens into: the dimension's legs are the StockDeburrProfile
-# sketch lines, whose end-face leg runs 15.2 mm (12:1) OUT past the vertex
-# where no edge is drawn, so an arc inside it put its 0 deg arrow on bare paper
-# (leaf 20260922T195516Z: no witness line at all), and an arc beyond it gets a
-# witness stub floating 15 mm from the vertex. Opposite, the 180 deg arrow
-# lands on the drawn end face and the 225 deg one on a witness line that
-# starts at the vertex.
-ANGLE_ARC_RADIUS_M = 0.013
-ANGLE_ARC_RADIUS_TOLERANCE_M = 0.003
+# The sheet's 45 deg is a DRAWING dimension between the drawn chamfer and the
+# drawn end face in Detail A (user decision, 2026-09-22); the model's driving
+# ChamferAngle stays in the part and is re-proved from it, not shown. The
+# model dimension could not be drawn cleanly: its legs are the deburr
+# CUTTER's sketch lines (diagnostics/diag_mcmaster_lib.py), whose end-face leg
+# runs 2c = 30.4 mm (12:1) outward past the vertex through air, so in the
+# 0..45 deg span its 0 deg arrow sat on bare paper (leaf 20260922T195516Z) and
+# IDisplayDimension::VerticallyOppositeAngle returned True and changed nothing
+# (leaf 20260922T203003Z, logged after every step). The drawn end face ends AT
+# the vertex, so a drawing dimension's witness line starts there.
+#
+# The ARC of an angular dimension is laid out by its NON-offset position,
+# centred on the vertex through the text point; a later ``OffsetText`` move
+# carries only the text ("dimension line and extension lines ... do not
+# move", types/IDisplayDimension/OffsetText.md). stud-4 parked the text 85 mm
+# out and 8 deg outside the span, and the arc swept the sheet at r = 84 mm. So
+# the dimension is created with its text 12 mm out on the 0..45 deg bisector
+# -- inside the ~14.4 mm drawn chamfer, so the 45 deg arrow lands on it -- and
+# only then is the text offset to its pocket on a leader.
+ANGLE_ARC_RADIUS_M = 0.012
+ANGLE_ARC_RADIUS_TOLERANCE_M = 0.0015
 # Gate for every dimension arc on the sheet: stud-4's was 0.084 m.
 ANGLE_ARC_RADIUS_MAX_M = 0.030
 ANGLE_ARC_SWEEP_MAX_DEG = 60.0
 ANGLE_ARC_HOLD_M = 0.0003
 ANGLE_VERTEX_TOLERANCE_M = 0.0005
-# The two legs as the cut-end detail draws them: the end face runs outward
-# (+x) and the chamfer climbs outward toward the head at 45 deg; the arc sits
-# in the span opposite them.
-ANGLE_SPAN_DEG = (180.0, 180.0 + CHAMFER_ANGLE_DEG)
+# The legs as Detail A draws them: the end face runs outward (+x, its witness
+# line) and the chamfer climbs outward toward the head at 45 deg.
+ANGLE_SPAN_DEG = (0.0, CHAMFER_ANGLE_DEG)
 ANGLE_SPAN_SLACK_DEG = 3.0
 ANGLE_BISECTOR_RAD = math.radians(sum(ANGLE_SPAN_DEG) / 2.0)
+# Where each drawn leg is picked, measured from the vertex along the leg: the
+# chamfer at 45 deg, the end face back along 180 deg.
+ANGLE_PICK_M = 0.006
+# A witness line starts within this of the vertex (its gap) and must reach the
+# arc end it carries to within the second.
+WITNESS_START_M = 0.003
+WITNESS_REACH_M = 0.0003
+# A drawing dimension reads the same geometry as the model control: equal
+# within 1e-6 deg or the picks landed on the wrong edges.
+ANGLE_VALUE_TOLERANCE_RAD = math.radians(1e-6)
+MODEL_ANGLE = "ChamferAngle@StockDeburrProfile"
+SW_ANGULAR_DIMENSION = 3  # swDimensionType_e.swAngularDimension
+CHAMFER_ANGLE_PRECISION = DIMENSION_PRECISION["ChamferAngle"]
+# The 45 deg text keeps this much paper below "ISO SCALE 1.5:1" so the two do
+# not read as one stack (stud-6 printed them 4 mm apart).
+ANGLE_TEXT_NOTE_CLEAR_M = 0.010
 CHAMFER_VERTEX_MODEL_M = (
     (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 1000.0,
     THREAD_TIP_Y_MM / 1000.0,
@@ -170,6 +189,11 @@ ARROWS_INSIDE = 0
 # with the pictorial or the notes block. On leaf 20260922T195516Z the circle
 # was r 30.2 mm, making the chords smaller still.
 DETAIL_BOUNDARY_CROSSINGS = {"ChamferAngle": 1}
+# Which drawn legs carry the arrows: the chamfer's outline and the end face's
+# edge-on circle. The chamfer is a cone, whose side outline is a silhouette,
+# not a model edge; each pick tries its expected entity first.
+CHAMFER_PICK_TYPES = ("SILHOUETTE", "EDGE")
+END_FACE_PICK_TYPES = ("EDGE", "SILHOUETTE")
 # Proper crossings between a dimension's own lines (e.g. its leader through
 # its witness line) are measured apart from shared endpoints by this much.
 SELF_CROSSING_END_M = 0.0005
@@ -177,13 +201,12 @@ SELF_CROSSING_END_M = 0.0005
 LAYOUT_REPORT = (
     Path(OUTPUTS.slddrw).parent.parent / "reports" / "layout-audit" / f"{SPEC.name}.json"
 )
-EXPECTED_CONTROLS = {
-    "ChamferAngle": (
-        math.radians(CHAMFER_ANGLE_DEG),
-        -math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
-        math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
-    ),
-}
+# The model's driving ChamferAngle: (nominal, lower, upper) signed SI values.
+MODEL_ANGLE_CONTROL = (
+    math.radians(CHAMFER_ANGLE_DEG),
+    -math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
+    math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
+)
 
 
 def _fit_translation(
@@ -638,70 +661,33 @@ def _angle_arc(annotation: Any) -> DimensionArc:
     return first
 
 
-def _log_angle_step(step: str, ink: DimensionInk) -> None:
-    _telemetry.info(
-        f"45 deg arc {step}: " + json.dumps(ink.as_mm(), sort_keys=True)
-    )
-
-
 def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> DimensionArc:
     """Lay the 45 deg arc on its bisector, close to the vertex, BEFORE offsetting.
 
-    The arc centre IS the angle vertex, so it is read back rather than trusted
-    from the model projection, and the non-offset text point is set at
+    The arc centre IS the angle vertex, so it is read back: it must be where
+    the model puts the chamfer's root corner, which proves the two picks were
+    the chamfer and the end face. The non-offset text point is then set at
     ``ANGLE_ARC_RADIUS_M`` along the bisector from it.
     """
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.OffsetText):
         display.OffsetText = False
     display.ArrowSide = ARROWS_INSIDE
-    curated = _read_dimension_ink(annotation, "ChamferAngle")
-    if not curated.arcs:
-        raise RuntimeError(f"45 deg dimension draws no arc: {curated.as_mm()!r}")
-    vertex = curated.arcs[0].center
-    # Text parked in the opposite quadrant does NOT flip the dimension: leaf
-    # 20260922T200336Z kept the 0..45 deg arc and ran a second arc round to the
-    # text (216.6..360 deg). The flip is its own documented call, but a flip
-    # before the reposition changed nothing either (leaf 20260922T202535Z), so
-    # every step below is logged: flip, reposition, and a flip after it.
-    _log_angle_step("curated", curated)
-    # swDimensionDrivenState_e (1 driven, 2 driving) and swAnnotationOwner_e
-    # (0 drawing view -- an imported model item, 1 sheet): whether the flip is
-    # refused because the item belongs to the model.
-    _telemetry.info(
-        "45 deg dimension ownership: "
-        + json.dumps(
-            {
-                "driven_state": int(
-                    _early_bound(display.GetDimension2(0), "IDimension").DrivenState
-                ),
-                "owner_type": int(_early_bound(annotation, "IAnnotation").OwnerType),
-            },
-            sort_keys=True,
+    created = _read_dimension_ink(annotation, "ChamferAngle")
+    if not created.arcs:
+        raise RuntimeError(f"45 deg dimension draws no arc: {created.as_mm()!r}")
+    vertex = created.arcs[0].center
+    if math.dist(vertex, vertex_guess) > ANGLE_VERTEX_TOLERANCE_M:
+        raise RuntimeError(
+            f"45 deg dimension vertex {_mm(vertex)} mm is not the chamfer root "
+            f"corner {_mm(vertex_guess)} mm: the picks missed the drawn legs "
+            f"({created.as_mm()!r})"
         )
-    )
     target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
     placed = _early_bound(annotation, "IAnnotation")
-    if _span_problem(curated.arcs) is not None:
-        flipped = bool(display.VerticallyOppositeAngle())
-        rebuild_drawing(adapter, label="45 deg flip")
-        _log_angle_step(
-            f"flip before reposition returned {flipped}",
-            _read_dimension_ink(annotation, "ChamferAngle"),
-        )
     if not placed.SetPosition2(target[0], target[1], 0.0):
         raise RuntimeError("cannot pin the 45 deg dimension arc")
     rebuild_drawing(adapter, label="45 deg arc")
-    repositioned = _read_dimension_ink(annotation, "ChamferAngle")
-    _log_angle_step("repositioned", repositioned)
-    if _span_problem(repositioned.arcs) is not None:
-        fresh = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        flipped = bool(fresh.VerticallyOppositeAngle())
-        rebuild_drawing(adapter, label="45 deg flip after reposition")
-        _log_angle_step(
-            f"flip after reposition returned {flipped}",
-            _read_dimension_ink(annotation, "ChamferAngle"),
-        )
     arrows = int(
         _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").ArrowSide
     )
@@ -735,6 +721,192 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
             f"{ANGLE_ARC_RADIUS_TOLERANCE_M * 1000.0:.1f} mm"
         )
     return arc
+
+
+def _model_angle_problems(
+    *, driven_state: int, value: float, tolerance_type: int, lower: float, upper: float
+) -> list[str]:
+    """How the model's ChamferAngle stopped being the driving, banded control."""
+    nominal, low, high = MODEL_ANGLE_CONTROL
+    problems = []
+    if driven_state != 2:  # swDimensionDrivenState_e.swDimensionDriving
+        problems.append(f"{MODEL_ANGLE} is no longer driving (state {driven_state})")
+    if not math.isclose(value, nominal, abs_tol=1e-9):
+        problems.append(f"{MODEL_ANGLE} nominal {math.degrees(value)!r} deg changed")
+    if (
+        tolerance_type != DIMENSION_TOLERANCE_TYPES["ChamferAngle"]
+        or not math.isclose(lower, low, abs_tol=1e-9)
+        or not math.isclose(upper, high, abs_tol=1e-9)
+    ):
+        problems.append(
+            f"{MODEL_ANGLE} tolerance changed: type {tolerance_type}, "
+            f"{math.degrees(lower)!r}..{math.degrees(upper)!r} deg"
+        )
+    return problems
+
+
+def _model_chamfer_angle(view: Any) -> float:
+    """Re-prove the part's driving ChamferAngle and return its value (radians).
+
+    The sheet shows a drawing dimension, so the control the shop is held to is
+    read from the model the view references, not from an imported display.
+    """
+    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    parameter = model.Parameter(MODEL_ANGLE)
+    if parameter is None:
+        raise RuntimeError(f"{MODEL_ANGLE} is missing from the referenced part")
+    dimension = _early_bound(parameter, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    problems = _model_angle_problems(
+        driven_state=int(dimension.DrivenState),
+        value=float(dimension.SystemValue),
+        tolerance_type=int(tolerance.Type),
+        lower=float(tolerance.GetMinValue()),
+        upper=float(tolerance.GetMaxValue()),
+    )
+    if problems:
+        raise RuntimeError("; ".join(problems))
+    return float(dimension.SystemValue)
+
+
+def _pick_leg(
+    adapter: Any, view: Any, xy: Point, *, axis: str, types: tuple[str, ...], label: str
+) -> tuple[Point, str]:
+    """Refine a pick onto a drawn leg, trying each entity type in order."""
+    misses = []
+    for entity_type in types:
+        try:
+            found = find_edge_near(
+                adapter, view, xy, axis=axis, label=label, entity_type=entity_type
+            )
+        except RuntimeError as exc:
+            misses.append(f"{entity_type}: {exc}")
+            continue
+        _telemetry.info(
+            f"{label} picked as {entity_type} at {_mm(found)} mm (asked {_mm(xy)})"
+        )
+        return found, entity_type
+    raise RuntimeError(f"{label} not found near {_mm(xy)} mm: {misses}")
+
+
+def _add_chamfer_angle(adapter: Any, detail: Any, vertex: Point) -> tuple[Any, str]:
+    """Dimension the drawn chamfer against the drawn end face, 45 deg span."""
+    chamfer, chamfer_type = _pick_leg(
+        adapter,
+        detail,
+        (
+            vertex[0] + ANGLE_PICK_M * math.cos(math.radians(CHAMFER_ANGLE_DEG)),
+            vertex[1] + ANGLE_PICK_M * math.sin(math.radians(CHAMFER_ANGLE_DEG)),
+        ),
+        axis="x",
+        types=CHAMFER_PICK_TYPES,
+        label="chamfer outline",
+    )
+    end_face, end_face_type = _pick_leg(
+        adapter,
+        detail,
+        (vertex[0] - ANGLE_PICK_M, vertex[1]),
+        axis="y",
+        types=END_FACE_PICK_TYPES,
+        label="cut end face",
+    )
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            detail,
+            p0=chamfer,
+            p1=end_face,
+            text_xy=_bisector_point(vertex, ANGLE_ARC_RADIUS_M),
+            label="chamfer angle",
+            entity_types=(chamfer_type, end_face_type),
+        ),
+        "IDisplayDimension",
+    )
+    kind = int(display.Type2)
+    if kind != SW_ANGULAR_DIMENSION:
+        raise RuntimeError(f"chamfer dimension is type {kind}, not angular")
+    return _early_bound(display.GetAnnotation(), "IAnnotation"), chamfer_type
+
+
+def _witness_covers(
+    lines: tuple[tuple[Point, Point], ...], vertex: Point, end: Point
+) -> bool:
+    """Whether a witness line runs from the vertex out along the end face to ``end``."""
+    for a, b in lines:
+        if max(abs(a[1] - vertex[1]), abs(b[1] - vertex[1])) > WITNESS_REACH_M:
+            continue
+        if (
+            min(a[0], b[0]) <= vertex[0] + WITNESS_START_M
+            and max(a[0], b[0]) >= end[0] - WITNESS_REACH_M
+        ):
+            return True
+    return False
+
+
+def _assert_arrows_on_drawn_edges(
+    adapter: Any, detail: Any, annotation: Any, vertex: Point, chamfer_type: str
+) -> None:
+    """Both arrows must end on ink: the 0 deg one on the end face's witness
+    line, the 45 deg one on the drawn chamfer itself."""
+    ink = _read_dimension_ink(annotation, "ChamferAngle")
+    ends = [point for arc in ink.arcs for point in (arc.start, arc.end)]
+    if not ends:
+        raise RuntimeError(f"45 deg dimension draws no arc: {ink.as_mm()!r}")
+
+    def bearing(point: Point) -> float:
+        return math.degrees(math.atan2(point[1] - vertex[1], point[0] - vertex[0]))
+
+    face_end = min(ends, key=lambda point: abs(bearing(point)))
+    chamfer_end = min(ends, key=lambda point: abs(bearing(point) - CHAMFER_ANGLE_DEG))
+    if not _witness_covers(ink.lines, vertex, face_end):
+        raise RuntimeError(
+            f"0 deg arrow at {_mm(face_end)} mm has no witness line from the "
+            f"vertex {_mm(vertex)} mm: {ink.as_mm()!r}"
+        )
+    find_edge_near(
+        adapter,
+        detail,
+        chamfer_end,
+        axis="x",
+        label="45 deg arrow on the drawn chamfer",
+        span_m=0.0005,
+        entity_type=chamfer_type,
+    )
+    adapter.currentModel.ClearSelection2(True)
+    _telemetry.info(
+        "45 deg arrows on drawn edges: "
+        + json.dumps(
+            {"face_end_mm": _mm(face_end), "chamfer_end_mm": _mm(chamfer_end)},
+            sort_keys=True,
+        )
+    )
+
+
+def _assert_chamfer_angle_display(annotation: Any, model_value: float) -> None:
+    """Value, parentheses and places of the sheet's 45 deg, on a fresh handle."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
+    places = int(_read_member(display, "GetPrimaryPrecision2"))
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    texts = [str(data.GetTextAtIndex(index) or "") for index in range(int(data.GetTextCount()))]
+    state = {
+        "value_deg": math.degrees(value),
+        "model_deg": math.degrees(model_value),
+        "parenthesis": bool(display.ShowParenthesis),
+        "places": places,
+        "texts": texts,
+    }
+    _telemetry.info("45 deg sheet dimension: " + json.dumps(state, sort_keys=True))
+    if abs(value - model_value) > ANGLE_VALUE_TOLERANCE_RAD:
+        raise RuntimeError(f"45 deg sheet dimension disagrees with {MODEL_ANGLE}: {state!r}")
+    if state["parenthesis"] or any("(" in text for text in texts):
+        raise RuntimeError(f"SolidWorks forces parentheses on the 45 deg: {state!r}")
+    if places != CHAMFER_ANGLE_PRECISION:
+        raise RuntimeError(
+            f"45 deg prints {places} places, the spec says {CHAMFER_ANGLE_PRECISION} "
+            f"(the drawing default; a DRAWING_REFERENCE_PRECISION would be needed): "
+            f"{state!r}"
+        )
 
 
 def _write_root_finish_callout(display: Any, text: str) -> None:
@@ -789,17 +961,9 @@ def _reference_dimension(
     return matches[0]
 
 
-def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
-    matches = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "ChamferAngle"
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one native angle dimension, found {len(matches)}")
-    display = _early_bound(
-        matches[0].GetSpecificAnnotation(), "IDisplayDimension"
-    )
+def _attach_root_finish_callout(adapter: Any, annotation: Any) -> None:
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.ShowParenthesis = False
     _write_root_finish_callout(display, ROOT_FINISH_SUFFIX)
     rebuild_drawing(adapter, label="root finish callout")
     # EditRebuild3 can hand out a new IDisplayDimension: probing the old handle
@@ -809,11 +973,8 @@ def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
         "root-finish callout parts on the pre-rebuild handle: "
         + json.dumps(_callout_text_parts(display), sort_keys=True)
     )
-    fresh = _early_bound(
-        matches[0].GetSpecificAnnotation(), "IDisplayDimension"
-    )
+    fresh = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     _assert_root_finish_callout(fresh, ROOT_FINISH_SUFFIX)
-    return matches[0]
 
 
 def _place_angle_text(
@@ -832,24 +993,43 @@ def _place_angle_text(
     whole, and re-measured after the rebuild. The final position is proven by
     ``GetPosition`` readback and by clearance to every surrounding box.
 
-    The pocket is off the detail's lower-left corner: the arc lies under the
-    cut end, left of the 225 deg witness line, so a leader from down-left
-    reaches it through empty paper without crossing that line (a leader from
-    the right or from straight below would have to). The arc itself must not
-    move.
+    The pocket is right of the detail, the side the chamfer opens toward:
+    the leader reaches the arc above the 0 deg witness line. The block sits
+    as level with the arc as the pocket allows and ``ANGLE_TEXT_NOTE_CLEAR_M``
+    under the pictorial's scale note. The arc itself must not move.
     """
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
+    # A drawing dimension has no model name: move it by its own handle.
+    display.OffsetText = True
+    placed = _early_bound(annotation, "IAnnotation")
+    if not placed.SetPosition2(anchor[0], anchor[1], 0.0):
+        raise RuntimeError("cannot offset the 45 deg text")
+    rebuild_drawing(adapter, label="45 deg offset")
     block = _display_text_box(adapter, display)
     gap = ANGLE_TEXT_GAP_M
     park = gap + ANGLE_TEXT_PARK_SLOP_M
-    detail = obstacles["cut-end detail"]
-    target = (
-        detail[0] - park - (block[2] - block[0]),
-        detail[1] - park - (block[3] - block[1]),
+    left = obstacles["cut-end detail"][2] + park
+    bottom = obstacles["DETAIL A label"][3] + park
+    top = min(
+        obstacles["isometric"][1] - park,
+        obstacles["isometric note"][1] - ANGLE_TEXT_NOTE_CLEAR_M,
     )
+    height = block[3] - block[1]
+    if top - bottom < height:
+        raise RuntimeError(
+            f"45 deg text pocket {(top - bottom) * 1000.0:.1f} mm is shorter than "
+            f"its {height * 1000.0:.1f} mm block"
+        )
+    level = _bisector_point(arc.center, arc.radius)[1] - height / 2.0
+    target = (left, min(max(level, bottom), top - height))
     anchor = (anchor[0] + target[0] - block[0], anchor[1] + target[1] - block[1])
-    offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
+    if not placed.SetPosition2(anchor[0], anchor[1], 0.0):
+        raise RuntimeError("cannot park the 45 deg text")
+    rebuild_drawing(adapter, label="45 deg park")
+    if not bool(
+        _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").OffsetText
+    ):
+        raise RuntimeError("45 deg text did not stay offset")
     block = _display_text_box(adapter, display)
     for name, obstacle in obstacles.items():
         if not _clear_of(block, obstacle, gap):
@@ -964,16 +1144,6 @@ def _audit_sheet_layout(
     check_drawing_layout(adapter, layout=SPEC.layout, stem=SPEC.artifact_stem)
 
 
-def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
-    trim_drawing.verify_machining_controls(
-        adapter,
-        annotations,
-        expected=EXPECTED_CONTROLS,
-        tolerance_types=DIMENSION_TOLERANCE_TYPES,
-        precision=DIMENSION_PRECISION,
-    )
-
-
 def _fit_iso_view(adapter: Any, iso: Any) -> tuple[float, float, float, float]:
     """Translate the pictorial into ``ISO_REGION`` and prove it stayed there."""
     rebuild_drawing(adapter, label="isometric extents")
@@ -1060,19 +1230,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "Isometric View Note", *_iso_note_xy(iso_box)
     )
     detail_box = _view_box(detail, label="cut end detail")
-    # Curate the 45 deg dimension ON its span, near the vertex: this first,
-    # non-offset position is what fixes the arc radius (_pin_angle_arc).
-    vertex_guess = model_point_in_view(
-        adapter, detail, CHAMFER_VERTEX_MODEL_M, label="chamfer angle vertex"
-    )
-    detail_keep = {"ChamferAngle": _bisector_point(vertex_guess, ANGLE_ARC_RADIUS_M)}
-    detail_annotations = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=detail_keep,
-        view_label="cut end detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+    model_angle = _model_chamfer_angle(detail)
     front_annotations = curate_view_dimensions(
         adapter,
         front,
@@ -1080,19 +1238,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="finished under-head length",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*front_annotations, *detail_annotations]
-    angle_annotations = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "ChamferAngle"
-    ]
-    _verify_controls(adapter, angle_annotations)
-    if len(angle_annotations) != 1:
-        raise RuntimeError(
-            f"expected one native angle dimension, found {len(angle_annotations)}"
-        )
-    arc = _pin_angle_arc(adapter, angle_annotations[0], vertex_guess)
-    angle = _attach_root_finish_callout(adapter, angle_annotations)
     finished = _reference_dimension(
         adapter,
         front_annotations,
@@ -1107,6 +1252,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, detail):
         set_hidden_lines_removed(adapter, view)
+    # The drawn legs are picked on the final hidden-lines-removed detail.
+    vertex = model_point_in_view(
+        adapter, detail, CHAMFER_VERTEX_MODEL_M, label="chamfer angle vertex"
+    )
+    angle, chamfer_type = _add_chamfer_angle(adapter, detail, vertex)
+    arc = _pin_angle_arc(adapter, angle, vertex)
+    _attach_root_finish_callout(adapter, angle)
+    _assert_chamfer_angle_display(angle, model_angle)
+    # Refusal (e) of the layout-tuning doc: re-assert the mode after the last
+    # annotation lands on the view.
+    set_hidden_lines_removed(adapter, detail)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
     iso_note_box = _note_box(_early_bound(iso_note, "INote"), label="isometric note")
@@ -1118,25 +1274,20 @@ async def build(adapter: Any) -> dict[str, str]:
     notes_box = _note_box(
         _early_bound(manufacturing_notes, "INote"), label="manufacturing notes"
     )
-    template = DRAWING_TEMPLATES[SPEC.layout]
     _place_angle_text(
         adapter,
         angle,
-        anchor=detail_keep["ChamferAngle"],
+        anchor=_bisector_point(arc.center, arc.radius),
         obstacles={
             "cut-end detail": detail_box,
-            "front view": front_box,
-            "manufacturing notes": notes_box,
+            "isometric": iso_box,
+            "isometric note": iso_note_box,
             "DETAIL A label": detail_label_box,
-            "title block": (
-                template.title_block_left_m,
-                0.0,
-                template.width_m,
-                template.title_block_top_m,
-            ),
         },
         arc=arc,
     )
+    _assert_arrows_on_drawn_edges(adapter, detail, angle, arc.center, chamfer_type)
+    _assert_chamfer_angle_display(angle, model_angle)
     _audit_sheet_layout(
         adapter,
         {
