@@ -18,7 +18,7 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
     )
     crown_web_at_limits = (
         knife_mount_spec.BORE_FROM_TOP
-        - 0.5 * knife_mount_spec.BORE_POSITION_DIAMETRAL_TOLERANCE_MM
+        - knife_mount_spec.BORE_FROM_TOP_TOLERANCE_MM
         - (
             2.0 * knife_mount_spec.R_BORE
             + knife_mount_spec.BORE_DIAMETER_TOLERANCE_MM
@@ -53,6 +53,20 @@ def test_conventional_blind_tap_closes_the_adverse_crown_stack() -> None:
         < 1e-9
     )
     assert crown_web_at_limits >= 0.5
+
+
+def test_midplane_hanger_tap_retains_axial_wall_at_depth_limit() -> None:
+    import _config
+
+    two_place_mm = round(
+        float(_config.title_block("linear_2pl")["value_in"]) * 25.4, 2
+    )
+    minimum_depth = knife_mount_spec.SUPPORT_Z_THICK - two_place_mm
+    basic_major_radius = 12.7 / 2.0
+
+    assert minimum_depth / 2.0 - basic_major_radius > 0.0
+
+
 
 
 

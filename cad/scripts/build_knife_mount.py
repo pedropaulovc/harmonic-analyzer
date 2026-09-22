@@ -51,11 +51,9 @@ from _common import (
     SketchDims,
     _early_bound,
     add_line_chain,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
-    define_circle,
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
@@ -83,6 +81,7 @@ from _drawing_marks import (
 from _part_pmi import author_part_pmi
 from knife_mount_spec import (
     BORE_DIAMETER_TOLERANCE_MM,
+    BORE_FROM_TOP_TOLERANCE_MM,
     BORE_FROM_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -120,7 +119,7 @@ TOP_CLEAR = 0.0  # bore crown is tangent to the lever's top-vertex knife ridge
 BORE_CY = TOP_CLEAR - R_BORE  # -6.0; upper inner wall lies on the knife axis
 
 # --- block (bearing body, held to the crossbar) ----------------------------
-SUPPORT_Z_THICK = 14.0  # axial length straddling the trunnion mid (low)
+SUPPORT_Z_THICK = 16.0  # axial depth; centred tap retains wall at .XX limits
 BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
@@ -134,31 +133,10 @@ MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
 BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.616
 
-THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
 # --- hanger-stud tap: 1/2-13 UNC-2B blind in the block top ------------------
 # A conventional 118-degree drill and bottoming tap accept the 5.5-mm-shortened
 # hanger stud while their native depth bands preserve an uninterrupted crown.
-
-
-def _as_construction(adapter, entity_id: str) -> None:
-    """Make a reference-sketch line construction geometry and verify it."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
-
-
-def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None:
-    """Prove a creation-order rename landed on the intended reference value."""
-    dimension = adapter.currentModel.Parameter(full_name)
-    if dimension is None:
-        raise RuntimeError(f"missing model dimension {full_name!r}")
-    actual_mm = abs(float(_early_bound(dimension, "IDimension").SystemValue)) * 1000.0
-    if abs(actual_mm - expected_mm) > 1e-6:
-        raise RuntimeError(
-            f"{full_name} measured {actual_mm:g}, expected {expected_mm:g} mm"
-        )
 
 
 
@@ -386,13 +364,13 @@ async def build(adapter) -> dict[str, str]:
     # batch at the end (every target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Bearing block: Front-plane rectangle, mid-plane extrude along Z (the
-    #    bore/trunnion axis), straddling the trunnion mid. Asymmetric in Y (not
-    #    origin-centred), so a generic rectilinear chain, not define_centered_*.
-    #    Emission order (anchor vertex 0 at (-BlkHalfX, BlkBot)): the width dim
-    #    (seg 0), the height dim (seg 1), then the anchor dims (x, then z).
+    # 1. Bearing block and knife bore: one actual Front-plane profile with an
+    # outer rectangle and inner circle, extruded symmetrically about the tap's
+    # axial centre plane. BoreFromSide and BoreFromTop directly drive the real
+    # bore centre relative to the real block profile; there are no detached
+    # manufacturing-dimension replicas.
     block_dims = SketchDims()
-    check("create_sketch block", await adapter.create_sketch("Front"))
+    check("create_sketch block and bore", await adapter.create_sketch("Front"))
     block_rect = [
         (-BLK_HALF_X, BLK_BOT),
         (BLK_HALF_X, BLK_BOT),
@@ -406,7 +384,7 @@ async def build(adapter) -> dict[str, str]:
         block_rect,
         label="block",
         dims=block_dims,
-        names=["BlockWidth", "BlockHeight", "BlockAnchorX", "BlockAnchorZ"],
+        names=["BlockWidth", "BlockHeight", "BoreFromSide", "BlockAnchorZ"],
         drives=[
             '2 * "BlkHalfX"',
             '"BlkTop" - "BlkBot"',
@@ -414,12 +392,40 @@ async def build(adapter) -> dict[str, str]:
             '-"BlkBot"',
         ],
     )
-    await ensure_fully_defined(adapter, "block sketch")
-    check("exit_sketch block", await adapter.exit_sketch())
+    set_sketch_direct_db(adapter, True)
+    try:
+        bore_result = await adapter.add_circle(0.0, BORE_CY, R_BORE)
+    finally:
+        set_sketch_direct_db(adapter, False)
+    bore = check("add actual knife-bore circle", bore_result)
+    check(
+        "align knife-bore and hanger-tap centreline",
+        await adapter.add_sketch_constraint(
+            f"{bore}.center", "origin", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{block[2]}.start",
+        f"{bore}.center",
+        "vertical_distance",
+        BORE_FROM_TOP,
+        "actual bore from top seat",
+    )
+    block_dims.record("BoreFromTop", '"BlkTop" - "BoreCy"')
+    check(
+        "dimension actual knife-bore diameter",
+        await adapter.add_sketch_dimension(
+            bore, None, "diameter", 2.0 * R_BORE
+        ),
+    )
+    block_dims.record("BoreDia", '2 * "RBore"')
+    await ensure_fully_defined(adapter, "block and bore profile")
+    check("exit_sketch block and bore", await adapter.exit_sketch())
     name_last_feature(adapter, "BlockProfile")
     drive_jobs += block_dims.apply(adapter, "BlockProfile")
     check(
-        "extrude block",
+        "extrude block with knife bore",
         await adapter.create_extrusion(
             ExtrusionParameters(depth=SUPPORT_Z_THICK, both_directions=True)
         ),
@@ -427,44 +433,14 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Block")
     depth_dim = name_dimensions(adapter, "Block", ["Depth"])
     drive_jobs += [(depth_dim[0], '"SupportZThick"')]
-    expected = 2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT) * SUPPORT_Z_THICK
+    expected = (
+        2.0 * BLK_HALF_X * (BLK_TOP - BLK_BOT)
+        - math.pi * R_BORE**2
+    ) * SUPPORT_Z_THICK
     vol = await _volume(adapter)
-    _telemetry.info(f"volume after block: {vol:.1f} mm^3 (analytic {expected:.1f})")
-    if abs(vol - expected) > 0.005 * expected:
-        raise RuntimeError(f"block volume {vol:.1f} != {expected:.1f}")
-
-    # 2. Circular bore through the block (the trunnion rides inside; only the
-    #    hex top vertex nears the upper inner wall). Centred TOP_CLEAR below the
-    #    ridge so the rest of the hex clears. On the Y-axis (x 0): only the
-    #    centre-Z + diameter are dims (the X is a relation).
-    bore_dims = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        BORE_CY,
-        R_BORE,
-        "knife bore",
-        dims=bore_dims,
-        names=("BoreCx", "BoreCz", "BoreDia"),
-        drives=(None, '-"BoreCy"', '2 * "RBore"'),
-    )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore_dims.apply(adapter, "BoreProfile")
-    check(
-        "cut knife bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "KnifeBore")
-    expected -= math.pi * R_BORE**2 * SUPPORT_Z_THICK
-    vol = await _volume(adapter)
-    _telemetry.info(f"volume after bore: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    _telemetry.info(f"volume after block and bore: {vol:.1f} mm^3")
     if abs(vol - expected) > 0.01 * expected:
-        raise RuntimeError(f"bore volume {vol:.1f} != {expected:.1f}")
+        raise RuntimeError(f"block-and-bore volume {vol:.1f} != {expected:.1f}")
 
     # The bore crown and lever ridge share the named knife axis: actual contact,
     # not the former 0.25-mm modeled gap.
@@ -526,6 +502,7 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 1.0, 0.0),
         "hanger-stud tapped hole (1/2-13)",
         name="StudTap",
+        placement_dims=[((None, None), (None, None))],
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);
         # the pinned dia is what HoleWizard5 was handed, and the volume
@@ -564,49 +541,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
 
-    # Model-owned BASIC height for the knife-bore position control.  This
-    # construction sketch adds no material and imports normally into the front
-    # drawing view; unlike a drawing-native dimension, its nominal and decimal
-    # places persist in the SLDPRT.
-    check("create bore-height reference", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    bore_height_ref = check(
-        "bore-height reference line",
-        await adapter.add_line(0.0, BLK_TOP, 0.0, BORE_CY),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, bore_height_ref)
-    check(
-        "bore-height reference vertical",
-        await adapter.add_sketch_constraint(bore_height_ref, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{bore_height_ref}.start",
-        f"{bore_height_ref}.end",
-        "vertical_distance",
-        BORE_FROM_TOP,
-        "bore height from top seat",
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{bore_height_ref}.start",
-        0.0,
-        BLK_TOP,
-        "bore height reference",
-    )
-    await ensure_fully_defined(adapter, "bore-height reference sketch")
-    check("exit bore-height reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreHeightReference")
-    name_dimensions(adapter, "BoreHeightReference", ["BoreFromTop"])
-    _verify_named_dimension(
-        adapter, "BoreFromTop@BoreHeightReference", BORE_FROM_TOP
-    )
-
-    await force_rebuild(adapter)
-    await volume_check(
-        adapter, "knife mount after reference sketches", expected, 0.01 * expected
-    )
 
     await apply_material(adapter, MATERIAL)
     # ch18 p.42: heat-treated and left unpainted -- a dark grey, not the
@@ -622,9 +556,15 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     set_dimension_symmetric_tolerance(
         adapter,
-        "BoreProfile",
+        "BlockProfile",
         "BoreDia",
         BORE_DIAMETER_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "BlockProfile",
+        "BoreFromTop",
+        BORE_FROM_TOP_TOLERANCE_MM,
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
