@@ -65,7 +65,6 @@ from knife_mount_spec import (
     STUD_TAP_SPEC,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
     STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
-    SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -265,7 +264,13 @@ FRONT_KEEP = {
 SECTION_KEEP = {
     "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
 }
-TOP_KEEP: dict[str, tuple[float, float]] = {}
+TOP_KEEP: dict[str, tuple[float, float]] = {
+    # The tap's thickness-direction location is a real driving model dimension
+    # now (see _dimension_tap_from_end in build_knife_mount): kept in the top
+    # view, with its text parked between the two witness lines at the
+    # dimension's midpoint instead of sitting on one of them.
+    "TapFromEnd": (TOP_CENTER[0] - 0.035, 0.197),
+}
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
@@ -865,9 +870,12 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center mark to {label}")
 
-    # Parenthesized locators are derived from the actual finished edges and
-    # actual Hole Wizard circle. They expose the model's common-axis/mid-plane
-    # construction without creating a second driving acceptance requirement.
+    # The tap's width-direction station is a parenthesized read of the model's
+    # common-axis/mid-plane construction, derived from the actual finished
+    # edges and the actual Hole Wizard circle: a sheet-side location with no
+    # second driving acceptance requirement. Its thickness-direction location
+    # is the model's own driving TapFromEnd (kept in TOP_KEEP above), so the
+    # sheet prints its 8.00 as a controlling dimension instead of '(8.00)'.
     tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_from_side = add_edge_dimension(
         adapter,
@@ -886,24 +894,6 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_from_side,
         "TapFromSide",
         label="hanger tap from finished side",
-    )
-    tap_from_end = add_edge_dimension(
-        adapter,
-        top,
-        p0=(
-            TOP_CENTER[0],
-            TOP_CENTER[1] - SUPPORT_Z_THICK * SHEET_SCALE[0] / 2000.0,
-        ),
-        p1=(TOP_CENTER[0], TOP_CENTER[1] - tap_radius_sheet),
-        text_xy=(TOP_CENTER[0] - 0.035, 0.197),
-        label="hanger tap from finished end",
-        orientation="vertical",
-    )
-    _finish_tap_reference_dimension(
-        adapter,
-        tap_from_end,
-        "TapFromEnd",
-        label="hanger tap from finished end",
     )
 
     # Native Hole Wizard callout owns the thread size/class and blind depth.
