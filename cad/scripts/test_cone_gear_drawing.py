@@ -205,6 +205,10 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_face
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
         assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
+        # The largest side view's face-width dimension must stay below the
+        # multi-line Gear Data note; the native layout audit missed this text
+        # collision on T084 and T108-T120.
+        assert right["FaceWidth"][1] < drawing.GEAR_DATA_POS[1] - 0.040
         assert front["BoreCutDia"][0] < drawing.FRONT_CENTER[0] - half_od
         assert front["BoreCutDia"][0] == pytest.approx(
             drawing.BORE_CALLOUT_LANE_X
