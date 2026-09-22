@@ -120,7 +120,10 @@ TOP_CLEAR = 0.0  # bore crown is tangent to the lever's top-vertex knife ridge
 BORE_CY = TOP_CLEAR - R_BORE  # -6.0; upper inner wall lies on the knife axis
 
 # --- block (bearing body, held to the crossbar) ----------------------------
-SUPPORT_Z_THICK = 16.0  # axial depth; centred tap retains wall at .XX limits
+# Axial depth. 2026-09-22 user decision: 18 (was 16) so the tap, located
+# Depth/2 from one end face, keeps >= 1.2 mm of wall on both sides of the
+# 1/2-13 thread at the printed bands (test_knife_mount_drawing).
+SUPPORT_Z_THICK = 18.0
 BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
@@ -351,7 +354,7 @@ async def _volume(adapter) -> float:
 _DIMENSION_DRIVING = 2
 _DIMENSION_DRIVEN = 1
 # swConstraintType_e: the placement point's only relations -- vertical to the
-# sketch origin (on the bore centreline) and the 8.00 distance to the near
+# sketch origin (on the bore centreline) and the 9.00 distance to the near
 # end edge. A coincident (9) would own the thickness DOF instead.
 _TAP_PLACEMENT_RELATIONS = sorted([26, 1])  # VERTPOINTS, DISTANCE
 _SW_FULLY_CONSTRAINED = 3  # swConstrainedStatus_e
@@ -424,7 +427,7 @@ def _assert_tap_station(adapter: Any, sketch: Any) -> None:
 
 
 def _assert_tap_from_end(dimension: Any) -> None:
-    """A DRIVING 8.00 mm dimension -- read back, never assumed."""
+    """A DRIVING 9.00 mm dimension -- read back, never assumed."""
     state = int(dimension.DrivenState)
     if state != _DIMENSION_DRIVING:
         raise RuntimeError(
@@ -446,9 +449,9 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
     model origin's projection -- the tap's own station, since the block
     extrudes symmetrically about it -- so ``_holes`` cannot dimension the
     placement (a zero coordinate may not carry a distance dimension), which is
-    why the sheet had to print ``(8.00)`` as a reference. Hold the tap on the
+    why the sheet had to print ``(9.00)`` as a reference. Hold the tap on the
     bore centreline with the one axis relation and dimension the point from
-    the block's near END edge instead: 8.00 mm, driving, from the outer face
+    the block's near END edge instead: 9.00 mm, driving, from the outer face
     the machinist asked for, owned by the model like every other marked dim.
     """
     from _common import check
@@ -460,7 +463,7 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
     model, _sub, sketch, place_name = _tap_placement(adapter)
     point = _early_bound((sketch.GetSketchPoints2() or [None])[0], "ISketchPoint")
 
-    # The 8.00 measures from the block's OUTER (near) end face: pick its edge
+    # The 9.00 measures from the block's OUTER (near) end face: pick its edge
     # inside the top face by endpoint midpoint -- never by coordinate
     # SelectByID2, which mis-resolves on end faces (see _holes's header).
     top_face = find_planar_face(model, (0.0, 1.0, 0.0), [[0.0, BLK_TOP, 0.0]])
@@ -507,7 +510,7 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
         )
         # Raw COM, narrowly: adapter.add_sketch_dimension cannot dimension a
         # point against an EDGE -- its distance types hard-require two point
-        # refs (sketch.py:1467-1490) and this 8.00 must measure to the block's
+        # refs (sketch.py:1467-1490) and this 9.00 must measure to the block's
         # near end edge. Mixed selection is the same shape as that helper's own
         # _try_create_angular_dimension (sketch.py:1508-1548).
         model.ClearSelection2(True)
@@ -581,12 +584,12 @@ def _equations_for(adapter: Any, lhs: str) -> list[str]:
 def _assert_tap_from_end_contract(adapter: Any) -> None:
     """After the deferred equations and the final rebuild.
 
-    The volume gates prove the cut did not move; this proves the 8.00 has ONE
+    The volume gates prove the cut did not move; this proves the 9.00 has ONE
     owner and it is not a reference dimension: exactly one equation drives
     ``TapFromEnd``, the dimension reads the same equation-owned state as the
     BlockWidth control (see ``_DIMENSION_DRIVEN``), IsReference() is False,
     the placement sketch is fully defined by the vertical relation plus the
-    8.00 alone (no coincident owns the DOF), and the tap still sits on the
+    9.00 alone (no coincident owns the DOF), and the tap still sits on the
     mid-plane station. The drawing proves the sheet prints it unparenthesized.
     """
     _, _, sketch, place_name = _tap_placement(adapter)
@@ -804,7 +807,7 @@ async def build(adapter) -> dict[str, str]:
         # No placement_dims: _holes' zero-coordinate relation would pin the
         # tap coincident to the sketch origin (the tap IS that station -- the
         # block extrudes symmetrically about it), leaving no free coordinate
-        # for the driving 8.00 the sheet must print. _dimension_tap_from_end
+        # for the driving 9.00 the sheet must print. _dimension_tap_from_end
         # authors it right below, from the block's near end face.
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);

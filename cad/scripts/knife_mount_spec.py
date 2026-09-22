@@ -27,7 +27,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
 BLK_HALF_X = 12.0  # block half-width (24 across)
-SUPPORT_Z_THICK = 16.0  # axial depth; 8.00-centred matched tap retains wall
+SUPPORT_Z_THICK = 18.0  # axial depth (user, 2026-09-22); mirrors build_knife_mount
 BLK_TOP = 14.616  # exact local top from 999.7 - (979.7 + 10.268/2) - 0.25
 BORE_CY = -6.0  # bore crown is the knife axis: actual trunnion line contact
 BLK_BOT = -15.0  # BORE_CY - R_BORE - 3.0 wall
