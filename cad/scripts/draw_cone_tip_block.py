@@ -420,8 +420,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adjuster_view,
         edge=adjuster_edge,
         callout_xy=(
-            adjuster_center[0] + 0.048,
-            0.225,
+            adjuster_center[0] + 0.020,
+            0.115,
         ),
         label="blind adjuster thread",
     )
