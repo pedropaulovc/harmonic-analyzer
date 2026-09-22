@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections import Counter
 from typing import Any
 
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
@@ -239,19 +240,18 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
 
 def _hole_callout_variable_snapshot(
     display: Any, label: str
-) -> dict[str, tuple[Any, ...]]:
-    """Read the native variables referenced by the current callout definition."""
+) -> Counter[tuple[Any, ...]]:
+    """Read a multiset of native variables in the current callout definition."""
     display = _early_bound(display, "IDisplayDimension")
-    variables: dict[str, tuple[Any, ...]] = {}
+    variables: Counter[tuple[Any, ...]] = Counter()
     for raw in display.GetHoleCalloutVariables() or ():
         variable = dynamic_dispatch(raw._oleobj_)
         name = str(variable.VariableName)
         kind = int(variable.Type)
-        if name in variables:
-            raise RuntimeError(f"{label}: duplicate native callout variable {name!r}")
         if kind == 1:  # swCalloutVariableType_Length
             value = _early_bound(raw, "ICalloutLengthVariable")
-            variables[name] = (
+            record = (
+                name,
                 kind,
                 float(value.Length),
                 int(value.Precision),
@@ -259,14 +259,15 @@ def _hole_callout_variable_snapshot(
             )
         elif kind == 2:  # swCalloutVariableType_Angle
             value = _early_bound(raw, "ICalloutAngleVariable")
-            variables[name] = (kind, float(value.Angle), int(value.Precision))
+            record = (name, kind, float(value.Angle), int(value.Precision))
         elif kind == 3:  # swCalloutVariableType_String
             value = _early_bound(raw, "ICalloutStringVariable")
-            variables[name] = (kind, str(value.String or ""))
+            record = (name, kind, str(value.String or ""))
         else:
             raise RuntimeError(
                 f"{label}: unsupported native callout variable type {kind} for {name!r}"
             )
+        variables[record] += 1
     return variables
 
 
@@ -274,15 +275,20 @@ def _omit_default_thread_class(display: Any, expected_class: str, label: str) ->
     """Hide only the associative class token already covered by the title block."""
     display = _early_bound(display, "IDisplayDimension")
     variables_before = _hole_callout_variable_snapshot(display, label)
-    class_variable = variables_before.get("hw-threadclass")
-    if class_variable is None:
-        raise RuntimeError(f"{label}: native thread-class variable is missing")
-    if (
-        class_variable[0] != 3
-        or str(class_variable[1]).strip(" -") != expected_class
-    ):
+    class_records = [
+        (record, count)
+        for record, count in variables_before.items()
+        if record[0] == "hw-threadclass"
+    ]
+    if sum(count for _record, count in class_records) != 1:
         raise RuntimeError(
-            f"{label}: native thread class {class_variable!r} != "
+            f"{label}: expected exactly one native thread-class occurrence, "
+            f"found {class_records!r}"
+        )
+    class_record = class_records[0][0]
+    if class_record[1] != 3 or str(class_record[2]).strip(" -") != expected_class:
+        raise RuntimeError(
+            f"{label}: native thread class {class_record!r} != "
             f"string {expected_class!r}"
         )
 
@@ -325,8 +331,10 @@ def _omit_default_thread_class(display: Any, expected_class: str, label: str) ->
     ):
         raise RuntimeError(f"{label}: unrelated native callout definition changed")
 
-    expected_variables = dict(variables_before)
-    del expected_variables["hw-threadclass"]
+    expected_variables = variables_before.copy()
+    expected_variables[class_record] -= 1
+    if not expected_variables[class_record]:
+        del expected_variables[class_record]
     variables_after = _hole_callout_variable_snapshot(display, label)
     if variables_after != expected_variables:
         raise RuntimeError(
