@@ -49,13 +49,14 @@ class _FakeDisplay:
         return self.parts.get(part, "")
 
 
-def test_root_finish_callout_writes_resolved_and_definition_parts() -> None:
+def test_root_finish_callout_writes_definition_then_resolved() -> None:
     display = _FakeDisplay({})
     drawing._write_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
-    # Both compartments: the resolved lane (3) AND its stored definition (7).
+    # The stored definition (7) FIRST, then the resolved lane (3) it renders
+    # from -- a definition written last can clear what was just resolved.
     assert display.writes == [
-        (drawing.CALLOUT_ABOVE, drawing.ROOT_FINISH_CALLOUT_TEXT),
         (drawing.CALLOUT_ABOVE_DEFINITION, drawing.ROOT_FINISH_CALLOUT_TEXT),
+        (drawing.CALLOUT_ABOVE, drawing.ROOT_FINISH_CALLOUT_TEXT),
     ]
     drawing._assert_root_finish_callout(display, drawing.ROOT_FINISH_CALLOUT_TEXT)
 

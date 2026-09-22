@@ -215,19 +215,34 @@ def _display_text_box(adapter: Any, display: Any) -> tuple[float, float, float, 
 
 
 def _write_root_finish_callout(display: Any, text: str) -> None:
-    """Write BOTH the resolved and the stored definition of the callout lane."""
-    for part in (CALLOUT_ABOVE, CALLOUT_ABOVE_DEFINITION):
-        display.SetText(part, text)
+    """Store the callout in the DEFINITION lane first, then the resolved lane.
+
+    Writing only the resolved lane (3) leaves the stored definition (7) empty
+    and the next rebuild / save re-resolves the lane from it, so the text drops
+    off the sheet -- the same resolved-vs-definition trap _drawing_common
+    documents for hole-callout prefixes. The definition goes in first so no
+    later write can clear what the resolved lane renders from.
+    """
+    display.SetText(CALLOUT_ABOVE_DEFINITION, text)
+    display.SetText(CALLOUT_ABOVE, text)
+
+
+def _callout_text_parts(display: Any) -> dict[str, str]:
+    """Every ``swDimensionTextParts_e`` compartment, as the rebuild left it."""
+    return {
+        str(part): str(display.GetText(part) or "") for part in range(1, 9)
+    }
 
 
 def _assert_root_finish_callout(display: Any, text: str) -> None:
-    """Fail unless the callout survived re-resolution with both parts intact."""
+    """Fail unless BOTH callout lanes carry the text after the rebuild."""
+    parts = _callout_text_parts(display)
+    _telemetry.info("root-finish callout text parts: " + json.dumps(parts, sort_keys=True))
     for part in (CALLOUT_ABOVE, CALLOUT_ABOVE_DEFINITION):
-        got = str(display.GetText(part) or "")
-        if got != text:
+        if parts[str(part)] != text:
             raise RuntimeError(
                 f"root-finish callout did not survive the rebuild in text part "
-                f"{part}: {got!r} != {text!r}"
+                f"{part}: {parts[str(part)]!r} != {text!r} (all parts: {parts!r})"
             )
 
 
@@ -257,7 +272,17 @@ def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> Any:
     )
     _write_root_finish_callout(display, ROOT_FINISH_CALLOUT_TEXT)
     rebuild_drawing(adapter, label="root finish callout")
-    _assert_root_finish_callout(display, ROOT_FINISH_CALLOUT_TEXT)
+    # EditRebuild3 can hand out a new IDisplayDimension: probing the old handle
+    # reads the pre-rebuild state, so the proof runs on a FRESH one and both
+    # handles' compartments land in the log for the next diagnosis.
+    _telemetry.info(
+        "root-finish callout parts on the pre-rebuild handle: "
+        + json.dumps(_callout_text_parts(display), sort_keys=True)
+    )
+    fresh = _early_bound(
+        matches[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    _assert_root_finish_callout(fresh, ROOT_FINISH_CALLOUT_TEXT)
     return matches[0]
 
 
