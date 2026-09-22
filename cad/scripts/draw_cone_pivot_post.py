@@ -829,7 +829,7 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         top_annotations,
-        {"CrankBossStartZ": (0.150, 0.2225)},
+        {"CrankBossStartZ": (0.170, 0.2225)},
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
