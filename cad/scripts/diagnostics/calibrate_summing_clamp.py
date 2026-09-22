@@ -49,6 +49,11 @@ IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 ROLE_PARTS = {role: f"summing-clamp-experiment-{role}" for role in ("tube", "plug", "screw")}
 SEED_GAP = goose.SPRING_SCREW_CLAMPED_GAP_MM
 HEAD_X = goose.ARM_END_X - SEED_GAP
+# The arm end is the plug face AND the coplanar tube end face. The 1.75-turn eye
+# is widest at radii beyond the plug, so it meets the tube rim first (r3: the
+# plug-only root drove the eye 0.504 mm into the tube, 0.503 mm3).
+ARM_END_FACES = ("plug", "tube")
+FACE_BODY = {"plug": "plug", "tube": "tube", "head": "screw", "shank": "screw"}
 # Identity tolerances, never contact/placement allowances.
 IDENTITY_MM = 1e-5
 IDENTITY_AREA_MM2 = 1e-4
@@ -360,7 +365,7 @@ class Fixture:
         self.witnesses = {}
         evidence["witness_sources"] = {}
         evidence["native_part_body_census"] = {}
-        for body_role in ("counter", "plug", "screw"):
+        for body_role in ("counter", "plug", "tube", "screw"):
             document = _early_bound(self.component(body_role).GetModelDoc2(), "IModelDoc2")
             solids = _solids(document)
             if body_role != "counter" and len(solids) != 1:
@@ -384,7 +389,7 @@ class Fixture:
             face for body in self.part_contexts["counter"]["bodies"] for face in body["faces"]
         ]
         evidence["faces"] = {}
-        for role, body_role in (("plug", "plug"), ("head", "screw"), ("shank", "screw")):
+        for role, body_role in FACE_BODY.items():
             component = self.component(body_role)
             document = _early_bound(component.GetModelDoc2(), "IModelDoc2")
             if document is None:
@@ -416,6 +421,7 @@ class Fixture:
         controls = {}
         for role, local_x, inner, outer in (
             ("plug", goose.ARM_END_X, goose.SCREW_TAP_MINOR_DIA / 2.0, goose.PLUG_DIA / 2.0),
+            ("tube", goose.ARM_END_X, goose.TUBE_DIA / 2.0 - goose.WALL_T, goose.TUBE_DIA / 2.0),
             ("head", HEAD_X, goose.SCREW_THREAD_MAJOR_DIA / 2.0, goose.SCREW_HEAD_DIA / 2.0),
         ):
             rows = {}
@@ -486,7 +492,7 @@ class Fixture:
 
     def _witness_poses(self, role):
         self.assert_poses()
-        body_role = "plug" if role == "plug" else "screw"
+        body_role = FACE_BODY[role]
         # Read the native transforms, not the requested placement dictionary.
         return {name: component_transform(self.adapter, self.names[name]) for name in (body_role, "counter")}
 
@@ -638,7 +644,7 @@ class Fixture:
         return projected
 
     def _raw_witness(self, role, raw, poses):
-        body_role = "plug" if role == "plug" else "screw"
+        body_role = FACE_BODY[role]
         clamp_face = self.part_faces[role]
         # Native Measure may return the cylinder axis: follow the documented
         # face-distance example and project the OTHER entity's point instead.
@@ -657,7 +663,7 @@ class Fixture:
         }
 
     def _transport_witness(self, role, witness, poses):
-        body_role = "plug" if role == "plug" else "screw"
+        body_role = FACE_BODY[role]
         points, proofs, changes = [], [], []
         for name, face, owner, local, original in zip(
             (body_role, "counter"), witness["faces"], witness["owner_bodies"],
@@ -702,10 +708,10 @@ class Fixture:
 
     def face_distance(self, role, *, certify=False):
         raw = self.distance(self.faces[role], self.component("counter"))
-        body_role = "plug" if role == "plug" else "screw"
+        body_role = FACE_BODY[role]
         poses = self._witness_poses(role)
         if role != "shank":
-            local_x = goose.ARM_END_X if role == "plug" else HEAD_X
+            local_x = goose.ARM_END_X if role in ARM_END_FACES else HEAD_X
             world_x = poses[body_role][9] * 1000.0 - local_x
             if abs(raw["point1_mm"][0] - world_x) > self.guard:
                 raise RuntimeError(f"{role}: closest point is not on the transformed clamp face")
@@ -751,12 +757,34 @@ class Fixture:
         result = self.face_distance(role, certify=True)
         if result["distance_mm"] > self.distance_limit:
             raise RuntimeError(f"{role}: finite face not in contact ({result!r}); a shank/body contact is insufficient")
-        body_role = "plug" if role == "plug" else "screw"
+        body_role = FACE_BODY[role]
         native = self.state(body_role)
         if native["state"] != "clear" or native["volume_mm3"] != 0.0:
             raise RuntimeError(f"{role}: finite witness has nonzero or uncertified native overlap: {native!r}")
         result["native_overlap"] = native
         return result
+
+    def arm_end_state(self):
+        """The arm end is one clamp surface: interfering if EITHER body is."""
+        rows = {role: self.state(role) for role in ARM_END_FACES}
+        state = "interfering" if any(row["state"] != "clear" for row in rows.values()) else "clear"
+        return {"state": state, **rows}
+
+    def arm_end_contact(self):
+        """Certify the arm-end face(s) the eye bears on; the rest must be clear."""
+        faces = {role: self.face_distance(role, certify=True) for role in ARM_END_FACES}
+        rooting = [role for role, row in faces.items() if row["distance_mm"] <= self.distance_limit]
+        if not rooting:
+            raise RuntimeError(f"no arm-end face in contact: {faces!r}")
+        contacts = {role: self.require_contact(role) for role in rooting}
+        return {"rooting_faces": rooting, "faces": faces, "contacts": contacts}
+
+    def all_clear(self, label):
+        """Every clamp body natively clear of the spring, not only the one rooted."""
+        rows = {role: self.state(role) for role in ("boss", *ARM_END_FACES, "screw")}
+        if any(row["state"] != "clear" or row["volume_mm3"] != 0.0 for row in rows.values()):
+            raise RuntimeError(f"{label}: spring overlaps a clamp body: {rows!r}")
+        return rows
 
 
 def _rotated_seed(seed, travel):
@@ -802,12 +830,12 @@ def _tilt_trial(fixture, seed, travel):
     open_head_raw = open_head.get("raw_closest_distance", open_head)
     if min(open_head["distance_mm"], open_head_raw["distance_mm"]) <= fixture.distance_limit:
         raise RuntimeError("8 mm installation position does not leave the finite head clear")
-    state = fixture.state("plug")
+    state = fixture.arm_end_state()
     result = {"parameter_mm": travel, "state": state["state"], "native": state,
               "pose": _pose_record(pose), "gooseneck_origin_y_mm": y,
               "lower": lower, "upper": upper, "shank": shank, "open_head": open_head}
     if state["state"] == "clear":
-        result["plug_face"] = fixture.face_distance("plug")
+        result["arm_end_faces"] = {role: fixture.face_distance(role) for role in ARM_END_FACES}
     fixture.evidence["last_tilt_trial"] = result
     return result
 
@@ -829,7 +857,7 @@ def _bisect(evaluate, overlap, clear, resolution):
     raise RuntimeError("native clamp root did not converge in 64 bisections")
 
 
-def _plug_root(fixture, seed):
+def _arm_end_root(fixture, seed):
     with _telemetry.span("clamp.solve_tilt_and_seats"):
         evaluate = lambda travel: _tilt_trial(fixture, seed, travel)
         first = evaluate(0.0)
@@ -842,15 +870,16 @@ def _plug_root(fixture, seed):
             if trial["state"] != previous["state"]:
                 overlap, clear = (trial, previous) if direction < 0 else (previous, trial)
                 bracket = _bisect(evaluate, overlap, clear, fixture.resolution)
-                fixture.evidence["plug_bracket"] = bracket
+                fixture.evidence["arm_end_bracket"] = bracket
                 landed = evaluate(bracket["clear"]["parameter_mm"] + fixture.allowance)
                 if landed["state"] != "clear":
-                    raise RuntimeError("plug boundary landing is not natively clear")
-                landed["plug_face"] = fixture.require_contact("plug")
-                fixture.evidence["plug_landed"] = landed
+                    raise RuntimeError("arm-end boundary landing is not natively clear")
+                landed["arm_end_contact"] = fixture.arm_end_contact()
+                landed["all_bodies"] = fixture.all_clear("arm-end landing")
+                fixture.evidence["arm_end_landed"] = landed
                 return landed
             previous = trial
-        raise RuntimeError("finite plug contact not bracketed within +/-4 mm upper-eye arc")
+        raise RuntimeError("finite arm-end contact not bracketed within +/-4 mm upper-eye arc")
 
 
 def _close_screw(fixture):
@@ -883,17 +912,19 @@ def _close_screw(fixture):
                     raise RuntimeError("screw closure landing is not natively clear")
                 fixture.evidence["head_landed"] = landed
                 fixture.require_contact("head")
+                landed["all_bodies"] = fixture.all_clear("screw closure landing")
                 return gap
             previous = trial
         raise RuntimeError("native under-head contact not bracketed between 8 and 0 mm gap")
 
 
-def _positive_controls(fixture, final_gap):
+def _positive_controls(fixture, final_gap, rooting_faces):
     """Exercise the finite-face channels independently of shank bearing."""
     controls = {}
     original = {key: list(value) for key, value in fixture.expected.items()}
+    arm_end = [(role, FACE_BODY[role], -1.0) for role in rooting_faces]
     try:
-        for face_role, body_role, direction in (("head", "screw", 1.0), ("plug", "plug", -1.0)):
+        for face_role, body_role, direction in (("head", "screw", 1.0), *arm_end):
             at_contact = fixture.require_contact(face_role)
             fixture.shift(body_role, (direction, 0.0, 0.0), 0.05)
             withdrawn = fixture.face_distance(face_role, certify=True)
@@ -949,10 +980,11 @@ async def _calibrate_length(adapter, preset, length, refit, evidence):
         names = await place_components_batch(adapter, specifications, label=f"{preset} finite clamp fixture")
         titles = _owned_titles(adapter, model, names)
         fixture = Fixture(adapter, dict(zip(roles, names, strict=True)), evidence)
-        landed = _plug_root(fixture, seed)
+        landed = _arm_end_root(fixture, seed)
         gap = _close_screw(fixture)
         with _telemetry.span("clamp.certify_finite_contacts", preset=preset) as span:
-            evidence["positive_controls"] = _positive_controls(fixture, gap)
+            rooting = landed["arm_end_contact"]["rooting_faces"]
+            evidence["positive_controls"] = _positive_controls(fixture, gap, rooting)
             ux, uy = landed["pose"]["axis_xy"]
             lower_verify = solve_component_contact(adapter, fixture.names["counter"], fixture.names["boss"],
                                                    (-ux, -uy, 0.0), mounts.MIN_CLEARANCE_MM / 2.0,
@@ -961,7 +993,7 @@ async def _calibrate_length(adapter, preset, length, refit, evidence):
             if not _seated(f"{preset} final lower", lower_verify, fixture.allowance):
                 raise RuntimeError("final lower hook is no longer seated")
             evidence["lower_verify"] = asdict(lower_verify)
-            contacts = {role: fixture.require_contact(role) for role in ("plug", "head", "shank")}
+            contacts = {role: fixture.require_contact(role) for role in (*rooting, "head", "shank")}
             overlaps = {role: fixture.state(role) for role in ("boss", "tube", "plug", "screw")}
             if any(row["state"] != "clear" or row["volume_mm3"] != 0.0 for row in overlaps.values()):
                 raise RuntimeError(f"final spring/anchor overlap is not measured zero: {overlaps!r}")
@@ -989,11 +1021,13 @@ async def _calibrate_length(adapter, preset, length, refit, evidence):
             return {
                 "pose": _pose_record(native_pose), "gooseneck_origin_y_mm": landed["gooseneck_origin_y_mm"],
                 "upper_eye_x_mm": native_pose.upper_eye_xy[0],
+                "eye_centre_from_arm_end_mm": native_pose.upper_eye_xy[0] - mounts.GOOSENECK_END_X,
+                "arm_end_rooting_faces": rooting,
                 "clamp_gap_mm": evidence["measured_clamp_gap_mm"],
                 "screw_axial_displacement_from_seed_mm": gap - SEED_GAP,
                 "final_distance_mm": {"lower": lower_verify.seed_distance_mm,
                                       "upper": contacts["shank"]["distance_mm"],
-                                      "plug_face": contacts["plug"]["distance_mm"],
+                                      **{f"{role}_face": contacts[role]["distance_mm"] for role in rooting},
                                       "under_head_face": contacts["head"]["distance_mm"]},
             }
     finally:
@@ -1039,7 +1073,7 @@ async def _calibrate_preset(adapter, preset, table, evidence):
             if actual_force > mounts.COUNTER_MAXIMUM_LOAD_N:
                 raise RuntimeError(f"{preset}: installed force exceeds catalog maximum")
             residual = required - length
-            endpoints = iteration["plug_bracket"]
+            endpoints = iteration["arm_end_bracket"]
             endpoint_lengths = [
                 _required_length(endpoints[side]["pose"], channel_moment)[0]
                 for side in ("overlap", "clear")
@@ -1052,7 +1086,7 @@ async def _calibrate_preset(adapter, preset, table, evidence):
                 "length_tolerance_mm": tolerance,
                 "required_length_change_mm": None if previous_required is None else required - previous_required,
                 "native_bracket_required_length_spread_mm": abs(endpoint_lengths[1] - endpoint_lengths[0]),
-                "plug_bracket_width_mm": endpoints["width_mm"],
+                "arm_end_bracket_width_mm": endpoints["width_mm"],
                 "head_bracket_width_mm": iteration["head_bracket"]["width_mm"],
             }
             iteration["balance"] = balance
