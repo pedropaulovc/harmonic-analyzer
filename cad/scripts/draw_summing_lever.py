@@ -29,6 +29,7 @@ from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _drawing_component_name,
     add_edge_dimension,
     add_native_hole_callout,
     add_note,
@@ -341,10 +342,13 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
     if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
         raise RuntimeError(f"failed to activate {name} to hide {sketch}")
     draw.ClearSelection2(True)
+    # The middle qualifier is the view's own model instance ("summing-lever-N",
+    # numbered per view), not the file stem: the stem refused on R4.
+    qualified = f"{sketch}@{_drawing_component_name(adapter, view)}@{name}"
     if not draw.Extension.SelectByID2(
-        f"{sketch}@{PART_STEM}@{name}", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+        qualified, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError(f"cannot select {sketch} in {name}")
+        raise RuntimeError(f"cannot select {qualified}")
     draw.BlankSketch()
     draw.ClearSelection2(True)
 
