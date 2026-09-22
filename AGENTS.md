@@ -394,7 +394,14 @@ farm worker 4). A build that dies before its teardown (crash, kill) is covered o
 the restore side: `_artifact_cache.restore` raises `RestoreLocked` instead of
 falling through, and the seat-holding action runs `release_seat_documents.py`
 (an empty `run_build` session — the discard IS the work) and re-probes; still
-locked after that is fatal.
+locked after that is fatal. SolidWorks is not the only holder: a scanner, the
+Search indexer or a thumbnailer with the file *mapped* makes the extract fail
+with `OSError(22)` (EINVAL, not a `PermissionError`; stud-6, 2026-09-22). Both
+errnos on a `cad/out` file are "destination held": the restore waits them out
+for ~60 s (`_HELD_RETRY_DELAYS_S`; re-extraction also heals a torn restore)
+before raising `RestoreLocked`. Any other restore failure returns
+`RestoreOutcome.ERROR` — never reported as a miss, and under `--executor farm`
+never as "cache key … is absent".
 
 **Empty of directories, too.** SolidWorks moves its own *process current directory*
 to follow the documents it opens, so after a build that saved into `cad/out/sldprt`

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
 import sys
 from pathlib import Path
 
@@ -129,7 +130,7 @@ def test_store_then_restore_logs_events_and_stamps_key(tmp_path, fake):
     assert key in fake.blobs                                  # published
     assert cache.last_stored_key("part:x") == key            # sidecar stamped
 
-    assert cache.restore(key, [out], "part:x") is True        # HIT
+    assert cache.restore(key, [out], "part:x") == cache.RestoreOutcome.HIT
     events = [e["event"] for e in _events(tmp_path)]
     assert events == ["store", "restore_hit"]
     assert all(e["key"] == key for e in _events(tmp_path))
@@ -163,11 +164,32 @@ def test_restore_miss_logs_event_at_debug(tmp_path, fake, monkeypatch):
     )
     dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
     key = cache.cache_key([dep], _digest_one, label="part:x")
-    assert cache.restore(key, [], "part:x") is False
+    assert cache.restore(key, [], "part:x") == cache.RestoreOutcome.MISS
     assert records == [("debug", f"[cache] miss  part:x ({key[:12]}) -> building locally")]
     events = _events(tmp_path)
     assert [e["event"] for e in events] == ["restore_miss"]
     assert events[0]["inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
+
+
+def _held_by_unpack(monkeypatch, *errors):
+    """``_unpack`` raising ``errors`` in turn, then succeeding; returns the call log."""
+    pending = iter(errors)
+    calls: list[int] = []
+
+    def unpack(_blob):
+        calls.append(1)
+        error = next(pending, None)
+        if error is not None:
+            raise error
+
+    monkeypatch.setattr(cache, "_unpack", unpack)
+    monkeypatch.setattr(cache, "_HELD_RETRY_DELAYS_S", (0.0, 0.0, 0.0))
+    return calls
+
+
+def _mapped(filename):
+    """The stud-6 error: the CRT's EINVAL for ERROR_USER_MAPPED_FILE."""
+    return OSError(22, "Invalid argument", filename)
 
 
 def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_through(
@@ -179,20 +201,72 @@ def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_throug
     dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
     key = cache.cache_key([dep], _digest_one, label="part:x")
     fake.blobs[key] = b"payload"
+    locked = PermissionError(13, "Permission denied", "cad/out/sldprt/x.SLDPRT")
+    calls = _held_by_unpack(monkeypatch, *[locked] * 4)
 
-    def refuse(_blob):
-        raise PermissionError(13, "Permission denied", "cad/out/sldprt/x.SLDPRT")
-
-    monkeypatch.setattr(cache, "_unpack", refuse)
-
-    with pytest.raises(cache.RestoreLocked, match="share-locked") as info:
+    with pytest.raises(cache.RestoreLocked, match="held by another process") as info:
         cache.restore(key, [], "part:x")
 
     assert info.value.key == key
+    assert len(calls) == 4  # the first attempt plus one per configured delay
     assert [e["event"] for e in _events(tmp_path)] == ["restore_locked"]
 
 
-def test_restore_other_unpack_errors_still_fall_through(tmp_path, fake, monkeypatch):
+def test_restore_over_a_mapped_output_retries_then_raises_locked(
+    tmp_path, fake, monkeypatch
+):
+    """EINVAL naming a cad/out file is a held destination, not a generic error:
+    it is waited out, and a hold that outlasts the wait is RestoreLocked -- never
+    the "building locally" fall-through that stud-6 took."""
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="drawing:x")
+    fake.blobs[key] = b"payload"
+    held = str(cache._CACHE_OUTPUT_ROOT / "png" / "drawing-x.png")
+    calls = _held_by_unpack(monkeypatch, *[_mapped(held)] * 4)
+
+    with pytest.raises(cache.RestoreLocked, match="errno 22"):
+        cache.restore(key, [], "drawing:x")
+
+    assert len(calls) == 4
+    (event,) = _events(tmp_path)
+    assert event["event"] == "restore_locked"
+    assert event["errno"] == 22
+    assert event["filename"] == held
+
+
+def test_restore_over_a_briefly_mapped_output_is_a_hit(tmp_path, fake, monkeypatch):
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="drawing:x")
+    fake.blobs[key] = b"payload"
+    held = str(cache._CACHE_OUTPUT_ROOT / "png" / "drawing-x.png")
+    calls = _held_by_unpack(monkeypatch, _mapped(held), _mapped(held))
+
+    assert cache.restore(key, [], "drawing:x") == cache.RestoreOutcome.HIT
+    assert len(calls) == 3
+    assert [e["event"] for e in _events(tmp_path)] == ["restore_hit"]
+
+
+def test_restore_einval_outside_cad_out_is_an_error_without_retry(
+    tmp_path, fake, monkeypatch
+):
+    """The classification stays narrow: an EINVAL with no cad/out filename is an
+    ordinary restore error, reported as ERROR (not a miss) with its OS detail."""
+    dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
+    key = cache.cache_key([dep], _digest_one, label="part:x")
+    fake.blobs[key] = b"payload"
+    calls = _held_by_unpack(monkeypatch, _mapped(str(tmp_path / "elsewhere.bin")))
+
+    assert cache.restore(key, [], "part:x") == cache.RestoreOutcome.ERROR
+    assert len(calls) == 1
+    (event,) = _events(tmp_path)
+    assert event["event"] == "restore_error"
+    assert event["errno"] == 22
+    assert event["filename"] == str(tmp_path / "elsewhere.bin")
+
+
+def test_restore_other_unpack_errors_are_errors_not_misses(
+    tmp_path, fake, monkeypatch
+):
     dep = _make_dep(tmp_path, "input.py", "VALUE = 1\n")
     key = cache.cache_key([dep], _digest_one, label="part:x")
     fake.blobs[key] = b"payload"
@@ -200,8 +274,114 @@ def test_restore_other_unpack_errors_still_fall_through(tmp_path, fake, monkeypa
         cache, "_unpack", lambda _blob: (_ for _ in ()).throw(OSError("disk full"))
     )
 
-    assert cache.restore(key, [], "part:x") is False
+    assert cache.restore(key, [], "part:x") == cache.RestoreOutcome.ERROR
     assert [e["event"] for e in _events(tmp_path)] == ["restore_error"]
+
+
+def test_unpack_names_the_member_it_failed_to_write(tmp_path, monkeypatch):
+    """The telemetry must say which output failed even when the OS error is
+    path-less; the archive member rides the exception."""
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", tmp_path / "cad" / "out")
+    output = tmp_path / "cad" / "out" / "png" / "drawing-x.png"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"new")
+    blob = cache._pack([output])
+    monkeypatch.setattr(
+        cache.tarfile.TarFile,
+        "extract",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError(22, "Invalid argument")),
+    )
+
+    with pytest.raises(OSError) as info:
+        cache._unpack(blob)
+
+    fields = cache._error_fields(info.value)
+    assert fields["member"] == "cad/out/png/drawing-x.png"
+    assert fields["errno"] == 22
+    assert "filename" not in fields
+
+
+# --------------------------------------------------------------------------- #
+# The real Windows mechanism: another process holding a mapped view of the
+# destination makes open(dest, "wb") fail with OSError(22) (stud-6, 2026-09-22;
+# the repro this ports is C:/src/dt-logs/flakes/repro_restore_einval.py).
+# --------------------------------------------------------------------------- #
+_MAP_AND_HOLD = """
+import mmap, sys, time
+f = open(sys.argv[1], "rb")
+view = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+print("READY", flush=True)
+time.sleep(float(sys.argv[2]))
+"""
+
+
+@pytest.fixture
+def real_tree(tmp_path, monkeypatch):
+    """A cache HIT whose archive rewrites one existing cad/out PNG, extracted by
+    the REAL ``_unpack`` into a tmp repo root. Returns (key, png path)."""
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("HARMONIC_EXECUTOR", "local")
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", tmp_path / "cad" / "out")
+    monkeypatch.setattr(cache, "_REPORTS", tmp_path / "reports")
+    monkeypatch.setattr(cache, "_EVENTS_LOG", tmp_path / "reports" / "cache.jsonl")
+    monkeypatch.setattr(cache, "_KEYDIR", tmp_path / "reports" / "cache-keys")
+    backend = _FakeBackend()
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    png = tmp_path / "cad" / "out" / "png" / "drawing-x.png"
+    png.parent.mkdir(parents=True)
+    png.write_bytes(b"NEW" + bytes(4096))
+    key = "m" * 64
+    backend.blobs[key] = cache._pack([png])
+    png.write_bytes(b"OLD" + bytes(4096))
+    return key, png
+
+
+def _hold_mapped(path: Path, seconds: float):
+    child = subprocess.Popen(
+        [sys.executable, "-c", _MAP_AND_HOLD, str(path), str(seconds)],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert child.stdout is not None
+    assert child.stdout.readline().startswith("READY")
+    return child
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows mapped-file semantics")
+def test_restore_over_a_file_mapped_by_another_process_raises_locked(
+    real_tree, monkeypatch
+):
+    key, png = real_tree
+    monkeypatch.setattr(cache, "_HELD_RETRY_DELAYS_S", (0.05, 0.05))
+    holder = _hold_mapped(png, 30)
+    try:
+        with pytest.raises(cache.RestoreLocked) as info:
+            cache.restore(key, [png], "drawing:x")
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert info.value.cause.errno == 22
+    assert Path(info.value.cause.filename).resolve() == png.resolve()
+    (event,) = _events(cache._REPORTS)
+    assert event["event"] == "restore_locked"
+    assert event["member"] == "cad/out/png/drawing-x.png"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows mapped-file semantics")
+def test_restore_waits_out_a_mapping_released_after_a_second(real_tree, monkeypatch):
+    key, png = real_tree
+    monkeypatch.setattr(cache, "_HELD_RETRY_DELAYS_S", (0.5, 1.0, 2.0, 4.0))
+    holder = _hold_mapped(png, 1.0)
+    try:
+        assert cache.restore(key, [png], "drawing:x") == cache.RestoreOutcome.HIT
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert png.read_bytes()[:3] == b"NEW"
 
 
 def test_miss_retains_previous_and_current_inputs(tmp_path, fake):
@@ -215,7 +395,7 @@ def test_miss_retains_previous_and_current_inputs(tmp_path, fake):
 
     Path(dep).write_text("VALUE = 2\n", encoding="utf-8")
     new_key = cache.cache_key([dep], _digest_one, label="part:x")
-    assert cache.restore(new_key, [], "part:x") is False
+    assert cache.restore(new_key, [], "part:x") == cache.RestoreOutcome.MISS
     event = _events(tmp_path)[-1]
     assert event["previous_key"] == old_key
     assert event["previous_inputs"] == [{"path": "input.py", "digest": "VALUE = 1\n"}]
@@ -257,7 +437,7 @@ def test_hit_under_new_key_warns_drift(tmp_path, fake, caplog, monkeypatch):
     logger = _telemetry_logger(caplog, monkeypatch)
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
-        assert cache.restore(k_new, [out], "part:x") is True
+        assert cache.restore(k_new, [out], "part:x") == cache.RestoreOutcome.HIT
     assert _records(caplog, logger, logging.WARNING)
     event = _events(tmp_path)[-1]
     assert event["event"] == "restore_hit_drift"
@@ -287,7 +467,7 @@ def test_farm_submitter_hit_on_worker_published_key_does_not_warn(
     logger = _telemetry_logger(caplog, monkeypatch)
 
     with caplog.at_level(logging.DEBUG, logger=logger.name):
-        assert cache.restore(k_new, [out], "part:x") is True
+        assert cache.restore(k_new, [out], "part:x") == cache.RestoreOutcome.HIT
     assert _records(caplog, logger, logging.WARNING) == []
     assert any("expected" in msg for msg in _records(caplog, logger, logging.DEBUG))
     event = _events(tmp_path)[-1]
@@ -313,7 +493,7 @@ def test_read_only_seat_hit_on_foreign_key_does_not_warn(
     logger = _telemetry_logger(caplog, monkeypatch)
 
     with caplog.at_level(logging.DEBUG, logger=logger.name):
-        assert cache.restore(k_new, [out], "part:x") is True
+        assert cache.restore(k_new, [out], "part:x") == cache.RestoreOutcome.HIT
     assert _records(caplog, logger, logging.WARNING) == []
     event = _events(tmp_path)[-1]
     assert event["drift_expected"] is True
@@ -338,7 +518,7 @@ def test_drift_bookkeeping_failure_cannot_demote_a_hit(tmp_path, fake, monkeypat
 
     monkeypatch.setattr(cache, "_cannot_publish_reason", boom)
 
-    assert cache.restore(k_new, [out], "part:x") is True
+    assert cache.restore(k_new, [out], "part:x") == cache.RestoreOutcome.HIT
     assert "restore_error" not in [e["event"] for e in _events(tmp_path)]
 
 
@@ -347,7 +527,7 @@ def test_hit_under_same_key_is_not_drift(tmp_path, fake):
     out.write_text("v0", encoding="utf-8")
     key = "3" * 64
     cache.store(key, [out], "part:x")
-    assert cache.restore(key, [out], "part:x") is True
+    assert cache.restore(key, [out], "part:x") == cache.RestoreOutcome.HIT
     assert [e["event"] for e in _events(tmp_path)][-1] == "restore_hit"
 
 
@@ -356,7 +536,7 @@ def test_hit_under_same_key_is_not_drift(tmp_path, fake):
 # --------------------------------------------------------------------------- #
 def test_mode_off_is_silent(tmp_path, fake, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
-    assert cache.restore("k" * 64, [], "part:x") is False
+    assert cache.restore("k" * 64, [], "part:x") == cache.RestoreOutcome.MISS
     cache.store("k" * 64, [tmp_path / "out.bin"], "part:x")
     assert _events(tmp_path) == []                            # no jsonl on a disabled seat
 

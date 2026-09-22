@@ -824,7 +824,7 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     monkeypatch.setattr(
         dodo._cache,
         "restore",
-        lambda key, outputs, label: restores.append((key, outputs, label)) or True,
+        lambda key, outputs, label: restores.append((key, outputs, label)) or "hit",
     )
     monkeypatch.setattr(
         dodo._cache,
@@ -848,7 +848,7 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
 def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     dodo = _load_dodo()
     output = tmp_path / "platen-guide.SLDDRW"
-    outcomes = iter((False, False))
+    outcomes = iter(("miss", "miss"))
     restores = []
     builds = []
     stores = []
@@ -887,6 +887,27 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     assert stores[0][1] == [output]
 
 
+class _Span:
+    def __init__(self):
+        self.attributes = {}
+
+    def set_attribute(self, name, value):
+        self.attributes[name] = value
+
+
+def test_probe_cache_reports_a_restore_error_as_error_not_miss(monkeypatch):
+    """An errored restore used to read ``miss`` on the probe span, hiding why a
+    local build ran; the disposition now says what happened."""
+    dodo = _load_dodo()
+    monkeypatch.setattr(
+        dodo._cache, "restore", lambda *_a: dodo._cache.RestoreOutcome.ERROR
+    )
+    span = _Span()
+
+    assert dodo._probe_cache("k" * 64, [], "drawing:x", span) == "error"
+    assert span.attributes == {"cache": "error"}
+
+
 def _locked(dodo, key, label):
     return dodo._cache.RestoreLocked(
         label, key, PermissionError(13, "Permission denied", "platen-guide.SLDDRW")
@@ -908,7 +929,7 @@ def test_cached_drawing_locked_restore_releases_seat_then_restores(
     )
     monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
-    outcomes = iter(("locked", True))
+    outcomes = iter(("locked", "hit"))
 
     def restore(key, outputs, label):
         outcome = next(outcomes)
@@ -936,7 +957,7 @@ def test_cached_drawing_locked_restore_releases_seat_then_restores(
     assert events == [
         ("restore", "locked"),
         ("exec", "release_seat_documents.py"),
-        ("restore", True),
+        ("restore", "hit"),
     ]
 
 
@@ -955,7 +976,7 @@ def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
     )
     monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
-    outcomes = iter((False, "locked", True))
+    outcomes = iter(("miss", "locked", "hit"))
 
     def restore(key, outputs, label):
         outcome = next(outcomes)
@@ -977,10 +998,10 @@ def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
     dodo._cached_drawing_action("platen_guide")
 
     assert events == [
-        ("restore", False),
+        ("restore", "miss"),
         ("restore", "locked"),
         ("exec", "release_seat_documents.py"),
-        ("restore", True),
+        ("restore", "hit"),
     ]
 
 
@@ -1005,7 +1026,7 @@ def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypa
         dodo, "_exec_com", lambda cmd, label, **_kwargs: builds.append(Path(cmd[1]).name)
     )
 
-    with pytest.raises(RuntimeError, match="still share-locked"):
+    with pytest.raises(RuntimeError, match="still held"):
         dodo._cached_drawing_action("platen_guide")
 
     # The release ran; the drawing itself was never built over the locked file.
@@ -1035,7 +1056,7 @@ def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypat
         lambda *_args: (_ for _ in ()).throw(AssertionError("leaf dispatched")),
     )
 
-    with pytest.raises(dodo._cache.RestoreLocked, match="share-locked"):
+    with pytest.raises(dodo._cache.RestoreLocked, match="held by another process"):
         dodo._cached_drawing_action("platen_guide")
 
 
@@ -1384,7 +1405,7 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     dodo = _load_dodo()
     script = tmp_path / "build_pen_rod.py"
     script.write_text("", encoding="utf-8")
-    outcomes = iter((False, False))  # probe MISS, re-probe under the seat MISS
+    outcomes = iter(("miss", "miss"))  # probe MISS, re-probe under the seat MISS
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(
@@ -1441,7 +1462,7 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
     dodo = _load_dodo()
     script = tmp_path / "build_pen_rod.py"
     script.write_text("", encoding="utf-8")
-    outcomes = iter((False, False))  # probe MISS, re-probe MISS -> builds
+    outcomes = iter(("miss", "miss"))  # probe MISS, re-probe MISS -> builds
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(

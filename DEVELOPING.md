@@ -326,9 +326,12 @@ build):
   restore/store: `ts`, `event`, `label`, `key`, `epoch`, `salt`). Events:
   `store` / `store_skip` (ro seat) / `store_empty` / `store_error`,
   `restore_hit` / `restore_miss` / `restore_hit_drift` / `restore_error` /
-  `restore_locked` (a HIT whose extract a share lock refused — the one restore
-  failure that raises instead of "building locally", see AGENTS.md's seat
-  contract). Post-hoc
+  `restore_locked` (a HIT whose extract another process kept refusing through
+  the ~60 s wait: a share lock, EACCES, or a mapped view, EINVAL — the one
+  restore failure that raises instead of "building locally", see AGENTS.md's
+  seat contract). `restore_error` and `restore_locked` carry the OS detail the
+  exception's repr drops: `errno`, `winerror`, `filename` and the archive
+  `member` being written. Post-hoc
   debugging reads this file instead of scrollback. Gitignored (under `cad/out/`).
 
 **Store-skip-on-hit drift.** `restore` returns early on a HIT and never re-stores,
