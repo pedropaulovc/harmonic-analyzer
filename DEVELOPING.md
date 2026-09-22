@@ -80,8 +80,8 @@ The build worktree is removed on success **and** on a failed build. Its
 thing nobody should reuse; to reproduce a failure, relaunch the same commit.
 The single exception is a failed copy-back (a `PermissionError` from a document
 open in the caller's `cad/out`, say): the run fails with the reason in the log
-and the build worktree stays for inspection. Remove it by hand afterwards with
-`git worktree remove --force <path>`.
+and the build worktree stays for inspection. Remove it afterwards with
+[`scripts/farm-prune.ps1`](#removing-leftover-build-worktrees).
 
 Measured overhead on this machine (warm uv cache): about 1.6 s for
 `worktree add`, 1.5 s for the `SolidworksMCP-python` submodule, and 6.2 s for
@@ -120,11 +120,13 @@ trusting `cad/out`.
   line to the console and the log, and lists those paths in the record's
   `caller_dirty`. (`build.py`'s own dirty-tree preflight still runs, inside the
   build worktree, where it always passes.)
-- **Nothing else writing the caller's `cad/out` while the run finishes.** The
-  copy-back overwrites outputs and edits `cad/out/.doit.db` without a lock; a
-  local `doit` in the caller, or a second launch from the same caller finishing
-  at the same moment, would race both (the later writer can restore records
-  the earlier one dropped). Concurrent launches are otherwise independent.
+- **No local `doit` in the caller while a launch finishes.** The copy-back
+  overwrites outputs and edits `cad/out/.doit.db`. Harvests from concurrent
+  launches into one caller are serialized by an exclusive handle on
+  `cad/out/.farm-harvest.lock` (the log says `farm-launch waiting for …` while
+  one queues; it gives up after 600 s and fails the run, keeping its build
+  worktree), so they cannot restore each other's dropped records. doit itself
+  takes no lock, so a local `doit` running at that moment would still race.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
 - **A log directory outside the worktree.** Run records and logs must never land
@@ -264,8 +266,9 @@ one compressed JSON line):
 
 `build_worktree_changes` lists any file the build wrote outside `cad/out` (it is
 discarded with the build worktree, and the launcher warns). A
-`build_worktree_removed: false` is a warning, not a failure: remove the path by
-hand once nothing holds it open.
+`build_worktree_removed: false` is a warning, not a failure: run
+[`scripts/farm-prune.ps1`](#removing-leftover-build-worktrees) once nothing
+holds it open.
 
 Only exit 0 is `succeeded`; a wrapper exception is `failed` with exit 1 and its
 diagnostic in the log. A run ID is
@@ -305,8 +308,9 @@ Read the records first, in this order:
    The remote work is very likely still running: `_farm.run_leaf` shares
    workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
    anything. The record's `build_worktree` is left behind and nothing was
-   copied back; once the workflows below are resolved, remove it with
-   `git worktree remove --force <build_worktree>`.
+   copied back. Removing it does not touch the remote workflows, so
+   `scripts/farm-prune.ps1` may remove it at any time; recover the workflows
+   below all the same.
 
 In case 3, harvest every workflow ID the log recorded — both
 `Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
@@ -331,6 +335,24 @@ an automatic relaunch: `NOT_FOUND` for an attached ID, a missing or unreadable
 identifier, a changed commit or cache environment, or a `status` call that
 failed on authentication, network or CLI error. An auth or network failure is
 never a `NOT_FOUND`.
+
+### Removing leftover build worktrees
+
+A build worktree survives a failed copy-back, a failed removal or a killed
+launcher. `scripts/farm-prune.ps1` reads the launch records and removes each
+record's `build_worktree` once its run is over: the `.done` exists (`done`), or
+there is no `.done` and the recorded launcher PID has exited or now belongs to
+a younger process (`launcher-gone`). A worktree whose launcher is still running
+is left alone. Preview first, then remove:
+
+```powershell
+pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs -WhatIf
+pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs
+```
+
+It prints one `run_id`/`build_worktree`/`reason`/`removed` object per
+candidate and accepts several `-LogDirectory` values. A directory under
+`-WorkRoot` with no record in the directories you pass is not touched.
 
 ## Remote build-artifact cache
 

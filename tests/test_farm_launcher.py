@@ -728,3 +728,117 @@ def test_submitter_only_targets_are_rejected_before_startup(
     assert f"Targets cannot include {target}" in result.stderr
     assert not Path(fixture["invocation"]).exists()
     assert not list(Path(fixture["log_directory"]).glob("*.run.json"))
+
+
+def test_harvest_waits_for_another_harvest_into_the_same_caller(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    caller_out = Path(fixture["worktree"]) / "cad" / "out"
+    caller_out.mkdir(parents=True)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    with open(caller_out / ".farm-harvest.lock", "a+b"):
+        process = subprocess.Popen(
+            _command(fixture, "part:probe"),
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        log_directory = Path(fixture["log_directory"])
+        deadline = time.monotonic() + 20
+        launch_log = ""
+        while time.monotonic() < deadline and process.poll() is None:
+            logs = list(log_directory.glob("*.log"))
+            launch_log = logs[0].read_text(encoding="utf-8") if logs else ""
+            if "waiting for" in launch_log:
+                break
+            time.sleep(0.05)
+        assert "waiting for" in launch_log
+        time.sleep(1)
+        assert process.poll() is None
+        assert not list(log_directory.glob("*.done"))
+        assert not (caller_out / "png" / "probe.png").exists()
+
+    stdout, stderr = process.communicate(timeout=30)
+    assert process.returncode == 0, (stdout, stderr)
+    finished = _record(_only(log_directory, "*.done"))
+    assert finished["outputs_copied"] == 4
+    assert (caller_out / "png" / "probe.png").exists()
+    _assert_build_worktree_gone(fixture, finished)
+
+
+PRUNE = REPO_ROOT / "scripts" / "farm-prune.ps1"
+
+
+def _leftover(
+    fixture: dict[str, object], tmp_path: Path, name: str, *, pid: int, done: bool
+) -> Path:
+    caller = Path(fixture["worktree"])
+    build_worktree = tmp_path / "fw" / name
+    _git(caller, "worktree", "add", "-q", "--detach", str(build_worktree), "HEAD")
+    log_directory = Path(fixture["log_directory"])
+    log_directory.mkdir(exist_ok=True)
+    record = {
+        "run_id": name,
+        "pid": pid,
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S.0000000Z", time.gmtime()),
+        "done": str(log_directory / f"{name}.done"),
+        "build_worktree": str(build_worktree),
+    }
+    (log_directory / f"{name}.run.json").write_text(json.dumps(record), encoding="utf-8")
+    if done:
+        (log_directory / f"{name}.done").write_text("{}", encoding="utf-8")
+    return build_worktree
+
+
+def _prune(fixture: dict[str, object], *extra: str) -> list[dict[str, object]]:
+    result = subprocess.run(
+        [
+            str(fixture["pwsh"]),
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            f"& '{PRUNE}' -LogDirectory '{fixture['log_directory']}' {' '.join(extra)}"
+            " | ConvertTo-Json -AsArray -Compress",
+        ],
+        text=True,
+        capture_output=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    # -WhatIf narrates on stdout ahead of the JSON array
+    return json.loads(result.stdout.splitlines()[-1])
+
+
+def _dead_pid() -> int:
+    finished = subprocess.run([sys.executable, "-c", "import os; print(os.getpid())"],
+                              capture_output=True, text=True, check=True)
+    return int(finished.stdout)
+
+
+def test_prune_removes_finished_and_orphaned_build_worktrees_only(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    time.sleep(1.1)  # the live launcher below must predate its record
+    finished = _leftover(fixture, tmp_path, "aaaa0001", pid=_dead_pid(), done=True)
+    orphaned = _leftover(fixture, tmp_path, "aaaa0002", pid=_dead_pid(), done=False)
+    running = _leftover(fixture, tmp_path, "aaaa0003", pid=os.getpid(), done=False)
+
+    assert _prune(fixture, "-WhatIf") == [
+        {"run_id": "aaaa0001", "build_worktree": str(finished), "reason": "done", "removed": False},
+        {"run_id": "aaaa0002", "build_worktree": str(orphaned), "reason": "launcher-gone", "removed": False},
+    ]
+    assert finished.exists() and orphaned.exists()
+
+    reports = _prune(fixture)
+
+    assert [(r["run_id"], r["reason"], r["removed"]) for r in reports] == [
+        ("aaaa0001", "done", True),
+        ("aaaa0002", "launcher-gone", True),
+    ]
+    assert not finished.exists() and not orphaned.exists()
+    assert running.exists()
+    registered = _registered_worktrees(Path(fixture["worktree"]))
+    assert finished.resolve() not in registered
+    assert orphaned.resolve() not in registered
+    assert running.resolve() in registered

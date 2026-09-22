@@ -215,8 +215,11 @@ such build:
   launcher runs the submitter in a disposable detached worktree under
   `<WorkRoot>` (default `C:\src\fw\<8 hex>`), with its own `.venv`, an empty
   `cad/out` and a fresh `.doit.db`, then copies `cad/out` back to the caller,
-  drops the caller's `.doit.db` records for the tasks it touched, and removes
-  the build worktree. Uncommitted edits, a stale `.doit.db` or old artefacts in
+  drops the caller's `.doit.db` records for the tasks it touched (all of them
+  after a failed build), and removes the build worktree. Concurrent launches
+  from one caller harvest one at a time under `cad/out/.farm-harvest.lock`;
+  `scripts/farm-prune.ps1` removes build worktrees a finished or killed launch
+  left behind. Uncommitted edits, a stale `.doit.db` or old artefacts in
   the caller can no longer move a cache key, and editing the caller mid-run
   cannot reach the build. A dirty caller is warned about (`caller_dirty` in the
   record), not refused: those edits are **not** built. `release` and `gallery`

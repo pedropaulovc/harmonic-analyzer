@@ -368,6 +368,44 @@ function Remove-CallerTaskRecords {
     return @($removed)
 }
 
+function Enter-CallerOutputLock {
+    param(
+        [Parameter(Mandatory)][string]$CallerOutput,
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][int]$TimeoutSeconds
+    )
+
+    # Serializes harvests into one caller: two launches finishing together
+    # would otherwise race the copy and the read-modify-write of .doit.db,
+    # and the later writer could restore records the earlier one dropped.
+    # The OS releases the handle if this process dies, so a stale lock file
+    # never blocks; the file itself is left in place on purpose.
+    [System.IO.Directory]::CreateDirectory($CallerOutput) | Out-Null
+    $lockPath = Join-Path $CallerOutput '.farm-harvest.lock'
+    $deadline = [System.Diagnostics.Stopwatch]::StartNew()
+    $announced = $false
+    while ($true) {
+        try {
+            return [System.IO.File]::Open(
+                $lockPath,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+        }
+        catch [System.IO.IOException] {
+            if ($deadline.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
+                throw "timed out after $TimeoutSeconds s waiting for $lockPath"
+            }
+            if (-not $announced) {
+                Write-LaunchLine -Path $LogPath -Text "farm-launch waiting for $lockPath (another harvest into this caller)"
+                $announced = $true
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+}
+
 function Remove-BuildWorktree {
     param(
         [Parameter(Mandatory)][string]$Caller,
@@ -693,13 +731,20 @@ if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Contai
         $buildOut = Join-Path $buildWorktree 'cad/out'
         $callerOut = Join-Path $resolvedWorktree 'cad/out'
         $harvest['outputs_copied_to'] = $callerOut
-        $harvest['outputs_copied'] = Copy-BuildOutputs -Source $buildOut -Destination $callerOut
-        $harvest['caller_tasks_forgotten'] = @(
-            Remove-CallerTaskRecords `
-                -BuildDatabase (Join-Path $buildOut '.doit.db') `
-                -CallerDatabase (Join-Path $callerOut '.doit.db') `
-                -Scope $(if ($exitCode -eq 0) { 'Recorded' } else { 'All' })
-        )
+        $harvestLock = Enter-CallerOutputLock `
+            -CallerOutput $callerOut -LogPath $logPath -TimeoutSeconds 600
+        try {
+            $harvest['outputs_copied'] = Copy-BuildOutputs -Source $buildOut -Destination $callerOut
+            $harvest['caller_tasks_forgotten'] = @(
+                Remove-CallerTaskRecords `
+                    -BuildDatabase (Join-Path $buildOut '.doit.db') `
+                    -CallerDatabase (Join-Path $callerOut '.doit.db') `
+                    -Scope $(if ($exitCode -eq 0) { 'Recorded' } else { 'All' })
+            )
+        }
+        finally {
+            $harvestLock.Dispose()
+        }
         Write-LaunchLine -Path $logPath -Text (
             "farm-launch copied $($harvest['outputs_copied']) output file(s) to $callerOut; " +
             "forgot $($harvest['caller_tasks_forgotten'].Count) caller doit record(s)"
