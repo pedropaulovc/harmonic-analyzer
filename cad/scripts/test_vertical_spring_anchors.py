@@ -1,12 +1,12 @@
-"""Offline contract: both stock springs hang PLUMB in the neutral pose.
+"""Offline attachment-axis contracts for the two loaded stock springs.
 
-The channel lever's spring reach (``channel_lever_spec.LEVER_SPRING_X``) and the
-gooseneck's arm end (``gooseneck_geom.ARM_END_X``) are not free styling numbers:
-each is dimensioned so its spring's upper attachment lands on the machine X of
-the summing-lever anchor underneath it. A lean feeds a horizontal component into
-the knife load that no tension setting removes, so a reach/arm-end edit (or a
-summing-lever hole move) that drifts off plumb must fail here rather than in a
-native interference run.
+The channel lever's spring reach (``channel_lever_spec.LEVER_SPRING_X``) keeps
+the neutral channel spring plumb over its summing-lever anchor. The counter
+spring instead terminates at the centre of MHA-032's released clamped screw
+gap. That upper contact is authoritative: reopening the screw must not leak
+back into the saved assembly pose, and the rigid spring axis must be recomputed
+from the unchanged lower anchor rather than silently retaining the old plumb
+orientation.
 """
 
 from __future__ import annotations
@@ -49,25 +49,30 @@ def test_neutral_channel_spring_axis_is_vertical() -> None:
     assert abs(pose.axis_xy[0]) <= PLUMB_TOL_MM / pose.length_mm
 
 
-def test_gooseneck_arm_end_hangs_the_counter_eye_over_its_anchor() -> None:
-    anchor_x, _anchor_y = spring_mount_geom.COUNTER_ANCHOR_XY
+def test_gooseneck_clamp_centres_counter_eye_in_the_released_gap() -> None:
+    clamped = (
+        spring_mount_geom.GOOSENECK_END_X
+        + gooseneck_geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+    )
+    open_position = (
+        spring_mount_geom.GOOSENECK_END_X
+        + gooseneck_geom.SPRING_SCREW_OPEN_GAP_MM / 2.0
+    )
 
     assert spring_mount_geom.COUNTER_UPPER_EYE_X == pytest.approx(
-        anchor_x, abs=PLUMB_TOL_MM
+        clamped, abs=PLUMB_TOL_MM
     )
-    # Stated the other way: the arm end face is the only free term, so it is the
-    # thing a future edit must keep, not the eye position it produces.
-    assert gooseneck_geom.ARM_END_X == pytest.approx(
-        spring_mount_geom.COLUMN_X - anchor_x + gooseneck_geom.SCREW_SHANK_LEN / 2.0,
-        abs=PLUMB_TOL_MM,
+    assert spring_mount_geom.COUNTER_UPPER_EYE_X != pytest.approx(
+        open_position, abs=PLUMB_TOL_MM
     )
 
 
-def test_reference_counter_spring_axis_is_vertical() -> None:
+def test_reference_counter_spring_recomputes_its_axis_to_the_clamped_eye() -> None:
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
 
     assert pose.axis_xy[1] > 0.0
-    assert pose.lower_eye_xy[0] == pytest.approx(
-        pose.upper_eye_xy[0], abs=PLUMB_TOL_MM
+    assert pose.upper_eye_xy[0] == pytest.approx(
+        spring_mount_geom.COUNTER_UPPER_EYE_X, abs=PLUMB_TOL_MM
     )
-    assert abs(pose.axis_xy[0]) <= PLUMB_TOL_MM / pose.length_mm
+    assert pose.axis_xy[0] < 0.0
+    assert pose.upper_eye_xy[0] < pose.lower_eye_xy[0]

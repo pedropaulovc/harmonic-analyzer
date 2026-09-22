@@ -39,3 +39,19 @@ def test_adjustment_screw_thread_and_slot_fit_the_body() -> None:
     assert geom.SCREW_SLOT_W < geom.SCREW_HEAD_DIA
 
 
+
+
+def test_gooseneck_consumers_import_against_this_geometry() -> None:
+    # The assembly-side consumers read gooseneck_geom at import time; a renamed
+    # or removed constant must fail here, on the gooseneck PR, not at merge.
+    import build_motion_study_springs
+    import build_summing_assembly
+    import spring_mount_geom
+
+    assert spring_mount_geom.COUNTER_UPPER_EYE_X == (
+        spring_mount_geom.GOOSENECK_END_X + geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+    )
+    assert build_summing_assembly.gooseneck_geom is geom
+    assert build_motion_study_springs.GOOSENECK_EYE[0] == (
+        geom.ARM_END_X - geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+    )
