@@ -2689,6 +2689,73 @@ def task_verify():
             "verbosity": 2,
         }
 
+    # Same shape as the clamp experiment above: the leaf only measures and writes
+    # the report JSON (a leaf may never commit config), and the submitter merges it
+    # with --apply-report. seat_anchors are the parts the seat fixtures PLACE from
+    # disk; the 9432K31/1330K524 variants are rebuilt in-session at the measured
+    # length and need no part dep.
+    seats = SCRIPTS_DIR / "diagnostics" / "calibrate_spring_seats.py"
+    seat_report = REPORTS / "spring-seat-calibration.json"
+    seat_anchors = ("boss_hook", "gooseneck", "channel_lever", "spring_hook")
+    seat_deps = list(
+        dict.fromkeys(
+            [
+                str(Path(__file__).resolve()),
+                *_part_file_deps(seats, "counter_spring"),
+                _submodule_assembly_dep(),
+                *(_sldprt(stem) for stem in seat_anchors),
+                *(_part_execution_token(stem) for stem in seat_anchors),
+            ]
+        )
+    )
+    # Labels are provenance only, not part of the cache key. Represent the
+    # selected CLI recipe as an input, using the existing sidecar convention
+    # so graph export and execution derive identical keys.
+    seat_recipe = "\0".join(
+        [
+            seats.relative_to(REPO_ROOT).as_posix(),
+            "--presets",
+            "neutral",
+            "square",
+            "--output",
+            seat_report.relative_to(REPO_ROOT).as_posix(),
+        ]
+    )
+    seat_deps.append(
+        _write_digest_sidecar(
+            CAD_OUT / ".spring-seat-recipes" / "neutral-square.digest",
+            hashlib.sha256(seat_recipe.encode("utf-8")).hexdigest(),
+        )
+    )
+    yield {
+        "name": "calibrate_spring_seats",
+        "task_dep": [f"part:{stem}" for stem in seat_anchors],
+        "file_dep": seat_deps,
+        "targets": [str(seat_report)],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:calibrate_spring_seats",
+                    [
+                        sys.executable,
+                        str(seats.resolve()),
+                        "--presets",
+                        "neutral",
+                        "square",
+                        "--output",
+                        str(seat_report.resolve()),
+                    ],
+                    seat_deps,
+                    [seat_report],
+                    "verify-calibrate-spring-seats",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER

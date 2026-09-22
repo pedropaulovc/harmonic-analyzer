@@ -32,6 +32,14 @@ Run with SolidWorks open (the parts must already be built)::
     uv run cad/scripts/diagnostics/calibrate_spring_seats.py --write
 
 Without ``--write`` the measurements only go to the JSON report.
+
+A farm leaf may only write under ``cad/out/``, so it can never commit config:
+on the farm the measurement runs WITHOUT ``--write`` and only lands the report
+JSON. ``--apply-report`` merges that completed report into ``springs.yaml``
+back on the submitter, taking no COM seat at all::
+
+    uv run cad/scripts/diagnostics/calibrate_spring_seats.py --apply-report \\
+        cad/out/reports/spring-seat-calibration.json
 """
 
 from __future__ import annotations
@@ -459,6 +467,54 @@ def _merge_yaml(
     SPRINGS_YAML.write_text(header + "\n" + text, encoding="utf-8", newline="\n")
 
 
+def apply_report(path: Path, source: str) -> int:
+    """Merge a completed report into ``springs.yaml`` on the submitter.
+
+    Takes no COM seat and never runs the measurement: the farm leaf owns the
+    measurement and may only write under ``cad/out/``, so the rewrite of the
+    configured table happens here, on the submitter, from the leaf's report."""
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if report.get("status") != "completed":
+        raise SystemExit(
+            f"--apply-report merges a completed report only; {path} has status "
+            f"{report.get('status')!r}"
+        )
+    channel_rows = report.get("channel_seats")
+    counters = report.get("counters")
+    for key, value in (("channel_seats", channel_rows), ("counters", counters)):
+        if not value:
+            raise SystemExit(f"--apply-report needs a non-empty {key}; {path} has {value!r}")
+    table = _config.machine("springs", "presets")
+    # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
+    # amplitude exactly (no fit, no interpolation), so a report that calibrated
+    # only some presets would delete the rows the omitted ones need. Same refusal
+    # as --write, replayed here because this path never reaches `calibrate`.
+    measured = {float(row["amplitude_mm"]) for row in channel_rows}
+    missing = [
+        (name, amplitude)
+        for name in sorted(table)
+        for amplitude in (float(x) for x in table[name]["amplitudes_mm"])
+        if amplitude not in measured
+    ]
+    if missing:
+        raise SystemExit(
+            "--apply-report rewrites every channel seat, so the calibrated presets "
+            f"must cover all configured amplitudes; missing {missing}. Calibrate "
+            f"{sorted(table)} together, or drop --apply-report."
+        )
+    stale = sorted(set(table) - set(report.get("presets") or []))
+    if stale:
+        raise SystemExit(
+            "--apply-report rewrites only the presets the report carries, so the "
+            f"report must cover every configured preset; missing {stale}. Calibrate "
+            f"{sorted(table)} together, or drop --apply-report."
+        )
+    _merge_yaml(channel_rows, counters, source)
+    print(f"--apply-report read {path}")
+    print(f"--apply-report wrote {SPRINGS_YAML}")
+    return 0
+
+
 async def calibrate(
     adapter, presets: list[str], output: Path, write: bool, source: str
 ) -> dict[str, str]:
@@ -547,7 +603,19 @@ def main() -> int:
         default="Native fixture calibration (diagnostics/calibrate_spring_seats.py); "
         "full saved-assembly acceptance is required by the build gates.",
     )
+    parser.add_argument(
+        "--apply-report",
+        type=Path,
+        default=None,
+        help="merge a completed report JSON into springs.yaml on the submitter; no COM",
+    )
     args = parser.parse_args()
+    if args.apply_report is not None:
+        if args.write:
+            parser.error(
+                "--apply-report merges an existing report; --write is a COM-run flag"
+            )
+        return apply_report(args.apply_report.resolve(), args.source)
     with dodo._com_seat("calibrate-spring-seats"):
         return run_build(
             lambda adapter: calibrate(
