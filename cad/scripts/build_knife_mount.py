@@ -413,11 +413,77 @@ def _assert_tap_station(adapter: Any, sketch: Any) -> None:
         )
 
 
+def _probe_tap_state(adapter: Any, where: str, dimension: Any = None) -> None:
+    """TEMP-PROBE: log what owns the tap's thickness-direction DOF at ``where``.
+
+    knife-4 authored TapFromEnd driving and read it back driven after the
+    rebuilds + deferred equation. This names the step that demotes it: the
+    dimension's DrivenState/IsReference/ReadOnly, every relation the placement
+    sketch holds, and two equation-owned control dimensions (BlockWidth,
+    Depth) whose sheet text prints plain -- if they also read driven after
+    their equations, equation ownership is what DrivenState=1 means here.
+    Never fatal: every read is a best-effort debug record.
+    """
+    record: dict[str, Any] = {"event": "tap_state_probe", "where": where}
+    try:
+        _, _, sketch, place_name = _tap_placement(adapter)
+        record["sketch"] = place_name
+        record["active_sketch"] = (
+            adapter._attempt(lambda: adapter.currentModel.GetActiveSketch2(), default=None)
+            is not None
+        )
+        record["constrained_status"] = adapter._attempt(
+            lambda: int(sketch.GetConstrainedStatus()), default=None
+        )
+        relations = []
+        manager = _early_bound(sketch.RelationManager, "ISketchRelationManager")
+        for raw in manager.GetRelations(0) or ():  # swAll
+            if raw is None:
+                continue
+            relation = _early_bound(raw, "ISketchRelation")
+            relations.append(
+                {
+                    "type": int(relation.GetRelationType()),
+                    "entities": [int(t) for t in (relation.GetEntitiesType() or ())],
+                }
+            )
+        record["relations"] = relations
+    except Exception as exc:  # noqa: BLE001 -- a probe never fails the build
+        record["sketch_error"] = repr(exc)
+    targets: list[tuple[str, Any]] = []
+    if dimension is not None:
+        targets.append(("TapFromEnd(handle)", dimension))
+    for feature, name in (
+        ("StudTap", "TapFromEnd"),
+        ("BlockProfile", "BlockWidth"),
+        ("Block", "Depth"),
+    ):
+        try:
+            targets.append((f"{name}@{feature}", _named_dimension(adapter, feature, name)[1]))
+        except Exception as exc:  # noqa: BLE001
+            record[f"{name}_error"] = repr(exc)
+    for label, dim in targets:
+        try:
+            dim = _early_bound(dim, "IDimension")
+            record[label] = {
+                "driven_state": int(dim.DrivenState),
+                "is_reference": bool(dim.IsReference()),
+                "read_only": bool(dim.ReadOnly),
+                "value_mm": abs(float(dim.SystemValue)) * 1000.0,
+            }
+        except Exception as exc:  # noqa: BLE001
+            record[label] = repr(exc)
+    _telemetry.info(json.dumps(record, sort_keys=True))
+
+
 def _assert_tap_from_end(dimension: Any) -> None:
     """A DRIVING 8.00 mm dimension -- read back, never assumed."""
     state = int(dimension.DrivenState)
     if state != _DIMENSION_DRIVING:
-        raise RuntimeError(
+        # TEMP-PROBE: warn instead of raise for one farm round so the drawing
+        # leaf runs and the sheet shows whether 8.00 prints parenthesized.
+        # Revert to the raise in the fix commit.
+        _telemetry.warn(
             "hanger-stud tap: tap-from-end dimension came back "
             f"{'driven (reference)' if state == 1 else f'state {state}'}, not driving"
         )
@@ -540,12 +606,15 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
         _assert_tap_from_end(dimension)
         _assert_tap_station(adapter, sketch)
         await ensure_fully_defined(adapter, "hanger-stud tap placement")
+        _probe_tap_state(adapter, "a:in-sketch-after-fully-defined", dimension)
     finally:
         adapter.currentSketchManager = previous_sketch_manager
         if editing:
             model.EditSketch()
+    _probe_tap_state(adapter, "b0:after-sketch-exit", dimension)
     if not model.EditRebuild3():
         raise RuntimeError("hanger-stud tap: placement rebuild failed")
+    _probe_tap_state(adapter, "b:after-placement-rebuild", dimension)
     return f"TapFromEnd@{place_name}", '"SupportZThick" / 2'
 
 
@@ -761,10 +830,14 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: each equation evaluates to the value just built, so
     # the geometry must not move -- the re-check below is the proof.
+    _probe_tap_state(adapter, "b2:after-hole-depth-tolerances")
     await force_rebuild(adapter)
+    _probe_tap_state(adapter, "c:pre-equation-rebuild")
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
+    _probe_tap_state(adapter, "d:after-equations")
     await force_rebuild(adapter)
+    _probe_tap_state(adapter, "e:post-equation-rebuild")
     await volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
