@@ -65,9 +65,11 @@ So the submitter no longer runs in the caller's worktree. The launcher:
    run touched. The copied artefacts may disagree with what the caller had
    recorded for them, which is exactly the second failure above; without a
    record, the caller's next local `doit` re-derives those keys from its own
-   inputs and restores or rebuilds. After a failed build every caller record
-   goes, because doit drops a failed task's record and the build database
-   can no longer name every task whose outputs came back;
+   inputs and restores or rebuilds. After a failed build that copied anything
+   back, every caller record goes, because doit drops a failed task's record
+   and the build database can no longer name every task whose outputs came
+   back. A failure before any output existed (a submodule or `uv` that would
+   not start) leaves the caller's records alone;
 7. removes the build worktree (`git worktree remove --force`, then `prune`).
 
 Nothing in the caller's worktree (uncommitted edits, `.doit.db`, `cad/out`)
@@ -98,7 +100,9 @@ from an attended terminal.
 
 An attended `build.py` run in your own worktree keeps the old exposure: it
 keys tasks from the live tree and its own `.doit.db`. `build.py` therefore
-digests HEAD, `git status` and the tracked diff before and after every
+digests HEAD, `git status`, the tracked diff with dirty submodule content
+expanded (`--submodule=diff`) and the bytes of every untracked, non-ignored
+file, in the tree and its initialized submodules, before and after every
 task-executing command and prints `build: WARNING the working tree changed
 while this build ran` when they differ. It warns rather than fails because a
 `release` legitimately advances a tracked file. After that warning, or after
@@ -343,7 +347,11 @@ launcher. `scripts/farm-prune.ps1` reads the launch records and removes each
 record's `build_worktree` once its run is over: the `.done` exists (`done`), or
 there is no `.done` and the recorded launcher PID has exited or now belongs to
 a younger process (`launcher-gone`). A worktree whose launcher is still running
-is left alone. Preview first, then remove:
+is left alone. A record is untrusted input, so the path is removed only when
+git lists it as a detached linked worktree of the record's caller repository
+and its name is the run GUID's first eight characters; anything else is
+reported as `unverified` with a warning and left in place. Preview first, then
+remove:
 
 ```powershell
 pwsh -NoProfile -File C:/src/harmonic-analyzer/scripts/farm-prune.ps1 -LogDirectory C:/src/dt-logs/farm-runs -WhatIf

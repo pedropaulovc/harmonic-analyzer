@@ -15,7 +15,11 @@ build_worktree when the run is over:
 - `launcher-gone`: there is no .done and the launcher PID is no longer the
   process that wrote the record (it exited, or Windows reused the PID).
 
-A worktree whose launcher is still alive is skipped. Removing a build worktree
+A worktree whose launcher is still alive is skipped. A record is untrusted
+input: its build_worktree is removed only when git lists it as a detached
+linked worktree of the record's caller repository and its name is the run
+GUID's first eight characters; anything else is reported as `unverified` and
+left alone. Removing a build worktree
 never touches remote farm workflows; recover those from the launch log as
 DEVELOPING.md describes before relaunching.
 
@@ -47,23 +51,61 @@ function Test-LauncherAlive {
     return $process.StartTime.ToUniversalTime() -le $startedAt
 }
 
-function Remove-LeftoverWorktree {
-    param([Parameter(Mandatory)][string]$Path)
+function Get-OwnershipProblem {
+    param([Parameter(Mandatory)]$Record)
 
-    $commonDirectory = (& git -C $Path rev-parse --path-format=absolute --git-common-dir 2>$null |
-        Select-Object -Last 1)
-    $repository = if ($LASTEXITCODE -eq 0 -and $commonDirectory) {
-        Split-Path -Path $commonDirectory.Trim() -Parent
+    # A record is external JSON, so its build_worktree is deleted recursively
+    # only when git agrees it is what the launcher made: a detached linked
+    # worktree of the recorded caller's repository, named for this run.
+    $buildWorktree = [System.IO.Path]::GetFullPath([string]$Record.build_worktree)
+    $match = [System.Text.RegularExpressions.Regex]::Match(
+        [string]$Record.run_id,
+        '\A\d{8}T\d{9}Z-(?<guid>[0-9a-f]{32})\z'
+    )
+    if (-not $match.Success) {
+        return "run_id $($Record.run_id) is not a launcher run id"
     }
-    if ($repository) {
-        & git -C $repository worktree remove --force --force $Path 2>&1 | Out-Null
+    if ((Split-Path -Path $buildWorktree -Leaf) -cne $match.Groups['guid'].Value.Substring(0, 8)) {
+        return "its name does not match run $($Record.run_id)"
     }
+    $caller = [string]$Record.worktree
+    if ([string]::IsNullOrEmpty($caller) -or -not (Test-Path -LiteralPath $caller -PathType Container)) {
+        return "the recorded caller worktree $caller is gone"
+    }
+    $listing = @(& git -C $caller worktree list --porcelain 2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        return "git cannot list the worktrees of $caller"
+    }
+    $entries = ($listing -join "`n") -split "`n`n"
+    foreach ($entry in $entries | Select-Object -Skip 1) {
+        $lines = $entry -split "`n"
+        $path = ($lines | Where-Object { $_.StartsWith('worktree ') } | Select-Object -First 1)
+        if ($null -eq $path) {
+            continue
+        }
+        $registered = [System.IO.Path]::GetFullPath($path.Substring('worktree '.Length))
+        if (-not $registered.Equals($buildWorktree, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        if ($lines -notcontains 'detached') {
+            return 'it is a linked worktree with a branch checked out'
+        }
+        return $null
+    }
+    return "it is not a linked worktree of $caller"
+}
+
+function Remove-LeftoverWorktree {
+    param(
+        [Parameter(Mandatory)][string]$Caller,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    & git -C $Caller worktree remove --force --force $Path 2>&1 | Out-Null
     if (Test-Path -LiteralPath $Path) {
         Remove-Item -LiteralPath $Path -Recurse -Force
     }
-    if ($repository) {
-        & git -C $repository worktree prune 2>&1 | Out-Null
-    }
+    & git -C $Caller worktree prune 2>&1 | Out-Null
     return -not (Test-Path -LiteralPath $Path)
 }
 
@@ -92,8 +134,13 @@ foreach ($directory in $directories) {
         }
 
         $removed = $false
-        if ($PSCmdlet.ShouldProcess($buildWorktree, "remove build worktree of $($record.run_id) ($reason)")) {
-            $removed = Remove-LeftoverWorktree -Path $buildWorktree
+        $problem = Get-OwnershipProblem -Record $record
+        if ($null -ne $problem) {
+            Write-Warning "not removing $buildWorktree for $($record.run_id): $problem"
+            $reason = 'unverified'
+        }
+        elseif ($PSCmdlet.ShouldProcess($buildWorktree, "remove build worktree of $($record.run_id) ($reason)")) {
+            $removed = Remove-LeftoverWorktree -Caller ([string]$record.worktree) -Path $buildWorktree
             if (-not $removed) {
                 Write-Warning "could not remove $buildWorktree; close whatever holds it open and rerun"
             }

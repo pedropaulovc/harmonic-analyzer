@@ -739,7 +739,11 @@ if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Contai
                 Remove-CallerTaskRecords `
                     -BuildDatabase (Join-Path $buildOut '.doit.db') `
                     -CallerDatabase (Join-Path $callerOut '.doit.db') `
-                    -Scope $(if ($exitCode -eq 0) { 'Recorded' } else { 'All' })
+                    -Scope $(
+                        # Only a failed build that copied something back can
+                        # have overwritten a caller artefact its db misnames.
+                        if ($exitCode -ne 0 -and $harvest['outputs_copied'] -gt 0) { 'All' } else { 'Recorded' }
+                    )
             )
         }
         finally {

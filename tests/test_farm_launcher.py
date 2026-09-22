@@ -340,6 +340,10 @@ def test_wrapper_failure_after_startup_writes_a_failed_terminal_record(
     )
     environment = dict(fixture["environment"])
     environment["PATH"] = str(tools)
+    # Nothing ran, so nothing came back: the caller's records must survive.
+    caller_db = Path(fixture["worktree"]) / "cad" / "out" / ".doit.db"
+    caller_db.parent.mkdir(parents=True)
+    caller_db.write_text(json.dumps({"part:kept": {"kept": True}}), encoding="utf-8")
 
     result = subprocess.run(
         _command(fixture, "part:pen_rod"),
@@ -360,6 +364,10 @@ def test_wrapper_failure_after_startup_writes_a_failed_terminal_record(
     assert "farm-launch wrapper failed:" in Path(finished["log"]).read_text(
         encoding="utf-8"
     )
+    assert finished["outputs_copied"] == 0
+    assert finished["caller_tasks_forgotten"] == []
+    assert json.loads(caller_db.read_text(encoding="utf-8")) == {"part:kept": {"kept": True}}
+    _assert_build_worktree_gone(fixture, finished)
 
 
 @pytest.mark.parametrize(
@@ -777,19 +785,30 @@ def _leftover(
     caller = Path(fixture["worktree"])
     build_worktree = tmp_path / "fw" / name
     _git(caller, "worktree", "add", "-q", "--detach", str(build_worktree), "HEAD")
+    _prune_record(fixture, _run_id(name), build_worktree, pid=pid, done=done)
+    return build_worktree
+
+
+def _run_id(name: str) -> str:
+    return f"20260922T000000000Z-{name}{'0' * 24}"
+
+
+def _prune_record(
+    fixture: dict[str, object], run_id: str, build_worktree: Path, *, pid: int, done: bool
+) -> None:
     log_directory = Path(fixture["log_directory"])
     log_directory.mkdir(exist_ok=True)
     record = {
-        "run_id": name,
+        "run_id": run_id,
+        "worktree": str(fixture["worktree"]),
         "pid": pid,
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S.0000000Z", time.gmtime()),
-        "done": str(log_directory / f"{name}.done"),
+        "done": str(log_directory / f"{run_id}.done"),
         "build_worktree": str(build_worktree),
     }
-    (log_directory / f"{name}.run.json").write_text(json.dumps(record), encoding="utf-8")
+    (log_directory / f"{run_id}.run.json").write_text(json.dumps(record), encoding="utf-8")
     if done:
-        (log_directory / f"{name}.done").write_text("{}", encoding="utf-8")
-    return build_worktree
+        (log_directory / f"{run_id}.done").write_text("{}", encoding="utf-8")
 
 
 def _prune(fixture: dict[str, object], *extra: str) -> list[dict[str, object]]:
@@ -825,16 +844,16 @@ def test_prune_removes_finished_and_orphaned_build_worktrees_only(tmp_path: Path
     running = _leftover(fixture, tmp_path, "aaaa0003", pid=os.getpid(), done=False)
 
     assert _prune(fixture, "-WhatIf") == [
-        {"run_id": "aaaa0001", "build_worktree": str(finished), "reason": "done", "removed": False},
-        {"run_id": "aaaa0002", "build_worktree": str(orphaned), "reason": "launcher-gone", "removed": False},
+        {"run_id": _run_id("aaaa0001"), "build_worktree": str(finished), "reason": "done", "removed": False},
+        {"run_id": _run_id("aaaa0002"), "build_worktree": str(orphaned), "reason": "launcher-gone", "removed": False},
     ]
     assert finished.exists() and orphaned.exists()
 
     reports = _prune(fixture)
 
     assert [(r["run_id"], r["reason"], r["removed"]) for r in reports] == [
-        ("aaaa0001", "done", True),
-        ("aaaa0002", "launcher-gone", True),
+        (_run_id("aaaa0001"), "done", True),
+        (_run_id("aaaa0002"), "launcher-gone", True),
     ]
     assert not finished.exists() and not orphaned.exists()
     assert running.exists()
@@ -842,3 +861,30 @@ def test_prune_removes_finished_and_orphaned_build_worktrees_only(tmp_path: Path
     assert finished.resolve() not in registered
     assert orphaned.resolve() not in registered
     assert running.resolve() in registered
+
+
+def test_prune_never_deletes_a_path_git_does_not_vouch_for(tmp_path: Path) -> None:
+    """Codex review of #827: a stale or edited record must not steer the
+    recursive delete at an arbitrary directory."""
+    fixture = _launcher_fixture(tmp_path)
+    precious = tmp_path / "fw" / "bbbb0001"
+    precious.mkdir(parents=True)
+    (precious / "keep.txt").write_text("not a build worktree", encoding="utf-8")
+    _prune_record(fixture, _run_id("bbbb0001"), precious, pid=_dead_pid(), done=True)
+    misnamed = tmp_path / "fw" / "cccc0001"
+    _git(Path(fixture["worktree"]), "worktree", "add", "-q", "--detach", str(misnamed), "HEAD")
+    _prune_record(fixture, _run_id("dddd0001"), misnamed, pid=_dead_pid(), done=True)
+    branched = tmp_path / "fw" / "eeee0001"
+    _git(Path(fixture["worktree"]), "worktree", "add", "-q", "-b", "slice", str(branched), "HEAD")
+    _prune_record(fixture, _run_id("eeee0001"), branched, pid=_dead_pid(), done=True)
+
+    reports = _prune(fixture)
+
+    assert sorted((r["run_id"], r["reason"], r["removed"]) for r in reports) == [
+        (_run_id("bbbb0001"), "unverified", False),
+        (_run_id("dddd0001"), "unverified", False),
+        (_run_id("eeee0001"), "unverified", False),
+    ]
+    assert (precious / "keep.txt").exists()
+    assert misnamed.exists()
+    assert branched.exists()

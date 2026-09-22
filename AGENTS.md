@@ -216,7 +216,8 @@ such build:
   `<WorkRoot>` (default `C:\src\fw\<8 hex>`), with its own `.venv`, an empty
   `cad/out` and a fresh `.doit.db`, then copies `cad/out` back to the caller,
   drops the caller's `.doit.db` records for the tasks it touched (all of them
-  after a failed build), and removes the build worktree. Concurrent launches
+  after a failed build that copied outputs back), and removes the build
+  worktree. Concurrent launches
   from one caller harvest one at a time under `cad/out/.farm-harvest.lock`;
   `scripts/farm-prune.ps1` removes build worktrees a finished or killed launch
   left behind. Uncommitted edits, a stale `.doit.db` or old artefacts in

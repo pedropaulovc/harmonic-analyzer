@@ -557,6 +557,8 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
         "status": "",
         "submodule": "",
         "rev-parse": SHA + "\n",
+        "diff": "",
+        "ls-files": "",
     }
     stdout.update(git or {})
     if agents is None:
@@ -602,7 +604,7 @@ def test_successful_preflight_stamps_only_committed_head_without_mutating_refs(
     ]
     git_commands = [argv[1] for argv in launched if argv[0] == "git"]
     # preflight, bracketed by the read-only drift snapshots around the run
-    drift_snapshot = ["rev-parse", "status", "diff"]
+    drift_snapshot = ["rev-parse", "status", "diff", "submodule", "ls-files"]
     assert git_commands == [
         *drift_snapshot,
         "status",
@@ -777,6 +779,59 @@ def test_a_local_build_warns_when_the_tree_changes_mid_run(
         yield {"name": "x", "actions": [edit_mid_run]}
 
     _install_real_doit(monkeypatch, {"task_part": task_part})
+
+    assert build.main(["--executor", "local", "part:x"]) == 0
+    assert "working tree changed while this build ran" in capsys.readouterr().err
+
+
+def _edit_mid_run(monkeypatch, path: Path, text: str) -> None:
+    def edit():
+        path.write_text(text, encoding="utf-8")
+
+    def task_part():
+        yield {"name": "x", "actions": [edit]}
+
+    _install_real_doit(monkeypatch, {"task_part": task_part})
+
+
+def test_a_local_build_warns_when_an_untracked_input_changes_mid_run(
+    tmp_path, monkeypatch, capsys
+):
+    repo = _drift_repo(tmp_path)
+    (repo / "draft.yaml").write_text("v: 1\n", encoding="utf-8")
+    monkeypatch.setattr(build, "REPO_ROOT", repo)
+    _edit_mid_run(monkeypatch, repo / "draft.yaml", "v: 2\n")
+
+    assert build.main(["--executor", "local", "part:x"]) == 0
+    assert "working tree changed while this build ran" in capsys.readouterr().err
+
+
+def test_a_local_build_warns_when_a_dirty_submodule_changes_again_mid_run(
+    tmp_path, monkeypatch, capsys
+):
+    """Codex review of #827: a plain diff shows only "modified content" for a
+    dirty submodule, so a second edit to SolidworksMCP-python compared equal."""
+    source = tmp_path / "adapter"
+    source.mkdir()
+    _git(source, "init", "-q")
+    (source / "adapter.py").write_text("v = 1\n", encoding="utf-8")
+    _git(source, "add", "adapter.py")
+    _git(source, "commit", "-q", "-m", "adapter")
+    repo = _drift_repo(tmp_path)
+    _git(
+        repo,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        "-q",
+        str(source),
+        "adapter",
+    )
+    _git(repo, "commit", "-q", "-m", "submodule")
+    (repo / "adapter" / "adapter.py").write_text("v = 2\n", encoding="utf-8")
+    monkeypatch.setattr(build, "REPO_ROOT", repo)
+    _edit_mid_run(monkeypatch, repo / "adapter" / "adapter.py", "v = 3\n")
 
     assert build.main(["--executor", "local", "part:x"]) == 0
     assert "working tree changed while this build ran" in capsys.readouterr().err
