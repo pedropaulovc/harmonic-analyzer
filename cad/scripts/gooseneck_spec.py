@@ -46,12 +46,13 @@ for _partition in (
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. The calibration-critical 50.80 arm
 # reach prints to two places; routine formed length/radius print to one, and
-# so does the screw's under-head length (the through thread adjusts it).
+# so do the screw's under-head length (the through thread adjusts it) and
+# the plug length (thread engagement, not a fit).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
     "BendPath": {"BendRadius": 1, "ArmRun": 2},
-    "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 2},
+    "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 1},
     "ScrewProfile": {
         "ScrewShankDia": 3,
         "UnderHeadLength": 1,
@@ -86,6 +87,9 @@ PLUG_FIT_CALLOUT = (
     "CENTER CONCENTRIC; SILVER-BRAZE AWS A5.8 BAg-7"
 )
 TAP_CALLOUT = "#6-32 UNC-2B THRU"
+# The bend radius is the tube-bender's centreline radius; its imported
+# dimension rides the (unshown) sweep path, so the sheet says so.
+BEND_RADIUS_CALLOUT = "AT TUBE CENTERLINE"
 SCREW_CALLOUT = "#6-32 UNC-2A"
 
 # Only non-dimensional fabrication/functional facts remain in notes. Coating

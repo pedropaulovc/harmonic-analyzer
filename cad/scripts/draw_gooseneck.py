@@ -66,6 +66,7 @@ from gooseneck_geom import (
 )
 from build_gooseneck import LEG_BOTTOM
 from gooseneck_spec import (
+    BEND_RADIUS_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     ELEVATION_DIMENSIONS,
@@ -298,6 +299,56 @@ def _diameters_as_linear(
     rebuild_drawing(adapter, label="linear diameters")
 
 
+# swAreaHatchFillStyle_e
+_HATCH_NONE = 1
+
+
+def _screw_hatches(view: Any) -> tuple[list[Any], int]:
+    """The view's face hatches on the screw's cut faces, and the total count.
+
+    Only the screw reaches beyond the arm end (its head sits a clamped gap
+    outboard); tube and plug cut faces both stop at ``ARM_END_X``.
+    """
+    hatches = [
+        _early_bound(raw, "IFaceHatch")
+        for raw in _early_bound(view, "IView").GetFaceHatches() or ()
+    ]
+    beyond_arm_end = (ARM_END_X - 1.0) / 1000.0
+    screw = [
+        hatch
+        for hatch in hatches
+        if float(_early_bound(hatch.Face, "IFace2").GetBox()[0]) < beyond_arm_end
+    ]
+    return screw, len(hatches)
+
+
+def _leave_screw_unsectioned(adapter: Any, view: Any) -> None:
+    """Show the screw unsectioned in section A-A, per the Y14.3 fastener rule.
+
+    A part drawing cannot exclude one body from a section: the IDrSection and
+    CreateSectionViewAt5 exclusions take assembly components, and
+    ISectionViewData's selective sectioning is for model views. So instead the
+    screw's cut-face hatch fill is cleared. Its cut outline is the same as its
+    unsectioned side-view outline, because the cut runs along the axis.
+    """
+    label = "section A-A screw hatch"
+    screw, total = _screw_hatches(view)
+    if not screw or len(screw) == total:
+        raise RuntimeError(f"{label}: {len(screw)} of {total} hatches are the screw's")
+    for hatch in screw:
+        hatch.HatchType = _HATCH_NONE
+    rebuild_drawing(adapter, label=label)
+    screw, total = _screw_hatches(view)
+    kept = [int(hatch.HatchType) for hatch in screw]
+    if not screw or any(kind != _HATCH_NONE for kind in kept):
+        raise RuntimeError(f"{label}: screw hatch fill did not clear: {kept}")
+    _telemetry.info(
+        f"{label}: cleared {len(screw)} screw hatch(es), kept {total - len(screw)}",
+        screw_hatches=len(screw),
+        kept_hatches=total - len(screw),
+    )
+
+
 def _show_only_screw(adapter: Any, view: Any) -> None:
     """Restrict ``view`` to the adjustment-screw body (the body reaching
     furthest toward -X: the head face sits beyond the arm end)."""
@@ -405,6 +456,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="elevation",
         dimensions_by_feature=ELEVATION_DIMENSIONS,
     )
+    set_dimension_callouts(
+        adapter, front_dimensions, {"BendRadius": BEND_RADIUS_CALLOUT}, location="below"
+    )
     _add_overall_height(adapter, front, front_at, leg_mid_y)
 
     post = create_section_view(
@@ -471,6 +525,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _cut_surface_only(joint, label="arm and brazed end joint")
     set_hidden_lines_removed(adapter, joint)
     rebuild_drawing(adapter, label="arm and brazed end joint")
+    _leave_screw_unsectioned(adapter, joint)
     arm_end = _move_to(
         adapter, joint, (ARM_END_X, ARM_Y), JOINT_AXIS_AT_ARM_END,
         label="arm and brazed end joint",
