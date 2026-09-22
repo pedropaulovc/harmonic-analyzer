@@ -28,7 +28,6 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_center,
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
 )
@@ -419,206 +418,6 @@ def _visible_component_circle(
     return candidates[0][1]
 
 
-_CURVE_TYPES = {
-    3001: "line",
-    3002: "circle",
-    3003: "ellipse",
-    3004: "intersection",
-    3005: "bcurve",
-    3006: "spcurve",
-    3008: "constparam",
-    3009: "trimmed",
-}
-
-
-def _curve_kind(curve: Any) -> str:
-    """Name an edge curve by swCurveTypes_e, resolving trimmed curves."""
-    if curve is None:
-        return "none"
-    # Late-bound dispatch exposes the no-argument Identity() as a property;
-    # bind ICurve so it is callable (r6 died on "'int' object is not callable").
-    curve = _early_bound(curve, "ICurve")
-    kind = _CURVE_TYPES.get(int(curve.Identity()), "other")
-    if kind != "trimmed":
-        return kind
-    if curve.IsCircle():
-        return "trimmed-circle"
-    if curve.IsLine():
-        return "trimmed-line"
-    if curve.IsBcurve():
-        return "trimmed-bcurve"
-    return "trimmed-other"
-
-
-def _census_error(exc: Exception) -> str:
-    return f"{type(exc).__name__}: {exc}"
-
-
-def _census_view_edges(
-    view_label: str,
-    raw_view: Any,
-    *,
-    component_stem: str,
-    label: str,
-    brep_components: dict[str, Any],
-) -> None:
-    """Record one view's visible-edge curve mix per stem instance (never raises)."""
-    facts: dict[str, Any] = {"label": label, "view": view_label}
-    try:
-        view = _early_bound(raw_view, "IView")
-        facts["view_name"] = str(view.GetName2() or "")
-        for raw_drawing_component in tuple(view.GetVisibleDrawingComponents() or ()):
-            component = _early_bound(
-                _early_bound(raw_drawing_component, "IDrawingComponent").Component,
-                "IComponent2",
-            )
-            if _component_stem(component) == component_stem:
-                name = str(component.Name2 or "").rsplit("/", 1)[-1]
-                brep_components.setdefault(name, component)
-        components = tuple(view.GetVisibleComponents() or ())
-    except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
-        facts["error"] = _census_error(exc)
-        _telemetry.event("drawing.visible_edge_kinds", **facts)
-        _telemetry.warn(f"{label} census: {view_label} view unreadable: {facts['error']}")
-        return
-    for raw_component in components:
-        component_facts = dict(facts)
-        kinds: dict[str, int] = {}
-        try:
-            component = _early_bound(raw_component, "IComponent2")
-            if _component_stem(component) != component_stem:
-                continue
-            component_facts["component"] = str(component.Name2 or "").rsplit("/", 1)[-1]
-            for raw_edge in tuple(view.GetVisibleEntities2(component, 1) or ()):
-                kind = _curve_kind(_early_bound(raw_edge, "IEdge").GetCurve())
-                kinds[kind] = kinds.get(kind, 0) + 1
-            component_facts["silhouette_edges"] = len(
-                tuple(view.GetVisibleEntities2(component, 4) or ())
-            )
-        except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
-            component_facts["error"] = _census_error(exc)
-        component_facts["edge_kinds"] = tuple(sorted(kinds.items()))
-        _telemetry.event("drawing.visible_edge_kinds", **component_facts)
-        _telemetry.info(
-            f"{label} census: {view_label} view "
-            f"{component_facts.get('view_name')!r} "
-            f"{component_facts.get('component')} visible edge kinds "
-            f"{dict(sorted(kinds.items()))}, "
-            f"{component_facts.get('silhouette_edges')} silhouette edges"
-            + (f"; error {component_facts['error']}" if "error" in component_facts else "")
-        )
-
-
-def _census_brep_circles(
-    name: str,
-    component: Any,
-    *,
-    target_y_mm: float,
-    label: str,
-) -> None:
-    """Record one instance's B-rep circles in assembly space (never raises)."""
-    circles: dict[tuple[float, float], int] = {}
-    kinds: dict[str, int] = {}
-    y_range = [math.inf, -math.inf]
-    raw_y_range = [math.inf, -math.inf]
-    transform: tuple[float, ...] = ()
-    error = None
-    try:
-        transform = tuple(
-            float(value)
-            for value in _early_bound(component.Transform2, "IMathTransform").ArrayData
-        )
-        for raw_body in tuple(component.GetBodies2(0) or ()):
-            body = _early_bound(raw_body, "IBody2")
-            box = tuple(float(value) for value in body.GetBodyBox())
-            # Untransformed too: settles whether component bodies report in
-            # part or assembly space.
-            raw_y_range = [
-                min(raw_y_range[0], box[1] * 1000.0),
-                max(raw_y_range[1], box[4] * 1000.0),
-            ]
-            for corner in ((box[0], box[1], box[2]), (box[3], box[4], box[5])):
-                y = _component_point_in_assembly(component, corner)[1] * 1000.0
-                y_range = [min(y_range[0], y), max(y_range[1], y)]
-            for raw_edge in tuple(body.GetEdges() or ()):
-                raw_curve = _early_bound(raw_edge, "IEdge").GetCurve()
-                kind = _curve_kind(raw_curve)
-                kinds[kind] = kinds.get(kind, 0) + 1
-                if raw_curve is None:
-                    continue
-                curve = _early_bound(raw_curve, "ICurve")
-                if not curve.IsCircle():
-                    continue
-                parameters = tuple(float(value) for value in curve.CircleParams)
-                center = _component_point_in_assembly(component, parameters[:3])
-                key = (
-                    round(center[1] * 1000.0, 4),
-                    round(parameters[6] * transform[12] * 1000.0, 5),
-                )
-                circles[key] = circles.get(key, 0) + 1
-    except Exception as exc:  # noqa: BLE001 -- a diagnostic must never cost a round
-        error = _census_error(exc)
-    nearest = sorted(circles.items(), key=lambda item: abs(item[0][0] - target_y_mm))
-    origin = tuple(value * 1000.0 for value in transform[9:12])
-    axis = transform[3:6]
-    _telemetry.event(
-        "drawing.brep_circle_census",
-        label=label,
-        component=name,
-        target_y_mm=target_y_mm,
-        body_y_range_mm=tuple(y_range),
-        raw_body_y_range_mm=tuple(raw_y_range),
-        origin_mm=origin,
-        part_y_axis=axis,
-        transform=transform,
-        edge_kinds=tuple(sorted(kinds.items())),
-        circles=tuple(f"y={y} r={r} x{count}" for (y, r), count in nearest[:40]),
-        error=error,
-    )
-    _telemetry.info(
-        f"{label} census: {name} origin "
-        f"{tuple(round(value, 5) for value in origin)} mm, part +Y axis "
-        f"{tuple(round(value, 9) for value in axis)}, scale "
-        f"{transform[12] if len(transform) > 12 else None}; B-rep y range "
-        f"{y_range[0]:.4f}..{y_range[1]:.4f} mm (raw "
-        f"{raw_y_range[0]:.4f}..{raw_y_range[1]:.4f}; target tip "
-        f"{target_y_mm:.4f}); edge kinds {dict(sorted(kinds.items()))}; "
-        "circles nearest the target (y, r mm, count): "
-        + "; ".join(f"{y} {r} x{count}" for (y, r), count in nearest[:16])
-        + (f"; error {error}" if error else "")
-    )
-
-
-def _census_component_geometry(
-    views: tuple[tuple[str, Any], ...],
-    *,
-    component_stem: str,
-    target_y_mm: float,
-    label: str,
-) -> None:
-    """Record, never judge, where a component's circular edges really are.
-
-    Two independent readings: the curve-type mix of the edges each view reports
-    visible, and the circular edges of the component's own B-rep transformed
-    into assembly space. Together they separate an edge the view hides from
-    geometry that is not where the drawing expects it. Every section records
-    its own exception and carries on: a diagnostic must never cost a round.
-    """
-    brep_components: dict[str, Any] = {}
-    for view_label, raw_view in views:
-        _census_view_edges(
-            view_label,
-            raw_view,
-            component_stem=component_stem,
-            label=label,
-            brep_components=brep_components,
-        )
-    for name, component in sorted(brep_components.items()):
-        _census_brep_circles(
-            name, component, target_y_mm=target_y_mm, label=label
-        )
-
-
 def hanger_engagement_violations(
     mouth_y_mm: float,
     tip_y_mm: float,
@@ -944,13 +743,20 @@ def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
     draw.ClearSelection2(True)
     if display is None:
         raise RuntimeError("failed to add native hanger engagement measurement")
-    display = set_arc_endpoints_to_center(
-        adapter,
-        display,
-        label="hanger engagement actual-edge measurement",
-    )
+    # Both circles lie normal to the view (edge-on), so the dimension is
+    # plane-to-plane: SolidWorks gives it no arc endpoints to re-anchor
+    # (r8: GetArcEndCondition 0 on both). The value check below proves it
+    # measures E.
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    arc_end_conditions = tuple(
+        int(dimension.GetArcEndCondition(index)) for index in (1, 2)
+    )
+    _telemetry.event(
+        "drawing.hanger_engagement_dimension",
+        arc_end_conditions=arc_end_conditions,
+        system_value_mm=float(dimension.SystemValue) * 1000.0,
+    )
     measured_mm = abs(float(dimension.SystemValue) * 1000.0)
     if abs(measured_mm - HANGER_ENGAGEMENT_TARGET_MM) > 1e-5:
         raise RuntimeError(
@@ -1034,12 +840,6 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
     _assert_built_hanger_engagement(section, station_z_mm=SUMMING_Z + HEX_Z_MID)
     detail = _create_hanger_detail(adapter, section)
     set_hidden_lines_removed(adapter, detail)
-    _census_component_geometry(
-        (("parent", parent), ("section", section), ("detail", detail)),
-        component_stem="knife-hanger-stud",
-        target_y_mm=KNIFE_MOUNT_TOP_Y - HANGER_ENGAGEMENT_TARGET_MM,
-        label="MHA-119 finished tip",
-    )
     _add_hanger_engagement_dimension(adapter, detail)
     _add_note_block(
         adapter,
