@@ -11,31 +11,33 @@ from __future__ import annotations
 
 # Per-view native-dimension partitions. The part marks their union; each drawing
 # view imports only the dimensions whose source plane projects truthfully there.
+# Plug and screw are Front-plane revolves, so the z=0 joint section carries
+# their side-view diameters and lengths; the slot detail enlarges that section.
 ELEVATION_DIMENSIONS: dict[str, set[str]] = {
     "Leg": {"LegLength"},
     "BendPath": {"BendRadius", "ArmRun"},
 }
-END_DIMENSIONS: dict[str, set[str]] = {
+POST_SECTION_DIMENSIONS: dict[str, set[str]] = {
     "LegProfile": {"TubeDia", "TubeBoreDia"},
 }
 JOINT_DIMENSIONS: dict[str, set[str]] = {
-    "EndPlugProfile": {"PlugDia", "TapMinorDia"},
-    "EndPlug": {"PlugDepth"},
-    "ScrewShankProfile": {"ScrewShankDia"},
-    "ScrewShank": {"UnderHeadLength"},
-    "ScrewHeadProfile": {"ScrewHeadDia"},
-    "ScrewHead": {"HeadThickness"},
-    "ScrewSlotProfile": {"SlotDepth"},
+    "EndPlugProfile": {"PlugDia", "TapMinorDia", "PlugDepth"},
+    "ScrewProfile": {
+        "ScrewHeadDia",
+        "ScrewShankDia",
+        "HeadThickness",
+        "UnderHeadLength",
+    },
 }
-SLOT_FACE_DIMENSIONS: dict[str, set[str]] = {
-    "ScrewSlotProfile": {"SlotWidth"},
+SLOT_DETAIL_DIMENSIONS: dict[str, set[str]] = {
+    "ScrewSlotProfile": {"SlotDepth", "SlotWidth"},
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 for _partition in (
     ELEVATION_DIMENSIONS,
-    END_DIMENSIONS,
+    POST_SECTION_DIMENSIONS,
     JOINT_DIMENSIONS,
-    SLOT_FACE_DIMENSIONS,
+    SLOT_DETAIL_DIMENSIONS,
 ):
     for _feature, _names in _partition.items():
         DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
@@ -47,12 +49,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
     "BendPath": {"BendRadius": 1, "ArmRun": 2},
-    "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3},
-    "EndPlug": {"PlugDepth": 2},
-    "ScrewShankProfile": {"ScrewShankDia": 3},
-    "ScrewShank": {"UnderHeadLength": 2},
-    "ScrewHeadProfile": {"ScrewHeadDia": 2},
-    "ScrewHead": {"HeadThickness": 2},
+    "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 2},
+    "ScrewProfile": {
+        "ScrewShankDia": 3,
+        "UnderHeadLength": 2,
+        "ScrewHeadDia": 2,
+        "HeadThickness": 2,
+    },
     "ScrewSlotProfile": {"SlotDepth": 2, "SlotWidth": 2},
 }
 
@@ -92,7 +95,7 @@ DRAWING_NOTES = "\n".join(
         "DEFAULT SHOWN CLAMPED; LOOSEN SCREW FOR EYE INSTALLATION, THEN RETIGHTEN.",
     )
 )
-END_VIEW_NOTE = "POST END VIEW SCALE 2:1"
-JOINT_VIEW_NOTE = "SECTION A-A: ARM / BRAZED JOINT SCALE 1:1"
+# Section and detail views carry SolidWorks' native label (letter + scale);
+# only the unlabelled model views need a caption note.
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
