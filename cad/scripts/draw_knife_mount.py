@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+from typing import Any, NamedTuple
 
 
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
@@ -145,8 +145,18 @@ def _assert_imported_bore_tolerance(adapter: Any, annotations: list[Any]) -> Non
     raise RuntimeError("BoreDia never reached sheet for native tolerance readback")
 
 
-def _read_source_tap_depth_precisions(adapter: Any) -> dict[str, tuple[int, int]]:
-    """Read the two model-owned depth precisions before opening the drawing."""
+class _TapDepthContract(NamedTuple):
+    precision: int
+    tolerance_precision: int
+    tolerance_type: int
+    tolerance_lower_m: float
+    tolerance_upper_m: float
+
+
+def _read_source_tap_depth_contracts(
+    adapter: Any,
+) -> dict[str, _TapDepthContract]:
+    """Read model-owned depth precision and tolerance before opening the drawing."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = model.FeatureByName("StudTap")
     if feature is None:
@@ -156,7 +166,7 @@ def _read_source_tap_depth_precisions(adapter: Any) -> dict[str, tuple[int, int]
         "tapdrilldepth": "hw-tapdrldepth",
         "fullthreaddepth": "hw-threaddepth",
     }
-    found: dict[str, list[tuple[int, int]]] = {
+    found: dict[str, list[_TapDepthContract]] = {
         variable: [] for variable in targets.values()
     }
     display = feature.GetFirstDisplayDimension()
@@ -172,43 +182,64 @@ def _read_source_tap_depth_precisions(adapter: Any) -> dict[str, tuple[int, int]
             )
             for token, variable in targets.items():
                 if token in normalized:
+                    tolerance = _early_bound(
+                        dimension.Tolerance, "IDimensionTolerance"
+                    )
                     found[variable].append(
-                        (
-                            int(display.GetPrimaryPrecision2()),
-                            int(display.GetPrimaryTolPrecision2()),
+                        _TapDepthContract(
+                            precision=int(display.GetPrimaryPrecision2()),
+                            tolerance_precision=int(
+                                display.GetPrimaryTolPrecision2()
+                            ),
+                            tolerance_type=int(tolerance.Type),
+                            tolerance_lower_m=float(tolerance.GetMinValue()),
+                            tolerance_upper_m=float(tolerance.GetMaxValue()),
                         )
                     )
         display = feature.GetNextDisplayDimension(display)
-    result: dict[str, tuple[int, int]] = {}
+    result: dict[str, _TapDepthContract] = {}
+    expected_tolerances = {
+        "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+        "hw-threaddepth": STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    }
     for variable, values in found.items():
         if len(values) != 1:
             raise RuntimeError(
                 f"source StudTap has {len(values)} native {variable} dimensions"
             )
-        if values[0] != (2, 2):
+        contract = values[0]
+        expected_lower_mm, expected_upper_mm = expected_tolerances[variable]
+        if (
+            (contract.precision, contract.tolerance_precision) != (2, 2)
+            or contract.tolerance_type != 2
+            or abs(contract.tolerance_lower_m * 1000.0 - expected_lower_mm)
+            > 1e-6
+            or abs(contract.tolerance_upper_m * 1000.0 - expected_upper_mm)
+            > 1e-6
+        ):
             raise RuntimeError(
-                f"source StudTap {variable} precision is not concrete 2/2: "
-                f"{values[0]!r}"
+                f"source StudTap {variable} contract is not the approved native "
+                f"precision/tolerance: {contract!r}"
             )
-        result[variable] = values[0]
+        result[variable] = contract
     return result
 
 
-def _propagate_source_tap_depth_precisions(
+def _propagate_source_tap_depth_contracts(
     adapter: Any,
     display: Any,
-    source_precisions: dict[str, tuple[int, int]],
+    source_contracts: dict[str, _TapDepthContract],
 ) -> None:
-    """Apply only model-read precision to native callout length variables."""
+    """Apply only model-read depth precision and tolerance to callout variables."""
     set_hole_callout_precision(
         display,
         {
-            variable: precision[0]
-            for variable, precision in source_precisions.items()
+            variable: contract.precision
+            for variable, contract in source_contracts.items()
         },
         label="knife-mount tap source precision",
     )
-    remaining = dict(source_precisions)
+    remaining = dict(source_contracts)
     for raw in display.GetHoleCalloutVariables() or ():
         late = dynamic_dispatch(raw._oleobj_)
         name = str(late.VariableName)
@@ -216,24 +247,39 @@ def _propagate_source_tap_depth_precisions(
         if expected is None:
             continue
         length = _early_bound(raw, "ICalloutLengthVariable")
-        length.TolerancePrecision = expected[1]
-        actual = (int(length.Precision), int(length.TolerancePrecision))
-        if actual != expected:
+        length.TolerancePrecision = expected.tolerance_precision
+        late.ToleranceType = expected.tolerance_type
+        late.ToleranceMin = expected.tolerance_lower_m
+        late.ToleranceMax = expected.tolerance_upper_m
+        actual = _TapDepthContract(
+            precision=int(length.Precision),
+            tolerance_precision=int(length.TolerancePrecision),
+            tolerance_type=int(late.ToleranceType),
+            tolerance_lower_m=float(late.ToleranceMin),
+            tolerance_upper_m=float(late.ToleranceMax),
+        )
+        if (
+            actual.precision != expected.precision
+            or actual.tolerance_precision != expected.tolerance_precision
+            or actual.tolerance_type != expected.tolerance_type
+            or abs(actual.tolerance_lower_m - expected.tolerance_lower_m) > 1e-9
+            or abs(actual.tolerance_upper_m - expected.tolerance_upper_m) > 1e-9
+        ):
             raise RuntimeError(
-                f"knife-mount tap {name}: source precision did not persist; "
+                f"knife-mount tap {name}: source contract did not persist; "
                 f"expected={expected!r}, actual={actual!r}"
             )
     if remaining:
         raise RuntimeError(
-            "knife-mount tap lacks native depth precision variables: "
+            "knife-mount tap lacks native depth contract variables: "
             f"{sorted(remaining)}"
         )
-    rebuild_drawing(adapter, label="knife-mount tap source precision")
+    rebuild_drawing(adapter, label="knife-mount tap source contract")
 
 
 @_telemetry.traced("drawing.knife_mount_tap_readback")
 def _check_tap_callout(
-    display: Any, source_precisions: dict[str, tuple[int, int]]
+    display: Any, source_contracts: dict[str, _TapDepthContract]
 ) -> None:
     """Prove the native callout carries both drill and usable-thread depths."""
     expected_lengths = {
@@ -324,7 +370,10 @@ def _check_tap_callout(
                     int(length.Precision),
                     int(length.TolerancePrecision),
                 )
-                != source_precisions[name]
+                != (
+                    source_contracts[name].precision,
+                    source_contracts[name].tolerance_precision,
+                )
             ):
                 raise RuntimeError(
                     f"knife-mount tap {name}: native tolerance readback "
@@ -368,7 +417,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Isometric View Note",
         ),
     )
-    source_tap_precisions = _read_source_tap_depth_precisions(adapter)
+    source_tap_contracts = _read_source_tap_depth_contracts(adapter)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -418,10 +467,10 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.175, 0.258),
         label="hanger-stud blind tap",
     )
-    _propagate_source_tap_depth_precisions(
-        adapter, tap_callout, source_tap_precisions
+    _propagate_source_tap_depth_contracts(
+        adapter, tap_callout, source_tap_contracts
     )
-    _check_tap_callout(tap_callout, source_tap_precisions)
+    _check_tap_callout(tap_callout, source_tap_contracts)
 
     # Datum A is the hanger seat; datum B is the mating hanger-tap axis.
     # Together with the imported BASIC height they fully locate the sole
