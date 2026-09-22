@@ -149,6 +149,8 @@ BOM_SHEET_CLEARANCE = 0.003
 # down inside a field and each block's measured extent is gated against it.
 NOTE_FIELD_LEFT = (0.018, 0.263, 0.212, 0.035)
 NOTE_FIELD_RIGHT = (0.222, 0.263, 0.415, 0.072)
+# A rendered note corner may sit this far off its anchor after the move.
+NOTE_ANCHOR_TOLERANCE = 1e-5
 NOTE_BLOCK_GAP = 0.006
 # Region the exploded view's balloon ring must fit: left of the BOM, below the
 # heading, above the caption. The ring is the view outline grown by the
@@ -267,7 +269,8 @@ HANGER_FIT_INSPECTION = "\n".join(
         "FINISHED TIP MUST NOT PASS THE ACTUAL MHA-037 COMPLETE-THREAD DEPTH.",
         "REQUIRE POSITIVE AXIAL OVERLAP BETWEEN COMPLETE MHA-119 MALE THREAD",
         "AND COMPLETE MHA-037 FEMALE THREAD.",
-        "VERIFY FULL HEAD/WASHER SEATING AND POSITIVE MOUNT-TO-FRAME CLEARANCE.",
+        "VERIFY FULL HEAD/WASHER SEATING AND POSITIVE MOUNT-TO-FRAME",
+        "CLEARANCE.",
         "VERIFY BOTH KNIFE CONTACTS AND FREE ROCK WITHOUT AXIAL RUB.",
         "NO FORCING OR BOTTOMING.",
     )
@@ -344,20 +347,66 @@ def _note_extent(adapter: Any, note: Any, *, label: str) -> tuple[float, ...]:
     return (extent[0], extent[1], extent[3], extent[4])
 
 
+def _anchor_note(
+    adapter: Any,
+    note: Any,
+    corner: tuple[float, float],
+    *,
+    label: str,
+) -> tuple[float, ...]:
+    """Move a note so its RENDERED top-left corner, not its insertion point,
+    sits on ``corner`` (summing-asm-r10: the insertion point sits 0.28 mm right
+    of and 0.34 mm below the text box, so a note placed at a field corner left
+    the field).
+    """
+    left, top = corner
+    extent = _note_extent(adapter, note, label=label)
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError(f"{label}: note has no annotation to move")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3:
+        raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+    shift = (left - extent[0], top - extent[3])
+    if not annotation.SetPosition(
+        position[0] + shift[0], position[1] + shift[1], position[2]
+    ):
+        raise RuntimeError(f"{label}: note SetPosition failed")
+    moved = _note_extent(adapter, note, label=label)
+    residual = max(abs(moved[0] - left), abs(moved[3] - top))
+    _telemetry.event(
+        "drawing.note_anchor",
+        block=label,
+        shift_mm=tuple(value * 1000.0 for value in shift),
+        residual_mm=residual * 1000.0,
+        extent_mm=tuple(value * 1000.0 for value in moved),
+    )
+    if residual > NOTE_ANCHOR_TOLERANCE:
+        raise RuntimeError(
+            f"{label}: rendered corner is {residual * 1000.0:.3f} mm off its "
+            f"anchor after the move (extent {moved!r})"
+        )
+    return moved
+
+
 def _stack_note_field(
     adapter: Any,
     blocks: tuple[tuple[str, str], ...],
     field: tuple[float, float, float, float],
     *,
     label: str,
-) -> list[tuple[float, ...]]:
-    """Stack note blocks top-down in one field, each gated on its real extent."""
+) -> list[str]:
+    """Stack note blocks top-down in one field by their rendered extents.
+
+    Returns every block's field violations instead of raising on the first, so
+    one farm round reports every field; ``_check_package_layout`` fails on them.
+    """
     left, top, _right, _bottom = field
     y = top
-    extents = []
+    findings = []
     for block_label, text in blocks:
         note = _add_note_block(adapter, text, (left, y), label=block_label)
-        extent = _note_extent(adapter, note, label=block_label)
+        extent = _anchor_note(adapter, note, (left, y), label=block_label)
         violations = note_field_violations(extent, field)
         _telemetry.event(
             "drawing.note_field",
@@ -367,13 +416,12 @@ def _stack_note_field(
             violations=tuple(violations),
         )
         if violations:
-            raise RuntimeError(
+            findings.append(
                 f"{label}: {block_label} leaves its note field: "
                 + "; ".join(violations)
             )
-        extents.append(extent)
         y = extent[1] - NOTE_BLOCK_GAP
-    return extents
+    return findings
 
 
 def _view_outline(view: Any) -> tuple[float, float, float, float]:
@@ -463,9 +511,11 @@ def ring_fit_shift(
     return shift, overflows
 
 
-def _check_package_layout(adapter: Any) -> None:
-    """Run the layout audit on every sheet and fail on any finding at all."""
-    failures = []
+def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
+    """Run the layout audit on every sheet and fail on any finding at all,
+    including the note-field findings collected while the sheets were placed.
+    """
+    failures = list(field_findings)
     for number, sheet_name in enumerate(SHEET_NAMES, start=1):
         _activate_sheet(adapter, sheet_name)
         try:
@@ -978,7 +1028,7 @@ def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
     return display
 
 
-def _place_hanger_fit_sheet(adapter: Any) -> None:
+def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
     """Place the real assembly section/detail and its as-built fit instructions."""
     _add_note_block(
         adapter,
@@ -1060,7 +1110,7 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
     set_hidden_lines_removed(adapter, detail)
     _record_cosmetic_threads(adapter, detail, label="hanger fit detail")
     _add_hanger_engagement_dimension(adapter, detail)
-    _stack_note_field(
+    return _stack_note_field(
         adapter,
         (
             (
@@ -1687,7 +1737,7 @@ def _place_package(adapter: Any) -> None:
         instruction_iso,
         label="summing instruction isometric",
     )
-    _stack_note_field(
+    field_findings = _stack_note_field(
         adapter,
         (("assembly sequence", ASSEMBLY_STEPS),),
         NOTE_FIELD_LEFT,
@@ -1701,16 +1751,16 @@ def _place_package(adapter: Any) -> None:
     )
 
     _activate_sheet(adapter, SHEET_NAMES[3])
-    _place_hanger_fit_sheet(adapter)
+    field_findings += _place_hanger_fit_sheet(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[4])
-    _stack_note_field(
+    field_findings += _stack_note_field(
         adapter,
         (("assembly functional checks", ASSEMBLY_CHECKS),),
         NOTE_FIELD_LEFT,
         label="sheet 5 left note field",
     )
-    _stack_note_field(
+    field_findings += _stack_note_field(
         adapter,
         (
             ("neutral setup", SETUP_NOTES),
@@ -1719,7 +1769,7 @@ def _place_package(adapter: Any) -> None:
         NOTE_FIELD_RIGHT,
         label="sheet 5 right note field",
     )
-    _check_package_layout(adapter)
+    _check_package_layout(adapter, field_findings)
 
 
 async def build(adapter: Any) -> dict[str, str]:

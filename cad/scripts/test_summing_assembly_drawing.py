@@ -138,3 +138,72 @@ def test_balloon_ring_is_centred_in_its_region_or_refused() -> None:
     assert [item.split()[0] for item in overflows] == ["width", "height"]
     # The ring region stays left of the relocated BOM.
     assert region[2] < draw_summing_assembly.BOM_ANCHOR[0]
+
+
+class _FakeAnnotation:
+    def __init__(self, x: float, y: float) -> None:
+        self.position = [x, y, 0.0]
+
+    def GetPosition(self) -> tuple[float, float, float]:
+        return tuple(self.position)
+
+    def SetPosition(self, x: float, y: float, z: float) -> bool:
+        self.position = [x, y, z]
+        return True
+
+
+class _FakeNote:
+    """A note whose text box sits off its insertion point, as r10 measured."""
+
+    def __init__(self, text: str, x: float, y: float) -> None:
+        self.text = text
+        self.annotation = _FakeAnnotation(x, y)
+        lines = text.splitlines()
+        self.size = (0.0027 * max(map(len, lines)), 0.0045 * len(lines))
+
+    def GetText(self) -> str:
+        return self.text
+
+    def GetAnnotation(self) -> _FakeAnnotation:
+        return self.annotation
+
+    def GetExtent(self) -> tuple[float, ...]:
+        x, y, _z = self.annotation.position
+        x0, y1 = x - 0.00028, y + 0.00034
+        return (x0, y1 - self.size[1], 0.0, x0 + self.size[0], y1, 0.0)
+
+
+class _FakeAdapter:
+    class currentModel:  # noqa: N801 - mirrors the adapter attribute
+        @staticmethod
+        def GraphicsRedraw2() -> None:
+            return None
+
+
+def test_note_blocks_anchor_their_rendered_corner_and_report_every_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        draw_summing_assembly,
+        "add_note",
+        lambda _adapter, text, x, y: _FakeNote(text, x, y),
+    )
+    field = draw_summing_assembly.NOTE_FIELD_LEFT
+    findings = draw_summing_assembly._stack_note_field(
+        _FakeAdapter(),
+        (("first", "A\nB"), ("second", "C" * 10)),
+        field,
+        label="test field",
+    )
+    # r10's insertion-point offset no longer pushes the box out of the field.
+    assert findings == []
+    too_wide = draw_summing_assembly._stack_note_field(
+        _FakeAdapter(),
+        (("wide", "W" * 90), ("tall", "\n".join("T" * 50))),
+        field,
+        label="test field",
+    )
+    # Every escaping block is reported in one pass, not only the first.
+    assert len(too_wide) == 2
+    assert "wide leaves its note field: right" in too_wide[0]
+    assert "tall leaves its note field: bottom" in too_wide[1]
