@@ -638,6 +638,12 @@ def _angle_arc(annotation: Any) -> DimensionArc:
     return first
 
 
+def _log_angle_step(step: str, ink: DimensionInk) -> None:
+    _telemetry.info(
+        f"45 deg arc {step}: " + json.dumps(ink.as_mm(), sort_keys=True)
+    )
+
+
 def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> DimensionArc:
     """Lay the 45 deg arc on its bisector, close to the vertex, BEFORE offsetting.
 
@@ -655,14 +661,47 @@ def _pin_angle_arc(adapter: Any, annotation: Any, vertex_guess: Point) -> Dimens
     vertex = curated.arcs[0].center
     # Text parked in the opposite quadrant does NOT flip the dimension: leaf
     # 20260922T200336Z kept the 0..45 deg arc and ran a second arc round to the
-    # text (216.6..360 deg). The flip is its own documented call.
-    if _span_problem(curated.arcs) is not None and not display.VerticallyOppositeAngle():
-        raise RuntimeError("cannot flip the 45 deg dimension to its opposite span")
+    # text (216.6..360 deg). The flip is its own documented call, but a flip
+    # before the reposition changed nothing either (leaf 20260922T202535Z), so
+    # every step below is logged: flip, reposition, and a flip after it.
+    _log_angle_step("curated", curated)
+    # swDimensionDrivenState_e (1 driven, 2 driving) and swAnnotationOwner_e
+    # (0 drawing view -- an imported model item, 1 sheet): whether the flip is
+    # refused because the item belongs to the model.
+    _telemetry.info(
+        "45 deg dimension ownership: "
+        + json.dumps(
+            {
+                "driven_state": int(
+                    _early_bound(display.GetDimension2(0), "IDimension").DrivenState
+                ),
+                "owner_type": int(_early_bound(annotation, "IAnnotation").OwnerType),
+            },
+            sort_keys=True,
+        )
+    )
     target = _bisector_point(vertex, ANGLE_ARC_RADIUS_M)
     placed = _early_bound(annotation, "IAnnotation")
+    if _span_problem(curated.arcs) is not None:
+        flipped = bool(display.VerticallyOppositeAngle())
+        rebuild_drawing(adapter, label="45 deg flip")
+        _log_angle_step(
+            f"flip before reposition returned {flipped}",
+            _read_dimension_ink(annotation, "ChamferAngle"),
+        )
     if not placed.SetPosition2(target[0], target[1], 0.0):
         raise RuntimeError("cannot pin the 45 deg dimension arc")
     rebuild_drawing(adapter, label="45 deg arc")
+    repositioned = _read_dimension_ink(annotation, "ChamferAngle")
+    _log_angle_step("repositioned", repositioned)
+    if _span_problem(repositioned.arcs) is not None:
+        fresh = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        flipped = bool(fresh.VerticallyOppositeAngle())
+        rebuild_drawing(adapter, label="45 deg flip after reposition")
+        _log_angle_step(
+            f"flip after reposition returned {flipped}",
+            _read_dimension_ink(annotation, "ChamferAngle"),
+        )
     arrows = int(
         _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension").ArrowSide
     )
