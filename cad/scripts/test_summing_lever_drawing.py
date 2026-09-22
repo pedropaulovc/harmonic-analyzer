@@ -79,3 +79,24 @@ def test_manufacturing_note_block_stays_four_lines() -> None:
     failure and trips this too.
     """
     assert len(draw_summing_lever.MANUFACTURING_NOTES) == 4
+
+
+def test_printed_arc_centre_lays_the_arc_onto_the_boss() -> None:
+    """The R138.8 side arcs are laid out from their printed centre and radius.
+
+    The arc's base end is buried in the cylinder, so the shop can only strike it
+    from the centre the print locates (2X 123.2 from the cylinder axis, 2X 64.0
+    beyond the plate end).  Rounded to the printed places, that centre and radius
+    must still land the arc on the boss quadrant and on the buried base corner
+    within the one-place title-block band.
+    """
+    import build_summing_lever as build
+
+    base_end, tip_end, interior = build._summation_top_arc_points()
+    cx, cy = build._circumcenter(base_end, tip_end, interior)
+    printed_x = round(abs(cx), 1)
+    printed_z = round(cy - base_end[1], 1)
+    printed_r = round(math.dist((cx, cy), base_end), 1)
+    centre = (-printed_x, base_end[1] + printed_z)
+    for end in (tip_end, base_end):
+        assert abs(math.dist(centre, end) - printed_r) < 0.8

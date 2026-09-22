@@ -199,9 +199,14 @@ FORM_TOP_KEEP = {
     "EdgeRibThickness": (0.1900, 0.0590),
     # Below its own arrows: between them the witness lines ruled through the text.
     "MiddleRibThickness": (0.1985, 0.0950),
-    # Outside the web, on the centre side of the arc and under the (195.83)
-    # extension line; the leader now runs only from the text to the arc.
-    "SummationArcRadius": (0.1263, 0.1397),
+    # Beyond the located centre, on the radial through the arc: the leader runs
+    # text -> centre -> arc, so no line passes through the text.
+    "SummationArcRadius": (0.0907, 0.1891),
+    # The R138.8 centre from the plate end face on the cylinder axis; both
+    # dimensions sit in the clear field above the web, their witness lines
+    # crossing at the centre.
+    "SummationArcCentreX": (0.1295, 0.1833),
+    "SummationArcCentreZ": (0.2029, 0.1591),
     "BossAxialLocation": (0.0900, 0.0860),
 }
 DETAIL_KEEP = {
@@ -330,12 +335,14 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
 
 
 def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Hide one model sketch in one drawing view only.
+    """Hide one model reference sketch in one drawing view that prints none of
+    its dimensions.
 
     ``PatternReferences`` carries the construction line that locates the boss
-    axially; the isometric shows no dimension from it and printed the line as a
-    stray dash-dot stroke off the boss.  ``BlankSketch`` is VT_VOID and there is
-    no per-view read-back, so the selection is the gate and the render the proof.
+    axially, and the isometric printed it as a stray dash-dot stroke off the boss;
+    ``SummationArcReference`` would print its centre stub edge-on beside the boss
+    in the front view.  ``BlankSketch`` is VT_VOID and there is no per-view
+    read-back, so the selection is the gate and the render the proof.
     """
     draw = adapter.currentModel
     name = view_name(adapter, view)
@@ -722,6 +729,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
+    _hide_view_sketch(adapter, front, "SummationArcReference")
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
@@ -811,6 +819,8 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
+    for view in (pattern, iso):
+        _hide_view_sketch(adapter, view, "SummationArcReference")
     _hide_view_sketch(adapter, iso, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
