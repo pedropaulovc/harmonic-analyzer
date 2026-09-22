@@ -101,9 +101,10 @@ SHEET_SCALES = {
 }
 SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 
-FRONT_CENTER = (0.090, 0.145)
-RIGHT_CENTER = (0.235, 0.145)
-ISO_CENTER = (0.350, 0.145)
+FRONT_CENTER = (0.105, 0.150)
+RIGHT_CENTER = (0.245, 0.150)
+ISO_CENTER = (0.355, 0.150)
+BORE_CALLOUT_LANE_X = 0.045
 GEAR_DATA_POS = (0.215, 0.247)
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
@@ -134,9 +135,12 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
         "BlankDia": (FRONT_CENTER[0], FRONT_CENTER[1] + half_od + 0.012),
+        # One measured exterior lane keeps the full stacked fit callout inside
+        # the left border on every scale/configuration.  Do not derive X from
+        # gear diameter: that pushed the large-family text through the border.
         "BoreCutDia": (
-            FRONT_CENTER[0] - half_od - 0.025,
-            FRONT_CENTER[1] - half_od - 0.010,
+            BORE_CALLOUT_LANE_X,
+            FRONT_CENTER[1] - half_od - 0.012,
         ),
         "ToothThickness": (
             FRONT_CENTER[0] + half_od + 0.035,
@@ -352,6 +356,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
             control=bore_surface_finish(teeth),
             label=f"{configuration} cone-gear bore finish",
+            char_height=0.0025,
         )
 
         add_property_linked_note(

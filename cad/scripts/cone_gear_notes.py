@@ -39,7 +39,8 @@ def gear_data(teeth: int, backlash_mm: Sequence[float]) -> str:
     # Validate the configured band through the same derivation used by the part.
     tooth_thickness_band((minimum, maximum))
     pitch_dia = teeth * spec.MODULE_MM
-    whole_depth = 2.157 * spec.MODULE_MM
+    chord_root_dia = 2.0 * spec.base_chord_root_radius_mm(teeth)
+    as_cut_depth = spec.as_cut_tooth_depth_mm(teeth)
     rows = (
         ("CONFIGURATION", f"T{teeth:03d}"),
         ("NUMBER OF TEETH", f"{teeth}"),
@@ -47,8 +48,9 @@ def gear_data(teeth: int, backlash_mm: Sequence[float]) -> str:
         ("MODULE (mm, REF)", f"{spec.MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("PITCH DIAMETER (mm, REF)", f"{pitch_dia:.2f}"),
-        ("WHOLE DEPTH (mm, REF)", f"{whole_depth:.2f}"),
-        ("TOOTH FORM", "STRAIGHT SPUR INVOLUTE, FULL DEPTH"),
+        ("MIN CHORD-FLOOR DIAMETER (mm, REF)", f"{chord_root_dia:.3f}"),
+        ("AS-CUT RADIAL TOOTH DEPTH (mm, REF)", f"{as_cut_depth:.3f}"),
+        ("TOOTH FORM", spec.BASE_CHORD_ROOT_FORM),
         (
             "MATES WITH",
             f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T, FULL STANDARD THICKNESS",
@@ -62,17 +64,18 @@ def gear_data(teeth: int, backlash_mm: Sequence[float]) -> str:
 
 
 # The user approved either a metallurgical joint or a retaining-compound joint
-# for every cone gear.  There is no key, pin, set screw, or hub in the evidence
-# or model; the plain fitted bore is the whole attachment interface.
-ATTACHMENT_PROCESS = "SOLDER OR SILVER-BRAZE TO"
-ATTACHMENT_ALTERNATIVE = "LOCTITE 638 OR 648 RETAINING COMPOUND ACCEPTABLE"
+# for every cone gear.  State the required bonded interface first, then list
+# the accepted joint systems without turning one process into the part's
+# definition.  There is no key, pin, set screw, or hub in the evidence or model.
+ATTACHMENT_PROCESS = "SOLDER OR SILVER-BRAZE"
+ATTACHMENT_ALTERNATIVE = "LOCTITE 638 OR LOCTITE 648"
 SHAFT_MATE_NUMBER = "MHA-014"
 
 DRAWING_NOTES = "\n".join(
     (
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
         "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-        f"PLAIN BORE, NO KEYWAY: {ATTACHMENT_PROCESS} THE {SHAFT_MATE_NUMBER}",
-        f"SHAFT SEAT AT ASSEMBLY; OR USE {ATTACHMENT_ALTERNATIVE}.",
+        f"PLAIN BORE, NO KEYWAY; BOND TO {SHAFT_MATE_NUMBER} SHAFT SEAT AT ASSEMBLY.",
+        f"ACCEPTABLE BONDS: {ATTACHMENT_PROCESS}, OR {ATTACHMENT_ALTERNATIVE}.",
     )
 )
