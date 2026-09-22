@@ -87,6 +87,7 @@ if os.environ.get("UV_STUB_OUTPUTS"):
     out = Path("cad/out")
     for relative, content in {
         "png/probe.png": "built png",
+        "png/probe/iso.png": "built view",
         "sldprt/probe.SLDPRT": "built part",
         "sldprt/.probe.execution": "built token",
         "reports/telemetry/traces.jsonl": '{"span": "built"}\\n',
@@ -565,7 +566,7 @@ def test_poisoned_caller_doit_state_never_reaches_the_build(tmp_path: Path) -> N
     assert invocation["cad_out_present"] is False
     finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
     assert Path(finished["outputs_copied_to"]) == caller_out.resolve()
-    assert finished["outputs_copied"] == 4
+    assert finished["outputs_copied"] == 5
     assert finished["caller_tasks_forgotten"] == ["part:probe"]
     assert (caller_out / "png" / "probe.png").read_text(encoding="utf-8") == "built png"
     assert (caller_out / "sldprt" / "probe.SLDPRT").read_text(encoding="utf-8") == "built part"
@@ -633,7 +634,7 @@ def test_native_failure_still_harvests_and_removes_the_build_worktree(
     assert result.returncode == 23, (result.stdout, result.stderr)
     finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
     assert finished["state"] == "failed"
-    assert finished["outputs_copied"] == 4
+    assert finished["outputs_copied"] == 5
     assert sorted(finished["caller_tasks_forgotten"]) == ["drawing:failed", "part:other"]
     assert json.loads((caller_out / ".doit.db").read_text(encoding="utf-8")) == {}
     _assert_build_worktree_gone(fixture, finished)
@@ -771,7 +772,7 @@ def test_harvest_waits_for_another_harvest_into_the_same_caller(tmp_path: Path) 
     stdout, stderr = process.communicate(timeout=30)
     assert process.returncode == 0, (stdout, stderr)
     finished = _record(_only(log_directory, "*.done"))
-    assert finished["outputs_copied"] == 4
+    assert finished["outputs_copied"] == 5
     assert (caller_out / "png" / "probe.png").exists()
     _assert_build_worktree_gone(fixture, finished)
 
@@ -928,3 +929,89 @@ def test_a_copy_back_that_fails_midway_has_already_dropped_the_stale_records(
     assert finished["build_worktree_removed"] is False
     assert build_worktree.exists()
     _git(Path(fixture["worktree"]), "worktree", "remove", "--force", str(build_worktree))
+
+
+def test_a_caller_that_moved_during_the_run_receives_nothing(tmp_path: Path) -> None:
+    """Third Codex pass on #827: an older run finishing last must not overwrite
+    a caller that has since moved to another commit."""
+    fixture = _launcher_fixture(tmp_path)
+    caller = Path(fixture["worktree"])
+    caller_db = caller / "cad" / "out" / ".doit.db"
+    caller_db.parent.mkdir(parents=True)
+    caller_db.write_text(json.dumps({"part:probe": {"newer": True}}), encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_SLEEP"] = "3"
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    process = subprocess.Popen(
+        _command(fixture, "part:probe"),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    deadline = time.monotonic() + 15
+    while not Path(fixture["invocation"]).exists() and time.monotonic() < deadline:
+        assert process.poll() is None
+        time.sleep(0.05)
+    assert Path(fixture["invocation"]).exists()
+    _git(caller, "commit", "-q", "--allow-empty", "-m", "moved on")
+
+    stdout, stderr = process.communicate(timeout=30)
+    assert process.returncode == 0, (stdout, stderr)
+    assert "moved from" in stdout
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert finished["harvest_skipped"].startswith("caller HEAD moved to ")
+    assert finished["outputs_copied"] == 0
+    assert finished["outputs_copied_to"] is None
+    assert finished["caller_tasks_forgotten"] == []
+    assert not (caller / "cad" / "out" / "png").exists()
+    assert json.loads(caller_db.read_text(encoding="utf-8")) == {"part:probe": {"newer": True}}
+    _assert_build_worktree_gone(fixture, finished)
+
+
+def test_task_owned_directories_are_mirrored_and_shared_ones_overlaid(
+    tmp_path: Path,
+) -> None:
+    """Third Codex pass on #827: a render dir holds one task's whole output, so
+    views the built commit no longer draws must not survive the copy-back."""
+    fixture = _launcher_fixture(tmp_path)
+    caller_out = Path(fixture["worktree"]) / "cad" / "out"
+    for relative in ("png/probe/old-view.png", "sldprt/other.SLDPRT", "reports/check-x.ok"):
+        (caller_out / relative).parent.mkdir(parents=True, exist_ok=True)
+        (caller_out / relative).write_text("older commit", encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_OUTPUTS"] = "1"
+
+    result = subprocess.run(
+        _command(fixture, "part:probe"),
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
+    assert finished["outputs_removed"] == 1
+    assert not (caller_out / "png" / "probe" / "old-view.png").exists()
+    assert (caller_out / "png" / "probe" / "iso.png").read_text(encoding="utf-8") == "built view"
+    assert (caller_out / "sldprt" / "other.SLDPRT").exists()
+    assert (caller_out / "reports" / "check-x.ok").exists()
+
+
+def test_prune_reports_a_held_leftover_and_keeps_sweeping(tmp_path: Path) -> None:
+    """Third Codex pass on #827: one locked leftover must not stop the sweep."""
+    fixture = _launcher_fixture(tmp_path)
+    held = _leftover(fixture, tmp_path, "aaaa0001", pid=_dead_pid(), done=True)
+    free = _leftover(fixture, tmp_path, "aaaa0002", pid=_dead_pid(), done=True)
+
+    with open(held / "build.py", "rb"):
+        reports = _prune(fixture)
+
+    assert [(r["run_id"], r["removed"]) for r in reports] == [
+        (_run_id("aaaa0001"), False),
+        (_run_id("aaaa0002"), True),
+    ]
+    assert held.exists()
+    assert not free.exists()

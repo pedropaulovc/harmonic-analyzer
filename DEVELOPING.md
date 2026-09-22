@@ -56,7 +56,12 @@ So the submitter no longer runs in the caller's worktree. The launcher:
    (`--reference`) when it has one; the checkout is still the pinned gitlink;
 4. clears `VIRTUAL_ENV` and `UV_PROJECT_ENVIRONMENT` and runs the child from
    that worktree, so `uv run --frozen` syncs the worktree's own `.venv`;
-5. deletes, from the caller's `cad/out/.doit.db`, the records of every task the
+5. takes the caller's harvest lock and re-reads the caller's HEAD. If it is no
+   longer the built commit (a checkout, rebase or newer launch during the
+   run), it copies nothing and touches no record, warns, and records
+   `harvest_skipped`; the artefacts stay in the remote cache for a launch at
+   the new HEAD. Otherwise it continues;
+6. deletes, from the caller's `cad/out/.doit.db`, the records of every task the
    run touched. The artefacts about to be copied may disagree with what the
    caller had recorded for them, which is exactly the second failure above;
    without a record, the caller's next local `doit` re-derives those keys from
@@ -68,12 +73,24 @@ So the submitter no longer runs in the caller's worktree. The launcher:
    *before* any file is replaced, so a copy-back that dies halfway leaves
    missing records (a cache re-probe), never a stale record beside a new
    artefact;
-6. copies every non-dot entry of the build's `cad/out` into the caller's
+7. copies every non-dot entry of the build's `cad/out` into the caller's
    `cad/out`, dotfiles within them included (`.execution` tokens, `.dof.json`
    sidecars). `*.jsonl` journals (telemetry, `cache.jsonl`) are appended rather
    than overwritten. The build's `.doit.db` and `.drawing-registry/` are never
-   copied: they are doit state keyed to the build worktree's absolute paths;
-7. removes the build worktree (`git worktree remove --force`, then `prune`).
+   copied: they are doit state keyed to the build worktree's absolute paths.
+   A directory one level below an output kind (`png/<stem>/`,
+   `release/native/`) belongs to the one task that wrote it, so the caller's
+   copy is mirrored: files the build did not produce are removed first
+   (`outputs_removed`). Flat kind directories (`sldprt/`, `stl/`) are shared
+   by every task and only overlaid, and `reports/` and `logs/` accumulate;
+8. removes the build worktree (`git worktree remove --force`, then `prune`).
+
+The overlay cannot tell an obsolete file in a flat directory from another
+task's output. The one family that matters today is `assembly:channel`'s
+glob-discovered `channel-spring-installed-stretch*.SLDPRT` variants: a variant
+an older commit produced stays in the caller's `sldprt/`, as it already did
+when the submitter restored in place. `doit clean assembly:channel` removes
+them (`_clean_assembly`).
 
 Nothing in the caller's worktree (uncommitted edits, `.doit.db`, `cad/out`)
 can reach a key, and nothing done to it during the run can reach the build.
@@ -262,8 +279,10 @@ one compressed JSON line):
   "exit_code": 0,
   "elapsed_s": 1487.216,
   "finished_at": "2026-09-20T17:54:58.6980000Z",
+  "harvest_skipped": null,
   "outputs_copied_to": "C:\\src\\harmonic-smoke\\cad\\out",
   "outputs_copied": 14,
+  "outputs_removed": 0,
   "caller_tasks_forgotten": ["part:pen_rod"],
   "build_worktree_changes": [],
   "build_worktree_removed": true,

@@ -374,6 +374,83 @@ function Remove-CallerTaskRecords {
     return @($removed)
 }
 
+function Invoke-CallerHarvest {
+    param(
+        [Parameter(Mandatory)][string]$BuildOutput,
+        [Parameter(Mandatory)][string]$CallerOutput
+    )
+
+    # Runs under the harvest lock and fills the script's $harvest record.
+    # Records go BEFORE any file is overwritten: a harvest that dies halfway
+    # then leaves the caller missing records (a re-probe), never a stale record
+    # beside a replaced artefact.
+    $harvest['outputs_copied_to'] = $CallerOutput
+    [System.IO.FileInfo[]]$outputFiles = @(Get-BuildOutputFiles -Source $BuildOutput)
+    # Only a failed build with outputs to copy back can overwrite a caller
+    # artefact its database misnames.
+    $scope = if ($exitCode -ne 0 -and $outputFiles.Count -gt 0) { 'All' } else { 'Recorded' }
+    $harvest['caller_tasks_forgotten'] = @(
+        Remove-CallerTaskRecords `
+            -BuildDatabase (Join-Path $BuildOutput '.doit.db') `
+            -CallerDatabase (Join-Path $CallerOutput '.doit.db') `
+            -Scope $scope
+    )
+    $harvest['outputs_removed'] = Remove-StaleTaskDirectoryFiles `
+        -Source $BuildOutput -Destination $CallerOutput -Files $outputFiles
+    $harvest['outputs_copied'] = Copy-BuildOutputs `
+        -Source $BuildOutput -Destination $CallerOutput -Files $outputFiles
+    Write-LaunchLine -Path $logPath -Text (
+        "farm-launch copied $($harvest['outputs_copied']) output file(s) to $CallerOutput; " +
+        "removed $($harvest['outputs_removed']) stale file(s); " +
+        "forgot $($harvest['caller_tasks_forgotten'].Count) caller doit record(s)"
+    )
+}
+
+function Remove-StaleTaskDirectoryFiles {
+    param(
+        [Parameter(Mandatory)][string]$Source,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.IO.FileInfo[]]$Files
+    )
+
+    # A directory one level below an output kind (png/<stem>/, release/native/)
+    # belongs to the one task that wrote it, so the build's copy is the whole
+    # truth: caller files missing from it are an older commit's leftovers.
+    # Flat kind directories (sldprt/, stl/) are shared by every task and only
+    # overlaid; reports/ and logs/ accumulate by design.
+    $owned = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    $built = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
+    $separators = [char[]]@('\', '/')
+    foreach ($file in $Files) {
+        $relative = [System.IO.Path]::GetRelativePath($Source, $file.FullName)
+        [void]$built.Add($relative)
+        $parts = $relative.Split($separators)
+        if ($parts.Count -ge 3 -and $parts[0] -notin @('reports', 'logs')) {
+            [void]$owned.Add((Join-Path $parts[0] $parts[1]))
+        }
+    }
+    $removed = 0
+    foreach ($directory in $owned) {
+        $callerDirectory = Join-Path $Destination $directory
+        if (-not (Test-Path -LiteralPath $callerDirectory -PathType Container)) {
+            continue
+        }
+        foreach ($stale in Get-ChildItem -LiteralPath $callerDirectory -Recurse -File -Force) {
+            $relative = [System.IO.Path]::GetRelativePath($Destination, $stale.FullName)
+            if ($built.Contains($relative)) {
+                continue
+            }
+            Remove-Item -LiteralPath $stale.FullName -Force
+            $removed++
+        }
+    }
+    return $removed
+}
+
 function Enter-CallerOutputLock {
     param(
         [Parameter(Mandatory)][string]$CallerOutput,
@@ -712,8 +789,10 @@ catch {
 }
 
 $harvest = [ordered]@{
+    harvest_skipped = $null
     outputs_copied_to = $null
     outputs_copied = 0
+    outputs_removed = 0
     caller_tasks_forgotten = @()
     build_worktree_changes = @()
     build_worktree_removed = $false
@@ -736,34 +815,30 @@ if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Contai
         }
         $buildOut = Join-Path $buildWorktree 'cad/out'
         $callerOut = Join-Path $resolvedWorktree 'cad/out'
-        $harvest['outputs_copied_to'] = $callerOut
         $harvestLock = Enter-CallerOutputLock `
             -CallerOutput $callerOut -LogPath $logPath -TimeoutSeconds 600
         try {
-            # Records go BEFORE any file is overwritten: a harvest that dies
-            # halfway then leaves the caller missing records (a re-probe),
-            # never a stale record beside a replaced artefact.
-            [System.IO.FileInfo[]]$outputFiles = @(Get-BuildOutputFiles -Source $buildOut)
-            $harvest['caller_tasks_forgotten'] = @(
-                Remove-CallerTaskRecords `
-                    -BuildDatabase (Join-Path $buildOut '.doit.db') `
-                    -CallerDatabase (Join-Path $callerOut '.doit.db') `
-                    -Scope $(
-                        # Only a failed build with outputs to copy back can
-                        # overwrite a caller artefact its db misnames.
-                        if ($exitCode -ne 0 -and $outputFiles.Count -gt 0) { 'All' } else { 'Recorded' }
-                    )
-            )
-            $harvest['outputs_copied'] = Copy-BuildOutputs `
-                -Source $buildOut -Destination $callerOut -Files $outputFiles
+            # Checked under the lock: a caller that moved during a long run
+            # (checkout, rebase, a newer launch) must not receive this
+            # commit's artefacts. They stay in the remote cache; a launch at
+            # the caller's new HEAD restores its own.
+            $callerHead = (Invoke-Git -Directory $resolvedWorktree -Arguments @(
+                'rev-parse', '--verify', 'HEAD'
+            ) | Select-Object -Last 1).Trim()
+            if ($callerHead -ne $commit) {
+                $harvest['harvest_skipped'] = "caller HEAD moved to $callerHead"
+                Write-LaunchLine -Path $logPath -Text (
+                    "farm-launch WARNING: $resolvedWorktree moved from $commit to $callerHead " +
+                    'during the run; nothing was copied back and no caller doit record was touched'
+                )
+            }
+            else {
+                Invoke-CallerHarvest -BuildOutput $buildOut -CallerOutput $callerOut
+            }
         }
         finally {
             $harvestLock.Dispose()
         }
-        Write-LaunchLine -Path $logPath -Text (
-            "farm-launch copied $($harvest['outputs_copied']) output file(s) to $callerOut; " +
-            "forgot $($harvest['caller_tasks_forgotten'].Count) caller doit record(s)"
-        )
     }
     catch {
         $harvestFailed = $true

@@ -102,8 +102,15 @@ function Remove-LeftoverWorktree {
     )
 
     & git -C $Caller worktree remove --force --force $Path 2>&1 | Out-Null
-    if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Recurse -Force
+    try {
+        if (Test-Path -LiteralPath $Path) {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+        }
+    }
+    catch {
+        # A held file or a process working directory: report this candidate
+        # and keep going, so one holder never stops the rest of the sweep.
+        Write-Warning "removing $Path failed: $($_.Exception.Message)"
     }
     & git -C $Caller worktree prune 2>&1 | Out-Null
     return -not (Test-Path -LiteralPath $Path)
