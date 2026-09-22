@@ -315,24 +315,32 @@ function Copy-BuildOutputs {
 function Remove-CallerTaskRecords {
     param(
         [Parameter(Mandatory)][string]$BuildDatabase,
-        [Parameter(Mandatory)][string]$CallerDatabase
+        [Parameter(Mandatory)][string]$CallerDatabase,
+        [Parameter(Mandatory)][ValidateSet('Recorded', 'All')][string]$Scope
     )
 
     # The copied artefacts now disagree with whatever the caller's .doit.db
     # recorded for the same tasks. Dropping those records makes the caller's
     # next local doit re-derive each key from its own inputs instead of
-    # trusting an artefact it did not produce.
-    if (-not (Test-Path -LiteralPath $BuildDatabase -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $CallerDatabase -PathType Leaf)) {
+    # trusting an artefact it did not produce. doit drops a failed task's
+    # record, so after a failed build the build database cannot name every
+    # task whose outputs were copied: Scope All forgets every caller record.
+    if (-not (Test-Path -LiteralPath $CallerDatabase -PathType Leaf)) {
         return @()
     }
-    $build = [System.Text.Json.Nodes.JsonNode]::Parse(
-        [System.IO.File]::ReadAllText($BuildDatabase)
-    ).AsObject()
     $caller = [System.Text.Json.Nodes.JsonNode]::Parse(
         [System.IO.File]::ReadAllText($CallerDatabase)
     ).AsObject()
-    [string[]]$tasks = @($build | ForEach-Object { $_.Key })
+    [string[]]$tasks = @($caller | ForEach-Object { $_.Key })
+    if ($Scope -eq 'Recorded') {
+        if (-not (Test-Path -LiteralPath $BuildDatabase -PathType Leaf)) {
+            return @()
+        }
+        $build = [System.Text.Json.Nodes.JsonNode]::Parse(
+            [System.IO.File]::ReadAllText($BuildDatabase)
+        ).AsObject()
+        $tasks = @($build | ForEach-Object { $_.Key })
+    }
     $removed = [System.Collections.Generic.List[string]]::new()
     foreach ($task in $tasks) {
         if ($caller.Remove($task)) {
@@ -689,7 +697,8 @@ if ($buildRequested -and (Test-Path -LiteralPath $buildWorktree -PathType Contai
         $harvest['caller_tasks_forgotten'] = @(
             Remove-CallerTaskRecords `
                 -BuildDatabase (Join-Path $buildOut '.doit.db') `
-                -CallerDatabase (Join-Path $callerOut '.doit.db')
+                -CallerDatabase (Join-Path $callerOut '.doit.db') `
+                -Scope $(if ($exitCode -eq 0) { 'Recorded' } else { 'All' })
         )
         Write-LaunchLine -Path $logPath -Text (
             "farm-launch copied $($harvest['outputs_copied']) output file(s) to $callerOut; " +

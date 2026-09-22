@@ -602,6 +602,14 @@ def test_native_failure_still_harvests_and_removes_the_build_worktree(
     tmp_path: Path,
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
+    caller_out = Path(fixture["worktree"]) / "cad" / "out"
+    caller_out.mkdir(parents=True)
+    # doit drops a failed task's record, so the build database cannot name
+    # every task whose partial outputs came back: every caller record goes.
+    (caller_out / ".doit.db").write_text(
+        json.dumps({"drawing:failed": {"stale": True}, "part:other": {"kept": True}}),
+        encoding="utf-8",
+    )
     environment = dict(fixture["environment"])
     environment["UV_STUB_EXIT"] = "23"
     environment["UV_STUB_OUTPUTS"] = "1"
@@ -618,6 +626,8 @@ def test_native_failure_still_harvests_and_removes_the_build_worktree(
     finished = _record(_only(Path(fixture["log_directory"]), "*.done"))
     assert finished["state"] == "failed"
     assert finished["outputs_copied"] == 4
+    assert sorted(finished["caller_tasks_forgotten"]) == ["drawing:failed", "part:other"]
+    assert json.loads((caller_out / ".doit.db").read_text(encoding="utf-8")) == {}
     _assert_build_worktree_gone(fixture, finished)
 
 

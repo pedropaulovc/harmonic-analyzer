@@ -65,7 +65,9 @@ So the submitter no longer runs in the caller's worktree. The launcher:
    run touched. The copied artefacts may disagree with what the caller had
    recorded for them, which is exactly the second failure above; without a
    record, the caller's next local `doit` re-derives those keys from its own
-   inputs and restores or rebuilds;
+   inputs and restores or rebuilds. After a failed build every caller record
+   goes, because doit drops a failed task's record and the build database
+   can no longer name every task whose outputs came back;
 7. removes the build worktree (`git worktree remove --force`, then `prune`).
 
 Nothing in the caller's worktree (uncommitted edits, `.doit.db`, `cad/out`)
