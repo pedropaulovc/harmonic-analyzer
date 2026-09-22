@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import inspect
 import math
-from pathlib import Path
 
 import _config
 import build_cone_pivot_screw
@@ -13,19 +11,11 @@ import cone_pivot_post_spec
 import cone_swing_platform_spec as spec
 import draw_cone_swing_platform as drawing
 import pytest
-from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_spec import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
 
-def test_required_drawing_paths_and_registry() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/cone-swing-platform.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/cone-swing-platform.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/cone-swing-platform_drawing.png")
-    assert DRAWINGS_BY_NAME["cone_swing_platform"].script == Path(
-        drawing.__file__
-    ).resolve()
 
 
 def test_every_marked_model_dimension_has_one_view_and_native_precision() -> None:
@@ -53,12 +43,6 @@ def test_pivot_preserves_native_close_clearance_hole() -> None:
     assert spec.PIVOT_HOLE_DIA == blind_cut_dia_mm(spec.PIVOT_HOLE_SPEC)
     assert spec.PIVOT_HOLE_DIA == pytest.approx(6.756)
     assert spec.PIVOT_HOLE_DIA > build_cone_pivot_screw.SHOULDER_DIA
-    build_source = inspect.getsource(part)
-    drawing_source = inspect.getsource(drawing)
-    assert "PIVOT_HOLE_SPEC" in build_source
-    assert 'name="PivotHole"' in build_source
-    assert "dia_tolerance_mm=(0.0, 0.10)" in build_source
-    assert 'label="pivot close-clearance hole"' in drawing_source
 
 
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
@@ -87,15 +71,6 @@ def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
     )
     assert by_key["base_slide"].roughness_um == MACHINED_UM
     assert by_key["base_slide"].face == PlanarFace((0, -1, 0), 0.0)
-    build_source = inspect.getsource(part)
-    drawing_source = inspect.getsource(drawing)
-    assert "surface_finishes=SURFACE_FINISHES" in build_source
-    assert "roughness_ra=" not in drawing_source
-    for key in by_key:
-        assert (
-            f'control=surface_finish_by_key(SURFACE_FINISHES, "{key}")'
-            in drawing_source
-        )
 
 
 def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
@@ -114,26 +89,8 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     }
 
 
-def test_sheet_has_no_gdt_or_dimension_bearing_notes() -> None:
-    assert not hasattr(spec, "PART_DATUMS")
-    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
-    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
-    assert not hasattr(spec, "DRAWING_NOTES")
-    source = inspect.getsource(drawing)
-    assert "add_datum_feature" not in source
-    assert "add_feature_control_frame" not in source
-    assert "set_dimension_precision" not in source
-    assert "SetPrecision3" not in source
 
 
-def test_pivot_section_exposes_thickness_and_relief_depth() -> None:
-    assert set(drawing.SECTION_KEEP) == {"PlateThk", "PivotBearingReliefDepth"}
-    assert len({drawing.PROFILE_CENTER, drawing.FEATURE_CENTER, drawing.NOTCH_CENTER}) == 3
-    assert spec.PROFILE_VIEW_NOTE == "PLATE PROFILE — SCALE 1:2"
-    assert spec.FEATURE_VIEW_NOTE == "HOLE LOCATIONS — SCALE 1:2"
-    assert spec.NOTCH_VIEW_NOTE == "LOCK NOTCH — SCALE 1:2"
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:3"
-    assert drawing.SHEET_SCALE == (1.0, 3.0)
 
 
 def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:

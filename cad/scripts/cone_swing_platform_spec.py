@@ -23,9 +23,18 @@ POST_CONE_BORE_HEIGHT = cone_pivot_post_spec.BORE_HEIGHT
 
 PLATE_THICKNESS = 6.35
 PIVOT_BEARING_RELIEF_DIAMETER = 10.50
-PIVOT_BEARING_RELIEF_DEPTH = 0.25
+PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit governs.
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
+# User decision relayed by Main, 2026-09-22: fit the actual purchased shoulder
+# and finished plate; do not invent a numerical axial-clearance band.
+PIVOT_RELIEF_FIT_REQUIREMENT = (
+    "TOP PIVOT SPOTFACE: MATCH DEPTH TO FINISHED PLATE\n"
+    "AND ACTUAL CONE-PIVOT-SCREW (McMASTER 91829A560).\n"
+    "WITH SCREW SHOULDER FULLY SEATED ON BASE AND LOCK\n"
+    "KNOB RELEASED, PLATFORM SHALL SWING FREELY WITHOUT\n"
+    "CLAMPING, WITH MINIMAL PERCEPTIBLE AXIAL PLAY."
+)
 # The platform swings on the stock 1/4-in shoulder, but this occasional setup
 # pivot has no measured need for a close running bearing fit.  Preserve the
 # established native Hole Wizard close-clearance feature and its table size.
@@ -92,9 +101,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
 # 2), so the MODEL owns them: build_cone_swing_platform applies this map to the
-# .SLDPRT and draw_cone_swing_platform only reads it back.  Plate geometry,
-# relief, tapped-hole pattern, notch and corner radii use the title block's
-# general two-place grade.  The Hole Wizard owns the pivot-hole size/callout.
+# .SLDPRT and draw_cone_swing_platform only reads it back. Plate geometry,
+# relief diameter, tapped-hole pattern, notch and corner radii use the general
+# grade. Relief depth is a reference nominal governed by the matched fit above.
+# The Hole Wizard owns the pivot-hole size/callout.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "NorthEastX": 2,

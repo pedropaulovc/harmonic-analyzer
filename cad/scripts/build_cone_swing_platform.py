@@ -97,6 +97,7 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_DIA,
     PIVOT_HOLE_SPEC,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
+    PIVOT_RELIEF_FIT_REQUIREMENT,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
@@ -600,9 +601,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pivot hole", volume - v_hole, 0.01 * v_hole
     )
 
-    # The stock 1/4-in shoulder is exactly as long as the nominal plate is
-    # thick. A shallow top relief preserves the established 0.25 mm running
-    # clearance without lowering the plate or any hardware mounted on it.
+    # Nominal reconstruction of the shallow top relief. The finished depth is
+    # matched to the actual purchased shoulder and plate under the user-approved
+    # functional acceptance; 0.25 is reference, not an independent depth limit.
     check(
         "create_plane PivotBearingTop",
         await adapter.create_plane(
@@ -907,6 +908,7 @@ async def build(adapter) -> dict[str, str]:
             "Feature View Note": FEATURE_VIEW_NOTE,
             "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Pivot Relief Fit": PIVOT_RELIEF_FIT_REQUIREMENT,
         },
     )
     blank_reference_geometry(
