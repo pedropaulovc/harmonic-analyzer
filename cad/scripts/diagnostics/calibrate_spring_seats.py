@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import traceback
 from dataclasses import asdict, replace
@@ -616,12 +617,22 @@ def main() -> int:
                 "--apply-report merges an existing report; --write is a COM-run flag"
             )
         return apply_report(args.apply_report.resolve(), args.source)
-    with dodo._com_seat("calibrate-spring-seats"):
+
+    def build():
         return run_build(
             lambda adapter: calibrate(
                 adapter, args.presets, args.output.resolve(), args.write, args.source
             )
         )
+
+    # Under verify:calibrate_spring_seats the doit parent already holds the
+    # machine-global seat and exports HARMONIC_COM_SEAT. The lock is re-entrant
+    # only within one process, so a nested acquire here waits on our own parent
+    # forever (spring-seats-r2 burned its 3 h leaf budget that way).
+    if os.environ.get(dodo._COM_SEAT_HELD_ENV):
+        return build()
+    with dodo._com_seat("calibrate-spring-seats"):
+        return build()
 
 
 if __name__ == "__main__":

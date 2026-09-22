@@ -9,6 +9,7 @@ the clear endpoint never inside the interfering region.
 
 from __future__ import annotations
 
+import sys
 
 import pytest
 
@@ -196,3 +197,34 @@ def test_calibrating_every_preset_passes_the_coverage_guard(tmp_path) -> None:
                 source="test",
             )
         )
+
+
+@pytest.mark.parametrize("held", ["verify:calibrate_spring_seats pid=692", None])
+def test_driver_takes_the_seat_only_when_no_parent_holds_it(monkeypatch, held) -> None:
+    """Under its doit task the parent already holds the machine-global seat.
+
+    The file lock is re-entrant only within one process, so a nested acquire in
+    the child waits on its own parent forever -- spring-seats-r2 sat on that
+    until its 3 h leaf budget expired. A standalone run must still take it.
+    """
+    import contextlib
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    taken = []
+
+    @contextlib.contextmanager
+    def seat(label):
+        taken.append(label)
+        yield 0.0
+
+    if held is None:
+        monkeypatch.delenv(driver.dodo._COM_SEAT_HELD_ENV, raising=False)
+    else:
+        monkeypatch.setenv(driver.dodo._COM_SEAT_HELD_ENV, held)
+    monkeypatch.setattr(driver.dodo, "_com_seat", seat)
+    monkeypatch.setattr(driver, "run_build", lambda build: "built")
+    monkeypatch.setattr(sys, "argv", ["calibrate_spring_seats.py"])
+
+    assert driver.main() == "built"
+    assert taken == ([] if held else ["calibrate-spring-seats"])
