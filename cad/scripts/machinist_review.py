@@ -27,6 +27,12 @@ nothing in the invocation references the repo, every page is copied as a
 ``sheet-N.png``, safe mode disables project/user customizations, MCP is disabled,
 and Read is the only available tool. The event stream is scanned so any tool
 use beyond reading the copied package images flags the review as non-blind.
+Blindness is enforced by those tool restrictions and the neutral workdir, not
+by ephemerality: each attempt's session transcript is kept under the CLI's own
+home instead of discarded, on a fresh session id per attempt so it never loads
+prior context. The verdict JSON's attempt records name the session id and a
+ready-to-run resume command (``claude --resume <id>`` / ``codex resume <id>``)
+so a completed review's reasoning can be reopened offline.
 
 Usage (SolidWorks-free; needs the native PDFs under ``cad/out/pdf``)::
 
@@ -50,6 +56,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -260,6 +267,7 @@ def build_claude_command(
     schema: Path,
     model: str,
     effort: str,
+    session_id: str,
     claude: str = "claude",
     schema_content: str | None = None,
 ) -> list[str]:
@@ -298,7 +306,8 @@ def build_claude_command(
         *(f"Read({image.name})" for image in images),
         "--restricted",
         "--safe-mode",
-        "--no-session-persistence",
+        "--session-id",
+        session_id,
         "--permission-mode",
         "dontAsk",
         "--permission-prompts",
@@ -327,7 +336,6 @@ def build_codex_command(
         "--ignore-user-config",
         "--ignore-rules",
         "--skip-git-repo-check",
-        "--ephemeral",
         "--sandbox",
         "read-only",
         "-C",
@@ -552,6 +560,29 @@ def extract_codex_verdict(
     return validate_verdict(json.loads(text[start : end + 1]))
 
 
+def _codex_session_id(events: Sequence[dict[str, Any]]) -> str | None:
+    """Return the session id Codex announced in its ``--json`` event stream.
+
+    ``codex exec --json`` opens with a ``thread.started`` event whose
+    ``thread_id`` is what ``codex resume`` takes; ``None`` when unrecoverable.
+    """
+    for event in events:
+        for node in _walk(event):
+            if isinstance(node, dict) and node.get("type") == "thread.started":
+                thread_id = node.get("thread_id")
+                if isinstance(thread_id, str) and thread_id:
+                    return thread_id
+    return None
+
+
+def _resume_command(reviewer: str, session_id: str | None) -> str | None:
+    """Ready-to-run command that reopens one attempt's persisted CLI session."""
+    if session_id is None:
+        return None
+    resume = "claude --resume" if reviewer == "claude" else "codex resume"
+    return f"{resume} {session_id}"
+
+
 def review_package(
     package: ReviewPackage,
     *,
@@ -594,17 +625,23 @@ def review_package(
     for attempt in range(retries + 1):
         attempts = attempt + 1
         workdir = Path(tempfile.mkdtemp(prefix="machrev-"))
+        # Fresh session per attempt: a persisted session must never load the
+        # context of an earlier attempt or review.
+        session_id: str | None = str(uuid.uuid4()) if reviewer == "claude" else None
         attempt_events: list[dict[str, Any]] = []
         stdout: str | bytes | None = None
         stderr: str | bytes | None = None
         attempt_record: dict[str, Any] = {
             "attempt": attempts,
+            "reviewer": reviewer,
             "cwd": str(workdir),
             "images": [],
             "command": None,
             "outcome": "failed",
             "error": None,
             "exit_code": None,
+            "session_id": None,
+            "resume_command": None,
             "stdout_file": None,
             "stderr_file": None,
             "artifacts": [],
@@ -629,6 +666,7 @@ def review_package(
                     schema=schema,
                     model=model,
                     effort=effort,
+                    session_id=session_id,
                     claude=executable,
                 )
                 if reviewer == "claude"
@@ -685,6 +723,10 @@ def review_package(
             attempt_record["error"] = error
             verdict = None
         finally:
+            if reviewer == "codex":
+                session_id = _codex_session_id(attempt_events)
+            attempt_record["session_id"] = session_id
+            attempt_record["resume_command"] = _resume_command(reviewer, session_id)
             events.extend(_tag_events(attempts, attempt_events))
             retained_dir = report_dir / f"{package.name}.attempts" / workdir.name
             retained_dir.mkdir(parents=True, exist_ok=True)
