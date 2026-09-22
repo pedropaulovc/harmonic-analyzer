@@ -33,7 +33,9 @@ def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
 
 def test_iso_fit_rejects_an_outline_that_cannot_fit() -> None:
     with pytest.raises(RuntimeError, match="cannot fit"):
-        drawing._fit_translation((0.0, 0.0, 0.1, 0.12), drawing.ISO_REGION, drawing.ISO_FIT_MARGIN_M)
+        drawing._fit_translation(
+            (0.0, 0.0, 0.1, 0.12), drawing.ISO_REGION, drawing.ISO_FIT_MARGIN_M
+        )
 
 
 class _FakeDisplay:
@@ -240,7 +242,9 @@ def test_leader_across_an_annotation_is_rejected() -> None:
 def test_bisector_point_splits_the_chamfer_span() -> None:
     x, y = drawing._bisector_point((0.0, 0.0), 0.013)
     assert math.hypot(x, y) == pytest.approx(0.013)
-    assert math.degrees(math.atan2(y, x)) == pytest.approx(drawing.CHAMFER_ANGLE_DEG / 2.0)
+    assert math.degrees(math.atan2(y, x)) == pytest.approx(
+        drawing.CHAMFER_ANGLE_DEG / 2.0
+    )
 
 
 def test_pinned_arc_stays_on_the_drawn_chamfer() -> None:
@@ -305,3 +309,17 @@ def test_segment_circle_crossing() -> None:
     assert not drawing._segment_crosses_circle((-0.5, 0.0), (0.5, 0.0), center, radius)
     assert not drawing._segment_crosses_circle((-2.0, 1.5), (2.0, 1.5), center, radius)
 
+
+def test_document_precision_resolves_the_printed_places() -> None:
+    # stud-10: the drawing dimension read -2 (follows the drawing default) and
+    # rendered "45°"; the default resolves the setting, the render confirms it.
+    texts = [" 45° CHAMFER TO EXISTING THREAD ROOT "]
+    follows = drawing.PRECISION_FOLLOWS_DOCUMENT
+    assert drawing._printed_places_problem(follows, 0, texts, 45.0) is None
+    assert drawing._printed_places_problem(0, 2, texts, 45.0) is None
+    problem = drawing._printed_places_problem(follows, 2, texts, 45.0)
+    assert problem is not None and "prints 2 places" in problem
+    stale = [" 45.00° CHAMFER TO EXISTING THREAD ROOT "]
+    problem = drawing._printed_places_problem(follows, 0, stale, 45.0)
+    assert problem is not None and "renders" in problem
+    assert drawing._printed_places_problem(follows, 0, [], 45.0) is not None

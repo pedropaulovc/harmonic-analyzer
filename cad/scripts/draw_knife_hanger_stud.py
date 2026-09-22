@@ -161,6 +161,15 @@ ANGLE_VALUE_TOLERANCE_RAD = math.radians(1e-6)
 MODEL_ANGLE = "ChamferAngle@StockDeburrProfile"
 SW_ANGULAR_DIMENSION = 3  # swDimensionType_e.swAngularDimension
 CHAMFER_ANGLE_PRECISION = DIMENSION_PRECISION["ChamferAngle"]
+# swDimensionPrecisionSettings_e.swPrecisionFollowsDocumentSetting: a drawing
+# dimension prints the drawing's own angular default (leaf 20260922T205428Z
+# read -2 and rendered "45°"). That default is read back under the
+# angle-dimension scope: swUserPreferenceIntegerValue_e.
+# swDetailingAngularDimPrecision and swUserPreferenceOption_e.
+# swDetailingAngleDimension, values from swconst.tlb v34 (the docs print none).
+PRECISION_FOLLOWS_DOCUMENT = -2
+ANGULAR_DIM_PRECISION = 28
+ANGLE_DIMENSION_SCOPE = 201
 # The 45 deg text keeps this much paper below "ISO SCALE 1.5:1" so the two do
 # not read as one stack (stud-6 printed them 4 mm apart).
 ANGLE_TEXT_NOTE_CLEAR_M = 0.010
@@ -199,7 +208,10 @@ END_FACE_PICK_TYPES = ("EDGE", "SILHOUETTE")
 SELF_CROSSING_END_M = 0.0005
 
 LAYOUT_REPORT = (
-    Path(OUTPUTS.slddrw).parent.parent / "reports" / "layout-audit" / f"{SPEC.name}.json"
+    Path(OUTPUTS.slddrw).parent.parent
+    / "reports"
+    / "layout-audit"
+    / f"{SPEC.name}.json"
 )
 # The model's driving ChamferAngle: (nominal, lower, upper) signed SI values.
 MODEL_ANGLE_CONTROL = (
@@ -282,7 +294,9 @@ def _display_text_box(adapter: Any, display: Any) -> tuple[float, float, float, 
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
     total = None
     for index in range(int(data.GetTextCount())):
-        position = tuple(float(value) for value in (data.GetTextPositionAtIndex(index) or ()))
+        position = tuple(
+            float(value) for value in (data.GetTextPositionAtIndex(index) or ())
+        )
         if len(position) < 2:
             continue
         box = estimate_text_box(
@@ -296,11 +310,15 @@ def _display_text_box(adapter: Any, display: Any) -> tuple[float, float, float, 
         if box is None:
             continue
         candidate = (box.xmin, box.ymin, box.xmax, box.ymax)
-        total = candidate if total is None else (
-            min(total[0], candidate[0]),
-            min(total[1], candidate[1]),
-            max(total[2], candidate[2]),
-            max(total[3], candidate[3]),
+        total = (
+            candidate
+            if total is None
+            else (
+                min(total[0], candidate[0]),
+                min(total[1], candidate[1]),
+                max(total[2], candidate[2]),
+                max(total[3], candidate[3]),
+            )
         )
     if total is None:
         raise RuntimeError("45 deg dimension reports no text to place")
@@ -414,7 +432,9 @@ class DimensionInk:
         bounds = self.bounds()
         return {
             "name": self.name,
-            "bounds_mm": None if bounds is None else [round(v * 1000.0, 2) for v in bounds],
+            "bounds_mm": None
+            if bounds is None
+            else [round(v * 1000.0, 2) for v in bounds],
             "lines_mm": [[_mm(a), _mm(b)] for a, b in self.lines],
             "arcs": [arc.as_mm() for arc in self.arcs],
             "triangles": len(self.triangles),
@@ -526,19 +546,19 @@ def _dimension_ink_problems(
         if any(_segment_hits_box(a, b, box) for a, b in segments):
             problems.append(f"{ink.name} ink crosses {label} {_format_box(box)}")
     for index, (a, b) in enumerate(ink.lines):
-        for c, d in ink.lines[index + 1:]:
+        for c, d in ink.lines[index + 1 :]:
             point = _segment_intersection(a, b, c, d)
-            if point is not None and min(
-                math.dist(point, end) for end in (a, b, c, d)
-            ) > SELF_CROSSING_END_M:
+            if (
+                point is not None
+                and min(math.dist(point, end) for end in (a, b, c, d))
+                > SELF_CROSSING_END_M
+            ):
                 problems.append(
                     f"{ink.name} lines {[_mm(a), _mm(b)]} and {[_mm(c), _mm(d)]} "
                     f"cross at {_mm(point)} mm"
                 )
     if boundary is not None:
-        crossings = sum(
-            _segment_crosses_circle(a, b, *boundary) for a, b in segments
-        )
+        crossings = sum(_segment_crosses_circle(a, b, *boundary) for a, b in segments)
         allowed = DETAIL_BOUNDARY_CROSSINGS.get(ink.name, 0)
         if crossings > allowed:
             problems.append(
@@ -882,31 +902,64 @@ def _assert_arrows_on_drawn_edges(
     )
 
 
-def _assert_chamfer_angle_display(annotation: Any, model_value: float) -> None:
+def _printed_places_problem(
+    places: int, document_places: int, texts: list[str], model_deg: float
+) -> str | None:
+    """Why the 45 deg does not print the spec's places, or None when it does.
+
+    The resolved setting must equal the spec, and the rendered value must show
+    exactly those places: the setting alone would not catch a stale render.
+    """
+    printed = document_places if places == PRECISION_FOLLOWS_DOCUMENT else places
+    if printed != CHAMFER_ANGLE_PRECISION:
+        return (
+            f"45 deg prints {printed} places (setting {places}, drawing default "
+            f"{document_places}), the spec says {CHAMFER_ANGLE_PRECISION}; a "
+            "DRAWING_REFERENCE_PRECISION would be needed"
+        )
+    expected = f"{model_deg:.{CHAMFER_ANGLE_PRECISION}f}°"
+    rendered = texts[0].split() if texts else []
+    if rendered[:1] != [expected]:
+        return f"45 deg renders {texts[:1]!r}, expected it to lead with {expected!r}"
+    return None
+
+
+def _assert_chamfer_angle_display(
+    adapter: Any, annotation: Any, model_value: float
+) -> None:
     """Value, parentheses and places of the sheet's 45 deg, on a fresh handle."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     value = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
     places = int(_read_member(display, "GetPrimaryPrecision2"))
+    extension = _early_bound(adapter.currentModel, "IModelDoc2").Extension
+    document_places = int(
+        extension.GetUserPreferenceInteger(ANGULAR_DIM_PRECISION, ANGLE_DIMENSION_SCOPE)
+    )
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    texts = [str(data.GetTextAtIndex(index) or "") for index in range(int(data.GetTextCount()))]
+    texts = [
+        str(data.GetTextAtIndex(index) or "")
+        for index in range(int(data.GetTextCount()))
+    ]
     state = {
         "value_deg": math.degrees(value),
         "model_deg": math.degrees(model_value),
         "parenthesis": bool(display.ShowParenthesis),
         "places": places,
+        "document_places": document_places,
         "texts": texts,
     }
     _telemetry.info("45 deg sheet dimension: " + json.dumps(state, sort_keys=True))
     if abs(value - model_value) > ANGLE_VALUE_TOLERANCE_RAD:
-        raise RuntimeError(f"45 deg sheet dimension disagrees with {MODEL_ANGLE}: {state!r}")
+        raise RuntimeError(
+            f"45 deg sheet dimension disagrees with {MODEL_ANGLE}: {state!r}"
+        )
     if state["parenthesis"] or any("(" in text for text in texts):
         raise RuntimeError(f"SolidWorks forces parentheses on the 45 deg: {state!r}")
-    if places != CHAMFER_ANGLE_PRECISION:
-        raise RuntimeError(
-            f"45 deg prints {places} places, the spec says {CHAMFER_ANGLE_PRECISION} "
-            f"(the drawing default; a DRAWING_REFERENCE_PRECISION would be needed): "
-            f"{state!r}"
-        )
+    problem = _printed_places_problem(
+        places, document_places, texts, state["model_deg"]
+    )
+    if problem is not None:
+        raise RuntimeError(f"{problem}: {state!r}")
 
 
 def _write_root_finish_callout(display: Any, text: str) -> None:
@@ -919,9 +972,7 @@ def _write_root_finish_callout(display: Any, text: str) -> None:
 
 def _callout_text_parts(display: Any) -> dict[str, str]:
     """Every ``swDimensionTextParts_e`` compartment, as the rebuild left it."""
-    return {
-        str(part): str(display.GetText(part) or "") for part in range(1, 9)
-    }
+    return {str(part): str(display.GetText(part) or "") for part in range(1, 9)}
 
 
 def _assert_root_finish_callout(display: Any, text: str) -> None:
@@ -956,7 +1007,9 @@ def _reference_dimension(
         if dimension_name(adapter, annotation) == name
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"expected one {name} reference dimension, found {len(matches)}")
+        raise RuntimeError(
+            f"expected one {name} reference dimension, found {len(matches)}"
+        )
     set_reference_dimension(adapter, matches[0], label=label)
     return matches[0]
 
@@ -1152,7 +1205,9 @@ def _fit_iso_view(adapter: Any, iso: Any) -> tuple[float, float, float, float]:
     position = tuple(float(value) for value in iso.Position)
     if len(position) != 2:
         raise RuntimeError(f"isometric view has no position: {position!r}")
-    if not iso.SetViewPosition(double_array([position[0] + dx, position[1] + dy]), False):
+    if not iso.SetViewPosition(
+        double_array([position[0] + dx, position[1] + dy]), False
+    ):
         raise RuntimeError("cannot position the isometric view")
     rebuild_drawing(adapter, label="isometric fit")
     fitted = _view_box(iso, label="isometric")
@@ -1168,8 +1223,7 @@ def _fit_iso_view(adapter: Any, iso: Any) -> tuple[float, float, float, float]:
             f"{_format_box(ISO_REGION)} at {margin * 1000.0:.1f} mm clearance"
         )
     _telemetry.info(
-        f"isometric outline {_format_box(fitted)} fitted into "
-        f"{_format_box(ISO_REGION)}"
+        f"isometric outline {_format_box(fitted)} fitted into {_format_box(ISO_REGION)}"
     )
     return fitted
 
@@ -1259,7 +1313,7 @@ async def build(adapter: Any) -> dict[str, str]:
     angle, chamfer_type = _add_chamfer_angle(adapter, detail, vertex)
     arc = _pin_angle_arc(adapter, angle, vertex)
     _attach_root_finish_callout(adapter, angle)
-    _assert_chamfer_angle_display(angle, model_angle)
+    _assert_chamfer_angle_display(adapter, angle, model_angle)
     # Refusal (e) of the layout-tuning doc: re-assert the mode after the last
     # annotation lands on the view.
     set_hidden_lines_removed(adapter, detail)
@@ -1287,7 +1341,7 @@ async def build(adapter: Any) -> dict[str, str]:
         arc=arc,
     )
     _assert_arrows_on_drawn_edges(adapter, detail, angle, arc.center, chamfer_type)
-    _assert_chamfer_angle_display(angle, model_angle)
+    _assert_chamfer_angle_display(adapter, angle, model_angle)
     _audit_sheet_layout(
         adapter,
         {
