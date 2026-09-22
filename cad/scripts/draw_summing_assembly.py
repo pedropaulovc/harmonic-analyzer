@@ -20,9 +20,11 @@ from _common import _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
+    check_drawing_layout,
     create_blank_drawing_sheets,
     create_section_view,
     finalize_drawing,
+    import_cosmetic_threads,
     insert_bom_table,
     isolate_drawing_view_components,
     model_point_in_view,
@@ -75,11 +77,15 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
+# Sheet 4 keeps its position: the MHA-119 stud note cites "SHEET 4". Checks,
+# setup and interfaces moved to an appended sheet 5 (Main, 2026-09-22) because
+# 60 note lines at the 3.5 mm ASME Y14.2 height cannot share sheet 3.
 SHEET_NAMES = (
     "ASSEMBLED VIEWS",
     "EXPLODED VIEW + BOM",
-    "ASSEMBLY + SETUP",
+    "ASSEMBLY SEQUENCE",
     "HANGER FIT + INSPECTION",
+    "CHECKS + SETUP",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -90,13 +96,15 @@ EXPLODED_SCALE = (1.0, 4.0)
 INSTRUCTION_SCALE = (1.0, 6.0)
 HANGER_FIT_SHEET_SCALE = (1.0, 1.0)
 HANGER_PARENT_SCALE = (1.0, 2.0)
-HANGER_SECTION_SCALE = (1.0, 1.0)
+HANGER_SECTION_SCALE = (1.0, 2.0)
 HANGER_DETAIL_SCALE = (4.0, 1.0)
+NOTES_SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: EXPLODED_SCALE,
     SHEET_NAMES[2]: INSTRUCTION_SCALE,
     SHEET_NAMES[3]: HANGER_FIT_SHEET_SCALE,
+    SHEET_NAMES[4]: NOTES_SHEET_SCALE,
 }
 
 ASSEMBLED_FRONT_CENTER = (0.065, 0.158)
@@ -106,7 +114,12 @@ EXPLODED_ISO_CENTER = (0.105, 0.158)
 INSTRUCTION_ISO_CENTER = (0.345, 0.190)
 HANGER_PARENT_CENTER = (0.060, 0.205)
 HANGER_SECTION_CENTER = (0.300, 0.205)
-HANGER_DETAIL_CENTER = (0.095, 0.080)
+# Where the knife-mount top on the hanger axis lands on sheet 4. The views
+# carry the whole (mostly hidden) assembly box, so they are placed by this
+# model point, not by their outline.
+HANGER_PARENT_ANCHOR_XY = (0.040, 0.200)
+HANGER_SECTION_ANCHOR_XY = (0.140, 0.200)
+HANGER_DETAIL_CENTER = (0.095, 0.085)
 # The native detail label letter. The sheet heading and the MHA-119 stud note
 # reference it; test_summing_assembly_drawing.py pins the cross-reference.
 HANGER_DETAIL_LABEL = "B"
@@ -115,19 +128,34 @@ HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
 # centre may sit off the nominal hanger axis and still belong to that station.
 BUILT_GEOMETRY_TOLERANCE_MM = 1e-4
 BUILT_STATION_TOLERANCE_MM = 0.01
-BOM_ANCHOR = (0.195, 0.258)
+# The BOM sits bottom-right, just above the title block, so the exploded view
+# and its balloon ring own the upper-left of the sheet. DESCRIPTION is wide
+# enough for the longest description on one line (r9: 70 chars wrapped at
+# 145 mm; the rendered pitch is about 2.63 mm per character).
 BOM_COLUMN_WIDTHS = {
-    "item": 0.020,
-    "part": 0.034,
-    "description": 0.145,
-    "quantity": 0.020,
+    "item": 0.018,
+    "part": 0.030,
+    "description": 0.190,
+    "quantity": 0.014,
 }
+BOM_ANCHOR = (0.414 - sum(BOM_COLUMN_WIDTHS.values()), 0.130)
 # Requested row height. SolidWorks raises any row to the minimum that fits its
 # text, so a row may persist taller (the header, legitimately); never shorter.
 BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 # Paper clearance kept between the table and the sheet edge / title block.
 BOM_SHEET_CLEARANCE = 0.003
+# Sheet-space note fields (x0, top, x1, bottom), in metres. Blocks stack top
+# down inside a field and each block's measured extent is gated against it.
+NOTE_FIELD_LEFT = (0.018, 0.263, 0.212, 0.035)
+NOTE_FIELD_RIGHT = (0.222, 0.263, 0.415, 0.072)
+NOTE_BLOCK_GAP = 0.006
+# Region the exploded view's balloon ring must fit: left of the BOM, below the
+# heading, above the caption. The ring is the view outline grown by the
+# balloon margin plus one rendered balloon diameter.
+EXPLODED_RING_REGION = (0.020, 0.040, 0.160, 0.252)
+EXPLODED_BALLOON_MARGIN = 0.012
+BALLOON_DIAMETER = 0.010
 # Only assembly-level requirements live here. Part drawings own component
 # manufacture, and calculated native placements remain evidence rather than
 # fitter tolerances. Keeping these drawing notes out of the assembly spec also
@@ -286,6 +314,172 @@ def _add_note_block(
             f"(actual_length={len(actual)}, expected_length={len(expected)})"
         )
     return note
+
+
+def note_field_violations(
+    extent: tuple[float, float, float, float],
+    field: tuple[float, float, float, float],
+) -> list[str]:
+    """Name every edge of a note box (x0, y0, x1, y1) that leaves its field."""
+    x0, y0, x1, y1 = extent
+    left, top, right, bottom = field
+    violations = []
+    if x0 < left - 1e-6:
+        violations.append(f"left {x0 * 1000:.2f} mm < field {left * 1000:.2f}")
+    if x1 > right + 1e-6:
+        violations.append(f"right {x1 * 1000:.2f} mm > field {right * 1000:.2f}")
+    if y1 > top + 1e-6:
+        violations.append(f"top {y1 * 1000:.2f} mm > field {top * 1000:.2f}")
+    if y0 < bottom - 1e-6:
+        violations.append(f"bottom {y0 * 1000:.2f} mm < field {bottom * 1000:.2f}")
+    return violations
+
+
+def _note_extent(adapter: Any, note: Any, *, label: str) -> tuple[float, ...]:
+    """The rendered sheet-space box (x0, y0, x1, y1) of a free note."""
+    adapter.currentModel.GraphicsRedraw2()
+    extent = tuple(float(value) for value in (_early_bound(note, "INote").GetExtent() or ()))
+    if len(extent) != 6 or extent[3] <= extent[0] or extent[4] <= extent[1]:
+        raise RuntimeError(f"{label}: note has no rendered extent: {extent!r}")
+    return (extent[0], extent[1], extent[3], extent[4])
+
+
+def _stack_note_field(
+    adapter: Any,
+    blocks: tuple[tuple[str, str], ...],
+    field: tuple[float, float, float, float],
+    *,
+    label: str,
+) -> list[tuple[float, ...]]:
+    """Stack note blocks top-down in one field, each gated on its real extent."""
+    left, top, _right, _bottom = field
+    y = top
+    extents = []
+    for block_label, text in blocks:
+        note = _add_note_block(adapter, text, (left, y), label=block_label)
+        extent = _note_extent(adapter, note, label=block_label)
+        violations = note_field_violations(extent, field)
+        _telemetry.event(
+            "drawing.note_field",
+            field=label,
+            block=block_label,
+            extent_mm=tuple(value * 1000.0 for value in extent),
+            violations=tuple(violations),
+        )
+        if violations:
+            raise RuntimeError(
+                f"{label}: {block_label} leaves its note field: "
+                + "; ".join(violations)
+            )
+        extents.append(extent)
+        y = extent[1] - NOTE_BLOCK_GAP
+    return extents
+
+
+def _view_outline(view: Any) -> tuple[float, float, float, float]:
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if len(outline) != 4 or outline[2] <= outline[0] or outline[3] <= outline[1]:
+        raise RuntimeError(f"view has an invalid outline {outline!r}")
+    return outline
+
+
+def _shift_view(adapter: Any, view: Any, delta: tuple[float, float], *, label: str) -> None:
+    """Move a drawing view by a sheet-space delta and read the move back."""
+    view = _early_bound(view, "IView")
+    before = tuple(float(value) for value in view.Position)
+    target = (before[0] + delta[0], before[1] + delta[1])
+    if not view.SetViewPosition(double_array(list(target)), False):
+        raise RuntimeError(f"{label}: SetViewPosition refused {target!r}")
+    adapter.currentModel.EditRebuild3()
+    after = tuple(float(value) for value in view.Position)
+    if math.dist(after, target) > 1e-6:
+        raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
+
+
+def _place_view_by_model_point(
+    adapter: Any,
+    view: Any,
+    model_point_mm: tuple[float, float, float],
+    target_xy: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Land one model point of a view on a sheet target (views of an isolated
+    assembly keep the whole assembly's box, so their outline is no guide)."""
+    current = model_point_in_view(
+        adapter,
+        view,
+        tuple(value / 1000.0 for value in model_point_mm),
+        label=label,
+    )
+    _shift_view(
+        adapter,
+        view,
+        (target_xy[0] - current[0], target_xy[1] - current[1]),
+        label=label,
+    )
+    landed = model_point_in_view(
+        adapter,
+        view,
+        tuple(value / 1000.0 for value in model_point_mm),
+        label=label,
+    )
+    if math.dist(landed[:2], target_xy) > 1e-6:
+        raise RuntimeError(f"{label}: model point landed at {landed!r}, not {target_xy!r}")
+
+
+def ring_fit_shift(
+    outline: tuple[float, float, float, float],
+    region: tuple[float, float, float, float],
+    *,
+    grow: float,
+) -> tuple[tuple[float, float], list[str]]:
+    """Shift that centres an outline's balloon ring in a region, plus overflows.
+
+    The ring is estimated from the view OUTLINE, which SolidWorks pads beyond
+    the ink, so an overflow is reported rather than raised: the end-of-build
+    layout audit on the real balloons is the hard gate.
+    """
+    ring = (
+        outline[0] - grow,
+        outline[1] - grow,
+        outline[2] + grow,
+        outline[3] + grow,
+    )
+    x0, y0, x1, y1 = region
+    ring_w, ring_h = ring[2] - ring[0], ring[3] - ring[1]
+    overflows = [
+        f"{axis} {size * 1000:.1f} mm > {room * 1000:.1f} mm"
+        for axis, size, room in (
+            ("width", ring_w, x1 - x0),
+            ("height", ring_h, y1 - y0),
+        )
+        if size > room
+    ]
+    shift = (
+        (x0 + x1) / 2.0 - (ring[0] + ring[2]) / 2.0,
+        (y0 + y1) / 2.0 - (ring[1] + ring[3]) / 2.0,
+    )
+    return shift, overflows
+
+
+def _check_package_layout(adapter: Any) -> None:
+    """Run the layout audit on every sheet and fail on any finding at all."""
+    failures = []
+    for number, sheet_name in enumerate(SHEET_NAMES, start=1):
+        _activate_sheet(adapter, sheet_name)
+        try:
+            check_drawing_layout(
+                adapter,
+                layout=SHEET_LAYOUTS[sheet_name],
+                stem=f"{ARTIFACT_STEM} sheet {number}",
+            )
+        except RuntimeError as exc:
+            failures.append(f"sheet {number} {sheet_name}: {exc}")
+    if failures:
+        raise RuntimeError(
+            "summing package layout audit failed:\n" + "\n".join(failures)
+        )
 
 
 def _component_point_in_assembly(
@@ -565,7 +759,7 @@ def _exclude_fasteners_from_section(
     adapter: Any,
     section: Any,
     *,
-    component_stem: str,
+    component_stems: tuple[str, ...],
     label: str,
 ) -> None:
     """Draw the hanger studs unsectioned in the cut (ASME Y14.3 bolt rule).
@@ -583,13 +777,13 @@ def _exclude_fasteners_from_section(
             _early_bound(raw_drawing_component, "IDrawingComponent").Component,
             "IComponent2",
         )
-        if _component_stem(component) == component_stem:
+        if _component_stem(component) in component_stems:
             components[str(component.Name2 or "").rsplit("/", 1)[-1]] = component
-    expected = BOM_QUANTITIES[component_stem]
+    expected = sum(BOM_QUANTITIES[stem] for stem in component_stems)
     if len(components) != expected:
         raise RuntimeError(
             f"{label}: section shows {sorted(components)!r}, expected "
-            f"{expected} {component_stem!r} instances to exclude"
+            f"{expected} instances of {component_stems!r} to exclude"
         )
     dr_section = _early_bound(section.GetSection(), "IDrSection")
     if not dr_section.SetExcludedComponents(dispatch_array(list(components.values()))):
@@ -786,6 +980,14 @@ def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
 
 def _place_hanger_fit_sheet(adapter: Any) -> None:
     """Place the real assembly section/detail and its as-built fit instructions."""
+    _add_note_block(
+        adapter,
+        f"{DRAWING_NUMBER} - {SHEET_NAMES[3]}\n"
+        "MHA-119 / MHA-131 / MHA-037 MATCHED TO MHA-077",
+        (0.018, 0.263),
+        label="hanger fit sheet identity",
+    )
+    hanger_axis_mm = (KNIFE[0], KNIFE_MOUNT_TOP_Y, SUMMING_Z)
     parent = place_view(
         adapter,
         str(SOURCE),
@@ -804,16 +1006,23 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
         visible_stems=visible_stems,
         label="hanger fit parent",
     )
+    _place_view_by_model_point(
+        adapter,
+        parent,
+        hanger_axis_mm,
+        HANGER_PARENT_ANCHOR_XY,
+        label="hanger fit parent placement",
+    )
     parent = _early_bound(parent, "IView")
-    outline = tuple(float(value) for value in parent.GetOutline())
-    if len(outline) != 4:
-        raise RuntimeError("hanger fit parent has invalid outline")
     cut_x = model_point_in_view(
         adapter,
         parent,
-        (KNIFE[0] / 1000.0, KNIFE_MOUNT_TOP_Y / 1000.0, SUMMING_Z / 1000.0),
+        tuple(value / 1000.0 for value in hanger_axis_mm),
         label="hanger-axis section station",
     )[0]
+    # Span the parent's whole outline, as r9 did: a line short of the cut
+    # bodies leaves a full section open ("olive, unhatched").
+    outline = _view_outline(parent)
     section = create_section_view(
         adapter,
         parent,
@@ -831,40 +1040,58 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
         visible_stems=visible_stems,
         label="hanger-axis assembly section",
     )
+    _place_view_by_model_point(
+        adapter,
+        section,
+        hanger_axis_mm,
+        HANGER_SECTION_ANCHOR_XY,
+        label="hanger-axis section placement",
+    )
+    # ASME Y14.3: bolts and washers in a cut are drawn unsectioned.
     _exclude_fasteners_from_section(
         adapter,
         section,
-        component_stem="knife-hanger-stud",
+        component_stems=("knife-hanger-stud", "knife-hanger-washer"),
         label="hanger-axis assembly section",
     )
     _assert_built_hanger_engagement(section, station_z_mm=SUMMING_Z + HEX_Z_MID)
+    _record_cosmetic_threads(adapter, section, label="hanger-axis assembly section")
     detail = _create_hanger_detail(adapter, section)
     set_hidden_lines_removed(adapter, detail)
+    _record_cosmetic_threads(adapter, detail, label="hanger fit detail")
     _add_hanger_engagement_dimension(adapter, detail)
-    _add_note_block(
+    _stack_note_field(
         adapter,
-        f"{DRAWING_NUMBER} - {SHEET_NAMES[3]}\n"
-        "MHA-119 / MHA-131 / MHA-037 MATCHED TO MHA-077",
-        (0.018, 0.263),
-        label="hanger fit sheet identity",
+        (
+            (
+                "hanger engagement detail heading",
+                f"DETAIL {HANGER_DETAIL_LABEL}: E IS ACTUAL TAP MOUTH TO FINISHED "
+                "BOLT TIP",
+            ),
+            ("hanger fit construction", HANGER_FIT_CONSTRUCTION),
+            ("hanger fit inspection", HANGER_FIT_INSPECTION),
+        ),
+        NOTE_FIELD_RIGHT,
+        label="sheet 4 note field",
     )
-    _add_note_block(
-        adapter,
-        f"DETAIL {HANGER_DETAIL_LABEL} - E IS ACTUAL TAP MOUTH TO FINISHED BOLT TIP",
-        (0.030, 0.150),
-        label="hanger engagement detail heading",
+
+
+def _record_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> None:
+    """Import the view's cosmetic threads and record what SolidWorks shows.
+
+    Investigation for Main (S4-5): the MHA-037 tap is modelled at tap-drill
+    size with a cosmetic thread, so the modelled MHA-119 crests overlap the
+    hatched wall. The counts say whether the internal thread can be drawn.
+    """
+    seeds, instances = import_cosmetic_threads(adapter, view)
+    _telemetry.event(
+        "drawing.cosmetic_threads",
+        label=label,
+        seed_count=seeds,
+        instance_count=instances,
     )
-    _add_note_block(
-        adapter,
-        HANGER_FIT_CONSTRUCTION,
-        (0.165, 0.145),
-        label="hanger fit construction",
-    )
-    _add_note_block(
-        adapter,
-        HANGER_FIT_INSPECTION,
-        (0.165, 0.100),
-        label="hanger fit inspection",
+    _telemetry.info(
+        f"{label}: {seeds} cosmetic-thread seed(s), {instances} instance(s)"
     )
 
 
@@ -1389,6 +1616,27 @@ def _place_package(adapter: Any) -> None:
         exploded,
         label="summing exploded isometric",
     )
+    # Centre the balloon ring (outline + margin + one balloon) in its region,
+    # so no balloon lands on the heading, the caption, the BOM or the border.
+    exploded_outline = _view_outline(exploded)
+    ring_shift, ring_overflows = ring_fit_shift(
+        exploded_outline,
+        EXPLODED_RING_REGION,
+        grow=EXPLODED_BALLOON_MARGIN + BALLOON_DIAMETER,
+    )
+    _telemetry.event(
+        "drawing.exploded_ring_fit",
+        outline_mm=tuple(value * 1000.0 for value in exploded_outline),
+        shift_mm=tuple(value * 1000.0 for value in ring_shift),
+        overflows=tuple(ring_overflows),
+    )
+    if ring_overflows:
+        _telemetry.warn(
+            "exploded balloon ring estimate overflows its region ("
+            + "; ".join(ring_overflows)
+            + "); the layout audit decides"
+        )
+    _shift_view(adapter, exploded, ring_shift, label="exploded isometric ring fit")
     table = insert_bom_table(
         adapter,
         exploded,
@@ -1405,18 +1653,18 @@ def _place_package(adapter: Any) -> None:
         exploded,
         items=balloon_items,
         label="summing exploded-view BOM coverage",
-        margin=0.012,
+        margin=EXPLODED_BALLOON_MARGIN,
     )
     _add_note_block(
         adapter,
         "EXPLODED ISOMETRIC 1:4",
-        (0.060, 0.263),
+        (0.018, 0.263),
         label="exploded-view heading",
     )
     _add_note_block(
         adapter,
-        "SEE SHEET 3 FOR ASSEMBLY; SHEET 4 FOR HANGER FIT/INSPECTION",
-        (0.060, 0.075),
+        "SEE SHEET 3 FOR ASSEMBLY, SHEET 4 FOR HANGER FIT, SHEET 5 FOR CHECKS",
+        (0.018, 0.037),
         label="exploded-view caption",
     )
 
@@ -1439,29 +1687,11 @@ def _place_package(adapter: Any) -> None:
         instruction_iso,
         label="summing instruction isometric",
     )
-    _add_note_block(
+    _stack_note_field(
         adapter,
-        ASSEMBLY_STEPS,
-        (0.018, 0.263),
-        label="assembly sequence",
-    )
-    _add_note_block(
-        adapter,
-        ASSEMBLY_CHECKS,
-        (0.018, 0.165),
-        label="assembly functional checks",
-    )
-    _add_note_block(
-        adapter,
-        SETUP_NOTES,
-        (0.265, 0.128),
-        label="neutral setup",
-    )
-    _add_note_block(
-        adapter,
-        INTERFACE_NOTES,
-        (0.265, 0.094),
-        label="external interfaces",
+        (("assembly sequence", ASSEMBLY_STEPS),),
+        NOTE_FIELD_LEFT,
+        label="sheet 3 note field",
     )
     _add_note_block(
         adapter,
@@ -1472,6 +1702,24 @@ def _place_package(adapter: Any) -> None:
 
     _activate_sheet(adapter, SHEET_NAMES[3])
     _place_hanger_fit_sheet(adapter)
+
+    _activate_sheet(adapter, SHEET_NAMES[4])
+    _stack_note_field(
+        adapter,
+        (("assembly functional checks", ASSEMBLY_CHECKS),),
+        NOTE_FIELD_LEFT,
+        label="sheet 5 left note field",
+    )
+    _stack_note_field(
+        adapter,
+        (
+            ("neutral setup", SETUP_NOTES),
+            ("external interfaces", INTERFACE_NOTES),
+        ),
+        NOTE_FIELD_RIGHT,
+        label="sheet 5 right note field",
+    )
+    _check_package_layout(adapter)
 
 
 async def build(adapter: Any) -> dict[str, str]:

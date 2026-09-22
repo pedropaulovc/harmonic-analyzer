@@ -1,6 +1,7 @@
 """Behavioral boundary contract for the summing assembly package."""
 
 import _config
+import pytest
 import build_summing_assembly
 import draw_summing_assembly
 import knife_hanger_stud_spec
@@ -70,7 +71,7 @@ def test_bom_budget_uses_measured_extents_against_sheet_and_title_block() -> Non
         anchor, width, (rows + 1) * draw_summing_assembly.BOM_ROW_HEIGHT
     ) == []
     # A table tall enough to reach the title block is refused by name.
-    violations = draw_summing_assembly.bom_extent_violations(anchor, width, 0.190)
+    violations = draw_summing_assembly.bom_extent_violations(anchor, width, 0.080)
     assert len(violations) == 1
     assert "title block" in violations[0]
     wide = draw_summing_assembly.bom_extent_violations(anchor, 0.300, 0.050)
@@ -93,3 +94,47 @@ def test_built_hanger_engagement_is_judged_against_the_receiver_band() -> None:
     assert any("printed band" in item for item in deep)
     # A mount whose built top is not where the stack says.
     assert any("knife-mount top" in item for item in violations(top + 0.5, 993.5765))
+
+
+def test_package_appends_the_checks_sheet_after_the_pinned_hanger_sheet() -> None:
+    # Sheet 4 must stay the hanger-fit sheet (the MHA-119 note cites it);
+    # checks/setup/interfaces live on an appended fifth sheet.
+    assert len(draw_summing_assembly.SHEET_NAMES) == 5
+    assert draw_summing_assembly.SHEET_NAMES[3] == "HANGER FIT + INSPECTION"
+    assert draw_summing_assembly.SHEET_NAMES[4] == "CHECKS + SETUP"
+    assert set(draw_summing_assembly.SHEET_SCALES) == set(
+        draw_summing_assembly.SHEET_NAMES
+    )
+    assert set(draw_summing_assembly.SHEET_LAYOUTS) == set(
+        draw_summing_assembly.SHEET_NAMES
+    )
+
+
+def test_note_fields_name_every_escaping_edge() -> None:
+    field = draw_summing_assembly.NOTE_FIELD_RIGHT
+    violations = draw_summing_assembly.note_field_violations
+    left, top, right, bottom = field
+    assert violations((left, bottom, right, top), field) == []
+    escaped = violations((left - 0.01, bottom - 0.01, right + 0.01, top + 0.01), field)
+    assert [item.split()[0] for item in escaped] == ["left", "right", "top", "bottom"]
+    # Both fields stay clear of the title block and of each other.
+    title_top = 0.066
+    assert draw_summing_assembly.NOTE_FIELD_RIGHT[3] > title_top
+    assert draw_summing_assembly.NOTE_FIELD_LEFT[2] < draw_summing_assembly.NOTE_FIELD_RIGHT[0]
+
+
+def test_balloon_ring_is_centred_in_its_region_or_refused() -> None:
+    region = draw_summing_assembly.EXPLODED_RING_REGION
+    shift, overflows = draw_summing_assembly.ring_fit_shift(
+        (0.10, 0.10, 0.14, 0.20), region, grow=0.02
+    )
+    assert overflows == []
+    ring = (0.08 + shift[0], 0.08 + shift[1], 0.16 + shift[0], 0.22 + shift[1])
+    assert ring[0] - region[0] == pytest.approx(region[2] - ring[2])
+    assert ring[1] - region[1] == pytest.approx(region[3] - ring[3])
+    _shift, overflows = draw_summing_assembly.ring_fit_shift(
+        (0.0, 0.0, 0.2, 0.3), region, grow=0.02
+    )
+    assert [item.split()[0] for item in overflows] == ["width", "height"]
+    # The ring region stays left of the relocated BOM.
+    assert region[2] < draw_summing_assembly.BOM_ANCHOR[0]

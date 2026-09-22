@@ -79,8 +79,8 @@ Inspect every page and complete the blind machinist review before release.
 
 ## Summing package
 
-`draw_summing_assembly.py` ships `MHA-A07` as four landscape ASME B sheets
-(`SHEET_NAMES`), each stamped `SHEET n OF 4`:
+`draw_summing_assembly.py` ships `MHA-A07` as five landscape ASME B sheets
+(`SHEET_NAMES`), each stamped `SHEET n OF 5`:
 
 1. **ASSEMBLED VIEWS** (1:4): collapsed `*Front`/`*Right` HLR views and a
    standard Shaded With Edges isometric, headed as the neutral reference pose.
@@ -88,23 +88,34 @@ Inspect every page and complete the blind machinist review before release.
    reference, and no parked or engaged configuration exists.
 2. **EXPLODED VIEW + BOM** (1:4): the builder-owned persisted
    `SUMMING_EXPLODED` presentation as a Shaded With Edges isometric with the
-   native BOM (seven rows, ten direct instances, one balloon per row). The
-   MHA-077 frame, its MHA-118 gooseneck set screw, and the twenty channel
-   MHA-090/MHA-011 spring connections are identified as external installation
-   interfaces rather than duplicated BOM occurrences.
-3. **ASSEMBLY + SETUP** (1:6): a finished-assembly isometric with the ordered
-   match-drill and assembly sequence, assembly-only functional checks, and the
-   neutral setup and external-interface notes. The MHA-077 hanger holes
-   transfer from the actual MHA-037 tap axes (the released top-frame print
-   keeps the native final hole size but carries no independent hanger X/Z
-   requirement), never from CAD marks.
-4. **HANGER FIT + INSPECTION** (1:1): a hanger-station parent isolated to
-   MHA-037/MHA-131/MHA-119, its hanger-axis section A-A, and detail B at 4:1
+   native BOM (seven rows, ten direct instances, one balloon per row). The view
+   is moved so its balloon ring fits `EXPLODED_RING_REGION`, left of the BOM,
+   which sits bottom-right above the title block. The MHA-077 frame, its MHA-118
+   gooseneck set screw, and the twenty channel MHA-090/MHA-011 spring
+   connections are identified as external installation interfaces rather than
+   duplicated BOM occurrences.
+3. **ASSEMBLY SEQUENCE** (1:6): a finished-assembly isometric with the ordered
+   match-drill and assembly sequence. The MHA-077 hanger holes transfer from the
+   actual MHA-037 tap axes (the released top-frame print keeps the native final
+   hole size but carries no independent hanger X/Z requirement), never from CAD
+   marks.
+4. **HANGER FIT + INSPECTION** (1:1 sheet): a hanger-station parent isolated to
+   MHA-037/MHA-131/MHA-119 (1:2), its hanger-axis section A-A (1:2, with the
+   bolts and washers drawn unsectioned per ASME Y14.3), and detail B at 4:1
    carrying the associative actual-edge engagement dimension E (MHA-037 tap
    mouth to MHA-119 finished tip) in the printed general `.XX` band, plus the
    per-side trim construction (CUT L = T + W + G + E) and as-built inspection
-   notes. E is the fit acceptance (the MHA-119 under-head length stays
-   reference); no load rating or minimum-turns requirement is claimed.
+   notes in the right note field. Before dimensioning, the drawing measures E
+   between the built mount and stud solids (`_assert_built_hanger_engagement`).
+   E is the fit acceptance (the MHA-119 under-head length stays reference).
+5. **CHECKS + SETUP** (notes only): the assembly-only functional checks, the
+   neutral/free-rocking setup and the external installation interfaces. The
+   sheet is appended after sheet 4 so the MHA-119 cross-reference stays valid.
+
+Note blocks stack top-down in the `NOTE_FIELD_*` fields at 3.5 mm text (the ASME
+Y14.2 minimum on B size is 3 mm). Each block's rendered `INote.GetExtent` is
+gated against its field, and the build ends with `check_drawing_layout` on every
+sheet: any overlap, border crossing or leader crossing fails the drawing.
 
 The MHA-119 stud drawing points back here: "TRIM/INSPECT TO MHA-A07 SHEET 4,
 HANGER FIT + INSPECTION, DETAIL B."
