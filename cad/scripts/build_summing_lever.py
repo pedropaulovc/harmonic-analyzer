@@ -527,6 +527,17 @@ async def _edge_rib(
 
 
 
+def _summation_top_arc_points() -> tuple[
+    tuple[float, float], tuple[float, float], tuple[float, float]
+]:
+    """Base end, tip end and interior point of the +Z summation side arc."""
+    return (
+        (0.0, SUM_BASE),
+        (TIP_X, ANCHOR_R),
+        (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV),
+    )
+
+
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 5: Top-plane leaf on the -X arm -- vertical base edge (x=0), two
     curved sides, short tip edge at the anchor (x=TIP_X)."""
@@ -535,10 +546,8 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     sd = SketchDims()
     check("create_sketch summation plate", await adapter.create_sketch("Top"))
     p1 = (0.0, -SUM_BASE)
-    p2 = (0.0, SUM_BASE)
-    p3 = (TIP_X, ANCHOR_R)
+    p2, p3, top_int = _summation_top_arc_points()
     p4 = (TIP_X, -ANCHOR_R)
-    top_int = (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV)
     bot_int = (SX * SUM_H / 2.0, -SUM_BASE / 2.0 + SUM_CURV)
 
     set_sketch_direct_db(adapter, True)
@@ -977,6 +986,92 @@ async def _drawing_reference_sketches(
     drive_jobs += pattern.apply(adapter, "PatternReferences")
 
 
+async def _summation_arc_reference(
+    adapter, drive_jobs: list[tuple[str, str]]
+) -> None:
+    """Locate the R138.8 summation arc centre for the print (rule 11, R3 B2).
+
+    The arc runs from the boss quadrant to the plate-end corner ON the cylinder
+    axis, which is buried in the cylinder, so radius plus the one visible end
+    does not lay the arc out.  The centre is circumcentre-derived (no clean
+    global) and already implied by the profile, so it lives here as a reference
+    sketch whose two driving dims ARE the printed values, measured from the plate
+    end face on the cylinder axis.  Construction line A is the +Z trunnion's
+    centreline (its start is that datum, its end clears the trunnion for the
+    witness line); line B is a short stub from the centre along the witness line
+    the vertical dimension draws anyway.  Values restate the model's own
+    ``_circumcenter`` of the same three points, so no geometry moves.
+    """
+    base_end, tip_end, interior = _summation_top_arc_points()
+    cx, cy = _circumcenter(base_end, tip_end, interior)
+    arc = SketchDims()
+    check("create summation-arc reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "summation-arc datum on the trunnion axis",
+        await adapter.add_line(0.0, SUM_BASE, 0.0, HEX_Z_OUTER),
+    )
+    centre = check(
+        "summation-arc centre stub",
+        await adapter.add_line(cx, cy, cx + 20.0, cy),
+    )
+    set_sketch_direct_db(adapter, False)
+    for entity in (axis, centre):
+        _as_construction(adapter, entity)
+    check(
+        "summation-arc datum vertical",
+        await adapter.add_sketch_constraint(axis, None, "vertical"),
+    )
+    check(
+        "summation-arc centre stub horizontal",
+        await adapter.add_sketch_constraint(centre, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, SUM_BASE, "summation-arc datum"
+    )
+    arc.record("SummationArcDatumZ", '"PlateL" / 2')
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        HEX_Z_OUTER - SUM_BASE,
+        "summation-arc datum length",
+    )
+    arc.record("SummationArcDatumLength", '"HexDepth"')
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{axis}.end",
+        "horizontal_distance",
+        abs(cx),
+        "summation-arc centre from the cylinder axis",
+    )
+    arc.record("SummationArcCentreX")
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{axis}.start",
+        "vertical_distance",
+        cy - SUM_BASE,
+        "summation-arc centre beyond the plate end",
+    )
+    arc.record("SummationArcCentreZ")
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{centre}.end",
+        "horizontal_distance",
+        20.0,
+        "summation-arc centre stub length",
+    )
+    arc.record(None)
+    await ensure_fully_defined(adapter, "summation-arc reference sketch")
+    check("exit summation-arc reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "SummationArcReference")
+    drive_jobs += arc.apply(adapter, "SummationArcReference")
+
+
 def _set_parenthetical_dimension(
     adapter, feature_name: str, dimension_name: str, *, prefix: str = ""
 ) -> None:
@@ -1072,6 +1167,7 @@ async def build(adapter) -> dict[str, str]:
     await _middle_rib(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _drawing_reference_sketches(adapter, drive_jobs)
+    await _summation_arc_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -1149,6 +1245,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(
         adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
     )
+    # Both arc centres, one per side, mirror about the boss axis.
+    for name in ("SummationArcCentreX", "SummationArcCentreZ"):
+        set_dimension_prefix(adapter, "SummationArcReference", name, "2X ")
     _set_parenthetical_dimension(
         adapter,
         "SpringHolePattern",
