@@ -63,11 +63,13 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     IN,
     SketchDims,
     _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
@@ -117,6 +119,42 @@ from summing_lever_spec import (
     HOLE_Z_OFFSET,
     SURFACE_FINISHES,
 )
+
+# GetTypeName2 classes that describe construction geometry rather than material.
+# The plane/axis members are blanked out of every saved render; the two profile
+# classes are inventoried beside them because they are the other reference
+# shapes a reader sees as clutter, and deliberately NOT blanked -- hiding a
+# sketch hides the dimensions that describe it.
+_REFERENCE_GEOMETRY_TYPES = (
+    "RefPlane",
+    "RefAxis",
+    "ProfileFeature",
+    "3DProfileFeature",
+)
+_BLANKABLE_SELECT_TYPE = {"RefPlane": "PLANE", "RefAxis": "AXIS"}
+
+
+def _reference_geometry_inventory(adapter) -> tuple[tuple[str, str, object], ...]:
+    """Name, type and current visibility of every reference/sketch feature.
+
+    Walked through ``_read_member`` only, with no in-place method flagging:
+    ``mark_dimensions_for_drawing`` walks the same shared ``IFeature`` wrappers
+    later in this build and a flagged wrapper flips ``GetTypeName2`` to method
+    dispatch for it.  Visibility is logged verbatim, never interpreted.
+    """
+    found: list[tuple[str, str, object]] = []
+    pending = [_read_member(adapter.currentModel, "FirstFeature")]
+    while pending:
+        feature = pending.pop()
+        while feature:
+            name = str(_read_member(feature, "Name"))
+            kind = str(_read_member(feature, "GetTypeName2"))
+            if kind in _REFERENCE_GEOMETRY_TYPES:
+                found.append((name, kind, _read_member(feature, "Visible")))
+            pending.append(_read_member(feature, "GetFirstSubFeature"))
+            feature = _read_member(feature, "GetNextFeature")
+    return tuple(found)
+
 
 PART_NAME = "summing-lever"
 MATERIAL = "Gray Cast Iron"  # see _common.apply_material docstring
@@ -1107,11 +1145,25 @@ async def build(adapter) -> dict[str, str]:
     knife_axis = await name_bore_axis(
         adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
     )
-    # Blank the axes out of every saved render (they still select for mates):
-    # left visible, one dashes out of the boss in the isometric and one prints
-    # as a stray dashed line on the spring-pattern sheet.
+    # Blank EVERY plane and axis out of the saved renders, not only the three
+    # named mates: the unnamed offset planes name_bore_axis stacks up print as
+    # clutter too.  All of them stay selectable -- BlankRefGeom hides, it does
+    # not suppress -- so the three named axes still carry their mates.
+    named_axes = tuple((name, "AXIS") for name in (pivot_axis, anchor_axis, knife_axis))
+    reference_geometry = _reference_geometry_inventory(adapter)
+    _telemetry.info(f"reference-geometry inventory: {list(reference_geometry)!r}")
     blank_reference_geometry(
-        adapter, tuple((name, "AXIS") for name in (pivot_axis, anchor_axis, knife_axis))
+        adapter,
+        tuple(
+            dict.fromkeys(
+                named_axes
+                + tuple(
+                    (name, _BLANKABLE_SELECT_TYPE[kind])
+                    for name, kind, _visible in reference_geometry
+                    if kind in _BLANKABLE_SELECT_TYPE
+                )
+            )
+        ),
     )
 
     await apply_material(adapter, MATERIAL)
@@ -1126,12 +1178,18 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # Only ASME multipliers survive as prefixes: the prose qualifiers are gone,
-    # so the radial dimensions print their native R and the Detail A note -- not
-    # a "HEX A/F" qualifier -- is what says the profile is nonregular.
+    # A prefix occupies swDimensionTextPrefix, which is exactly where the radius
+    # symbol lives: a RADIAL dimension carrying a multiplier must therefore spell
+    # the R itself ("2X R") or the multiplier displaces it -- the R1 render at
+    # C:/src/summing-logs/lever-0e4dfc4b/sheet-1.png printed "2X 15.2".  The two
+    # LINEAR dims displace no native symbol and print correctly as "2X 21.7" and
+    # "2X 5.08", so they keep the bare "2X ".
     set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
-    set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X ")
+    set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X R")
+    set_dimension_prefix(
+        adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
+    )
     _set_parenthetical_dimension(
         adapter,
         "SpringHolePattern",

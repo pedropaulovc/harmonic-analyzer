@@ -100,13 +100,11 @@ _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 
 FORM_FRONT_CENTER = (0.150, 0.220)
 FORM_TOP_CENTER = (0.150, 0.105)  # same X: true third-angle projection
-ISO_CENTER = (0.335, 0.165)
+# Sheet-2 pictorial, parked clear of the staggered pattern-dimension lanes.
+ISO_CENTER = (0.340, 0.195)
 PATTERN_CENTER = (0.165, 0.145)
-DETAIL_CENTER = (0.300, 0.150)
-# Detail A lives on sheet 2. A detail view cannot be moved across sheets
-# (IView::Sheet is get-only and no view-move API exists), so its *Front parent is
-# re-created here and hidden once the detail it feeds is fully annotated.
-DETAIL_PARENT_CENTER = (0.300, 0.245)
+# Sheet-1 Detail A, cut from the real (still visible) *Front view.
+DETAIL_CENTER = (0.330, 0.155)
 DETAIL_SCALE = (2.0, 1.0)
 DETAIL_RADIUS_MM = CYL_R + 3.3
 
@@ -162,14 +160,40 @@ def _attach_radial_leaders(
         raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
 
 
+def _log_radial_display_text(
+    adapter: Any, annotations: Any, names: tuple[str, ...], label: str
+) -> None:
+    """Print every native text compartment of the named radial dimensions.
+
+    ``GetText(0)`` is the resolved display string a reader actually sees; parts 1
+    and 5 are the writable prefix and its definition.  All of 0-8 go to the log
+    verbatim so the drawing-side result can be compared with the model-side
+    prefix -- persistence itself is already proved by ``set_dimension_prefix``.
+    """
+    wanted = set(names)
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        display = _early_bound(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        compartments = {part: str(display.GetText(part) or "") for part in range(9)}
+        _telemetry.info(f"radial display text {label} {name}: {compartments!r}")
+        wanted.discard(name)
+    if wanted:
+        raise RuntimeError(f"{label}: no radial dimension named {sorted(wanted)!r}")
+
+
 FORM_FRONT_KEEP = {
     "CylDia": (0.155, 0.258),
-    "PlateThickness": (0.1880, 0.2200),
-    "WebThickness": (0.1240, 0.2145),
-    "AnchorHeight": (0.1120, 0.2248),
-    "MidRibArcR": (0.1780, 0.2300),
-    "MidRibLeftX": (0.1690, 0.2065),
-    "EdgeRibFrontArcR": (0.1930, 0.2130),
+    "AnchorHeight": (0.0980, 0.2300),
+    "WebThickness": (0.1080, 0.2130),
+    "MidRibArcR": (0.1700, 0.2420),
+    "PlateThickness": (0.2050, 0.2200),
+    "MidRibRightX": (0.1413, 0.2020),
+    "MidRibLeftX": (0.1690, 0.2020),
+    "EdgeRibFrontArcR": (0.1950, 0.1950),
 }
 FORM_TOP_KEEP = {
     "PlateWidth": (0.1714, 0.1650),
@@ -179,23 +203,34 @@ FORM_TOP_KEEP = {
     "HexKnifeFrontDepth": (0.1470, 0.1530),
     "EdgeRibThickness": (0.1900, 0.1418),
     "MiddleRibThickness": (0.1960, 0.1050),
-    "SummationArcRadius": (0.1285, 0.1385),
+    "SummationArcRadius": (0.1430, 0.1270),
     "BossAxialLocation": (0.1130, 0.0860),
 }
 DETAIL_KEEP = {
-    "HexWidth": (0.300, 0.108),
-    "HexHeight": (0.348, 0.150),
-    # Clear of the detail circle (x 0.268-0.332) so the text stays outside the
-    # depicted silhouette; only its extension lines cross geometry.
-    "HexKnifeFrontSideFlat": (0.2500, 0.1500),
+    "HexWidth": (0.330, 0.113),
+    "HexHeight": (0.378, 0.155),
+    # 0.0634 from the drawn detail centre against a 0.0468 fence radius: the
+    # text box clears the fence entirely, so only its extension lines cross
+    # geometry and SolidWorks jogs the leader instead of ruling it through text.
+    "HexKnifeFrontSideFlat": (0.280, 0.1770),
 }
 PATTERN_KEEP = {
     "HoleSeedX": (0.190, 0.205),
-    "HolePitch": (0.212, 0.128),
-    "HoleStartOffset": (0.228, 0.104),
+    "HolePitch": (0.245, 0.128),
+    "HoleStartOffset": (0.250, 0.100),
     "PatternSpan": (0.228, 0.145),
-    "HoleEndOffsetLast": (0.235, 0.181),
+    "HoleEndOffsetLast": (0.252, 0.181),
 }
+
+# The whole general-note block: four lines, sheet 1 upper right beside Detail A.
+# Pinned to four on purpose -- the drawing simplicity policy treats a growing
+# note block as the disease the migration cures, not as the cure.
+MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
+    ("CLOCK KNIFE RIDGE TO BOSS AXIS", 0.230, 0.255),
+    ("NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES", 0.230, 0.246),
+    ("KNIFE RIDGES SHARP; NO EDGE BREAK", 0.230, 0.237),
+    ("Ra 1.6 ON ALL SIX FLATS, BOTH TRUNNIONS", 0.230, 0.228),
+)
 
 
 def _knife_detail(adapter: Any, front: Any) -> Any:
@@ -518,15 +553,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "*Top",
         *FORM_TOP_CENTER,
     )
-    iso = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *ISO_CENTER,
-    )
-    for label, view in (("form front", front), ("form top", top), ("iso", iso)):
+    for label, view in (("form front", front), ("form top", top)):
         _assert_uses_sheet_scale(view, label)
-    for view in (front, top, iso):
+    for view in (front, top):
         set_hidden_lines_removed(adapter, view)
 
     front_dimensions = curate_view_dimensions(
@@ -550,6 +579,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, front_dimensions, ("MidRibArcR", "EdgeRibFrontArcR"), "form front"
     )
     _attach_radial_leaders(
+        adapter, top_dimensions, ("SummationArcRadius",), "form top"
+    )
+    # What these two actually PRINT, read back off the drawing side.  The model
+    # prefix is already proved by set_dimension_prefix's own read-back, so this
+    # logs every native text compartment verbatim rather than re-asserting.
+    _log_radial_display_text(
+        adapter, front_dimensions, ("EdgeRibFrontArcR",), "form front"
+    )
+    _log_radial_display_text(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
     )
     # This is a read-only measurement of the actual knife-ridge endpoints,
@@ -614,7 +652,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     if int(overall_dimension.GetToleranceType()) != 0:  # swTolNONE
         raise RuntimeError("overall trunnion reference unexpectedly carries a tolerance")
-    overall_text_xy = (0.070, FORM_TOP_CENTER[1])
+    overall_text_xy = (0.045, 0.105)
     if not overall_annotation.SetPosition2(*overall_text_xy, 0.0):
         raise RuntimeError("failed to position overall trunnion reference text")
     overall_text_position = tuple(
@@ -636,7 +674,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=counter_tap_edge,
-        callout_xy=(0.070, 0.125),
+        callout_xy=(0.060, 0.170),
         label="counter-spring anchor tap",
     )
     _omit_default_thread_class(
@@ -651,63 +689,12 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
-        raise RuntimeError("failed to activate summing-lever spring-pattern sheet")
-    pattern = place_view(
-        adapter,
-        str(SOURCE),
-        "*Top",
-        *PATTERN_CENTER,
-    )
-    _assert_uses_sheet_scale(pattern, "spring-pattern plan")
-    set_hidden_lines_removed(adapter, pattern)
-    pattern_dimensions = curate_view_dimensions(
-        adapter,
-        pattern,
-        keep=PATTERN_KEEP,
-        view_label="spring-pattern plan",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    seed_rim_right = _top_xy(
-        HOLE_X + HOLE_DIA / 2.0,
-        HOLE_Z_LAST,
-        center=PATTERN_CENTER,
-        scale=PATTERN_SCALE,
-    )
-    # Clears both the (8.43) reference and the Detail A circle (x 0.268-0.332,
-    # y 0.118-0.182).
-    spring_callout = add_native_hole_callout(
-        adapter,
-        pattern,
-        edge_xy=seed_rim_right,
-        callout_xy=(0.245, 0.222),
-        label="spring-hole pattern",
-    )
-    _omit_default_thread_class(
-        spring_callout,
-        HOLE_SPEC.thread_class,
-        "spring-hole pattern",
-    )
-    _assert_model_thread_class(
-        source_part,
-        "SpringHoleSeed",
-        HOLE_SPEC.thread_class,
-        "spring-hole pattern",
-    )
-
-    # Detail A sits here with the spring field it belongs to. A detail view
-    # cannot be moved across sheets, so its *Front parent is re-created at its
-    # own coordinates and hidden once the detail is fully annotated. The parent
-    # carries no curated dimensions.
-    detail_parent = place_view(
-        adapter,
-        str(SOURCE),
-        "*Front",
-        *DETAIL_PARENT_CENTER,
-    )
-    _assert_uses_sheet_scale(detail_parent, "detail-A parent")
-    set_hidden_lines_removed(adapter, detail_parent)
-    detail = _knife_detail(adapter, detail_parent)
+    # Detail A rides sheet 1 under the real front view. The R1 round hid the
+    # detail's dedicated *Front parent, which took the fence circle and the "A"
+    # letter with it -- the very thing that names the detail. Cross-sheet view
+    # moves are refused outright (IView::Sheet is get-only), so every view is
+    # created on the sheet it belongs to and this parent stays visible.
+    detail = _knife_detail(adapter, front)
     set_hidden_lines_removed(adapter, detail)
     detail_dimensions = curate_view_dimensions(
         adapter,
@@ -732,44 +719,69 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge_entity=knife_surface_edge,
-        symbol_xy=(0.330, 0.196),
+        symbol_xy=(0.360, 0.206),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
         leader_attach_xy=knife_surface_xy,
         char_height=0.0025,
     )
-    if (
-        add_note(
-            adapter,
-            "CLOCK KNIFE RIDGE TO BOSS AXIS",
-            0.255,
-            0.100,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to label knife-ridge clocking")
-    if (
-        add_note(
-            adapter,
-            "NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES",
-            0.255,
-            0.090,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to state the nonregular knife profile")
+    for note_text, note_x, note_y in MANUFACTURING_NOTES:
+        if add_note(adapter, note_text, note_x, note_y) is None:
+            raise RuntimeError(f"failed to state {note_text!r}")
 
-    # IView::SetVisible is VT_VOID -- the effect is only proven by GetVisible,
-    # and hiding the parent must not take the detail it feeds with it.
-    _early_bound(detail_parent, "IView").SetVisible(False, False)
-    drawing_model.EditRebuild3()
-    parent_hidden = bool(_early_bound(detail_parent, "IView").GetVisible())
-    detail_visible = bool(_early_bound(detail, "IView").GetVisible())
-    if parent_hidden is not False or detail_visible is not True:
-        raise RuntimeError(
-            f"detail-A visibility did not persist: "
-            f"parent.GetVisible()={parent_hidden!r}, detail.GetVisible()={detail_visible!r}"
-        )
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate summing-lever spring-pattern sheet")
+    pattern = place_view(
+        adapter,
+        str(SOURCE),
+        "*Top",
+        *PATTERN_CENTER,
+    )
+    iso = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ISO_CENTER,
+    )
+    for label, view in (
+        ("spring-pattern plan", pattern),
+        ("spring-pattern pictorial", iso),
+    ):
+        _assert_uses_sheet_scale(view, label)
+    for view in (pattern, iso):
+        set_hidden_lines_removed(adapter, view)
+    pattern_dimensions = curate_view_dimensions(
+        adapter,
+        pattern,
+        keep=PATTERN_KEEP,
+        view_label="spring-pattern plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    seed_rim_right = _top_xy(
+        HOLE_X + HOLE_DIA / 2.0,
+        HOLE_Z_LAST,
+        center=PATTERN_CENTER,
+        scale=PATTERN_SCALE,
+    )
+    # Above the staggered pattern-dimension lanes, left of the pictorial.
+    spring_callout = add_native_hole_callout(
+        adapter,
+        pattern,
+        edge_xy=seed_rim_right,
+        callout_xy=(0.245, 0.222),
+        label="spring-hole pattern",
+    )
+    _omit_default_thread_class(
+        spring_callout,
+        HOLE_SPEC.thread_class,
+        "spring-hole pattern",
+    )
+    _assert_model_thread_class(
+        source_part,
+        "SpringHoleSeed",
+        HOLE_SPEC.thread_class,
+        "spring-hole pattern",
+    )
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
