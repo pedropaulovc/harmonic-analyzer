@@ -142,3 +142,17 @@ def test_bore_crown_contacts_ridge_and_clears_required_rock_sweep_at_limits() ->
         )
 
     assert minimum_clearance > 0.0
+
+
+def test_summing_assembly_imports_the_knife_mount_tap_contract() -> None:
+    """The assembly consumes the tap contract by name; a rename must fail here.
+
+    5849f9d5 dropped STUD_TAP_DEPTH while build_summing_assembly still
+    imported it, and only check:math's spring gate noticed.
+    """
+    import build_summing_assembly
+
+    assert (
+        build_summing_assembly.STUD_TAP_THREAD_DEPTH_MM
+        == knife_mount_spec.STUD_TAP_THREAD_DEPTH_MM
+    )
