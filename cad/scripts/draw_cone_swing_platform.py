@@ -359,12 +359,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for annotation in section_annotations:
         if dimension_name(adapter, annotation) == "PlateThk":
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-            print(f"PlateThk witness before: smart={display.SmartWitness} max={display.MaxWitnessLineLength}")
-            display.SmartWitness = True
-            rebuild_drawing(adapter, label="smart plate thickness witness lines")
-            if display.SmartWitness is not True:
-                raise RuntimeError("plate thickness refused smart witness display")
-            print(f"PlateThk witness after: smart={display.SmartWitness} max={display.MaxWitnessLineLength}")
+            for witness_index in (0, 1):
+                ok, _use_doc, old_gap = display.GetWitnessLineGap(witness_index, False, 0.0)
+                if ok is not True:
+                    raise RuntimeError("plate thickness witness gap could not be read")
+                # Measured native witness origin is x415; the actual cut edge
+                # is x310.2. Leave a visible 1.2 mm gap at x309, without
+                # changing the model dimension or hiding either witness.
+                gap = float(old_gap) + 0.106
+                if display.SetWitnessLineGap(witness_index, False, gap) is not True:
+                    raise RuntimeError("plate thickness witness gap was refused")
+                ok, use_doc, actual_gap = display.GetWitnessLineGap(witness_index, False, 0.0)
+                if ok is not True or use_doc or abs(float(actual_gap) - gap) > 1e-8:
+                    raise RuntimeError("plate thickness witness gap did not persist")
+                print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
+            rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
     annotations = [
         *profile_annotations,
         *feature_annotations,
@@ -434,6 +443,22 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     for sheet_geometry in collect_document(adapter):
         print(describe_sheet(sheet_geometry))
+        thickness_geometry = [
+            item for item in sheet_geometry.annotations if item.label == "PlateThk"
+        ]
+        if len(thickness_geometry) != 1:
+            raise RuntimeError("expected one measured plate thickness annotation")
+        witnesses = [
+            segment for segment in thickness_geometry[0].segments
+            if abs(segment.y0 - segment.y1) < 1e-8
+            and any(abs(segment.y0 - level) < 0.0001 for level in (0.09865, 0.11135))
+        ]
+        if len(witnesses) != 2 or any(
+            abs(max(segment.x0, segment.x1) - 0.309) > 0.0005
+            or abs(min(segment.x0, segment.x1) - 0.299) > 0.0005
+            for segment in witnesses
+        ):
+            raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
 
     return await finalize_drawing(
