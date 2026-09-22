@@ -254,13 +254,17 @@ def _front_y(model_y_mm: float) -> float:
 
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
+    # 29.6 sits 8 mm further out and the Ø12.00 THRU callout 3 mm further in:
+    # at -0.060/-0.048 the callout's shoulder crossed the 29.6 dimension line
+    # and its Ø glyph straddled it (knife-cc-6 render).
+    "BlockHeight": (FRONT_CENTER[0] - 0.068, FRONT_CENTER[1]),
+    "BoreDia": (FRONT_CENTER[0] - 0.045, _front_y(BORE_CY) + 0.026),
     "BoreFromTop": (FRONT_CENTER[0] + 0.043, FRONT_CENTER[1]),
-    # 12.00 at its own dimension-line midpoint (the bore centreline is only
-    # 24 mm from the left edge), so it stops reading as '12.00 ->A' against
-    # the section line's upper arrow.
-    "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(BLK_TOP) + 0.014),
+    # 12.0 at its own dimension-line midpoint (the bore centreline is only
+    # 24 mm from the left edge), so it stops reading as '12.0 ->A' against
+    # the section line's upper arrow; 0.020 above the block top keeps its
+    # outside arrowhead ~6 mm clear of that arrow's stem (0.014 left ~1 mm).
+    "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(BLK_TOP) + 0.020),
 }
 SECTION_KEEP = {
     "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
@@ -927,7 +931,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         p1=(TOP_CENTER[0] - tap_radius_sheet, TOP_CENTER[1]),
         # Text at the dimension line's midpoint: centred on the tap (the old
-        # TOP_CENTER x) the tap's own centreline ran up into '(12.00)'.
+        # TOP_CENTER x) the tap's own centreline ran up into '(12.0)'.
         text_xy=(
             TOP_CENTER[0] - BLK_HALF_X * SHEET_SCALE[0] / 2000.0,
             TOP_CENTER[1] + 0.027,
