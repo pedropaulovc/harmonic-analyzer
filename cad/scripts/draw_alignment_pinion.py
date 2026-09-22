@@ -99,6 +99,8 @@ def _hide_profile_tooth_edges(adapter: Any, view: Any) -> None:
             or not _early_bound(curve, "ICurve").IsLine()
         ):
             continue
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
         start_xyz = tuple(float(value) for value in start.GetPoint())
         end_xyz = tuple(float(value) for value in end.GetPoint())
         span_mm = (
