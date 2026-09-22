@@ -441,6 +441,12 @@ def test_drawn_edge_witnesses_pass() -> None:
         ((0.069, 0.21266), (0.08345, 0.21266)),
         ((0.069, 0.12246), (0.09234, 0.12246)),
     )
+    # stud-14's census: the witnesses end exactly at the drawn edge ends.
+    stud14 = _finished_ink(
+        ((0.08495, 0.21266), (0.069, 0.21266)),
+        ((0.09384, 0.12246), (0.069, 0.12246)),
+    )
+    assert drawing._extension_line_problems(stud14, STUD12_SILHOUETTE) == []
     assert drawing._extension_line_problems(ink, STUD12_SILHOUETTE) == []
     assert (
         drawing._dimension_ink_problems(
@@ -512,3 +518,43 @@ def test_bearing_circle_is_told_from_the_hex_underside(monkeypatch) -> None:
     assert drawing._circle_edge(None, radius, axial, label="bearing") is bearing
     with pytest.raises(RuntimeError, match="no circle"):
         drawing._circle_edge(None, radius, axial - 1.0, label="bearing")
+
+
+def _turned(point: tuple[float, float]) -> tuple[float, float]:
+    """The same sheet point with the view turned 90 deg (axis horizontal)."""
+    return (point[1], -point[0])
+
+
+def _turned_box(box: tuple[float, float, float, float]) -> tuple[float, ...]:
+    a, b = _turned(box[:2]), _turned(box[2:])
+    return (min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+
+
+def test_extension_gate_reads_either_orientation() -> None:
+    # stud-12's bad witnesses and stud-14's good ones, replayed with the view
+    # turned so the dimension line is horizontal and its extensions vertical.
+    silhouette = tuple(_turned_box(box) for box in STUD12_SILHOUETTE)
+
+    def turned_ink(*witnesses):
+        lines = (*witnesses, *STUD12_DIMENSION_LINE)
+        return drawing.DimensionInk(
+            name="FinishedOverall",
+            lines=tuple((_turned(a), _turned(b)) for a, b in lines),
+            arcs=(),
+            triangles=(),
+            arrowheads=2,
+        )
+
+    bad = turned_ink(
+        ((0.104, 0.21266), (0.069, 0.21266)),
+        ((0.1294, 0.12246), (0.069, 0.12246)),
+    )
+    problems = drawing._extension_line_problems(bad, silhouette)
+    assert len(problems) == 2
+    assert "19.0 mm into the part" in problems[0]
+    assert "through the part and 15.2 mm past it" in problems[1]
+    good = turned_ink(
+        ((0.069, 0.21266), (0.08495, 0.21266)),
+        ((0.069, 0.12246), (0.09384, 0.12246)),
+    )
+    assert drawing._extension_line_problems(good, silhouette) == []

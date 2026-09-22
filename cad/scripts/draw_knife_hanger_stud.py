@@ -599,39 +599,70 @@ def _dimension_ink_problems(
     return problems
 
 
+def _linear_dimension_lines(
+    ink: DimensionInk,
+) -> tuple[int, float, list[tuple[Point, Point]]] | None:
+    """Split a linear dimension's lines: (axis, dimension-line coordinate, extensions).
+
+    ``axis`` is the sheet coordinate (0 = x, 1 = y) the extension lines run
+    along. The dimension line is the group of axis-parallel lines that are all
+    collinear; the extension lines are the other group, parallel and offset by
+    the measured distance. None when the ink is not a linear dimension.
+    """
+    groups: dict[int, list[tuple[Point, Point]]] = {0: [], 1: []}
+    for a, b in ink.lines:
+        for along in (0, 1):
+            if abs(a[1 - along] - b[1 - along]) <= LINE_AXIS_TOLERANCE_M:
+                groups[along].append((a, b))
+                break
+
+    def collinear(lines: list[tuple[Point, Point]], along: int) -> bool:
+        return bool(lines) and all(
+            abs(a[1 - along] - lines[0][0][1 - along]) <= LINE_AXIS_TOLERANCE_M
+            for a, _b in lines
+        )
+
+    for along in (0, 1):
+        dimension, extensions = groups[1 - along], groups[along]
+        if (
+            collinear(dimension, 1 - along)
+            and extensions
+            and not collinear(extensions, along)
+        ):
+            return along, dimension[0][0][along], extensions
+    return None
+
+
 def _extension_line_problems(
     ink: DimensionInk, silhouette: tuple[Box, ...]
 ) -> list[str]:
-    """Extension lines of a vertical linear dimension that enter the part.
+    """Extension lines of a linear dimension that enter the part.
 
-    The dimension line is the vertical ink; every horizontal line is an
-    extension line whose far end (away from the dimension line) must stop at
+    Every extension line's far end (away from the dimension line) must stop at
     the silhouette row it points into, not run into or across the part.
     """
-    uprights = [
-        (a, b) for a, b in ink.lines if abs(a[0] - b[0]) <= LINE_AXIS_TOLERANCE_M
-    ]
-    if not uprights or not silhouette:
+    split = _linear_dimension_lines(ink) if silhouette else None
+    if split is None:
         return []
-    dimension_x = sum(a[0] for a, _b in uprights) / len(uprights)
+    along, dimension_c, extensions = split
+    across = 1 - along
     problems = []
-    for a, b in ink.lines:
-        if abs(a[1] - b[1]) > LINE_AXIS_TOLERANCE_M or (a, b) in uprights:
-            continue
-        near, far = sorted((a, b), key=lambda point: abs(point[0] - dimension_x))
-        toward = 1.0 if far[0] >= near[0] else -1.0
+    for a, b in extensions:
+        near, far = sorted((a, b), key=lambda point: abs(point[along] - dimension_c))
+        toward = 1.0 if far[along] >= near[along] else -1.0
         worst = None
         for box in silhouette:
             if not (
-                box[1] - EXTENSION_ROW_TOLERANCE_M
-                <= far[1]
-                <= box[3] + EXTENSION_ROW_TOLERANCE_M
+                box[across] - EXTENSION_ROW_TOLERANCE_M
+                <= far[across]
+                <= box[across + 2] + EXTENSION_ROW_TOLERANCE_M
             ):
                 continue
-            near_side, far_side = (box[0], box[2]) if toward > 0 else (box[2], box[0])
-            entry = (far[0] - near_side) * toward
+            low, high = box[along], box[along + 2]
+            near_side, far_side = (low, high) if toward > 0 else (high, low)
+            entry = (far[along] - near_side) * toward
             if entry > EXTENSION_ENTRY_MAX_M and (worst is None or entry > worst[0]):
-                worst = (entry, (far[0] - far_side) * toward, box)
+                worst = (entry, (far[along] - far_side) * toward, box)
         if worst is None:
             continue
         entry, past, box = worst
