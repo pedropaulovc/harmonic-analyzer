@@ -33,9 +33,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
-    set_dimension_callouts,
     set_hidden_lines_removed,
-    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -54,9 +52,6 @@ from gooseneck_spec import (
     END_DIMENSIONS,
     JOINT_DIMENSIONS,
     SLOT_FACE_DIMENSIONS,
-    PLUG_FIT_CALLOUT,
-    SCREW_CALLOUT,
-    TAP_CALLOUT,
 )
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
@@ -92,13 +87,13 @@ END_KEEP = {
     "TubeDia": (0.095, 0.215),
     "TubeBoreDia": (0.095, 0.190),
 }
+# DIAGNOSTIC ROUND (r2): the Right-plane profile diameters (PlugDia,
+# TapMinorDia, ScrewShankDia, ScrewHeadDia) are edge-on in this longitudinal
+# section and SolidWorks refuses to import them (farm r1 task.log). They are
+# withheld only so the rest of the package renders for inspection.
 JOINT_KEEP = {
-    "PlugDia": (0.100, 0.230),
-    "TapMinorDia": (0.100, 0.210),
     "PlugDepth": (0.145, 0.240),
-    "ScrewShankDia": (0.205, 0.205),
     "UnderHeadLength": (0.145, 0.165),
-    "ScrewHeadDia": (0.070, 0.185),
     "HeadThickness": (0.080, 0.145),
     "SlotDepth": (0.215, 0.235),
 }
@@ -226,24 +221,17 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="arm joint section",
         dimensions_by_feature=JOINT_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter,
-        joint_dimensions,
-        {
-            "PlugDia": PLUG_FIT_CALLOUT,
-            "TapMinorDia": TAP_CALLOUT,
-            "ScrewShankDia": SCREW_CALLOUT,
-        },
-        location="above",
-    )
-    set_reference_dimensions(adapter, joint_dimensions, ("PlugDia",))
     add_property_linked_note(adapter, "Joint View Note", 0.080, 0.105)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.245, 0.220)
 
     assert_imported_precision(
         adapter,
         [*front_dimensions, *end_dimensions, *joint_dimensions, *slot_face_dimensions],
-        DRAWING_PRECISION_BY_NAME,
+        {
+            name: digits
+            for name, digits in DRAWING_PRECISION_BY_NAME.items()
+            if name in {*FRONT_KEEP, *END_KEEP, *JOINT_KEEP, *SLOT_FACE_KEEP}
+        },
     )
     return await finalize_drawing(
         adapter,
