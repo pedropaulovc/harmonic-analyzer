@@ -79,48 +79,48 @@ Inspect every page and complete the blind machinist review before release.
 
 ## Summing package
 
-`draw_summing_assembly.py` uses four landscape ASME B sheets: collapsed
-assembled Front/Right HLR views with a standard Shaded With Edges isometric,
-the builder-owned persisted `SUMMING_EXPLODED` presentation with a native
-seven-row BOM and one balloon per row, ordered assembly/setup instructions
-with functional checks, and an associative hanger-axis section/detail carrying
-the actual MHA-037 tap-mouth to MHA-119 finished-tip fit dimension. The BOM
-contains the ten direct instances only.
-Top-frame MHA-077, its MHA-118 gooseneck set screw, and the twenty channel
-MHA-090/MHA-011 spring connections are identified as external installation
-interfaces rather than duplicated BOM occurrences.
+`draw_summing_assembly.py` ships `MHA-A07` as four landscape ASME B sheets
+(`SHEET_NAMES`), each stamped `SHEET n OF 4`:
 
-MHA-077 retains the native final hanger-hole size, but the released top-frame
-print carries no independent hanger X/Z requirement. Fit MHA-073 between the
-actual MHA-037 pair first, preserve both knife contacts and free axial rock,
-then align its counter-boss tap axis with the MHA-077 guide-bore axis in one
-plane normal to the knife axis. Transfer the actual MHA-037 tap centres, remove
-the fitted set, and only then pilot and drill the MHA-077 clearance holes;
-never enter the mount taps or recenter to CAD marks. Retain the identified
-front/rear MHA-077/MHA-037 set as non-interchangeable.
+1. **ASSEMBLED VIEWS** (1:4): collapsed `*Front`/`*Right` HLR views and a
+   standard Shaded With Edges isometric, headed as the neutral reference pose.
+   The `lever_rock` DOF stays genuinely free: the saved pose is the neutral
+   reference, and no parked or engaged configuration exists.
+2. **EXPLODED VIEW + BOM** (1:4): the builder-owned persisted
+   `SUMMING_EXPLODED` presentation as a Shaded With Edges isometric with the
+   native BOM (seven rows, ten direct instances, one balloon per row). The
+   MHA-077 frame, its MHA-118 gooseneck set screw, and the twenty channel
+   MHA-090/MHA-011 spring connections are identified as external installation
+   interfaces rather than duplicated BOM occurrences.
+3. **ASSEMBLY + SETUP** (1:6): a finished-assembly isometric with the ordered
+   match-drill and assembly sequence, assembly-only functional checks, and the
+   neutral setup and external-interface notes. The MHA-077 hanger holes
+   transfer from the actual MHA-037 tap axes (the released top-frame print
+   keeps the native final hole size but carries no independent hanger X/Z
+   requirement), never from CAD marks.
+4. **HANGER FIT + INSPECTION** (1:1): a hanger-station parent isolated to
+   MHA-037/MHA-131/MHA-119, its hanger-axis section A-A, and detail B at 4:1
+   carrying the associative actual-edge engagement dimension E (MHA-037 tap
+   mouth to MHA-119 finished tip) in the printed general `.XX` band, plus the
+   per-side trim construction (CUT L = T + W + G + E) and as-built inspection
+   notes. E is the fit acceptance (the MHA-119 under-head length stays
+   reference); no load rating or minimum-turns requirement is claimed.
 
-Each identified MHA-119/MHA-131 station is fitted from its actual MHA-077
-thickness, assigned-washer thickness, and positive mount-to-frame clearance;
-the MHA-119 under-head length remains a reference, not a fixed cut acceptance.
-The fourth sheet keeps the engagement target and its printed general `.XX`
-window on the native actual-edge measurement. It then requires the finished
-tip to remain within the actual MHA-037 complete-thread depth, positive
-complete-thread overlap, full seating, positive clearance, and free rock
-without axial rub or bottoming. The assembly source separately gates its
-nominal root-cone, drill-shoulder, and runout envelope. Neither route claims a
-load rating or invents a minimum number of turns.
+The MHA-119 stud drawing points back here: "TRIM/INSPECT TO MHA-A07 SHEET 4,
+HANGER FIT + INSPECTION, DETAIL B."
+`test_summing_assembly_drawing.py` pins that sentence to
+`build_summing_assembly.DRAWING_NUMBER`, `draw_summing_assembly.SHEET_NAMES[3]`,
+and `draw_summing_assembly.HANGER_DETAIL_LABEL`, so renaming any of them fails
+the offline suite.
 
-The released default clamps the MHA-019 upper eye between the MHA-032 retainer
-head and arm end. Loosen that screw only for spring access, then retighten it
-without threadlocker; its open travel is an installation allowance, not a saved
-stand-off or a second assembly configuration.
-
-The source assembly remains saved collapsed in `Default`. Its `lever_rock` DOF
-stays genuinely free, and the package identifies the saved pose as the neutral
-reference; it does not invent parked or engaged assembly configurations.
-Final balance is established with the installed springs by sliding MHA-032 in
-the MHA-077 guide before tightening MHA-118, rather than treating the computed
-CAD spring placement as a fitter tolerance.
+The builder saves the source collapsed in `Default` and owns the
+`SUMMING_EXPLODED` presentation; the drawing only consumes it and verifies the
+source stays byte-identical. Final balance is established with the installed
+springs by sliding MHA-032 in the MHA-077 guide before tightening MHA-118, and
+the MHA-032 retainer screw's open travel is a spring-access installation
+allowance, not a saved stand-off or a second assembly configuration. The
+assembly source separately gates the nominal root-cone, drill-shoulder, and
+runout envelope.
 
 Use `uv run python -m doit drawing:summing_assembly` to regenerate the package.
 Inspect all four pages and complete the blind machinist review before release.

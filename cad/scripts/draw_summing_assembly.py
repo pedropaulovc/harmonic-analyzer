@@ -48,6 +48,7 @@ from summing_assembly_spec import (
 from build_knife_hanger_stud import THREAD_TIP_ROOT_RADIUS_MM
 from build_knife_mount import STUD_TAP_DIA
 from build_summing_assembly import (
+    DRAWING_NUMBER,
     HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM,
     HANGER_ENGAGEMENT_PRECISION,
     HANGER_ENGAGEMENT_TARGET_MM,
@@ -102,6 +103,9 @@ INSTRUCTION_ISO_CENTER = (0.345, 0.190)
 HANGER_PARENT_CENTER = (0.060, 0.205)
 HANGER_SECTION_CENTER = (0.300, 0.205)
 HANGER_DETAIL_CENTER = (0.095, 0.080)
+# The native detail label letter. The sheet heading and the MHA-119 stud note
+# reference it; test_summing_assembly_drawing.py pins the cross-reference.
+HANGER_DETAIL_LABEL = "B"
 HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
 BOM_ANCHOR = (0.195, 0.258)
 # Only assembly-level requirements live here. Part drawings own component
@@ -402,7 +406,7 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
         0.0,
         0,
         *HANGER_DETAIL_SCALE,
-        "B",
+        HANGER_DETAIL_LABEL,
         1,
         True,
         False,
@@ -578,14 +582,14 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
     _add_hanger_engagement_dimension(adapter, detail)
     _add_note_block(
         adapter,
-        "MHA-A07 - HANGER FIT + INSPECTION\n"
+        f"{DRAWING_NUMBER} - {SHEET_NAMES[3]}\n"
         "MHA-119 / MHA-131 / MHA-037 MATCHED TO MHA-077",
         (0.018, 0.263),
         label="hanger fit sheet identity",
     )
     _add_note_block(
         adapter,
-        "DETAIL B - E IS ACTUAL TAP MOUTH TO FINISHED BOLT TIP",
+        f"DETAIL {HANGER_DETAIL_LABEL} - E IS ACTUAL TAP MOUTH TO FINISHED BOLT TIP",
         (0.030, 0.150),
         label="hanger engagement detail heading",
     )
@@ -601,6 +605,7 @@ def _place_hanger_fit_sheet(adapter: Any) -> None:
         (0.165, 0.100),
         label="hanger fit inspection",
     )
+
 
 def _set_exploded_state(
     adapter: Any,

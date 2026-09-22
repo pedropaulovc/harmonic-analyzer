@@ -118,6 +118,9 @@ from summing_assembly_spec import (
 )
 
 ASM_NAME = "summing"
+# MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
+# (a longer number overflows the DWG. NO. title-block cell).
+DRAWING_NUMBER = "MHA-A07"
 
 from spring_mount_geom import COLUMN_X, KNIFE, KNIFE_CONTACT_Y  # noqa: E402
 
@@ -989,9 +992,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         {
             **assembly_title_properties(ASM_NAME),
-            # MHA-A## = assembly-drawing ids, beside the parts' MHA-### range
-            # (a longer number overflows the DWG. NO. title-block cell).
-            "Number": "MHA-A07",
+            "Number": DRAWING_NUMBER,
             "Revision Description": "Initial release",
             "Material": "SEE COMPONENT DRAWINGS",
             "Material Specification": "SEE COMPONENT DRAWINGS",
