@@ -45,7 +45,8 @@ for _partition in (
 
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. The calibration-critical 50.80 arm
-# reach prints to two places; routine formed length/radius print to one.
+# reach prints to two places; routine formed length/radius print to one, and
+# so does the screw's under-head length (the through thread adjusts it).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
@@ -53,7 +54,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 2},
     "ScrewProfile": {
         "ScrewShankDia": 3,
-        "UnderHeadLength": 2,
+        "UnderHeadLength": 1,
         "ScrewHeadDia": 2,
         "HeadThickness": 2,
     },
@@ -93,11 +94,17 @@ DRAWING_NOTES = "\n".join(
     (
         "FULL FAYING-SURFACE BRAZE PENETRATION; NO OPEN VOIDS.",
         "BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
-        "DEFAULT SHOWN CLAMPED; LOOSEN SCREW FOR EYE INSTALLATION, THEN RETIGHTEN.",
+        "SCREW SHOWN CLAMPED; GAP UNDER HEAD = SPRING-EYE SEAT (EYE NOT SHOWN).",
+        "LOOSEN SCREW FOR EYE INSTALLATION, THEN RETIGHTEN.",
     )
 )
 # Section and detail views carry SolidWorks' native label (letter + scale);
 # only the unlabelled model views need a caption note.
+# The one drawing-created dimension (overall height) is the read-only sum of
+# model-owned sizes: no model dimension to import and no tolerance to carry.
+# Its places are still specification, so the part hands them over here.
+DRAWING_REFERENCE_PRECISION = 1
+
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1"

@@ -31,8 +31,10 @@ from _drawing_common import (
     assert_imported_precision,
     create_blank_drawing_sheets,
     create_section_view,
+    add_edge_dimension,
     curate_view_dimensions,
     dimension_name,
+    find_edge_near,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -40,6 +42,7 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     set_reference_dimensions,
     stamp_drawing_summary,
 )
@@ -61,8 +64,10 @@ from gooseneck_geom import (
     TUBE_DIA,
     WALL_T,
 )
+from build_gooseneck import LEG_BOTTOM
 from gooseneck_spec import (
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     ELEVATION_DIMENSIONS,
     JOINT_DIMENSIONS,
     PLUG_FIT_CALLOUT,
@@ -89,6 +94,8 @@ SHEET_NAMES = ("FORM + POST", "ARM-END FABRICATION")
 
 # Model stations (mm, part frame) the placements key on.
 TUBE_R = TUBE_DIA / 2.0
+BORE_R = TUBE_R - WALL_T
+OVERALL_HEIGHT = ARM_Y + TUBE_R - LEG_BOTTOM  # leg bottom to arm top, 501.3
 HEAD_X = ARM_END_X - SPRING_SCREW_CLAMPED_GAP_MM
 SCREW_TIP_X = HEAD_X - SCREW_HEAD_T
 SHANK_END_X = HEAD_X + SPRING_SCREW_UNDERHEAD_LENGTH_MM
@@ -105,6 +112,9 @@ POST_SECTION_SCALE = (2, 1)
 ISO_CENTER = (0.330, 0.170)
 ISO_SCALE = (1, 3)
 ELEVATION_NOTE_XY = (0.058, 0.048)
+# The overall height stands LEFT of the elevation: right of it, its upper
+# extension line would graze the bend and cross the R51 leader.
+OVERALL_HEIGHT_X = 0.060
 ISO_NOTE_XY = (0.290, 0.085)
 POST_LABEL_BELOW_MM = 44.0  # below the post axis: ring, the Ø12 row, air
 # The two diameters print as LINEAR dimensions above and below the ring:
@@ -219,6 +229,51 @@ def _axis_signs(adapter: Any, view: Any, *, label: str) -> tuple[float, float]:
         raise RuntimeError(f"{label}: arm axis is not horizontal on the sheet")
     _telemetry.info(f"{label}: part +X -> sheet {sx:+.0f} x, part +Y -> sheet {sy:+.0f} y")
     return sx, sy
+
+
+def _add_overall_height(
+    adapter: Any, front: Any, front_at: Any, leg_mid_y: float
+) -> None:
+    """Reference overall height, leg bottom to arm top (Codex r6 clarity).
+
+    The 442.3 leg length stops at the bend tangent, so without this a reader
+    can take it for the overall height. Derived from model-owned sizes, so it
+    prints as a REFERENCE at the spec's reference places.
+    """
+    label = "overall height reference"
+    # Leg bottom: pick the end face's outer circle between bore and wall
+    # (edge-on, it lies wholly at LEG_BOTTOM); arm top: its silhouette.
+    bottom = find_edge_near(
+        adapter, front, front_at((BORE_R + TUBE_R) / 2.0, LEG_BOTTOM), axis="y", label=label
+    )
+    top = find_edge_near(
+        adapter,
+        front,
+        front_at((-BEND_R + ARM_END_X) / 2.0, ARM_Y + TUBE_R),
+        axis="y",
+        label=label,
+        entity_type="SILHOUETTE",
+    )
+    display = _early_bound(
+        add_edge_dimension(
+            adapter,
+            front,
+            p0=bottom,
+            p1=top,
+            text_xy=(OVERALL_HEIGHT_X, front_at(0.0, leg_mid_y)[1]),
+            label=label,
+            orientation="vertical",
+            entity_types=("EDGE", "SILHOUETTE"),
+        ),
+        "IDisplayDimension",
+    )
+    measured_mm = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    if abs(measured_mm - OVERALL_HEIGHT) > 1e-5:
+        raise RuntimeError(f"{label}: measured {measured_mm!r}, expected {OVERALL_HEIGHT!r} mm")
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label}: reference precision did not persist")
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
 
 
 def _diameters_as_linear(
@@ -337,7 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
     def front_at(x: float, y: float, dx: float = 0.0, dy: float = 0.0) -> tuple[float, float]:
         return _offset(_sheet_point(adapter, front, x, y, label="elevation"), dx, dy)
 
-    leg_mid_y = (-330.0 + (ARM_Y - BEND_R)) / 2.0
+    leg_mid_y = (LEG_BOTTOM + (ARM_Y - BEND_R)) / 2.0
     bend_45 = (-BEND_R + BEND_R * math.cos(math.pi / 4), ARM_Y - BEND_R + BEND_R * math.sin(math.pi / 4))
     front_dimensions = curate_view_dimensions(
         adapter,
@@ -350,6 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="elevation",
         dimensions_by_feature=ELEVATION_DIMENSIONS,
     )
+    _add_overall_height(adapter, front, front_at, leg_mid_y)
 
     post = create_section_view(
         adapter,
@@ -449,7 +505,9 @@ async def build(adapter: Any) -> dict[str, str]:
         {"PlugDia": PLUG_FIT_CALLOUT, "TapMinorDia": TAP_CALLOUT},
         location="below",
     )
-    set_reference_dimensions(adapter, joint_dimensions, ("PlugDia",))
+    # Thread sizes are set by the callouts: the modelled diameters (the #36
+    # tap drill, the #6 major) print as REFERENCE (Codex r6 over-spec).
+    set_reference_dimensions(adapter, joint_dimensions, ("PlugDia", "TapMinorDia"))
     _place_view_label(
         adapter,
         joint,
@@ -481,9 +539,9 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
             # Slot width and head diameter stand OFF the slotted face: to the
             # right, the head-diameter line crossed the shank (farm r6). The
-            # slot-width text sits below the head-diameter extension line so
-            # its leader never crosses it.
-            "SlotWidth": screw_at(SCREW_TIP_X - 2.0, head_plus, dy=-17.0),
+            # slot-width text sits just past its upper arrow, so it reads
+            # with the slot it sizes and clears the head-diameter lines.
+            "SlotWidth": screw_at(SCREW_TIP_X - 2.0, ARM_Y, dy=9.0),
             # -Y side: diameters and the slot depth (its sketch edge is -Y).
             "ScrewHeadDia": screw_at(SCREW_TIP_X - 4.5, head_minus, dy=-10.0),
             # Text past the slot floor: between its extension lines it
@@ -499,6 +557,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, screw_dimensions, {"ScrewShankDia": SCREW_CALLOUT}, location="below"
     )
+    set_reference_dimensions(adapter, screw_dimensions, ("ScrewShankDia",))
     add_property_linked_note(
         adapter,
         "Screw View Note",
