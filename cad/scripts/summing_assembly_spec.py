@@ -44,7 +44,7 @@ BOM_DESCRIPTIONS = {
     "counter-spring": (
         "MUSIC-WIRE EXTENSION SPRING, MCMASTER 1330K524"
     ),
-    "gooseneck": "COUNTER-SPRING GOOSENECK",
+    "gooseneck": "COUNTER-SPRING GOOSENECK WITH EYE-CLAMP SCREW",
 }
 if set(BOM_PART_NUMBERS) != set(BOM_QUANTITIES):
     raise AssertionError("summing BOM part-number coverage is incomplete")

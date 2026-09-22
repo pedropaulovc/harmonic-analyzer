@@ -88,6 +88,20 @@ Top-frame MHA-077, its MHA-118 gooseneck set screw, and the twenty channel
 MHA-090/MHA-011 spring connections are identified as external installation
 interfaces rather than duplicated BOM occurrences.
 
+MHA-077 retains the native final hanger-hole size, but the released top-frame
+print carries no independent hanger X/Z requirement. Fit MHA-073 between the
+actual MHA-037 pair first, preserve both knife contacts and free axial rock,
+then align its counter-boss tap axis with the MHA-077 guide-bore axis in one
+plane normal to the knife axis. Transfer the actual MHA-037 tap centres, remove
+the fitted set, and only then pilot and drill the MHA-077 clearance holes;
+never enter the mount taps or recenter to CAD marks. Retain the identified
+front/rear MHA-077/MHA-037 set as non-interchangeable.
+
+The released default clamps the MHA-019 upper eye between the MHA-032 retainer
+head and arm end. Loosen that screw only for spring access, then retighten it
+without threadlocker; its open travel is an installation allowance, not a saved
+stand-off or a second assembly configuration.
+
 The source assembly remains saved collapsed in `Default`. Its `lever_rock` DOF
 stays genuinely free, and the package identifies the saved pose as the neutral
 reference; it does not invent parked or engaged assembly configurations.

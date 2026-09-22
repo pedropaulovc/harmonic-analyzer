@@ -114,7 +114,6 @@ from build_top_frame import (
     SIDE_TAP_DRILL_DIA,
     STUD_HOLE_DIA,
     STUD_Z_FRONT,
-    STUD_Z_REAR,
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
 )
@@ -189,7 +188,7 @@ ORIENTATION_KEY_XY = (0.030, 0.052)
 ORIENTATION_KEY_TEXT = (
     "FACE NAMES ABOVE ARE THE PRINT'S: FRONT IS THE FACE THE FRONT VIEW SHOWS.\n"
     "MACHINE FRONT (OPERATOR SIDE) IS THE OPPOSITE RAIL, AT THE TOP OF THE PLAN;\n"
-    "SHEET 3 'FRONT' / 'REAR' HANGER AND KEEPER NAMES ARE THE MACHINE'S."
+    "SHEET 3 'FRONT' / 'REAR' KEEPER NAMES ARE THE MACHINE'S."
 )
 _LABEL_X = (BAR_X1 + INNER_X) / 2.0  # over the right window, clear of the web
 PICTORIAL_VIEWS = (
@@ -334,31 +333,24 @@ GEOMETRY_CALLOUTS = {
 }
 
 # The boss/socket diameters leave the socket they qualify in opposite
-# directions so neither leader crosses the other's text.  The hole STATIONS
-# are not imported: the model's Hole Wizard placement dims measure from the
-# origin -- mid-air on the print, a centre the shop would first have to
-# derive from the socket pattern -- so sheet 3 dimensions every hole from
-# the socket bore axes instead (``HOLE_STATIONS``, policy rule 7).
+# directions so neither leader crosses the other's text. The keeper stations
+# are not imported: their Hole Wizard placement sketch measures from the
+# origin -- mid-air on the print -- so sheet 3 derives them from socket bore
+# axes instead (policy rule 7). Hanger positions are deliberately absent from
+# the released print: the final-size holes are match-drilled from the fitted
+# actual MHA-037 pair.
 DETAIL_TOP_KEEP = {
     "C0Dia": (0.035, 0.232),
     "B0Dia": (0.050, 0.252),
 }
-# Baseline stations from the socket bores the shop picks up: X from the left
-# socket pair's axis plane, Z from the upper pair's, each dimension picked on
-# a socket rim and a hole rim (centre to centre).  The Z stations stand in
-# the margins beside the socket they measure from, the hanger X above the
-# plan, the keeper X under the socket pitch it parallels -- its text pulled
-# left along the line, clear of the title block the 396.9 span reaches over.
-# The origin note sits in the sheet's empty lower-left, off the left
-# socket's extension lines; the boss callout reads from the left of its boss
-# so its leader never crosses the hanger X row.
+# The keeper baselines use the socket bores the shop picks up: X from the left
+# socket pair's axis plane and Z from the upper pair's. The origin note sits in
+# the sheet's empty lower-left, clear of the native matched-hole callout.
 HOLE_STATION_NOTE_XY = (0.030, 0.0585)
-# One coordinate system, not two origins: the upper-left socket bore is
-# the origin and the line joining the upper socket centres is the X
-# direction, so a keeper Z picked up from the upper-RIGHT socket lies on the
-# same baseline by construction (advisor review, 2026-09-16).
+# One coordinate system, not two origins: a keeper Z picked up from the
+# upper-right socket lies on the upper-left baseline by construction.
 HOLE_STATION_NOTE = (
-    "HOLE X, Z ORIGIN: UPPER-LEFT SOCKET\n"
+    "KEEPER X, Z ORIGIN: UPPER-LEFT SOCKET\n"
     "X ALONG THE LINE JOINING THE UPPER SOCKET CENTRES"
 )
 # Both are native.  The gooseneck bore diameter is GooseneckProfile's own
@@ -1129,12 +1121,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The face names are the PRINT's (FRONT is the face the front view
     # shows, +Z; RIGHT is +X), the ASME orientation-key reading and the one
-    # every *Front/*Right projection in the fleet follows.  The MACHINE's
+    # every *Front/*Right projection in the fleet follows. The MACHINE's
     # front is the operator side, model -Z -- the opposite rail, at the top
-    # of the plan -- and the model-owned hanger/keeper dimension names on
-    # sheet 3 (StudFrontZ -> "FRONT HANGER Z") keep that word.  A blind
-    # review read the two as conflicting hole locations (codex round 3), so
-    # the key says which is which once, here, where the reader starts.
+    # of the plan -- and the keeper station labels on sheet 3 use that
+    # machine convention. The key distinguishes the two once, where the
+    # reader starts.
     if add_note(adapter, ORIENTATION_KEY_TEXT, *ORIENTATION_KEY_XY) is None:
         raise RuntimeError("failed to add the pictorial sheet orientation key")
 
@@ -1448,11 +1439,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=stud_edge,
-        # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).
+        # The diameter remains a native final-size control; only its position is
+        # established from the fitted actual mount pair.
         callout_xy=(0.262, 0.258),
-        label="2X hanger-stud clearance holes",
-        process="HANGER DRILL",
+        label="2X matched hanger-stud clearance holes",
+        process=(
+            "MATCH-DRILL: TRANSFER FROM ACTUAL MHA-037 SET; "
+            "REMOVE SET; DRILL"
+        ),
     )
     keeper_edge = model_point_in_view(
         adapter,
@@ -1481,18 +1475,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
-    hanger_x = (BAR_X0 + BAR_X1) / 2.0
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
     for p0, p1, expected, xy, orientation, label, suffix in (
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
-         COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
-         "hanger x from left sockets", "2X HANGER X"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
-         STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
-         "front hanger z from upper sockets", "FRONT HANGER Z"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + STUD_HOLE_DIA/2),
-         STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z"),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
          "keeper x from left sockets", "KEEPER X"),
