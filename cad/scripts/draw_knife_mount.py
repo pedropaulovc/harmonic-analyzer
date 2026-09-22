@@ -55,6 +55,7 @@ from knife_mount_spec import (
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
+    SEAT_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
@@ -63,8 +64,8 @@ from knife_mount_spec import (
     DRAWING_REFERENCE_PRECISION,
     STUD_TAP_DIA,
     STUD_TAP_SPEC,
-    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
-    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_DRILL_DEPTH_TOLERANCE_TYPE,
+    STUD_TAP_THREAD_DEPTH_TOLERANCE_TYPE,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
 )
@@ -89,7 +90,9 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
-_BLOCK_CY = (BLK_TOP + BLK_BOT) / 2.0  # block centre height (model mm)
+# Model height the front/section views centre on: their outline runs from the
+# block bottom to the seat-boss top.
+_BLOCK_CY = (SEAT_TOP + BLK_BOT) / 2.0
 
 FRONT_CENTER = (0.145, 0.115)
 SECTION_CENTER = (0.255, 0.115)
@@ -265,35 +268,44 @@ FRONT_KEEP = {
     "BoreFromTop": (FRONT_CENTER[0] + 0.043, FRONT_CENTER[1]),
     # 12.0 at its own dimension-line midpoint (the bore centreline is only
     # 24 mm from the left edge), so it stops reading as '12.0 ->A' against
-    # the section line's upper arrow; 0.020 above the block top keeps its
-    # outside arrowhead ~6 mm clear of that arrow's stem (0.014 left ~1 mm).
-    "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(BLK_TOP) + 0.020),
+    # the section line's upper arrow; 0.021 above the seat-boss top keeps its
+    # outside arrowhead clear of that arrow's stem.
+    "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(SEAT_TOP) + 0.021),
 }
 SECTION_KEEP = {
-    "Depth": (SECTION_CENTER[0], _front_y(BLK_TOP) + 0.018),
+    # Above the seat boss, between the block's end-face witness lines.
+    "Depth": (SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.012),
+    # The boss height beside the section's right outline, where the cut shows
+    # the boss and the tap drilled through it.
+    "BossHeight": (
+        SECTION_CENTER[0] + 0.030,
+        (_front_y(BLK_TOP) + _front_y(SEAT_TOP)) / 2.0,
+    ),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {
-    # The tap's thickness-direction location is the model's own equation-owned
-    # dimension (see _dimension_tap_from_end in build_knife_mount), measured
-    # from the block's near end edge, which the top view draws as its UPPER
-    # outline. Text at the midpoint of that span (tap centreline -> upper
-    # edge), between the witness lines: knife-cc-5 parked it at the old
-    # centre->lower-edge midpoint and the dimension line ran out past its own
-    # witness line to reach the text.
-    "TapFromEnd": (
+    # The boss's (and its concentric tap's) thickness-direction location is the
+    # model's own equation-owned dimension (see _dimension_boss_from_end in
+    # build_knife_mount), measured from the block's near end edge, which the
+    # top view draws as its UPPER outline. Text at the midpoint of that span
+    # (boss centreline -> upper edge), between the witness lines: knife-cc-5
+    # parked the old tap locator at the centre->lower-edge midpoint and the
+    # dimension line ran out past its own witness line to reach the text.
+    "BossFromEnd": (
         TOP_CENTER[0] - 0.035,
         TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
     ),
+    # Lower right, clear of the tap callout above and the front view below.
+    "BossDia": (TOP_CENTER[0] + 0.042, TOP_CENTER[1] - 0.026),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
 
 
-def _assert_tap_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
-    """The imported 9.00 is a controlling dimension, not a reference read.
+def _assert_boss_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
+    """The imported 9.0 is a controlling dimension, not a reference read.
 
-    The model's TapFromEnd reads swDimensionDriven once its equation owns it,
+    The model's BossFromEnd reads swDimensionDriven once its equation owns it,
     exactly like BlockWidth/Depth (knife-cc-5), so DrivenState cannot tell a
     reference from an equation-owned dimension. What the machinist reads can:
     no reference flag, no parentheses flag, no "(" / ")" text around the value.
@@ -301,10 +313,10 @@ def _assert_tap_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> N
     matches = [
         annotation
         for annotation in annotations
-        if dimension_name(adapter, annotation) == "TapFromEnd"
+        if dimension_name(adapter, annotation) == "BossFromEnd"
     ]
     if len(matches) != 1:
-        raise RuntimeError(f"top view carries {len(matches)} TapFromEnd dimensions")
+        raise RuntimeError(f"top view carries {len(matches)} BossFromEnd dimensions")
     display = _early_bound(matches[0].GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
@@ -316,7 +328,7 @@ def _assert_tap_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> N
         or ")" in suffix
     ):
         raise RuntimeError(
-            "TapFromEnd prints as a reference dimension: "
+            "BossFromEnd prints as a reference dimension: "
             f"is_reference={bool(dimension.IsReference())}, "
             f"show_parenthesis={bool(display.ShowParenthesis)}, "
             f"prefix={prefix!r}, suffix={suffix!r}"
@@ -394,6 +406,14 @@ def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+# swTolType_e of the two native depth variables: the drill depth rides the
+# title-block .XX band (swTolNONE), the usable thread prints MIN (swTolMIN).
+_TAP_DEPTH_TOLERANCE_TYPES = {
+    "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_TOLERANCE_TYPE,
+    "hw-threaddepth": STUD_TAP_THREAD_DEPTH_TOLERANCE_TYPE,
+}
+
+
 class _TapDepthContract(NamedTuple):
     precision: int
     tolerance_precision: int
@@ -447,24 +467,15 @@ def _read_source_tap_depth_contracts(
                     )
         display = feature.GetNextDisplayDimension(display)
     result: dict[str, _TapDepthContract] = {}
-    expected_tolerances = {
-        "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
-        "hw-threaddepth": STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
-    }
     for variable, values in found.items():
         if len(values) != 1:
             raise RuntimeError(
                 f"source StudTap has {len(values)} native {variable} dimensions"
             )
         contract = values[0]
-        expected_lower_mm, expected_upper_mm = expected_tolerances[variable]
         if (
             (contract.precision, contract.tolerance_precision) != (2, 2)
-            or contract.tolerance_type != 2
-            or abs(contract.tolerance_lower_m * 1000.0 - expected_lower_mm)
-            > 1e-6
-            or abs(contract.tolerance_upper_m * 1000.0 - expected_upper_mm)
-            > 1e-6
+            or contract.tolerance_type != _TAP_DEPTH_TOLERANCE_TYPES[variable]
         ):
             raise RuntimeError(
                 f"source StudTap {variable} contract is not the approved native "
@@ -536,10 +547,6 @@ def _check_tap_callout(
         "hw-tapdrldepth": STUD_TAP_SPEC.depth_mm,
         "hw-threaddepth": STUD_TAP_SPEC.overrides_mm["ThreadDepth"],
     }
-    expected_tolerances = {
-        "hw-tapdrldepth": STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
-        "hw-threaddepth": STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
-    }
     expected_strings = {
         "hw-threaddesc": _TAP_THREAD_DESCRIPTION,
         "hw-threadclass": STUD_TAP_SPEC.thread_class,
@@ -570,14 +577,9 @@ def _check_tap_callout(
                 f"knife-mount tap {name}: {actual_mm} != "
                 f"{expected_lengths[name]} mm"
             )
-        if name in expected_tolerances:
-            expected_lower_mm, expected_upper_mm = expected_tolerances[name]
-            actual_lower_mm = float(late.ToleranceMin) * 1000.0
-            actual_upper_mm = float(late.ToleranceMax) * 1000.0
+        if name in _TAP_DEPTH_TOLERANCE_TYPES:
             if (
-                int(late.ToleranceType) != 2
-                or abs(actual_lower_mm - expected_lower_mm) > 1e-6
-                or abs(actual_upper_mm - expected_upper_mm) > 1e-6
+                int(late.ToleranceType) != _TAP_DEPTH_TOLERANCE_TYPES[name]
                 or (
                     int(length.Precision),
                     int(length.TolerancePrecision),
@@ -590,8 +592,6 @@ def _check_tap_callout(
                 raise RuntimeError(
                     f"knife-mount tap {name}: native tolerance readback "
                     f"type={int(late.ToleranceType)}, "
-                    f"lower_mm={actual_lower_mm!r}, "
-                    f"upper_mm={actual_upper_mm!r}, "
                     f"nominal_precision={int(length.Precision)}, "
                     f"tolerance_precision={int(length.TolerancePrecision)}"
                 )
@@ -852,8 +852,8 @@ async def build(adapter: Any) -> dict[str, str]:
     section = create_section_view(
         adapter,
         front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.040),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.040),
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.045),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.045),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(2, 1),
@@ -892,7 +892,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
-    _assert_tap_from_end_prints_plain(adapter, top_annotations)
+    _assert_boss_from_end_prints_plain(adapter, top_annotations)
 
     # The Ø12.00 THRU callout is leader-attached, so SOLIDWORKS drew its
     # dimension leader-line pair straight across the bore circle. Suppress the
@@ -922,8 +922,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # common-axis/mid-plane construction, derived from the actual finished
     # edges and the actual Hole Wizard circle: a sheet-side location with no
     # second driving acceptance requirement. Its thickness-direction location
-    # is the model's own equation-owned TapFromEnd (kept in TOP_KEEP above), so
-    # the sheet prints its 9.00 as a controlling dimension instead of '(9.00)'.
+    # is the concentric seat boss's own equation-owned BossFromEnd (kept in
+    # TOP_KEEP above), printed as a controlling 9.0, not a '(9.0)' reference.
     tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_from_side = add_edge_dimension(
         adapter,

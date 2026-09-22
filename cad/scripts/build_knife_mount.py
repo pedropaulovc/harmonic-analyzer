@@ -2,7 +2,7 @@ r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (hung by the stepped knife-hanger stud, whose
-shoulder seats on the block top over a #10-24 tip in the block-top tap). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
+shoulder seats on a round boss atop the block over a #10-24 tip in the boss tap). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
@@ -24,11 +24,13 @@ Layout (part-local): origin = the **knife-edge contact line** = the hex top
 vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge. The block rises from below the bore
-up to just under the top-frame casting underside (999.7). The stepped hanger
-stud's shoulder seats on the block top, and its #10-24 tip engages >= 1.5D of
-the blind tap (knife_hanger_interface; user ruling 2026-09-22,
-machining-dfm.md:73). A conventional 118-degree tap drill retains at least
-0.50 mm of uninterrupted material above the bore at limits.
+up to MOUNT_GAP under the top-frame casting underside (999.7); a round boss
+rises from it into the casting's hanger-stud hole. The stepped hanger stud's
+shoulder seats on the boss top, and its #10-24 tip engages >= 1.5D of the
+blind tap through the boss (knife_hanger_interface; user rulings 2026-09-22:
+machining-dfm.md:73, title-block bands, option D). A conventional 118-degree
+tap drill retains at least 2.0 mm of uninterrupted material above the bore at
+limits.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
@@ -84,6 +86,8 @@ from _drawing_marks import (
 )
 from _part_pmi import author_part_pmi
 from knife_mount_spec import (
+    BOSS_DIA,
+    BOSS_HEIGHT,
     BORE_DIAMETER_TOLERANCE_MM,
     BORE_FROM_TOP_TOLERANCE_MM,
     BORE_FROM_TOP,
@@ -94,19 +98,26 @@ from knife_mount_spec import (
     REQUIRED_ROCK_SWEEP_DEG,
     STUD_TAP_CROWN_WEB_MM,
     STUD_TAP_DIA,
-    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,  # noqa: F401 -- build_summing_assembly
     STUD_TAP_DRILL_DEPTH_MM,
+    STUD_TAP_DRILL_DEPTH_TOLERANCE_TYPE,
     STUD_TAP_PITCH_MM,
     STUD_TAP_POINT_HEIGHT_MM,
     STUD_TAP_SPEC,
-    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,  # noqa: F401 -- build_summing_assembly
     STUD_TAP_THREAD_DEPTH_MM,
+    STUD_TAP_THREAD_DEPTH_TOLERANCE_TYPE,
     STUD_TAP_WORST_CASE_CROWN_WEB_MM,
     STUD_TAP_WORST_CASE_RUNOUT_MM,
     SURFACE_FINISHES,
 )
 
-from knife_hanger_interface import CASTING_UNDERSIDE_Y, MOUNT_GAP
+from knife_hanger_interface import (
+    CASTING_UNDERSIDE_Y,
+    CROWN_WEB_TARGET_MM,
+    MOUNT_GAP,
+    TAP_LEAD_ALLOWANCE_PITCHES,
+)
 import _telemetry
 
 PART_NAME = "knife-mount"
@@ -133,19 +144,22 @@ BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
 
-# Mount: the block top seat hangs MOUNT_GAP below the top-frame casting
-# underside (the integral crossbar's flush lower face); the stepped knife-hanger
-# stud's shoulder seats on that top face and carries the hang. CASTING_UNDERSIDE_Y
-# and MOUNT_GAP come from knife_hanger_interface (the joint's seat plane).
+# Mount: the block top hangs MOUNT_GAP below the top-frame casting underside
+# (the integral crossbar's flush lower face); the seat boss rises from it into
+# the casting's hanger-stud hole, and the stepped knife-hanger stud's shoulder
+# seats on the boss top and carries the hang. CASTING_UNDERSIDE_Y, MOUNT_GAP and
+# the boss come from knife_hanger_interface (the joint's seat plane).
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNIFE)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.616
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.116
+SEAT_TOP = BLK_TOP + BOSS_HEIGHT  # boss top = stud-shoulder seat plane (19.116)
 
 
-# --- hanger-stud tap: #10-24 UNC-2B blind in the block top ------------------
+# --- hanger-stud tap: #10-24 UNC-2B blind through the boss ------------------
 # A conventional 118-degree drill and bottoming tap take the stepped stud's
-# #10-24 tip while their native depth bands (knife_hanger_interface) preserve
-# an uninterrupted crown.
+# #10-24 tip; the interface's depths keep the drill point >= 2 mm above the
+# bore crown at limits, and a usable-thread MINIMUM three pitches above the
+# shallowest drill so the tap never has to reach the bottom.
 
 
 
@@ -209,9 +223,13 @@ def _tolerance_hole_depth(
     adapter,
     feature_name: str,
     dimension_token: str,
-    deviations_mm: tuple[float, float],
+    tolerance_type: int,
 ) -> None:
-    """Apply and read back one native Hole Wizard depth tolerance in the part."""
+    """Apply and read back one native Hole Wizard depth tolerance in the part.
+
+    ``tolerance_type`` is a value-free swTolType_e: swTolNONE (0) leaves the
+    depth to the title-block band, swTolMIN (5) prints it as a minimum.
+    """
     model = _early_bound(adapter.currentModel, "IPartDoc")
     feature = model.FeatureByName(feature_name)
     if feature is None:
@@ -301,23 +319,14 @@ def _tolerance_hole_depth(
             f"{json.dumps(evidence, sort_keys=True)}"
         )
     display, dimension = matches[0]
-    lower_mm, upper_mm = deviations_mm
+    if tolerance_type not in (0, 5):  # swTolNONE, swTolMIN
+        raise ValueError(f"unsupported depth tolerance type {tolerance_type}")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = 2  # swTolBILAT
-    if not tolerance.SetValues(lower_mm / 1000.0, upper_mm / 1000.0):
+    tolerance.Type = tolerance_type
+    if int(tolerance.Type) != tolerance_type:
         raise RuntimeError(
-            f"{feature_name} {dimension_token}: rejected native depth tolerance"
-        )
-    lower = float(tolerance.GetMinValue()) * 1000.0
-    upper = float(tolerance.GetMaxValue()) * 1000.0
-    if (
-        int(tolerance.Type) != 2
-        or abs(lower - lower_mm) > 1e-6
-        or abs(upper - upper_mm) > 1e-6
-    ):
-        raise RuntimeError(
-            f"{feature_name} {dimension_token}: tolerance readback "
-            f"{lower:+.3f}/{upper:+.3f} mm"
+            f"{feature_name} {dimension_token}: tolerance type readback "
+            f"{int(tolerance.Type)} != {tolerance_type}"
         )
     display.SetPrecision3(2, -1, 2, -1)
     if (
@@ -351,17 +360,20 @@ async def _volume(adapter) -> float:
 # swDimensionDrivenState_e. A sketch dimension reads DRIVING (2) as authored
 # and DRIVEN (1) once an equation owns its value -- the equation, not the
 # sketch, is then its single driver. Measured on the farm (knife-cc-5,
-# 3c7efb27): TapFromEnd, BlockWidth and Depth all read 2 up to the deferred
+# 3c7efb27): TapFromEnd (now BossFromEnd), BlockWidth and Depth all read 2 up to the deferred
 # equations and 1 after them, IsReference() False throughout, and the sheet
 # prints all three plain. So "driving" is asserted at authoring, and after
 # the equations the dimension must share the equation-owned state of the
 # BlockWidth control -- never a bare "== 2" that every equation fails.
 _DIMENSION_DRIVING = 2
 _DIMENSION_DRIVEN = 1
-# swConstraintType_e: the placement point's only relations -- vertical to the
-# sketch origin (on the bore centreline) and the 9.00 distance to the near
-# end edge. A coincident (9) would own the thickness DOF instead.
-_TAP_PLACEMENT_RELATIONS = sorted([26, 1])  # VERTPOINTS, DISTANCE
+# swConstraintType_e. The boss centre is held vertical to the sketch origin
+# (on the bore centreline, VERTPOINTS 26) and located by the 9.0 distance to
+# the near end edge (DISTANCE 1); a coincident (9) would own the thickness DOF
+# instead. The tap placement point is coincident (9) with the origin, which the
+# BossFromEnd equation keeps at the boss centre.
+_BOSS_CENTRE_RELATIONS = {26, 1}  # VERTPOINTS, DISTANCE
+_COINCIDENT = 9
 _SW_FULLY_CONSTRAINED = 3  # swConstrainedStatus_e
 
 
@@ -413,66 +425,47 @@ def _model_point_in_placement(
 
 
 def _assert_tap_station(adapter: Any, sketch: Any) -> None:
-    """The tap must still sit at x=0 on the extrusion mid-plane.
+    """The tap must still sit on the boss axis: x=0 on the extrusion mid-plane.
 
-    The solved placement point against the model station (0, BLK_TOP, 0)
+    The solved placement point against the model station (0, SEAT_TOP, 0)
     mapped into the same sketch -- one space, no assumption about the sketch
     origin's model position.
     """
     point = _early_bound((sketch.GetSketchPoints2() or [None])[0], "ISketchPoint")
     solved = adapter._point_xyz(point)
-    expected = _model_point_in_placement(adapter, sketch, [0.0, BLK_TOP, 0.0])
+    expected = _model_point_in_placement(adapter, sketch, [0.0, SEAT_TOP, 0.0])
     if solved is None or any(
         abs(got - want) > 1e-7 for got, want in zip(solved, expected, strict=True)
     ):
         raise RuntimeError(
-            f"hanger-stud tap: placement moved off the mid-plane station: "
+            f"hanger-stud tap: placement moved off the boss axis: "
             f"solved {solved}, expected {expected}"
         )
 
 
-def _assert_tap_from_end(dimension: Any) -> None:
-    """A DRIVING 9.00 mm dimension -- read back, never assumed."""
+def _assert_boss_from_end(dimension: Any) -> None:
+    """A DRIVING 9.0 mm dimension -- read back, never assumed."""
     state = int(dimension.DrivenState)
     if state != _DIMENSION_DRIVING:
         raise RuntimeError(
-            "hanger-stud tap: tap-from-end dimension authored "
+            "seat boss: boss-from-end dimension authored "
             f"{'driven (reference)' if state == 1 else f'state {state}'}, not driving"
         )
     measured_mm = abs(float(dimension.SystemValue)) * 1000.0
     if abs(measured_mm - SUPPORT_Z_THICK / 2.0) > 1e-5:
         raise RuntimeError(
-            f"hanger-stud tap: tap-from-end reads {measured_mm:.4f} mm, "
+            f"seat boss: boss-from-end reads {measured_mm:.4f} mm, "
             f"expected {SUPPORT_Z_THICK / 2.0:.4f} mm"
         )
 
 
-async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
-    """Author the tap's thickness-direction location as a DRIVING model dim.
+def _block_near_end_top_edge(model: Any) -> Any:
+    """The block top face's edge on the near (z = -Depth/2) end face.
 
-    The wizard's placement sketch sits on the top face with its origin on the
-    model origin's projection -- the tap's own station, since the block
-    extrudes symmetrically about it -- so ``_holes`` cannot dimension the
-    placement (a zero coordinate may not carry a distance dimension), which is
-    why the sheet had to print ``(9.00)`` as a reference. Hold the tap on the
-    bore centreline with the one axis relation and dimension the point from
-    the block's near END edge instead: 9.00 mm, driving, from the outer face
-    the machinist asked for, owned by the model like every other marked dim.
+    Picked inside the top face by endpoint midpoint -- never by coordinate
+    SelectByID2, which mis-resolves on end faces (see _holes's header).
     """
-    from _common import check
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
-    from solidworks_mcp.adapters.solidworks.sketch import (
-        _add_sketch_constraint_impl,
-    )
-
-    model, _sub, sketch, place_name = _tap_placement(adapter)
-    point = _early_bound((sketch.GetSketchPoints2() or [None])[0], "ISketchPoint")
-
-    # The 9.00 measures from the block's OUTER (near) end face: pick its edge
-    # inside the top face by endpoint midpoint -- never by coordinate
-    # SelectByID2, which mis-resolves on end faces (see _holes's header).
     top_face = find_planar_face(model, (0.0, 1.0, 0.0), [[0.0, BLK_TOP, 0.0]])
-    near_edge = None
     for raw_edge in top_face.GetEdges() or ():
         edge = _early_bound(raw_edge, "IEdge")
         ends = [
@@ -484,87 +477,71 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
             continue
         mid = [sum(pair) / 2.0 for pair in zip(*ends)]
         if abs(mid[0]) < 1e-7 and abs(mid[2] + SUPPORT_Z_THICK / 2000.0) < 1e-7:
-            near_edge = edge
-            break
-    if near_edge is None:
-        raise RuntimeError("hanger-stud tap: block near end edge not found")
+            return edge
+    raise RuntimeError("seat boss: block near end edge not found")
 
-    sm = _early_bound(model.SketchManager, "ISketchManager")
-    previous_sketch_manager = adapter.currentSketchManager
-    adapter.currentSketchManager = sm
-    adapter._sketch_origin_point = None
+
+def _dimension_boss_from_end(adapter: Any, boss: str) -> None:
+    """Author the boss's thickness-direction location as a DRIVING sketch dim.
+
+    Called inside the open boss sketch, which lies in the block top face's
+    plane. The boss centre is held on the bore centreline by one vertical
+    relation; this dimensions it from the block's near END edge -- 9.0 mm,
+    from the outer face the machinist asked for (knife-cc-5), owned by the
+    model like every other marked dim. The tap is concentric with the boss.
+    """
+    from solidworks_mcp.adapters.solidworks.sketch import _resolve_entity_ref
+
+    model = adapter.currentModel
+    point = _early_bound(_resolve_entity_ref(adapter, f"{boss}.center"), "ISketchPoint")
+    near_edge = _block_near_end_top_edge(model)
+    # SolidWorks resets swInputDimValOnCreate on every sketch entry: the Modify
+    # dialog would block the unattended session (the same per-call re-assert
+    # the adapter's add_sketch_dimension makes).
+    adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(10, False))
+    adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(372, False))
+    adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(520, False))
+    # Raw COM, narrowly: adapter.add_sketch_dimension cannot dimension a point
+    # against an EDGE -- its distance types hard-require two point refs
+    # (sketch.py:1467-1490) and this 9.0 must measure to the block's near end
+    # edge. Mixed selection is the same shape as that helper's own
+    # _try_create_angular_dimension (sketch.py:1508-1548).
     model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(
-        place_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    if not adapter._select_sketch_entity(point, append=False):
+        raise RuntimeError("seat boss: centre point selection failed")
+    if not _early_bound(near_edge, "IEntity").Select2(True, 0):
+        raise RuntimeError("seat boss: near end edge selection failed")
+    text = (0.0, BLK_TOP / 1000.0, -SUPPORT_Z_THICK / 4000.0)
+    display = adapter._attempt(lambda: model.AddDimension2(*text), default=None)
+    if display is None:
+        display = adapter._attempt(
+            lambda: model.Extension.AddDimension(
+                *text, adapter.constants["swSmartDimensionDirectionUp"]
+            ),
+            default=None,
+        )
+    if display is None:
+        raise RuntimeError("seat boss: boss-from-end dimension did not insert")
+    dimension = (
+        adapter._attempt(lambda: display.GetDimension2(0), default=None)
+        or adapter._attempt(lambda: display.GetDimension(), default=None)
+        or display
+    )
+    dimension = _early_bound(dimension, "IDimension")
+    target_m = SUPPORT_Z_THICK / 2000.0
+    if (
+        adapter._attempt(
+            lambda: dimension.SetSystemValue3(target_m, 1, None), default=None
+        )
+        is None
+        and adapter._attempt(
+            lambda: dimension.SetSystemValue2(target_m, 1), default=None
+        )
+        is None
     ):
-        raise RuntimeError(f"hanger-stud tap: cannot edit {place_name}")
-    editing = False
-    try:
-        model.EditSketch()
-        editing = True
-        # SolidWorks resets swInputDimValOnCreate on every sketch entry: the
-        # Modify dialog would block the unattended session (the same per-call
-        # re-assert the adapter's add_sketch_dimension makes).
-        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(10, False))
-        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(372, False))
-        adapter._attempt(lambda: adapter.swApp.SetUserPreferenceToggle(520, False))
-        point_id = adapter._register_sketch_entity("Point", point)
-        check(
-            "tap on the bore centreline",
-            _add_sketch_constraint_impl(adapter, point_id, "origin", "vertical_points"),
-        )
-        # Raw COM, narrowly: adapter.add_sketch_dimension cannot dimension a
-        # point against an EDGE -- its distance types hard-require two point
-        # refs (sketch.py:1467-1490) and this 9.00 must measure to the block's
-        # near end edge. Mixed selection is the same shape as that helper's own
-        # _try_create_angular_dimension (sketch.py:1508-1548).
-        model.ClearSelection2(True)
-        if not adapter._select_sketch_entity(point, append=False):
-            raise RuntimeError("hanger-stud tap: placement point selection failed")
-        if not _early_bound(near_edge, "IEntity").Select2(True, 0):
-            raise RuntimeError("hanger-stud tap: near end edge selection failed")
-        text = (0.0, BLK_TOP / 1000.0, -SUPPORT_Z_THICK / 4000.0)
-        display = adapter._attempt(lambda: model.AddDimension2(*text), default=None)
-        if display is None:
-            display = adapter._attempt(
-                lambda: model.Extension.AddDimension(
-                    *text, adapter.constants["swSmartDimensionDirectionUp"]
-                ),
-                default=None,
-            )
-        if display is None:
-            raise RuntimeError("hanger-stud tap: tap-from-end dimension did not insert")
-        dimension = (
-            adapter._attempt(lambda: display.GetDimension2(0), default=None)
-            or adapter._attempt(lambda: display.GetDimension(), default=None)
-            or display
-        )
-        dimension = _early_bound(dimension, "IDimension")
-        target_m = SUPPORT_Z_THICK / 2000.0
-        if (
-            adapter._attempt(
-                lambda: dimension.SetSystemValue3(target_m, 1, None), default=None
-            )
-            is None
-            and adapter._attempt(
-                lambda: dimension.SetSystemValue2(target_m, 1), default=None
-            )
-            is None
-        ):
-            dimension.SystemValue = target_m
-        dimension.Name = "TapFromEnd"
-        if str(dimension.Name) != "TapFromEnd":
-            raise RuntimeError("hanger-stud tap: tap-from-end rename did not persist")
-        _assert_tap_from_end(dimension)
-        _assert_tap_station(adapter, sketch)
-        await ensure_fully_defined(adapter, "hanger-stud tap placement")
-    finally:
-        adapter.currentSketchManager = previous_sketch_manager
-        if editing:
-            model.EditSketch()
-    if not model.EditRebuild3():
-        raise RuntimeError("hanger-stud tap: placement rebuild failed")
-    return f"TapFromEnd@{place_name}", '"SupportZThick" / 2'
+        dimension.SystemValue = target_m
+    model.ClearSelection2(True)
+    _assert_boss_from_end(dimension)
 
 
 def _equations_for(adapter: Any, lhs: str) -> list[str]:
@@ -586,22 +563,9 @@ def _equations_for(adapter: Any, lhs: str) -> list[str]:
     return matches
 
 
-def _assert_tap_from_end_contract(adapter: Any) -> None:
-    """After the deferred equations and the final rebuild.
-
-    The volume gates prove the cut did not move; this proves the 9.00 has ONE
-    owner and it is not a reference dimension: exactly one equation drives
-    ``TapFromEnd``, the dimension reads the same equation-owned state as the
-    BlockWidth control (see ``_DIMENSION_DRIVEN``), IsReference() is False,
-    the placement sketch is fully defined by the vertical relation plus the
-    9.00 alone (no coincident owns the DOF), and the tap still sits on the
-    mid-plane station. The drawing proves the sheet prints it unparenthesized.
-    """
-    _, _, sketch, place_name = _tap_placement(adapter)
-    _display, dimension = _named_dimension(adapter, "StudTap", "TapFromEnd")
-    _control_display, control = _named_dimension(adapter, "BlockProfile", "BlockWidth")
-    equations = _equations_for(adapter, f'"TapFromEnd@{place_name}"')
-    relations = sorted(
+def _sketch_relations(sketch: Any) -> list[int]:
+    """Every relation type in ``sketch`` (swAll), sorted."""
+    return sorted(
         int(_early_bound(raw, "ISketchRelation").GetRelationType())
         for raw in (
             _early_bound(sketch.RelationManager, "ISketchRelationManager").GetRelations(0)
@@ -609,45 +573,80 @@ def _assert_tap_from_end_contract(adapter: Any) -> None:
         )  # swAll
         if raw is not None
     )
+
+
+def _assert_boss_and_tap_contract(adapter: Any) -> None:
+    """After the deferred equations and the final rebuild.
+
+    The volume gates prove the cuts did not move; this proves the 9.0 has ONE
+    owner and it is not a reference dimension: exactly one equation drives
+    ``BossFromEnd``, the dimension reads the same equation-owned state as the
+    BlockWidth control (see ``_DIMENSION_DRIVEN``), IsReference() is False, the
+    boss sketch is fully defined with the centre held by the vertical relation
+    plus the 9.0 (no coincident owns the DOF), and the tap's placement point is
+    coincident with the origin station on the boss axis. The drawing proves the
+    sheet prints the 9.0 unparenthesized.
+    """
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    boss_feature = part.FeatureByName("BossProfile")
+    if boss_feature is None:
+        raise RuntimeError("seat boss: BossProfile sketch not found")
+    boss_sketch = _early_bound(
+        _early_bound(boss_feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    _, _, tap_sketch, _place_name = _tap_placement(adapter)
+    _display, dimension = _named_dimension(adapter, "BossProfile", "BossFromEnd")
+    _control_display, control = _named_dimension(adapter, "BlockProfile", "BlockWidth")
+    equations = _equations_for(adapter, '"BossFromEnd@BossProfile"')
+    boss_relations = _sketch_relations(boss_sketch)
+    tap_relations = _sketch_relations(tap_sketch)
     evidence = {
-        "event": "tap_from_end_contract",
+        "event": "boss_from_end_contract",
         "driven_state": int(dimension.DrivenState),
         "control_driven_state": int(control.DrivenState),
         "is_reference": bool(dimension.IsReference()),
         "equations": equations,
-        "relations": relations,
-        "constrained_status": int(sketch.GetConstrainedStatus()),
+        "boss_relations": boss_relations,
+        "boss_constrained_status": int(boss_sketch.GetConstrainedStatus()),
+        "tap_relations": tap_relations,
+        "tap_constrained_status": int(tap_sketch.GetConstrainedStatus()),
         "value_mm": abs(float(dimension.SystemValue)) * 1000.0,
     }
     _telemetry.info(json.dumps(evidence, sort_keys=True))
     problems = []
     if len(equations) != 1:
-        problems.append(f"expected one TapFromEnd equation, found {equations}")
+        problems.append(f"expected one BossFromEnd equation, found {equations}")
     if evidence["driven_state"] != _DIMENSION_DRIVEN:
-        problems.append("TapFromEnd is not equation-owned (DrivenState != 1)")
+        problems.append("BossFromEnd is not equation-owned (DrivenState != 1)")
     if evidence["driven_state"] != evidence["control_driven_state"]:
-        problems.append("TapFromEnd's state differs from the BlockWidth control")
+        problems.append("BossFromEnd's state differs from the BlockWidth control")
     if evidence["is_reference"]:
-        problems.append("TapFromEnd became a reference dimension")
-    if relations != _TAP_PLACEMENT_RELATIONS:
+        problems.append("BossFromEnd became a reference dimension")
+    if not _BOSS_CENTRE_RELATIONS <= set(boss_relations):
         problems.append(
-            f"placement relations {relations} != {_TAP_PLACEMENT_RELATIONS}"
+            f"boss relations {boss_relations} lack {sorted(_BOSS_CENTRE_RELATIONS)}"
         )
-    if evidence["constrained_status"] != _SW_FULLY_CONSTRAINED:
-        problems.append("placement sketch is not fully defined")
+    if _COINCIDENT in boss_relations:
+        problems.append("a coincident relation owns the boss centre")
+    if evidence["boss_constrained_status"] != _SW_FULLY_CONSTRAINED:
+        problems.append("boss sketch is not fully defined")
+    if _COINCIDENT not in tap_relations:
+        problems.append(f"tap placement relations {tap_relations} lack coincident")
+    if evidence["tap_constrained_status"] != _SW_FULLY_CONSTRAINED:
+        problems.append("tap placement sketch is not fully defined")
     if abs(evidence["value_mm"] - SUPPORT_Z_THICK / 2.0) > 1e-5:
-        problems.append(f"TapFromEnd reads {evidence['value_mm']:.6f} mm")
+        problems.append(f"BossFromEnd reads {evidence['value_mm']:.6f} mm")
     if problems:
         raise RuntimeError(
-            "hanger-stud tap: tap-from-end contract failed: "
+            "seat boss: boss/tap location contract failed: "
             + "; ".join(problems)
             + f" -- {json.dumps(evidence, sort_keys=True)}"
         )
-    _assert_tap_station(adapter, sketch)
+    _assert_tap_station(adapter, tap_sketch)
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -663,6 +662,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlkHalfX", f"{BLK_HALF_X}mm")
     await set_global(adapter, "Wall", f"{WALL}mm")
     await set_global(adapter, "BlkTop", f"{BLK_TOP}mm")
+    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "BossHeight", f"{BOSS_HEIGHT}mm")
     await set_global(adapter, "BoreCy", '"TopClear" - "RBore"')
     await set_global(adapter, "BlkBot", '"BoreCy" - "RBore" - "Wall"')
 
@@ -771,19 +772,68 @@ async def build(adapter) -> dict[str, str]:
         f"{rock_clearance:.6f} mm"
     )
 
-    # Hanger-stud tap: native #10-24 blind bottoming tap on the trunnion-axis
-    # centreline.  HoleWizard5 reads depth as the cylindrical drill shoulder;
-    # its ordinary 118-degree point ends above the functional bore crown.
-    tap_runout = STUD_TAP_DRILL_DEPTH_MM - STUD_TAP_THREAD_DEPTH_MM
-    two_pitches = 2.0 * STUD_TAP_PITCH_MM
-    if tap_runout < two_pitches or STUD_TAP_WORST_CASE_RUNOUT_MM < two_pitches:
+    # 2. Hanger-stud seat boss (knife_hanger_interface option D, user
+    # 2026-09-22): a round boss rising from the block top into the casting's
+    # hanger-stud hole; its top is the stud shoulder's seat plane. The sketch
+    # lies in the block top face's plane: the centre is held on the bore
+    # centreline and located 9.0 from the block's near end edge (BossFromEnd,
+    # equation-owned like the old tap locator), and the tap below is concentric.
+    check(
+        "create_plane block top",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=BLK_TOP)
+        ),
+    )
+    name_last_feature(adapter, "BlockTopPlane")
+    boss_dims = SketchDims()
+    check("create_sketch seat boss", await adapter.create_sketch("BlockTopPlane"))
+    set_sketch_direct_db(adapter, True)
+    try:
+        boss_result = await adapter.add_circle(0.0, 0.0, BOSS_DIA / 2.0)
+    finally:
+        set_sketch_direct_db(adapter, False)
+    boss = check("add seat-boss circle", boss_result)
+    check(
+        "seat boss on the bore centreline",
+        await adapter.add_sketch_constraint(f"{boss}.center", "origin", "vertical_points"),
+    )
+    check(
+        "dimension seat-boss diameter",
+        await adapter.add_sketch_dimension(boss, None, "diameter", BOSS_DIA),
+    )
+    boss_dims.record("BossDia", '"BossDia"')
+    _dimension_boss_from_end(adapter, boss)
+    boss_dims.record("BossFromEnd", '"SupportZThick" / 2')
+    await ensure_fully_defined(adapter, "seat-boss profile")
+    check("exit_sketch seat boss", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossProfile")
+    drive_jobs += boss_dims.apply(adapter, "BossProfile")
+    check(
+        "extrude seat boss",
+        await adapter.create_extrusion(ExtrusionParameters(depth=BOSS_HEIGHT)),
+    )
+    name_last_feature(adapter, "Boss")
+    boss_height_dim = name_dimensions(adapter, "Boss", ["BossHeight"])
+    drive_jobs += [(boss_height_dim[0], '"BossHeight"')]
+    expected += math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_HEIGHT
+    vol = await _volume(adapter)
+    _telemetry.info(f"volume after seat boss: {vol:.1f} mm^3 (analytic {expected:.1f})")
+    if abs(vol - expected) > 0.01 * expected:
+        raise RuntimeError(f"seat boss volume {vol:.1f} != {expected:.1f}")
+
+    # 3. Hanger-stud tap: native #10-24 blind bottoming tap down the boss axis.
+    # HoleWizard5 reads depth as the cylindrical drill shoulder below the seat;
+    # its ordinary 118-degree point ends >= 2 mm above the bore crown at limits.
+    tap_lead = STUD_TAP_DRILL_DEPTH_MM - STUD_TAP_THREAD_DEPTH_MM
+    lead_floor = TAP_LEAD_ALLOWANCE_PITCHES * STUD_TAP_PITCH_MM
+    if tap_lead < lead_floor or STUD_TAP_WORST_CASE_RUNOUT_MM < lead_floor - 1e-9:
         raise RuntimeError(
-            "stud tap has insufficient bottoming-tap lead: "
-            f"{tap_runout:.4f} mm nominal, "
+            "stud tap has insufficient lead below its usable thread: "
+            f"{tap_lead:.4f} mm nominal, "
             f"{STUD_TAP_WORST_CASE_RUNOUT_MM:.4f} mm at limits"
         )
     tap_crown_web = (
-        BLK_TOP
+        SEAT_TOP
         - (BORE_CY + R_BORE)
         - STUD_TAP_DRILL_DEPTH_MM
         - STUD_TAP_POINT_HEIGHT_MM
@@ -793,10 +843,7 @@ async def build(adapter) -> dict[str, str]:
             "stud tap crown-web contract drifted: "
             f"model {tap_crown_web:.4f} mm, spec {STUD_TAP_CROWN_WEB_MM:.4f} mm"
         )
-    if (
-        tap_crown_web < 0.5
-        or STUD_TAP_WORST_CASE_CROWN_WEB_MM < 0.5
-    ):
+    if STUD_TAP_WORST_CASE_CROWN_WEB_MM < CROWN_WEB_TARGET_MM:
         raise RuntimeError(
             "stud tap crown web is insufficient: "
             f"{tap_crown_web:.4f} mm nominal, "
@@ -805,32 +852,31 @@ async def build(adapter) -> dict[str, str]:
     wizard_holes(
         adapter,
         STUD_TAP_SPEC,
-        [[0.0, BLK_TOP, 0.0]],
+        [[0.0, SEAT_TOP, 0.0]],
         (0.0, 1.0, 0.0),
         f"hanger-stud tapped hole ({STUD_TAP_SPEC.size})",
         name="StudTap",
-        # No placement_dims: _holes' zero-coordinate relation would pin the
-        # tap coincident to the sketch origin (the tap IS that station -- the
-        # block extrudes symmetrically about it), leaving no free coordinate
-        # for the driving 9.00 the sheet must print. _dimension_tap_from_end
-        # authors it right below, from the block's near end face.
+        # The tap IS the origin station on the boss top (the block extrudes
+        # symmetrically about it and BossFromEnd holds the boss centre there),
+        # so _holes pins the point coincident to the sketch origin: concentric
+        # with the boss by construction, no second locator to print.
+        placement_dims=[((None, None), (None, None))],
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);
         # the pinned dia is what HoleWizard5 was handed, and the volume
         # gate below proves the cut.
     )
-    drive_jobs.append(await _dimension_tap_from_end(adapter))
     _tolerance_hole_depth(
         adapter,
         "StudTap",
         "tapdrilldepth",
-        STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
+        STUD_TAP_DRILL_DEPTH_TOLERANCE_TYPE,
     )
     _tolerance_hole_depth(
         adapter,
         "StudTap",
         "fullthreaddepth",
-        STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
+        STUD_TAP_THREAD_DEPTH_TOLERANCE_TYPE,
     )
     expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH_MM)
     vol = await _volume(adapter)
@@ -852,7 +898,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
-    _assert_tap_from_end_contract(adapter)
+    _assert_boss_and_tap_contract(adapter)
 
 
     await apply_material(adapter, MATERIAL)
