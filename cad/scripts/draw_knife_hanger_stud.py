@@ -19,11 +19,13 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -33,12 +35,9 @@ from knife_hanger_stud_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
     CHAMFER_WIDTH_MM,
-    CHAMFER_WIDTH_TOLERANCE_MM,
     DIMENSION_PRECISION,
     DIMENSION_TOLERANCE_TYPES,
     DRAWING_DIMENSIONS,
-    FINISHED_UNDERHEAD_MM,
-    FINISHED_UNDERHEAD_TOLERANCE_MM,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -49,8 +48,8 @@ SHEET_SCALE = (2.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
 FRONT_CENTER = (0.120, 0.165)
 ISO_CENTER = (0.350, 0.210)
-FRONT_KEEP = {"FinishedOverall": (0.045, 0.165)}
-DETAIL_KEEP = {"ChamferWidth": (0.235, 0.125), "ChamferAngle": (0.315, 0.155)}
+FRONT_KEEP = {"FinishedOverall": (0.090, 0.165)}
+DETAIL_KEEP = {"ChamferAngle": (0.315, 0.155)}
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
     detail_center=(0.280, 0.145),
@@ -63,22 +62,42 @@ SHEET = TrimSheet(
     detail_center_x_mm=SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM / 2.0,
 )
 EXPECTED_CONTROLS = {
-    "FinishedOverall": (
-        FINISHED_UNDERHEAD_MM / 1000,
-        -FINISHED_UNDERHEAD_TOLERANCE_MM / 1000,
-        FINISHED_UNDERHEAD_TOLERANCE_MM / 1000,
-    ),
-    "ChamferWidth": (
-        CHAMFER_WIDTH_MM / 1000,
-        -CHAMFER_WIDTH_TOLERANCE_MM / 1000,
-        CHAMFER_WIDTH_TOLERANCE_MM / 1000,
-    ),
     "ChamferAngle": (
         math.radians(CHAMFER_ANGLE_DEG),
         -math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
         math.radians(CHAMFER_ANGLE_TOLERANCE_DEG),
     ),
 }
+
+
+def _reference_dimension(
+    adapter: Any, annotations: list[Any], name: str, label: str
+) -> None:
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} reference dimension, found {len(matches)}")
+    set_reference_dimension(adapter, matches[0], label=label)
+
+
+def _attach_root_finish_callout(adapter: Any, annotations: list[Any]) -> None:
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "ChamferAngle"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one native angle dimension, found {len(matches)}")
+    display = _early_bound(
+        matches[0].GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    text = "CHAMFER TO EXISTING THREAD ROOT"
+    display.SetText(3, text)  # swDimensionTextCalloutAbove
+    if str(display.GetText(3) or "") != text:
+        raise RuntimeError("root-finish callout did not persist on native angle")
 
 
 def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
@@ -142,7 +161,19 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *detail_annotations]
-    _verify_controls(adapter, annotations)
+    angle_annotations = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "ChamferAngle"
+    ]
+    _verify_controls(adapter, angle_annotations)
+    _attach_root_finish_callout(adapter, angle_annotations)
+    _reference_dimension(
+        adapter,
+        front_annotations,
+        "FinishedOverall",
+        "finished under-head length reference",
+    )
     add_property_linked_note(adapter, "Supplier", 0.016, 0.056, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.016, 0.047, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.038, char_height=0.003)
