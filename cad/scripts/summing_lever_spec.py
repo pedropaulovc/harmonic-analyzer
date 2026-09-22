@@ -112,9 +112,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringHolePattern": {"HolePitch"},
     "PatternReferences": {
         "BossAxialLocation",
-        "HoleStartOffset",
-        "PatternSpan",
         "HoleEndOffsetLast",
+        "HoleFirstFromEnd",
     },
 }
 
@@ -125,7 +124,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_REFERENCE_PRECISION = 2
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PlateProfile": {"PlateWidth": 2, "PlateLength": 1},
+    "PlateProfile": {"PlateWidth": 1, "PlateLength": 1},
     "CoefficientsPlate": {"PlateThickness": 2},
     "CylinderProfile": {"CylDia": 1},
     "HexKnifeFront": {"HexKnifeFrontDepth": 1},
@@ -138,15 +137,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationPlate": {"WebThickness": 2},
     "SummationAnchorProfile": {"AnchorOuterX": 1, "AnchorOuterDia": 2},
     "SummationAnchor": {"AnchorHeight": 2},
-    "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 2, "MidRibRightX": 1},
+    "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 1, "MidRibRightX": 1},
     "MiddleRib": {"MiddleRibThickness": 2},
     "SpringHoleSeed": {"HoleSeedX": 1},
     "SpringHolePattern": {"HolePitch": 2},
     "PatternReferences": {
         "BossAxialLocation": 1,
-        "HoleStartOffset": 2,
-        "PatternSpan": 2,
         "HoleEndOffsetLast": 2,
+        "HoleFirstFromEnd": 2,
     },
 }
 

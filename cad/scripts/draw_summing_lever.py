@@ -3,9 +3,8 @@ r"""Create the two-sheet manufacturing drawing for MHA-073.
 The SLDPRT owns every nominal, decimal place, tolerance and surface control.
 Sheet ``FORM-KNIFE`` defines the lever envelope, boss and knife trunnions at
 native 1:2 sheet scale, with a native 2:1 Detail A for the functional knife
-end. Sheet ``SPRING-PATTERN`` gives the authoritative 20-hole field an ordinary
-first location, controlled total span, equal-spacing reference and both end
-offsets.
+end. Sheet ``SPRING-PATTERN`` locates both terminal holes of the authoritative
+20-hole field from the same plate end, with an equal-spacing reference.
 All orthographic views are HLR; the standard isometric is finalized as
 precision Shaded With Edges.
 
@@ -200,8 +199,11 @@ FORM_TOP_KEEP = {
     # Below its own arrows: between them the witness lines ruled through the text.
     "MiddleRibThickness": (0.1985, 0.0950),
     # Beyond the located centre, on the radial through the arc: the leader runs
-    # text -> centre -> arc, so no line passes through the text.
-    "SummationArcRadius": (0.0907, 0.1891),
+    # text -> centre -> arc, so no line passes through the text.  The leader
+    # leaves from the shelf end (about +13 / +3 mm from this anchor), and it is
+    # THAT point that must sit up-left of the centre: on R5 the shelf end sat
+    # up-right and the leader went through the centre to the far side.
+    "SummationArcRadius": (0.0708, 0.1993),
     # The R138.8 centre from the plate end face on the cylinder axis; both
     # dimensions sit in the clear field above the web, their witness lines
     # crossing at the centre.
@@ -219,11 +221,12 @@ DETAIL_KEEP = {
 }
 PATTERN_KEEP = {
     "HoleSeedX": (0.190, 0.205),
-    "HolePitch": (0.245, 0.128),
-    "HoleStartOffset": (0.250, 0.100),
-    "PatternSpan": (0.228, 0.145),
-    # Above its own arrows: between them the witness lines ruled through "(8.43)".
+    # Left of the baseline dimension's line, so that line runs clear of the text.
+    "HolePitch": (0.215, 0.128),
+    # Both terminal holes from the +Z plate end.  Above its own arrows: between
+    # them the witness lines ruled through the text.
     "HoleEndOffsetLast": (0.252, 0.193),
+    "HoleFirstFromEnd": (0.2656, 0.147),
 }
 
 # The whole general-note block: four lines, sheet 1 upper right beside Detail A.
@@ -233,7 +236,7 @@ MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
     ("CLOCK KNIFE RIDGE TO BOSS AXIS", 0.230, 0.255),
     ("NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES", 0.230, 0.246),
     ("KNIFE RIDGES SHARP; NO EDGE BREAK", 0.230, 0.237),
-    ("Ra 1.6 ON ALL SIX FLATS, BOTH TRUNNIONS", 0.230, 0.228),
+    ("Ra 1.6 ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS", 0.230, 0.228),
 )
 
 
