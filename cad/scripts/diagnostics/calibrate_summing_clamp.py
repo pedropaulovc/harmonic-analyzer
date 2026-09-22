@@ -359,17 +359,26 @@ class Fixture:
         self.part_faces = {}
         self.witnesses = {}
         evidence["witness_sources"] = {}
+        evidence["native_part_body_census"] = {}
         for body_role in ("counter", "plug", "screw"):
             document = _early_bound(self.component(body_role).GetModelDoc2(), "IModelDoc2")
             solids = _solids(document)
-            if len(solids) != 1:
-                raise RuntimeError(f"{body_role}: witness needs one native solid")
-            body = solids[0]
-            self.part_contexts[body_role] = {
-                "document": document, "body": body,
-                "volume_si": _values(body.GetMassProperties(1.0), 12, "witness body mass")[3],
-            }
-        self.counter_faces = [face for face, _ in _face_rows(self.part_contexts["counter"]["body"])]
+            if body_role != "counter" and len(solids) != 1:
+                raise RuntimeError(f"{body_role}: copied fixture part needs one native solid")
+            bodies = []
+            census = evidence["native_part_body_census"][body_role] = []
+            for index, body in enumerate(solids):
+                faces = [face for face, _ in _face_rows(body)]
+                volume = _values(body.GetMassProperties(1.0), 12, "witness body mass")[3]
+                if volume <= 0.0:
+                    raise RuntimeError(f"{body_role}: witness body has no positive native volume")
+                bodies.append({"body": body, "index": index, "volume_si": volume, "faces": faces})
+                census.append({"index": index, "name": body.Name, "volume_mm3": volume * 1e9,
+                               "face_count": len(faces)})
+            self.part_contexts[body_role] = {"document": document, "bodies": bodies}
+        self.counter_faces = [
+            face for body in self.part_contexts["counter"]["bodies"] for face in body["faces"]
+        ]
         evidence["faces"] = {}
         for role, body_role in (("plug", "plug"), ("head", "screw"), ("shank", "screw")):
             component = self.component(body_role)
@@ -479,12 +488,26 @@ class Fixture:
 
     def _face_proof(self, body_role, face):
         context = self.part_contexts[body_role]
-        volume = _values(context["body"].GetMassProperties(1.0), 12, "witness body mass")[3]
-        if not math.isclose(volume, context["volume_si"], rel_tol=1e-12, abs_tol=0.0):
-            raise RuntimeError(f"{body_role}: native witness solid changed local geometry")
-        proof = {}
+        owner = _early_bound(face.GetBody(), "IBody2")
+        if owner is None:
+            raise RuntimeError(f"{body_role}: witness face has no native owner")
+        app = _early_bound(self.adapter.swApp, "ISldWorks")
+        matches = []
+        for candidate in context["bodies"]:
+            same = app.IsSame(candidate["body"], owner)
+            if type(same) is not int or same not in (0, 1):
+                raise RuntimeError(f"{body_role}: native body-census identity is undetermined: {same!r}")
+            if same == 1:
+                matches.append(candidate)
+        if len(matches) != 1:
+            raise RuntimeError(f"{body_role}: witness owner must match exactly one native body-census member")
+        body = matches[0]
+        volume = _values(owner.GetMassProperties(1.0), 12, "witness owner mass")[3]
+        if not math.isclose(volume, body["volume_si"], rel_tol=1e-12, abs_tol=0.0):
+            raise RuntimeError(f"{body_role}: native witness owner changed local geometry")
+        proof = {"owner_body_index": body["index"], "owner_census_count": len(context["bodies"])}
         proof["persist_hex"] = _face_identity(
-            self.adapter, context["document"], face, context["body"], proof
+            self.adapter, context["document"], face, body["body"], proof
         )
         proof["area_mm2"] = float(face.GetArea()) * 1e6
         proof["body_volume_si"] = volume
@@ -511,6 +534,7 @@ class Fixture:
         spring_point = self._on_face(spring_face, spring_point)
         return {
             "faces": (clamp_face, spring_face), "local_points_mm": (clamp_point, spring_point),
+            "owner_bodies": tuple(_early_bound(face.GetBody(), "IBody2") for face in (clamp_face, spring_face)),
             "proofs": (self._face_proof(body_role, clamp_face), self._face_proof("counter", spring_face)),
             "source_actual_transforms": poses, "source_raw_distance": raw,
         }
@@ -518,10 +542,17 @@ class Fixture:
     def _transport_witness(self, role, witness, poses):
         body_role = "plug" if role == "plug" else "screw"
         points, proofs, changes = [], [], []
-        for name, face, local, original in zip(
-            (body_role, "counter"), witness["faces"], witness["local_points_mm"], witness["proofs"], strict=True
+        for name, face, owner, local, original in zip(
+            (body_role, "counter"), witness["faces"], witness["owner_bodies"],
+            witness["local_points_mm"], witness["proofs"], strict=True
         ):
             proof = self._face_proof(name, face)
+            same_owner = _early_bound(self.adapter.swApp, "ISldWorks").IsSame(
+                owner, _early_bound(face.GetBody(), "IBody2")
+            )
+            if type(same_owner) is not int or same_owner != 1:
+                raise RuntimeError(f"{role}: transported witness changed its original native owner")
+            proof["same_source_owner_body"] = same_owner
             if proof["persist_hex"] != original["persist_hex"] or not math.isclose(
                 proof["area_mm2"], original["area_mm2"], rel_tol=1e-12, abs_tol=0.0
             ):
@@ -560,7 +591,7 @@ class Fixture:
             return {**raw, "distance_kind": "raw_closest_distance"}
         result, chosen = min(candidates, key=lambda value: value[0]["distance_mm"])
         if chosen is not previous and result["distance_mm"] <= self.distance_limit:
-            record = {key: value for key, value in chosen.items() if key != "faces"}
+            record = {key: value for key, value in chosen.items() if key not in ("faces", "owner_bodies")}
             sources = self.evidence["witness_sources"].setdefault(role, [])
             chosen["source_index"] = len(sources)
             record["source_index"] = chosen["source_index"]
