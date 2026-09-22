@@ -94,6 +94,11 @@ ISO_NOTE_BELOW_M = 0.004
 
 # Clearance the 45 deg text block keeps from every surrounding box.
 ANGLE_TEXT_GAP_M = 0.003
+# How far PAST that clearance the block is parked. SetPosition2's block/anchor
+# relation is not fixed behaviour, so parking exactly AT the limit re-measured
+# 0.04 mm under it and the read-back guard failed a sheet that only needed
+# margin (leaf 20260922T160352Z). The guard still demands ANGLE_TEXT_GAP_M.
+ANGLE_TEXT_PARK_SLOP_M = 0.001
 
 ROOT_FINISH_CALLOUT_TEXT = "CHAMFER TO EXISTING\nTHREAD ROOT"
 # swDimensionTextParts_e: writing only the RESOLVED callout (3) leaves the
@@ -305,9 +310,10 @@ def _place_angle_text(
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
     block = _display_text_box(adapter, display)
     gap = ANGLE_TEXT_GAP_M
-    left = obstacles["cut-end detail"][2] + gap
-    bottom = obstacles["DETAIL A label"][3] + gap
-    top = min(obstacles["isometric"][1], obstacles["isometric note"][1]) - gap
+    park = gap + ANGLE_TEXT_PARK_SLOP_M
+    left = obstacles["cut-end detail"][2] + park
+    bottom = obstacles["DETAIL A label"][3] + park
+    top = min(obstacles["isometric"][1], obstacles["isometric note"][1]) - park
     target = (left, bottom + ((top - bottom) - (block[3] - block[1])) / 2.0)
     anchor = (anchor[0] + target[0] - block[0], anchor[1] + target[1] - block[1])
     offset_dimension_text(adapter, [annotation], {"ChamferAngle": anchor})
