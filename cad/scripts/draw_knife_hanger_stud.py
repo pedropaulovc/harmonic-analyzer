@@ -34,6 +34,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
@@ -79,10 +80,14 @@ FINISHED_TEXT_XY = (0.070, 0.175)
 MODEL_FINISHED = "FinishedOverall@StockTrimProfile"
 FINISHED_VALUE_TOLERANCE_M = 1e-9
 SW_TOL_NONE = 0  # swTolType_e.swTolNONE: the build clears the native band
-# Where each drawn edge is picked, in model mm off the axis: the washer face
-# just outside the shank, the cut end face midway across its flat.
-UNDERHEAD_PICK_X_MM = SHANK_DIA / 2.0 + 1.0
-END_FACE_PICK_X_MM = (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM) / 2.0
+# The two drawn edges are the model's circular edges, seen edge-on, found by
+# radius and axial station: the washer face's bearing circle and the cut end
+# face's root circle. Coordinate picks are ambiguous at the bearing face: the
+# hex underside's edge lies 0.2 mm (0.4 mm of sheet) above it all the way
+# across, and stud-13 (leaf 20260922T213616Z) picked it and read (45.3).
+BEARING_CIRCLE = (HEAD_AF / 2.0, UNDERHEAD_Y_MM)
+CUT_END_CIRCLE = (SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM, THREAD_TIP_Y_MM)
+CIRCLE_MATCH_MM = 0.01
 SHEET = TrimSheet(
     sheet_scale=SHEET_SCALE,
     detail_center=(0.265, 0.150),
@@ -943,38 +948,52 @@ def _part_silhouette(adapter: Any, front: Any) -> tuple[Box, ...]:
     return tuple(boxes)
 
 
+def _circle_edge(view: Any, radius_mm: float, axial_mm: float, *, label: str) -> Any:
+    """The visible circular model edge of ``radius_mm`` at axial station ``axial_mm``."""
+    candidates = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = edge.GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) * 1000.0 for value in curve.CircleParams)
+        candidates.append((params[6], params[1], edge))
+    if not candidates:
+        raise RuntimeError(f"{label}: the view has no visible circular model edges")
+    radius, axial, edge = min(
+        candidates,
+        key=lambda item: abs(item[0] - radius_mm) + abs(item[1] - axial_mm),
+    )
+    if (
+        abs(radius - radius_mm) > CIRCLE_MATCH_MM
+        or abs(axial - axial_mm) > CIRCLE_MATCH_MM
+    ):
+        raise RuntimeError(
+            f"{label}: no circle of r {radius_mm:.3f} mm at y {axial_mm:.3f} mm; "
+            f"nearest is r {radius:.3f} mm at y {axial:.3f} mm"
+        )
+    _telemetry.info(f"{label}: circle r {radius:.3f} mm at y {axial:.3f} mm")
+    return edge
+
+
 def _add_finished_reference(adapter: Any, front: Any) -> Any:
     """Dimension the drawn bearing face to the drawn cut end, as a reference."""
-    underhead, underhead_type = _pick_leg(
-        adapter,
-        front,
-        _near_side_point(
-            adapter, front, UNDERHEAD_PICK_X_MM, UNDERHEAD_Y_MM, label="bearing face"
-        ),
-        axis="y",
-        types=END_FACE_PICK_TYPES,
-        label="washer-face bearing edge",
-    )
-    tip, tip_type = _pick_leg(
-        adapter,
-        front,
-        _near_side_point(
-            adapter, front, END_FACE_PICK_X_MM, THREAD_TIP_Y_MM, label="cut end face"
-        ),
-        axis="y",
-        types=END_FACE_PICK_TYPES,
-        label="cut end face edge",
-    )
+    bearing = _circle_edge(front, *BEARING_CIRCLE, label="washer-face bearing edge")
+    cut_end = _circle_edge(front, *CUT_END_CIRCLE, label="cut end face edge")
     display = _early_bound(
         add_edge_dimension(
             adapter,
             front,
-            p0=underhead,
-            p1=tip,
+            p0=_near_side_point(adapter, front, *BEARING_CIRCLE, label="bearing"),
+            p1=_near_side_point(adapter, front, *CUT_END_CIRCLE, label="cut end"),
             text_xy=FINISHED_TEXT_XY,
             label="finished under-head length",
             orientation="vertical",
-            entity_types=(underhead_type, tip_type),
+            entity_types=("EDGE", "EDGE"),
+            entities=(bearing, cut_end),
         ),
         "IDisplayDimension",
     )

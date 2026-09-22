@@ -476,3 +476,39 @@ def test_underhead_prints_as_a_one_place_reference() -> None:
     assert drawing._finished_text_problem(-2, ["(45.1)"], 45.1)
     assert drawing._finished_text_problem(1, ["45.1"], 45.1)
     assert drawing._finished_text_problem(1, ["(45.10)"], 45.1)
+
+
+class _FakeCircle:
+    def __init__(
+        self, radius_mm: float, axial_mm: float, *, circle: bool = True
+    ) -> None:
+        self.CircleParams = (
+            0.0,
+            axial_mm / 1000.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            radius_mm / 1000.0,
+        )
+        self._circle = circle
+
+    def IsCircle(self) -> bool:
+        return self._circle
+
+    def GetCurve(self) -> "_FakeCircle":
+        return self
+
+
+def test_bearing_circle_is_told_from_the_hex_underside(monkeypatch) -> None:
+    # stud-13: a coordinate pick took the hex underside 0.2 mm above the
+    # bearing face and read (45.3); the circle scan keys on the station.
+    radius, axial = drawing.BEARING_CIRCLE
+    hex_underside = _FakeCircle(radius, axial + 0.2)
+    bearing = _FakeCircle(radius, axial)
+    edges = [_FakeCircle(radius, axial, circle=False), hex_underside, bearing]
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *a, **k: edges)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    assert drawing._circle_edge(None, radius, axial, label="bearing") is bearing
+    with pytest.raises(RuntimeError, match="no circle"):
+        drawing._circle_edge(None, radius, axial - 1.0, label="bearing")
