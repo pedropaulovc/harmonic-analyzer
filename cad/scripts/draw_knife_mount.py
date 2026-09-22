@@ -4,9 +4,9 @@ A machined, heat-treated steel block (24 wide x ~29.4 tall x 16 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
-and the bore are real edges, so
-the block dimensions ride the auto-imported profile marks (block + bore) with the
-depth added across the right-view section.
+and the bore are real edges, so the block dimensions ride the auto-imported
+profile marks while center section A-A shows the true tap-drill cone and
+knife-bore crown.
 
 Run with SolidWorks open::
 
@@ -26,24 +26,29 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_native_hole_callout,
+    add_edge_dimension,
     add_property_linked_note,
+    add_native_hole_callout,
     add_surface_finish,
     assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
     rebuild_drawing,
     read_required_properties,
+    set_arc_endpoints_to_center,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hole_callout_precision,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from knife_mount_spec import (
+    BLK_HALF_X,
     BORE_DIAMETER_TOLERANCE_MM,
     BORE_FROM_TOP_TOLERANCE_MM,
     BLK_BOT,
@@ -53,6 +58,8 @@ from knife_mount_spec import (
     DRAWING_NOMINALS_MM,
     DRAWING_PRECISION_BY_NAME,
     R_BORE,
+    REFERENCE_DIMENSION_NOMINALS_MM,
+    DRAWING_REFERENCE_PRECISION,
     STUD_TAP_DIA,
     STUD_TAP_SPEC,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
@@ -81,17 +88,17 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 _BLOCK_CY = (BLK_TOP + BLK_BOT) / 2.0  # block centre height (model mm)
 
-FRONT_CENTER = (0.115, 0.140)
-RIGHT_CENTER = (0.220, 0.140)
-TOP_CENTER = (0.115, 0.235)
-ISO_CENTER = (0.345, 0.210)
+FRONT_CENTER = (0.145, 0.115)
+SECTION_CENTER = (0.255, 0.115)
+TOP_CENTER = (0.145, 0.205)
+ISO_CENTER = (0.345, 0.195)
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
 
 
 def _hide_top_cosmetic_thread_annotation(adapter: Any, view: Any) -> None:
-    """Hide the redundant model cosmetic-thread label without deleting its source."""
+    """Hide exactly the view-owned cosmetic thread, never the hole callout."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -112,20 +119,39 @@ def _hide_top_cosmetic_thread_annotation(adapter: Any, view: Any) -> None:
         layer.Printable = False
     if bool(layer.Visible) or bool(layer.Printable):
         raise RuntimeError("cosmetic-thread layer is not hidden and non-printing")
-    hidden = 0
+
+    cosmetic_threads = []
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 1:
+        if int(annotation.GetType()) != 1:  # swCThread, not swNote/hole callout
             continue
-        annotation.Layer = _COSMETIC_THREAD_LAYER
-        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("top cosmetic-thread annotation refused hidden layer")
-        hidden += 1
-    if hidden != 1:
+        if int(annotation.OwnerType) != 0:  # swAnnotationOwner_DrawingView
+            raise RuntimeError("top cosmetic thread is not owned by its drawing view")
+        if annotation.GetSpecificAnnotation() is None:
+            raise RuntimeError("top cosmetic thread has no native ICThread object")
+        cosmetic_threads.append(annotation)
+    if len(cosmetic_threads) != 1:
         raise RuntimeError(
-            f"top view has {hidden} cosmetic-thread annotations; expected one"
+            f"top view has {len(cosmetic_threads)} cosmetic-thread annotations; "
+            "expected one"
         )
+    cosmetic_threads[0].Layer = _COSMETIC_THREAD_LAYER
+    if str(cosmetic_threads[0].Layer or "") != _COSMETIC_THREAD_LAYER:
+        raise RuntimeError("top cosmetic-thread annotation refused hidden layer")
+
     rebuild_drawing(adapter, label="hide redundant top cosmetic thread")
+    persisted_layer = _early_bound(
+        manager.GetLayer(_COSMETIC_THREAD_LAYER), "ILayer"
+    )
+    if bool(persisted_layer.Visible) or bool(persisted_layer.Printable):
+        raise RuntimeError("cosmetic-thread layer flags changed after rebuild")
+    persisted = [
+        _early_bound(raw, "IAnnotation")
+        for raw in (_early_bound(view, "IView").GetAnnotations() or ())
+        if int(_early_bound(raw, "IAnnotation").GetType()) == 1
+    ]
+    if len(persisted) != 1 or str(persisted[0].Layer or "") != _COSMETIC_THREAD_LAYER:
+        raise RuntimeError("cosmetic-thread annotation layer changed after rebuild")
 
 
 def _front_y(model_y_mm: float) -> float:
@@ -139,8 +165,8 @@ FRONT_KEEP = {
     "BoreFromTop": (FRONT_CENTER[0] + 0.043, FRONT_CENTER[1]),
     "BoreFromSide": (FRONT_CENTER[0], _front_y(BLK_TOP) + 0.014),
 }
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], _front_y(BLK_BOT) - 0.016),
+SECTION_KEEP = {
+    "Depth": (SECTION_CENTER[0], _front_y(BLK_BOT) - 0.016),
 }
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 DIMENSION_CALLOUTS = {
@@ -166,6 +192,30 @@ def _assert_imported_nominals(adapter: Any, annotations: list[Any]) -> None:
     if remaining:
         raise RuntimeError(f"model dimensions never reached sheet: {sorted(remaining)}")
 
+
+def _finish_tap_reference_dimension(
+    adapter: Any, display: Any, dimension_name: str, *, label: str
+) -> Any:
+    """Center-anchor, parenthesize, and read back one actual-geometry locator."""
+    expected_mm = REFERENCE_DIMENSION_NOMINALS_MM[dimension_name]
+    precision = DRAWING_REFERENCE_PRECISION[dimension_name]
+    display = set_arc_endpoints_to_center(adapter, display, label=label)
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(
+        DRAWING_REFERENCE_PRECISION[dimension_name], -1, -1, -1
+    )
+    if int(display.GetPrimaryPrecision2()) != precision:
+        raise RuntimeError(f"{label} did not retain {precision}-place precision")
+    display = set_reference_dimension(
+        adapter, display.GetAnnotation(), label=label
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual_mm = abs(float(dimension.SystemValue)) * 1000.0
+    if abs(actual_mm - expected_mm) > 1e-5:
+        raise RuntimeError(
+            f"{label} measured {actual_mm:g} mm, expected {expected_mm:g} mm"
+        )
+    return display
 
 def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
     expected = {
@@ -418,7 +468,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -426,7 +475,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -447,15 +495,22 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - 0.040),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.040),
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(2, 1),
+        label="tap and knife-bore center section",
+    )
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    # Standard holes are fully defined by their native callouts, so hidden
-    # lines add no manufacturing information on this part.  The shared
+    # The manufacturing section and orthographic views use HLR; the shared
     # finalizer promotes the standard isometric to precise Shaded With Edges.
-    for view in (front, right, top, iso):
+    for view in (front, section, top, iso):
         set_hidden_lines_removed(adapter, view)
-    _hide_top_cosmetic_thread_annotation(adapter, top)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -464,11 +519,11 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    right_annotations = curate_view_dimensions(
+    section_annotations = curate_view_dimensions(
         adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
+        section,
+        keep=SECTION_KEEP,
+        view_label="section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
@@ -478,21 +533,62 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    dimensions = [*front_annotations, *right_annotations, *top_annotations]
+    dimensions = [*front_annotations, *section_annotations, *top_annotations]
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to knife bore")
+    for view, label in ((front, "knife bore"), (top, "hanger tap")):
+        if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+            raise RuntimeError(f"failed to add ASME center mark to {label}")
+
+    # Parenthesized locators are derived from the actual finished edges and
+    # actual Hole Wizard circle. They expose the model's common-axis/mid-plane
+    # construction without creating a second driving acceptance requirement.
+    tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
+    tap_from_side = add_edge_dimension(
+        adapter,
+        top,
+        p0=(
+            TOP_CENTER[0] - BLK_HALF_X * SHEET_SCALE[0] / 1000.0,
+            TOP_CENTER[1],
+        ),
+        p1=(TOP_CENTER[0] - tap_radius_sheet, TOP_CENTER[1]),
+        text_xy=(TOP_CENTER[0], TOP_CENTER[1] + 0.027),
+        label="hanger tap from finished side",
+        orientation="horizontal",
+    )
+    _finish_tap_reference_dimension(
+        adapter,
+        tap_from_side,
+        "TapFromSide",
+        label="hanger tap from finished side",
+    )
+    tap_from_end = add_edge_dimension(
+        adapter,
+        top,
+        p0=(
+            TOP_CENTER[0],
+            TOP_CENTER[1] - SUPPORT_Z_THICK * SHEET_SCALE[0] / 2000.0,
+        ),
+        p1=(TOP_CENTER[0], TOP_CENTER[1] - tap_radius_sheet),
+        text_xy=(TOP_CENTER[0] - 0.035, TOP_CENTER[1]),
+        label="hanger tap from finished end",
+        orientation="vertical",
+    )
+    _finish_tap_reference_dimension(
+        adapter,
+        tap_from_end,
+        "TapFromEnd",
+        label="hanger tap from finished end",
+    )
 
     # Native Hole Wizard callout owns the thread size/class and blind depth.
-    tap_radius_sheet = STUD_TAP_DIA * SHEET_SCALE[0] / 2000.0
     tap_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + tap_radius_sheet, TOP_CENTER[1]),
-        callout_xy=(0.165, 0.218),
+        callout_xy=(0.195, 0.218),
         label="hanger-stud blind tap",
     )
     _propagate_source_tap_depth_contracts(
@@ -503,15 +599,17 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
-        symbol_xy=(FRONT_CENTER[0] + 0.040, _front_y(BORE_CY) - 0.018),
+        edge_xy=(FRONT_CENTER[0] - R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
+        symbol_xy=(FRONT_CENTER[0] - 0.037, _front_y(BORE_CY) - 0.018),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
         char_height=0.0025,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.160)
+    # Cosmetic-thread imports can be regenerated by dimension/callout rebuilds.
+    # Hide the one native swCThread only after every recipe annotation exists.
+    _hide_top_cosmetic_thread_annotation(adapter, top)
 
     return await finalize_drawing(
         adapter,

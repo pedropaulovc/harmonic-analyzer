@@ -141,13 +141,14 @@ DRAWING_NOMINALS_MM: dict[str, float] = {
     "BoreFromTop": BORE_FROM_TOP,
     "BoreFromSide": BLK_HALF_X,
 }
-
-# The blind hanger tap must retain solid material between its floor and the
-# functional knife-bearing crown; the model's native tap definition proves it.
-# Its location is match-drilled with the top frame and the pair stays together.
-DRAWING_NOTES = (
-    "KNIFE-BORE CROWN SHALL BE CONTINUOUS.\n"
-    "HANGER TAP ON KNIFE-BORE CENTERLINE; CENTER ON DEPTH.\n"
-    "USE HANGER TAP TO MATCH-DRILL TOP FRAME; KEEP AS SET."
-)
+REFERENCE_DIMENSION_NOMINALS_MM = {
+    "TapFromSide": BLK_HALF_X,
+    "TapFromEnd": SUPPORT_Z_THICK / 2.0,
+}
+DRAWING_REFERENCE_PRECISION = {
+    "TapFromSide": 2,
+    "TapFromEnd": 2,
+}
+# The native tap definition and the bore-location/size bands close the adverse
+# uninterrupted-crown stack; the drawing's center section shows that geometry.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

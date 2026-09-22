@@ -84,7 +84,6 @@ from knife_mount_spec import (
     BORE_FROM_TOP_TOLERANCE_MM,
     BORE_FROM_TOP,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     MATING_HEX_SIZE_PLUS_MM,
@@ -571,7 +570,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
