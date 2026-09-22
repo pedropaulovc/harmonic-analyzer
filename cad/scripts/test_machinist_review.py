@@ -41,12 +41,14 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
     images = [tmp_path / "sheet-1.png", tmp_path / "sheet-2.png"]
     schema = tmp_path / "schema.json"
     schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
+    session_id = "2f4a6c8e-1111-4222-8333-444455556666"
     command = mr.build_claude_command(
         workdir=tmp_path,
         images=images,
         schema=schema,
         model="fable",
         effort="high",
+        session_id=session_id,
     )
     schema_json = json.dumps(mr.load_schema(), separators=(",", ":"))
     assert command == [
@@ -70,7 +72,8 @@ def test_command_references_only_the_neutral_workdir(tmp_path: Path) -> None:
         "Read(sheet-2.png)",
         "--restricted",
         "--safe-mode",
-        "--no-session-persistence",
+        "--session-id",
+        session_id,
         "--permission-mode",
         "dontAsk",
         "--permission-prompts",
@@ -99,7 +102,6 @@ def test_codex_command_is_exact_and_neutral(tmp_path: Path) -> None:
         "--ignore-user-config",
         "--ignore-rules",
         "--skip-git-repo-check",
-        "--ephemeral",
         "--sandbox",
         "read-only",
         "-C",
@@ -118,6 +120,72 @@ def test_codex_command_is_exact_and_neutral(tmp_path: Path) -> None:
         "-",
     ]
     assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
+
+
+def test_attempt_records_carry_session_id_and_resume_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import uuid
+
+    source = tmp_path / "page.png"
+    source.write_bytes(b"png")
+    verdict = _clean_verdict()
+    thread_id = "0199c0de-1234-4abc-9def-0123456789ab"
+    calls = 0
+
+    def fake_run(command: list[str], **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        if command[0] == "codex-test":
+            output = Path(command[command.index("-o") + 1])
+            output.write_text(json.dumps(verdict), encoding="utf-8")
+            stdout = "\n".join(
+                [
+                    json.dumps({"type": "thread.started", "thread_id": thread_id}),
+                    json.dumps({"type": "turn.completed"}),
+                ]
+            )
+            return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+        if calls == 1:
+            return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="failed")
+        stdout = json.dumps({"type": "result", "structured_output": verdict})
+        return mr.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(mr.subprocess, "run", fake_run)
+    package = mr.ReviewPackage("package", "part", (source,))
+    mr.review_package(
+        package,
+        reviewer="claude",
+        report_dir=tmp_path / "claude",
+        retries=1,
+        claude="claude-test",
+    )
+    mr.review_package(
+        package,
+        reviewer="codex",
+        report_dir=tmp_path / "codex",
+        retries=0,
+        codex="codex-test",
+    )
+
+    def attempts(report_dir: Path) -> list[dict[str, Any]]:
+        data = json.loads((report_dir / "package.json").read_text(encoding="utf-8"))
+        return data["extra"]["evidence"]["attempts"]
+
+    claude_attempts = attempts(tmp_path / "claude")
+    assert [record["reviewer"] for record in claude_attempts] == ["claude", "claude"]
+    claude_ids = [record["session_id"] for record in claude_attempts]
+    assert len(set(claude_ids)) == 2  # fresh session per attempt: no prior context
+    for record, session_id in zip(claude_attempts, claude_ids):
+        assert uuid.UUID(session_id).version == 4
+        command = record["command"]
+        assert command[command.index("--session-id") + 1] == session_id
+        assert record["resume_command"] == f"claude --resume {session_id}"
+
+    codex_attempt = attempts(tmp_path / "codex")[0]
+    assert codex_attempt["reviewer"] == "codex"
+    assert codex_attempt["session_id"] == thread_id
+    assert codex_attempt["resume_command"] == f"codex resume {thread_id}"
 
 
 def test_pass_requires_ship_with_no_gating_findings() -> None:
