@@ -16,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 from collections import Counter
 import sys
 from typing import Any, NamedTuple
@@ -274,6 +275,36 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
 }
+
+
+def _log_tap_from_end_sheet_state(adapter: Any, annotations: list[Any]) -> None:
+    """TEMP-PROBE: what the sheet does with the model's TapFromEnd.
+
+    Pairs with build_knife_mount's tap-state probe: the imported dimension's
+    DrivenState and its printed text parts show whether a model dimension
+    reading swDimensionDriven still prints plain (equation ownership) or in
+    parentheses (a real reference dimension).
+    """
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in ("TapFromEnd", "Depth", "BlockWidth"):
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        _telemetry.info(
+            json.dumps(
+                {
+                    "event": "tap_from_end_sheet_state",
+                    "name": name,
+                    "driven_state": int(dimension.DrivenState),
+                    "is_reference": bool(dimension.IsReference()),
+                    "text": {
+                        part: str(display.GetText(part) or "") for part in range(1, 9)
+                    },
+                },
+                sort_keys=True,
+            )
+        )
 
 
 def _assert_imported_nominals(adapter: Any, annotations: list[Any]) -> None:
@@ -845,6 +876,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_imported_nominals(adapter, dimensions)
     _assert_imported_tolerances(adapter, dimensions)
     assert_imported_precision(adapter, dimensions, DRAWING_PRECISION_BY_NAME)
+    _log_tap_from_end_sheet_state(adapter, dimensions)
 
     # The Ø12.00 THRU callout is leader-attached, so SOLIDWORKS drew its
     # dimension leader-line pair straight across the bore circle. Suppress the
