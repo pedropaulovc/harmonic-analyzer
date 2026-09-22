@@ -1,8 +1,8 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
-top-frame casting's integral crossbar (hung by a 1/2-13 knife-hanger stud
-threaded into the block top). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
+top-frame casting's integral crossbar (hung by the stepped knife-hanger stud, whose
+shoulder seats on the block top over a #10-24 tip in the block-top tap). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
@@ -24,9 +24,11 @@ Layout (part-local): origin = the **knife-edge contact line** = the hex top
 vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge. The block rises from below the bore
-up to just under the top-frame casting underside (999.7); the shortened hanger
-stud engages 5.8735 mm of the block-top tap. A conventional 118-degree tap drill
-retains at least 0.50 mm of uninterrupted material above the bore at limits.
+up to just under the top-frame casting underside (999.7). The stepped hanger
+stud's shoulder seats on the block top, and its #10-24 tip engages >= 1.5D of
+the blind tap (knife_hanger_interface; user ruling 2026-09-22,
+machining-dfm.md:73). A conventional 118-degree tap drill retains at least
+0.50 mm of uninterrupted material above the bore at limits.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
@@ -94,6 +96,7 @@ from knife_mount_spec import (
     STUD_TAP_DIA,
     STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
     STUD_TAP_DRILL_DEPTH_MM,
+    STUD_TAP_PITCH_MM,
     STUD_TAP_POINT_HEIGHT_MM,
     STUD_TAP_SPEC,
     STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
@@ -103,6 +106,7 @@ from knife_mount_spec import (
     SURFACE_FINISHES,
 )
 
+from knife_hanger_interface import CASTING_UNDERSIDE_Y, MOUNT_GAP
 import _telemetry
 
 PART_NAME = "knife-mount"
@@ -122,25 +126,26 @@ BORE_CY = TOP_CLEAR - R_BORE  # -6.0; upper inner wall lies on the knife axis
 # --- block (bearing body, held to the crossbar) ----------------------------
 # Axial depth. 2026-09-22 user decision: 18 (was 16) so the tap, located
 # Depth/2 from one end face, keeps >= 1.2 mm of wall on both sides of the
-# 1/2-13 thread at the printed bands (test_knife_mount_drawing).
+# 1/2-13 thread at the printed bands (test_knife_mount_drawing). The #10-24
+# tap that replaced it would also pass at 16; the user kept 18.
 SUPPORT_Z_THICK = 18.0
 BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -15.0
 
 # Mount: the block top seat hangs MOUNT_GAP below the top-frame casting
-# underside (the integral crossbar's flush lower face); the knife-hanger stud
-# threaded into the block top carries the hang (build_summing_assembly).
+# underside (the integral crossbar's flush lower face); the stepped knife-hanger
+# stud's shoulder seats on that top face and carries the hang. CASTING_UNDERSIDE_Y
+# and MOUNT_GAP come from knife_hanger_interface (the joint's seat plane).
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_summing_assembly KNIFE)
-CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
-MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
 BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # exact local top 14.616
 
 
-# --- hanger-stud tap: 1/2-13 UNC-2B blind in the block top ------------------
-# A conventional 118-degree drill and bottoming tap accept the 5.5-mm-shortened
-# hanger stud while their native depth bands preserve an uninterrupted crown.
+# --- hanger-stud tap: #10-24 UNC-2B blind in the block top ------------------
+# A conventional 118-degree drill and bottoming tap take the stepped stud's
+# #10-24 tip while their native depth bands (knife_hanger_interface) preserve
+# an uninterrupted crown.
 
 
 
@@ -766,11 +771,11 @@ async def build(adapter) -> dict[str, str]:
         f"{rock_clearance:.6f} mm"
     )
 
-    # Hanger-stud tap: native 1/2-13 blind bottoming tap on the trunnion-axis
+    # Hanger-stud tap: native #10-24 blind bottoming tap on the trunnion-axis
     # centreline.  HoleWizard5 reads depth as the cylindrical drill shoulder;
     # its ordinary 118-degree point ends above the functional bore crown.
     tap_runout = STUD_TAP_DRILL_DEPTH_MM - STUD_TAP_THREAD_DEPTH_MM
-    two_pitches = 2.0 * 25.4 / 13.0
+    two_pitches = 2.0 * STUD_TAP_PITCH_MM
     if tap_runout < two_pitches or STUD_TAP_WORST_CASE_RUNOUT_MM < two_pitches:
         raise RuntimeError(
             "stud tap has insufficient bottoming-tap lead: "
@@ -802,7 +807,7 @@ async def build(adapter) -> dict[str, str]:
         STUD_TAP_SPEC,
         [[0.0, BLK_TOP, 0.0]],
         (0.0, 1.0, 0.0),
-        "hanger-stud tapped hole (1/2-13)",
+        f"hanger-stud tapped hole ({STUD_TAP_SPEC.size})",
         name="StudTap",
         # No placement_dims: _holes' zero-coordinate relation would pin the
         # tap coincident to the sketch origin (the tap IS that station -- the

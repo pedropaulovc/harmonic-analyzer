@@ -23,6 +23,7 @@ import math
 from _gtol_spec import CylinderFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+import knife_hanger_interface as knife_hanger
 
 # --- fixed geometry for the drawing's view math (mirrors build_knife_mount) ----
 R_BORE = 6.0  # Ø12 knife-bearing bore (2026-09-02 ch18 p.42 re-read: close bore)
@@ -44,20 +45,26 @@ REQUIRED_ROCK_SWEEP_DEG = 1.6
 
 # Native blind hanger-stud tap, shared by the model and its hole callout.  Depth
 # is the 118-degree tap-drill's cylindrical shoulder; ThreadDepth is the full
-# usable thread.  The asymmetric native bands close the crown, tool-lead, and
-# shortened-stud stack without depending on the much looser general tolerance.
-STUD_TAP_DRILL_DEPTH_MM = 10.5
-STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM = (-0.10, 0.0)
-STUD_TAP_THREAD_DEPTH_MM = 6.3
-STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM = (0.0, 0.10)
+# usable thread.  The thread, depths and bands are the knife-hanger joint
+# interface (user ruling 2026-09-22: engagement >= 1.5D of the engaging
+# thread, machining-dfm.md:73): a stepped stud's shoulder seats on this top
+# face over a #10-24 tip.  The names stay STUD_TAP_* for the assembly.
+STUD_TAP_DRILL_DEPTH_MM = knife_hanger.TAP_DRILL_DEPTH_MM
+STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM = knife_hanger.TAP_DRILL_DEPTH_DEVIATIONS_MM
+STUD_TAP_THREAD_DEPTH_MM = knife_hanger.TAP_THREAD_DEPTH_MM
+STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM = knife_hanger.TAP_THREAD_DEPTH_DEVIATIONS_MM
 STUD_TAP_SPEC = HoleSpec(
     "tapped_bottoming",
-    "1/2-13",
+    knife_hanger.THREAD,
     end="blind",
     depth_mm=STUD_TAP_DRILL_DEPTH_MM,
     overrides_mm={"ThreadDepth": STUD_TAP_THREAD_DEPTH_MM},
 )
 STUD_TAP_DIA = blind_cut_dia_mm(STUD_TAP_SPEC)
+if abs(STUD_TAP_DIA - knife_hanger.TAP_DRILL_DIA_MM) > 1e-9:
+    raise AssertionError("knife-mount tap drill differs from the hanger interface")
+STUD_TAP_PITCH_MM = knife_hanger.THREAD_PITCH_MM
+STUD_TAP_MAJOR_DIA_MM = knife_hanger.THREAD_MAJOR_DIA_MM
 STUD_TAP_POINT_HEIGHT_MM = 0.5 * STUD_TAP_DIA * DRILL_POINT_H
 STUD_TAP_CROWN_WEB_MM = (
     BLK_TOP - STUD_TAP_DRILL_DEPTH_MM - STUD_TAP_POINT_HEIGHT_MM
