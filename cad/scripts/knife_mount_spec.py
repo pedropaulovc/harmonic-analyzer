@@ -110,13 +110,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # actual model dimensions. BoreFromTop has the tighter explicit native band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
-        "BlockWidth": 2,
-        "BlockHeight": 2,
+        "BlockWidth": 1,
+        "BlockHeight": 1,
         "BoreFromSide": 2,
         "BoreFromTop": 2,
         "BoreDia": 2,
     },
-    "Block": {"Depth": 2},
+    "Block": {"Depth": 1},
 }
 
 _PRECISION_NAMES = [
