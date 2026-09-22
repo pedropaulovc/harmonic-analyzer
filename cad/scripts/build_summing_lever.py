@@ -99,12 +99,12 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_prefix,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from summing_lever_spec import (
     ANCHOR_H,
-    BASIC_DRAWING_DIMENSIONS,
     CHANNEL_PITCH,
     CHANNEL_Z0,
     DRAWING_DIMENSIONS,
@@ -391,6 +391,8 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "PivotCylinder")
+    [pivot_length] = name_dimensions(adapter, "PivotCylinder", ["PivotLength"])
+    drive_jobs.append((pivot_length, '"PlateL"'))
 
 
 async def _hex_collar(
@@ -509,6 +511,18 @@ async def _edge_rib(
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
     name_last_feature(adapter, stem)
+    thickness_name = (
+        "EdgeRibThickness" if stem == "EdgeRibFront" else "EdgeRibBackThickness"
+    )
+    rib_depths = name_dimensions(
+        adapter, stem, [thickness_name, f"{stem}Start"]
+    )
+    drive_jobs.extend(
+        (
+            (rib_depths[0], '"RibT"'),
+            (rib_depths[1], '"PlateL" / 2 - "RibT"'),
+        )
+    )
 
 
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -598,6 +612,8 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "SummationPlate")
+    web_depth = name_dimensions(adapter, "SummationPlate", ["WebThickness"])
+    drive_jobs.append((web_depth[0], '"PlateT"'))
 
 
 async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -720,6 +736,8 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "MiddleRib")
+    middle_depth = name_dimensions(adapter, "MiddleRib", ["MiddleRibThickness"])
+    drive_jobs.append((middle_depth[0], '"RibT"'))
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -847,11 +865,26 @@ async def _drawing_reference_sketches(
             HOLE_Z[0],
         ),
     )
+    pattern_span = check(
+        "spring-hole total span reference",
+        await adapter.add_line(HOLE_X, HOLE_Z[0], HOLE_X, HOLE_Z[-1]),
+    )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, first_offset)
+    for entity in (first_offset, pattern_span):
+        _as_construction(adapter, entity)
     check(
         "first spring-hole offset vertical",
         await adapter.add_sketch_constraint(first_offset, None, "vertical"),
+    )
+    check(
+        "spring-hole total span vertical",
+        await adapter.add_sketch_constraint(pattern_span, None, "vertical"),
+    )
+    check(
+        "spring-hole span starts at first station",
+        await adapter.add_sketch_constraint(
+            f"{pattern_span}.start", f"{first_offset}.end", "coincident"
+        ),
     )
     await dimension_between(
         adapter,
@@ -874,27 +907,37 @@ async def _drawing_reference_sketches(
     )
     pattern.record("PatternRefX", '"HoleX"')
     pattern.record("PatternRefEnd", '"PlateL" / 2')
+    await dimension_between(
+        adapter,
+        f"{pattern_span}.start",
+        f"{pattern_span}.end",
+        "vertical_distance",
+        HOLE_Z[-1] - HOLE_Z[0],
+        "spring-hole total span",
+    )
+    pattern.record("PatternSpan", f'{HOLE_COUNT - 1} * "ChannelPitch"')
     await ensure_fully_defined(adapter, "pattern reference sketch")
     check("exit pattern reference", await adapter.exit_sketch())
     name_last_feature(adapter, "PatternReferences")
     drive_jobs += pattern.apply(adapter, "PatternReferences")
 
 
-def _apply_basic_drawing_dimensions(adapter) -> None:
-    """Author and read back the pattern's source-model BASIC coordinates."""
-    for feature_name, dimension_names in BASIC_DRAWING_DIMENSIONS.items():
-        for dimension_name in dimension_names:
-            _display, dimension = _named_dimension(
-                adapter, feature_name, dimension_name
-            )
-            tolerance = _early_bound(
-                dimension.Tolerance, "IDimensionTolerance"
-            )
-            tolerance.Type = 1  # swTolType_e.swTolBASIC
-            if int(tolerance.Type) != 1:
-                raise RuntimeError(
-                    f"{dimension_name}@{feature_name}: BASIC tolerance did not persist"
-                )
+def _set_parenthetical_dimension(
+    adapter, feature_name: str, dimension_name: str, *, prefix: str = ""
+) -> None:
+    """Author and verify model-owned reference display text."""
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    expected_prefix = f"{prefix}("
+    display.SetText(1, expected_prefix)
+    display.SetText(2, ")")
+    if (
+        str(display.GetText(1) or "") != expected_prefix
+        or str(display.GetText(2) or "") != ")"
+    ):
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: reference text did not persist"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1018,7 +1061,15 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _apply_basic_drawing_dimensions(adapter)
+    set_dimension_prefix(adapter, "CoefficientsPlate", "PlateThickness", "2X ")
+    set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
+    set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
+    _set_parenthetical_dimension(
+        adapter,
+        "SpringHolePattern",
+        "HolePitch",
+        prefix=f"{HOLE_COUNT - 1} EQ SP ",
+    )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME)
     artefacts = await save_part_and_images(adapter, PART_NAME)

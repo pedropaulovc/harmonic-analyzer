@@ -3,8 +3,8 @@ r"""Create the two-sheet manufacturing drawing for MHA-073.
 The SLDPRT owns every nominal, decimal place, tolerance and surface control.
 Sheet ``FORM-KNIFE`` defines the lever envelope, knife trunnions and
 counter-spring boss at one native 1:2 sheet scale.  Sheet ``SPRING-PATTERN``
-gives the authoritative 20-hole field its own readable 1:2 plan, one rule-3
-position frame, and unobstructed native thread callout.
+gives the authoritative 20-hole field an ordinary first location, controlled
+total span, equal-spacing reference and unobstructed native thread callout.
 All orthographic views are HLR; the standard isometric is finalized as
 precision Shaded With Edges.
 
@@ -24,8 +24,7 @@ from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_edge_dimension,
     add_native_hole_callout,
     add_note,
     add_surface_finish,
@@ -37,30 +36,27 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    set_reference_dimension,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
     ANCHOR_R,
-    BASIC_DRAWING_DIMENSIONS,
     COUNTER_HOLE_SPEC,
+    DRAWING_REFERENCE_PRECISION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
+    HEX_W,
     HOLE_SPEC,
     HOLE_X,
-    HOLE_Z_FIRST,
     HOLE_Z_LAST,
     PLATE_L,
     PLATE_W,
     SURFACE_FINISHES,
     TIP_X,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    dimension_name,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["summing_lever"]
@@ -92,9 +88,9 @@ PATTERN_SCALE = SHEET_SCALE
 _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 
 FORM_FRONT_CENTER = (0.150, 0.220)
-FORM_TOP_CENTER = (0.165, 0.105)
+FORM_TOP_CENTER = (0.150, 0.105)  # same X: true third-angle projection
 ISO_CENTER = (0.335, 0.165)
-PATTERN_CENTER = (0.225, 0.145)
+PATTERN_CENTER = (0.190, 0.145)
 
 
 def _top_xy(
@@ -119,50 +115,28 @@ def _assert_uses_sheet_scale(view: Any, label: str) -> None:
 
 
 FORM_FRONT_KEEP = {
-    "CylDia": (0.120, 0.255),
-    "PlateThickness": (0.225, 0.215),
-    "AnchorHeight": (0.045, 0.215),
-    "HexWidth": (0.160, 0.245),
-    "HexHeight": (0.095, 0.245),
+    "CylDia": (0.155, 0.258),
+    "PlateThickness": (0.205, 0.215),
+    "AnchorHeight": (0.112, 0.215),
+    "HexWidth": (0.175, 0.248),
+    "HexHeight": (0.140, 0.248),
 }
 FORM_TOP_KEEP = {
-    "PlateWidth": (0.195, 0.158),
-    "PlateLength": (0.220, FORM_TOP_CENTER[1]),
-    "AnchorOuterDia": (0.105, 0.125),
-    "AnchorOuterX": (0.145, 0.052),
-    "HexKnifeFrontDepth": (0.120, 0.172),
+    "PlateWidth": (0.195, 0.150),
+    "PlateLength": (0.225, FORM_TOP_CENTER[1]),
+    "AnchorOuterDia": (0.112, 0.125),
+    "AnchorOuterX": (0.135, 0.045),
+    "HexKnifeFrontDepth": (0.165, 0.170),
+    "EdgeRibThickness": (0.195, 0.165),
+    "MiddleRibThickness": (0.205, 0.090),
 }
 PATTERN_KEEP = {
-    "HoleSeedX": (0.340, 0.245),
-    "HolePitch": (0.320, 0.120),
-    "HoleStartOffset": (0.350, 0.085),
+    "HoleSeedX": (0.265, 0.230),
+    "HolePitch": (0.255, 0.125),
+    "HoleStartOffset": (0.285, 0.090),
+    "PatternSpan": (0.300, 0.155),
 }
 
-def _assert_imported_basics(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the pattern coordinates retained the part-authored BASIC state."""
-    expected = {
-        name
-        for dimension_names in BASIC_DRAWING_DIMENSIONS.values()
-        for name in dimension_names
-    }
-    remaining = set(expected)
-    for annotation in annotations:
-        annotation = _early_bound(annotation, "IAnnotation")
-        name = dimension_name(adapter, annotation)
-        if name not in remaining:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        dimension = _early_bound(display.GetDimension2(0), "IDimension")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        if int(tolerance.Type) != 1:  # swTolType_e.swTolBASIC
-            raise RuntimeError(
-                f"imported pattern dimension {name!r} is no longer BASIC"
-            )
-        remaining.remove(name)
-    if remaining:
-        raise RuntimeError(
-            f"part-authored BASIC dimensions never reached the sheet: {sorted(remaining)}"
-        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -245,6 +219,49 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="form top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # The parenthesized overall is an actual projected-geometry readback, not
+    # a duplicate calculated construction dimension.  Pick inside each
+    # outboard end edge rather than at its knife-ridge vertex junction.
+    overall = _early_bound(
+        add_edge_dimension(
+            adapter,
+            top,
+            p0=_top_xy(
+                HEX_W / 4.0,
+                -(PLATE_L / 2.0 + HEX_DEPTH),
+                center=FORM_TOP_CENTER,
+                scale=FORM_TOP_SCALE,
+            ),
+            p1=_top_xy(
+                HEX_W / 4.0,
+                PLATE_L / 2.0 + HEX_DEPTH,
+                center=FORM_TOP_CENTER,
+                scale=FORM_TOP_SCALE,
+            ),
+            text_xy=(0.075, FORM_TOP_CENTER[1]),
+            label="overall trunnion length reference",
+            orientation="vertical",
+        ),
+        "IDisplayDimension",
+    )
+    set_reference_dimension(
+        adapter,
+        overall.GetAnnotation(),
+        label="overall trunnion length reference",
+    )
+    overall.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(overall.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("overall trunnion reference precision did not persist")
+    overall_dimension = _early_bound(overall.GetDimension2(0), "IDimension")
+    measured_overall_mm = abs(float(overall_dimension.SystemValue) * 1000.0)
+    expected_overall_mm = PLATE_L + 2.0 * HEX_DEPTH
+    if abs(measured_overall_mm - expected_overall_mm) > 1e-5:
+        raise RuntimeError(
+            "overall trunnion reference measured "
+            f"{measured_overall_mm:g}, expected {expected_overall_mm:g} mm"
+        )
+    if int(overall_dimension.GetToleranceType()) != 0:  # swTolNONE
+        raise RuntimeError("overall trunnion reference unexpectedly carries a tolerance")
 
     counter_tap_edge = _top_xy(
         TIP_X,
@@ -269,7 +286,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(0.095, 0.070),
+        symbol_xy=(0.145, 0.070),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
     )
@@ -291,67 +308,18 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="spring-pattern plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _assert_imported_basics(adapter, pattern_dimensions)
-
-    knife_edge_datum = _top_xy(
-        0.0,
-        PLATE_L / 2.0 + HEX_DEPTH / 2.0,
-        center=PATTERN_CENTER,
-        scale=PATTERN_SCALE,
-    )
-    add_datum_feature(
-        adapter,
-        pattern,
-        edge_xy=knife_edge_datum,
-        symbol_xy=(knife_edge_datum[0] + 0.022, knife_edge_datum[1] - 0.012),
-        datum="A",
-        label="knife-edge pivot axis",
-    )
-    plate_end_edge = _top_xy(
-        10.0,
-        -PLATE_L / 2.0,
-        center=PATTERN_CENTER,
-        scale=PATTERN_SCALE,
-    )
-    add_datum_feature(
-        adapter,
-        pattern,
-        edge_xy=plate_end_edge,
-        symbol_xy=(plate_end_edge[0] - 0.020, plate_end_edge[1] - 0.010),
-        datum="B",
-        label="plate first-hole end",
-    )
-
-    seed_rim_bottom = _top_xy(
-        HOLE_X,
-        HOLE_Z_FIRST - HOLE_DIA / 2.0,
+    seed_rim_right = _top_xy(
+        HOLE_X + HOLE_DIA / 2.0,
+        HOLE_Z_LAST,
         center=PATTERN_CENTER,
         scale=PATTERN_SCALE,
     )
     add_native_hole_callout(
         adapter,
         pattern,
-        edge_xy=seed_rim_bottom,
-        callout_xy=(0.330, 0.075),
-        label="spring-hole seed",
-    )
-    pattern_rim_right = _top_xy(
-        HOLE_X + HOLE_DIA / 2.0,
-        HOLE_Z_LAST,
-        center=PATTERN_CENTER,
-        scale=PATTERN_SCALE,
-    )
-    add_feature_control_frame(
-        adapter,
-        pattern,
-        edge_xy=pattern_rim_right,
-        frame_xy=(0.330, 0.225),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
-        datums=("A", "B"),
-        diameter=True,
-        quantity="20X",
-        label="spring-hole pattern position",
+        edge_xy=seed_rim_right,
+        callout_xy=(0.300, 0.200),
+        label="spring-hole pattern",
     )
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
