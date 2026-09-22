@@ -439,7 +439,7 @@ async def _hex_collar(
             f"{stem}TopY",
             f"{stem}S0dx",
             f"{stem}S0dy",
-            f"{stem}S1dy",
+            f"{stem}SideFlat",
             f"{stem}S2dx",
             f"{stem}S2dy",
             f"{stem}S3dx",
@@ -1097,10 +1097,20 @@ async def build(adapter) -> dict[str, str]:
     # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
     # rock/suspension line the lever hangs from; the pivot revolute moves here
     # once the top-plate bearing supports are modeled.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
-    await name_bore_axis(
+    pivot_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis"
+    )
+    anchor_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis"
+    )
+    knife_axis = await name_bore_axis(
         adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
+    )
+    # Blank the axes out of every saved render (they still select for mates):
+    # left visible, one dashes out of the boss in the isometric and one prints
+    # as a stray dashed line on the spring-pattern sheet.
+    blank_reference_geometry(
+        adapter, tuple((name, "AXIS") for name in (pivot_axis, anchor_axis, knife_axis))
     )
 
     await apply_material(adapter, MATERIAL)
@@ -1115,27 +1125,17 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    set_dimension_prefix(adapter, "SummationPlate", "WebThickness", "WEB THK ")
-    set_dimension_prefix(adapter, "SummationAnchor", "AnchorHeight", "BOSS LENGTH ")
+    # Only ASME multipliers survive as prefixes: the prose qualifiers are gone,
+    # so the radial dimensions print their native R and the Detail A note -- not
+    # a "HEX A/F" qualifier -- is what says the profile is nonregular.
     set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
-    set_dimension_prefix(adapter, "KnifeEnvelopeReference", "HexWidth", "HEX A/F ")
-    set_dimension_prefix(adapter, "KnifeEnvelopeReference", "HexHeight", "HEX A/C ")
-    set_dimension_prefix(
-        adapter, "SummationPlateProfile", "SummationArcRadius", "SIDE PROFILE "
-    )
-    set_dimension_prefix(adapter, "MiddleRibProfile", "MidRibArcR", "GUSSET ")
+    set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X ")
     _set_parenthetical_dimension(
         adapter,
         "SpringHolePattern",
         "HolePitch",
         prefix=f"{HOLE_COUNT - 1} EQ SP ",
-    )
-    _set_parenthetical_dimension(
-        adapter,
-        "PatternReferences",
-        "BossAxialLocation",
-        prefix="BOSS C/L ",
     )
     _set_parenthetical_dimension(
         adapter,
