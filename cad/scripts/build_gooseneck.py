@@ -181,8 +181,13 @@ def _assert_start_stations(adapter) -> None:
             )
 
 
+# B-rep parameters (plane stations, cylinder radii) are exact: 1e-6 mm.
+# Integrated quantities are not: farm r3 read the plug's arm-end face area
+# 1.13e-6 mm^2 (1.08e-8 relative) below analytic -- a 3e-8 mm radius
+# equivalent, far under SolidWorks' 1e-5 mm resolution. Areas and volumes are
+# held to 1e-7 relative, ten times that measured floor.
 IDENTITY_MM = 1e-6
-IDENTITY_MM3 = 1e-6
+IDENTITY_REL = 1e-7
 
 
 def _slot_strip_area() -> float:
@@ -224,7 +229,7 @@ def _grouped(values: list[tuple[float, float]]) -> list[tuple[float, int, float]
 
 
 def _assert_arm_end_identity(adapter) -> None:
-    """Fail unless plug and screw are the released geometry to 1e-6 mm / mm^3.
+    """Fail unless plug and screw are the released geometry (1e-6 mm, 1e-7 rel).
 
     The spring-seat calibration selects exactly one plug face at the arm end,
     one head-underside face at HEAD_X and one shank cylinder, each by station
@@ -282,9 +287,20 @@ def _assert_arm_end_identity(adapter) -> None:
                 raise RuntimeError(f"{name}: axial face at {got_x!r}, expected {x!r} mm")
             if count is not None and got_count != count:
                 raise RuntimeError(f"{name}: {got_count} faces at x {x:g}, expected {count}")
-            if area is not None and abs(got_area - area) > IDENTITY_MM3:
+            if area is None:
+                continue
+            _telemetry.info(
+                f"{name} face x {x:g}: area {got_area!r} mm^2, analytic {area!r}, "
+                f"delta {got_area - area:.3e} ({(got_area - area) / area:.3e} rel)"
+            )
+            if abs(got_area - area) > IDENTITY_REL * area:
                 raise RuntimeError(f"{name}: face area at x {x:g} is {got_area!r}, expected {area!r} mm^2")
-        if abs(row["volume"] - want["volume"]) > IDENTITY_MM3:
+        delta = row["volume"] - want["volume"]
+        _telemetry.info(
+            f"{name} volume {row['volume']!r} mm^3, analytic {want['volume']!r}, "
+            f"delta {delta:.3e} ({delta / want['volume']:.3e} rel)"
+        )
+        if abs(delta) > IDENTITY_REL * want["volume"]:
             raise RuntimeError(
                 f"{name}: volume {row['volume']!r} != analytic {want['volume']!r} mm^3"
             )
