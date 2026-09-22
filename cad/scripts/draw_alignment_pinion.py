@@ -58,29 +58,30 @@ SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
-FRONT_CENTER = (0.150, 0.185)
-RIGHT_CENTER = (0.285, 0.185)
-ISO_CENTER = (0.350, 0.225)
+FRONT_CENTER = (0.150, 0.165)
+RIGHT_CENTER = (0.285, 0.165)
+ISO_CENTER = (0.350, 0.215)
 GEAR_DATA_POS = (0.018, 0.262)
 ISOMETRIC_NOTE_POS = (0.330, 0.262)
-MANUFACTURING_NOTES_POS = (0.018, 0.085)
+MANUFACTURING_NOTES_POS = (0.018, 0.095)
 
 
 FRONT_KEEP = {
-    "ArborBoreDia": (0.085, 0.175),
-    "OutsideDia": (0.150, 0.230),
+    "ArborBoreDia": (0.085, 0.155),
+    "OutsideDia": (0.150, 0.210),
 }
 RIGHT_KEEP = {
-    "FaceWidth": (RIGHT_CENTER[0], 0.145),
+    "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
 MIN_INTERFERENCE, MAX_INTERFERENCE = ARBOR_DIAMETRAL_INTERFERENCE_MM
+BORE_CALLOUT = (
+    "THRU; BORE LIMITS AND MATCHED FIT BOTH APPLY\n"
+    "MATCH TO MEASURED MHA-102 PINION ARBOR\n"
+    f"{MIN_INTERFERENCE:.3f}-{MAX_INTERFERENCE:.3f} "
+    "DIAMETRAL INTERFERENCE"
+)
 DIMENSION_CALLOUTS = {
-    "ArborBoreDia": (
-        "FINISH BORE THRU; MATCH TO\n"
-        "FINISHED MHA-102 PINION ARBOR\n"
-        f"{MIN_INTERFERENCE:.3f}-{MAX_INTERFERENCE:.3f} "
-        "DIAMETRAL INTERFERENCE"
-    ),
+    "ArborBoreDia": BORE_CALLOUT,
     "FaceWidth": "FULL TOOTH FACE",
 }
 
@@ -147,7 +148,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, keep=RIGHT_KEEP, view_label="full tooth face"
     )
     annotations = [*front_annotations, *right_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, front_annotations, {"ArborBoreDia": BORE_CALLOUT}, location="above"
+    )
+    set_dimension_callouts(
+        adapter, right_annotations, {"FaceWidth": "FULL TOOTH FACE"}
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
@@ -156,7 +162,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(0.205, 0.155),
+        symbol_xy=(0.190, 0.135),
         control=surface_finish_by_key(SURFACE_FINISHES, "drum_bore"),
         label="drum bore finish",
         entity=bore_edge,
@@ -164,6 +170,7 @@ async def build(adapter: Any) -> dict[str, str]:
             FRONT_CENTER[0],
             FRONT_CENTER[1] - BORE_DIA * FRONT_SCALE[0] / FRONT_SCALE[1] / 2000.0,
         ),
+        char_height=0.0025,
     )
 
     add_property_linked_note(adapter, "Gear Data", *GEAR_DATA_POS, char_height=0.0025)

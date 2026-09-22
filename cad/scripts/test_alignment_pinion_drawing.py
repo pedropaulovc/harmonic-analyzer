@@ -67,5 +67,5 @@ def test_mha102_fit_band_has_a_valid_intersection_at_both_shaft_limits() -> None
 def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "gear teeth cut; polished brass"
+    assert config["finish"] == "polished brass; tooth surfaces as cut"
     assert int(config["quantity"]) == 1
