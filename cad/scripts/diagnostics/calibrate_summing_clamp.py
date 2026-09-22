@@ -158,12 +158,62 @@ def _body_record(body):
     }
 
 
-def _persist(model, entity):
+def _persist(model, entity, evidence):
     extension = _early_bound(model.Extension, "IModelDocExtension")
     reference = extension.GetPersistReference3(entity)
-    if not isinstance(reference, (tuple, list, bytes)) or not reference:
-        raise RuntimeError("native persistent identity unavailable")
-    return bytes(int(value) & 255 for value in reference).hex()
+    evidence["raw_type"] = f"{type(reference).__module__}.{type(reference).__qualname__}"
+    try:
+        evidence["raw_length"] = len(reference)
+    except TypeError:
+        evidence["raw_length"] = None
+    try:
+        if reference is None or isinstance(reference, str):
+            raise ValueError("reference is not a native byte sequence")
+        # Match probe_face_identity's iterable-byte conversion: a native array
+        # need not be one of a hardcoded set of Python container classes.
+        encoded = bytes((int(value) & 0xFF) for value in reference)
+        if not encoded:
+            raise ValueError("reference byte sequence is empty")
+    except (TypeError, ValueError, OverflowError) as exc:
+        evidence["raw_repr"] = repr(reference)
+        raise RuntimeError(f"native persistent identity unavailable: {evidence!r}") from exc
+    evidence["byte_count"] = len(encoded)
+    return encoded.hex()
+
+
+def _face_identity(adapter, model, face, body, evidence):
+    """Positive-control a face PID and prove its round-tripped native owner."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    capture = evidence["capture"] = {}
+    identity = _persist(model, face, capture)
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    # Explicit BYTE SAFEARRAY input; the ErrorCode OUT rides the return tuple.
+    reference = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_UI1, bytes.fromhex(identity))
+    answer = extension.GetObjectByPersistReference3(reference)
+    evidence["roundtrip_return_type"] = type(answer).__name__
+    if not isinstance(answer, (tuple, list)) or len(answer) != 2:
+        raise RuntimeError(f"face PID roundtrip returned an invalid shape: {answer!r}")
+    resolved, state = answer
+    evidence["roundtrip_state"] = state
+    if type(state) is not int or state != 0 or resolved is None:
+        raise RuntimeError(f"face PID roundtrip failed: state={state!r}, object_missing={resolved is None}")
+    resolved_face = _early_bound(resolved, "IFace2")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    same_face = app.IsSame(face, resolved_face)
+    evidence["same_face"] = same_face
+    if type(same_face) is not int or same_face != 1:  # swObjectSame
+        raise RuntimeError(f"face PID resolved a different native face: {same_face!r}")
+    owner = _early_bound(resolved_face.GetBody(), "IBody2")
+    if owner is None or body is None:
+        raise RuntimeError("face PID owner body is unavailable")
+    same_body = app.IsSame(body, owner)
+    evidence["same_owner_body"] = same_body
+    evidence["owner_body_name"] = owner.Name
+    if type(same_body) is not int or same_body != 1:
+        raise RuntimeError(f"face PID resolved into a different native body: {same_body!r}")
+    return identity
 
 
 async def _extract_goose(adapter, report):
@@ -172,6 +222,7 @@ async def _extract_goose(adapter, report):
         check("open native gooseneck", await adapter.open_model(str(PARTS / "gooseneck.SLDPRT")))
         source = _early_bound(adapter.currentModel, "IModelDoc2")
         copied = {}
+        identified = {}
         try:
             bodies = _solids(source)
             if len(bodies) != 3:
@@ -185,14 +236,30 @@ async def _extract_goose(adapter, report):
                     role = "plug"
                 else:
                     role = "tube"
-                if role in copied:
+                if role in identified:
                     raise RuntimeError(f"ambiguous native body role: {role}")
                 face_role = "head" if role == "screw" else role
                 face, face_row = _select_face(body, face_role)
                 record = _body_record(body)
-                record.update(body_persist_hex=_persist(source, body), contact_face={
-                    **face_row, "persist_hex": _persist(source, face),
-                })
+                record["contact_face"] = dict(face_row)
+                report["source_bodies"][role] = record
+                identified[role] = (body, face)
+            if set(identified) != set(ROLE_PARTS):
+                raise RuntimeError("native source role census incomplete")
+            # Preserve the complete geometry census before any identity probe.
+            # A face PID is the positive control; its proven native owner is
+            # sufficient body identity. A body PID is diagnostic, not required.
+            for role, (body, face) in identified.items():
+                record = report["source_bodies"][role]
+                control = record["face_identity_control"] = {}
+                record["contact_face"]["persist_hex"] = _face_identity(
+                    adapter, source, face, body, control
+                )
+                body_probe = record["body_pid_diagnostic"] = {}
+                try:
+                    body_probe["persist_hex"] = _persist(source, body, body_probe)
+                except Exception as exc:
+                    body_probe["error"] = repr(exc)
                 if role == "screw":
                     _select_face(body, "shank")
                     lo, hi = _extreme_x(body, -1), _extreme_x(body, 1)
@@ -201,7 +268,7 @@ async def _extract_goose(adapter, report):
                     if abs(hi - HEAD_X - 14.0) > IDENTITY_MM:
                         raise RuntimeError("native screw is not 14 mm underhead")
                     slot_floor = HEAD_X - goose.SCREW_HEAD_T + goose.SCREW_SLOT_DEPTH
-                    if not any(_plane(row, slot_floor) for _, row in rows):
+                    if not any(_plane(row, slot_floor) for row in record["faces"]):
                         raise RuntimeError("actual native screw slot floor is missing")
                     record.update(extreme_x_mm=[lo, hi], underhead_length_mm=hi - HEAD_X,
                                   slot_floor_x_mm=slot_floor)
@@ -209,7 +276,6 @@ async def _extract_goose(adapter, report):
                 if copy is None:
                     raise RuntimeError(f"{role}: native body copy failed")
                 copied[role] = copy
-                report["source_bodies"][role] = record
             if set(copied) != set(ROLE_PARTS):
                 raise RuntimeError("native source role census incomplete")
         finally:
@@ -285,11 +351,18 @@ class Fixture:
             if corresponding is None:
                 raise RuntimeError(f"{role}: face did not map to assembly context")
             self.faces[role] = corresponding
-            evidence["faces"][role] = {
+            record = evidence["faces"][role] = {
                 **row, "component": names[body_role], "body_name": solids[0].Name,
-                "part_face_persist_hex": _persist(document, face),
-                "assembly_face_persist_hex": _persist(self.model, corresponding),
             }
+            part_control = record["part_face_identity_control"] = {}
+            record["part_face_persist_hex"] = _face_identity(
+                adapter, document, face, solids[0], part_control
+            )
+            assembly_control = record["assembly_face_identity_control"] = {}
+            assembly_body = _early_bound(corresponding.GetBody(), "IBody2")
+            record["assembly_face_persist_hex"] = _face_identity(
+                adapter, self.model, corresponding, assembly_body, assembly_control
+            )
 
     def component(self, role):
         result = _early_bound(self.assembly.GetComponentByName(self.names[role]), "IComponent2")
