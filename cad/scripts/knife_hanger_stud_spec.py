@@ -21,6 +21,15 @@ FINISHED_UNDERHEAD_MM = 45.100
 if abs(STOCK_UNDERHEAD_MM - TRIM_LENGTH_MM - FINISHED_UNDERHEAD_MM) > 1e-9:
     raise ValueError("modified stud length does not equal stock length minus trim")
 
+# Stepped turned stud (user decision, 2026-09-22): the shoulder seats on the
+# knife-mount top face, knife_hanger_interface.SHOULDER_SEAT_Y. Its distance
+# under the washer bearing face is the fit-to-stack reference L = T + W + G
+# (MHA-A07 sheet 4): crossbar 36.5 + washer 2.4765 + mount gap 0.25 in the
+# summing assembly. A literal here, so a top-frame or washer edit cannot re-key
+# this part; test_knife_hanger_stud_drawing cross-checks it against those
+# sources and the interface.
+SHOULDER_UNDERHEAD_MM = 39.2265
+
 # The cut-end deburr reaches the diagnostic recipe's modeled thread root.  This
 # is a native radial control, not an arbitrary fraction of the stock pitch.
 CHAMFER_WIDTH_MM = ROOT_CHAMFER_MM

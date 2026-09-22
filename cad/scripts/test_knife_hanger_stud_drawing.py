@@ -558,3 +558,16 @@ def test_extension_gate_reads_either_orientation() -> None:
         ((0.069, 0.12246), (0.09384, 0.12246)),
     )
     assert drawing._extension_line_problems(good, silhouette) == []
+
+
+def test_shoulder_reference_matches_the_assembly_stack() -> None:
+    # Not imported by the build: a top-frame or washer edit must fail here,
+    # not silently re-key the stud.
+    import knife_hanger_interface as joint
+    from build_knife_hanger_washer import THICKNESS as WASHER_THICKNESS
+    from build_top_frame import RING_HEIGHT
+
+    bearing_face_y = joint.CASTING_UNDERSIDE_Y + RING_HEIGHT + WASHER_THICKNESS
+    assert spec.SHOULDER_UNDERHEAD_MM == pytest.approx(
+        bearing_face_y - joint.SHOULDER_SEAT_Y, abs=1e-9
+    )
