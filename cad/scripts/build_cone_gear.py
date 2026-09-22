@@ -188,6 +188,83 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
+async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
+    """Author the model-owned thickness dimension at the bottom pitch chord."""
+    tooth_reference = SketchDims()
+    check(
+        "create_sketch tooth-thickness reference",
+        await adapter.create_sketch("Front"),
+    )
+    pitch_radius_mm = DEFAULT_TEETH / DP * 25.4 / 2.0
+    set_sketch_direct_db(adapter, True)
+    pitch_radius_line = check(
+        "tooth-thickness pitch-radius witness",
+        await adapter.add_line(0.0, 0.0, 0.0, -pitch_radius_mm),
+    )
+    tooth_line = check(
+        "tooth-thickness reference line",
+        await adapter.add_line(
+            -TOOTH_THICKNESS / 2.0,
+            -pitch_radius_mm,
+            TOOTH_THICKNESS / 2.0,
+            -pitch_radius_mm,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, pitch_radius_line)
+    _as_construction(adapter, tooth_line)
+    check(
+        "tooth-thickness pitch radius vertical",
+        await adapter.add_sketch_constraint(
+            pitch_radius_line, None, "vertical"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{pitch_radius_line}.start",
+        0.0,
+        0.0,
+        "tooth-thickness pitch radius",
+    )
+    check(
+        "tooth-thickness reference centred on pitch radius",
+        await adapter.add_sketch_constraint(
+            f"{pitch_radius_line}.end", tooth_line, "midpoint"
+        ),
+    )
+    check(
+        "tooth-thickness reference horizontal",
+        await adapter.add_sketch_constraint(tooth_line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{pitch_radius_line}.start",
+        f"{pitch_radius_line}.end",
+        "vertical_distance",
+        pitch_radius_mm,
+        "tooth-thickness pitch radius",
+    )
+    tooth_reference.record(
+        "ToothPitchRadius",
+        '"ToothCount" / "DP" / 2',
+    )
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
+        f"{tooth_line}.end",
+        "horizontal_distance",
+        TOOTH_THICKNESS,
+        "circular tooth thickness",
+    )
+    tooth_reference.record("ToothThickness", '"ToothThickness"')
+    await ensure_fully_defined(adapter, "tooth-thickness reference sketch")
+    check(
+        "exit_sketch tooth-thickness reference",
+        await adapter.exit_sketch(),
+    )
+    return tooth_reference
+
+
 def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
     """Python mirror of the equation-manager globals (lengths in inches)."""
     pa = math.radians(pa_deg)
@@ -1122,78 +1199,7 @@ async def build(adapter) -> dict[str, str]:
     # on the tooth flanks instead of running from the model origin through the
     # bore and body.  Both construction lines remain volume-neutral and hidden,
     # but blanking the sketch would also suppress the dimension.
-    tooth_reference = SketchDims()
-    check(
-        "create_sketch tooth-thickness reference",
-        await adapter.create_sketch("Front"),
-    )
-    pitch_radius_mm = DEFAULT_TEETH / DIAMETRAL_PITCH * 25.4 / 2.0
-    set_sketch_direct_db(adapter, True)
-    pitch_radius_line = check(
-        "tooth-thickness pitch-radius witness",
-        await adapter.add_line(0.0, 0.0, 0.0, -pitch_radius_mm),
-    )
-    tooth_line = check(
-        "tooth-thickness reference line",
-        await adapter.add_line(
-            -TOOTH_THICKNESS / 2.0,
-            -pitch_radius_mm,
-            TOOTH_THICKNESS / 2.0,
-            -pitch_radius_mm,
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, pitch_radius_line)
-    _as_construction(adapter, tooth_line)
-    check(
-        "tooth-thickness pitch radius vertical",
-        await adapter.add_sketch_constraint(
-            pitch_radius_line, None, "vertical"
-        ),
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{pitch_radius_line}.start",
-        0.0,
-        0.0,
-        "tooth-thickness pitch radius",
-    )
-    check(
-        "tooth-thickness reference centred on pitch radius",
-        await adapter.add_sketch_constraint(
-            f"{pitch_radius_line}.end", tooth_line, "midpoint"
-        ),
-    )
-    check(
-        "tooth-thickness reference horizontal",
-        await adapter.add_sketch_constraint(tooth_line, None, "horizontal"),
-    )
-    await dimension_between(
-        adapter,
-        f"{pitch_radius_line}.start",
-        f"{pitch_radius_line}.end",
-        "vertical_distance",
-        pitch_radius_mm,
-        "tooth-thickness pitch radius",
-    )
-    tooth_reference.record(
-        "ToothPitchRadius",
-        '"ToothCount" / "DP" / 2',
-    )
-    await dimension_between(
-        adapter,
-        f"{tooth_line}.start",
-        f"{tooth_line}.end",
-        "horizontal_distance",
-        TOOTH_THICKNESS,
-        "circular tooth thickness",
-    )
-    tooth_reference.record("ToothThickness", '"ToothThickness"')
-    await ensure_fully_defined(adapter, "tooth-thickness reference sketch")
-    check(
-        "exit_sketch tooth-thickness reference",
-        await adapter.exit_sketch(),
-    )
+    tooth_reference = await _author_tooth_thickness_reference(adapter)
     tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
     drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
 
