@@ -89,7 +89,7 @@ SECTION_KEEP = {
 RIGHT_KEEP = {
     "PinchDepthCenter": (
         RIGHT_CENTER[0] + 0.049,
-        _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.012,
+        _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.003,
     )
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
