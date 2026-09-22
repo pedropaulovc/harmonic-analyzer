@@ -6,13 +6,18 @@ import counter_spring_stock_geom as counter_stock
 import gooseneck_geom as geom
 
 
-def test_counter_spring_eye_is_retained_with_running_clearance() -> None:
+def test_counter_spring_eye_fits_the_clamped_screw_envelope() -> None:
     radial_retention = (geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
     radial_clearance = (counter_stock.EYE_ID_MM - geom.SCREW_SHANK_DIA) / 2.0
 
     assert radial_retention >= 1.0
     assert radial_clearance >= 0.25
-    assert geom.SCREW_SHANK_LEN > counter_stock.END_OCCUPIED_WIDTH_MM
+    assert geom.SPRING_SCREW_CLAMPED_GAP_MM == counter_stock.END_OCCUPIED_WIDTH_MM
+    assert (
+        geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+        == counter_stock.END_OCCUPIED_WIDTH_MM / 2.0
+    )
+    assert geom.SPRING_SCREW_TRAVEL_MM > 0.0
 
 
 def test_brazed_plug_has_capillary_clearance_in_the_nominal_tube_bore() -> None:
@@ -23,8 +28,13 @@ def test_brazed_plug_has_capillary_clearance_in_the_nominal_tube_bore() -> None:
     assert 0.051 <= nominal_radial_gap <= 0.127
 
 
-def test_captive_screw_thread_and_slot_fit_the_body() -> None:
+def test_adjustment_screw_thread_and_slot_fit_the_body() -> None:
     assert geom.SCREW_THREAD_MAJOR_DIA <= geom.SCREW_SHANK_DIA
+    assert (
+        geom.SPRING_SCREW_UNDERHEAD_LENGTH_MM
+        == geom.SPRING_SCREW_PLUG_ENGAGEMENT_MM + geom.SPRING_SCREW_OPEN_GAP_MM
+    )
+    assert geom.SPRING_SCREW_PLUG_ENGAGEMENT_MM == geom.PLUG_T
     assert geom.SCREW_SLOT_DEPTH < geom.SCREW_HEAD_T
     assert geom.SCREW_SLOT_W < geom.SCREW_HEAD_DIA
 

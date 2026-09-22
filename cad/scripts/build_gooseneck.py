@@ -21,20 +21,20 @@ The horizontal arm retains the photographed 90-degree bend and axial screw.
 The 1330K524 double-loop eye needs its full axial wire band on the exposed
 shank; the assembly checks both end-face/head clearance and coil clearance.
 
-The released MHA-032 remains one inseparable fabricated part but its physical
+The released MHA-032 package remains one assembly BOM row, but its physical
 construction is explicit: a bent Ø16 x 2 tube body, a separate AISI 1018 annular
 plug match-turned to the actual tube bore for the BAg-7 capillary clearance, and
-a separate captive #6-32 slotted screw. The plug is 6 mm deep and carries the
-standard Ø2.705 tap-minor envelope. The screw body extends 6 mm into the plug,
-leaves the calibrated 8 mm shank exposed, and carries the Ø12 x 2 head with its
-0.8 x 0.8 slot. These are three native bodies so the joint section retains the
-fabrication interfaces; MHA-032 is still one assembly BOM row.
+a separate #6-32 slotted adjustment screw. The plug is 6 mm deep and carries the
+standard Ø2.705 tap-minor envelope. The screw is fully threaded over its 14 mm
+under-head length so the 6 mm plug remains engaged throughout adjustment. The
+saved Default places the head at the stock MHA-019 end-band width; loosening can
+open the head gap to 8 mm for installation. These are three native bodies.
 
 Layout: part origin at the vertical leg's mid-height; leg y -330..+112.3,
 bend arc centre (-51, +112.3), arm centreline y +163.3 from x -51 to -101.8
-(a 50.8 run: the arm end sets the spring's calibrated plumb line). The plug
-occupies x -101.8..-95.8 inside the arm, the screw shank x -109.8..-95.8,
-and the head x -111.8..-109.8. The tube remains hollow Ø16 x 2 wall.
+(a 50.8 run: the arm end sets the spring station). The plug occupies
+x -101.8..-95.8; the saved screw station is derived from the clamped MHA-019
+end-band width. The tube remains hollow Ø16 x 2 wall.
 Dimensions: cad/DIMENSIONS.md ch. 19 (low/med).
 
 Run (SolidWorks already open)::
@@ -58,7 +58,7 @@ from _common import (
     define_rectilinear_chain,
     dimension_between,
     drive_dimension,
-    blank_sketch,
+    dump_dimensions,
     ensure_fully_defined,
     extrude_at_offset,
     force_rebuild,
@@ -102,12 +102,12 @@ from gooseneck_geom import (  # noqa: E402
     PLUG_T,
     SCREW_HEAD_DIA,
     SCREW_HEAD_T,
-    SCREW_SHANK_LEN,
     SCREW_THREAD_MAJOR_DIA,
     SCREW_SLOT_DEPTH,
     SCREW_SLOT_W,
     SCREW_TAP_MINOR_DIA,
-    SCREW_THREAD_ENGAGEMENT,
+    SPRING_SCREW_CLAMPED_GAP_MM,
+    SPRING_SCREW_UNDERHEAD_LENGTH_MM,
     TUBE_DIA,
     WALL_T,
 )
@@ -135,7 +135,7 @@ PLUG_R = PLUG_DIA / 2.0
 TAP_MINOR_R = SCREW_TAP_MINOR_DIA / 2.0
 SHANK_R = SCREW_THREAD_MAJOR_DIA / 2.0
 HEAD_R = SCREW_HEAD_DIA / 2.0
-HEAD_X = ARM_END_X - SCREW_SHANK_LEN
+HEAD_X = ARM_END_X - SPRING_SCREW_CLAMPED_GAP_MM
 SCREW_TIP_X = HEAD_X - SCREW_HEAD_T
 
 
@@ -149,6 +149,32 @@ def _solid_body_count(adapter) -> int:
     if bodies is None:
         raise RuntimeError("gooseneck solid-body census failed")
     return len(tuple(bodies))
+
+
+def _assert_start_stations(adapter) -> None:
+    expected = {
+        ("Leg", "LegStart"): LEG_BOTTOM,
+        ("EndPlug", "PlugStart"): ARM_END_X,
+        ("ScrewShank", "ShankStart"): HEAD_X,
+        ("ScrewHead", "HeadStart"): SCREW_TIP_X,
+    }
+    for (feature, dimension), expected_mm in expected.items():
+        rows = dump_dimensions(adapter, feature)
+        actual = next(
+            (
+                row["value_mm"]
+                for row in rows
+                if row["full_name"].split("@")[:2] == [dimension, feature]
+            ),
+            None,
+        )
+        if actual is None or not math.isclose(
+            actual, expected_mm, rel_tol=0.0, abs_tol=1e-6
+        ):
+            raise RuntimeError(
+                f"{dimension}@{feature}: start station {actual!r} mm; "
+                f"expected {expected_mm:g} mm"
+            )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -168,7 +194,7 @@ async def build(adapter) -> dict[str, str]:
     # distance dims they drive negate them so the equation evaluates positive
     # (a centre/anchor dim at a negative coordinate displays as the magnitude).
     # Derived spans (ArmY/ArmRun) reference other globals as equation strings;
-    # the leg feature's named depth/start dimensions are likewise driven below.
+    # extrude depths are equation-driven below, while negative starts stay native.
     await set_global(adapter, "TubeDia", f"{TUBE_DIA}mm")
     await set_global(adapter, "WallT", f"{WALL_T}mm")
     await set_global(adapter, "LegTop", f"{LEG_TOP}mm")
@@ -181,15 +207,13 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlugT", f"{PLUG_T}mm")
     await set_global(adapter, "TapMinorDia", f"{SCREW_TAP_MINOR_DIA}mm")
     await set_global(adapter, "ScrewShankDia", f"{SCREW_THREAD_MAJOR_DIA}mm")
-    await set_global(adapter, "ScrewShankLen", f"{SCREW_SHANK_LEN}mm")
     await set_global(
-        adapter, "ScrewThreadEngagement", f"{SCREW_THREAD_ENGAGEMENT}mm"
+        adapter, "ScrewUnderHeadLen", f"{SPRING_SCREW_UNDERHEAD_LENGTH_MM}mm"
     )
     await set_global(adapter, "ScrewHeadDia", f"{SCREW_HEAD_DIA}mm")
     await set_global(adapter, "ScrewHeadT", f"{SCREW_HEAD_T}mm")
     await set_global(adapter, "ScrewSlotW", f"{SCREW_SLOT_W}mm")
     await set_global(adapter, "ScrewSlotDepth", f"{SCREW_SLOT_DEPTH}mm")
-    await set_global(adapter, "ScrewRefY", '"ArmY" + 20mm')
 
     # Per-sketch dim names + drive equations are declared inline at each define_*
     # / record call; their drive jobs collect here and apply in one deferred batch
@@ -230,10 +254,7 @@ async def build(adapter) -> dict[str, str]:
     extrude_at_offset(adapter, LEG_TOP - LEG_BOTTOM, LEG_BOTTOM)
     name_last_feature(adapter, "Leg")
     leg_dims = name_dimensions(adapter, "Leg", ["LegLength", "LegStart"])
-    drive_jobs += [
-        (leg_dims[0], '"LegTop" - "LegBottom"'),
-        (leg_dims[1], '"LegBottom"'),
-    ]
+    drive_jobs.append((leg_dims[0], '"LegTop" - "LegBottom"'))
     expected = _RING_AREA * (LEG_TOP - LEG_BOTTOM)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after leg: {vol:.1f} mm^3 (analytic {expected:.1f})")
@@ -424,18 +445,18 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("end plug cannot enter the nominal tube bore")
     expected = vol  # rebase: keep the sweep's B-rep slack out of the screw delta
 
-    # 3. The arm-end fabrication is three physical bodies in one released part:
-    # bent tube, capillary-clearance plug, and captive screw. The old Ø14 plug
-    # was only Boolean overlap and could not enter the Ø12 tube bore. This
+    # 3. The arm-end package is three physical bodies in one assembly BOM row:
+    # bent tube, capillary-clearance plug, and adjustment screw. The old Ø14
+    # plug was only Boolean overlap and could not enter the Ø12 tube bore. This
     # Ø11.85 annular plug leaves 0.075 mm nominal gap per facing surface and keeps
-    # a modeled #6-32 tap-minor passage. The screw retains the calibrated outer
-    # envelope but now includes its 6 mm engagement and a real head slot.
+    # a modeled #6-32 tap-minor passage. The fully threaded screw retains the
+    # maximum external envelope and can advance through the plug into the bore.
     if _solid_body_count(adapter) != 1:
         raise RuntimeError("formed gooseneck tube is not one solid body")
 
     plug = SketchDims()
     check("create_sketch end plug", await adapter.create_sketch("Right"))
-    await define_circle(
+    plug_circle = await define_circle(
         adapter,
         0.0,
         ARM_Y,
@@ -445,16 +466,27 @@ async def build(adapter) -> dict[str, str]:
         names=("PlugCz", "PlugCy", "PlugDia"),
         drives=(None, '"ArmY"', '"PlugDia"'),
     )
-    await define_circle(
-        adapter,
-        0.0,
-        ARM_Y,
-        TAP_MINOR_R,
-        "plug tap minor",
-        dims=plug,
-        names=("TapCz", "TapCy", "TapMinorDia"),
-        drives=(None, '"ArmY"', '"TapMinorDia"'),
+    set_sketch_direct_db(adapter, True)
+    try:
+        tap_circle = check(
+            "add_circle plug tap minor",
+            await adapter.add_circle(0.0, ARM_Y, TAP_MINOR_R),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
+    check(
+        "plug tap minor concentric",
+        await adapter.add_sketch_constraint(
+            f"{tap_circle}.center", f"{plug_circle}.center", "coincident"
+        ),
     )
+    check(
+        "dimension plug tap minor diameter",
+        await adapter.add_sketch_dimension(
+            tap_circle, None, "diameter", 2.0 * TAP_MINOR_R
+        ),
+    )
+    plug.record("TapMinorDia", '"TapMinorDia"')
     await ensure_fully_defined(adapter, "end plug sketch")
     check("exit_sketch end plug", await adapter.exit_sketch())
     name_last_feature(adapter, "EndPlugProfile")
@@ -464,10 +496,7 @@ async def build(adapter) -> dict[str, str]:
     plug_feature_dims = name_dimensions(
         adapter, "EndPlug", ["PlugDepth", "PlugStart"]
     )
-    drive_jobs += [
-        (plug_feature_dims[0], '"PlugT"'),
-        (plug_feature_dims[1], '"ArmEndX"'),
-    ]
+    drive_jobs.append((plug_feature_dims[0], '"PlugT"'))
     if _solid_body_count(adapter) != 2:
         raise RuntimeError("brazed end plug did not persist as a separate body")
 
@@ -487,19 +516,13 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch spring screw shank", await adapter.exit_sketch())
     name_last_feature(adapter, "ScrewShankProfile")
     drive_jobs += shank.apply(adapter, "ScrewShankProfile")
-    under_head_len = SCREW_THREAD_ENGAGEMENT + SCREW_SHANK_LEN
+    under_head_len = SPRING_SCREW_UNDERHEAD_LENGTH_MM
     extrude_at_offset(adapter, under_head_len, HEAD_X, merge_result=False)
     name_last_feature(adapter, "ScrewShank")
     shank_feature_dims = name_dimensions(
         adapter, "ScrewShank", ["UnderHeadLength", "ShankStart"]
     )
-    drive_jobs += [
-        (
-            shank_feature_dims[0],
-            '"ScrewThreadEngagement" + "ScrewShankLen"',
-        ),
-        (shank_feature_dims[1], '"ArmEndX" - "ScrewShankLen"'),
-    ]
+    drive_jobs.append((shank_feature_dims[0], '"ScrewUnderHeadLen"'))
     if _solid_body_count(adapter) != 3:
         raise RuntimeError("spring screw shank did not persist as a separate body")
 
@@ -524,53 +547,10 @@ async def build(adapter) -> dict[str, str]:
     head_feature_dims = name_dimensions(
         adapter, "ScrewHead", ["HeadThickness", "HeadStart"]
     )
-    drive_jobs += [
-        (head_feature_dims[0], '"ScrewHeadT"'),
-        (
-            head_feature_dims[1],
-            '"ArmEndX" - "ScrewShankLen" - "ScrewHeadT"',
-        ),
-    ]
+    drive_jobs.append((head_feature_dims[0], '"ScrewHeadT"'))
     if _solid_body_count(adapter) != 3:
         raise RuntimeError("spring screw head did not merge only with its shank")
 
-    # Hidden model reference: the exposed shank is the spring's functional seat,
-    # so its 8.00 value must be model-owned even though the solid shank is one
-    # continuous 14 mm feature through the tapped plug.
-    exposed_ref_y = ARM_Y + 20.0
-    exposed = SketchDims()
-    check("create_sketch exposed shank reference", await adapter.create_sketch("Front"))
-    exposed_line = check(
-        "exposed shank reference line",
-        await adapter.add_line(HEAD_X, exposed_ref_y, ARM_END_X, exposed_ref_y),
-    )
-    check(
-        "exposed shank reference horizontal",
-        await adapter.add_sketch_constraint(exposed_line, None, "horizontal"),
-    )
-    await dimension_between(
-        adapter,
-        f"{exposed_line}.start",
-        f"{exposed_line}.end",
-        "horizontal_distance",
-        SCREW_SHANK_LEN,
-        "exposed shank",
-    )
-    exposed.record("ExposedShank", '"ScrewShankLen"')
-    await anchor_point_to_origin(
-        adapter,
-        f"{exposed_line}.start",
-        HEAD_X,
-        exposed_ref_y,
-        "exposed shank reference",
-    )
-    exposed.record("ExposedRefX", '-"ArmEndX" + "ScrewShankLen"')
-    exposed.record("ExposedRefY", '"ScrewRefY"')
-    await ensure_fully_defined(adapter, "exposed shank reference sketch")
-    check("exit_sketch exposed shank reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "ScrewStationReference")
-    drive_jobs += exposed.apply(adapter, "ScrewStationReference")
-    blank_sketch(adapter, "ScrewStationReference")
 
     slot = SketchDims()
     slot_profile = [
@@ -618,22 +598,33 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     added = vol - before
     _telemetry.info(
-        f"volume after plug + captive screw: {vol:.1f} mm^3 "
+        f"volume after plug + adjustment screw: {vol:.1f} mm^3 "
         f"(+{added:.1f}, analytic {v_fabrication:.1f})"
     )
     if abs(added - v_fabrication) > 0.02 * v_fabrication:
         raise RuntimeError(
-            f"plug + captive screw: added {added:.1f}, expected ~{v_fabrication:.1f}"
+            f"plug + adjustment screw: added {added:.1f}, expected ~{v_fabrication:.1f}"
         )
     final_vol = vol
 
-    # Apply the deferred drive equations now -- after the whole model + a rebuild
-    # exists, so every target resolves. Each equation evaluates to the value just
-    # built, so the geometry must not move; the re-check below is the proof.
+    # Measured on SW 2026: a positive-magnitude equation reverses each of these
+    # negative starts on rebuild, while a signed-global RHS is refused when the
+    # equation is added.  Keep the four native start stations as-built; they are
+    # construction coordinates, not printed controls.  Their final readback
+    # below guards the released envelope.  Positive starts elsewhere (for
+    # example build_wheel_axle) remain equation-driven.
+    # Apply each deferred equation only after the whole model exists.  Rebuild
+    # at each boundary so a rejected neutral constraint is attributed to its
+    # exact native target instead of surfacing as an unactionable batch failure.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
-    await force_rebuild(adapter)
+        try:
+            await force_rebuild(adapter)
+        except RuntimeError as exc:
+            raise RuntimeError(
+                f"equation {dim_name!r} = {expr!r} made the model fail rebuild"
+            ) from exc
     await volume_check(
         adapter, "driven gooseneck (equations neutral)", final_vol, 0.001 * final_vol
     )
@@ -641,6 +632,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError("driven gooseneck did not retain tube/plug/screw bodies")
 
     await apply_material(adapter, MATERIAL)
+    _assert_start_stations(adapter)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
