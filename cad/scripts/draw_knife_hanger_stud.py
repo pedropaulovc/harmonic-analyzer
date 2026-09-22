@@ -53,7 +53,12 @@ SPEC = DRAWINGS_BY_NAME["knife_hanger_stud"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (2.0, 1.0)
-ISO_SCALE = (2.0, 1.0)
+# 1.5:1, not 2:1: ``GetOutline`` of the pictorial measures 72.4 x 135.2 mm at
+# 2:1 (the rendered ink is only 52 x 99.5 mm -- the outline is NOT the ink),
+# and no keep-in region tall enough for it leaves the 45 deg text block its
+# pocket below. At 1.5:1 the outline is 54.3 x 101.4 mm and everything fits
+# with margin (measured on leaf 20260922T152754Z, which failed loudly at 2:1).
+ISO_SCALE = (1.5, 1.0)
 FRONT_CENTER = (0.105, 0.175)
 FRONT_KEEP = {"FinishedOverall": (0.070, 0.175)}
 SHEET = TrimSheet(
@@ -66,19 +71,22 @@ SHEET = TrimSheet(
     # Right of the detail outline, never on it. The audit boxes the detail view
     # from ``GetOutline`` and the label from ``GetExtent``; at (0.310, 0.115) the
     # label box penetrated the outline's lower-right corner by 8.8 x 3.0 mm --
-    # an overlap finding the layout gate rejects (its slack is 1.5 mm).
-    detail_label_xy=(0.335, 0.115),
+    # an overlap finding the layout gate rejects (its slack is 1.5 mm). The
+    # extra drop to y = 0.108 buys the 45 deg text block a 34 mm pocket between
+    # the label's top edge and the linked note below the pictorial.
+    detail_label_xy=(0.335, 0.108),
     parent_letter_offset=(0.020, 0.014),
     detail_center_x_mm=SHANK_DIA / 2.0 - CHAMFER_WIDTH_MM / 2.0,
 )
 
 # The free upper-right cell the pictorial lives in, on this 0.4318 x 0.2794 m
-# sheet: the detail outline ends at x = 0.303 and the border's inner line is
-# y = 0.2684. The measured isometric outline at 2:1 is 52.0 x 99.5 mm, so it
-# keeps >= 3 mm to every side of this region without leaving 2:1.
-ISO_REGION = (0.290, 0.155, 0.425, 0.265)
+# sheet: the detail outline ends at x = 0.303, the border's inner line is
+# y = 0.2684 and the zone border keeps content under ~x 0.421. Sized for the
+# MEASURED outline at 1.5:1 (54.3 x 101.4 mm) so the fit keeps >= 3 mm to every
+# side and the callout pocket under it stays tall enough for the text block.
+ISO_REGION = (0.290, 0.152, 0.415, 0.2625)
 ISO_FIT_MARGIN_M = 0.003
-# "ISO SCALE 2:1" renders ~30 mm wide at its default text height and a note's
+# The linked "ISO SCALE 1.5:1" renders ~30 mm wide at its default text height and a note's
 # SetPosition2 anchor is the text box's UPPER-LEFT (measured on this sheet), so
 # it is centred under the fitted outline and kept just clear of it.
 ISO_NOTE_WIDTH_M = 0.030

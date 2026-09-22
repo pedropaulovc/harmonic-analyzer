@@ -15,8 +15,9 @@ def test_root_chamfer_flat_clears_the_receiving_tap_drill() -> None:
 
 
 def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
-    # The measured pictorial outline at 2:1 (52.0 x 99.5 mm).
-    box = (0.304, 0.178, 0.356, 0.2775)
+    # The measured pictorial outline at 1.5:1 (54.3 x 101.4 mm: GetOutline is
+    # 72.4 x 135.2 mm at 2:1 -- 1.37x the rendered ink -- scaled by 0.75).
+    box = (0.330, 0.150, 0.3843, 0.2514)
     dx, dy = drawing._fit_translation(box, drawing.ISO_REGION, drawing.ISO_FIT_MARGIN_M)
     moved = (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
     region = drawing.ISO_REGION
