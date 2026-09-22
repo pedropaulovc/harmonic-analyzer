@@ -340,11 +340,21 @@ async def _volume(adapter) -> float:
     return res.data.volume if res.is_success else float("nan")
 
 
-# swDimensionDrivenState_e.swDimensionDriving: the sheet prints the tap's 8.00
-# plain only while its model dimension drives the geometry. A demoted (driven)
-# dimension satisfies every build gate and still prints the machinist's
-# parenthesized complaint, so the state is read back, never assumed.
+# swDimensionDrivenState_e. A sketch dimension reads DRIVING (2) as authored
+# and DRIVEN (1) once an equation owns its value -- the equation, not the
+# sketch, is then its single driver. Measured on the farm (knife-cc-5,
+# 3c7efb27): TapFromEnd, BlockWidth and Depth all read 2 up to the deferred
+# equations and 1 after them, IsReference() False throughout, and the sheet
+# prints all three plain. So "driving" is asserted at authoring, and after
+# the equations the dimension must share the equation-owned state of the
+# BlockWidth control -- never a bare "== 2" that every equation fails.
 _DIMENSION_DRIVING = 2
+_DIMENSION_DRIVEN = 1
+# swConstraintType_e: the placement point's only relations -- vertical to the
+# sketch origin (on the bore centreline) and the 8.00 distance to the near
+# end edge. A coincident (9) would own the thickness DOF instead.
+_TAP_PLACEMENT_RELATIONS = sorted([26, 1])  # VERTPOINTS, DISTANCE
+_SW_FULLY_CONSTRAINED = 3  # swConstrainedStatus_e
 
 
 def _tap_placement(adapter: Any) -> tuple[Any, Any, Any, str]:
@@ -413,78 +423,12 @@ def _assert_tap_station(adapter: Any, sketch: Any) -> None:
         )
 
 
-def _probe_tap_state(adapter: Any, where: str, dimension: Any = None) -> None:
-    """TEMP-PROBE: log what owns the tap's thickness-direction DOF at ``where``.
-
-    knife-4 authored TapFromEnd driving and read it back driven after the
-    rebuilds + deferred equation. This names the step that demotes it: the
-    dimension's DrivenState/IsReference/ReadOnly, every relation the placement
-    sketch holds, and two equation-owned control dimensions (BlockWidth,
-    Depth) whose sheet text prints plain -- if they also read driven after
-    their equations, equation ownership is what DrivenState=1 means here.
-    Never fatal: every read is a best-effort debug record.
-    """
-    record: dict[str, Any] = {"event": "tap_state_probe", "where": where}
-    try:
-        _, _, sketch, place_name = _tap_placement(adapter)
-        record["sketch"] = place_name
-        record["active_sketch"] = (
-            adapter._attempt(lambda: adapter.currentModel.GetActiveSketch2(), default=None)
-            is not None
-        )
-        record["constrained_status"] = adapter._attempt(
-            lambda: int(sketch.GetConstrainedStatus()), default=None
-        )
-        relations = []
-        manager = _early_bound(sketch.RelationManager, "ISketchRelationManager")
-        for raw in manager.GetRelations(0) or ():  # swAll
-            if raw is None:
-                continue
-            relation = _early_bound(raw, "ISketchRelation")
-            relations.append(
-                {
-                    "type": int(relation.GetRelationType()),
-                    "entities": [int(t) for t in (relation.GetEntitiesType() or ())],
-                }
-            )
-        record["relations"] = relations
-    except Exception as exc:  # noqa: BLE001 -- a probe never fails the build
-        record["sketch_error"] = repr(exc)
-    targets: list[tuple[str, Any]] = []
-    if dimension is not None:
-        targets.append(("TapFromEnd(handle)", dimension))
-    for feature, name in (
-        ("StudTap", "TapFromEnd"),
-        ("BlockProfile", "BlockWidth"),
-        ("Block", "Depth"),
-    ):
-        try:
-            targets.append((f"{name}@{feature}", _named_dimension(adapter, feature, name)[1]))
-        except Exception as exc:  # noqa: BLE001
-            record[f"{name}_error"] = repr(exc)
-    for label, dim in targets:
-        try:
-            dim = _early_bound(dim, "IDimension")
-            record[label] = {
-                "driven_state": int(dim.DrivenState),
-                "is_reference": bool(dim.IsReference()),
-                "read_only": bool(dim.ReadOnly),
-                "value_mm": abs(float(dim.SystemValue)) * 1000.0,
-            }
-        except Exception as exc:  # noqa: BLE001
-            record[label] = repr(exc)
-    _telemetry.info(json.dumps(record, sort_keys=True))
-
-
 def _assert_tap_from_end(dimension: Any) -> None:
     """A DRIVING 8.00 mm dimension -- read back, never assumed."""
     state = int(dimension.DrivenState)
     if state != _DIMENSION_DRIVING:
-        # TEMP-PROBE: warn instead of raise for one farm round so the drawing
-        # leaf runs and the sheet shows whether 8.00 prints parenthesized.
-        # Revert to the raise in the fix commit.
-        _telemetry.warn(
-            "hanger-stud tap: tap-from-end dimension came back "
+        raise RuntimeError(
+            "hanger-stud tap: tap-from-end dimension authored "
             f"{'driven (reference)' if state == 1 else f'state {state}'}, not driving"
         )
     measured_mm = abs(float(dimension.SystemValue)) * 1000.0
@@ -606,28 +550,91 @@ async def _dimension_tap_from_end(adapter: Any) -> tuple[str, str]:
         _assert_tap_from_end(dimension)
         _assert_tap_station(adapter, sketch)
         await ensure_fully_defined(adapter, "hanger-stud tap placement")
-        _probe_tap_state(adapter, "a:in-sketch-after-fully-defined", dimension)
     finally:
         adapter.currentSketchManager = previous_sketch_manager
         if editing:
             model.EditSketch()
-    _probe_tap_state(adapter, "b0:after-sketch-exit", dimension)
     if not model.EditRebuild3():
         raise RuntimeError("hanger-stud tap: placement rebuild failed")
-    _probe_tap_state(adapter, "b:after-placement-rebuild", dimension)
     return f"TapFromEnd@{place_name}", '"SupportZThick" / 2'
+
+
+def _equations_for(adapter: Any, lhs: str) -> list[str]:
+    """Every equation whose left-hand side is exactly ``lhs``."""
+    from solidworks_mcp.adapters.solidworks.parametrics import (
+        _equation_manager,
+        _read_member,
+    )
+
+    # The same flagged manager + GetCount read the adapter's own
+    # _equation_index_by_lhs uses (GetCount resolves as a property or a method
+    # depending on the dispatch).
+    manager = _equation_manager(adapter)
+    matches = []
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        text = str(manager.Equation(index) or "")
+        if text.partition("=")[0].strip() == lhs:
+            matches.append(text)
+    return matches
 
 
 def _assert_tap_from_end_contract(adapter: Any) -> None:
     """After the deferred equations and the final rebuild.
 
-    The volume gates prove the cut did not move; this proves the placement
-    dimension still drives at 8.00 mm and the tap still sits on the mid-plane
-    station.
+    The volume gates prove the cut did not move; this proves the 8.00 has ONE
+    owner and it is not a reference dimension: exactly one equation drives
+    ``TapFromEnd``, the dimension reads the same equation-owned state as the
+    BlockWidth control (see ``_DIMENSION_DRIVEN``), IsReference() is False,
+    the placement sketch is fully defined by the vertical relation plus the
+    8.00 alone (no coincident owns the DOF), and the tap still sits on the
+    mid-plane station. The drawing proves the sheet prints it unparenthesized.
     """
-    _, _, sketch, _ = _tap_placement(adapter)
+    _, _, sketch, place_name = _tap_placement(adapter)
     _display, dimension = _named_dimension(adapter, "StudTap", "TapFromEnd")
-    _assert_tap_from_end(dimension)
+    _control_display, control = _named_dimension(adapter, "BlockProfile", "BlockWidth")
+    equations = _equations_for(adapter, f'"TapFromEnd@{place_name}"')
+    relations = sorted(
+        int(_early_bound(raw, "ISketchRelation").GetRelationType())
+        for raw in (
+            _early_bound(sketch.RelationManager, "ISketchRelationManager").GetRelations(0)
+            or ()
+        )  # swAll
+        if raw is not None
+    )
+    evidence = {
+        "event": "tap_from_end_contract",
+        "driven_state": int(dimension.DrivenState),
+        "control_driven_state": int(control.DrivenState),
+        "is_reference": bool(dimension.IsReference()),
+        "equations": equations,
+        "relations": relations,
+        "constrained_status": int(sketch.GetConstrainedStatus()),
+        "value_mm": abs(float(dimension.SystemValue)) * 1000.0,
+    }
+    _telemetry.info(json.dumps(evidence, sort_keys=True))
+    problems = []
+    if len(equations) != 1:
+        problems.append(f"expected one TapFromEnd equation, found {equations}")
+    if evidence["driven_state"] != _DIMENSION_DRIVEN:
+        problems.append("TapFromEnd is not equation-owned (DrivenState != 1)")
+    if evidence["driven_state"] != evidence["control_driven_state"]:
+        problems.append("TapFromEnd's state differs from the BlockWidth control")
+    if evidence["is_reference"]:
+        problems.append("TapFromEnd became a reference dimension")
+    if relations != _TAP_PLACEMENT_RELATIONS:
+        problems.append(
+            f"placement relations {relations} != {_TAP_PLACEMENT_RELATIONS}"
+        )
+    if evidence["constrained_status"] != _SW_FULLY_CONSTRAINED:
+        problems.append("placement sketch is not fully defined")
+    if abs(evidence["value_mm"] - SUPPORT_Z_THICK / 2.0) > 1e-5:
+        problems.append(f"TapFromEnd reads {evidence['value_mm']:.6f} mm")
+    if problems:
+        raise RuntimeError(
+            "hanger-stud tap: tap-from-end contract failed: "
+            + "; ".join(problems)
+            + f" -- {json.dumps(evidence, sort_keys=True)}"
+        )
     _assert_tap_station(adapter, sketch)
 
 
@@ -830,14 +837,10 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: each equation evaluates to the value just built, so
     # the geometry must not move -- the re-check below is the proof.
-    _probe_tap_state(adapter, "b2:after-hole-depth-tolerances")
     await force_rebuild(adapter)
-    _probe_tap_state(adapter, "c:pre-equation-rebuild")
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
-    _probe_tap_state(adapter, "d:after-equations")
     await force_rebuild(adapter)
-    _probe_tap_state(adapter, "e:post-equation-rebuild")
     await volume_check(
         adapter, "driven knife mount (equations neutral)", expected, 0.01 * expected
     )
