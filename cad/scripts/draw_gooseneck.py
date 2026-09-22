@@ -136,7 +136,7 @@ JOINT_LABEL_BELOW_MM = 62.0
 SCREW_AXIS_AT_HEAD = (0.300, 0.185)  # screw view: head underside on the axis
 SCREW_SCALE = (7, 1)
 SCREW_NOTE_BELOW_MM = 80.0
-NOTES_XY = (0.020, 0.046)
+NOTES_XY = (0.020, 0.042)
 
 
 def _sheet_point(
