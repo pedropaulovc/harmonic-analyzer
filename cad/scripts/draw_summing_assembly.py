@@ -426,6 +426,9 @@ def _curve_kind(curve: Any) -> str:
     """Name an edge curve by swCurveTypes_e, resolving trimmed curves."""
     if curve is None:
         return "none"
+    # Late-bound dispatch exposes the no-argument Identity() as a property;
+    # bind ICurve so it is callable (r6 died on "'int' object is not callable").
+    curve = _early_bound(curve, "ICurve")
     kind = _CURVE_TYPES.get(int(curve.Identity()), "other")
     if kind != "trimmed":
         return kind
@@ -510,10 +513,13 @@ def _census_component_geometry(
                 y = _component_point_in_assembly(component, corner)[1] * 1000.0
                 y_range = [min(y_range[0], y), max(y_range[1], y)]
             for raw_edge in tuple(body.GetEdges() or ()):
-                curve = _early_bound(raw_edge, "IEdge").GetCurve()
-                kind = _curve_kind(curve)
+                raw_curve = _early_bound(raw_edge, "IEdge").GetCurve()
+                kind = _curve_kind(raw_curve)
                 kinds[kind] = kinds.get(kind, 0) + 1
-                if curve is None or not curve.IsCircle():
+                if raw_curve is None:
+                    continue
+                curve = _early_bound(raw_curve, "ICurve")
+                if not curve.IsCircle():
                     continue
                 parameters = tuple(float(value) for value in curve.CircleParams)
                 center = _component_point_in_assembly(component, parameters[:3])
