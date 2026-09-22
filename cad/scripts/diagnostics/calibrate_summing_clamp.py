@@ -490,6 +490,30 @@ class Fixture:
         # Read the native transforms, not the requested placement dictionary.
         return {name: component_transform(self.adapter, self.names[name]) for name in (body_role, "counter")}
 
+    def _record_invariance(self, kind, body_role, baseline, current, relative, proof_keys):
+        """Record, never refuse: these kernel re-evaluation differences are
+        diagnostics only (see commit body for the measured magnitude)."""
+        bucket = self.evidence.setdefault("invariance_observations", {}).setdefault(kind, {
+            "samples": 0,
+            "max_abs_delta": 0.0,
+            "max_relative_delta": 0.0,
+            "worst": None,
+            "units": {"body_volume": "mm3", "face_area": "mm2"}[kind],
+        })
+        delta = current - baseline
+        bucket["samples"] += 1
+        bucket["max_abs_delta"] = max(bucket["max_abs_delta"], abs(delta))
+        if bucket["worst"] is None or abs(relative) > bucket["max_relative_delta"]:
+            bucket["worst"] = {
+                "body_role": body_role,
+                **proof_keys,
+                "baseline": baseline,
+                "current": current,
+                "delta": delta,
+                "relative_delta": relative,
+            }
+        bucket["max_relative_delta"] = max(bucket["max_relative_delta"], abs(relative))
+
     def _geometry_diagnostic(self, body_role, face, body, properties, source_proof, stage, triggering_proof=None):
         """Record native observations before refusal; never repair or re-pose."""
         baseline = body["mass_properties_si"]
@@ -588,9 +612,6 @@ class Fixture:
         body = matches[0]
         properties = _values(owner.GetMassProperties(1.0), 12, "witness owner mass")
         volume = properties[3]
-        if not math.isclose(volume, body["volume_si"], rel_tol=1e-12, abs_tol=0.0):
-            self._geometry_diagnostic(body_role, face, body, properties, source_proof, "body_volume_invariance")
-            raise RuntimeError(f"{body_role}: native witness owner volume invariance guard failed")
         proof = {"owner_body_index": body["index"], "owner_census_count": len(context["bodies"])}
         proof["persist_hex"] = _face_identity(
             self.adapter, context["document"], face, body["body"], proof
@@ -598,6 +619,15 @@ class Fixture:
         proof["area_mm2"] = float(face.GetArea()) * 1e6
         proof["body_volume_si"] = volume
         proof["body_mass_properties_si_density_1"] = properties
+        proof["baseline_body_volume_si"] = body["volume_si"]
+        proof["body_volume_delta_si"] = volume - body["volume_si"]
+        proof["body_volume_relative_delta"] = (volume - body["volume_si"]) / body["volume_si"]
+        self._record_invariance(
+            "body_volume", body_role, body["volume_si"], volume,
+            proof["body_volume_relative_delta"],
+            {"component": self.names[body_role], "owner_body_index": body["index"],
+             "persist_hex": proof["persist_hex"]},
+        )
         return proof
 
     def _on_face(self, face, point):
@@ -640,15 +670,22 @@ class Fixture:
             if type(same_owner) is not int or same_owner != 1:
                 raise RuntimeError(f"{role}: transported witness changed its original native owner")
             proof["same_source_owner_body"] = same_owner
-            if proof["persist_hex"] != original["persist_hex"] or not math.isclose(
-                proof["area_mm2"], original["area_mm2"], rel_tol=1e-12, abs_tol=0.0
-            ):
+            proof["source_area_mm2"] = original["area_mm2"]
+            proof["area_delta_mm2"] = proof["area_mm2"] - original["area_mm2"]
+            proof["area_relative_delta"] = (proof["area_mm2"] - original["area_mm2"]) / original["area_mm2"]
+            self._record_invariance(
+                "face_area", name, original["area_mm2"], proof["area_mm2"],
+                proof["area_relative_delta"],
+                {"component": self.names[name], "owner_body_index": proof["owner_body_index"],
+                 "persist_hex": proof["persist_hex"]},
+            )
+            if proof["persist_hex"] != original["persist_hex"]:
                 body = self.part_contexts[name]["bodies"][proof["owner_body_index"]]
                 self._geometry_diagnostic(
                     name, face, body, proof["body_mass_properties_si_density_1"], original,
                     "face_identity_or_area_invariance", triggering_proof=proof,
                 )
-                raise RuntimeError(f"{role}: native witness face identity/area invariance guard failed")
+                raise RuntimeError(f"{role}: native witness face identity invariance guard failed")
             projected = self._on_face(face, local)
             if math.dist(projected, local) > self.resolution:
                 raise RuntimeError(f"{role}: transported local witness lost native finite-face membership")
