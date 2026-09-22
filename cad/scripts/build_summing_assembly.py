@@ -43,6 +43,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -179,43 +180,58 @@ import summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# The counter spring and gooseneck use complete calibrated placements loaded by
-# ``counter_seat`` before assembly creation.
+# The counter spring uses its complete calibrated placement, and the gooseneck
+# is inserted with the spring eye clamped in its released default screw state.
 
 
 def _assert_counter_spring_top_hang(
     pose: spring_mounts.SpringPose,
     gooseneck_y: float,
 ) -> None:
-    """Bound retention and envelopes at the fixed measured placement.
+    """Bound the clamped upper eye at the fixed measured placement.
 
-    Native body contact is certified separately against actual final component
-    instances. The half-turn clocking keeps the raised end on the open side of
-    the arm.
+    The saved calibration must be based on the released clamped screw geometry,
+    never the former 8 mm setup opening. Native body contact and zero overlap
+    are certified separately against the final component instances.
     """
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + gooseneck_geom.ARM_Y
+    clamped_gap = gooseneck_geom.SPRING_SCREW_CLAMPED_GAP_MM
+    if not math.isclose(
+        clamped_gap,
+        counter_stock.END_OCCUPIED_WIDTH_MM,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise RuntimeError(
+            "gooseneck clamped gap does not match the purchased spring eye band"
+        )
+    clamped_eye_x = spring_mounts.COUNTER_UPPER_EYE_X
+    open_eye_x = (
+        spring_mounts.GOOSENECK_END_X
+        + gooseneck_geom.SPRING_SCREW_OPEN_GAP_MM / 2.0
+    )
+    centre_error = pose.upper_eye_xy[0] - clamped_eye_x
+    if abs(centre_error) >= abs(pose.upper_eye_xy[0] - open_eye_x):
+        raise RuntimeError(
+            "counter spring calibration still uses the obsolete open screw "
+            "position; rerun diagnostics/calibrate_spring_seats.py for the "
+            "clamped gooseneck geometry"
+        )
     retention = (gooseneck_geom.SCREW_HEAD_DIA - counter_stock.EYE_ID_MM) / 2.0
     if retention < 1.0:
         raise RuntimeError(f"counter eye head retention only {retention:.3f} mm radial")
-    band = (
+    projected_band = (
         abs(ux) * counter_stock.COIL_MEAN_RADIUS_MM
-        + uy * counter_stock.LOOP_HALF_RISE_MM
+        + abs(uy) * counter_stock.LOOP_HALF_RISE_MM
         + counter_stock.WIRE_RADIUS_MM
     )
-    axial_gap = (
-        min(
-            pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X,
-            spring_mounts.GOOSENECK_END_X
-            + gooseneck_geom.SCREW_SHANK_LEN
-            - pose.upper_eye_xy[0],
-        )
-        - band
+    arm_side = pose.upper_eye_xy[0] - spring_mounts.GOOSENECK_END_X
+    head_side = (
+        spring_mounts.GOOSENECK_END_X
+        + clamped_gap
+        - pose.upper_eye_xy[0]
     )
-    if axial_gap < spring_mounts.MIN_CLEARANCE_MM:
-        raise RuntimeError(
-            f"double-loop band does not fit exposed shank: {axial_gap:.3f} mm"
-        )
     coil_top = (
         pose.centre_xy[1]
         + uy * counter_stock.coil_end_x_mm(pose.length_mm)
@@ -230,9 +246,11 @@ def _assert_counter_spring_top_hang(
             f"half-turn/tube {tube_gap:.3f}, half-turn/head {head_gap:.3f} mm"
         )
     log(
-        f"counter upper support: head retention {retention:.3f}, "
-        f"eye axial gap {axial_gap:.3f}, main coil {main_coil_gap:.3f}, "
-        f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
+        f"counter upper clamp: head retention {retention:.3f}, "
+        f"centre error {centre_error:.6f}, eye half-band projection "
+        f"{projected_band:.3f}, arm/head spans {arm_side:.3f}/{head_side:.3f}, "
+        f"main coil {main_coil_gap:.3f}, half-turn tube/head "
+        f"{tube_gap:.3f}/{head_gap:.3f} mm"
     )
 
 

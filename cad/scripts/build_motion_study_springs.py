@@ -84,10 +84,10 @@ SUM_LEVER_EYE = (
     + ANCHOR_9489T111.eye_centre_mm[1],
     _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],
 )
-# The stock double-loop spring is centred along the exposed screw shank,
-# as in spring_mount_geom.COUNTER_UPPER_EYE_X (in the assembly frame).
+# The stock double-loop spring is centred in the released clamped head gap,
+# matching spring_mount_geom.COUNTER_UPPER_EYE_X in the assembly frame.
 GOOSENECK_EYE = (
-    _GN.ARM_END_X - _GN.SCREW_SHANK_LEN / 2.0,
+    _GN.ARM_END_X - _GN.SPRING_EYE_CENTRE_FROM_ARM_END_MM,
     _GN.ARM_Y,
     0.0,
 )
