@@ -201,6 +201,10 @@ DRAWING_REFERENCE_PRECISION = {
     "TapFromSide": 1,  # a read of BoreFromSide's centreline, same precision
     "BossDia": 1,  # .X: knife_hanger_interface.BOSS_DIA_DEVIATIONS_MM
 }
+# Hole Wizard depth places (policy rule 2's callout exception): SetPrecision3
+# cannot reach a callout's per-variable places, so the part build writes these
+# onto the native depth dimensions and the drawing copies them to the callout.
+HOLE_CALLOUT_PRECISION = {"hw-tapdrldepth": 2, "hw-threaddepth": 2}
 # The native tap definition and the bore-location/size bands close the adverse
 # uninterrupted-crown stack; the drawing's center section shows that geometry.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
