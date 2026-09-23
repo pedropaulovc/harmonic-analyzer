@@ -76,20 +76,67 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
 
 
-def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
-    assert spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
+def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
+    assert spec.JOURNAL_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.SHAFT_DIA_BAND == (0.0, -0.10)
     assert model_toleranced_dimensions(part) == {
-        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
+        ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
     }
-    (finish,) = spec.SURFACE_FINISHES
-    assert finish.key == "bearing"
-    assert finish.roughness_um == 1.6
-    assert finish.face.diameter_mm == spec.SHAFT_DIA
+    lands = {
+        "front_journal": spec.FRONT_JOURNAL_Z,
+        "back_journal": spec.BACK_JOURNAL_Z,
+    }
+    assert {finish.key for finish in spec.SURFACE_FINISHES} == set(lands)
+    for finish in spec.SURFACE_FINISHES:
+        assert finish.roughness_um == 1.6
+        assert finish.face.diameter_mm == spec.SHAFT_DIA
+        station = lands[finish.key]
+        assert station < finish.face.contains_z_mm < station + spec.JOURNAL_LEN
+    assert set(drawing.JOURNAL_FINISHES) == set(lands)
+    for key, (station_z, _symbol_xy) in drawing.JOURNAL_FINISHES.items():
+        assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
+    assert spec.JOURNAL_LEN == pytest.approx(12.0)
+    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(51.0)
+    assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(204.0)
     assert "MHA-056" in spec.DRAWING_NOTES
     assert "BOND INTO MHA-002 WITH LOCTITE 638." in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
+
+
+def test_each_journal_land_covers_its_strap_with_axial_margin() -> None:
+    """The lands must cover the MHA-056 straps where the assembly puts them."""
+    import build_drive_train_assembly as assembly
+
+    front_face = assembly.APINION_Z_FRONT - assembly.STRAP_AIR - assembly.ARBOR_Z0
+    back_face = assembly.APINION_Z_BACK + assembly.STRAP_AIR - assembly.ARBOR_Z0
+    # 9 mm is the thicker strap the pinion-cluster slice carries.
+    for strap_t in {assembly.STRAP_T, 9.0}:
+        for strap_lo, strap_hi, land_lo in (
+            (front_face - strap_t, front_face, spec.FRONT_JOURNAL_Z),
+            (back_face, back_face + strap_t, spec.BACK_JOURNAL_Z),
+        ):
+            assert strap_lo - land_lo >= 1.0
+            assert land_lo + spec.JOURNAL_LEN - strap_hi >= 1.0
+
+
+def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
+    import alignment_pinion_spec as drum
+    import pinion_bracket_spec as strap
+
+    journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
+    strap_upper, strap_lower = strap.ARBOR_BORE_BAND
+    assert strap_lower - journal_upper == pytest.approx(0.010)
+    assert strap_upper - journal_lower == pytest.approx(0.045)
+    # Every bore slides on from the back crown, so no zone may exceed 8.00,
+    # and the worst drum-bore/shaft gap stays inside Loctite 638's 0.25.
+    shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
+    assert shaft_upper == journal_upper == 0.0
+    drum_upper, _drum_lower = drum.ARBOR_BORE_BAND
+    assert drum_upper - shaft_lower <= 0.20 + 1e-9
 
 
 def test_retired_socket_and_retention_pin_are_not_exported() -> None:
