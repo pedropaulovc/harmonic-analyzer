@@ -51,6 +51,7 @@ from _surface_finish import surface_finish_by_key
 from knife_mount_spec import (
     BLK_HALF_X,
     BORE_DIAMETER_TOLERANCE_MM,
+    HOLE_CALLOUT_PRECISION,
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
@@ -683,13 +684,14 @@ def _propagate_source_tap_depth_contracts(
     display: Any,
     source_contracts: dict[str, _TapDepthContract],
 ) -> None:
-    """Apply only model-read depth precision and tolerance to callout variables."""
+    """Apply the spec's callout places and the model-read depth tolerances.
+
+    The part build writes HOLE_CALLOUT_PRECISION onto the native depth
+    dimensions; the readback below fails if the model and the callout disagree.
+    """
     set_hole_callout_precision(
         display,
-        {
-            variable: contract.precision
-            for variable, contract in source_contracts.items()
-        },
+        HOLE_CALLOUT_PRECISION,
         label="knife-mount tap source precision",
     )
     remaining = dict(source_contracts)
