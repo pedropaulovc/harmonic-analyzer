@@ -28,6 +28,7 @@ from _drawing_common import (
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -38,9 +39,7 @@ from pinion_arbor_spec import (
     DRAWING_REFERENCE_PRECISION,
     HEAD_CENTER_Z,
     HEAD_DIA,
-    HEAD_REAR_Z,
     NECK_DIA,
-    NECK_END_Z,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -232,35 +231,113 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
         raise RuntimeError(f"native detail label position did not persist: {actual}")
 
 
+SILHOUETTE_RADIUS_TOLERANCE_M = 1e-6
+
+
+def classify_axial_silhouettes(
+    records: list[tuple[float, tuple[float, float], tuple[float, float], float, Any]],
+    radii_mm: dict[str, float],
+) -> dict[str, tuple[Any, Any]]:
+    """Pick one (below, above) silhouette per named turned diameter.
+
+    Each record is ``(face_radius_m, sheet_midpoint, sheet_axis_point,
+    length_m, silhouette)``: the silhouette's own cylinder radius, its midpoint
+    projected onto the sheet, the turning axis projected at the same station,
+    and its length.  The side is the sign of the midpoint's offset across the
+    projected axis, so the result does not depend on a screen-space hit test.
+    A flank split into pieces keeps its longest piece.
+    """
+    best: dict[tuple[str, int], tuple[float, Any]] = {}
+    for radius_m, midpoint, axis_point, length_m, silhouette in records:
+        for name, diameter_mm in radii_mm.items():
+            if abs(radius_m - diameter_mm / 2000.0) > SILHOUETTE_RADIUS_TOLERANCE_M:
+                continue
+            offset = midpoint[1] - axis_point[1]
+            if abs(offset) < diameter_mm / 4000.0:
+                raise RuntimeError(
+                    f"{name} silhouette lies on its axis projection: {offset:g} m"
+                )
+            key = (name, 1 if offset > 0.0 else -1)
+            if key not in best or length_m > best[key][0]:
+                best[key] = (length_m, silhouette)
+    missing = [
+        f"{name} {'above' if side > 0 else 'below'}"
+        for name in radii_mm
+        for side in (-1, 1)
+        if (name, side) not in best
+    ]
+    if missing:
+        raise RuntimeError(f"no visible silhouette for: {', '.join(missing)}")
+    return {name: (best[(name, -1)][1], best[(name, 1)][1]) for name in radii_mm}
+
+
+def _axial_silhouettes(
+    adapter: Any, view: Any, radii_mm: dict[str, float], *, label: str
+) -> dict[str, tuple[Any, Any]]:
+    """Resolve turned-diameter flanks by entity: one silhouette sweep per view.
+
+    Coordinate SILHOUETTE picks hit-test in screen space, so the same pick
+    passed on one farm seat and missed on another (runs bcfefa9d/d1409dfd).
+    The turning axis runs along model Z and is horizontal on this sheet.
+    """
+    records = []
+    for raw in visible_view_entities(view, 4, label=label):
+        silhouette = _early_bound(raw, "ISilhouetteEdge")
+        face = silhouette.GetFace()
+        if face is None:
+            continue
+        surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
+        if not surface.IsCylinder():
+            continue
+        radius_m = float(tuple(_read_member(surface, "CylinderParams"))[6])
+        start_point = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
+        end_point = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
+        if start_point is None or end_point is None:
+            continue
+        start = tuple(
+            float(v) for v in adapter._get_attr_or_call(start_point, "ArrayData") or ()
+        )
+        end = tuple(
+            float(v) for v in adapter._get_attr_or_call(end_point, "ArrayData") or ()
+        )
+        if len(start) < 3 or len(end) < 3:
+            continue
+        middle = tuple((a + b) / 2.0 for a, b in zip(start[:3], end[:3]))
+        records.append(
+            (
+                radius_m,
+                model_point_in_view(adapter, view, middle, label=f"{label} midpoint"),
+                model_point_in_view(
+                    adapter, view, (0.0, 0.0, middle[2]), label=f"{label} axis"
+                ),
+                math.dist(start[:3], end[:3]),
+                raw,
+            )
+        )
+    return classify_axial_silhouettes(records, radii_mm)
+
+
 def _detail_diameter(
     adapter: Any,
     detail: Any,
     *,
-    station_z_mm: float,
+    flanks: tuple[Any, Any],
     diameter_mm: float,
     dimension_name: str,
     text_xy: tuple[float, float],
     label: str,
 ) -> Any:
     """Create and verify one native diametric size across detail silhouettes."""
-    picks = [
-        model_point_in_view(
-            adapter,
-            detail,
-            (sign * diameter_mm / 2000.0, 0.0, station_z_mm / 1000.0),
-            label=f"{label} silhouette {sign:+g}",
-        )
-        for sign in (-1.0, 1.0)
-    ]
     display = add_edge_dimension(
         adapter,
         detail,
-        p0=picks[0],
-        p1=picks[1],
+        p0=text_xy,
+        p1=text_xy,
         text_xy=text_xy,
         label=label,
         orientation="vertical",
         entity_type="SILHOUETTE",
+        entities=flanks,
     )
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
@@ -365,11 +442,17 @@ async def build(adapter: Any) -> dict[str, str]:
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty diameter donor view")
+    detail_flanks = _axial_silhouettes(
+        adapter,
+        detail,
+        {"HeadDia": HEAD_DIA, "NeckDia": NECK_DIA},
+        label="head detail flanks",
+    )
     derived_diameters = [
         _detail_diameter(
             adapter,
             detail,
-            station_z_mm=HEAD_CENTER_Z,
+            flanks=detail_flanks["HeadDia"],
             diameter_mm=HEAD_DIA,
             dimension_name="HeadDia",
             text_xy=DIAMETER_POSITIONS["HeadDia"],
@@ -378,7 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _detail_diameter(
             adapter,
             detail,
-            station_z_mm=(HEAD_REAR_Z + NECK_END_Z) / 2.0,
+            flanks=detail_flanks["NeckDia"],
             diameter_mm=NECK_DIA,
             dimension_name="NeckDia",
             text_xy=DIAMETER_POSITIONS["NeckDia"],
@@ -416,10 +499,14 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(PRINCIPAL_CENTER[0], PRINCIPAL_CENTER[1] + 0.001),
         label="pinion arbor turning axis",
     )
+    _, upper_shaft_flank = _axial_silhouettes(
+        adapter, principal, {"ShaftDia": SHAFT_DIA}, label="shaft flanks"
+    )["ShaftDia"]
     add_surface_finish(
         adapter,
         principal,
-        edge_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
+        entity=upper_shaft_flank,
+        leader_attach_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
         symbol_xy=(0.265, 0.205),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="arbor bearing finish",

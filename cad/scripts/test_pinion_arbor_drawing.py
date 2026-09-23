@@ -108,3 +108,48 @@ def test_retired_socket_and_retention_pin_are_not_exported() -> None:
     }
     assert retired.isdisjoint(vars(spec))
     assert "RETENTION PIN" not in spec.CROSS_HOLE_CALLOUT
+
+
+def _silhouette(radius_mm, offset_m, length_m, tag):
+    axis = (0.2, 0.17)
+    return (radius_mm / 2000.0, (0.2, axis[1] + offset_m), axis, length_m, tag)
+
+
+def test_turned_flanks_classify_by_face_radius_and_side_of_the_axis() -> None:
+    records = [
+        _silhouette(15.0, +0.0150, 0.009, "head-up"),
+        _silhouette(15.0, -0.0150, 0.009, "head-down"),
+        _silhouette(10.5, +0.0105, 0.004, "neck-up-short"),
+        _silhouette(10.5, +0.0105, 0.012, "neck-up"),
+        _silhouette(10.5, -0.0105, 0.012, "neck-down"),
+        _silhouette(8.0, +0.0080, 0.200, "shaft-up"),  # not requested here
+        _silhouette(15.2, +0.0152, 0.009, "near-miss radius"),
+    ]
+    flanks = drawing.classify_axial_silhouettes(
+        records, {"HeadDia": spec.HEAD_DIA, "NeckDia": spec.NECK_DIA}
+    )
+    assert flanks == {
+        "HeadDia": ("head-down", "head-up"),
+        "NeckDia": ("neck-down", "neck-up"),
+    }
+
+
+def test_missing_flank_fails_loud_instead_of_picking_blind() -> None:
+    with pytest.raises(RuntimeError, match="HeadDia below"):
+        drawing.classify_axial_silhouettes(
+            [_silhouette(15.0, +0.015, 0.009, "head-up")], {"HeadDia": spec.HEAD_DIA}
+        )
+
+
+def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> None:
+    """Offline audit of the names the sheet looks up after the model import."""
+    carried = (
+        set(drawing.DONOR_KEEP)
+        | set(drawing.PRINCIPAL_KEEP)
+        | set(drawing.DETAIL_KEEP)
+    )
+    derived = set(spec.DRAWING_REFERENCE_PRECISION)
+    assert set(drawing.DIMENSION_CALLOUTS) <= carried
+    assert set(drawing.IMPORTED_PRECISION_BY_NAME) == carried
+    assert derived <= set(drawing.DIAMETER_POSITIONS)
+    assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
