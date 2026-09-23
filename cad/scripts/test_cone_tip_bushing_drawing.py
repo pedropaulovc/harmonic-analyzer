@@ -37,9 +37,9 @@ def test_part_and_drawing_share_the_native_dimension_contract() -> None:
 
 def test_model_owns_the_printed_precision() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
-        "ODDim": 2,
+        "ODDim": 1,
         "BoreDiaDim": 3,
-        "Depth": 2,
+        "Depth": 1,
     }
     assert "draw_cone_tip_bushing.py" in PRECISION_MIGRATED_DRAWINGS
 
@@ -117,6 +117,35 @@ def test_sheet_scale_and_layout_keep_every_annotation_clear() -> None:
         assert not (x > 0.216 and y < 0.070)
     assert drawing.END_CENTER[0] + outer_radius < drawing.SIDE_CENTER[0] - outer_radius
     assert drawing.SIDE_CENTER[0] + outer_radius < drawing.ISO_CENTER[0] - half_length
+
+
+def test_od_moves_to_the_side_view_and_the_end_view_keeps_one_diametric_callout() -> None:
+    # Policy rule 7: turned diameters on the side view.  The OD is imported on
+    # its sketch-plane view and dragged, so the end view's only diametric
+    # dimension is the reamed bore and no two leaders cross at the centre.
+    half_length = spec.LENGTH * 8 / 2000.0
+    assert drawing.HALF_LENGTH == pytest.approx(half_length)
+    od_x, od_y = drawing.SIDE_OD_XY
+    assert od_x == pytest.approx(drawing.SIDE_CENTER[0])
+    assert od_y > drawing.SIDE_CENTER[1] + half_length + 0.006
+    bore_x, bore_y = drawing.END_KEEP["BoreDiaDim"]
+    od_donor_x, od_donor_y = drawing.END_KEEP["ODDim"]
+    # The donor text sits on the opposite quadrant from the bore callout.
+    assert od_donor_x < drawing.END_CENTER[0] < bore_x
+    assert bore_y < drawing.END_CENTER[1] < od_donor_y
+    # ~33 mm wide bore text, centred on its x: clear of the OD circle and the
+    # side view.
+    assert bore_x - 0.0165 > drawing.END_CENTER[0] + drawing.OUTER_R + 0.004
+    assert bore_x + 0.0165 < drawing.SIDE_CENTER[0] - drawing.OUTER_R - 0.004
+    # Finish glyph above the bore callout, right of the OD circle.
+    finish_x, finish_y = drawing.BORE_FINISH_XY
+    assert finish_x > drawing.END_CENTER[0] + drawing.OUTER_R
+    assert finish_y > bore_y + 0.020
+    # The fit note stays under the lowest view feature.
+    assert (
+        drawing.MANUFACTURING_NOTES_POS[1]
+        < min(drawing.END_CENTER[1] - drawing.OUTER_R, bore_y - 0.010) - 0.010
+    )
 
 
 def test_part_registry_values_remain_the_title_block_source() -> None:

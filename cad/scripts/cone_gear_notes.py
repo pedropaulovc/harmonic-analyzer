@@ -55,10 +55,20 @@ def gear_data(teeth: int, backlash_mm: Sequence[float]) -> str:
             "MATES WITH",
             f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T, FULL STANDARD THICKNESS",
         ),
+        # The drive-train cone is backed off its drum on inclined axes, so the
+        # 120T tips never reach the reference-centre-distance depth; a blind
+        # review that assumed a standard mesh read the shallow chord floor as
+        # radial interference (codex, 2026-09-23; the assembly geometry leaves
+        # >= 0.148 mm tip-to-floor at T006).  Say so where the mate is named.
+        (
+            "OPERATING MESH",
+            "PARTIAL DEPTH ON INCLINED AXES; CENTRE DISTANCE FROM ASSEMBLY",
+        ),
         (
             f"BACKLASH WITH {CYLINDER_MATE_NUMBER}, ACCEPT AT ASSEMBLY (mm)",
             f"{minimum:.2f} TO {maximum:.2f}",
         ),
+        ("TOOTH THICKNESS IN VIEW", "ARC LENGTH AT PITCH DIAMETER"),
     )
     return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
 

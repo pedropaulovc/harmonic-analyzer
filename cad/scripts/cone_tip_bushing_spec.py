@@ -42,13 +42,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Policy rule 2: the places a dimension prints are part of the tolerance it
 # carries, so the part build applies them (``apply_drawing_precision``) and the
 # drawing only reads them back (``assert_imported_precision``). Three places
-# on the bore: it carries the running-fit band. Two on the OD and the length:
-# general grade -- the OD is a free outer surface and the length is a spacer
-# thickness the assembly's endplay absorbs.
+# on the bore: it carries the running-fit band. One on the OD and the length:
+# the loosest title-block band (.X +/-0.8) -- the OD is a free outer surface
+# and the length is a spacer thickness the tip adjuster's end-play takeup
+# absorbs, so neither earns the tighter .XX grade (codex review, 2026-09-23).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BodyProfile": {"ODDim": 2},
+    "BodyProfile": {"ODDim": 1},
     "BoreProfile": {"BoreDiaDim": 3},
-    "Body": {"Depth": 2},
+    "Body": {"Depth": 1},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
