@@ -371,36 +371,88 @@ async def build(adapter) -> dict[str, str]:
     v_final = v_with_journal - v_pin
     await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
-    # Drawing-only overall-length reference, on the shaft axis from the dome
-    # tip to the far end.  No feature dimension carries the true overall
-    # (Depth runs from the dome root), so this construction line's one
-    # driving dimension IS the printed value (policy rule 2).  It sits on the
-    # Right plane because the *Right side view prints it (every reference
-    # sketch that imports natively sits on the plane of its view -- see
-    # build_crank_hub's ServicePinStationReference), under the view's axis
-    # centreline so the construction line adds no visible ink.
-    # Right (u, v) -> (-Z, Y).
-    overall = SketchDims()
-    check("create_sketch overall reference", await adapter.create_sketch("Right"))
+    # Drawing-only station reference.  The print baselines every axial
+    # station from the FAR END, the one faced end a machinist zeroes on
+    # (policy rule 7), but the model's features measure from the dome root.
+    # Each construction line's one driving dimension IS the printed value
+    # (policy rule 2), driven by the same globals as the features, so no
+    # geometry moves.  The sketch sits on the Right plane because the *Right
+    # side view prints it (every reference sketch that imports natively sits
+    # on the plane of its view -- build_crank_hub's
+    # ServicePinStationReference), on the shaft axis under the view's
+    # centreline so the construction lines add no visible ink.  A
+    # construction arc over the dome silhouette carries its spherical radius.
+    # Right (u, v) -> (-Z, Y); u < 0 is model +Z, the side the rotated side
+    # view prints UP.
+    stations = SketchDims()
+    check("create_sketch station reference", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     overall_line = check(
         "overall reference line",
         await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
     )
+    station_lines = {}
+    for name, station in (
+        ("JournalInboardStation", JOURNAL_START + JOURNAL_LENGTH),
+        ("JournalOutboardStation", JOURNAL_START),
+        ("PinHoleStation", PIN_HOLE_HEIGHT),
+    ):
+        station_lines[name] = check(
+            f"{name} reference line",
+            await adapter.add_line(0.0, SHAFT_LENGTH, 0.0, station),
+        )
+    # Counter-clockwise from the dome root corner down to the tip.
+    dome_arc = check(
+        "dome radius reference arc",
+        await adapter.add_arc(
+            0.0,
+            DOME_SPHERE_R - SHAFT_DOME_HEIGHT,
+            -DOME_R,
+            0.0,
+            0.0,
+            -SHAFT_DOME_HEIGHT,
+        ),
+    )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[overall_line], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("overall reference did not take construction flag")
+    for entity in (overall_line, *station_lines.values(), dome_arc):
+        segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"station reference {entity} did not take construction flag")
     check(
         "overall reference vertical",
         await adapter.add_sketch_constraint(overall_line, None, "vertical"),
     )
-    # Dimensions in creation order: the tip anchor, then the overall.
+    for name, line in station_lines.items():
+        check(
+            f"{name} reference vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+        check(
+            f"{name} reference starts at the far end",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", f"{overall_line}.end", "coincident"
+            ),
+        )
+    check(
+        "dome radius reference ends at the tip",
+        await adapter.add_sketch_constraint(
+            f"{dome_arc}.end", f"{overall_line}.start", "coincident"
+        ),
+    )
+    check(
+        "dome radius reference centre on the axis",
+        await adapter.add_sketch_constraint(f"{dome_arc}.center", "origin", "vertical_points"),
+    )
+    check(
+        "dome radius reference starts at the dome root",
+        await adapter.add_sketch_constraint(f"{dome_arc}.start", "origin", "horizontal_points"),
+    )
+    # Dimensions in creation order; SketchDims renames them by that order.
     await anchor_point_to_origin(
         adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
     )
-    overall.record(None, '"DomeHeight"')
+    stations.record(None, '"DomeHeight"')
     await dimension_between(
         adapter,
         f"{overall_line}.start",
@@ -409,11 +461,50 @@ async def build(adapter) -> dict[str, str]:
         SHAFT_LENGTH + SHAFT_DOME_HEIGHT,
         "overall length reference",
     )
-    overall.record("OverallLength", '"ShaftLength" + "DomeHeight"')
-    await ensure_fully_defined(adapter, "overall reference sketch")
-    check("exit_sketch overall reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "OverallReference")
-    drive_jobs += overall.apply(adapter, "OverallReference")
+    stations.record("OverallLength", '"ShaftLength" + "DomeHeight"')
+    for name, line, drive in (
+        (
+            "JournalInboardStation",
+            station_lines["JournalInboardStation"],
+            '"ShaftLength" - "JournalStart" - "JournalLength"',
+        ),
+        (
+            "JournalOutboardStation",
+            station_lines["JournalOutboardStation"],
+            '"ShaftLength" - "JournalStart"',
+        ),
+        (
+            "PinHoleStation",
+            station_lines["PinHoleStation"],
+            '"ShaftLength" - "PinHoleHeight"',
+        ),
+    ):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            f"{line}.end",
+            "vertical_distance",
+            SHAFT_LENGTH - {
+                "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
+                "JournalOutboardStation": JOURNAL_START,
+                "PinHoleStation": PIN_HOLE_HEIGHT,
+            }[name],
+            f"{name} reference",
+        )
+        stations.record(name, drive)
+    check(
+        "dome radius reference",
+        await adapter.add_sketch_dimension(dome_arc, None, "radial", DOME_SPHERE_R),
+    )
+    stations.record(
+        "DomeSphereRadius",
+        '("ShaftDia" / 2 * "ShaftDia" / 2 + "DomeHeight" * "DomeHeight") '
+        '/ (2 * "DomeHeight")',
+    )
+    await ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "StationReference")
+    drive_jobs += stations.apply(adapter, "StationReference")
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built

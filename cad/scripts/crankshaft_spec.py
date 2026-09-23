@@ -49,19 +49,24 @@ SURFACE_FINISHES = (
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
-# Every printed length runs from ONE origin: the dome root (local y=0), the
-# plane where the arm and through hub MHA-137 finish flush and from which the
-# hub's own MHA-024 station is measured.  The overall to the dome tip is a
-# construction-only reference sketch (no geometry), printed as a reference.
+# Every printed axial station is a baseline from ONE origin: the FAR END, the
+# one faced end the shop zeroes on (policy rule 7).  The features themselves
+# measure from the dome root, so the far-end stations, the overall and the
+# dome's spherical radius live on a construction-only StationReference sketch
+# driven by the same globals (no geometry).  Depth (far end to dome root) and
+# DomeHeight complete the chain; the overall and SR are references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
     "ShaftDomeProfile": {"DomeHeight"},
-    "JournalStartPlane": {"JournalStart"},
     "JournalProfile": {"JournalDiaDim"},
-    "Journal": {"JournalLength"},
-    "PinHoleStationPlane": {"PinHoleHeight"},
-    "OverallReference": {"OverallLength"},
+    "StationReference": {
+        "OverallLength",
+        "JournalInboardStation",
+        "JournalOutboardStation",
+        "PinHoleStation",
+        "DomeSphereRadius",
+    },
 }
 # Decimal places ARE the tolerance (policy rule 2).  The two diameters are
 # functional fits and keep their three-place size bands; every length on this
@@ -70,11 +75,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 3},
     "Shaft": {"Depth": 1},
     "ShaftDomeProfile": {"DomeHeight": 1},
-    "JournalStartPlane": {"JournalStart": 1},
     "JournalProfile": {"JournalDiaDim": 3},
-    "Journal": {"JournalLength": 1},
-    "PinHoleStationPlane": {"PinHoleHeight": 1},
-    "OverallReference": {"OverallLength": 1},
+    "StationReference": {
+        "OverallLength": 1,
+        "JournalInboardStation": 1,
+        "JournalOutboardStation": 1,
+        "PinHoleStation": 1,
+        "DomeSphereRadius": 1,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -83,14 +91,25 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked crankshaft dimension needs authored places")
-# The overall is a read-only restatement of Depth + DomeHeight.
-REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+# Read-only restatements: the overall is Depth + DomeHeight, and a spherical
+# cap of DomeHeight on the Ø9.525 end already fixes its radius.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
+SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 
 # Matched-fit requirement on the feature callout (rule 6), above the native
-# drill size; mirrors the hub's "MATCH-REAM WITH MHA-026".
-CROSS_HOLE_PROCESS = (
-    "MATCH-REAM WITH MHA-137 TO FIT MHA-024\n"
-    f"{drill_process(PIN_HOLE_SPEC)}"
+# drill size, naming both mates and the acceptance of the custom 1:48 taper
+# pin (crank_pin_spec).  Short lines keep the callout narrow enough to sit
+# beside the cross-hole.
+CROSS_HOLE_PROCESS = "\n".join(
+    (
+        "MATCH TAPER-REAM 1:48",
+        "WITH CRANK HUB MHA-137",
+        "TO TAPER PIN MHA-024:",
+        "LIGHT DRIVE FIT",
+        drill_process(PIN_HOLE_SPEC),
+    )
 )
-DRAWING_NOTES = "PUNCH FIDUCIAL MARK WHERE SHOWN."
+# The punch mark is a visual witness: its clocking to the cross-hole shows in
+# the end view's hidden lines, and its exact spot is deliberately free.
+DRAWING_NOTES = "PUNCH FIDUCIAL MARK ON DOME WHERE SHOWN; LOCATE BY EYE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"
