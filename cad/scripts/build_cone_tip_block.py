@@ -8,9 +8,10 @@ as one unit about the platform's pivot axis.
 
 Dimensions estimated from the p.18 top-down and the v4_t00393 still
 (low). The adjuster axis above the block base is ADJUSTER_AXIS_HEIGHT; the platform
-adds PLATE_T under the foot, and ADJUSTER_AXIS_HEIGHT + PLATE_T must equal the
-drive height above the base top (54) -- asserted module-level in
-build_drive_train_assembly.
+adds PLATE_T and the fit-up shim pack (SHIM_NOMINAL, U30) under the foot, and
+ADJUSTER_AXIS_HEIGHT + SHIM_NOMINAL + PLATE_T must equal the drive height above
+the base top -- asserted module-level in build_drive_train_assembly. One
+hidden #6-32 socket head cap screw holds the foot down through the platform.
 
 Layout: block standing on the Top plane, plan centred on the origin,
 adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
@@ -56,7 +57,6 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
 from cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
@@ -67,20 +67,21 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    MIN_TOP_LIGAMENT_MM,
+    FOOT_BORE_DIA,
+    FOOT_BORE_SPEC,
+    MIN_WEB_MM,
     PINCH_CLEARANCE_DIA,
     PINCH_BORE_SPEC,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT,
     PINCH_RISE,
-    PINCH_RISE_TOLERANCE_MM,
     SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
-    WORST_CLEARANCE_TO_ADJUSTER_MM,
     WORST_SCREW_ENVELOPE_GAP_MM,
+    WORST_SLIT_MOUTH_WEB_MM,
     WORST_TOP_LIGAMENT_MM,
 )
 from _hole_spec import DRILL_POINT_H
@@ -109,11 +110,11 @@ PINCH_BORE_Y = PINCH_HEIGHT
 # These nominal checks catch a model/feature drift before the native build.
 if PINCH_BORE_Y - PINCH_BORE_DIA / 2.0 < ADJUSTER_AXIS_HEIGHT + ADJUSTER_BORE_DIA / 2.0:
     raise AssertionError("pinch tap-drill clips the adjuster tap-drill")
-if BLOCK_HEIGHT - PINCH_BORE_Y - PINCH_CLEARANCE_DIA / 2.0 < MIN_TOP_LIGAMENT_MM:
+if BLOCK_HEIGHT - PINCH_BORE_Y - PINCH_CLEARANCE_DIA / 2.0 < MIN_WEB_MM:
     raise AssertionError("pinch clearance leaves too little nominal top wall")
-if WORST_CLEARANCE_TO_ADJUSTER_MM < 0.15 or WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
-    raise AssertionError("approved pinch-to-adjuster envelope no longer closes")
-if WORST_TOP_LIGAMENT_MM < MIN_TOP_LIGAMENT_MM:
+if round(WORST_SLIT_MOUTH_WEB_MM, 6) < MIN_WEB_MM or WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
+    raise AssertionError("approved pinch-to-adjuster web no longer closes")
+if round(WORST_TOP_LIGAMENT_MM, 6) < MIN_WEB_MM:
     raise AssertionError("approved worst-case top ligament no longer closes")
 if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
     raise AssertionError("top slit does not cross the pinch bore")
@@ -400,6 +401,21 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pinch clearance", volume - v_clearance, 0.08 * v_clearance
     )
 
+    # U30 hold-down: one native #6-32 blind tap up into the foot centre. The
+    # #6-32 socket head cap screw comes up through the platform's counterbored
+    # lateral slot; the slot and the shim pack under the foot absorb the
+    # block's fit-up alignment, so the tap needs no location tighter than the
+    # footprint it is centred in.
+    wizard_holes(
+        adapter, FOOT_BORE_SPEC,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0),
+        f"foot hold-down tapped hole ({FOOT_BORE_SPEC.size} blind)",
+        name="FootBore",
+    )
+    v_foot = blind_hole_volume_mm3(FOOT_BORE_DIA, FOOT_BORE_SPEC.depth_mm)
+    volume = await volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
+
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
     await name_bore_axis(
@@ -460,14 +476,8 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="PinchRise",
         drive_expression='"PinchRise"',
     )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "PinchRiseReference",
-        "PinchRise",
-        PINCH_RISE_TOLERANCE_MM,
-    )
-    apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Model-owned places are applied only after PinchRiseReference exists.
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

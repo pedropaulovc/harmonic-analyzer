@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_cone_tip_block as part
 import cone_tip_block_spec
 import draw_cone_tip_block as drawing
@@ -81,23 +83,19 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
         - cone_tip_block_spec.SLIT_DEPTH
         - cone_tip_block_spec.SLIT_FLOOR
     ) < 1e-12
-    assert (
-        cone_tip_block_spec.WORST_CLEARANCE_TO_ADJUSTER_MM
-        >= cone_tip_block_spec.MIN_CLEARANCE_TO_ADJUSTER_MM
-    )
-    assert cone_tip_block_spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
-    assert (
-        cone_tip_block_spec.WORST_TOP_LIGAMENT_MM
-        >= cone_tip_block_spec.MIN_TOP_LIGAMENT_MM
-    )
-    assert (
-        cone_tip_block_spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM
-        >= cone_tip_block_spec.MIN_SIDE_LIGAMENT_MM
-    )
-    assert (
-        cone_tip_block_spec.WORST_PINCH_DEPTH_LIGAMENT_MM
-        >= cone_tip_block_spec.MIN_SIDE_LIGAMENT_MM
-    )
+    spec = cone_tip_block_spec
+    assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
+    # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.0365, abs=1e-3)
+    assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.00, abs=1e-6)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(2.052, abs=1e-3)
+    for web in (
+        spec.WORST_SLIT_MOUTH_WEB_MM,
+        spec.WORST_TOP_LIGAMENT_MM,
+        spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM,
+        spec.WORST_PINCH_DEPTH_LIGAMENT_MM,
+    ):
+        assert round(web, 6) >= spec.MIN_WEB_MM
     tap_bottom = part.PINCH_BORE_Y - part.PINCH_BORE_DIA / 2.0
     assert cone_tip_block_spec.SLIT_FLOOR <= tap_bottom
 
@@ -118,3 +116,27 @@ def test_part_config_preserves_manufacturing_metadata() -> None:
     assert "1018" in str(config["material"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_foot_hold_down_tap_is_blind_and_clear_of_the_adjuster() -> None:
+    """U30: the hidden #6-32 hold-down threads into the foot, nowhere else."""
+    spec = cone_tip_block_spec.FOOT_BORE_SPEC
+    assert spec.kind == "tapped"
+    assert spec.size == "#6-32"
+    assert spec.end == "blind"
+    assert 0.0 < spec.overrides_mm["ThreadDepth"] < spec.depth_mm
+    low, high = cone_tip_block_spec.FOOT_SCREW_REACH_MM
+    assert low >= 1.5 * 3.505
+    assert high <= spec.overrides_mm["ThreadDepth"] - 0.25
+    passage_floor = part.ADJUSTER_AXIS_HEIGHT - part.ADJUSTER_BORE_DIA / 2.0
+    assert passage_floor - spec.depth_mm >= 10.0
+
+
+def test_block_drops_by_the_shim_and_keeps_every_axis_relation() -> None:
+    """U30: the shim restores the old axis height; nothing moves off the axis."""
+    spec = cone_tip_block_spec
+    assert spec.ADJUSTER_AXIS_HEIGHT + spec.SHIM_NOMINAL == 33.368
+    assert abs(spec.SLIT_FLOOR - (spec.ADJUSTER_AXIS_HEIGHT - 0.65)) < 1e-12
+    assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
+    assert spec.ADJUSTER_THREAD_DEPTH == 9.5
+    assert spec.ADJUSTER_DEPTH == 11.0

@@ -850,6 +850,7 @@ from cone_tip_block_spec import (  # noqa: E402
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
+    SHIM_NOMINAL as TIP_SHIM_NOMINAL,
     SLIT_W as TIP_SLIT_W,
 )
 from build_cone_tip_bushing import (  # noqa: E402
@@ -902,7 +903,10 @@ PIVOT_STATION = TIP_BLOCK_STATION + 11.0
 # thickness under each foot + bore height = 54 above the base top.
 if (
     abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-    or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
+    or abs(
+        (Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_SHIM_NOMINAL + TIP_ADJUSTER_AXIS_HEIGHT)
+    )
+    > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
 # The shaft is placed by its front stub end; keep the station in lockstep with
