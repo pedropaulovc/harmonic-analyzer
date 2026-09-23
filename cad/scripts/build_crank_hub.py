@@ -261,8 +261,13 @@ async def build(adapter) -> dict[str, str]:
     # Drawing-only station reference, coincident with the hub axis.  Keeping
     # the construction line under the view centreline avoids extra printed
     # geometry while giving targeted model-item import a real sketch owner.
+    # It sits on the Right plane because the *Right side view prints it; every
+    # reference sketch that imports natively sits on the plane of its view
+    # (build_pinion_handle's HubReference, build_crank_arm's StationReference).
+    # On the Front plane the sketch was selected but its dimension never
+    # arrived (run 20260922T020620997Z-4a7ef16e).  Right (u, v) -> (-Z, Y).
     station = SketchDims()
-    check("create_sketch service pin station", await adapter.create_sketch("Front"))
+    check("create_sketch service pin station", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     station_line = check(
         "service pin station reference line",

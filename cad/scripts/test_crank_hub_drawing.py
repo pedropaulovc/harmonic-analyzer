@@ -58,3 +58,17 @@ def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
     assert "RADIAL" not in notes
     assert "SHOULDER SEATED" in notes and "FACES FLUSH" in notes
     assert "0.50 MIN HUB WALL" in notes and "AFTER EDGE BREAK" in notes
+
+
+def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
+    # A standalone reference sketch imports its dimension natively only on the
+    # plane of the view that prints it; on Front, the *Right side view got the
+    # sketch but no ServicePinStation (run 20260922T020620997Z-4a7ef16e).
+    source = Path(drawing.__file__).with_name("build_crank_hub.py").read_text(
+        encoding="utf-8"
+    )
+    head = source[: source.index('name_last_feature(adapter, "ServicePinStationReference")')]
+    last_sketch = head[head.rindex("create_sketch(") :].split(")", 1)[0]
+    assert last_sketch == 'create_sketch("Right"'
+    assert "ServicePinStation" in drawing.RIGHT_KEEP
+    assert '"*Right", *RIGHT_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
