@@ -63,7 +63,8 @@ BORE_CALLOUT = (
 )
 SEAT_CALLOUT = (
     "MATCH-FIT TO ASSIGNED MHA-020 BORE\n"
-    "LIGHT ARBOR-PRESS TO SHOULDER; NO TURN OR SLIDE BY HAND"
+    "LIGHT ARBOR-PRESS TO SHOULDER;\n"
+    "NO TURN OR SLIDE BY HAND"
 )
 # The cross-hole is taper-reamed through hub and shaft together; the wording
 # matches the crankshaft MHA-026 callout for the same operation.

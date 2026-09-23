@@ -107,3 +107,17 @@ def test_centerline_pick_hits_barrel_face_not_the_cross_hole() -> None:
     hole_x, hole_y = drawing.SERVICE_PIN_CENTER
     hole_r = drawing.SERVICE_PIN_DIA / 2.0 * scale
     assert (x - hole_x) ** 2 + (y - hole_y) ** 2 > hole_r**2
+
+
+def test_seat_callout_stands_clear_of_the_seat_extension_lines() -> None:
+    # ~2.5 mm per character at the sheet's text height; the callout is
+    # centred under its value, so its widest line must end left of the
+    # seat's left extension line instead of printing across it.
+    char_w = 0.0025
+    x = drawing.RIGHT_KEEP["SeatDia"][0]
+    half = max(len(line) for line in crank_hub_spec.SEAT_CALLOUT.splitlines()) * char_w / 2
+    seat_left = drawing.RIGHT_CENTER[0] - geometry.HUB_SEAT_DIA / 2.0 * (
+        drawing.VIEW_SCALE[0] / 1000.0
+    )
+    assert x + half < seat_left
+    assert x - half > drawing.FRONT_CENTER[0]
