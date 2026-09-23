@@ -606,14 +606,15 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
     )
 
 
-def _export_failure_pdf(adapter: Any) -> None:
+def _export_failure_pdf(adapter: Any, stage: str = "layout") -> None:
     """Export the failing package as a PDF under the forensic tree, which the
-    farm uploads on a failed leaf, so a failed audit still yields a render to
-    inspect (r12 failed without one). Best effort: never masks the audit.
+    farm uploads on a failed leaf, so a failed audit or finalize still yields
+    a render to inspect (r12 and r13 failed without one). Best effort: never
+    masks the failure.
     """
     path = (
         OUT_FAILURES
-        / "summing-package-layout"
+        / f"summing-package-{stage}"
         / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         / f"{ARTIFACT_STEM}.pdf"
     )
@@ -621,13 +622,13 @@ def _export_failure_pdf(adapter: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         _early_bound(adapter.currentModel, "IModelDoc2").SaveAs3(str(path), 0, 0)
     except Exception as exc:  # noqa: BLE001 - evidence must not mask the audit
-        _telemetry.warn(f"layout-failure PDF export failed: {exc!r}")
+        _telemetry.warn(f"{stage}-failure PDF export failed: {exc!r}")
         return
     if not path.is_file():
-        _telemetry.warn(f"layout-failure PDF export produced no file: {path}")
+        _telemetry.warn(f"{stage}-failure PDF export produced no file: {path}")
         return
-    _telemetry.event("drawing.layout_failure_pdf", path=str(path))
-    _telemetry.info(f"layout-failure evidence PDF: {path}")
+    _telemetry.event("drawing.failure_pdf", stage=stage, path=str(path))
+    _telemetry.info(f"{stage}-failure evidence PDF: {path}")
 
 
 def _component_point_in_assembly(
@@ -1866,16 +1867,20 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         _validate_persisted_explode(source_model)
         _place_package(adapter)
-        artifacts = await finalize_drawing(
-            adapter,
-            OUTPUTS,
-            layout=SPEC.layout,
-            pdf_title="Summing Assembly Drawing Package",
-            scale=ASSEMBLED_SCALE,
-            expected_sheet_names=SHEET_NAMES,
-            sheet_layouts=SHEET_LAYOUTS,
-            sheet_scales=SHEET_SCALES,
-        )
+        try:
+            artifacts = await finalize_drawing(
+                adapter,
+                OUTPUTS,
+                layout=SPEC.layout,
+                pdf_title="Summing Assembly Drawing Package",
+                scale=ASSEMBLED_SCALE,
+                expected_sheet_names=SHEET_NAMES,
+                sheet_layouts=SHEET_LAYOUTS,
+                sheet_scales=SHEET_SCALES,
+            )
+        except Exception:
+            _export_failure_pdf(adapter, "finalize")
+            raise
     finally:
         primary_error = sys.exception()
         cleanup_errors: list[str] = []
