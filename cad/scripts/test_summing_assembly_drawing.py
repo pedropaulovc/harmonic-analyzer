@@ -153,11 +153,18 @@ class _FakeAnnotation:
 
 
 class _FakeNote:
-    """A note whose text box sits off its insertion point, as r10 measured."""
+    """A note whose text box sits off its insertion point and does not follow
+    it 1:1 (r10: 0.28/0.34 mm offset; r11: 0.162 mm left after one exact move).
+    """
 
-    def __init__(self, text: str, x: float, y: float) -> None:
+    def __init__(
+        self, text: str, x: float, y: float, *, offset: float = 0.0003, gain: float = 0.8
+    ) -> None:
         self.text = text
         self.annotation = _FakeAnnotation(x, y)
+        self.origin = (x, y)
+        self.offset = offset
+        self.gain = gain
         lines = text.splitlines()
         self.size = (0.0027 * max(map(len, lines)), 0.0045 * len(lines))
 
@@ -169,7 +176,8 @@ class _FakeNote:
 
     def GetExtent(self) -> tuple[float, ...]:
         x, y, _z = self.annotation.position
-        x0, y1 = x - 0.00028, y + 0.00034
+        x0 = self.origin[0] + self.gain * (x - self.origin[0]) - self.offset
+        y1 = self.origin[1] + self.gain * (y - self.origin[1]) + self.offset
         return (x0, y1 - self.size[1], 0.0, x0 + self.size[0], y1, 0.0)
 
 
@@ -180,13 +188,15 @@ class _FakeAdapter:
             return None
 
 
-def test_note_blocks_anchor_their_rendered_corner_and_report_every_field(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("offset", (0.0002, 0.0003, 0.0004))
+@pytest.mark.parametrize("gain", (1.0, 0.8, 0.5))
+def test_note_blocks_stay_inside_their_field_however_the_box_tracks(
+    monkeypatch: pytest.MonkeyPatch, offset: float, gain: float
 ) -> None:
     monkeypatch.setattr(
         draw_summing_assembly,
         "add_note",
-        lambda _adapter, text, x, y: _FakeNote(text, x, y),
+        lambda _adapter, text, x, y: _FakeNote(text, x, y, offset=offset, gain=gain),
     )
     field = draw_summing_assembly.NOTE_FIELD_LEFT
     findings = draw_summing_assembly._stack_note_field(
@@ -195,15 +205,24 @@ def test_note_blocks_anchor_their_rendered_corner_and_report_every_field(
         field,
         label="test field",
     )
-    # r10's insertion-point offset no longer pushes the box out of the field.
+    # The anchor residual is never gated; containment is, and it holds.
     assert findings == []
+
+
+def test_note_fields_report_every_escaping_block_in_one_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        draw_summing_assembly,
+        "add_note",
+        lambda _adapter, text, x, y: _FakeNote(text, x, y),
+    )
     too_wide = draw_summing_assembly._stack_note_field(
         _FakeAdapter(),
         (("wide", "W" * 90), ("tall", "\n".join("T" * 50))),
-        field,
+        draw_summing_assembly.NOTE_FIELD_LEFT,
         label="test field",
     )
-    # Every escaping block is reported in one pass, not only the first.
     assert len(too_wide) == 2
     assert "wide leaves its note field: right" in too_wide[0]
     assert "tall leaves its note field: bottom" in too_wide[1]

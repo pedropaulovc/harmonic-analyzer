@@ -149,8 +149,11 @@ BOM_SHEET_CLEARANCE = 0.003
 # down inside a field and each block's measured extent is gated against it.
 NOTE_FIELD_LEFT = (0.018, 0.263, 0.212, 0.035)
 NOTE_FIELD_RIGHT = (0.222, 0.263, 0.415, 0.072)
-# A rendered note corner may sit this far off its anchor after the move.
-NOTE_ANCHOR_TOLERANCE = 1e-5
+# Notes aim this far inside their field, so an imperfect move stays contained;
+# the gate is containment, never the anchor residual (summing-asm-r11).
+NOTE_FIELD_INSET = 0.0005
+NOTE_ANCHOR_PASSES = 3
+NOTE_ANCHOR_SETTLE = 0.00005
 NOTE_BLOCK_GAP = 0.006
 # Region the exploded view's balloon ring must fit: left of the BOM, below the
 # heading, above the caption. The ring is the view outline grown by the
@@ -354,39 +357,45 @@ def _anchor_note(
     *,
     label: str,
 ) -> tuple[float, ...]:
-    """Move a note so its RENDERED top-left corner, not its insertion point,
-    sits on ``corner`` (summing-asm-r10: the insertion point sits 0.28 mm right
-    of and 0.34 mm below the text box, so a note placed at a field corner left
-    the field).
+    """Steer a note's RENDERED top-left corner toward ``corner``.
+
+    The text box neither sits on the insertion point (summing-asm-r10: 0.28 mm
+    right, 0.34 mm down) nor follows it 1:1 (r11: 0.162 mm residual after one
+    exact move), so this iterates move -> re-measure -> correct up to
+    NOTE_ANCHOR_PASSES times and never gates on the residual. The caller aims
+    NOTE_FIELD_INSET inside its field and gates on containment.
     """
-    left, top = corner
-    extent = _note_extent(adapter, note, label=label)
+    target_x, target_y = corner
     annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"{label}: note has no annotation to move")
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    if len(position) != 3:
-        raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
-    shift = (left - extent[0], top - extent[3])
-    if not annotation.SetPosition(
-        position[0] + shift[0], position[1] + shift[1], position[2]
-    ):
-        raise RuntimeError(f"{label}: note SetPosition failed")
-    moved = _note_extent(adapter, note, label=label)
-    residual = max(abs(moved[0] - left), abs(moved[3] - top))
+    extent = _note_extent(adapter, note, label=label)
+    moves = 0
+    for _pass in range(NOTE_ANCHOR_PASSES):
+        shift = (target_x - extent[0], target_y - extent[3])
+        if max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE:
+            break
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3:
+            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+        if not annotation.SetPosition(
+            position[0] + shift[0], position[1] + shift[1], position[2]
+        ):
+            raise RuntimeError(f"{label}: note SetPosition failed")
+        extent = _note_extent(adapter, note, label=label)
+        moves += 1
     _telemetry.event(
         "drawing.note_anchor",
         block=label,
-        shift_mm=tuple(value * 1000.0 for value in shift),
-        residual_mm=residual * 1000.0,
-        extent_mm=tuple(value * 1000.0 for value in moved),
+        moves=moves,
+        target_mm=(target_x * 1000.0, target_y * 1000.0),
+        residual_mm=(
+            (extent[0] - target_x) * 1000.0,
+            (extent[3] - target_y) * 1000.0,
+        ),
+        extent_mm=tuple(value * 1000.0 for value in extent),
     )
-    if residual > NOTE_ANCHOR_TOLERANCE:
-        raise RuntimeError(
-            f"{label}: rendered corner is {residual * 1000.0:.3f} mm off its "
-            f"anchor after the move (extent {moved!r})"
-        )
-    return moved
+    return extent
 
 
 def _stack_note_field(
@@ -406,7 +415,12 @@ def _stack_note_field(
     findings = []
     for block_label, text in blocks:
         note = _add_note_block(adapter, text, (left, y), label=block_label)
-        extent = _anchor_note(adapter, note, (left, y), label=block_label)
+        extent = _anchor_note(
+            adapter,
+            note,
+            (left + NOTE_FIELD_INSET, y - NOTE_FIELD_INSET),
+            label=block_label,
+        )
         violations = note_field_violations(extent, field)
         _telemetry.event(
             "drawing.note_field",
