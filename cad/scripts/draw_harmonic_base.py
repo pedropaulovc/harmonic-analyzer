@@ -562,7 +562,9 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 # table and carry their native size on a callout naming their source.
 TRANSFER_BLOCK_HOLES = tuple((x, z, BLOCK_SCREW_HOLE_DIA) for x, z in BLOCK_SCREW_XZ)
 TRANSFER_SPRING_HOLE = (*FOOT_SCREW_XZ[0], FOOT_SCREW_HOLE_DIA)
-TRANSFER_BLOCK_CALLOUT = "TRANSFER FROM MHA-061\nAT ASSEMBLY"
+# The prefix lands before the tap line, so the semicolon separates the
+# locating instruction from "8-32 UNC - 2B" on the rendered line.
+TRANSFER_BLOCK_CALLOUT = "TRANSFER FROM MHA-061\nAT ASSEMBLY;"
 TRANSFER_SPRING_NOTE = "TRANSFER FROM MHA-114\nAT ASSEMBLY; SIZE AS E1"
 
 ALL_HOLES = (
@@ -999,6 +1001,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # from the clear band above the plan.  The spring-foot seat shares the
     # pedestal seats' feature (a native callout would read 3X), so an
     # attached note names the table row that carries its size.
+    # Its note sits in the band between the plan's bottom edge and the
+    # cross-screw callout, left of the section-A arrow (render r4 had it
+    # colliding with the 4X cross-screw callout).
     add_native_hole_callout(
         adapter,
         hole_top,
@@ -1012,7 +1017,7 @@ async def build(adapter: Any) -> dict[str, str]:
         hole_top,
         text=TRANSFER_SPRING_NOTE,
         entity=transfer_spring_rim,
-        note_xy=(0.300, 0.153),
+        note_xy=(0.269, 0.1575),
         label="pinion-spring transfer seat",
     )
     tap_callout = add_native_hole_callout(
