@@ -603,7 +603,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=_shifted(0.365, 0.120),
+        # The layout audit boxes an Ra symbol 39 mm right of its anchor.
+        symbol_xy=_shifted(0.355, 0.120),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,

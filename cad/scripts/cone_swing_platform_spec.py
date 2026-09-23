@@ -101,24 +101,22 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
 # 2), so the MODEL owns them: build_cone_swing_platform applies this map to the
-# .SLDPRT and draw_cone_swing_platform only reads it back. Outline features
-# that touch nothing (plate length, pivot-boss edges, corner radii) print one
-# place (+/-0.8). Three edges keep two places (+/-0.51) because they spend the
-# 2.0 mm disengaged lock-collar margin: the east edge at the swing stop
-# (NorthEastX/SouthEastX, about 2x lever to the notch) and the west edge at
-# the notch mouth (SouthWestX); at +/-0.8 the estimated worst case is
-# 2.0 - 2(0.8) - 0.8 = -0.4 mm, at +/-0.51 it is +0.47 mm.
-# Relief diameter, tapped-hole pattern and notch stay at the .XX grade. Relief
+# .SLDPRT and draw_cone_swing_platform only reads it back. The whole plate
+# outline prints one place (+/-0.8): the east edge at the swing stop and the
+# west edge at the notch mouth spend the disengaged lock-collar margin, which
+# build_cone_swing_platform.DISENGAGE_COLLAR_MARGIN sizes to keep >= 2.0 mm
+# at this band.  Relief diameter, tapped-hole pattern and notch stay at the
+# .XX grade. Relief
 # depth is a reference nominal governed by the matched fit above. The Hole
 # Wizard owns the pivot-hole size/callout.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
-        "NorthEastX": 2,
+        "NorthEastX": 1,
         "NorthEdgeZ": 1,
         "NorthWestX": 1,
-        "SouthWestX": 2,
+        "SouthWestX": 1,
         "PlateLenDim": 1,
-        "SouthEastX": 2,
+        "SouthEastX": 1,
     },
     "Plate": {"PlateThk": 2},
     "PivotBearingReliefProfile": {"PivotBearingReliefDia": 2},

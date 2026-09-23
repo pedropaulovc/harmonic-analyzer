@@ -104,3 +104,24 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
         spec.PIVOT_BEARING_RELIEF_DEPTH
     )
     assert spec.CRANK_GEAR_PLATFORM_CLEARANCE > 0.5
+
+
+def test_disengaged_collar_margin_survives_general_bands() -> None:
+    """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
+    general, base_axis = 0.8, 0.51
+    east_slope = (part.EAST_HALF_S - part.HALF_WIDTH_N) / part.PLATE_LEN
+    stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - part.STOP_LOCAL_Z))
+    normal = (-1.0, east_slope)
+    norm = math.hypot(*normal)
+    lever = abs(part.STOP_LOCAL_Z * normal[0] - stop_x * normal[1]) / norm
+    stop_gain = part.SLOT_R / lever
+    east_edge = stop_gain * general
+    west_edge = general
+    stop_hole = stop_gain * base_axis * (abs(normal[0]) + abs(normal[1])) / norm
+    stud_hole = base_axis * (abs(part._SLOT_TX) + abs(part._SLOT_TZ))
+    diameters = 0.35
+    worst = part.DISENGAGE_COLLAR_MARGIN - (
+        east_edge + west_edge + stop_hole + stud_hole + diameters
+    )
+    assert worst >= 2.0
+    assert set(spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
