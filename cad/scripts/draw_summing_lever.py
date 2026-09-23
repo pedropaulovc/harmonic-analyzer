@@ -221,7 +221,9 @@ FORM_TOP_KEEP = {
     "AnchorOuterX": (0.1350, 0.0450),
     # Both "2X" callouts sit beside the -Z instance they measure: parked at the
     # top, each drew a dimension line the length of the view.
-    "HexKnifeFrontDepth": (0.1470, 0.0617),
+    # 4 mm left of R9's seat: the census's width-estimated text box reached the
+    # cylinder-axis witness of AnchorOuterX at x 160.3 mm (R10 text-on-line).
+    "HexKnifeFrontDepth": (0.1430, 0.0617),
     "EdgeRibThickness": (0.1900, 0.0590),
     # Below its own arrows: between them the witness lines ruled through the text.
     "MiddleRibThickness": (0.1985, 0.0950),
