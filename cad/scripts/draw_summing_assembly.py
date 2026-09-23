@@ -773,11 +773,14 @@ def _visible_component_circle(
     *,
     component_stem: str,
     height_mm: float,
-    radius_mm: float,
+    radius_mm: float | None,
     target_z_mm: float,
     label: str,
 ) -> Any:
-    """Resolve one actual component edge by identity and native circle geometry."""
+    """Resolve one actual component edge by identity and native circle geometry.
+
+    ``radius_mm=None`` accepts any radius in the ``height_mm`` plane.
+    """
     view = _early_bound(view, "IView")
     full_components: dict[str, Any] = {}
     for raw_drawing_component in tuple(view.GetVisibleDrawingComponents() or ()):
@@ -830,7 +833,7 @@ def _visible_component_circle(
             )
             if abs(actual_height_mm - height_mm) > 1e-5:
                 continue
-            if abs(actual_radius_mm - radius_mm) > 1e-5:
+            if radius_mm is not None and abs(actual_radius_mm - radius_mm) > 1e-5:
                 continue
             candidates.append(
                 (
@@ -845,7 +848,8 @@ def _visible_component_circle(
             )
     nearest = sorted(
         seen_circles,
-        key=lambda circle: abs(circle[1] - height_mm) + abs(circle[2] - radius_mm),
+        key=lambda circle: abs(circle[1] - height_mm)
+        + (0.0 if radius_mm is None else abs(circle[2] - radius_mm)),
     )[:8]
     _telemetry.event(
         "drawing.visible_circle_search",
@@ -864,7 +868,8 @@ def _visible_component_circle(
     if not candidates:
         raise RuntimeError(
             f"{label}: no {component_stem!r} circle at y={height_mm:g} mm, "
-            f"radius={radius_mm:g} mm in view {view.GetName2()!r}; visible "
+            f"radius={'any' if radius_mm is None else format(radius_mm, 'g')} mm "
+            f"in view {view.GetName2()!r}; visible "
             f"edges per component {edge_counts!r}, {len(seen_circles)} circles; "
             "nearest (component, y, r, z mm): "
             + "; ".join(
@@ -1246,22 +1251,108 @@ def _create_hanger_detail(adapter: Any, parent: Any) -> Any:
     return detail
 
 
-def _add_seat_to_knife_line_dimension(adapter: Any, detail: Any) -> Any:
-    """Dimension C: the seated shoulder (= the boss-top seat) to the bore crown.
+# The seat plane, in preference order: C is an MHA-037 dimension (its boss
+# top to its own knife line), so the mount's boss rim comes first and the
+# seated stud shoulder, which lies in the same plane, is the fallback.
+# summing-integration-b2: the front detail offered the stud 6 visible edges
+# and no circle at all, so the stud-only search had nothing to pick.
+# Any rim radius in the seat plane serves: the dimension only reads the plane.
+SEAT_PLANE_CANDIDATES = (
+    ("knife-mount", hanger.BOSS_DIA_MM / 2.0, "MHA-037 boss-top seat rim"),
+    ("knife-hanger-stud", STUD_SHANK_DIA / 2.0, "seated MHA-119 shoulder"),
+    ("knife-mount", None, "any MHA-037 rim in the seat plane"),
+    ("knife-hanger-stud", None, "any MHA-119 rim in the seat plane"),
+)
 
-    The shoulder face's outer circle lies edge-on in the front detail; the knife
+
+def _visible_edge_census(view: Any, stems: tuple[str, ...]) -> list[str]:
+    """Every visible edge of the given stems in a view, as short readable rows.
+
+    Circles give (y, r, z); lines give their end heights; anything else its
+    curve kind. Emitted as an event and quoted by a failed seat search, so the
+    next miss says what the view DID offer.
+    """
+    view = _early_bound(view, "IView")
+    rows = []
+    for raw_component in tuple(view.GetVisibleComponents() or ()):
+        component = _early_bound(raw_component, "IComponent2")
+        stem = _component_stem(component)
+        if stem not in stems:
+            continue
+        name = str(component.Name2 or "").rsplit("/", 1)[-1]
+        for raw_edge in tuple(view.GetVisibleEntities2(component, 1) or ()):
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = edge.GetCurve()
+            if curve is None:
+                rows.append(f"{name} no-curve")
+                continue
+            curve = _early_bound(curve, "ICurve")
+            if curve.IsCircle():
+                params = tuple(float(value) for value in curve.CircleParams)
+                rows.append(
+                    f"{name} circle local y={params[1] * 1000.0:.3f} "
+                    f"r={params[6] * 1000.0:.3f}"
+                )
+                continue
+            if curve.IsLine():
+                ends = [
+                    tuple(float(v) * 1000.0 for v in _early_bound(vertex, "IVertex").GetPoint())
+                    for vertex in (edge.GetStartVertex(), edge.GetEndVertex())
+                    if vertex is not None
+                ]
+                rows.append(
+                    f"{name} line local "
+                    + " -> ".join(f"({x:.2f},{y:.2f},{z:.2f})" for x, y, z in ends)
+                )
+                continue
+            rows.append(f"{name} curve identity={int(curve.Identity())}")
+    _telemetry.event(
+        "drawing.visible_edge_census",
+        view=str(view.GetName2() or ""),
+        stems=stems,
+        edges=tuple(rows),
+    )
+    return rows
+
+
+def _seat_plane_edge(detail: Any, station_z: float) -> Any:
+    """The first visible seat-plane rim among SEAT_PLANE_CANDIDATES."""
+    misses = []
+    for stem, radius, label in SEAT_PLANE_CANDIDATES:
+        try:
+            edge = _visible_component_circle(
+                detail,
+                component_stem=stem,
+                height_mm=hanger.SHOULDER_SEAT_Y,
+                radius_mm=radius,
+                target_z_mm=station_z,
+                label=label,
+            )
+        except RuntimeError as exc:
+            misses.append(str(exc))
+            continue
+        _telemetry.event("drawing.seat_plane_edge", stem=stem, radius_mm=radius)
+        return edge
+    census = _visible_edge_census(
+        detail, tuple(stem for stem, _radius, _label in SEAT_PLANE_CANDIDATES)
+    )
+    raise RuntimeError(
+        "no visible seat-plane rim in the hanger detail: "
+        + " | ".join(misses)
+        + f" | census ({len(census)} edges): "
+        + "; ".join(census[:40])
+    )
+
+
+def _add_seat_to_knife_line_dimension(adapter: Any, detail: Any) -> Any:
+    """Dimension C: the boss-top seat (= the seated shoulder) to the bore crown.
+
+    The seat rim lies edge-on in the front detail; the knife
     bore shows as a true circle whose NEAREST point is the crown, the knife
     line. The value is re-read and must equal the interface's crown depth.
     """
     station_z = SUMMING_Z + HEX_Z_MID
-    seat = _visible_component_circle(
-        detail,
-        component_stem="knife-hanger-stud",
-        height_mm=hanger.SHOULDER_SEAT_Y,
-        radius_mm=STUD_SHANK_DIA / 2.0,
-        target_z_mm=station_z,
-        label="seated MHA-119 shoulder",
-    )
+    seat = _seat_plane_edge(detail, station_z)
     bore = _visible_component_circle(
         detail,
         component_stem="knife-mount",
@@ -1893,12 +1984,35 @@ def _check_bom_extents(
     )
 
 
+# swUserPreferenceToggle_e.swViewDisplayHideAllTypes = 198 (checked against the
+# R2026x swconst interop by Main, 2026-09-23); drive-train applies the same
+# document switch (12e0955d).
+VIEW_DISPLAY_HIDE_ALL_TYPES = 198
+
+
+def _hide_model_reference_types(adapter: Any) -> None:
+    """View > Hide/Show > Hide All Types on the drawing.
+
+    The summing parts' PatternAxisX/Y/Z reference axes (the explode
+    directions) printed as stray dash-dot lines in the package (dtasm,
+    2026-09-23). Drawing-owned centerlines and center marks are annotations,
+    not model types, so they stay.
+    """
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(VIEW_DISPLAY_HIDE_ALL_TYPES, 0, True):
+        raise RuntimeError("summing drawing refused Hide All Types")
+    if not extension.GetUserPreferenceToggle(VIEW_DISPLAY_HIDE_ALL_TYPES, 0):
+        raise RuntimeError("summing drawing Hide All Types did not persist")
+    _telemetry.event("drawing.hide_all_types", toggle=VIEW_DISPLAY_HIDE_ALL_TYPES)
+
+
 def _create_package_sheets(adapter: Any) -> None:
     _drawing, _sheet = new_project_drawing(
         adapter,
         layout=SPEC.layout,
         scale=ASSEMBLED_SCALE,
     )
+    _hide_model_reference_types(adapter)
     create_blank_drawing_sheets(
         adapter,
         SHEET_NAMES,

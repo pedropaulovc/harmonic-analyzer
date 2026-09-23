@@ -517,3 +517,36 @@ def test_detail_fence_is_found_by_the_view_it_owns(monkeypatch) -> None:
         draw_summing_assembly._detail_fence_of(
             SimpleNamespace(GetDetailCircles=lambda: (crop,)), detail
         )
+
+
+def test_seat_plane_edge_prefers_the_mount_then_falls_back_and_reports(monkeypatch) -> None:
+    # summing-integration-b2: the front detail offered the stud no circle, so C
+    # reads the seat plane from the MHA-037 boss rim first.
+    tried = []
+
+    def fake_circle(_view, *, component_stem, height_mm, radius_mm, target_z_mm, label):
+        tried.append((component_stem, radius_mm))
+        assert height_mm == hanger.SHOULDER_SEAT_Y
+        if component_stem == "knife-hanger-stud" and radius_mm is None:
+            return "stud-rim"
+        raise RuntimeError(f"{label}: none")
+
+    monkeypatch.setattr(draw_summing_assembly, "_visible_component_circle", fake_circle)
+    monkeypatch.setattr(
+        draw_summing_assembly, "_visible_edge_census", lambda _view, _stems: ["x line"]
+    )
+    assert draw_summing_assembly._seat_plane_edge(object(), 0.0) == "stud-rim"
+    assert tried == [
+        ("knife-mount", hanger.BOSS_DIA_MM / 2.0),
+        ("knife-hanger-stud", draw_summing_assembly.STUD_SHANK_DIA / 2.0),
+        ("knife-mount", None),
+        ("knife-hanger-stud", None),
+    ]
+
+    monkeypatch.setattr(
+        draw_summing_assembly,
+        "_visible_component_circle",
+        lambda *_a, **kw: (_ for _ in ()).throw(RuntimeError(kw["label"] + ": none")),
+    )
+    with pytest.raises(RuntimeError, match=r"census \(1 edges\): x line"):
+        draw_summing_assembly._seat_plane_edge(object(), 0.0)
