@@ -387,3 +387,11 @@ def test_section_caption_states_no_scale_at_sheet_scale() -> None:
     assert drawing.SECTION_SCALE == drawing.SHEET_SCALE
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'expected = "<VLNAME> <VLLABEL>"\n' in source
+
+
+def test_spotface_station_has_one_driving_global() -> None:
+    """The printed station and the plane the boss grows from cannot drift apart."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
+    assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
+    assert 'plan.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source

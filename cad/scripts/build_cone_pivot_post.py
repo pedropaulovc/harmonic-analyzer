@@ -323,6 +323,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "MountThruDia": ATTACHMENT_THRU_DIA,
         "MountCboreDia": ATTACHMENT_CBORE_DIA,
         "MountCboreDepth": ATTACHMENT_CBORE_DEPTH,
+        # The spot-face station: one global drives both the interface plane
+        # the boss grows from and the plan ray the print dimensions it on.
+        "CrankBossNearZ": CRANK_BOSS_NEAR_Z,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -411,6 +414,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "CrankInterfacePlane")
+    # The offset is authored toward -Z; SOLIDWORKS stores that as a positive
+    # distance with the plane reversed, so the positive station drives it.  A
+    # sign slip would move the boss 42.75 mm and fail the final volume gate.
+    drive_jobs.append(("D1@CrankInterfacePlane", '"CrankBossNearZ"'))
     crank_boss = SketchDims()
     check(
         "create sketch CrankBossProfile",
@@ -675,7 +682,7 @@ async def build(adapter: Any) -> dict[str, str]:
             CRANK_BOSS_NEAR_Z,
         ),
     )
-    plan.record("CrankBossStartZ")
+    plan.record("CrankBossStartZ", '"CrankBossNearZ"')
     check(
         "crank boss far face station",
         await adapter.add_sketch_dimension(
