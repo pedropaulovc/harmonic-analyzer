@@ -295,7 +295,7 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-SIDE_SECTION_NOTE_XY = (0.290, 0.133)
+SIDE_SECTION_NOTE_XY = (0.290, 0.141)
 SIDE_WEB_TEXT_XY = (0.335, 0.120)
 
 # Only views drawn at a scale the title block does not state carry a label,
@@ -1228,14 +1228,14 @@ async def build(adapter: Any) -> dict[str, str]:
         center=True,
         entity_types=("EDGE", "SKETCHSEGMENT"),
         entities=(upper_left_socket_axis, central_web_axis),
-        suffix="CENTRAL WEB C/L\nFROM UPPER-LEFT SOCKET AXIS",
+        suffix="WEB C/L\nFROM SOCKET AXIS",
     )
     _checked_dimension(
         adapter,
         geometry_top,
         p0=(BAR_X1, HALF_H - EDGE_CHAMFER, 0.0),
         p1=(INNER_X, HALF_H - EDGE_CHAMFER, 0.0),
-        text_xy=(0.190, 0.118),
+        text_xy=(0.165, 0.118),
         label="right window clear width",
         expected_mm=INNER_X - BAR_X1,
         orientation="horizontal",

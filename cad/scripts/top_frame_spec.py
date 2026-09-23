@@ -147,8 +147,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # second place claimed a tolerance nothing on the part requires. The matched
 # hanger-hole positions carry no independent coordinate tolerance. Two places
 # appear only where a fit lives there: the cap-recess diameter and depth carry
-# their bilateral bands. The gooseneck bore is a drilled clearance feature and
-# therefore uses the routine one-place casting band.
+# their bilateral bands, and the gooseneck bore prints the clearance a
+# purchased post is set into (rule-12 E5: a one-place band on that bore eats
+# the 1/4-20 set-screw thread that breaks into it).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": 1},
@@ -159,7 +160,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubBossProfile": {"HubDia": 1},
     "RibProfile": {"RibWidth": 1},
     "SetPocketProfile": {"PocketRise": 1},
-    "GooseneckProfile": {"GnDia": 1},
+    "GooseneckProfile": {"GnDia": 2},
     "CapRecessProfile": {"CapRecessDia": 2},
     "CapRecesses": {"CapRecessDepth": 2},
 }
