@@ -162,8 +162,17 @@ def _arc_points(centre):
     import build_summing_lever as build
 
     cx, cy = centre
+    arm = build.CENTRE_CROSS_ARM
     return _top_plane(
-        [(0.0, build.SUM_BASE), (0.0, build.HEX_Z_OUTER), (cx, cy), (cx + 20.0, cy)]
+        [
+            (0.0, build.SUM_BASE),
+            (0.0, build.HEX_Z_OUTER),
+            (cx, cy),
+            (cx + arm, cy),
+            (cx - arm, cy),
+            (cx, cy + arm),
+            (cx, cy - arm),
+        ]
     )
 
 

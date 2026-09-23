@@ -48,6 +48,8 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import format_findings as format_layout_findings
+from diagnostics.drawing_layout_audit import audit_document
 from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
     ANCHOR_R,
@@ -199,7 +201,7 @@ FORM_TOP_KEEP = {
     # Below its own arrows: between them the witness lines ruled through the text.
     "MiddleRibThickness": (0.1985, 0.0950),
     # Inside the arc, on the radial 50 deg below the located centre, 0.6 R out:
-    # the dimension line runs from the centre mark to the arc.  Beyond the
+    # the dimension line runs from the centre's cross to the arc.  Beyond the
     # centre (R5-R7) the leader crossed the corner where the 2X 123.2 / 2X 64.0
     # witness lines meet (Main's R7 eye pass).
     "SummationArcRadius": (0.1251, 0.1431),
@@ -364,72 +366,26 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
     draw.ClearSelection2(True)
 
 
-# swCenterMarkHandle_e: Up, Left, Down, Right.
-_ARMS = (0, 1, 2, 3)
+@_telemetry.traced("drawing.lever_layout_census")
+def _audit_lines_through_text(adapter: Any) -> None:
+    """Fail the drawing when any line runs through another annotation's text.
 
-
-def _mark_summation_arc_centres(adapter: Any, view: Any, edges: Any) -> None:
-    """Centre-mark both R138.8 web arcs in the top view.
-
-    The 2X 123.2 / 2X 64.0 reference dimensions locate that centre, and without
-    a mark their witness lines met in empty space (Main's R7 eye pass).  The
-    arcs are picked from the view's own edge scan -- the only circles over
-    100 mm, axis along Y -- so the mark sits on the arc's real centre.  Extended
-    centre-mark lines would rule R138.8 across the view, so they are switched
-    off and read back.
+    The shared layout gate boxes dimensions nominally and checks leaders only
+    against view outlines, so nothing caught R8's 2X 123.2 witness line running
+    up through the front view's 5.08 text (Main's R8 eye pass).  The
+    annotation-level census reads every dimension's real rendered lines and
+    text; its text-on-line finding is policy rule 8's "no text on a line".  The
+    other finding kinds are logged for the eye pass, not gated here.
     """
-    arcs: dict[tuple[float, float], Any] = {}
-    for item in edges.circles:
-        cx, _cy, cz, _nx, ny, _nz, radius = item.circle
-        if radius < 100.0 or abs(abs(ny) - 1.0) > 1e-9:
-            continue
-        arcs.setdefault((round(cx, 3), round(cz, 3)), item)
-    if len(arcs) != 2:
+    findings = audit_document(adapter)
+    if findings:
+        _telemetry.info("lever layout census:\n" + format_layout_findings(findings))
+    blocking = [finding for finding in findings if finding.kind == "text-on-line"]
+    if blocking:
         raise RuntimeError(
-            f"expected the two R138.8 web arcs in the top view, found {sorted(arcs)}"
+            "a line runs through annotation text:\n"
+            + format_layout_findings(blocking)
         )
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    name = view_name(adapter, view)
-    bound_view = _early_bound(view, "IView")
-    for centre, item in sorted(arcs.items()):
-        if not ddoc.ActivateView(name):
-            raise RuntimeError(f"failed to activate {name} for the R138.8 centre mark")
-        draw.ClearSelection2(True)
-        if not bound_view.SelectEntity(item.edge, False):
-            raise RuntimeError(f"cannot select the R138.8 arc centred {centre}")
-        mark = ddoc.InsertCenterMark3(2, False, False)  # swCenterMark_Single
-        draw.ClearSelection2(True)
-        if mark is None:
-            raise RuntimeError(f"no centre mark on the R138.8 arc centred {centre}")
-        mark = _early_bound(mark, "ICenterMark")
-        mark.UseDocDisplaySettings = False
-        # The reference dimensions' extension lines start at the END of each
-        # arm, drawn or not: on R8 the arms ran out to R138.8, so the 2X 64.0
-        # witness started 70 mm short of the centre and the 2X 123.2 one ran up
-        # through the front view.  Cut every arm back to the mark itself.
-        size = float(mark.Size)
-        before = [float(mark.GetExtendedLength(0, handle)) for handle in _ARMS]
-        for handle in _ARMS:
-            if not mark.SetExtendedLength(0, handle, size):
-                raise RuntimeError(
-                    f"R138.8 centre mark {centre}: arm {handle} refused length {size}"
-                )
-        after = [float(mark.GetExtendedLength(0, handle)) for handle in _ARMS]
-        mark.ShowLines = False
-        if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
-            raise RuntimeError(
-                f"R138.8 centre mark {centre} kept its extended lines"
-            )
-        _telemetry.info(
-            f"R138.8 centre mark {centre}: size {size:.5f} m, arms {before} -> {after}"
-        )
-        if any(abs(value - size) > 1e-9 for value in after):
-            # First use of the arm API here: record it and let the render judge.
-            _telemetry.warn(
-                f"R138.8 centre mark {centre}: arms read back {after}, wanted {size}"
-            )
-    _telemetry.success(f"centre-marked {len(arcs)} R138.8 web arcs")
 
 
 def _hole_callout_variable_snapshot(
@@ -803,7 +759,6 @@ async def build(adapter: Any) -> dict[str, str]:
 
     for sketch in ("SummationArcReference", "BossAxialReference"):
         _hide_view_sketch(adapter, front, sketch)
-    _mark_summation_arc_centres(adapter, top, top_edges)
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
@@ -914,6 +869,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     tap_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {tap_notes!r}")
+    _audit_lines_through_text(adapter)
     assert_imported_precision(
         adapter,
         [*front_dimensions, *top_dimensions, *detail_dimensions, *pattern_dimensions],
