@@ -253,9 +253,11 @@ FORM_FRONT_KEEP = {
     "PlateThickness": (0.2050, 0.2120),
     # Both carry "RIB APEX" above the value (DIMENSION_CALLOUTS).  35.8 sits past
     # its +X witness so that label clears the shared cylinder-axis witness.
-    # 3 mm lower than R14b: room for "END RIBS" under the 2X R15.2 above.
-    "MidRibRightX": (0.1413, 0.1930),
-    "MidRibLeftX": (0.1943, 0.1930),
+    # 2.5 mm lower than R14b: room for "END RIBS" under the 2X R15.2 above,
+    # one text height clear of the top view's 2X 123.2 below (3 mm crowded it:
+    # R15b census).
+    "MidRibRightX": (0.1413, 0.1935),
+    "MidRibLeftX": (0.1943, 0.1935),
     # Lower left, onto the edge rib's own (-X) semicircle, above the 76.2 / 35.75
     # chain: from the lower right its leader crossed the 35.75 dimension line.
     "EdgeRibFrontArcR": (0.1350, 0.2080),
@@ -285,10 +287,13 @@ FORM_TOP_KEEP = {
     "SummationArcCentreX": (0.1295, 0.1833),
     "SummationArcCentreZ": (0.2029, 0.1591),
     "BossAxialLocation": (0.0900, 0.0860),
-    # In the clear web field left of the tube, level with its construction line
-    # (build_summing_lever.CYLINDER_REFERENCE_Z), so the dimension line spans
-    # the silhouette with no witness lines.
-    "CylRefDia": (0.1414, 0.1124),
+    # In the clear web field left of the tube, just below its construction line
+    # (build_summing_lever.CYLINDER_REFERENCE_Z), so the witness lines run on
+    # the silhouettes.  The census sizes the text from its string, "<MOD-DIAM>"
+    # token included (27 mm estimated for "Ø25.4"), and R15b's seat put that
+    # box across the cylinder-axis witness of PlateWidth: this one keeps the
+    # estimate short of it while the real text stays clear of the web arc.
+    "CylRefDia": (0.1380, 0.1115),
 }
 DETAIL_KEEP = {
     "HexWidth": (0.330, 0.113),
@@ -934,7 +939,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         pattern,
         edge_xy=seed_rim_right,
-        callout_xy=(0.245, 0.222),
+        # 10 mm right of R14b: the leader from the shelf's left end ran
+        # through the estimated "39.85 +-0.15" box (R15b census, 1.48 mm).
+        callout_xy=(0.255, 0.222),
         label="spring-hole pattern",
     )
     _omit_default_thread_class(
