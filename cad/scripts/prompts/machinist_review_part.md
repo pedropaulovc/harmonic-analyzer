@@ -58,6 +58,24 @@ decision must be reconciled and why; never invent the missing radius,
 dimension, feature, or process, and never paper it over with a note. Do not
 demand your preferred process or a particular value when another plausible
 allowed route makes the part exactly as drawn.
+The builder is a first-time hobby machinist, so margins must be generous:
+- Check every machined wall and web at the WORST CASE of the printed bands
+  (the title-block band for its decimal places, DRILLED HOLES, or the
+  explicit band on the dimension), plus realistic drill wander on a deep
+  hole. Not at nominal, and not by root-sum-square. That includes the thread
+  major diameter to an edge or another bore, a counterbore or countersink to
+  an outside surface, and the ligament over a cross-hole. Under 1.5 mm is a
+  blocker unless the sheet states it as an accepted exception. 1.5 to
+  2.0 mm goes in minor, recommending a geometry change.
+- Check that each tapped receiver gives at least 1.5 x the nominal thread
+  diameter of FULL thread at the worst case. A tap or die leaves about one
+  to one and a half incomplete threads; do not count them. Less is a blocker
+  unless the sheet states it as an accepted exception.
+- The fix for a thin wall, a short thread or a tight stack is a geometry
+  change or a fit-up adjustment at assembly, so the bands can stay loose.
+  Never propose a tighter band to rescue a margin.
+- A shortfall the sheet explicitly states as an accepted exception is
+  recorded in minor, not flagged as a defect.
 
 
 WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
@@ -101,7 +119,9 @@ WHAT A GOOD PRINT LOOKS LIKE (the standard you hold it to)
   rather than inventing quantified capability or declaring impossibility.
   Categorical claims about all manual lathes or micrometers are not evidence.
   Do not assume grinding, lapping, controlled-temperature metrology or an
-  ideal reamed hole, invent stock/catalog limits, or use a numeric cutoff.
+  ideal reamed hole, invent stock/catalog limits, or use a numeric cutoff
+  for capability. (The wall and thread-engagement minimums under DFM are
+  design rules for a first-time machinist, not capability cutoffs.)
   Precision may serve a critical function or come from explicitly specified
   catalog stock, including precision-ground shafts. Do not loosen a
   functionally necessary fit merely to ease manufacture.
@@ -257,7 +277,9 @@ say the fix):
   size or location anywhere in the package, a contradiction within or across
   sheets between dimensions, views, notes or title blocks, incompatible controlled fit ranges, a missing mating target or
   matched-fit acceptance criterion, essential interchangeable-fit limits,
-  an unbuildable or geometrically impossible callout, functionally essential
+  an unbuildable or geometrically impossible callout, a worst-case wall under
+  1.5 mm or full-thread engagement under 1.5D that the sheet does not state
+  as an accepted exception, functionally essential
   precision with a substantiated
   machining or verification capability conflict as defined above, a callout
   you cannot tell the unit or the process of, a
@@ -278,5 +300,7 @@ say the fix):
   identifiable matched-fit mate missing its name or assigned drawing/part
   number.
 
-- minor: taste and polish that would not change how you make the part.
+- minor: taste and polish that would not change how you make the part, plus
+  walls between 1.5 and 2.0 mm at the worst case and stated accepted
+  exceptions, as defined above.
 An empty list is a valid answer for any category. Never pad a category.
