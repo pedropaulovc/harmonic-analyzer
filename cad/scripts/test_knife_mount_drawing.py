@@ -395,3 +395,48 @@ def test_hole_callout_places_cover_exactly_the_native_depth_variables() -> None:
     assert set(knife_mount_spec.HOLE_CALLOUT_PRECISION) == set(
         drawing._TAP_DEPTH_TOLERANCE_TYPES
     )
+
+
+def test_tap_depths_need_two_places() -> None:
+    """U27: the tap depths keep two places because one place (.X) fails.
+
+    Main, 2026-09-23: one place unless a worst case then fails; both do.
+    - Drill 14.65 at +/-0.8: the deepest drill leaves a crown web of
+      2.052 - (0.8 - 0.51) = 1.762 mm, under the 2.0 target. The shallowest
+      leaves 14.65 - 0.8 - 10.95 = 2.90 mm of tap lead, under 3P = 3.175, so
+      the tap bottoms.
+    - Thread 10.95 MIN spelled with one place is 10.9 MIN or 11.0 MIN. 10.9
+      lets the longest stud tip (10.40 + 0.51 = 10.91) run past the usable
+      thread; 11.0 re-derives the drill and the frozen interface.
+    """
+    import knife_hanger_interface as hanger
+
+    widen = hanger.TITLE_BLOCK_X_MM - hanger.TITLE_BLOCK_XX_MM
+    assert hanger.MIN_CROWN_WEB_MM - widen < hanger.CROWN_WEB_TARGET_MM
+    assert (
+        hanger.TAP_DRILL_DEPTH_MM
+        - hanger.TITLE_BLOCK_X_MM
+        - hanger.TAP_THREAD_DEPTH_MIN_MM
+        < hanger.TAP_LEAD_ALLOWANCE_PITCHES * hanger.THREAD_PITCH_MM
+    )
+    one_place_min = round(hanger.TAP_THREAD_DEPTH_MIN_MM - 0.05, 1)  # 10.9
+    assert hanger.STUD_TIP_LENGTH_MAX_MM > one_place_min
+    assert knife_mount_spec.HOLE_CALLOUT_PRECISION == {
+        "hw-tapdrldepth": 2,
+        "hw-threaddepth": 2,
+    }
+
+
+def test_interface_title_block_bands_match_the_printed_sheet() -> None:
+    """The stacks use the bands the title block PRINTS, never tighter than its value.
+
+    title_block.yaml stores .X as 0.03 in (0.762 mm) printed ±0.8 and .XX as
+    0.02 in (0.508 mm) printed ±0.51; the interface stacks the printed band.
+    """
+    import _config
+    import knife_hanger_interface as hanger
+
+    for places, band in ((1, hanger.TITLE_BLOCK_X_MM), (2, hanger.TITLE_BLOCK_XX_MM)):
+        row = _config.title_block(f"linear_{places}pl")
+        assert band == float(str(row["display"]).lstrip("±"))
+        assert band >= float(row["value_in"]) * 25.4
