@@ -32,6 +32,7 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     )
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert spec.DRAWING_REFERENCE_PRECISION == {"HeadDia": 1, "NeckDia": 1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 

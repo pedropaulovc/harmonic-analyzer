@@ -34,6 +34,7 @@ from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     BACK_CAP_R,
     CROSS_HOLE_CALLOUT,
+    DRAWING_REFERENCE_PRECISION,
     DRAWING_PRECISION_BY_NAME,
     HEAD_CENTER_Z,
     HEAD_DIA,
@@ -227,6 +228,7 @@ def _detail_diameter(
     *,
     station_z_mm: float,
     diameter_mm: float,
+    dimension_name: str,
     text_xy: tuple[float, float],
     label: str,
 ) -> Any:
@@ -260,9 +262,12 @@ def _detail_diameter(
     display.SetText(1, "<MOD-DIAM>")
     if str(display.GetText(1) or "") != "<MOD-DIAM>":
         raise RuntimeError(f"{label}: diameter prefix did not persist")
-    display.SetPrecision3(1, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != 1:
-        raise RuntimeError(f"{label}: one-place precision did not persist")
+    places = DRAWING_REFERENCE_PRECISION[dimension_name]
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[dimension_name], -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != places:
+        raise RuntimeError(
+            f"{label}: spec-owned {places}-place precision did not persist"
+        )
     annotation = display.GetAnnotation()
     if annotation is None:
         raise RuntimeError(f"{label}: dimension has no drawing annotation")
@@ -356,6 +361,7 @@ async def build(adapter: Any) -> dict[str, str]:
             detail,
             station_z_mm=HEAD_CENTER_Z,
             diameter_mm=HEAD_DIA,
+            dimension_name="HeadDia",
             text_xy=DIAMETER_POSITIONS["HeadDia"],
             label="detail head diameter",
         ),
@@ -364,6 +370,7 @@ async def build(adapter: Any) -> dict[str, str]:
             detail,
             station_z_mm=(HEAD_REAR_Z + NECK_END_Z) / 2.0,
             diameter_mm=NECK_DIA,
+            dimension_name="NeckDia",
             text_xy=DIAMETER_POSITIONS["NeckDia"],
             label="detail neck diameter",
         ),
