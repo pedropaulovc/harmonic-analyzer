@@ -49,24 +49,20 @@ from summing_assembly_spec import (
     BOM_NORMALIZED_ALIASES,
     BOM_PART_NUMBERS,
     BOM_QUANTITIES,
+    CASTING_TO_KNIFE_LINE_MM,
+    DRAWING_REFERENCE_PRECISION,
     EXPLODED_VIEW_NAME,
+    HANGER_BLOCK_CLEARANCE_TEXT,
     SOURCE_CONFIGURATION,
 )
-from build_knife_hanger_stud import THREAD_TIP_ROOT_RADIUS_MM
-from build_knife_mount import STUD_TAP_DIA
+import knife_hanger_interface as hanger
+from build_knife_hanger_stud import SHANK_DIA as STUD_SHANK_DIA
+from knife_mount_spec import R_BORE, SUPPORT_Z_THICK
 from build_summing_assembly import (
     DRAWING_NUMBER,
-    HANGER_COMPLETE_MALE_START_DEPTH_MM,
-    HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM,
-    HANGER_ENGAGEMENT_MAX_MM,
-    HANGER_ENGAGEMENT_MIN_MM,
-    HANGER_ENGAGEMENT_PRECISION,
-    HANGER_ENGAGEMENT_TARGET_MM,
-    HANGER_TAP_DRILL_SHOULDER_MIN_MM,
-    HANGER_TAP_FULL_THREAD_MIN_MM,
     HEX_Z_MID,
     KNIFE,
-    KNIFE_MOUNT_TOP_Y,
+    measure_hanger_joint,
 )
 from cone_pivot_post_installation import SUMMING_Z
 
@@ -103,7 +99,7 @@ INSTRUCTION_SCALE = (1.0, 6.0)
 HANGER_FIT_SHEET_SCALE = (1.0, 1.0)
 HANGER_PARENT_SCALE = (1.0, 2.0)
 HANGER_SECTION_SCALE = (1.0, 2.0)
-HANGER_DETAIL_SCALE = (3.0, 1.0)
+HANGER_DETAIL_SCALE = (2.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: EXPLODED_SCALE,
@@ -133,15 +129,14 @@ HANGER_DETAIL_CENTER = (0.095, 0.092)
 # The native detail label letter. The sheet heading and the MHA-119 stud note
 # reference it; test_summing_assembly_drawing.py pins the cross-reference.
 HANGER_DETAIL_LABEL = "B"
+# Detail B is cut from the FRONT parent, where the knife bore shows as a
+# circle: its fence spans the seat plane down to the knife line (19.8 mm).
+HANGER_DETAIL_FENCE_RADIUS_MM = 14.0
 # The detail's own label hangs under its outline (summing-asm-r12: parked
 # inside the 4:1 outline it overlapped the view), inset from the left edge so
 # it clears the sheet-number note.
 HANGER_DETAIL_LABEL_GAP = 0.003
 HANGER_DETAIL_LABEL_INSET_X = 0.010
-# Built-solid readback tolerances: circle y/r agreement, and how far a circle
-# centre may sit off the nominal hanger axis and still belong to that station.
-BUILT_GEOMETRY_TOLERANCE_MM = 1e-4
-BUILT_STATION_TOLERANCE_MM = 0.01
 # The BOM sits bottom-right, just above the title block, so the exploded view
 # and its balloon ring own the upper-left of the sheet. DESCRIPTION is wide
 # enough for the longest description on one line (r9: 70 chars wrapped at
@@ -198,8 +193,8 @@ ASSEMBLY_STEPS = "\n".join(
         "   TRANSFERRED CENTERS; NEVER ENTER THE MHA-037 TAPS. DO NOT",
         "   RECENTER TO CAD COORDINATES OR PRE-DRILLED MARKS. DEBURR;",
         "   RETAIN PAIR, FRONT/REAR, AND ORIENTATION MATCH MARKS.",
-        "4. KEEP EACH MHA-119/MHA-131 WITH ITS IDENTIFIED SIDE. MEASURE,",
-        "   TRIM, AND INSPECT EACH ACTUAL STACK PER SHEET 4; THEN ASSEMBLE",
+        "4. KEEP EACH MHA-119/MHA-131 WITH ITS IDENTIFIED SIDE. MEASURE",
+        "   EACH STACK, TURN EACH SHOULDER, AND INSPECT PER SHEET 4; ASSEMBLE",
         "   FROM ABOVE WITH WASHER ON CROSSBAR AND HEAD FULLY ON WASHER.",
         "5. THREAD MHA-005 DIRECTLY INTO THE MHA-073 COUNTER BOSS; NO NUT.",
         "   CLOCK THE OPEN EYE TO THE PULL PLANE AND APPLY REMOVABLE",
@@ -269,30 +264,27 @@ INTERFACE_NOTES = "\n".join(
 HANGER_FIT_CONSTRUCTION = "\n".join(
     (
         "HANGER STUD CONSTRUCTION - MEASURE EACH IDENTIFIED SIDE",
-        "T = MHA-077 THICKNESS FROM TOP WASHER SEAT TO LOWER FRAME FACE",
-        "AT THE TRANSFERRED HANGER HOLE.",
-        "W = ASSIGNED MHA-131 THICKNESS BETWEEN ITS TWO SEATING FACES.",
-        "G = POSITIVE CLEARANCE FROM MHA-077 LOWER FRAME FACE TO THE",
-        "MHA-037 TOP FACE IN THE FREE, FULLY SEATED POSITION.",
-        "L = MHA-119 UNDER-HEAD SEAT TO FINISHED THREADED-END TIP.",
-        "E = MHA-037 TAP MOUTH/TOP FACE TO FINISHED TIP; SEE DETAIL B.",
-        "CUT L = T + W + G + E. MHA-119 UNDER-HEAD LENGTH IS REFERENCE.",
-        "CHAMFER EACH CUT TO THE EXISTING THREAD ROOT PER MHA-119.",
-        "MARK EACH BOLT FRONT/REAR; KEEP IT WITH ITS MHA-037/MHA-131 STATION.",
+        "T = MHA-077 THICKNESS, TOP WASHER SEAT TO LOWER FRAME FACE,",
+        "    AT THE TRANSFERRED HANGER HOLE.",
+        "W = ASSIGNED MHA-131 THICKNESS BETWEEN ITS SEATING FACES.",
+        "C = ACTUAL MHA-037 BOSS-TOP SEAT TO KNIFE LINE; SEE DETAIL B.",
+        f"{CASTING_TO_KNIFE_LINE_MM:.2f} = CASTING UNDERSIDE TO KNIFE LINE.",
+        f"TURN MHA-119 SHOULDER L = T + W + {CASTING_TO_KNIFE_LINE_MM:.2f} - C,",
+        "    UNDER-HEAD SEAT TO SHOULDER; TIP PER MHA-119.",
+        "FIT EACH STUD TO ITS OWN STACK: BOTH KNIFE LINES MATCH.",
+        "MARK EACH BOLT FRONT/REAR; KEEP IT WITH ITS",
+        "    MHA-037/MHA-131 STATION.",
     )
 )
 
 HANGER_FIT_INSPECTION = "\n".join(
     (
         "AS-BUILT HANGER FIT - INSPECT EACH IDENTIFIED SIDE",
-        "E MUST MEET DETAIL B'S NATIVE GENERAL .XX BAND.",
-        "FINISHED TIP MUST NOT PASS THE ACTUAL MHA-037 COMPLETE-THREAD DEPTH.",
-        "REQUIRE POSITIVE AXIAL OVERLAP BETWEEN COMPLETE MHA-119 MALE THREAD",
-        "AND COMPLETE MHA-037 FEMALE THREAD.",
-        "VERIFY FULL HEAD/WASHER SEATING AND POSITIVE MOUNT-TO-FRAME",
-        "CLEARANCE.",
-        "VERIFY BOTH KNIFE CONTACTS AND FREE ROCK WITHOUT AXIAL RUB.",
-        "NO FORCING OR BOTTOMING.",
+        "MHA-119 SHOULDER SEATS ON THE MHA-037 BOSS WITH NO GAP.",
+        HANGER_BLOCK_CLEARANCE_TEXT,
+        "MHA-119 TIP STAYS INSIDE THE MHA-037 USABLE THREAD.",
+        "BOTH KNIFE CONTACTS SEAT; THE LEVER ROCKS FREE WITHOUT",
+        "    AXIAL RUB. NO FORCING OR BOTTOMING.",
     )
 )
 
@@ -768,85 +760,9 @@ def _visible_component_circle(
     return candidates[0][1]
 
 
-def hanger_engagement_violations(
-    mouth_y_mm: float,
-    tip_y_mm: float,
-) -> list[str]:
-    """Judge a BUILT tap-mouth/finished-tip pair against the receiver band.
-
-    The assembly's stack gate proves the constants agree; this proves the
-    solids the drawing dimensions do.
-    """
-    engagement = mouth_y_mm - tip_y_mm
-    violations = []
-    if abs(mouth_y_mm - KNIFE_MOUNT_TOP_Y) > BUILT_GEOMETRY_TOLERANCE_MM:
-        violations.append(
-            f"tap mouth y {mouth_y_mm:.5f} mm is not the knife-mount top "
-            f"{KNIFE_MOUNT_TOP_Y:.5f} mm"
-        )
-    if abs(engagement - HANGER_ENGAGEMENT_TARGET_MM) > BUILT_GEOMETRY_TOLERANCE_MM:
-        violations.append(
-            f"built engagement {engagement:.5f} mm is not the stack target "
-            f"{HANGER_ENGAGEMENT_TARGET_MM:.5f} mm"
-        )
-    if not HANGER_ENGAGEMENT_MIN_MM <= engagement <= HANGER_ENGAGEMENT_MAX_MM:
-        violations.append(
-            f"built engagement {engagement:.5f} mm is outside the printed band "
-            f"{HANGER_ENGAGEMENT_MIN_MM:.2f}..{HANGER_ENGAGEMENT_MAX_MM:.2f} mm"
-        )
-    if engagement > HANGER_TAP_FULL_THREAD_MIN_MM:
-        violations.append(
-            f"finished tip {engagement:.5f} mm deep passes the minimum complete "
-            f"female thread {HANGER_TAP_FULL_THREAD_MIN_MM:.4f} mm"
-        )
-    if engagement >= HANGER_TAP_DRILL_SHOULDER_MIN_MM:
-        violations.append(
-            f"finished tip {engagement:.5f} mm deep reaches the tap-drill "
-            f"shoulder {HANGER_TAP_DRILL_SHOULDER_MIN_MM:.4f} mm"
-        )
-    if engagement <= max(0.0, HANGER_COMPLETE_MALE_START_DEPTH_MM):
-        violations.append(
-            f"finished tip {engagement:.5f} mm deep leaves no complete male "
-            "thread inside the receiver"
-        )
-    return violations
-
-
-def _brep_circles(component: Any) -> list[tuple[float, float, float, float]]:
-    """Every circular B-rep edge of one instance as (x, y, z, r) assembly mm."""
-    scale = float(
-        _early_bound(
-            _early_bound(component, "IComponent2").Transform2, "IMathTransform"
-        ).ArrayData[12]
-    )
-    circles = []
-    for raw_body in tuple(_early_bound(component, "IComponent2").GetBodies2(0) or ()):
-        for raw_edge in tuple(_early_bound(raw_body, "IBody2").GetEdges() or ()):
-            raw_curve = _early_bound(raw_edge, "IEdge").GetCurve()
-            if raw_curve is None:
-                continue
-            curve = _early_bound(raw_curve, "ICurve")
-            if not curve.IsCircle():
-                continue
-            parameters = tuple(float(value) for value in curve.CircleParams)
-            x, y, z = _component_point_in_assembly(component, parameters[:3])
-            circles.append(
-                (x * 1000.0, y * 1000.0, z * 1000.0, parameters[6] * scale * 1000.0)
-            )
-    return circles
-
-
-def _station_circle(
-    view: Any,
-    *,
-    component_stem: str,
-    radius_mm: float,
-    station_z_mm: float,
-    pick: Literal["highest", "lowest"],
-    label: str,
-) -> tuple[str, tuple[float, float, float, float]]:
-    """The B-rep circle of ``radius_mm`` on the stem instance at the station."""
-    matches = []
+def _view_components(view: Any, component_stem: str) -> list[tuple[str, Any]]:
+    """The visible instances of one stem in a view, by leaf name."""
+    components = []
     for raw_drawing_component in tuple(
         _early_bound(view, "IView").GetVisibleDrawingComponents() or ()
     ):
@@ -854,61 +770,21 @@ def _station_circle(
             _early_bound(raw_drawing_component, "IDrawingComponent").Component,
             "IComponent2",
         )
-        if _component_stem(component) != component_stem:
-            continue
-        name = str(component.Name2 or "").rsplit("/", 1)[-1]
-        for circle in _brep_circles(component):
-            on_station = abs(circle[2] - station_z_mm) <= BUILT_STATION_TOLERANCE_MM
-            on_axis = abs(circle[0] - KNIFE[0]) <= BUILT_STATION_TOLERANCE_MM
-            if not (on_station and on_axis):
-                continue
-            if abs(circle[3] - radius_mm) > BUILT_GEOMETRY_TOLERANCE_MM:
-                continue
-            matches.append((name, circle))
-    if not matches:
-        raise RuntimeError(
-            f"{label}: no {component_stem!r} B-rep circle r={radius_mm:g} mm on "
-            f"the x={KNIFE[0]:g}, z={station_z_mm:g} mm hanger axis"
-        )
-    matches.sort(key=lambda match: match[1][1], reverse=pick == "highest")
-    return matches[0]
+        if _component_stem(component) == component_stem:
+            components.append(
+                (str(component.Name2 or "").rsplit("/", 1)[-1], component)
+            )
+    return components
 
 
 def _assert_built_hanger_engagement(section: Any, *, station_z_mm: float) -> None:
-    """Measure E between the built mount and stud solids before dimensioning it."""
-    mount_name, mouth = _station_circle(
-        section,
-        component_stem="knife-mount",
-        radius_mm=STUD_TAP_DIA / 2.0,
+    """Judge the built joint the section shows before dimensioning it."""
+    measure_hanger_joint(
+        _view_components(section, "knife-mount"),
+        _view_components(section, "knife-hanger-stud"),
         station_z_mm=station_z_mm,
-        pick="highest",
-        label="built MHA-037 tap mouth",
+        label="built MHA-119 joint in MHA-037",
     )
-    stud_name, tip = _station_circle(
-        section,
-        component_stem="knife-hanger-stud",
-        radius_mm=THREAD_TIP_ROOT_RADIUS_MM,
-        station_z_mm=station_z_mm,
-        pick="lowest",
-        label="built MHA-119 finished tip",
-    )
-    violations = hanger_engagement_violations(mouth[1], tip[1])
-    facts = {
-        "mount": mount_name,
-        "stud": stud_name,
-        "mouth_y_mm": mouth[1],
-        "tip_y_mm": tip[1],
-        "engagement_mm": mouth[1] - tip[1],
-        "violations": tuple(violations),
-    }
-    _telemetry.event("drawing.built_hanger_engagement", **facts)
-    summary = (
-        f"built hanger engagement {stud_name} in {mount_name}: mouth "
-        f"{mouth[1]:.5f}, tip {tip[1]:.5f}, E {mouth[1] - tip[1]:.5f} mm"
-    )
-    if violations:
-        raise RuntimeError(f"{summary}: " + "; ".join(violations))
-    _telemetry.success(summary)
 
 
 def _exclude_fasteners_from_section(
@@ -963,28 +839,31 @@ def _exclude_fasteners_from_section(
     _telemetry.success(f"{label}: drawn unsectioned {', '.join(excluded)}")
 
 
-def _create_hanger_detail(adapter: Any, section: Any) -> Any:
-    """Create a native enlarged detail around one real hanger/receiver interface."""
+def _create_hanger_detail(adapter: Any, parent: Any) -> Any:
+    """Enlarge the seated shoulder, boss and knife bore from the front parent."""
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
-    section = _early_bound(section, "IView")
-    if not drawing.ActivateView(str(section.GetName2() or "")):
-        raise RuntimeError("failed to activate hanger section for detail")
+    parent = _early_bound(parent, "IView")
+    if not drawing.ActivateView(str(parent.GetName2() or "")):
+        raise RuntimeError("failed to activate hanger parent for detail")
     draw.ClearSelection2(True)
-    tip_y = KNIFE_MOUNT_TOP_Y - HANGER_ENGAGEMENT_TARGET_MM
     detail_point_mm = (
         KNIFE[0],
-        (KNIFE_MOUNT_TOP_Y + tip_y) / 2.0,
+        (hanger.SHOULDER_SEAT_Y + hanger.KNIFE_CONTACT_Y) / 2.0,
         SUMMING_Z + HEX_Z_MID,
     )
     center = model_point_in_view(
         adapter,
-        section,
+        parent,
         tuple(value / 1000.0 for value in detail_point_mm),
-        label="hanger engagement detail center",
+        label="hanger seat detail center",
     )
-    radius = 0.012 * HANGER_SECTION_SCALE[0] / HANGER_SECTION_SCALE[1]
-    sketch = _early_bound(section.GetSketch(), "ISketch")
+    radius = (
+        HANGER_DETAIL_FENCE_RADIUS_MM / 1000.0
+        * HANGER_PARENT_SCALE[0]
+        / HANGER_PARENT_SCALE[1]
+    )
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
@@ -1054,9 +933,9 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
         ),
         label="hanger detail label",
     )
-    circles = tuple(_read_member(section, "GetDetailCircles") or ())
+    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
     if len(circles) != 1:
-        raise RuntimeError(f"hanger section has {len(circles)} detail fences")
+        raise RuntimeError(f"hanger parent has {len(circles)} detail fences")
     detail_circle = _early_bound(circles[0], "IDetailCircle")
     parent_label = (center[0] + 0.014, center[1] + 0.010)
     detail_circle.SetLabelPosition(*parent_label)
@@ -1069,83 +948,98 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
     return detail
 
 
-def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
-    """Add and verify the associative tap-mouth-to-finished-tip measurement."""
-    tip_y = KNIFE_MOUNT_TOP_Y - HANGER_ENGAGEMENT_TARGET_MM
+def _add_seat_to_knife_line_dimension(adapter: Any, detail: Any) -> Any:
+    """Dimension C: the seated shoulder (= the boss-top seat) to the bore crown.
+
+    The shoulder face's outer circle lies edge-on in the front detail; the knife
+    bore shows as a true circle whose NEAREST point is the crown, the knife
+    line. The value is re-read and must equal the interface's crown depth.
+    """
     station_z = SUMMING_Z + HEX_Z_MID
-    mouth = _visible_component_circle(
-        detail,
-        component_stem="knife-mount",
-        height_mm=KNIFE_MOUNT_TOP_Y,
-        radius_mm=STUD_TAP_DIA / 2.0,
-        target_z_mm=station_z,
-        label="actual MHA-037 tap mouth",
-    )
-    tip = _visible_component_circle(
+    seat = _visible_component_circle(
         detail,
         component_stem="knife-hanger-stud",
-        height_mm=tip_y,
-        radius_mm=THREAD_TIP_ROOT_RADIUS_MM,
+        height_mm=hanger.SHOULDER_SEAT_Y,
+        radius_mm=STUD_SHANK_DIA / 2.0,
         target_z_mm=station_z,
-        label="actual MHA-119 finished tip",
+        label="seated MHA-119 shoulder",
+    )
+    bore = _visible_component_circle(
+        detail,
+        component_stem="knife-mount",
+        height_mm=hanger.KNIFE_CONTACT_Y - R_BORE,
+        radius_mm=R_BORE,
+        target_z_mm=station_z + SUPPORT_Z_THICK / 2.0,
+        label="MHA-037 knife bore",
     )
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     detail = _early_bound(detail, "IView")
     if not drawing.ActivateView(str(detail.GetName2() or "")):
-        raise RuntimeError("failed to activate hanger fit detail")
+        raise RuntimeError("failed to activate hanger seat detail")
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    for append, raw_entity in ((False, mouth), (True, tip)):
+    for append, raw_entity in ((False, seat), (True, bore)):
         selection_data = _early_bound(
             selection_manager.CreateSelectData(),
             "ISelectData",
         )
         selection_data.View = detail
         if not _early_bound(raw_entity, "IEntity").Select4(append, selection_data):
-            raise RuntimeError("failed to select actual hanger fit edge")
-    display = draw.AddVerticalDimension2(0.150, 0.082, 0.0)
+            raise RuntimeError("failed to select the seat or the knife bore")
+    outline = _view_outline(detail)
+    display = draw.AddVerticalDimension2(
+        outline[2] + 0.008, (outline[1] + outline[3]) / 2.0, 0.0
+    )
     draw.ClearSelection2(True)
     if display is None:
-        raise RuntimeError("failed to add native hanger engagement measurement")
-    # Both circles lie normal to the view (edge-on), so the dimension is
-    # plane-to-plane: SolidWorks gives it no arc endpoints to re-anchor
-    # (r8: GetArcEndCondition 0 on both). The value check below proves it
-    # measures E.
+        raise RuntimeError("failed to add the seat-to-knife-line dimension")
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    arc_end_conditions = tuple(
-        int(dimension.GetArcEndCondition(index)) for index in (1, 2)
-    )
-    _telemetry.event(
-        "drawing.hanger_engagement_dimension",
-        arc_end_conditions=arc_end_conditions,
-        system_value_mm=float(dimension.SystemValue) * 1000.0,
-    )
+    # swArcEndConditionMin: the bore's nearest point to the seat is its crown.
+    arc_ends = []
+    for index in (1, 2):
+        if int(dimension.GetArcEndCondition(index)) == 0:
+            continue
+        if int(dimension.SetArcEndCondition(index, 2)) != 0:
+            raise RuntimeError(f"seat-to-knife-line end {index} refused the crown")
+        arc_ends.append(index)
+    draw.EditRebuild3()
     measured_mm = abs(float(dimension.SystemValue) * 1000.0)
-    if abs(measured_mm - HANGER_ENGAGEMENT_TARGET_MM) > 1e-5:
+    _telemetry.event(
+        "drawing.seat_to_knife_line_dimension",
+        arc_ends=tuple(arc_ends),
+        arc_end_conditions=tuple(
+            int(dimension.GetArcEndCondition(index)) for index in (1, 2)
+        ),
+        system_value_mm=measured_mm,
+        expected_mm=hanger.KNIFE_BORE_CROWN_DEPTH_MM,
+    )
+    if len(arc_ends) != 1:
         raise RuntimeError(
-            "hanger engagement actual-edge measurement is "
-            f"{measured_mm:g} mm, expected {HANGER_ENGAGEMENT_TARGET_MM:g} mm"
+            f"seat-to-knife-line dimension has {len(arc_ends)} circular ends"
+        )
+    if abs(measured_mm - hanger.KNIFE_BORE_CROWN_DEPTH_MM) > 1e-5:
+        raise RuntimeError(
+            f"seat-to-knife-line measures {measured_mm:g} mm, expected "
+            f"{hanger.KNIFE_BORE_CROWN_DEPTH_MM:g} mm"
         )
     if int(
-        display.SetPrecision3(HANGER_ENGAGEMENT_PRECISION, -1, -1, -1)
+        display.SetPrecision3(
+            DRAWING_REFERENCE_PRECISION["SeatToKnifeLine"], -1, -1, -1
+        )
     ) < 0:
-        raise RuntimeError("failed to set hanger engagement precision")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM / 1000.0
-    tolerance.Type = 11
-    if not tolerance.SetValues(-band, band):
-        raise RuntimeError("hanger engagement general tolerance was rejected")
+        raise RuntimeError("failed to set the seat-to-knife-line precision")
+    display.ShowParenthesis = True
+    display.SetText(1, "C ")  # swDimensionTextPrefix
     draw.EditRebuild3()
-    if int(display.GetPrimaryPrecision2()) != HANGER_ENGAGEMENT_PRECISION:
-        raise RuntimeError("hanger engagement precision did not persist")
     if (
-        int(tolerance.Type) != 11
-        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
-        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+        int(display.GetPrimaryPrecision2())
+        != DRAWING_REFERENCE_PRECISION["SeatToKnifeLine"]
     ):
-        raise RuntimeError("hanger engagement general tolerance did not persist")
+        raise RuntimeError("seat-to-knife-line precision did not persist")
+    if not bool(display.ShowParenthesis):
+        raise RuntimeError("seat-to-knife-line reference parentheses did not persist")
     return display
 
 
@@ -1158,7 +1052,7 @@ def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
         (0.018, 0.263),
         label="hanger fit sheet identity",
     )
-    hanger_axis_mm = (KNIFE[0], KNIFE_MOUNT_TOP_Y, SUMMING_Z)
+    hanger_axis_mm = (KNIFE[0], hanger.SHOULDER_SEAT_Y, SUMMING_Z)
     parent = place_view(
         adapter,
         str(SOURCE),
@@ -1227,18 +1121,17 @@ def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
     )
     _assert_built_hanger_engagement(section, station_z_mm=SUMMING_Z + HEX_Z_MID)
     _record_cosmetic_threads(adapter, section, label="hanger-axis assembly section")
-    detail = _create_hanger_detail(adapter, section)
+    detail = _create_hanger_detail(adapter, parent)
     set_hidden_lines_removed(adapter, detail)
-    _record_cosmetic_threads(adapter, detail, label="hanger fit detail")
     _remove_auto_hole_notes(adapter, label="hanger fit sheet")
-    _add_hanger_engagement_dimension(adapter, detail)
+    _add_seat_to_knife_line_dimension(adapter, detail)
     return _stack_note_field(
         adapter,
         (
             (
-                "hanger engagement detail heading",
-                f"DETAIL {HANGER_DETAIL_LABEL}: E IS ACTUAL TAP MOUTH TO FINISHED "
-                "BOLT TIP",
+                "hanger seat detail heading",
+                f"DETAIL {HANGER_DETAIL_LABEL}: C IS ACTUAL MHA-037 SEAT TO KNIFE "
+                "LINE",
             ),
             ("hanger fit construction", HANGER_FIT_CONSTRUCTION),
             ("hanger fit inspection", HANGER_FIT_INSPECTION),

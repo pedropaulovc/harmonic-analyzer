@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import knife_hanger_interface as hanger
+
 
 EXPLODED_VIEW_NAME = "SUMMING_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
@@ -74,3 +76,18 @@ SAVED_SETUP = "neutral"
 SAVED_FREE_DOF = "lever_rock"
 DEFINED_ALTERNATE_CONFIGURATIONS: tuple[str, ...] = ()
 
+
+# --- sheet 4 (hanger fit) print values -------------------------------------
+# Places each drawing-created dimension prints (policy rule 2): C, the actual
+# seat -> knife-line depth, is a two-place reference.
+DRAWING_REFERENCE_PRECISION = {"SeatToKnifeLine": 2}
+# Casting underside to knife line: the machine height the fitter adds in
+# L = T + W + H - C (Main, 2026-09-23), printed with its meaning.
+CASTING_TO_KNIFE_LINE_MM = round(
+    hanger.CASTING_UNDERSIDE_Y - hanger.KNIFE_CONTACT_Y,
+    DRAWING_REFERENCE_PRECISION["SeatToKnifeLine"],
+)
+HANGER_BLOCK_CLEARANCE_TEXT = (
+    "MHA-037 BLOCK TOP CLEARS MHA-077 BY "
+    f"{hanger.MOUNT_GAP_MIN_MM_REQUIRED:.2f} MIN."
+)

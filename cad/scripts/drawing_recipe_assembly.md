@@ -99,15 +99,19 @@ Inspect every page and complete the blind machinist review before release.
    actual MHA-037 tap axes (the released top-frame print keeps the native final
    hole size but carries no independent hanger X/Z requirement), never from CAD
    marks.
-4. **HANGER FIT + INSPECTION** (1:1 sheet): a hanger-station parent isolated to
-   MHA-037/MHA-131/MHA-119 (1:2), its hanger-axis section A-A (1:2, with the
-   bolts and washers drawn unsectioned per ASME Y14.3), and detail B at 3:1
-   carrying the associative actual-edge engagement dimension E (MHA-037 tap
-   mouth to MHA-119 finished tip) in the printed general `.XX` band, plus the
-   per-side trim construction (CUT L = T + W + G + E) and as-built inspection
-   notes in the right note field. Before dimensioning, the drawing measures E
-   between the built mount and stud solids (`_assert_built_hanger_engagement`).
-   E is the fit acceptance (the MHA-119 under-head length stays reference).
+4. **HANGER FIT + INSPECTION** (1:1 sheet): a hanger-station front parent
+   isolated to MHA-037/MHA-131/MHA-119 (1:2) and its hanger-axis section A-A
+   (1:2, bolts and washers drawn unsectioned per ASME Y14.3, showing the #10-24
+   tip in its tap). Detail B (2:1) is cut from the FRONT parent, where the knife
+   bore is a circle: it shows the stud shoulder seated on the MHA-037 boss and
+   carries C, the associative seat-to-knife-line depth (shoulder face to the
+   bore crown), as a two-place reference. The right note field gives the per-side
+   fit (TURN MHA-119 SHOULDER L = T + W + 14.87 - C, 14.87 = casting underside to
+   knife line, from `knife_hanger_interface`) and the as-built inspection. Before
+   dimensioning, the drawing judges the built joint from the solids
+   (`build_summing_assembly.measure_hanger_joint`): shoulder seated on the seat
+   plane, full-thread engagement >= 1.5D, tip inside the usable thread, boss and
+   shank clear of the casting hole.
 5. **CHECKS + SETUP** (1:6): the assembly-only functional checks, the
    neutral/free-rocking setup and the external installation interfaces, with a
    reference isometric under the right notes. The finalizer links title-block
@@ -119,8 +123,8 @@ Y14.2 minimum on B size is 3 mm). Each block's rendered `INote.GetExtent` is
 gated against its field, and the build ends with `check_drawing_layout` on every
 sheet: any overlap, border crossing or leader crossing fails the drawing.
 
-The MHA-119 stud drawing points back here: "TRIM/INSPECT TO MHA-A07 SHEET 4,
-HANGER FIT + INSPECTION, DETAIL B."
+The MHA-119 stud drawing points back here: "FIT SHOULDER TO STACK PER MHA-A07
+SHEET 4, HANGER FIT + INSPECTION, DETAIL B."
 `test_summing_assembly_drawing.py` pins that sentence to
 `build_summing_assembly.DRAWING_NUMBER`, `draw_summing_assembly.SHEET_NAMES[3]`,
 and `draw_summing_assembly.HANGER_DETAIL_LABEL`, so renaming any of them fails

@@ -13,7 +13,8 @@ above by the boss-hook / counter-spring / gooseneck chain.
   the casting top face, one at each mount centreline.
 * knife-hanger-stud x2 -- modified/shortened McMaster 91247A720 bolts under
   the stable legacy stem: each passes through its washer and the casting's
-  clearance hole, then threads into the knife-mount's 1/2-13 top tap.
+  clearance hole; its turned shoulder seats on the knife-mount boss and its
+  #10-24 tip threads into the boss tap (option D, knife_hanger_interface).
 * summing-lever -- rocks on the knife edge (Axis3 coincident to the support
   contact ridge); the part the channel + counter springs drive in the M6
   Motion study. The rock is the sub's single FREED operational DOF: its
@@ -45,10 +46,10 @@ from __future__ import annotations
 
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import _config
 import _telemetry
 
 from _common import (
@@ -80,18 +81,14 @@ from _assembly import (
 )
 from _assembly_patterns import ensure_global_pattern_axis
 from _native_spring_contact import assert_assembly_spring_contacts
-from _interference_contracts import allowed_interference_pairs
+from summing_interference_contract import ALLOWED_PAIRS as ALLOWED_INTERFERENCE
 from _transforms import IDENTITY, ROT_Y_180, euler_from_rows
 from cone_pivot_post_installation import SUMMING_Z
+import knife_hanger_interface as hanger
 from build_knife_hanger_stud import (
     SHANK_DIA as BOLT_MAJOR_DIA,
-    THREAD_MAJOR_RADIUS_MM,
-    THREAD_TIP_CHAMFER_ANGLE_DEG,
-    THREAD_TIP_CHAMFER_AXIAL_MM,
-    THREAD_TIP_CHAMFER_RADIAL_MM,
-    THREAD_TIP_ROOT_RADIUS_MM,
-    THREAD_TIP_Y_MM,
-    UNDERHEAD_LEN,
+    SHOULDER_Y_MM,
+    TIP_END_Y_MM,
     UNDERHEAD_Y_MM,
 )
 from build_knife_hanger_washer import (
@@ -99,18 +96,8 @@ from build_knife_hanger_washer import (
     OUTER_DIA as HANGER_WASHER_OUTER_DIA,
     THICKNESS as HANGER_WASHER_THICKNESS,
 )
-from build_knife_mount import (
-    CASTING_UNDERSIDE_Y,
-    MOUNT_GAP,
-    STUD_TAP_DIA,
-    STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM,
-    STUD_TAP_DRILL_DEPTH_MM,
-    STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM,
-    STUD_TAP_THREAD_DEPTH_MM,
-)
+from build_knife_mount import STUD_TAP_THREAD_DEPTH_MM
 from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
-from diagnostics.diag_build_91247A720 import GB_LEN, GB_MTL, GB_UNDERSIDE
-from knife_hanger_stud_spec import CHAMFER_ANGLE_TOLERANCE_DEG
 from summing_assembly_spec import (
     BOM_QUANTITIES,
     EXPLODED_VIEW_NAME,
@@ -129,107 +116,18 @@ from summing_lever_spec import HEX_Z_INNER, HEX_Z_OUTER  # noqa: E402
 
 HEX_Z_MID = (HEX_Z_INNER + HEX_Z_OUTER) / 2.0  # hex trunnion mid (87.06)
 
-# --- knife-hanger hardware (two bolts + two separate washers) ----------------
-# The physical fit is made from the actual crossbar, washer, and mount gap:
-# E = L - T_crossbar - W_washer - G_mount.  The saved CAD uses the released
-# nominals below; the fitter measures T/W/G for each identified side and trims
-# that side's stud to retain the same E target.  UNDERHEAD_LEN is therefore a
-# nominal/reference representation, never a fixed finished-length acceptance.
-CROSSBAR_TOP_Y = CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
+# --- knife-hanger hardware (two stepped studs + two separate washers) --------
+# Option D (user, 2026-09-22; knife_hanger_interface): each washer sits on the
+# casting crossbar's top, the stud's head bears on the washer, and the stud's
+# turned shoulder SEATS on the knife-mount boss top, the interface's seat
+# plane. The shoulder's length under the bearing face is the fit-to-stack
+# reference on MHA-A07 sheet 4; the #10-24 tip's engagement is the interface's.
+CROSSBAR_TOP_Y = hanger.CASTING_UNDERSIDE_Y + CROSSBAR_HEIGHT
 HANGER_WASHER_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS / 2.0
 HANGER_WASHER_TOP_Y = CROSSBAR_TOP_Y + HANGER_WASHER_THICKNESS
 HANGER_STUD_Y = HANGER_WASHER_TOP_Y - UNDERHEAD_Y_MM
-KNIFE_MOUNT_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP
-HANGER_STACK_NOMINAL_MM = CROSSBAR_HEIGHT + HANGER_WASHER_THICKNESS + MOUNT_GAP
-HANGER_ENGAGEMENT_TARGET_MM = 5.8735
-HANGER_ENGAGEMENT_PRECISION = 2
-# The actual associative geometry retains 5.8735. The shop reads the printed
-# two-place nominal and title-block band: 5.87 +/- 0.51, hence 5.36..6.38.
-HANGER_ENGAGEMENT_DISPLAY_MM = round(
-    HANGER_ENGAGEMENT_TARGET_MM,
-    HANGER_ENGAGEMENT_PRECISION,
-)
-HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM = round(
-    float(_config.title_block("linear_2pl")["value_in"]) * 25.4,
-    HANGER_ENGAGEMENT_PRECISION,
-)
-HANGER_ENGAGEMENT_MIN_MM = (
-    HANGER_ENGAGEMENT_DISPLAY_MM - HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM
-)
-HANGER_ENGAGEMENT_MAX_MM = (
-    HANGER_ENGAGEMENT_DISPLAY_MM + HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM
-)
-
-# The purchased bolt is partially threaded.  Its complete-thread start is a
-# source-geometry station retained from the stock model, not a guessed "turns"
-# threshold.  In receiver-depth coordinates it begins at M - S, where M is the
-# under-head-to-complete-thread-start distance and S is the measured stack.
-HANGER_COMPLETE_THREAD_START_Y_MM = GB_UNDERSIDE - GB_LEN + GB_MTL
-HANGER_UNDERHEAD_TO_COMPLETE_THREAD_MM = (
-    UNDERHEAD_Y_MM - HANGER_COMPLETE_THREAD_START_Y_MM
-)
-HANGER_COMPLETE_MALE_START_DEPTH_MM = (
-    HANGER_UNDERHEAD_TO_COMPLETE_THREAD_MM - HANGER_STACK_NOMINAL_MM
-)
-HANGER_TAP_FULL_THREAD_MIN_MM = (
-    STUD_TAP_THREAD_DEPTH_MM + STUD_TAP_THREAD_DEPTH_DEVIATIONS_MM[0]
-)
-HANGER_TAP_DRILL_SHOULDER_MIN_MM = (
-    STUD_TAP_DRILL_DEPTH_MM + STUD_TAP_DRILL_DEPTH_DEVIATIONS_MM[0]
-)
-HANGER_TAP_DRILL_RADIUS_MIN_MM = STUD_TAP_DIA / 2.0
-# The native angle is measured from the radial tip plane. The purchased stock
-# does not guarantee a radial root tolerance, so these are explicitly NOMINAL
-# CAD-envelope checks; the drawing separately requires actual finished-root
-# inspection and conservatively keeps the tip within actual complete threads.
-HANGER_CHAMFER_ALPHA_MIN_DEG = (
-    THREAD_TIP_CHAMFER_ANGLE_DEG - CHAMFER_ANGLE_TOLERANCE_DEG
-)
-HANGER_CHAMFER_ALPHA_MAX_DEG = (
-    THREAD_TIP_CHAMFER_ANGLE_DEG + CHAMFER_ANGLE_TOLERANCE_DEG
-)
-HANGER_NOMINAL_CHAMFER_AXIAL_MAX_MM = (
-    THREAD_TIP_CHAMFER_RADIAL_MM
-    * math.tan(math.radians(HANGER_CHAMFER_ALPHA_MAX_DEG))
-)
-HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM = max(
-    0.0,
-    min(
-        HANGER_TAP_FULL_THREAD_MIN_MM,
-        HANGER_ENGAGEMENT_MIN_MM - HANGER_NOMINAL_CHAMFER_AXIAL_MAX_MM,
-    )
-    - max(0.0, HANGER_COMPLETE_MALE_START_DEPTH_MM),
-)
-HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM = (
-    HANGER_TAP_DRILL_SHOULDER_MIN_MM - HANGER_ENGAGEMENT_MAX_MM
-)
-HANGER_NOMINAL_CONE_RADIUS_AT_FULL_THREAD_MAX_MM = min(
-    THREAD_MAJOR_RADIUS_MM,
-    THREAD_TIP_ROOT_RADIUS_MM
-    + max(0.0, HANGER_ENGAGEMENT_MAX_MM - HANGER_TAP_FULL_THREAD_MIN_MM)
-    / math.tan(math.radians(HANGER_CHAMFER_ALPHA_MIN_DEG)),
-)
-HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM = (
-    HANGER_TAP_DRILL_RADIUS_MIN_MM
-    - HANGER_NOMINAL_CONE_RADIUS_AT_FULL_THREAD_MAX_MM
-)
-if not math.isclose(
-    THREAD_TIP_CHAMFER_AXIAL_MM,
-    THREAD_TIP_CHAMFER_RADIAL_MM
-    * math.tan(math.radians(THREAD_TIP_CHAMFER_ANGLE_DEG)),
-    abs_tol=1e-9,
-):
-    raise RuntimeError("knife-hanger tip chamfer exports use inconsistent axes")
-
-if not math.isclose(
-    UNDERHEAD_LEN - HANGER_STACK_NOMINAL_MM,
-    HANGER_ENGAGEMENT_TARGET_MM,
-    abs_tol=1e-9,
-):
-    raise RuntimeError(
-        "knife-hanger reference length no longer retains the assembly "
-        f"engagement target: {UNDERHEAD_LEN - HANGER_STACK_NOMINAL_MM:.4f} mm"
-    )
+HANGER_SHOULDER_Y = HANGER_STUD_Y + SHOULDER_Y_MM
+HANGER_TIP_Y = HANGER_STUD_Y + TIP_END_Y_MM
 
 
 def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
@@ -247,18 +145,18 @@ def _assert_hanger_axis_positive_y(name: str, transform: list[float]) -> None:
 
 
 def _assert_knife_hanger_stack() -> None:
-    """Gate the nominal source stack and its physical envelope before insertion."""
+    """Gate the nominal source stack against the interface before insertion."""
     bolt_in_washer_clearance = HANGER_WASHER_INNER_DIA - BOLT_MAJOR_DIA
     bolt_in_crossbar_clearance = STUD_HOLE_DIA - BOLT_MAJOR_DIA
     washer_crossbar_seat = (HANGER_WASHER_OUTER_DIA - STUD_HOLE_DIA) / 2.0
     if bolt_in_washer_clearance <= 0.0:
         raise RuntimeError(
-            "knife-hanger washer ID does not clear the 91247A720 bolt: "
+            "knife-hanger washer ID does not clear the stud shank: "
             f"{bolt_in_washer_clearance:.4f} mm diametral clearance"
         )
     if bolt_in_crossbar_clearance <= 0.0:
         raise RuntimeError(
-            "knife-hanger bolt does not clear the crossbar hole: "
+            "knife-hanger stud shank does not clear the crossbar hole: "
             f"{bolt_in_crossbar_clearance:.4f} mm diametral clearance"
         )
     if washer_crossbar_seat <= 0.0:
@@ -266,56 +164,328 @@ def _assert_knife_hanger_stack() -> None:
             "knife-hanger washer OD does not seat beyond the crossbar hole: "
             f"{washer_crossbar_seat:.4f} mm radial bearing width"
         )
+    # The interface restates the casting and the knife line so no slice
+    # imports another's build script; hold the models to it here.
+    for name, model, interface in (
+        ("crossbar height", CROSSBAR_HEIGHT, hanger.CASTING_CROSSBAR_HEIGHT_MM),
+        ("casting stud hole", STUD_HOLE_DIA, hanger.CASTING_STUD_HOLE_DIA_MM),
+        ("knife contact line", KNIFE_CONTACT_Y, hanger.KNIFE_CONTACT_Y),
+    ):
+        if abs(model - interface) > 1e-6:
+            raise RuntimeError(
+                f"knife-hanger {name} {model:.4f} mm differs from "
+                f"knife_hanger_interface {interface:.4f} mm"
+            )
 
     washer_lower_y = HANGER_WASHER_Y - HANGER_WASHER_THICKNESS / 2.0
     washer_upper_y = HANGER_WASHER_Y + HANGER_WASHER_THICKNESS / 2.0
     bolt_under_head_y = HANGER_STUD_Y + UNDERHEAD_Y_MM
-    bolt_tip_y = HANGER_STUD_Y + THREAD_TIP_Y_MM
-    engagement = KNIFE_MOUNT_TOP_Y - bolt_tip_y
+    tip_depth = HANGER_SHOULDER_Y - HANGER_TIP_Y
     if abs(washer_lower_y - CROSSBAR_TOP_Y) > 1e-9:
         raise RuntimeError("knife-hanger washer lower face is not seated on crossbar")
     if abs(bolt_under_head_y - washer_upper_y) > 1e-9:
         raise RuntimeError("knife-hanger bolt under-head face is not seated on washer")
-    if not math.isclose(
-        engagement,
-        HANGER_ENGAGEMENT_TARGET_MM,
-        abs_tol=1e-9,
-    ):
+    if abs(HANGER_SHOULDER_Y - hanger.SHOULDER_SEAT_Y) > 1e-6:
         raise RuntimeError(
-            "knife-hanger CAD stack no longer retains the nominal engagement "
-            f"target: {engagement:.4f} mm"
+            f"knife-hanger stud shoulder y {HANGER_SHOULDER_Y:.4f} mm is not the "
+            f"interface seat plane {hanger.SHOULDER_SEAT_Y:.4f} mm"
         )
-    if HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM <= 0.0:
+    if abs(tip_depth - hanger.STUD_TIP_LENGTH_MM) > 1e-6:
         raise RuntimeError(
-            "knife-hanger nominal fit envelope has no complete male/female "
-            "thread overlap"
+            f"knife-hanger stud tip {tip_depth:.4f} mm is not the interface "
+            f"tip length {hanger.STUD_TIP_LENGTH_MM:.4f} mm"
         )
-    if HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM <= 0.0:
+    if abs(STUD_TAP_THREAD_DEPTH_MM - hanger.TAP_THREAD_DEPTH_MIN_MM) > 1e-9:
         raise RuntimeError(
-            "knife-hanger allowed fit window lets the finished tip reach the "
-            "tap-drill cylindrical shoulder"
-        )
-    if HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM <= 0.0:
-        raise RuntimeError(
-            "knife-hanger nominal finished root cone cannot enter the receiver "
-            "runout at the shop window's maximum engagement"
+            f"knife-mount usable thread {STUD_TAP_THREAD_DEPTH_MM:.4f} mm is not "
+            f"the interface's {hanger.TAP_THREAD_DEPTH_MIN_MM:.4f} mm"
         )
     log(
         "knife-hanger stack: washer "
         f"{washer_lower_y:.4f}..{washer_upper_y:.4f}, bolt under-head "
-        f"{bolt_under_head_y:.4f}, tip {bolt_tip_y:.4f}, "
-        f"engagement target {engagement:.4f} "
-        f"(allowed {HANGER_ENGAGEMENT_MIN_MM:.4f}.."
-        f"{HANGER_ENGAGEMENT_MAX_MM:.4f}); nominal complete-thread overlap "
-        f"{HANGER_NOMINAL_COMPLETE_MALE_OVERLAP_MIN_MM:.4f}, "
-        f"drill-shoulder clearance {HANGER_TIP_TO_DRILL_SHOULDER_MIN_MM:.4f}, "
-        f"nominal runout radial clearance "
-        f"{HANGER_NOMINAL_CONE_TO_DRILL_RADIAL_CLEARANCE_MIN_MM:.4f}; "
-        "ID clearance "
-        f"{bolt_in_washer_clearance:.4f}, crossbar clearance "
+        f"{bolt_under_head_y:.4f}, shoulder {HANGER_SHOULDER_Y:.4f} on seat "
+        f"{hanger.SHOULDER_SEAT_Y:.4f}, tip {tip_depth:.4f} deep; engagement at "
+        f"limits {hanger.MIN_ENGAGEMENT_MM:.4f} >= "
+        f"{hanger.REQUIRED_ENGAGEMENT_MM:.4f} (1.5D {hanger.THREAD}); "
+        f"ID clearance {bolt_in_washer_clearance:.4f}, crossbar clearance "
         f"{bolt_in_crossbar_clearance:.4f}, radial seat "
         f"{washer_crossbar_seat:.4f} mm"
     )
+
+
+# Built-solid readback: circle y/r agreement, and how far a circle centre may
+# sit off the nominal hanger axis and still belong to that station.
+BUILT_GEOMETRY_TOLERANCE_MM = 1e-4
+BUILT_STATION_TOLERANCE_MM = 0.01
+# A stud circle wider than the engaging thread's major by more than this is
+# the shoulder/shank body, never the #10-24 tip.
+HANGER_SHOULDER_RADIUS_MARGIN_MM = 0.05
+# Main's option-D order: the boss enters the casting hole with at least this
+# radial clearance at its maximum size (the interface proves it at import; the
+# judge re-proves it on the built boss).
+HANGER_BOSS_HOLE_CLEARANCE_MIN_MM = 1.5
+
+
+@dataclass(frozen=True)
+class HangerJointReading:
+    """One station's stepped-stud joint, read from the built solids.
+
+    Every ``*_y`` is assembly y in mm. The stud's full thread runs from the
+    relief groove's far edge (``thread_top_y``) to the tip chamfer's start
+    (``thread_bottom_y``): the two major-diameter circles on the tip.
+    """
+
+    mount: str
+    stud: str
+    mount_top_y: float
+    shoulder_y: float
+    thread_top_y: float
+    thread_bottom_y: float
+    tip_y: float
+    boss_radius: float
+    shank_radius: float
+
+    @property
+    def tap_thread_top_y(self) -> float:
+        """Top of the tap's full thread, below the mouth break or countersink."""
+        return self.mount_top_y - hanger.TAP_MOUTH_ALLOWANCE_MM
+
+    @property
+    def stud_thread_top_y(self) -> float:
+        """Top of the stud's full thread: the die runout beside the shoulder is
+        not engagement, and the turned tip models none."""
+        return min(
+            self.thread_top_y, self.shoulder_y - hanger.STUD_THREAD_RELIEF_MAX_MM
+        )
+
+    @property
+    def tap_thread_bottom_y(self) -> float:
+        return self.mount_top_y - hanger.TAP_THREAD_DEPTH_MIN_MM
+
+    @property
+    def engagement(self) -> float:
+        """Stud full thread inside the tap's full thread, chamfers excluded."""
+        return max(
+            0.0,
+            min(self.stud_thread_top_y, self.tap_thread_top_y)
+            - max(self.thread_bottom_y, self.tap_thread_bottom_y),
+        )
+
+    @property
+    def tip_depth(self) -> float:
+        return self.mount_top_y - self.tip_y
+
+
+def hanger_joint_violations(reading: HangerJointReading) -> list[str]:
+    """Judge a BUILT stepped-stud joint (user ruling 2026-09-22).
+
+    The shoulder seats on the mount top at the interface's seat plane; the
+    stud's full #10-24 thread overlaps the tap's full thread by at least
+    ``knife_hanger_interface.REQUIRED_ENGAGEMENT_MM`` (1.5D,
+    cad/docs/machining-dfm.md:73); the tip stays inside the usable thread and
+    clear of the tap-drill shoulder. Shared with the drawing.
+    """
+    tolerance = BUILT_GEOMETRY_TOLERANCE_MM
+    violations = []
+    if abs(reading.mount_top_y - hanger.SHOULDER_SEAT_Y) > tolerance:
+        violations.append(
+            f"mount top y {reading.mount_top_y:.5f} mm is not the seat plane "
+            f"{hanger.SHOULDER_SEAT_Y:.5f} mm"
+        )
+    if abs(reading.shoulder_y - reading.mount_top_y) > tolerance:
+        violations.append(
+            f"stud shoulder y {reading.shoulder_y:.5f} mm is not seated on the "
+            f"mount top {reading.mount_top_y:.5f} mm"
+        )
+    if reading.engagement < hanger.REQUIRED_ENGAGEMENT_MM - tolerance:
+        violations.append(
+            f"full-thread engagement {reading.engagement:.5f} mm is below the "
+            f"required {hanger.REQUIRED_ENGAGEMENT_MM:.3f} mm "
+            f"(1.5 x {hanger.THREAD} major, machining-dfm.md)"
+        )
+    if reading.tip_depth > hanger.TAP_THREAD_DEPTH_MIN_MM + tolerance:
+        violations.append(
+            f"stud tip {reading.tip_depth:.5f} mm deep passes the usable tap "
+            f"thread {hanger.TAP_THREAD_DEPTH_MIN_MM:.3f} mm"
+        )
+    if reading.tip_depth >= hanger.TAP_DRILL_DEPTH_MIN_MM:
+        violations.append(
+            f"stud tip {reading.tip_depth:.5f} mm deep reaches the tap-drill "
+            f"shoulder {hanger.TAP_DRILL_DEPTH_MIN_MM:.3f} mm"
+        )
+    hole_radius = hanger.CASTING_STUD_HOLE_DIA_MM / 2.0
+    boss_clearance = hole_radius - (
+        reading.boss_radius + hanger.BOSS_DIA_DEVIATIONS_MM[1] / 2.0
+    )
+    if boss_clearance < HANGER_BOSS_HOLE_CLEARANCE_MIN_MM - tolerance:
+        violations.append(
+            f"boss r {reading.boss_radius:.4f} mm at its maximum size clears the "
+            f"casting hole by {boss_clearance:.4f} mm radially, under "
+            f"{HANGER_BOSS_HOLE_CLEARANCE_MIN_MM:.1f} mm"
+        )
+    if hole_radius - reading.shank_radius <= 0.0:
+        violations.append(
+            f"stud shank r {reading.shank_radius:.4f} mm does not clear the "
+            f"casting hole r {hole_radius:.4f} mm above the boss"
+        )
+    return violations
+
+
+def brep_circles(component: Any) -> list[tuple[float, float, float, float]]:
+    """Every circular B-rep edge of one instance as (x, y, z, r) assembly mm.
+
+    Component bodies report in PART space (summing-asm-r7 census: raw body y
+    -24.76..29.57 for a stud whose placed tip is at y 993.58), so each centre
+    goes through the instance's Transform2.
+    """
+    component = _early_bound(component, "IComponent2")
+    t = [
+        float(value)
+        for value in _early_bound(component.Transform2, "IMathTransform").ArrayData
+    ]
+    circles = []
+    for raw_body in tuple(component.GetBodies2(0) or ()):
+        for raw_edge in tuple(_early_bound(raw_body, "IBody2").GetEdges() or ()):
+            raw_curve = _early_bound(raw_edge, "IEdge").GetCurve()
+            if raw_curve is None:
+                continue
+            curve = _early_bound(raw_curve, "ICurve")
+            if not curve.IsCircle():
+                continue
+            x, y, z, *_axis, r = (float(value) for value in curve.CircleParams)
+            circles.append(
+                (
+                    1000.0 * (t[12] * (x * t[0] + y * t[3] + z * t[6]) + t[9]),
+                    1000.0 * (t[12] * (x * t[1] + y * t[4] + z * t[7]) + t[10]),
+                    1000.0 * (t[12] * (x * t[2] + y * t[5] + z * t[8]) + t[11]),
+                    1000.0 * r * t[12],
+                )
+            )
+    return circles
+
+
+def axis_circles(
+    components: list[tuple[str, Any]],
+    *,
+    station_z_mm: float,
+    label: str,
+) -> tuple[str, list[tuple[float, float]]]:
+    """The (y, r) circles of the ONE instance centred on a station's axis."""
+    found = []
+    for name, component in components:
+        circles = [
+            (circle[1], circle[3])
+            for circle in brep_circles(component)
+            if abs(circle[0] - KNIFE[0]) <= BUILT_STATION_TOLERANCE_MM
+            and abs(circle[2] - station_z_mm) <= BUILT_STATION_TOLERANCE_MM
+        ]
+        if circles:
+            found.append((name, circles))
+    if len(found) != 1:
+        raise RuntimeError(
+            f"{label}: {len(found)} instance(s) have circles on the "
+            f"x={KNIFE[0]:g}, z={station_z_mm:g} mm hanger axis among "
+            f"{[name for name, _component in components]!r}"
+        )
+    return found[0]
+
+
+def read_hanger_joint(
+    mount: tuple[str, list[tuple[float, float]]],
+    stud: tuple[str, list[tuple[float, float]]],
+    *,
+    label: str,
+) -> HangerJointReading:
+    """Classify one station's (y, r) axis circles into a joint reading."""
+    mount_name, mount_circles = mount
+    stud_name, stud_circles = stud
+    major_radius = hanger.THREAD_MAJOR_DIA_MM / 2.0
+    major = [y for y, r in stud_circles if abs(r - major_radius) <= 1e-3]
+    body = [
+        y
+        for y, r in stud_circles
+        if r > major_radius + HANGER_SHOULDER_RADIUS_MARGIN_MM
+    ]
+    if len(major) < 2 or not body or not mount_circles:
+        raise RuntimeError(
+            f"{label}: {stud_name} has {len(major)} thread-major circle(s) "
+            f"(r={major_radius:g}) and {len(body)} shoulder/body circle(s), "
+            f"{mount_name} has {len(mount_circles)}; stud circles (y, r): "
+            f"{sorted(stud_circles)!r}"
+        )
+    shoulder_y = min(body)
+    return HangerJointReading(
+        mount=mount_name,
+        stud=stud_name,
+        mount_top_y=max(y for y, _r in mount_circles),
+        shoulder_y=shoulder_y,
+        thread_top_y=max(major),
+        thread_bottom_y=min(major),
+        tip_y=min(y for y, _r in stud_circles),
+        boss_radius=max(r for _y, r in mount_circles),
+        shank_radius=max(
+            r
+            for y, r in stud_circles
+            if abs(y - shoulder_y) <= BUILT_GEOMETRY_TOLERANCE_MM
+        ),
+    )
+
+
+def measure_hanger_joint(
+    mounts: list[tuple[str, Any]],
+    studs: list[tuple[str, Any]],
+    *,
+    station_z_mm: float,
+    label: str,
+) -> HangerJointReading:
+    """Read and judge one station's joint from the mount and stud B-reps."""
+    reading = read_hanger_joint(
+        axis_circles(mounts, station_z_mm=station_z_mm, label=f"{label} mount"),
+        axis_circles(studs, station_z_mm=station_z_mm, label=f"{label} stud"),
+        label=label,
+    )
+    violations = hanger_joint_violations(reading)
+    _telemetry.event(
+        "hanger.built_joint",
+        label=label,
+        engagement_mm=reading.engagement,
+        tip_depth_mm=reading.tip_depth,
+        violations=tuple(violations),
+        **vars(reading),
+    )
+    summary = (
+        f"{label}: {reading.stud} in {reading.mount}, shoulder "
+        f"{reading.shoulder_y:.5f} on top {reading.mount_top_y:.5f}, full-thread "
+        f"engagement {reading.engagement:.5f} mm, tip {reading.tip_depth:.5f} mm deep"
+    )
+    if violations:
+        raise RuntimeError(f"{summary}: " + "; ".join(violations))
+    log(summary)
+    return reading
+
+
+def _assert_built_hanger_engagements(adapter: Any) -> None:
+    """Measure every built mount/stud joint, not the placement math."""
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    families: dict[str, list[tuple[str, Any]]] = {
+        "knife-mount": [],
+        "knife-hanger-stud": [],
+    }
+    for raw_component in tuple(assembly.GetComponents(True) or ()):
+        component = _early_bound(raw_component, "IComponent2")
+        stem = Path(str(component.GetPathName() or "")).stem.casefold()
+        if stem in families:
+            families[stem].append((str(component.Name2 or ""), component))
+    for side, station_z in (
+        ("front", SUMMING_Z + HEX_Z_MID),
+        ("back", SUMMING_Z - HEX_Z_MID),
+    ):
+        measure_hanger_joint(
+            families["knife-mount"],
+            families["knife-hanger-stud"],
+            station_z_mm=station_z,
+            label=f"built hanger joint ({side})",
+        )
 
 
 # --- purchased counter spring and directly threaded lower anchor -----------
@@ -856,8 +1026,7 @@ async def build(adapter) -> dict[str, str]:
         washer_lower_y = washer_o[1] - HANGER_WASHER_THICKNESS / 2.0
         washer_upper_y = washer_o[1] + HANGER_WASHER_THICKNESS / 2.0
         bolt_under_head_y = bolt_o[1] + UNDERHEAD_Y_MM
-        bolt_tip_y = bolt_o[1] + THREAD_TIP_Y_MM
-        engagement = KNIFE_MOUNT_TOP_Y - bolt_tip_y
+        shoulder_y = bolt_o[1] + SHOULDER_Y_MM
         if radial_offset > 1e-6:
             raise RuntimeError(
                 f"{bolt}: washer/bolt axes offset {radial_offset:.6f} mm"
@@ -872,11 +1041,12 @@ async def build(adapter) -> dict[str, str]:
                 f"{bolt}: under-head/washer gap "
                 f"{bolt_under_head_y - washer_upper_y:.6f} mm"
             )
-        if abs(engagement - HANGER_ENGAGEMENT_TARGET_MM) > 1e-6:
+        if abs(shoulder_y - hanger.SHOULDER_SEAT_Y) > 1e-6:
             raise RuntimeError(
-                f"{bolt}: knife-mount engagement measurement drifted to "
-                f"{engagement:.6f} mm"
+                f"{bolt}: shoulder y {shoulder_y:.6f} mm is off the seat plane "
+                f"{hanger.SHOULDER_SEAT_Y:.6f} mm"
             )
+    _assert_built_hanger_engagements(adapter)
     # Summing lever: knife-edge revolute = coincident axis-to-axis on the knife
     # line (the bore-bottom rocking edge) + a Front-plane axial distance,
     # leaving the rock DOF -- the sub's freed operational DOF (its drive spec
@@ -982,7 +1152,7 @@ async def build(adapter) -> dict[str, str]:
     write_dof_manifest(ASM_NAME)
     check_no_interference(
         adapter,
-        allowed_pairs=allowed_interference_pairs(ASM_NAME),
+        allowed_pairs=ALLOWED_INTERFERENCE,
     )
     # Title-block identity for the assembly drawing (draw_summing_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells

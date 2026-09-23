@@ -1,6 +1,9 @@
 """Behavioral boundary contract for the summing assembly package."""
 
+import math
+
 import _config
+import knife_hanger_interface as hanger
 import pytest
 import build_summing_assembly
 import draw_summing_assembly
@@ -40,14 +43,37 @@ def test_frame_and_channel_interfaces_are_identified_without_duplication() -> No
     }
 
 
-def test_stud_trim_note_agrees_with_the_assembly_hanger_fit_reference() -> None:
+def test_stud_fit_note_agrees_with_the_assembly_hanger_fit_reference() -> None:
     hanger_fit_sheet = draw_summing_assembly.SHEET_NAMES[3]
     expected_head = (
-        f"TRIM/INSPECT TO {build_summing_assembly.DRAWING_NUMBER} "
+        f"FIT SHOULDER TO STACK PER {build_summing_assembly.DRAWING_NUMBER} "
         f"SHEET {draw_summing_assembly.SHEET_NAMES.index(hanger_fit_sheet) + 1}, "
         f"{hanger_fit_sheet}, DETAIL {draw_summing_assembly.HANGER_DETAIL_LABEL}."
     )
     assert knife_hanger_stud_spec.DRAWING_NOTES.splitlines()[0] == expected_head
+
+
+def test_sheet_four_fit_formula_recovers_the_stud_shoulder_length() -> None:
+    # L = T + W + 14.87 - C at the nominal stack is the stud's own shoulder
+    # length (the stud slice's SHOULDER_UNDERHEAD_MM), within the printed
+    # rounding of the casting-to-knife-line height.
+    import build_knife_hanger_washer
+    import build_top_frame
+
+    printed = assembly_spec.CASTING_TO_KNIFE_LINE_MM
+    assert printed == round(hanger.CASTING_UNDERSIDE_Y - hanger.KNIFE_CONTACT_Y, 2)
+    assert f"{printed:.2f} = CASTING UNDERSIDE TO KNIFE LINE." in (
+        draw_summing_assembly.HANGER_FIT_CONSTRUCTION
+    )
+    shoulder = (
+        build_top_frame.RING_HEIGHT
+        + build_knife_hanger_washer.THICKNESS
+        + printed
+        - hanger.KNIFE_BORE_CROWN_DEPTH_MM
+    )
+    assert shoulder == pytest.approx(
+        knife_hanger_stud_spec.SHOULDER_UNDERHEAD_MM, abs=0.005
+    )
 
 
 def test_bom_rows_may_grow_to_the_native_minimum_but_never_shrink() -> None:
@@ -78,22 +104,92 @@ def test_bom_budget_uses_measured_extents_against_sheet_and_title_block() -> Non
     assert any("right edge" in violation for violation in wide)
 
 
-def test_built_hanger_engagement_is_judged_against_the_receiver_band() -> None:
-    top = draw_summing_assembly.KNIFE_MOUNT_TOP_Y
-    target = draw_summing_assembly.HANGER_ENGAGEMENT_TARGET_MM
-    violations = draw_summing_assembly.hanger_engagement_violations
-    # r7's B-rep reading: tip rim at 993.5765 under the 999.45 mount top.
-    assert violations(top, 993.5765) == []
-    assert violations(top, top - target) == []
-    # A built tip off the stack target by more than the readback tolerance.
-    drifted = violations(top, top - target - 0.01)
-    assert len(drifted) == 1 and "stack target" in drifted[0]
-    # A tip driven past the complete female thread and out of the print band.
-    deep = violations(top, top - 7.0)
-    assert any("complete female thread" in item for item in deep)
-    assert any("printed band" in item for item in deep)
-    # A mount whose built top is not where the stack says.
-    assert any("knife-mount top" in item for item in violations(top + 0.5, 993.5765))
+def _joint(
+    *,
+    seat_gap: float = 0.0,
+    tip_length: float = hanger.STUD_TIP_LENGTH_MM,
+    chamfer: float = hanger.STUD_TIP_CHAMFER_MAX_MM,
+    mount_top: float = hanger.SHOULDER_SEAT_Y,
+    boss_radius: float = hanger.BOSS_DIA_MM / 2.0,
+    shank_radius: float = 6.35,
+) -> build_summing_assembly.HangerJointReading:
+    """A synthetic option-D joint's axis circles, read like the built B-rep.
+
+    The turned tip models no runout: its thread-major circles are the shoulder
+    junction and the chamfer start.
+    """
+    major = hanger.THREAD_MAJOR_DIA_MM / 2.0
+    shoulder = mount_top + seat_gap
+    tip = shoulder - tip_length
+    stud = [
+        (shoulder + 30.0, shank_radius),
+        (shoulder, shank_radius),
+        (shoulder, major),
+        (tip + chamfer, major),
+        (tip, major - chamfer),
+    ]
+    mount = [
+        (mount_top, boss_radius),
+        (mount_top - hanger.BOSS_HEIGHT_MM, boss_radius),
+        (mount_top, hanger.TAP_DRILL_DIA_MM / 2.0 + hanger.TAP_MOUTH_EDGE_BREAK_MM),
+        (mount_top - hanger.TAP_DRILL_DEPTH_MM, hanger.TAP_DRILL_DIA_MM / 2.0),
+    ]
+    return build_summing_assembly.read_hanger_joint(
+        ("knife-mount-1", mount), ("knife-hanger-stud-1", stud), label="test"
+    )
+
+
+def test_built_hanger_joint_measures_full_thread_inside_the_full_tap() -> None:
+    violations = build_summing_assembly.hanger_joint_violations
+    nominal = _joint()
+    assert nominal.shoulder_y == nominal.mount_top_y == hanger.SHOULDER_SEAT_Y
+    assert nominal.boss_radius == hanger.BOSS_DIA_MM / 2.0
+    assert nominal.shank_radius == 6.35
+    # Die runout beside the shoulder and the tip chamfer are not engagement.
+    assert nominal.engagement == pytest.approx(
+        hanger.STUD_TIP_LENGTH_MM
+        - hanger.STUD_TIP_CHAMFER_MAX_MM
+        - hanger.STUD_THREAD_RELIEF_MAX_MM
+    )
+    assert violations(nominal) == []
+    short = _joint(
+        tip_length=hanger.REQUIRED_ENGAGEMENT_MM
+        + hanger.STUD_TIP_CHAMFER_MAX_MM
+        + hanger.STUD_THREAD_RELIEF_MAX_MM
+        - 0.01
+    )
+    assert [item for item in violations(short) if "full-thread engagement" in item]
+
+
+def test_built_hanger_joint_refuses_unseated_deep_or_misplaced_studs() -> None:
+    violations = build_summing_assembly.hanger_joint_violations
+    proud = violations(_joint(seat_gap=0.2))
+    assert any("not seated" in item for item in proud)
+    deep = violations(_joint(tip_length=hanger.TAP_THREAD_DEPTH_MIN_MM + 0.2))
+    assert any("usable tap thread" in item for item in deep)
+    low_mount = violations(_joint(mount_top=hanger.SHOULDER_SEAT_Y - 0.5))
+    assert any("seat plane" in item for item in low_mount)
+
+
+def test_built_hanger_joint_holds_the_boss_and_shank_clear_of_the_casting_hole() -> None:
+    violations = build_summing_assembly.hanger_joint_violations
+    hole = hanger.CASTING_STUD_HOLE_DIA_MM / 2.0
+    # A boss 0.1 mm wider in radius than the interface's leaves < 1.5 mm at
+    # its maximum size.
+    fat_boss = violations(_joint(boss_radius=hanger.BOSS_DIA_MM / 2.0 + 0.1))
+    assert any("clears the casting hole" in item for item in fat_boss)
+    assert violations(_joint(shank_radius=hole)) and any(
+        "does not clear" in item for item in violations(_joint(shank_radius=hole))
+    )
+
+
+def test_built_hanger_joint_names_the_circles_when_the_stud_is_unreadable() -> None:
+    with pytest.raises(RuntimeError, match="thread-major circle"):
+        build_summing_assembly.read_hanger_joint(
+            ("knife-mount-1", [(1004.65, 4.75)]),
+            ("knife-hanger-stud-1", [(1004.65, 6.35), (994.25, 1.9)]),
+            label="test",
+        )
 
 
 def test_package_appends_the_checks_sheet_after_the_pinned_hanger_sheet() -> None:
@@ -277,3 +373,73 @@ def test_balloons_on_one_ray_swap_slots_until_their_leaders_clear() -> None:
     segments = [draw_summing_assembly._balloon_leader(b.annotation, b.name) for b in balloons]
     assert draw_summing_assembly.find_leader_leader_crossings(segments) == []
     assert four.position[:2] == (0.0909, 0.0457)
+
+
+# Each non-summing contract set, digested BEFORE summing took ownership of its
+# own pairs (integration, 2026-09-23): sorted (pair, limit rounded to 1e-9).
+_OTHER_CONTRACT_DIGESTS = {
+    "drive-train": (8, "e6815d6a66052a05"),
+    "frame": (17, "4677d25965fb6fd2"),
+    "magnifier": (3, "4fdafd77e003d5c6"),
+    "pen": (2, "c859c793ecd100ba"),
+    "paper-drive": (29, "f47dafd2222d6d9d"),
+    "harmonic-analyzer": (32, "516c3ab72f513a2d"),
+}
+
+
+def test_summing_owning_its_contract_leaves_the_other_assemblies_unchanged() -> None:
+    import hashlib
+
+    import _interference_contracts
+
+    for name, (count, digest) in _OTHER_CONTRACT_DIGESTS.items():
+        items = sorted(
+            (tuple(sorted(pair)), round(limit, 9))
+            for pair, limit in _interference_contracts.allowed_interference_pairs(
+                name
+            ).items()
+        )
+        assert (len(items), hashlib.sha256(repr(items).encode()).hexdigest()[:16]) == (
+            count,
+            digest,
+        ), name
+
+
+def test_summing_contract_is_loaded_by_name_and_kept_out_of_other_recipes() -> None:
+    from pathlib import Path
+
+    import _interference_contracts
+    import summing_interference_contract
+    from _buildgraph import module_deps_of
+
+    # The gate and the soundness leaf read the same summing-owned pairs.
+    assert (
+        _interference_contracts.allowed_interference_pairs("summing")
+        is summing_interference_contract.ALLOWED_PAIRS
+    )
+    assert (
+        build_summing_assembly.ALLOWED_INTERFERENCE
+        is summing_interference_contract.ALLOWED_PAIRS
+    )
+    limit = summing_interference_contract.HANGER_TIP_THREAD_LIMIT_MM3
+    assert limit == pytest.approx(
+        1.10 * math.pi * (hanger.THREAD_MAJOR_DIA_MM**2 - hanger.TAP_DRILL_DIA_MM**2)
+        * hanger.STUD_TIP_LENGTH_MM / 4.0
+    )
+    scripts = Path(build_summing_assembly.__file__).parent
+    owned = {"knife_hanger_interface.py", "summing_interference_contract.py"}
+    for stem in (
+        "drive_train",
+        "frame",
+        "harmonic_analyzer",
+        "magnifier",
+        "paper_drive",
+        "pen",
+    ):
+        deps = {Path(dep).name for dep in module_deps_of(scripts / f"build_{stem}_assembly.py")}
+        assert "_interference_contracts.py" in deps, stem
+        assert not deps & owned, (stem, sorted(deps & owned))
+    summing = {
+        Path(dep).name for dep in module_deps_of(scripts / "build_summing_assembly.py")
+    }
+    assert owned <= summing
