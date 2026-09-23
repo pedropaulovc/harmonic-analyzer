@@ -5,7 +5,7 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The sheet runs at 3:1 (the block is 36 x 16 x 12); the isometric carries an
+The sheet runs at 3:1 (the block is 40 x 20.5 x 10.25); the isometric carries an
 explicit 2:1 override so it stays clear of the title block.
 
 Run with SolidWorks open::
@@ -46,11 +46,13 @@ from _surface_finish import surface_finish_by_key
 from pinion_pivot_block_spec import (
     BLOCK_BOTTOM_Y,
     BLOCK_DEPTH,
+    BLOCK_WEST,
     BLOCK_WIDTH as BLOCK_WIDTH,
     BORE_DIA,
-    BORE_HALF_SPACING,
+    FRONT_BBOX_CX,
     FRONT_BBOX_CY,
     LIFT_BORE_RISE,
+    LIFT_BORE_SPACING,
     SCREW_HALF_SPACING,
     SCREW_HOLE_DIA,
     SURFACE_FINISHES,
@@ -75,19 +77,20 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox runs -18..18 in X and
-# -12..4 in Y; at 3:1 the view is 108 x 48 mm.  Third angle: the top view
-# (block seen from above, carrying the two hold-down holes) sits ABOVE the
-# front view; the right view (16 x 12 stock section) sits to its right.
-FRONT_CENTER = (0.135, 0.130)
-TOP_CENTER = (0.135, 0.220)
-RIGHT_CENTER = (0.280, 0.130)
+# Sheet layout (meters).  U28: the part origin is the PIVOT bore (datum B), so
+# the front view's model bbox runs -26..14 in X and -12..8.5 in Y; at 3:1 the
+# view is 120 x 61.5 mm.  Third angle: the top view (block seen from above,
+# carrying the two hold-down holes) sits ABOVE the front view; the right view
+# (20.5 x 10.25 stock section) sits to its right.
+FRONT_CENTER = (0.140, 0.128)
+TOP_CENTER = (0.140, 0.222)
+RIGHT_CENTER = (0.285, 0.128)
 ISO_CENTER = (0.360, 0.225)
 
 
 def _front_x(model_x_mm: float) -> float:
     """Sheet X of a model-X point in the front/top views (3:1, bbox-centred)."""
-    return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
+    return FRONT_CENTER[0] + (model_x_mm - FRONT_BBOX_CX) * SHEET_SCALE[0] / 1000.0
 
 
 def _front_y(model_y_mm: float) -> float:
@@ -99,24 +102,27 @@ BORE_R_SHEET = BORE_DIA * SHEET_SCALE[0] / 2000.0
 SCREW_R_SHEET = SCREW_HOLE_DIA * SHEET_SCALE[0] / 2000.0
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position.  The bore-station pair (7.5/7.5 off the symmetric mid-plane) stacks
-# above the view; the vertical chain (bore height, lift drop) sits left; the
+# position.  Everything is measured from the pivot bore (datum B, the part
+# origin): the lift-bore spacing sits above the view, the pivot-to-west-end
+# station and overall width below it; the pivot height and overall height stack
+# on the east side next to the pivot; the lift-bore rise sits left; the
 # leadered diameters land in the clear corners.
 FRONT_KEEP = {
-    "BlockWidth": (0.135, 0.092),
-    "BlockHeight": (0.212, 0.130),
-    "AnchorZ": (0.062, 0.124),
-    "PivotBoreX": (_front_x(BORE_HALF_SPACING / 2.0), 0.162),
-    "LiftBoreX": (_front_x(-BORE_HALF_SPACING / 2.0), 0.172),
-    "LiftBoreCz": (0.086, 0.146),
-    # Lifted out of the between-views band to the clear sheet RIGHT of the top
-    # view (which ends at x=0.189). Horizontal text makes this callout ~46 mm
-    # wide, and at (0.205, 0.180) it filled the band the bore's Ra symbol needs;
-    # the bore-centre leader now passes ~35 mm clear of the top view's corner.
-    "PivotBoreDia": (0.235, 0.205),
-    "LiftBoreDia": (0.078, 0.184),
+    "BlockWidth": (_front_x(FRONT_BBOX_CX), 0.074),
+    "AnchorX": (_front_x(-BLOCK_WEST / 2.0), 0.084),
+    "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), 0.165),
+    "BlockHeight": (0.226, 0.123),
+    "AnchorZ": (0.212, 0.113),
+    "LiftBoreCz": (0.070, 0.1435),
+    # Every horizontal/vertical witness from the pivot centre crosses its rim
+    # at 0/90/180/270 deg, so the diameter leader climbs at ~70 deg into the
+    # band under the top view, leaving ~30 deg free for the bore's Ra symbol.
+    "PivotBoreDia": (0.180, 0.195),
+    # Shallow, to the left: the parallelism frame's leader climbs from the
+    # lift bore's top above this one, so the two never cross.
+    "LiftBoreDia": (0.045, 0.168),
 }
-RIGHT_KEEP = {"Depth": (0.280, 0.168)}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.168)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "THRU - REAM 1/4 IN",
@@ -180,7 +186,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
-    # Right view: the 16 x 12 stock section carries only the block depth.
+    # Right view: the 20.5 x 10.25 stock section carries only the block depth.
     right_annotations = curate_view_dimensions(
         adapter, right, keep=RIGHT_KEEP, view_label="right"
     )
@@ -198,24 +204,28 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
-    # Hold-down screw spacing (27): dimension across the two hole circles in
-    # the top view; both sit at mid-depth so the pick heights are identical.
+    # Hold-down screw spacing (17, symmetric about the pivot bore): dimension
+    # across the two hole circles in the top view; both sit at mid-depth so the
+    # pick heights are identical.
     screw_spacing = add_edge_dimension(
         adapter,
         top,
         p0=(_front_x(-SCREW_HALF_SPACING), TOP_CENTER[1] + SCREW_R_SHEET),
         p1=(_front_x(SCREW_HALF_SPACING), TOP_CENTER[1] + SCREW_R_SHEET),
-        text_xy=(TOP_CENTER[0], 0.248),
+        text_xy=(_front_x(0.0), 0.248),
         label="hold-down screw spacing",
     )
     set_basic_dimension(adapter, screw_spacing, label="hold-down screw spacing")
 
     # Hold-down pattern across the depth: both drills sit at exact mid-depth,
-    # so a single basic 6 from the broad face (datum C) locates the pair.
+    # so a single basic half-depth from the broad face (datum C) locates the pair.
     depth_location = add_edge_dimension(
         adapter,
         top,
-        p0=(_front_x(-17.0), TOP_CENTER[1] - BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0),
+        p0=(
+            _front_x(-SCREW_HALF_SPACING - 5.0),
+            TOP_CENTER[1] - BLOCK_DEPTH * SHEET_SCALE[0] / 2000.0,
+        ),
         p1=(_front_x(-SCREW_HALF_SPACING), TOP_CENTER[1] - SCREW_R_SHEET),
         text_xy=(0.062, 0.212),
         label="hold-down depth location",
@@ -229,7 +239,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0], _front_y(BLOCK_BOTTOM_Y)),
-        symbol_xy=(RIGHT_CENTER[0], _front_y(BLOCK_BOTTOM_Y) - 0.018),
+        symbol_xy=(RIGHT_CENTER[0], _front_y(BLOCK_BOTTOM_Y) - 0.015),
         datum="A",
         label="block base seat",
     )
@@ -247,9 +257,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # diameter line's far arrow, which leaves the lower right: 16.4 mm of clear
     # circumference from one and 9.6 mm from the other, with the symbol 10 mm
     # inside the block's bottom edge and clear of BlockHeight's extension lines
-    # (those start at x=0.189).
+    # (those start at x=0.200).
     pivot_edge = (
-        _front_x(BORE_HALF_SPACING),
+        _front_x(0.0),
         _front_y(0.0) - BORE_R_SHEET,
     )
     # SolidWorks restricts this axis-attached tag and live readback normalizes
@@ -258,7 +268,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=pivot_edge,
-        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),
+        symbol_xy=(_front_x(0.0) + 0.0145, _front_y(0.0) - 0.026),
         datum="B",
         label="pivot bore axis",
     )
@@ -272,14 +282,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block broad face",
     )
     lift_edge = (
-        _front_x(-BORE_HALF_SPACING),
+        _front_x(-LIFT_BORE_SPACING),
         _front_y(LIFT_BORE_RISE) + BORE_R_SHEET,
     )
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=lift_edge,
-        frame_xy=(0.048, 0.172),
+        frame_xy=(0.058, 0.196),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["lift-bore parallelism"],
         datums=("B",),
@@ -311,27 +321,21 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="2X",
         label="hold-down hole position",
     )
-    # Anchored on the bore's RIGHT quadrant, not its top (which datum B already
-    # uses), so the pull is a short one into the band between the two views.
-    # At (0.188, 0.196) the symbol's arm -- which reaches ~6 mm LEFT of the
-    # anchor -- printed over the top view's lower-right corner; the leader only
-    # grazed the view boundary, so the crossing gate stayed silent and just the
-    # render showed it. Three things box in the replacement:
-    #   * y=0.163 keeps the leader BELOW datum B's frame (y=0.166..0.174) the
-    #     whole way -- routed at B's own height it drew straight through it;
-    #   * the arm (x=0.194..0.210) sits above BlockHeight's upper extension line
-    #     at y=0.155 and right of the front view, which ends at x=0.189; and
-    #   * the text, which renders ABOVE the arm and to its RIGHT (~0.213..0.239
-    #     at y~0.177), stays under PivotBoreDia's leader shoulder at y=0.196.
+    # Anchored on the bore rim at ~30 deg: the pivot centre's AnchorZ witness
+    # leaves the rim at 0 deg and LiftBoreX's at 90 deg, and the diameter
+    # leader climbs at ~70 deg, so 30 deg is the clear sector.  The arm
+    # (x~0.199..0.215) sits above BlockHeight's upper extension line (y=0.154)
+    # and the text, which renders ABOVE and RIGHT of the arm, stays under the
+    # PivotBoreDia callout.
     pivot_right_edge = (
-        _front_x(BORE_HALF_SPACING) + BORE_R_SHEET,
-        _front_y(0.0),
+        _front_x(0.0) + BORE_R_SHEET * 0.866,
+        _front_y(0.0) + BORE_R_SHEET * 0.5,
     )
     add_surface_finish(
         adapter,
         front,
         edge_xy=pivot_right_edge,
-        symbol_xy=(0.200, 0.163),
+        symbol_xy=(0.205, 0.161),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
     )

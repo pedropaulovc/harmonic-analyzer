@@ -346,23 +346,26 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
 # and three #4-40 seats under the spring foot and both arbor-pedestal flanges.
-# The block and spring seats follow the user-authoritative 32T rig's coherent
-# 2 mm parked-gap shift; the drum-axis pedestal seats remain unchanged.
+# The block and spring seats follow the user-authoritative 32T rig's parked
+# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
+# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
+# about the pivot bore, block mid-depth 5.125 in from each outer face; the
+# drum-axis pedestal seats remain unchanged.
 _FORMER_BLOCK_SCREW_XZ = (
-    (-16.218941649810656, -98.0),  # front block, east screw
-    (10.781058350189346, -98.0),  # front block, west screw
-    (-16.218941649810656, 82.0),  # back block, east screw
-    (10.781058350189346, 82.0),  # back block, west screw
+    (-17.226441649810653, -98.875),  # front block, east screw
+    (-0.22644164981065273, -98.875),  # front block, west screw
+    (-17.226441649810653, 82.875),  # back block, east screw
+    (-0.22644164981065273, 82.875),  # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
-# Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
+# Stock 25.4-mm slotted screws penetrate 4.9 mm below each 20.5-mm block (U28).
+BLOCK_SCREW_HOLE_DEPTH = 6.9  # 4.9 engagement + 2.0 reserve (18.75-block depth kept)
 BLOCK_SCREW_DRILL_DEPTH = 10.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    (10.630093216467879, 70.95),  # spring foot follows the shifted 32T swing rig
+    (16.87259321646788, 70.95),  # spring foot follows the shifted 32T swing rig
     # clear of the unchanged rocker-arm-support casting after the rig recenter
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the

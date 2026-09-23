@@ -6,9 +6,11 @@ cross-bored TWICE for the two parallel Ø6.35 rods -- the strap torque
 shaft (east bore) and the lever lift rod (west bore). The slotted screw
 heads on the plates are simplified away.
 
-Layout: block centred on the origin midway between the bores (at local
-x +-BORE_HALF_SPACING), both bores along Z with the lift bore raised from
-the pivot bore after the v2 drive-line closure, z 0..12.
+Layout (U28, 2026-09-23): the PIVOT bore is the part origin (datum B); the
+lift bore sits LIFT_BORE_SPACING toward local -X and LIFT_BORE_RISE above it;
+the two hold-down holes straddle the pivot bore at +-SCREW_HALF_SPACING -- the
+photographed lift | screw | pivot | screw order.  Both bores run along Z,
+z 0..BLOCK_DEPTH.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25". The nominal geometry lives in
 ``pinion_pivot_block_spec`` -- the pure-data contract shared with the
@@ -58,16 +60,18 @@ from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_pivot_block_spec import (
     BLOCK_DEPTH,
+    BLOCK_EAST,
     BLOCK_HEIGHT,
+    BLOCK_WEST,
     BLOCK_WIDTH,
     BORE_DIA,
     BORE_DIA_BAND,
-    BORE_HALF_SPACING,
     BORE_UP,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
     LIFT_BORE_RISE,
+    LIFT_BORE_SPACING,
     SCREW_HOLE_SPEC,
     SCREW_HALF_SPACING,
     SURFACE_FINISHES,
@@ -103,7 +107,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlockDepth", f"{BLOCK_DEPTH}mm")
     await set_global(adapter, "BoreUp", f"{BORE_UP}mm")
     await set_global(adapter, "Bore", f"{BORE_DIA}mm")
-    await set_global(adapter, "BoreHalfSpacing", f"{BORE_HALF_SPACING}mm")
+    await set_global(adapter, "BlockEast", f"{BLOCK_EAST}mm")
+    await set_global(adapter, "LiftBoreSpacing", f"{LIFT_BORE_SPACING}mm")
     await set_global(adapter, "LiftBoreRise", f"{LIFT_BORE_RISE}mm")
     await set_global(adapter, "ScrewHalfSpacing", f"{SCREW_HALF_SPACING}mm")
     # Hole diameter is owned by the native #8 normal-clearance HoleSpec; only
@@ -117,39 +122,37 @@ async def build(adapter) -> dict[str, str]:
     block = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
     block_rect = [
-        (-BLOCK_WIDTH / 2.0, -BORE_UP),
-        (BLOCK_WIDTH / 2.0, -BORE_UP),
-        (BLOCK_WIDTH / 2.0, BLOCK_HEIGHT - BORE_UP),
-        (-BLOCK_WIDTH / 2.0, BLOCK_HEIGHT - BORE_UP),
+        (-BLOCK_WEST, -BORE_UP),
+        (BLOCK_EAST, -BORE_UP),
+        (BLOCK_EAST, BLOCK_HEIGHT - BORE_UP),
+        (-BLOCK_WEST, BLOCK_HEIGHT - BORE_UP),
     ]
     entities = await add_line_chain(adapter, block_rect)
-    # Pivot bore on the sketch x axis (y 0): x != 0 records ONE centre dim (an
-    # unsigned distance to the origin, driven by the positive spacing global) +
-    # diameter. The v2 linkage closure raises the lift bore, adding its own
-    # unsigned y dim.
+    # Pivot bore ON the origin (datum B): only its diameter is recorded.  The
+    # lift bore's two unsigned centre dims are its spacing and rise from it.
     await define_circle(
         adapter,
-        BORE_HALF_SPACING,
+        0.0,
         0.0,
         BORE_DIA / 2.0,
         "pivot bore",
         dims=block,
-        names=("PivotBoreX", "PivotBoreCz", "PivotBoreDia"),
-        drives=('"BoreHalfSpacing"', None, '"Bore"'),
+        names=(None, None, "PivotBoreDia"),
+        drives=(None, None, '"Bore"'),
     )
     await define_circle(
         adapter,
-        -BORE_HALF_SPACING,
+        -LIFT_BORE_SPACING,
         LIFT_BORE_RISE,
         BORE_DIA / 2.0,
         "lift bore",
         dims=block,
         names=("LiftBoreX", "LiftBoreCz", "LiftBoreDia"),
-        drives=('"BoreHalfSpacing"', '"LiftBoreRise"', '"Bore"'),
+        drives=('"LiftBoreSpacing"', '"LiftBoreRise"', '"Bore"'),
     )
-    # Rectangle anchored at vertex 0 (-BLOCK_WIDTH/2, -BORE_UP): the width (X
+    # Rectangle anchored at vertex 0 (-BLOCK_WEST, -BORE_UP): the width (X
     # span) and height (Y span) segment dims, then the two anchor dims (absolute
-    # distances to the origin, so AnchorX = BLOCK_WIDTH/2 and AnchorZ = BORE_UP).
+    # distances to the origin, so AnchorX = BLOCK_WEST and AnchorZ = BORE_UP).
     await define_rectilinear_chain(
         adapter,
         entities,
@@ -157,7 +160,12 @@ async def build(adapter) -> dict[str, str]:
         label="block",
         dims=block,
         names=["BlockWidth", "BlockHeight", "AnchorX", "AnchorZ"],
-        drives=['"BlockWidth"', '"BlockHeight"', '"BlockWidth" / 2', '"BoreUp"'],
+        drives=[
+            '"BlockWidth"',
+            '"BlockHeight"',
+            '"BlockWidth" - "BlockEast"',
+            '"BoreUp"',
+        ],
     )
     await ensure_fully_defined(adapter, "block sketch")
     check("exit_sketch block", await adapter.exit_sketch())
@@ -204,7 +212,7 @@ async def build(adapter) -> dict[str, str]:
     lift_axis = await name_bore_axis(
         adapter,
         "Right Plane",
-        -BORE_HALF_SPACING,
+        -LIFT_BORE_SPACING,
         "Top Plane",
         LIFT_BORE_RISE,
         "lift bore",

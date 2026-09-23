@@ -25,16 +25,20 @@ C2C = 28.0
 # pinion drum spans 174 px there, so the photo runs 7.76 px/mm.  Each strap shows
 # a foreshortened broad face plus its edge: front 61 + 62 px, back 86 + 40 px.
 # Solving 15*cos(t) + T*sin(t) = (face + edge)/7.76 for each end's own view angle
-# (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  8.0 is the stock flat
-# thickness inside that band, and it leaves (8 - 4)/2 = 2.0 mm of web each side of
-# the O4 blind follower-stud seat -- the old 5.0 left 0.50 mm, which no shop can
-# hold over a 4-deep reamed seat.
-THICKNESS = 8.0
+# (cos t = face/(15*7.76)) gives T = 9.4 front, 7.6 back.  U28 (user, 2026-09-23)
+# sets 9.0, inside that photo band: it leaves (9 - 4)/2 = 2.5 mm of web each side
+# of the O4 blind follower-stud seat, 1.59 at the printed worst case (Depth .X,
+# PinSeatCz .XX).  That is a NAMED book-fidelity exception to the 2.0 target --
+# the 2.0 target would need ~9.6, outside the photo band -- not a loosened
+# threshold; the 1.5 floor holds.
+THICKNESS = 9.0
 PIVOT_BORE = 6.35
 ARBOR_BORE = 8.0
 PIN_BORE = 4.0
-PIN_DROP = -6.0  # NEGATIVE: the stud seat is 6 ABOVE the pivot bore (on the
-# straight flank), where the collar under it can clear the base top
+PIN_DROP = -7.0  # NEGATIVE: the stud seat is 7 ABOVE the pivot bore (on the
+# straight flank).  U28 raised it from 6: the O4 seat keeps a 2.4 mm worst-case
+# web to the O6.35 pivot bore, and the higher pin lets the lift cam carry a
+# 2.1 mm thin-side wall at the same park gap.
 PIN_SEAT = 4.0
 
 R_END = WIDTH / 2.0

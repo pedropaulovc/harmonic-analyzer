@@ -1,10 +1,11 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø6.37 bore is offset 1.4 mm from the Ø10.32 OD
+An eccentric steel collar: the Ø6.37 bore is offset 2.0 mm from the Ø14.6 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
-on the Front plane (front view carries bore/eccentricity); a true boss-profile
-view carries collar length/OD while the visible boss end owns diameter/station.
+on the Front plane (front view carries bore/eccentricity); the side profile
+carries collar length/OD and the set-screw station, while the set-screw end
+view owns the M2.5 tapped hole (U28: the raised boss is gone).
 
 Run with SolidWorks open::
 
@@ -31,7 +32,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_reference_dimension,
     view_name,
     stamp_drawing_summary,
 )
@@ -40,7 +40,6 @@ from _named_views import octant_view_name
 from _surface_finish import surface_finish_by_key
 from pinion_cam_spec import (
     BORE,
-    BOSS_PROUD,
     CAM_OD,
     DRAWING_PRECISION_BY_NAME,
     ECC,
@@ -69,12 +68,13 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 
-# Front view (XY): the collar circle is centred ECC BELOW the origin, the bore
-# is ON the origin, and the boss stub points down.  bbox spans the boss tip.
-FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0 + BOSS_PROUD))) / 2.0
+# Front view (XY): the collar circle is centred ECC BELOW the origin and the
+# bore is ON the origin, so the view's bbox is the collar circle itself.
+FRONT_BBOX_CY = ((CAM_OD / 2.0 - ECC) + (-(ECC + CAM_OD / 2.0))) / 2.0
 FRONT_CENTER = (0.105, 0.150)
-# Third angle: the right-side boss profile projects to the right of the front
-# view.  The rotated boss-end view is deliberately offset from that projection.
+# Third angle: the right-side profile projects to the right of the front
+# view.  The rotated set-screw end view is deliberately offset from that
+# projection.
 SIDE_CENTER = (0.260, 0.150)
 ISO_CENTER = (0.365, 0.165)
 BOTTOM_CENTER = (0.320, 0.105)
@@ -91,36 +91,30 @@ BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
 _SQRT_HALF = 0.5**0.5
 
 # Diameters go on the view that shows them as a SOLID edge: the OD as the
-# boss-profile view's width, the boss on the boss end view, and the bore on the
+# profile view's width, the tapped hole on its end view, and the bore on the
 # circular view where it is the only diagonal (its and the OD's diagonals both
 # pass through nearly the same centre, so the two cannot share a view without
 # crossing -- machinist round 2).
 FRONT_KEEP = {
     "BoreDia": (0.055, 0.180),
     "CollarCy": (0.150, 0.200),
-    "BossProjection": (0.120, 0.105),
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
     "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
 }
 BOTTOM_KEEP = {
-    "BossDia": (0.360, 0.105),
-    "BossCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
+    "TapDrillDia": (0.360, 0.105),
+    "TapCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": f"REAM THRU\nSLIDE FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
     "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
-    "BossProjection": "RAISED BOSS PROJECTION (REF)",
-    "BossDia": (
-        "COSMETIC RAISED BOSS;\n"
-        "SIZE/SHAPE NONCRITICAL\n"
-        "M2.5 X 0.45-6H THRU TO BORE"
-    ),
+    "TapDrillDia": "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
-# by build_pinion_cam): two on the critical bore, OD and eccentricity, one
-# everywhere else.  The sheet only reads them back.
+# by build_pinion_cam): two on the critical bore, OD and eccentricity and on
+# the tap drill, one everywhere else.  The sheet only reads them back.
 
 
 def _limit_witness_lines(
@@ -233,38 +227,38 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(3, 1))
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=(3, 1))
     bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=(3, 1))
-    # The built-in isometric looks from +Y, which hides the set-screw boss --
-    # the part's one additional feature -- behind the collar, because the boss
-    # points at -Y.  The FRONT-BOTTOM-RIGHT octant the PART names shows the
-    # boss and its tapped opening (machinist round 2).
+    # The built-in isometric looks from +Y, which hides the set-screw hole --
+    # the part's one additional feature -- behind the collar, because the hole
+    # opens at -Y.  The FRONT-BOTTOM-RIGHT octant the PART names shows the
+    # tapped opening (machinist round 2).
     iso = place_view(
         adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=(2, 1)
     )
     for view in (front, side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Import the boss station from its authoring projection, then move it to
-    # the right-side profile where its end-face and boss-axis witnesses read
+    # Import the set-screw station from its authoring projection, then move it
+    # to the right-side profile where its end-face and hole-axis witnesses read
     # as a conventional horizontal linear dimension.
     bottom_annotations = curate_view_dimensions(
-        adapter, bottom, keep=BOTTOM_KEEP, view_label="boss end"
+        adapter, bottom, keep=BOTTOM_KEEP, view_label="set-screw end"
     )
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
     )
     side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="boss profile"
+        adapter, side, keep=SIDE_KEEP, view_label="profile"
     )
-    boss_station = [
+    screw_station = [
         annotation
         for annotation in bottom_annotations
-        if dimension_name(adapter, annotation) == "BossCz"
+        if dimension_name(adapter, annotation) == "TapCz"
     ]
-    if len(boss_station) != 1:
-        raise RuntimeError("expected one boss-axis station donor dimension")
+    if len(screw_station) != 1:
+        raise RuntimeError("expected one set-screw station donor dimension")
     moved_station = _move_dimension(
         adapter,
-        boss_station[0],
+        screw_station[0],
         side,
         (SIDE_CENTER[0], SIDE_CENTER[1] + 0.030),
         source_view=bottom,
@@ -272,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     bottom_annotations = [
         annotation
         for annotation in bottom_annotations
-        if dimension_name(adapter, annotation) != "BossCz"
+        if dimension_name(adapter, annotation) != "TapCz"
     ]
     side_annotations.append(moved_station)
     annotations = [*bottom_annotations, *front_annotations, *side_annotations]
@@ -280,35 +274,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _limit_witness_lines(
         adapter,
         front_annotations,
-        {"CollarCy", "BossProjection"},
+        {"CollarCy"},
         0.008,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The boss dome is cosmetic: its diameter and projection communicate
-    # nominal shape, but neither controls the functional M2.5 thread, which
-    # runs through the collar's thick wall.  Keep both model-owned nominals
-    # explicitly reference-only while the 3.0 station remains controlling.
-    reference_groups = {
-        "BossProjection": front_annotations,
-        "BossDia": bottom_annotations,
-    }
-    for name, group in reference_groups.items():
-        matches = [
-            annotation
-            for annotation in group
-            if dimension_name(adapter, annotation) == name
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one cosmetic {name} reference dimension")
-        set_reference_dimension(
-            adapter,
-            matches[0],
-            label=f"cosmetic {name} reference",
-        )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to boss end view")
+        raise RuntimeError("failed to add ASME center marks to set-screw end view")
 
     # Bore roughness: use the lower-left bore rim and a small, routine callout
     # below the circular view so it cannot dominate or cross the dimensions.
@@ -329,9 +302,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(
-        adapter, "BOSS END VIEW - ROTATED 90 DEG", 0.265, 0.075
+        adapter, "SET-SCREW END VIEW - ROTATED 90 DEG", 0.265, 0.075
     ) is None:
-        raise RuntimeError("failed to label rotated cam boss end view")
+        raise RuntimeError("failed to label rotated cam set-screw end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
 
     return await finalize_drawing(

@@ -47,10 +47,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
-    assert (drawing.BLOCK_WIDTH, drawing.FRONT_BBOX_CY, drawing.BORE_HALF_SPACING) == (
+    assert (drawing.BLOCK_WIDTH, drawing.FRONT_BBOX_CY, drawing.FRONT_BBOX_CX) == (
         pinion_pivot_block_spec.BLOCK_WIDTH,
         pinion_pivot_block_spec.FRONT_BBOX_CY,
-        pinion_pivot_block_spec.BORE_HALF_SPACING,
+        pinion_pivot_block_spec.FRONT_BBOX_CX,
     )
 
 
@@ -97,14 +97,14 @@ def test_native_gdt_replaces_form_orientation_notes() -> None:
     assert source.count("add_feature_control_frame(") == 2
     assert (
         "        edge_xy=pivot_edge,\n"
-        "        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),\n"
+        "        symbol_xy=(_front_x(0.0) + 0.0145, _front_y(0.0) - 0.026),\n"
         '        datum="B",\n'
         '        label="pivot bore axis",\n' in source
     )
     assert 'characteristic="parallelism"' in source
     assert 'characteristic="position"' in source
     assert "add_surface_finish(" in source
-    assert "set_basic_dimension(" in source  # the 27 hold-down spacing
+    assert "set_basic_dimension(" in source  # the 17 hold-down spacing
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

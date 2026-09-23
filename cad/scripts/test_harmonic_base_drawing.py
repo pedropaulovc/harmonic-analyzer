@@ -298,17 +298,18 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
 
 
 def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
-    # The 32T coherent-placement cutover shifts the block centre and spring
+    # The 32T coherent-placement cutover shifts the block screws and spring
     # foot with the pinion rig while the arbor-pedestal seats stay on the
-    # unchanged cylinder-drum axis.
+    # unchanged cylinder-drum axis.  U28 (2026-09-23): 2.2425 park-out, screws
+    # +-8.5 about the pivot bore, block mid-depth 5.125 in from each outer face.
     former_blocks = (
-        (-16.218941649810656, -98.0),
-        (10.781058350189346, -98.0),
-        (-16.218941649810656, 82.0),
-        (10.781058350189346, 82.0),
+        (-17.226441649810653, -98.875),
+        (-0.22644164981065273, -98.875),
+        (-17.226441649810653, 82.875),
+        (-0.22644164981065273, 82.875),
     )
     former_feet = (
-        (10.630093216467879, 70.95),
+        (16.87259321646788, 70.95),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )

@@ -16,12 +16,10 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_spec import CylinderFace
 from pinion_cam_geometry import (
     BORE as BORE,
-    BOSS_DIA as BOSS_DIA,
-    BOSS_PROUD as BOSS_PROUD,
-    BOSS_Z as BOSS_Z,
     CAM_LEN as CAM_LEN,
     CAM_OD as CAM_OD,
     ECC as ECC,
+    SET_SCREW_Z as SET_SCREW_Z,
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
@@ -38,8 +36,7 @@ BORE_BAND = (
 # The cam OD is the working surface the follower rides, and the bore-to-OD
 # offset IS the lift: both are on the drive train's critical list.  Nothing
 # else on this collar mates with anything, so nothing else carries a band.
-# Routine controlling dimensions use the title block's general grade; the
-# purely cosmetic boss projection prints as a reference nominal.
+# Routine controlling dimensions use the title block's general grade.
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
@@ -55,23 +52,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CollarProfile": {"CollarOd", "CollarCy"},
     "BoreProfile": {"BoreDia"},
     "Collar": {"Depth"},
-    "BossProfile": {"BossDia", "BossCz"},
-    "SetPinBossProjection": {"BossProjection"},
+    "TapDrillProfile": {"TapDrillDia", "TapCz"},
 }
 
 # The MODEL owns every printed decimal place: build_pinion_cam applies this
 # map to the .SLDPRT and draw_pinion_cam only reads it back.  Two places on
 # the critical trio -- the reamed running bore (its band rides the dimension),
-# the cam OD and the bore-to-OD eccentricity that IS the lift; one place
-# everywhere else.  Routine controlling dimensions therefore use the title
-# block's .X row, while the cosmetic BossProjection nominal is parenthesized
-# as reference by the drawing recipe.
+# the cam OD and the bore-to-OD eccentricity that IS the lift -- and on the
+# M2.5 tap drill, whose size is the drill's, not a band; one place everywhere
+# else, so routine controlling dimensions use the title block's .X row.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarOd": 2, "CollarCy": 2},
     "BoreProfile": {"BoreDia": 2},
     "Collar": {"Depth": 1},
-    "BossProfile": {"BossDia": 1, "BossCz": 1},
-    "SetPinBossProjection": {"BossProjection": 1},
+    "TapDrillProfile": {"TapDrillDia": 2, "TapCz": 1},
 }
 
 _PRECISION_NAMES = [
@@ -94,7 +88,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The tapped-hole requirement is attached to its boss-end dimension.  The sole
-# linked note carries only the loose purchased hardware supplied with the cam.
+# The tapped-hole requirement is attached to its tap-drill dimension.  The sole
+# linked note carries only the loose purchased hardware supplied with the cam:
+# the 5-long screw sits ~1.1 below the OD in the 6.1-thick heavy side.
 DRAWING_NOTES = "SUPPLY ISO 4026 M2.5 X 5 A2-70 FLAT-POINT SET SCREW LOOSE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

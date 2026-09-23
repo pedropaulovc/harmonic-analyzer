@@ -70,7 +70,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         assembly.HANDLE_ROWS,
         (0.0, 0.0, 0.0),
     )
-    expected_axis = (-16.077263315132342, 90.518, -138.41241221957347)
+    # x follows the drum's parked station: U28 (2026-09-23) parks it with a
+    # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
+    expected_axis = (-18.383940352466745, 90.518, -138.41241221957347)
     released_head_stations = (
         released_origin[2] - 9.0 / 2.0,
         released_origin[2] + 9.0 / 2.0,
@@ -102,11 +104,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (12.924585870040456, 76.99421562429762, -138.41241221957347),
+            (10.617908832706053, 76.99421562429762, -138.41241221957347),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-45.98542028734179, 104.46440263744309, -138.41241221957347),
+            (-48.29209732467619, 104.46440263744309, -138.41241221957347),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)

@@ -4,19 +4,17 @@ The eccentric steel collar pinned to the lift rod at each strap station
 (``page001_img01`` back-tail close-up): the strap's follower pin RESTS
 ON its OD from above, so turning the lever (rod + both cams spin as
 one) raises the surface under the pin and swings the drum into mesh.
-Photo reads at 9.45 px/mm against the Ø6.35 rods: collar OD ~9.5, a
-~Ø3.2 set-pin dome proud of the OD (locks the collar to the rod and
-stops axial drift -- review item 8b), pin-on-collar tangency at park.
 
-Eccentricity 1.4 after the v2 drive-line closure provides 2.8 full lift.  The
-low-confidence photo OD is reclosed to 10.32 so that the thin side retains the
-stated 0.575-mm wall over the Ø6.37 bore; the former Ø9.2 literal left only
-0.015 mm and was not manufacturable.
+U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift), so the
+thin side keeps 2.115 of wall over the Ø6.37 bore (U27 target 2.0, 2.04 at
+the printed worst case).  The former raised set-pin dome is gone -- a pad
+proud of a turned OD cannot be turned -- and an M2.5 set screw now sits
+sub-flush in the 6.1-thick heavy side, which never meets the follower.
 
 Layout: bore axis Z through the ORIGIN (rides the rod), authored in the
-PARK pose -- collar centre at (0, -ECC), heavy side and the set-pin
-boss straight DOWN, so the OD top is at its lowest (disengaged rest).
-Collar z 0..9; boss along -Y at z 3.0, nominally 0.5 proud of the OD.
+PARK pose -- collar centre at (0, -ECC), heavy side and the set-screw
+hole straight DOWN, so the OD top is at its lowest (disengaged rest).
+Collar z 0..9; tapped hole along -Y at z SET_SCREW_Z = 4.5.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -39,7 +37,6 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
     force_rebuild,
     name_bore_axis,
     name_dimensions,
@@ -64,12 +61,10 @@ from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from pinion_cam_geometry import (
     BORE,
-    BOSS_DIA,
-    BOSS_PROUD,
-    BOSS_Z,
     CAM_LEN,
     CAM_OD,
     ECC,
+    SET_SCREW_Z,
     TAP_DRILL_DIA,
 )
 from _named_views import name_octant_views
@@ -97,39 +92,15 @@ _SAVED_DRAWING_PROPERTIES = (
 
 CAM_R = CAM_OD / 2.0
 BORE_R = BORE / 2.0
-BOSS_R = BOSS_DIA / 2.0
-# Boss tip y and an anchor INSIDE the collar at every boss radius: the collar
-# surface below the centre (0, -ECC) along the boss axis plane spans
-# y = -ECC - sqrt(CAM_R^2 - x^2) for |x| <= BOSS_R -- deepest -5.75, shallowest
-# -ECC - sqrt(CAM_R^2 - BOSS_R^2) = -5.47.
-_BOSS_TIP_Y = -(ECC + CAM_R + BOSS_PROUD)  # -7.75
-_BOSS_TOP_Y = -4.0  # fully inside the collar for all |x| <= BOSS_R
+# The tap drill enters from the OD's lowest tangent plane (heavy side down).
+_TAP_PLANE_Y = -(ECC + CAM_R)  # -9.3
 
 V_COLLAR = math.pi * (CAM_R**2 - BORE_R**2) * CAM_LEN
 
 
-def _boss_added() -> float:
-    """Boss volume OUTSIDE the collar OD: Simpson over x in [-BOSS_R, BOSS_R]
-    of chord(x) * (surface(x) - tip), chord = the boss disc's z-extent."""
-    n = 2000
-    h = 2.0 * BOSS_R / n
-
-    def f(x: float) -> float:
-        chord = 2.0 * math.sqrt(max(BOSS_R**2 - x * x, 0.0))
-        surface = -(ECC + math.sqrt(max(CAM_R**2 - x * x, 0.0)))
-        return chord * (surface - _BOSS_TIP_Y)
-
-    s = f(-BOSS_R) + f(BOSS_R)
-    s += 4.0 * sum(f(-BOSS_R + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
-    s += 2.0 * sum(f(-BOSS_R + 2 * k * h) for k in range(1, n // 2))
-    return s * h / 3.0
-
-
-V_BOSS = _boss_added()  # ~17.5
-
-
 def _tap_drill_removed() -> float:
-    """Volume from the boss tip through to the existing rod bore."""
+    """Volume from the OD surface through to the existing rod bore: Simpson
+    over x in [-tap_r, tap_r] of chord(x) * (bore wall - OD surface)."""
     tap_r = TAP_DRILL_DIA / 2.0
     n = 2000
     h = 2.0 * tap_r / n
@@ -137,7 +108,8 @@ def _tap_drill_removed() -> float:
     def f(x: float) -> float:
         chord = 2.0 * math.sqrt(max(tap_r**2 - x * x, 0.0))
         bore_wall_y = -math.sqrt(max(BORE_R**2 - x * x, 0.0))
-        return chord * (bore_wall_y - _BOSS_TIP_Y)
+        surface_y = -(ECC + math.sqrt(max(CAM_R**2 - x * x, 0.0)))
+        return chord * (bore_wall_y - surface_y)
 
     s = f(-tap_r) + f(tap_r)
     s += 4.0 * sum(f(-tap_r + (2 * k - 1) * h) for k in range(1, n // 2 + 1))
@@ -159,8 +131,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "CamLen", f"{CAM_LEN}mm")
     await set_global(adapter, "Ecc", f"{ECC}mm")
     await set_global(adapter, "BoreDia", f"{BORE}mm")
-    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
-    await set_global(adapter, "BossProjection", f"{BOSS_PROUD}mm")
+    await set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
     await set_global(adapter, "TapDrillDia", f"{TAP_DRILL_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
@@ -193,7 +164,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "collar", v_solid, 0.005 * v_solid)
 
     # Rod bore on the origin axis (fully inside the collar: ECC + BORE_R =
-    # 4.175 < CAM_R).
+    # 5.185 < CAM_R).
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
     await define_circle(
@@ -219,66 +190,17 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Bore")
     volume = await volume_check(adapter, "bore", V_COLLAR, 0.005 * V_COLLAR)
 
-    # Set-pin boss (item 8b): a radial stub straight DOWN the heavy side,
-    # nominally 0.5 proud of the OD -- the img01 dome. Top sketch (u, v) ->
-    # (X, -Z); extruded -Y from an anchor plane fully inside the collar.
-    boss = SketchDims()
-    check("create_sketch boss", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        -BOSS_Z,
-        BOSS_R,
-        "set-pin boss",
-        dims=boss,
-        names=("BossCx", "BossCz", "BossDia"),
-        drives=(None, None, '"BossDia"'),
-    )
-    await ensure_fully_defined(adapter, "boss sketch")
-    check("exit_sketch boss", await adapter.exit_sketch())
-    name_last_feature(adapter, "BossProfile")
-    drive_jobs += boss.apply(adapter, "BossProfile")
-    boss_root_y = -(ECC + CAM_R)
-    extrude_at_offset(adapter, _BOSS_TOP_Y - boss_root_y, boss_root_y)
-    name_last_feature(adapter, "SetPinBossRoot")
-
-    # A second, coaxial extrusion carries the nominal cosmetic projection
-    # beyond the OD's lowest tangent plane.  The drawing prints this model
-    # value as reference rather than inventing a tight projection band.
-    projection = SketchDims()
-    check("create_sketch boss projection", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter,
-        0.0,
-        -BOSS_Z,
-        BOSS_R,
-        "set-pin boss projection",
-        dims=projection,
-        names=("ProjectionCx", "ProjectionCz", "ProjectionDia"),
-        drives=(None, None, '"BossDia"'),
-    )
-    await ensure_fully_defined(adapter, "boss projection sketch")
-    check("exit_sketch boss projection", await adapter.exit_sketch())
-    name_last_feature(adapter, "BossProjectionProfile")
-    drive_jobs += projection.apply(adapter, "BossProjectionProfile")
-    extrude_at_offset(adapter, BOSS_PROUD, _BOSS_TIP_Y)
-    name_last_feature(adapter, "SetPinBossProjection")
-    projection_dim = name_dimensions(
-        adapter, "SetPinBossProjection", ["BossProjection"]
-    )
-    drive_jobs += [(projection_dim[0], '"BossProjection"')]
-    volume = await volume_check(adapter, "set-pin boss", volume + V_BOSS, 0.1 * V_BOSS)
-
-    # M2.5 x 0.45 tap drill, cut from the boss tip into the existing rod bore.
-    # The drawing releases the final 6H thread and minimum full-thread length;
-    # this pilot geometry makes the machining operation part of the model too.
+    # M2.5 x 0.45 tap drill, cut from the OD's lowest tangent plane into the
+    # existing rod bore through the heavy side.  The drawing releases the
+    # final 6H thread; this pilot geometry makes the machining operation part
+    # of the model too.  Top sketch (u, v) -> (X, -Z).
     check(
-        "create_plane tap drill at boss tip",
+        "create_plane tap drill at OD tangent",
         await adapter.create_plane(
             CreatePlaneParameters(
                 mode="offset",
                 base_plane="Top Plane",
-                offset=_BOSS_TIP_Y,
+                offset=_TAP_PLANE_Y,
             )
         ),
     )
@@ -291,12 +213,12 @@ async def build(adapter) -> dict[str, str]:
     await define_circle(
         adapter,
         0.0,
-        -BOSS_Z,
+        -SET_SCREW_Z,
         TAP_DRILL_DIA / 2.0,
         "tap drill",
         dims=tap,
         names=("TapCx", "TapCz", "TapDrillDia"),
-        drives=(None, None, '"TapDrillDia"'),
+        drives=(None, '"SetScrewZ"', '"TapDrillDia"'),
     )
     await ensure_fully_defined(adapter, "tap-drill sketch")
     check("exit_sketch tap drill", await adapter.exit_sketch())
@@ -306,7 +228,7 @@ async def build(adapter) -> dict[str, str]:
         "cut M2.5 tap drill to bore",
         await adapter.create_cut_extrude(
             ExtrusionParameters(
-                depth=-_BOSS_TIP_Y,
+                depth=-_TAP_PLANE_Y,
             )
         ),
     )

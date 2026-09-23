@@ -12,7 +12,8 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 THICK = 0.8
 WIDTH = 4.0
-FOOT_LEN = 28.0  # foot runs under the lift rod; its screw head clears the rod flank
+FOOT_LEN = 34.0  # foot runs under the lift rod; its screw head clears the rod flank
+# (U28: +6 for the lift rod's move from 12.5 to 18.5 off the pivot)
 R_BEND = 2.0
 R_KINK = 1.5
 KINK_DEG = 20.0

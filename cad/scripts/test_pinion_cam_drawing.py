@@ -57,11 +57,19 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     assert "ECCENTRICITY" in eccentricity
     assert "BORE AXIS TO OD AXIS" in eccentricity
     assert "BOTH END FACES" not in eccentricity
-    assert pinion_cam_geometry.THIN_SIDE_WALL >= 0.5
-    assert pinion_cam_geometry.CAM_OD == 10.32
+    # U27/U28: 2.0 target on the thin side, and the 1.5 floor holds at the
+    # printed worst case (OD and eccentricity each +/-0.05, bore at its top).
+    assert pinion_cam_geometry.THIN_SIDE_WALL >= 2.0
+    worst = (
+        (pinion_cam_geometry.CAM_OD - pinion_cam_spec.COLLAR_OD_TOLERANCE_MM) / 2.0
+        - (pinion_cam_geometry.BORE + pinion_cam_spec.BORE_BAND[1]) / 2.0
+        - (pinion_cam_geometry.ECC + pinion_cam_spec.COLLAR_AXIS_TOLERANCE_MM)
+    )
+    assert worst >= 1.5
+    assert pinion_cam_geometry.CAM_OD == 14.6
 
 
-def test_sheet_runs_at_3_to_1_with_a_boss_showing_2_to_1_pictorial() -> None:
+def test_sheet_runs_at_3_to_1_with_a_set_screw_showing_2_to_1_pictorial() -> None:
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
@@ -71,7 +79,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "SLIDING FIT" not in notes
     # Only the critical features carry bands: the reamed RUNNING bore and the
     # cam OD / eccentricity that sets the follower lift.  Routine controlling
-    # dimensions take the title-block grade; the cosmetic projection is reference.
+    # dimensions take the title-block grade.
     assert model_toleranced_dimensions(cam) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
@@ -97,52 +105,60 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
     assert "ISO 4026" in notes
-    boss = drawing.DIMENSION_CALLOUTS["BossDia"]
-    assert "COSMETIC RAISED BOSS" in boss
-    assert "SIZE/SHAPE NONCRITICAL" in boss
-    assert "OPTIONAL" not in boss
-    assert "M2.5 X 0.45-6H THRU TO BORE" in boss
-    assert "THROUGH THE BOSS" not in boss
+    tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
+    assert "M2.5 X 0.45-6H" in tap
+    assert "THRU TO BORE" in tap
+    assert "BOSS" not in tap
+    assert "OPTIONAL" not in tap
 
 
-def test_set_screw_thread_cannot_break_the_front_face_at_general_grade() -> None:
-    # BOSS_Z 1.7 left 0.45 nominal wall between the M2.5 major and the front
-    # face; the .X ±0.8 general grade the station prints under then permitted a
-    # breakout (codex iter3 blocker).  The station is bounded above by the
-    # assembly's follower-pin and spring-foot bands (build_drive_train_assembly).
+def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
+    # A 1.7 station once left 0.45 nominal wall between the M2.5 major and the
+    # front face; the .X ±0.8 general grade the station prints under then
+    # permitted a breakout (codex iter3 blocker).  U28 centres the screw.
     import pinion_cam_geometry as geometry
 
     thread_major_r = 2.5 / 2.0
     general_grade_mm = 0.8
-    assert geometry.BOSS_Z - thread_major_r - general_grade_mm > 0.0
+    assert geometry.SET_SCREW_Z - thread_major_r - general_grade_mm > 0.0
+    assert (
+        geometry.CAM_LEN - geometry.SET_SCREW_Z - thread_major_r - general_grade_mm
+        > 0.0
+    )
+
+
+def test_set_screw_sits_below_the_od_in_the_heavy_side() -> None:
+    # U28: no raised boss, so the supplied M2.5 x 5 screw must seat fully
+    # inside the heavy-side wall with room to spare.
+    import pinion_cam_geometry as geometry
+
+    assert "M2.5 X 5" in pinion_cam_spec.DRAWING_NOTES
+    assert geometry.THICK_SIDE_WALL - 5.0 >= 1.0
+    assert not hasattr(geometry, "BOSS_DIA")
 
 
 def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
     assert not hasattr(pinion_cam_spec, "GEOMETRIC_TOLERANCES_MM")
     for line in ("DATUM A", "POSITION ", "AXIS C IS PARALLEL"):
         assert line not in pinion_cam_spec.DRAWING_NOTES, line
-    # The visible boss-end view owns both boss dimensions; the collar OD stays
-    # in the length view and the bore in the circular front view.
-    assert set(drawing.BOTTOM_KEEP) == {"BossDia", "BossCz"}
-    assert "BossCz" not in drawing.SIDE_KEEP
+    # The set-screw end view owns both tapped-hole dimensions; the collar OD
+    # stays in the length view and the bore in the circular front view.
+    assert set(drawing.BOTTOM_KEEP) == {"TapDrillDia", "TapCz"}
+    assert "TapCz" not in drawing.SIDE_KEEP
     assert "CollarOd" in drawing.SIDE_KEEP
     assert "BoreDia" in drawing.FRONT_KEEP
     assert "CollarOd" not in drawing.FRONT_KEEP
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
     assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
-    assert "BossCz" not in drawing.DIMENSION_CALLOUTS
-    assert "BossProjection" in drawing.FRONT_KEEP
-    assert drawing.DIMENSION_CALLOUTS["BossProjection"] == (
-        "RAISED BOSS PROJECTION (REF)"
-    )
+    assert "TapCz" not in drawing.DIMENSION_CALLOUTS
 
 
 def test_the_part_owns_every_printed_decimal_place() -> None:
     """Policy rule 2: the .SLDPRT owns places for every imported nominal.
 
     Two places serve the critical trio (the reamed running bore, the cam OD
-    and the eccentricity that IS the lift); routine controls use one place and
-    the cosmetic boss-projection nominal is parenthesized as reference.
+    and the eccentricity that IS the lift) and the M2.5 tap drill, whose size
+    is the drill's; routine controls use one place.
     """
     by_name = pinion_cam_spec.DRAWING_PRECISION_BY_NAME
     assert set(by_name) == set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
@@ -150,6 +166,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "BoreDia",
         "CollarOd",
         "CollarCy",
+        "TapDrillDia",
     }
     assert max(by_name.values()) == 2
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS

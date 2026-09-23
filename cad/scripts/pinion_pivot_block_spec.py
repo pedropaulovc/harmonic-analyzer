@@ -28,36 +28,44 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-# --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25", photo-scaled low).
+# --- Nominal geometry (cad/DIMENSIONS.md "Chapter 25").
 # These drive the part's named equation globals AND the drawing's coordinate
-# math. Layout: block centred on the origin midway between the bores, both
-# bores along Z, block x -18..18, y -12..6.75, z 0..12. ---
-BLOCK_WIDTH = 36.0  # spans both bores + margin; widened 33 -> 36 (PR7) so the
-# Ø8 screw heads at x +-13.5 seat fully on the block (edge 17.5 + 0.5 rim)
-BLOCK_HEIGHT = 18.75  # v2 linkage closure; keeps the strap's r 11 bottom cap
-# (PIVOT_Y - 11 = 51.8) swinging clear of the base top 50.8
-BLOCK_DEPTH = 12.0  # photo-scaled (low)
+# math.  U28 (user, 2026-09-23) re-laid the block in the photographed order
+# (ch25 page002_img07/img08 front pair, read against the annotated 6 mm lever
+# rod): from the west end, lift bore | screw | PIVOT bore | screw.  The two
+# hold-down screws straddle the pivot bore; the lift bore sits out near the west
+# end, 18.5 from the pivot, so the plain (uncut) swing strap clears the eccentric
+# lift cam by placement (U12) instead of by a relief.
+# Layout: the PIVOT bore is the part origin (datum B); the lift bore is at
+# (-LIFT_BORE_SPACING, LIFT_BORE_RISE), block x -BLOCK_WEST..+BLOCK_EAST,
+# y -BORE_UP..BLOCK_HEIGHT-BORE_UP, z 0..BLOCK_DEPTH.  (Part -X = machine
+# WEST: the assembly places the block mirrored.) ---
+BLOCK_EAST = 14.0  # pivot bore -> east end: 3.0 web past the east screw hole
+BLOCK_WEST = 26.0  # pivot bore -> west end: 4.3 web past the lift bore
+BLOCK_WIDTH = BLOCK_EAST + BLOCK_WEST  # 40.0 (photo ~38-41)
+BLOCK_HEIGHT = 20.5  # lift bore keeps 3.2 (2.1 worst) of web under the top
+BLOCK_DEPTH = 10.25  # U28: 12 -> 10.25 so the 9-thick back strap keeps 0.30 of
+# axial air to the back block; the outer faces (and the 192/202 shafts) stay put
 BORE_UP = 12.0  # pivot bore height above the base seat -- sets PIVOT_Y (derived)
 BORE_DIA = 6.35  # 1/4 in: rides the Ø6.35 torque shaft / lift rod (derived)
-BORE_HALF_SPACING = 6.25  # half the pivot-to-lift rod spacing 12.5 -- the
-# lift rod must clear BOTH the cone-pivot-post column (machine x -47.1)
-# and the strap's swinging r 11 bottom cap (build_drive_train_assembly)
-LIFT_BORE_RISE = 1.8561911789147132  # 2026-09 re-solve for the short near-
-# vertical strap (pinion_bracket_geometry C2C 28, lean ~8.1 deg, follower stud
-# 6 ABOVE the pivot): the lift bore sits this much above the pivot bore so the
-# ecc-down cam collar hovers exactly 0.15 under the stud (scratchpad solver,
-# re-proven at import by build_drive_train_assembly's park-gap band).
-SCREW_HALF_SPACING = 13.5  # hold-down hole centres out past the bores: 0.6 web
-# to the bore wall, 0.9 rim to the block end
+LIFT_BORE_SPACING = 18.5  # pivot -> lift bore, horizontal (photo ~16-17): the
+# eccentric collar (Ø14.6, ecc 2.0) orbits the lift axis and must clear the
+# strap's R7.5 pivot end cap over the whole engage throw -- 1.83 of air
+# nominal, 0.38 at the printed worst case (build_drive_train_assembly)
+LIFT_BORE_RISE = 2.16  # lift bore above the pivot bore: the ecc-down collar
+# hovers 0.153 under the follower stud 7 above the pivot (re-proven at import
+# by build_drive_train_assembly's park-gap band)
+SCREW_HALF_SPACING = 8.5  # hold-down holes at +-8.5 about the pivot bore:
+# 2.8 web (2.2 worst) to the pivot bore, 4.6 to the lift bore
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 
 # Derived spans (equations of the primitives above).
-BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +4.0: block top above the pivot axis
+BLOCK_TOP_Y = BLOCK_HEIGHT - BORE_UP  # +8.5: block top above the pivot axis
 BLOCK_BOTTOM_Y = -BORE_UP  # -12.0: the base seat
-FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -4.0: front-view centre
-BORE_SPACING = 2.0 * BORE_HALF_SPACING  # 15.0
-SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 27.0
+FRONT_BBOX_CX = (BLOCK_EAST - BLOCK_WEST) / 2.0  # -6.0: front-view centre
+FRONT_BBOX_CY = (BLOCK_TOP_Y + BLOCK_BOTTOM_Y) / 2.0  # -1.75: front-view centre
+SCREW_SPACING = 2.0 * SCREW_HALF_SPACING  # 17.0
 BORE_DIA_BAND = (0.05, 0.00)
 
 # The two reamed bores share a diameter.  The harvested pivot-bore cylinder
@@ -79,8 +87,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {
         "BlockWidth",
         "BlockHeight",
+        "AnchorX",
         "AnchorZ",
-        "PivotBoreX",
         "PivotBoreDia",
         "LiftBoreX",
         "LiftBoreCz",
@@ -95,7 +103,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "BORES AND HOLD-DOWN HOLES SYMMETRIC ABOUT THE BLOCK MID-PLANE.",
+        "HOLD-DOWN HOLES SYMMETRIC ABOUT THE PIVOT BORE (DATUM B).",
         "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
         "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",
         "HOLD-DOWN HOLES: #8 NORMAL CLEARANCE Ø4.978 THRU, 2 PLACES,",
