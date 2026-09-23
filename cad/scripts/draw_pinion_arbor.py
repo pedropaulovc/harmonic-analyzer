@@ -31,7 +31,6 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
-    BACK_CAP_R,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
     HEAD_CENTER_Z,
@@ -74,6 +73,9 @@ PRINCIPAL_KEEP = {
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
     "BackCapSagDim": (0.055, 0.220),
+    # Radial leader down-left from the back crown, below the shaft axis and
+    # clear of the (1.2) sag reference above it and the overall witnesses.
+    "BackCapR": (0.045, 0.140),
 }
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.205),
@@ -92,7 +94,7 @@ DIAMETER_POSITIONS = {
 DIMENSION_CALLOUTS = {
     "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
     "OverallLen": "OVERALL",
-    "BackCapSagDim": f"SR{BACK_CAP_R:.1f} BACK CROWN",
+    "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 SHAFT_FLANK_Y = PRINCIPAL_CENTER[1] + SHAFT_DIA / 2000.0

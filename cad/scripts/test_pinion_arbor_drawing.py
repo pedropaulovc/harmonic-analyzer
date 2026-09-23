@@ -103,3 +103,24 @@ def test_retired_socket_and_retention_pin_are_not_exported() -> None:
     }
     assert retired.isdisjoint(vars(spec))
     assert "RETENTION PIN" not in spec.CROSS_HOLE_CALLOUT
+
+
+def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> None:
+    """Offline audit of the names the sheet looks up after the model import."""
+    carried = (
+        set(drawing.DONOR_KEEP)
+        | set(drawing.PRINCIPAL_KEEP)
+        | set(drawing.DETAIL_KEEP)
+    )
+    assert set(drawing.DIMENSION_CALLOUTS) <= carried
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == carried
+    assert set(drawing.DIAMETER_POSITIONS) <= carried
+    assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
+
+
+def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
+    assert spec.DRAWING_DIMENSIONS["BackCapProfile"] == {"BackCapR", "BackCapSagDim"}
+    assert spec.DRAWING_PRECISION_BY_NAME["BackCapR"] == 1
+    assert "BackCapR" in drawing.PRINCIPAL_KEEP
+    assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
+    assert not any("SR" in text for text in drawing.DIMENSION_CALLOUTS.values())
