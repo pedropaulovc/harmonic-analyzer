@@ -585,7 +585,8 @@ async def build(adapter) -> dict[str, str]:
     # Pivot screw clearance hole at the origin: preserve the native Hole
     # Wizard 1/4 close-clearance feature used by this occasional setup pivot.
     # There is no measured evidence that its stock shoulder needs a tighter
-    # running-bearing fit.
+    # running-bearing fit, so the title block's DRILLED HOLES +0.10/0 row
+    # governs it; a per-feature band would only restate that row.
     pivot_dia = PIVOT_HOLE_DIA
     wizard_holes(
         adapter,
@@ -594,7 +595,6 @@ async def build(adapter) -> dict[str, str]:
         (0.0, -1.0, 0.0),
         "pivot screw hole (1/4 clearance)",
         name="PivotHole",
-        dia_tolerance_mm=(0.0, 0.10),
     )
     v_hole = math.pi * (pivot_dia / 2.0) ** 2 * PLATE_T
     volume = await volume_check(
