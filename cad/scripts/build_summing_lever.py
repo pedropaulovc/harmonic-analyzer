@@ -1587,9 +1587,14 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(
         adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
     )
-    # Both arc centres, one per side, mirror about the boss axis.
+    # Both arc centres, one per side, mirror about the boss axis.  REFERENCE,
+    # not controlling: R138.8 and its two ends (the boss quadrant and the
+    # plate-end corner on the cylinder axis) already define the arc; the centre
+    # is the layout aid that makes it strikeable (Main's B2 ruling, R10 check).
     for name in ("SummationArcCentreX", "SummationArcCentreZ"):
-        set_dimension_prefix(adapter, "SummationArcReference", name, "2X ")
+        _set_parenthetical_dimension(
+            adapter, "SummationArcReference", name, prefix="2X "
+        )
     _set_parenthetical_dimension(
         adapter,
         "SpringHolePattern",
