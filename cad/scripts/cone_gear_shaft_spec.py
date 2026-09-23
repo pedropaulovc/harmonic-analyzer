@@ -81,11 +81,30 @@ SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
 SECTION_ENDS = tuple(end for _dia_in, end in SECTIONS)
 SHAFT_LENGTH = SECTION_ENDS[-1]
 
-# Every turned section is a ground-shaft h fit: the cone gear, the cylinder
-# gear and the bearing bushings all slide onto these lands.  ONE shared class,
-# applied to the model dimension by build_cone_gear_shaft -- not five copies of
-# "+0.00/-0.02" typed as sheet callout text.
-SECTION_DIA_BAND = SHAFT_H
+# Diameter bands, one NAMED class per land, applied to the model dimension
+# by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
+#
+# The two lands that RUN keep the shared ground-shaft h band: the Ø12.231
+# journal turns in the pivot post's Ø12.2808 bore (0.05 nominal clearance),
+# and the Ø1.588 tip land -- T006's seat AND the journal -- turns in the cone
+# tip bushing's 1.5875 +0.05/0 bore, 0..0.07 running clearance.
+RUNNING_DIA_BAND = SHAFT_H
+# GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
+# soldered gears.  The upper limit stays at nominal, so every gear still
+# passes down its land to its pitch station; the -0.05 lower limit is the
+# soft-solder capillary gap, and holds the gear within 0.025 radially -- a
+# small fraction of the ~0.51 mm module, so mesh runout does not suffer.
+# 2.5x the h band, which a micrometer holds on a manual lathe; -0.10 would
+# allow ~20% of the module in runout on hand-cut teeth.  Spec-local on
+# purpose: _fit_limits is imported fleet-wide.
+GEAR_SEAT_BAND = (0.000, -0.050)
+SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
+    RUNNING_DIA_BAND,  # Sec0: pivot journal
+    GEAR_SEAT_BAND,  # Sec1: T024-T120 seats
+    GEAR_SEAT_BAND,  # Sec2: T018 seat
+    GEAR_SEAT_BAND,  # Sec3: T012 seat
+    RUNNING_DIA_BAND,  # Sec4: T006 seat + tip journal
+)
 
 # Shoulder root radius.  Each step sits in the ~0.39 mm axial air gap between
 # two neighbouring gear faces (~0.19 mm per side), so the root can be neither
@@ -111,22 +130,17 @@ SURFACE_FINISHES = (
 )
 
 # What the native dimensions cannot say (drawing-simplicity policy rule 2: a
-# fit or location requirement names its mate).  Line 1-2: the h band on the
-# gear-seat lands is a slip fit into the cone gears' bores -- the gear must
-# pass down the land and seat square before it is soldered, which a land
-# turned to the .XXX grade (+0.13 over a nominal-size bore) would not allow;
-# the acceptance is the printed limits.  Line 3-4: why three shoulder
-# stations print three places.  Neither line adds a check the shop cannot
-# make (codex, 375a122c: a "must fall between the gear faces" clause was
-# uncheckable without gear positions).  No digits but the mate's number, no
-# method words.  Lines stay short: the note block starts 58 mm in and the
-# title block begins at 216 mm.
+# fit requirement names its mate).  The gear-seat limits are what leaves the
+# solder gap in the cone gears' bores; the printed limits govern, so the note
+# is a reason, not a fitting instruction (review 2026-09-23).  The old lines
+# explaining the three-place stations went: the places already say it.  No
+# check the shop cannot make (codex, 375a122c), no digits but the mate's
+# number, no method words.  Lines stay short: the note block starts 58 mm in
+# and the title block begins at 216 mm.
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR SEAT DIAMETERS ARE A SLIP FIT",
+        "GEAR SEAT LIMITS LEAVE A SOLDER GAP",
         "IN THE CONE GEAR BORES, MHA-013.",
-        "THREE-PLACE SHOULDER STATIONS LOCATE",
-        "THE SOLDERED CONE GEAR SEATS.",
     )
 )
 
@@ -147,8 +161,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Display precision is a MODEL property (drawing-simplicity policy rule 2):
 # the part build stamps it and the sheet only reads it back.
 #
-# Diameters: three places.  All five carry the shared h band, so their places
-# are only the number's spelling.
+# Diameters: three places.  Each carries its named band (SECTION_DIA_BANDS),
+# so their places are only the number's spelling.
 #
 # Gear-seat shoulders Sec1End..Sec3End: three places, which is the title-block
 # .XXX general grade (+-0.13) and no explicit band.  This is a location
