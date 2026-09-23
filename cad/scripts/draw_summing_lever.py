@@ -173,6 +173,44 @@ def _attach_radial_leaders(
         raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
 
 
+# Codex raised the mid-rib ends three times (R7, R11, R12) although 76.2 / 35.8
+# locate them: nothing told the reader those stations are the rib's own apexes
+# (on its mid-plane, inside the boss and the plate), so the visible ends -- the
+# flanks running out into web and plate -- looked unlocated.  Name them where
+# they print.  (dimension, callout part, text): 3 = swDimensionTextCalloutAbove,
+# 4 = swDimensionTextCalloutBelow.
+MID_RIB_CALLOUTS = (
+    ("MidRibRightX", 3, "RIB APEX"),
+    ("MidRibLeftX", 3, "RIB APEX"),
+    ("MiddleRibThickness", 4, "MID RIB"),
+)
+
+
+def _label_mid_rib(
+    adapter: Any, annotations: Any, names: tuple[str, ...], label: str
+) -> None:
+    """Write and read back the mid-rib callouts on the named dimensions."""
+    wanted = {
+        name: (part, text) for name, part, text in MID_RIB_CALLOUTS if name in names
+    }
+    seen = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in wanted:
+            continue
+        part, text = wanted[name]
+        display = _early_bound(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        display.SetText(part, text)
+        if str(display.GetText(part) or "") != text:
+            raise RuntimeError(f"{label}: {name} callout {text!r} did not persist")
+        seen.add(name)
+    missing = sorted(set(wanted) - seen)
+    if missing:
+        raise RuntimeError(f"{label}: no mid-rib dimension named {missing!r}")
+
+
 def _assert_arc_centre_text(
     adapter: Any, annotations: Any, names: tuple[str, ...], label: str
 ) -> None:
@@ -210,8 +248,10 @@ FORM_FRONT_KEEP = {
     "MidRibArcR": (0.1700, 0.2420),
     # Past its own arrows: between them the witness lines ruled through the text.
     "PlateThickness": (0.2050, 0.2330),
+    # Both carry "RIB APEX" above the value (MID_RIB_CALLOUTS).  35.8 sits past
+    # its +X witness so that label clears the shared cylinder-axis witness.
     "MidRibRightX": (0.1413, 0.1960),
-    "MidRibLeftX": (0.1690, 0.1960),
+    "MidRibLeftX": (0.1943, 0.1960),
     # Lower left, onto the edge rib's own (-X) semicircle, above the 76.2 / 35.75
     # chain: from the lower right its leader crossed the 35.75 dimension line.
     "EdgeRibFrontArcR": (0.1350, 0.2080),
@@ -686,6 +726,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
     )
+    _label_mid_rib(
+        adapter, front_dimensions, ("MidRibRightX", "MidRibLeftX"), "form front"
+    )
+    _label_mid_rib(adapter, top_dimensions, ("MiddleRibThickness",), "form top")
     _assert_arc_centre_text(
         adapter,
         top_dimensions,
