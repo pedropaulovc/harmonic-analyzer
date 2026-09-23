@@ -55,6 +55,7 @@ from knife_mount_spec import (
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
+    BOSS_DIA,
     SEAT_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_NOMINALS_MM,
@@ -276,8 +277,9 @@ FRONT_KEEP = {
     "BoreFromSide": (FRONT_CENTER[0] - 0.012, _front_y(SEAT_TOP) + 0.021),
 }
 SECTION_KEEP = {
-    # Above the seat boss, between the block's end-face witness lines.
-    "Depth": (SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.012),
+    # Above the seat boss and its turned diameter, between the block's
+    # end-face witness lines.
+    "Depth": (SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.020),
     # The boss height beside the section's right outline, where the cut shows
     # the boss and the tap drilled through it.
     "BossHeight": (
@@ -297,10 +299,6 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
         TOP_CENTER[0] - 0.035,
         TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
     ),
-    # Right of the view, below the tap callout: the leader leaves through the
-    # block's right edge at mid-height. Parked lower right (knife-cc-12) it ran
-    # out past the block corner.
-    "BossDia": (TOP_CENTER[0] + 0.045, TOP_CENTER[1] - 0.012),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
@@ -315,13 +313,14 @@ def _uppercase_dimension_text(adapter: Any, drawing_model: Any) -> None:
     property 'All uppercase for dimensions and hole callouts'
     (DP_DraftingStandard), set here on this drawing's document and read back
     -- never a hand-typed override that would break the callout's model link.
+    The id is read off this install's swconst.tlb (R2026x gen_py:
+    swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts=754), as
+    draw_harmonic_base does for its section-label toggles: the drawing
+    subprocess has no swconst constants loaded, so resolving the name failed
+    on the farm (knife-cc-14).
     """
-    from _common import _preference_id
-
     name = "swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts"
-    preference = _preference_id(adapter, name)
-    if preference is None:
-        raise RuntimeError(f"{name} does not resolve on this install")
+    preference = 754
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
     if not extension.SetUserPreferenceToggle(preference, 0, True):
         raise RuntimeError(f"failed to set {name}")
@@ -404,6 +403,52 @@ def _finish_tap_reference_dimension(
             f"{label} measured {actual_mm:g} mm, expected {expected_mm:g} mm"
         )
     return display
+
+@_telemetry.traced("drawing.knife_mount_boss_diameter")
+def _add_boss_turned_diameter(adapter: Any, section: Any) -> Any:
+    """Print the lathe-turned seat boss as a diameter on the side view.
+
+    Drawing policy rule 7: a turned diameter is dimensioned on the side view,
+    not leader-piled on the end (circle) view -- the only view the model's
+    circle dimension can import into. Section A-A cuts the boss on its axis,
+    so its two flanks are the diameter's extremes: dimension flank to flank,
+    prefix the diameter symbol, read the measured value back. Plain, not a
+    reference: it is the boss's controlling size at the title-block .X band.
+    """
+    half = BOSS_DIA * SHEET_SCALE[0] / 2000.0
+    flank_y = (_front_y(BLK_TOP) + _front_y(SEAT_TOP)) / 2.0
+    label = "seat boss turned diameter"
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=(SECTION_CENTER[0] - half, flank_y),
+        p1=(SECTION_CENTER[0] + half, flank_y),
+        # Between the boss top and the 18.0 Depth line above it.
+        text_xy=(SECTION_CENTER[0], _front_y(SEAT_TOP) + 0.009),
+        label=label,
+        orientation="horizontal",
+    )
+    display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
+    display.SetText(1, "<MOD-DIAM>")  # swDimensionTextPrefix
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["BossDia"], -1, -1, -1)
+    display.ShowParenthesis = False
+    rebuild_drawing(adapter, label=label)
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual_mm = abs(float(dimension.SystemValue)) * 1000.0
+    expected_mm = REFERENCE_DIMENSION_NOMINALS_MM["BossDia"]
+    problems = []
+    if abs(actual_mm - expected_mm) > 1e-5:
+        problems.append(f"measured {actual_mm:g} mm, expected {expected_mm:g} mm")
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION["BossDia"]:
+        problems.append(f"precision {int(display.GetPrimaryPrecision2())}")
+    if "DIAM" not in str(display.GetText(1) or ""):
+        problems.append(f"prefix {display.GetText(1)!r}")
+    if bool(display.ShowParenthesis) or bool(dimension.IsReference()):
+        problems.append("prints as a reference dimension")
+    if problems:
+        raise RuntimeError(f"{label}: " + "; ".join(problems))
+    return display
+
 
 def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
     expected = {
@@ -976,6 +1021,8 @@ async def build(adapter: Any) -> dict[str, str]:
         "TapFromSide",
         label="hanger tap from finished side",
     )
+
+    _add_boss_turned_diameter(adapter, section)
 
     # Native Hole Wizard callout owns the thread size/class and blind depth.
     tap_callout = add_native_hole_callout(
