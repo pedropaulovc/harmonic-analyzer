@@ -41,6 +41,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
@@ -59,6 +60,7 @@ from crankshaft_spec import (
     REFERENCE_DIMENSIONS,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
+    SPHERICAL_DIMENSIONS,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
@@ -116,10 +118,12 @@ JOURNAL_END_X = _sheet_x(JOURNAL_START + JOURNAL_LENGTH)
 FAR_END_X = _sheet_x(SHAFT_LENGTH)
 JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 
-# Baseline rows below the profile, all from the dome root; rows are 13 mm
-# apart because the text sits ~3 mm above its requested point and the
-# dimension line ~5 mm below it.
-_ROW_Y = (0.149, 0.136, 0.123, 0.108)
+# Baseline rows below the profile, all from the FAR END and stacked
+# shortest-first so no extension line crosses a dimension line; rows are 13
+# mm apart because the text sits ~3 mm above its requested point and the
+# dimension line ~5 mm below it.  The 2.0 dome height shares the first row at
+# the far left, where no baseline reaches.
+_ROW_Y = (0.150, 0.137, 0.124, 0.111, 0.096)
 # The two diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (rule 7:
 # diameters on the side view).  Their temporary end-view spots are clear of
@@ -129,26 +133,34 @@ END_KEEP = {
     "JournalDiaDim": (0.036, 0.230),
 }
 SIDE_KEEP = {
-    "DomeHeight": (DOME_TIP_X - 0.020, 0.200),
-    "PinHoleHeight": ((DOME_ROOT_X + PIN_X) / 2.0, _ROW_Y[0]),
-    "JournalStart": ((DOME_ROOT_X + JOURNAL_START_X) / 2.0, _ROW_Y[1]),
-    "JournalLength": ((JOURNAL_START_X + JOURNAL_END_X) / 2.0, _ROW_Y[1]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[2]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[3]),
+    "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
+    "JournalInboardStation": ((JOURNAL_END_X + FAR_END_X) / 2.0 + 0.004, _ROW_Y[0]),
+    "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[1]),
+    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[2]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[3]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[4]),
+    # Above-left of the dome, where no extension line rises: the radial
+    # leader runs down-right to the dome silhouette.
+    "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
 }
 # A dragged diameter prints its dimension line at the requested X with the
-# text to its left: Ø9.525 on the dome-side seat right of the cross-hole,
-# Ø11.388 on the journal right of its finish symbol.
+# text running to its RIGHT (run 20260923T030252135Z-49e46990): Ø9.525 on
+# the far-end seat, Ø11.388 on the journal right of its finish symbol, which
+# leaves the dome-side seat above the cross-hole free for the hole callout.
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (JOURNAL_START_X - 0.022, 0.200),
-    "JournalDiaDim": (JOURNAL_END_X - 0.040, 0.200),
+    "ShaftDiaDim": (JOURNAL_END_X + 0.006, 0.200),
+    "JournalDiaDim": (JOURNAL_END_X - 0.052, 0.200),
 }
 # One Ø9.525 dimension governs both 3/8-in seats.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
-FINISH_PICK = (JOURNAL_START_X + 0.022, JOURNAL_FLANK_Y)
-FINISH_SYMBOL = (JOURNAL_START_X + 0.032, 0.203)
-HOLE_CALLOUT_XY = (0.062, 0.240)
+FINISH_PICK = (JOURNAL_START_X + 0.040, JOURNAL_FLANK_Y)
+FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
+# Text centred up-right of the cross-hole: the callout's leader leaves the
+# text's left end and runs down-left at ~57 deg through the hole centre, a
+# clean crossing of the 118.0 station's extension line rather than a near
+# parallel one (run 20260923T030252135Z-49e46990), clear of the SR on the left.
+HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.235)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
@@ -265,6 +277,28 @@ def _move_dimension(
     return matches[0]
 
 
+def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Print a model radius as the ASME spherical reference ``(SR6.7)``.
+
+    The radius is read-only: a spherical cap of the printed dome height on the
+    toleranced end diameter already fixes it.  Whatever radius prefix the
+    display carries is kept behind the ``(S``; the readback proves it stuck.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "(S" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    _telemetry.info(
+        f"{label}: spherical reference prefix {existing!r} -> {applied[0]!r}, "
+        f"suffix {applied[1]!r}"
+    )
+    if applied != (prefix, ")"):
+        raise RuntimeError(f"failed to mark {label} as a spherical reference: {applied}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -345,6 +379,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ]
         if len(matches) != 1:
             raise RuntimeError(f"expected one crankshaft {name} reference dimension")
+        if name in SPHERICAL_DIMENSIONS:
+            _set_spherical_reference(adapter, matches[0], label=f"crankshaft {name}")
+            continue
         set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
 
     # SolidWorks classifies a solid circular end silhouette under the same
@@ -380,6 +417,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # The end view's hidden lines show the cross-hole running across the
+    # dome end, which clocks the punched fiducial to it (rule 7: a cross-hole
+    # through a turned part).  Re-asserted last so the export regenerates the
+    # dashed edges after every annotation (layout-tuning refusal e).
+    set_hidden_lines_visible(adapter, end)
 
     return await finalize_drawing(
         adapter,

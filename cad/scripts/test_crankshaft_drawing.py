@@ -31,11 +31,12 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "ShaftDiaDim",
         "Depth",
         "DomeHeight",
-        "JournalStart",
         "JournalDiaDim",
-        "JournalLength",
-        "PinHoleHeight",
         "OverallLength",
+        "JournalInboardStation",
+        "JournalOutboardStation",
+        "PinHoleStation",
+        "DomeSphereRadius",
     }
     # Diameters are imported in the end view only to be dragged onto the
     # longitudinal profile (policy rule 7: diameters on the side view).
@@ -61,6 +62,18 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (3 if name in functional_fits else 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
+    assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
+
+
+def test_far_end_stations_restate_the_modelled_geometry() -> None:
+    # The StationReference sketch drives each printed station from the same
+    # globals as the features; these are the values the equations evaluate to.
+    far = spec.SHAFT_LENGTH
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(17.2105, abs=1e-3)
+    assert far - spec.JOURNAL_START == pytest.approx(89.2449, abs=1e-3)
+    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(118.0)
+    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(132.0)
+    assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
 
 def test_notes_stay_within_rule_six() -> None:
@@ -101,7 +114,8 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == 12.0
     # The matched fit identifies both mating parts on the feature callout.
     process = spec.CROSS_HOLE_PROCESS
-    assert "MATCH-REAM" in process
+    assert "TAPER-REAM" in process
+    assert "LIGHT DRIVE FIT" in process
     assert "MHA-137" in process
     assert "MHA-024" in process
     assert process.splitlines()[-1] == "#9 DRILL"
@@ -113,12 +127,13 @@ def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None
     assert spec.FIDUCIAL_MODEL_DEPTH == geometry.FIDUCIAL_MODEL_DEPTH == 0.2
     assert spec.SHAFT_FIDUCIAL_RADIUS == geometry.SHAFT_FIDUCIAL_RADIUS == 2.5
     assert "PUNCH FIDUCIAL MARK" in spec.DRAWING_NOTES
+    assert "BY EYE" in spec.DRAWING_NOTES
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
     assert "DIMPLE" not in spec.DRAWING_NOTES
 
 
-def test_side_view_references_stations_from_the_dome_root() -> None:
+def test_side_view_sheet_stations_follow_the_model() -> None:
     scale = drawing.SHEET_SCALE[0]
     span = spec.SHAFT_LENGTH + spec.SHAFT_DOME_HEIGHT
     assert drawing.DOME_TIP_X == pytest.approx(
@@ -160,13 +175,15 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
         assert not (x >= title_block[0] and y <= title_block[1])
-    # Both dragged diameters land on their own features: Ø9.525 between the
-    # cross-hole and the journal, Ø11.388 on the journal.
+    # Both dragged diameters land on their own features: Ø9.525 on the
+    # far-end seat, Ø11.388 on the journal.
     shaft_x = drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0]
     journal_x = drawing.DIAMETER_POSITIONS["JournalDiaDim"][0]
-    hole_radius = drawing._PIN_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    assert drawing.PIN_X + hole_radius < shaft_x < drawing.JOURNAL_START_X
+    assert drawing.JOURNAL_END_X < shaft_x < drawing.FAR_END_X
     assert drawing.JOURNAL_START_X < journal_x < drawing.JOURNAL_END_X
+    # The cross-hole callout sits right of the hole so its leader cannot run
+    # near-parallel to the station extension line through the hole.
+    assert drawing.HOLE_CALLOUT_XY[0] > drawing.PIN_X
     assert drawing.JOURNAL_START_X < drawing.FINISH_PICK[0] < drawing.JOURNAL_END_X
 
 
