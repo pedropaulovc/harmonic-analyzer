@@ -309,3 +309,20 @@ def test_hanger_section_crop_keeps_one_station_only() -> None:
     half = draw_summing_assembly.HANGER_SECTION_CROP_HALF_Z_MM
     assert half >= 27.0 / 2.0 + 5.0
     assert half + 27.0 / 2.0 < 2.0 * build_summing_assembly.HEX_Z_MID
+
+
+def test_section_crop_gate_accepts_r16_padded_outline_and_refuses_misses() -> None:
+    # r16: the crop worked (174 mm two-station section -> one station) but the
+    # padded outline read 27.4 mm against the 25.0 mm crop.
+    cropped = (0.16985, 0.17574, 0.19721, 0.23323)
+    uncropped = (0.05, 0.17, 0.23, 0.235)
+    station_x = 0.1835
+    check = draw_summing_assembly.section_crop_violations
+    assert check(uncropped, cropped, station_x) == []
+    assert check(uncropped, uncropped, station_x) == [
+        "cropped outline is 180.0 mm wide, not under 0.5 x the uncropped 180.0 mm",
+        "cropped outline centre is -43.5 mm off the station",
+    ]
+    assert check(uncropped, cropped, station_x + 0.010) == [
+        "cropped outline centre is -10.0 mm off the station"
+    ]

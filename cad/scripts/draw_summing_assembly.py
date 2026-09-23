@@ -138,6 +138,11 @@ HANGER_DETAIL_CENTER = (0.095, 0.092)
 # past the block bottom and the stud head top.
 HANGER_SECTION_CROP_HALF_Z_MM = 25.0
 HANGER_SECTION_CROP_MARGIN_MM = 5.0
+# IView.GetOutline pads the ink (r16: 27.4 mm outline for a 25.0 mm crop),
+# so the crop is gated relative to the uncropped outline and the station:
+# it must at least halve the width and stay centred on the station.
+HANGER_SECTION_CROP_MAX_WIDTH_RATIO = 0.5
+HANGER_SECTION_CROP_CENTRE_TOLERANCE = 0.003
 # The section's own label hangs this far under its cropped outline.
 HANGER_SECTION_LABEL_GAP = 0.003
 # The native detail label letter. The sheet heading and the MHA-119 stud note
@@ -1085,6 +1090,29 @@ def _sheet_to_view_sketch(
     return tuple(float(value) for value in projected.ArrayData)
 
 
+def section_crop_violations(
+    before: tuple[float, float, float, float],
+    after: tuple[float, float, float, float],
+    station_x: float,
+) -> list[str]:
+    """Findings for a crop that did not reduce the section to one station."""
+    findings = []
+    before_width = before[2] - before[0]
+    after_width = after[2] - after[0]
+    if after_width >= HANGER_SECTION_CROP_MAX_WIDTH_RATIO * before_width:
+        findings.append(
+            f"cropped outline is {after_width * 1000.0:.1f} mm wide, not under "
+            f"{HANGER_SECTION_CROP_MAX_WIDTH_RATIO:g} x the uncropped "
+            f"{before_width * 1000.0:.1f} mm"
+        )
+    offset = (after[0] + after[2]) / 2.0 - station_x
+    if abs(offset) > HANGER_SECTION_CROP_CENTRE_TOLERANCE:
+        findings.append(
+            f"cropped outline centre is {offset * 1000.0:+.1f} mm off the station"
+        )
+    return findings
+
+
 def _crop_section_to_station(
     adapter: Any,
     section: Any,
@@ -1118,6 +1146,12 @@ def _crop_section_to_station(
     ]
     xs = sorted(corner[0] for corner in corners)
     ys = sorted(corner[1] for corner in corners)
+    station_x = model_point_in_view(
+        adapter,
+        section,
+        (KNIFE[0] / 1000.0, KNIFE_MOUNT_TOP_Y / 1000.0, station_z_mm / 1000.0),
+        label=f"{label} station",
+    )[0]
     if not drawing.ActivateView(str(section.GetName2() or "")):
         raise RuntimeError(f"{label}: failed to activate the section for its crop")
     draw.ClearSelection2(True)
@@ -1148,16 +1182,15 @@ def _crop_section_to_station(
         crop_mm=(xs[0] * 1000.0, ys[0] * 1000.0, xs[1] * 1000.0, ys[1] * 1000.0),
         before_mm=tuple(value * 1000.0 for value in before),
         after_mm=tuple(value * 1000.0 for value in after),
+        station_x_mm=station_x * 1000.0,
     )
     if status != 1:  # swCropViewErrors_NoError
         raise RuntimeError(f"{label}: Crop2 returned {status}")
     if not bool(section.IsCropped()):
         raise RuntimeError(f"{label}: section does not read cropped")
-    if after[2] - after[0] > (xs[1] - xs[0]) + 0.002:
-        raise RuntimeError(
-            f"{label}: cropped outline {after!r} is wider than the crop "
-            f"({(xs[1] - xs[0]) * 1000.0:.1f} mm)"
-        )
+    findings = section_crop_violations(before, after, station_x)
+    if findings:
+        raise RuntimeError(f"{label}: " + "; ".join(findings))
 
 
 def _anchor_section_label(adapter: Any, section: Any, *, label: str) -> None:
