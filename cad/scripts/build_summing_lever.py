@@ -188,6 +188,9 @@ HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COU
 # The drawing-reference sketches restate geometry the solid owns, so each of
 # their points must sit ON that geometry, not near it (the gate below).
 REFERENCE_COINCIDENCE_TOL_MM = 1e-6
+# Each arm of the construction cross that marks the R138.8 centre (2.5 mm on
+# the 1:2 sheet).
+CENTRE_CROSS_ARM = 5.0
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -1026,8 +1029,11 @@ async def _summation_arc_reference(
     sketch whose two driving dims ARE the printed values, measured from the plate
     end face on the cylinder axis.  Construction line A is one trunnion's
     centreline (sketch +y is model -Z; the arcs are mirror-symmetric) (its start is that datum, its end clears the trunnion for the
-    witness line); line B is a short stub from the centre along the witness line
-    the vertical dimension draws anyway.  Values restate the model's own
+    witness line).  Four short construction arms from the centre print as the
+    centre's cross, the visible target both reference dimensions end on.  A
+    native drawing centre mark on the arc (R8) re-anchored both dimensions'
+    witness lines out at the arc's quadrants instead, running the 2X 123.2 one
+    up through the front view.  Values restate the model's own
     ``_circumcenter`` of the same three points, so no geometry moves.
     """
     base_end, tip_end, interior = _summation_top_arc_points()
@@ -1040,20 +1046,45 @@ async def _summation_arc_reference(
         await adapter.add_line(0.0, SUM_BASE, 0.0, HEX_Z_OUTER),
     )
     centre = check(
-        "summation-arc centre stub",
-        await adapter.add_line(cx, cy, cx + 20.0, cy),
+        "summation-arc centre cross +x arm",
+        await adapter.add_line(cx, cy, cx + CENTRE_CROSS_ARM, cy),
     )
+    arms = [
+        (
+            check(
+                f"summation-arc centre cross {name} arm",
+                await adapter.add_line(cx, cy, cx + dx, cy + dy),
+            ),
+            constraint,
+        )
+        for name, dx, dy, constraint in (
+            ("-x", -CENTRE_CROSS_ARM, 0.0, "horizontal"),
+            ("+y", 0.0, CENTRE_CROSS_ARM, "vertical"),
+            ("-y", 0.0, -CENTRE_CROSS_ARM, "vertical"),
+        )
+    ]
     set_sketch_direct_db(adapter, False)
-    for entity in (axis, centre):
+    for entity in (axis, centre, *(arm for arm, _constraint in arms)):
         _as_construction(adapter, entity)
     check(
         "summation-arc datum vertical",
         await adapter.add_sketch_constraint(axis, None, "vertical"),
     )
     check(
-        "summation-arc centre stub horizontal",
+        "summation-arc centre cross +x arm horizontal",
         await adapter.add_sketch_constraint(centre, None, "horizontal"),
     )
+    for arm, constraint in arms:
+        check(
+            f"summation-arc centre cross arm {constraint}",
+            await adapter.add_sketch_constraint(arm, None, constraint),
+        )
+        check(
+            "summation-arc centre cross arm on the centre",
+            await adapter.add_sketch_constraint(
+                f"{arm}.start", f"{centre}.start", "coincident"
+            ),
+        )
     await anchor_point_to_origin(
         adapter, f"{axis}.start", 0.0, SUM_BASE, "summation-arc datum"
     )
@@ -1090,10 +1121,20 @@ async def _summation_arc_reference(
         f"{centre}.start",
         f"{centre}.end",
         "horizontal_distance",
-        20.0,
-        "summation-arc centre stub length",
+        CENTRE_CROSS_ARM,
+        "summation-arc centre cross +x arm length",
     )
     arc.record(None)
+    for arm, constraint in arms:
+        await dimension_between(
+            adapter,
+            f"{arm}.start",
+            f"{arm}.end",
+            f"{constraint}_distance",
+            CENTRE_CROSS_ARM,
+            "summation-arc centre cross arm length",
+        )
+        arc.record(None)
     await ensure_fully_defined(adapter, "summation-arc reference sketch")
     check("exit summation-arc reference", await adapter.exit_sketch())
     name_last_feature(adapter, "SummationArcReference")
@@ -1149,8 +1190,8 @@ def _reference_claims(
     IDENTIFIES a feature; the coincidence itself is asserted separately at
     ``REFERENCE_COINCIDENCE_TOL_MM`` against the B-rep values.  Returns, per
     sketch: its candidate targets, the targets that must each be hit by at least
-    one sketch point, and how many sketch points may hit nothing (a stub's free
-    end).
+    one sketch point, and how many sketch points may hit nothing (the centre
+    cross's free arm ends).
     """
 
     def cylinders_of(radius: float, index: int) -> list[tuple[Point, Point, float]]:
@@ -1237,7 +1278,8 @@ def _reference_claims(
                 ("a trunnion end", set(trunnion_targets)),
                 ("a summation-arc centre", set(web_targets)),
             ],
-            1,
+            # The centre cross's four free arm ends.
+            4,
         ),
     }
 
