@@ -239,10 +239,12 @@ async def build(adapter) -> dict[str, str]:
 
     # U36 pin hole: a diametral cross-hole along X at the lever's
     # mid-engagement, sketched on the Right Plane (normal X; sketch u = -z) --
-    # the plane the side view looks at, with the crown -- and cut through all
-    # in both directions.  The origin sits on the flat front
-    # end face, so the circle's axial anchor IS the front-end station the print
-    # carries.  Its mirror station (z -4) lies outside the rod, so a wrong side
+    # the plane the side view looks at, with the crown -- and cut mid-plane
+    # twice the rod diameter deep.  (ThroughAll + both_directions cut only ONE
+    # side on the farm, r7: the adapter falls back to single-sided ThroughAll
+    # when the install has no swEndCondThroughAllBoth.)  The origin sits on
+    # the flat front end face, so the circle's axial anchor IS the front-end
+    # station the print carries.  Its mirror station (z -4) lies outside the rod, so a wrong side
     # cuts nothing and the volume gate fails loud.
     v_hole = _pin_hole_removed()
     pin_hole = SketchDims()
@@ -263,7 +265,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     cut = await adapter.create_cut_extrude(
         ExtrusionParameters(
-            depth=ROD_DIA, end_condition="ThroughAll", both_directions=True
+            depth=2.0 * ROD_DIA, both_directions=True
         )
     )
     if not cut.is_success:

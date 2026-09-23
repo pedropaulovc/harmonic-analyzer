@@ -225,7 +225,7 @@ async def _station_reference(
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -458,8 +458,10 @@ async def build(adapter) -> dict[str, str]:
 
     # U36 pin hole: a through cross-hole along X at the mid-engagement
     # station, sketched on the Right Plane (normal X; sketch u = -z) and cut
-    # through all in both directions, so it crosses both hub walls and the
-    # empty bore.  It stays clear of the +Y grip, whose root starts at
+    # mid-plane twice the hub OD deep, so it crosses both hub walls and the
+    # empty bore.  (ThroughAll + both_directions cut ONE side on the farm:
+    # the adapter falls back to single-sided ThroughAll when the install has
+    # no swEndCondThroughAllBoth -- r7, the lift rod lost half its hole.)  It stays clear of the +Y grip, whose root starts at
     # y ROD_Y0 -- well above the hole's radius.
     v_hole = _pin_hole_removed()
     mass = (await adapter.get_mass_properties()).data
@@ -484,7 +486,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     cut = await adapter.create_cut_extrude(
         ExtrusionParameters(
-            depth=HUB_OD, end_condition="ThroughAll", both_directions=True
+            depth=2.0 * HUB_OD, both_directions=True
         )
     )
     if not cut.is_success:
