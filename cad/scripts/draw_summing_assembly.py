@@ -719,18 +719,21 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
             failures.append(f"sheet {number} {sheet_name}: {exc}")
     if not failures:
         return
-    _export_failure_pdf(adapter)
     raise RuntimeError(
         "summing package layout audit failed:\n" + "\n".join(failures)
     )
 
 
-def _export_failure_pdf(adapter: Any, stage: str = "layout") -> None:
+def _export_failure_pdf(adapter: Any, stage: str) -> None:
     """Export the failing package as a PDF under the forensic tree, which the
-    farm uploads on a failed leaf, so a failed audit or finalize still yields
-    a render to inspect (r12 and r13 failed without one). Best effort: never
-    masks the failure.
+    farm uploads on a failed leaf, so any failed build still yields a render
+    to inspect (r12, r13 and r17 failed without one). Best effort: never
+    masks the failure, and skipped until the drawing is the active document.
     """
+    model = adapter.currentModel
+    if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != 3:
+        _telemetry.warn(f"{stage}-failure PDF skipped: no active drawing")
+        return
     path = (
         OUT_FAILURES
         / f"summing-package-{stage}"
@@ -1223,6 +1226,42 @@ def _anchor_section_label(adapter: Any, section: Any, *, label: str) -> None:
     )
 
 
+def _detail_fence_of(parent: Any, detail: Any) -> Any:
+    """The parent's IDetailCircle whose detail view IS ``detail``.
+
+    A cropped parent reports its crop profile among GetDetailCircles too
+    (summing-asm-r17: "2 detail fences" once section A-A was cropped), so the
+    fence is found by the view it owns, never by counting.
+    """
+    detail_name = str(_early_bound(detail, "IView").GetName2() or "")
+    circles = [
+        _early_bound(circle, "IDetailCircle")
+        for circle in (_read_member(parent, "GetDetailCircles") or ())
+    ]
+    census = []
+    owners = []
+    for circle in circles:
+        owned = circle.GetDetailView()
+        owned_name = (
+            str(_early_bound(owned, "IView").GetName2() or "") if owned else ""
+        )
+        census.append(
+            (str(circle.GetName() or ""), str(circle.GetLabel() or ""), owned_name)
+        )
+        if owned_name == detail_name:
+            owners.append(circle)
+    _telemetry.event(
+        "drawing.detail_fences",
+        detail=detail_name,
+        fences=repr(census),
+    )
+    if len(owners) != 1:
+        raise RuntimeError(
+            f"{len(owners)} fences own detail {detail_name!r}; census {census!r}"
+        )
+    return owners[0]
+
+
 def _create_hanger_detail(adapter: Any, section: Any) -> Any:
     """Create a native enlarged detail around one real hanger/receiver interface."""
     draw = adapter.currentModel
@@ -1314,10 +1353,7 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
         ),
         label="hanger detail label",
     )
-    circles = tuple(_read_member(section, "GetDetailCircles") or ())
-    if len(circles) != 1:
-        raise RuntimeError(f"hanger section has {len(circles)} detail fences")
-    detail_circle = _early_bound(circles[0], "IDetailCircle")
+    detail_circle = _detail_fence_of(section, detail)
     parent_label = (center[0] + 0.014, center[1] + 0.010)
     detail_circle.SetLabelPosition(*parent_label)
     draw.EditRebuild3()
@@ -2240,9 +2276,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     artifacts: dict[str, str] | None = None
     try:
-        _validate_persisted_explode(source_model)
-        _place_package(adapter)
         try:
+            _validate_persisted_explode(source_model)
+            _place_package(adapter)
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
@@ -2254,7 +2290,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 sheet_scales=SHEET_SCALES,
             )
         except Exception:
-            _export_failure_pdf(adapter, "finalize")
+            _export_failure_pdf(adapter, "build")
             raise
     finally:
         primary_error = sys.exception()

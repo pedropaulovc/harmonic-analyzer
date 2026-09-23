@@ -326,3 +326,28 @@ def test_section_crop_gate_accepts_r16_padded_outline_and_refuses_misses() -> No
     assert check(uncropped, cropped, station_x + 0.010) == [
         "cropped outline centre is -10.0 mm off the station"
     ]
+
+
+def test_detail_fence_is_found_by_the_view_it_owns(monkeypatch) -> None:
+    # r17: cropping section A-A added its crop profile to GetDetailCircles.
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(draw_summing_assembly, "_early_bound", lambda obj, _iface: obj)
+
+    def view(name):
+        return SimpleNamespace(GetName2=lambda: name)
+
+    def circle(name, label, owned):
+        return SimpleNamespace(
+            GetName=lambda: name, GetLabel=lambda: label, GetDetailView=lambda: owned
+        )
+
+    detail = view("Drawing View9")
+    fence = circle("Detail Circle1", "B", detail)
+    crop = circle("Crop1", "", None)
+    parent = SimpleNamespace(GetDetailCircles=lambda: (crop, fence))
+    assert draw_summing_assembly._detail_fence_of(parent, detail) is fence
+    with pytest.raises(RuntimeError, match="0 fences own detail 'Drawing View9'"):
+        draw_summing_assembly._detail_fence_of(
+            SimpleNamespace(GetDetailCircles=lambda: (crop,)), detail
+        )
