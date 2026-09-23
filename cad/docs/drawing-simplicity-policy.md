@@ -291,7 +291,10 @@ table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-| cone gears T006–T024 | root-to-bore webs accepted at the current nominal values: T006 0.49, T012 0.83, T018 0.78, T024 0.71 mm (main, `build_cone_gear.py`). Any change that thins a web below its listed value needs a new ruling; the in-flight U38 cone-mesh redesign must re-check against this row | the gears match the book photos (C67500 tip gears) | 2026-09-23 |
+
+No rows are accepted yet.
+
+Pending: cone gears T006–T024 webs (#846 / U38 study).
 
 ## The gate
 
