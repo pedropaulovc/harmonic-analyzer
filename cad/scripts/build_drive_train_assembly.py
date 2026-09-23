@@ -28,10 +28,11 @@ above the 6.35-mm swing plate fixes the drive plane at y = 90.518):
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605. MHA-024 is not inserted in this as-machined
-  assembly model: MHA-020 and MHA-026 retain their coaxial straight pilot
-  holes here, while the released drawings require their shared 1:48 taper to
-  be match-reamed at assembly.)
+  top level -- codex #189 :605. MHA-024 IS inserted: MHA-020 and MHA-026
+  retain their coaxial straight pilot holes in this as-machined model, the
+  nominal taper overlaps them as volume-bounded allowed pairs, and the
+  released drawings require their shared 1:48 taper to be match-reamed at
+  assembly.)
 * alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
 
@@ -205,6 +206,7 @@ from _assembly_patterns import (
     PatternDirection,
 )
 from _interference_contracts import allowed_interference_pairs
+from _drive_train_explode import create_drive_train_explode
 
 # CopyWithMates2 helpers for the cone-gear ladder (#228). NB importing _cwm
 # folds it into THIS assembly's recipe/cache key -- intended.
@@ -3993,6 +3995,7 @@ async def build(adapter) -> dict[str, str]:
     # The PART cell resolves the document summary Title; "drive-train assembly"
     # (not the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    create_drive_train_explode(adapter)
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
