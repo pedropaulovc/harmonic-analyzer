@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ import build_crankshaft as part
 import crank_hub_geometry as geometry
 import crankshaft_spec as spec
 import draw_crankshaft as drawing
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
@@ -24,7 +26,7 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert marked == {
         "ShaftDiaDim",
         "Depth",
@@ -32,8 +34,39 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalStart",
         "JournalDiaDim",
         "JournalLength",
+        "PinHoleHeight",
+        "OverallLength",
     }
-    assert drawing.DIMENSION_CALLOUTS == {}
+    # Diameters are imported in the end view only to be dragged onto the
+    # longitudinal profile (policy rule 7: diameters on the side view).
+    assert set(drawing.DIAMETER_POSITIONS) == set(drawing.END_KEEP)
+
+
+def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
+    # Rule 3: a shaft carries no frames, datums or basic dimensions.
+    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for helper in (
+        "add_feature_control_frame",
+        "add_datum_feature",
+        "set_basic_dimension",
+        "set_dimension_precision",
+    ):
+        assert helper not in source
+    # Rule 2: the part authors every printed dimension's places.
+    assert "draw_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    functional_fits = {"ShaftDiaDim", "JournalDiaDim"}
+    for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
+        assert places == (3 if name in functional_fits else 1), name
+    assert spec.REFERENCE_DIMENSIONS <= marked
+
+
+def test_notes_stay_within_rule_six() -> None:
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert 1 <= len(lines) <= 4
+    assert all(len(line) <= 66 for line in lines)
 
 
 def test_face_shift_preserves_every_inboard_world_station() -> None:
@@ -58,8 +91,7 @@ def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     assert geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[0] < (
         geometry.HUB_BORE_DIA + geometry.HUB_BORE_BAND[1]
     )
-    assert "ONLY INTEGRAL DOME PROJECTS" in spec.CRANK_END_NOTE
-    assert "MHA-020/MHA-137" in spec.CRANK_END_NOTE
+    assert not hasattr(spec, "CRANK_END_NOTE")
 
 
 def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
@@ -67,11 +99,13 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
     assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == 12.0
-    notes = spec.DRAWING_NOTES
-    assert "CRANK HUB MHA-137" in notes
-    assert "MHA-024" in notes
-    assert "FINISHED SIZE FOR THIS PART" in notes
-    assert "CRANK ARM MHA-020" not in notes
+    # The matched fit identifies both mating parts on the feature callout.
+    process = spec.CROSS_HOLE_PROCESS
+    assert "MATCH-REAM" in process
+    assert "MHA-137" in process
+    assert "MHA-024" in process
+    assert process.splitlines()[-1] == "#9 DRILL"
+    assert "MHA-020" not in process
 
 
 def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:
@@ -84,17 +118,56 @@ def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None
     assert "DIMPLE" not in spec.DRAWING_NOTES
 
 
-def test_side_view_references_stations_from_cylinder_face_not_dome_tip() -> None:
-    expected_tip = drawing.RIGHT_CENTER[1] - (
-        spec.SHAFT_LENGTH + spec.SHAFT_DOME_HEIGHT
-    ) / 2000.0
-    assert drawing._OUTBOARD_TIP_Y == pytest.approx(expected_tip)
-    assert drawing._CYLINDER_FACE_Y == pytest.approx(
-        expected_tip + spec.SHAFT_DOME_HEIGHT / 1000.0
+def test_side_view_references_stations_from_the_dome_root() -> None:
+    scale = drawing.SHEET_SCALE[0]
+    span = spec.SHAFT_LENGTH + spec.SHAFT_DOME_HEIGHT
+    assert drawing.DOME_TIP_X == pytest.approx(
+        drawing.SIDE_CENTER[0] - span * scale / 2000.0
     )
-    assert drawing._PIN_CENTER[1] == pytest.approx(
-        drawing._CYLINDER_FACE_Y + spec.PIN_HOLE_HEIGHT / 1000.0
+    assert drawing.FAR_END_X == pytest.approx(
+        drawing.SIDE_CENTER[0] + span * scale / 2000.0
     )
+    assert drawing.DOME_ROOT_X == pytest.approx(
+        drawing.DOME_TIP_X + spec.SHAFT_DOME_HEIGHT * scale / 1000.0
+    )
+    assert drawing.PIN_X == pytest.approx(
+        drawing.DOME_ROOT_X + spec.PIN_HOLE_HEIGHT * scale / 1000.0
+    )
+
+
+def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
+    # *Right rotated -90 deg puts model +Y (far end) at paper-right and +Z up;
+    # *Bottom (X right, Z up) is then the true left view, on the same axis.
+    assert drawing.SIDE_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
+    assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
+    end_radius = spec.JOURNAL_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.END_CENTER[0] + end_radius < drawing.DOME_TIP_X
+
+
+def test_sheet_placements_stay_inside_the_border() -> None:
+    inner = (0.0127, 0.0127, 0.4191, 0.2667)  # ASME B landscape inner border
+    title_block = (0.218, 0.065)  # x >= and y <=
+    points = [
+        drawing.END_CENTER,
+        drawing.ISO_CENTER,
+        drawing.HOLE_CALLOUT_XY,
+        drawing.NOTES_XY,
+        drawing.ISO_NOTE_XY,
+        drawing.FINISH_SYMBOL,
+        *drawing.SIDE_KEEP.values(),
+        *drawing.DIAMETER_POSITIONS.values(),
+    ]
+    for x, y in points:
+        assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
+        assert not (x >= title_block[0] and y <= title_block[1])
+    # Both dragged diameters land on their own features: Ø9.525 between the
+    # cross-hole and the journal, Ø11.388 on the journal.
+    shaft_x = drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0]
+    journal_x = drawing.DIAMETER_POSITIONS["JournalDiaDim"][0]
+    hole_radius = drawing._PIN_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.PIN_X + hole_radius < shaft_x < drawing.JOURNAL_START_X
+    assert drawing.JOURNAL_START_X < journal_x < drawing.JOURNAL_END_X
+    assert drawing.JOURNAL_START_X < drawing.FINISH_PICK[0] < drawing.JOURNAL_END_X
 
 
 def test_journal_fit_and_surface_finish_remain_unchanged() -> None:
@@ -102,16 +175,17 @@ def test_journal_fit_and_surface_finish_remain_unchanged() -> None:
     assert spec.JOURNAL_CLEARANCE == 0.05
     assert spec.JOURNAL_DIA == 11.388
     assert spec.JOURNAL_DIA_BAND == (0.0, -0.02)
-    assert spec.SURFACE_FINISHES[0].production_method == "BEARING JOURNAL"
-    assert "0.05 DIAMETRAL CLEARANCE" in spec.DRAWING_NOTES
-    assert "KEEP DIA 9.525" in spec.DRAWING_NOTES
+    # Rule 5: one Ra on the running journal; the band, not a note, states it.
+    assert len(spec.SURFACE_FINISHES) == 1
+    assert spec.SURFACE_FINISHES[0].key == "bearing_journal"
+    assert spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[0] < spec.JOURNAL_BORE_DIA
 
 
 def test_view_scales_and_linked_notes_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    assert drawing.END_VIEW_SCALE == 2.0
-    assert drawing.ISO_CENTER == (0.345, 0.197)
-    assert spec.END_VIEW_NOTE == "CRANK-END VIEW SCALE 2:1"
+    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.VIEW_SCALE == (2, 1)
+    assert drawing.ISO_SCALE == (1, 1)
+    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 1:1"
 
 
 def test_part_registry_retains_make_critical_properties() -> None:

@@ -18,11 +18,13 @@ import math
 import sys
 
 from _common import (
+    _early_bound,
     SketchDims,
     anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -37,6 +39,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -47,12 +50,12 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from crankshaft_spec import (
-    CRANK_END_NOTE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
+    DRAWING_PRECISION,
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
+    ISOMETRIC_VIEW_NOTE,
     JOURNAL_DIA_BAND,
     JOURNAL_DIA,
     JOURNAL_LENGTH,
@@ -368,6 +371,50 @@ async def build(adapter) -> dict[str, str]:
     v_final = v_with_journal - v_pin
     await volume_check(adapter, "shaft + pin hole", v_final, 0.02 * v_pin)
 
+    # Drawing-only overall-length reference, on the shaft axis from the dome
+    # tip to the far end.  No feature dimension carries the true overall
+    # (Depth runs from the dome root), so this construction line's one
+    # driving dimension IS the printed value (policy rule 2).  It sits on the
+    # Right plane because the *Right side view prints it (every reference
+    # sketch that imports natively sits on the plane of its view -- see
+    # build_crank_hub's ServicePinStationReference), under the view's axis
+    # centreline so the construction line adds no visible ink.
+    # Right (u, v) -> (-Z, Y).
+    overall = SketchDims()
+    check("create_sketch overall reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    overall_line = check(
+        "overall reference line",
+        await adapter.add_line(0.0, -SHAFT_DOME_HEIGHT, 0.0, SHAFT_LENGTH),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[overall_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("overall reference did not take construction flag")
+    check(
+        "overall reference vertical",
+        await adapter.add_sketch_constraint(overall_line, None, "vertical"),
+    )
+    # Dimensions in creation order: the tip anchor, then the overall.
+    await anchor_point_to_origin(
+        adapter, f"{overall_line}.start", 0.0, -SHAFT_DOME_HEIGHT, "dome tip reference"
+    )
+    overall.record(None, '"DomeHeight"')
+    await dimension_between(
+        adapter,
+        f"{overall_line}.start",
+        f"{overall_line}.end",
+        "vertical_distance",
+        SHAFT_LENGTH + SHAFT_DOME_HEIGHT,
+        "overall length reference",
+    )
+    overall.record("OverallLength", '"ShaftLength" + "DomeHeight"')
+    await ensure_fully_defined(adapter, "overall reference sketch")
+    check("exit_sketch overall reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "OverallReference")
+    drive_jobs += overall.apply(adapter, "OverallReference")
+
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
@@ -425,14 +472,14 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
         {
-            "Crank End Note": CRANK_END_NOTE,
             "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)
