@@ -1,0 +1,8 @@
+pinion-lever-pin:
+  number: MHA-135
+  material: AISI O1 drill rod, annealed as supplied; 1/16 in (1.5875 mm)
+  material_specification: AISI O1 drill rod, annealed as supplied; 1/16 in (1.5875 mm)
+  finish: bare steel; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  process: "cut from drill rod; driven and peened at assembly"

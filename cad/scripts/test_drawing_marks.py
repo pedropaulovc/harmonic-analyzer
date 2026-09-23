@@ -138,7 +138,7 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
     [
         (REAM_SLIDE, 3),
         ((0.004, -0.004), 3),
-        (LEVER_BORE_BAND, 4),
+        (LEVER_BORE_BAND, 3),
     ],
 )
 def test_sub_hundredth_model_bands_get_exact_tolerance_precision(

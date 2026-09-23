@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the eight pinion-cluster drawings."""
+"""Cross-sheet offline contracts for the pinion-cluster drawings."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
 import pinion_handle_spec
+import pinion_lever_pin_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
@@ -29,6 +30,7 @@ SHEETS = (
     ("pinion-cam-pin", pinion_cam_pin_spec),
     ("pinion-handle", pinion_handle_spec),
     ("pinion-lever", pinion_lever_spec),
+    ("pinion-lever-pin", pinion_lever_pin_spec),
     ("pinion-pivot-shaft", pinion_pivot_shaft_spec),
     ("pinion-spring", pinion_spring_spec),
 )

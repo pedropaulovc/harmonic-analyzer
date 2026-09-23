@@ -1,33 +1,53 @@
-r"""Create the curated machinist drawing for the pinion lift rod."""
+r"""Create the curated machinist drawing for the pinion lift rod.
+
+A plain 6.35 bearing rod, crowned at its back end, with the MHA-135 pin hole
+match-drilled at assembly near its flat front end (U36).  The 2:1 end view
+carries the bearing diameter; the 1:1 side view carries the length, the crown
+and the bearing finish; a 5:1 detail of the front end carries the pin hole and
+its station from the front face.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_pinion_lift_rod.py pinion-lift-rod
+"""
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from pinion_lift_rod_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
-from pinion_lift_rod_spec import CAP_SAG, ROD_DIA, ROD_LEN, SURFACE_FINISHES
+from pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
+from pinion_lift_rod_spec import (
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    PIN_HOLE_CALLOUT,
+    ROD_DIA,
+    ROD_LEN,
+    SURFACE_FINISHES,
+)
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -51,36 +71,110 @@ END_VIEW_SCALE = 2.0
 # The crown adds CAP_SAG past the nominal length, so the side view's bounding
 # box (and its centre) span ROD_LEN + CAP_SAG.
 HALF_SPAN = (ROD_LEN + CAP_SAG) / 2000.0
-FRONT_CENTER = (0.055, 0.205)
+FRONT_CENTER = (0.045, 0.205)
 RIGHT_CENTER = (
-    FRONT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0] + 0.045,
+    FRONT_CENTER[0] + HALF_SPAN * SHEET_SCALE[0] + 0.040,
     FRONT_CENTER[1],
 )
-# NOT (0.355, 0.205): up there the iso crowded the side view's right end and the
-# tip perpendicularity frame. The empty band below the side view and right of
-# the notes block takes it whole, clear of the 202 dimension line at y=0.180.
-ISO_CENTER = (0.345, 0.145)
+ISO_CENTER = (0.135, 0.125)
+DETAIL_CENTER = (0.335, 0.132)
+DETAIL_SCALE = (5, 1)
+DETAIL_RADIUS_MM = 7.0
+DETAIL_LABEL_XY = (0.312, 0.170)
 
-# The rod's flank in the *Right view: a 6.35-dia cylinder at 1:1, so its top
-# silhouette runs ~3.2 mm above the view centre. The cylindrical callouts anchor
-# HERE rather than on the front view's end circle -- see the GD&T block below.
+# The rod's flank in the *Right view: the bearing finish leader drops onto it.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
 
 FRONT_KEEP = {
-    # Offset kept tight (-0.010, not the fulcrum -0.025): the toleranced text
-    # is wide and a further-left anchor runs it across the sheet border.
     "RodDia": (
-        FRONT_CENTER[0] - ROD_DIA * END_VIEW_SCALE / 1000.0 - 0.010,
-        FRONT_CENTER[1] + 0.008,
+        FRONT_CENTER[0] - ROD_DIA * END_VIEW_SCALE / 1000.0 - 0.006,
+        FRONT_CENTER[1] + 0.022,
     ),
 }
+# In the *Right view the part's +Z (crowned back end) points screen-left, so
+# the flat front end (z 0) is the RIGHT silhouette edge.
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.022),
+    "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),
 }
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# The length tolerance rides its own dimension (codex machinist review: a
-# detached "LENGTH +/-0.25" UOS note is ambiguous about which length it bounds).
-RIGHT_CALLOUTS: dict[str, str] = {}
+DETAIL_KEEP = {
+    "PinHoleDia": (DETAIL_CENTER[0] + 0.040, DETAIL_CENTER[1] + 0.030),
+    "PinHoleZ": (DETAIL_CENTER[0] + 0.004, DETAIL_CENTER[1] - 0.034),
+}
+DIMENSION_CALLOUTS = {
+    "PinHoleDia": PIN_HOLE_CALLOUT,
+    "PinHoleZ": "FROM FRONT END",
+}
+
+
+def _front_end_detail(adapter: Any, side: Any) -> Any:
+    """A native 5:1 detail of the rod's front end, where the pin hole sits."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(side, "IView")
+    if not drawing.ActivateView(view_name(adapter, side)):
+        raise RuntimeError("failed to activate front-end detail parent")
+    draw.ClearSelection2(True)
+    center = model_point_in_view(
+        adapter,
+        side,
+        (0.0, 0.0, ROD_PIN_HOLE_FROM_END / 1000.0),
+        label="front-end detail centre",
+    )
+    radius = DETAIL_RADIUS_MM * SHEET_SCALE[0] / 1000.0
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if manager.CreateCircle(*points[0], *points[1]) is None:
+        raise RuntimeError("failed to create front-end detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        *DETAIL_SCALE,
+        "A",
+        1,  # swDetCircleCIRCLE
+        True,
+        False,
+        False,
+        5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create front-end detail")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("front-end detail has invalid bounds")
+    target = [
+        position[axis] + DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position front-end detail")
+    draw.EditRebuild3()
+    notes = tuple(_read_member(detail, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    label_xyz = (*DETAIL_LABEL_XY, 0.0)
+    if not annotation.SetPosition2(*label_xyz):
+        raise RuntimeError("failed to position front-end detail label")
+    draw.EditRebuild3()
+    actual = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
+    if math.dist(actual, label_xyz) > 1e-8:
+        raise RuntimeError(f"front-end detail label did not persist: {actual}")
+    return detail
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -131,83 +225,52 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, right_annotations, RIGHT_CALLOUTS)
-    # SolidWorks classifies a solid circular end silhouette under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to rod end view")
-
-    # The circular boundary controls the adjacent cylindrical bearing axis.
-    # SolidWorks chooses the datum position; 20 um bounds rebuild stability.
-    rod_edge = visible_circle_edge(adapter, front, ROD_DIA)
-    # In the *Right view the part's +Z (crowned back end) points screen-left,
-    # so the flat front end (z=0) is the RIGHT silhouette edge.
-    flat_end = (RIGHT_CENTER[0] + HALF_SPAN, RIGHT_CENTER[1])
-    add_native_axis_datum(
         adapter,
         front,
-        entity=rod_edge,
-        source_path=SOURCE,
-        radius_m=ROD_DIA / 2000.0,
-        datum="A",
-        label="lift rod axis",
-        stability_tolerance_m=0.00002,
+        keep=FRONT_KEEP,
+        view_label="rod end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Cylindricity and the bearing finish both control the rod's CYLINDRICAL
-    # face, which the side view shows edge-on -- so both anchor to its flank
-    # there instead of to the front view's end circle. Anchored on the front
-    # circle they had to sit out at the side view's x to find free sheet, and
-    # the leader then ran the whole way back across the side view. Off the flank
-    # the leader is a short vertical drop into the empty band above the view. A
-    # cylinder carries no model edge along its side, so these picks are
-    # SILHOUETTE entities (as in draw_transgear_stub).
-    add_feature_control_frame(
+    right_annotations = curate_view_dimensions(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
-        frame_xy=(RIGHT_CENTER[0] - 0.045, 0.236),
-        characteristic="cylindricity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["lift rod bearing cylindricity"],
-        label="lift rod bearing cylindricity",
-        entity_type="SILHOUETTE",
+        keep=RIGHT_KEEP,
+        view_label="rod side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Only the flat front end gets a perpendicularity control -- the back end
-    # is the SR4.8 crown (a note), where a face-orientation callout is
-    # meaningless.
-    # Above the view, not below at y=0.180: the isometric now occupies that band.
-    add_feature_control_frame(
+    detail = _front_end_detail(adapter, right)
+    set_hidden_lines_removed(adapter, detail)
+    detail_annotations = curate_view_dimensions(
         adapter,
-        right,
-        edge_xy=flat_end,
-        frame_xy=(flat_end[0] + 0.018, 0.228),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["front end perpendicularity"],
-        datums=("A",),
-        label="front end perpendicularity",
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="front-end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Sits right of the cylindricity frame, whose text ends near x=0.177; the
-    # Ra text renders ABOVE the arm (ASME Y14.36), reaching y~0.236.
+    annotations = [*front_annotations, *right_annotations, *detail_annotations]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # SolidWorks classifies a solid circular end silhouette under the same
+    # AutoInsertCenterMarks2 "hole" bit as a bored circle.
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to rod end view")
+    if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the pin hole")
+
+    # Rule 5: the flank turns in the pivot blocks' bores -- the one running
+    # surface.  A cylinder carries no model edge along its side, so the pick
+    # is a SILHOUETTE entity.
     add_surface_finish(
         adapter,
         right,
-        edge_xy=(RIGHT_CENTER[0] + 0.045, ROD_FLANK_Y),
-        symbol_xy=(RIGHT_CENTER[0] + 0.045, 0.222),
+        edge_xy=(RIGHT_CENTER[0] - 0.045, ROD_FLANK_Y),
+        symbol_xy=(RIGHT_CENTER[0] - 0.045, 0.228),
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="lift rod bearing finish",
         entity_type="SILHOUETTE",
     )
 
-    # 0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred border rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
 
     return await finalize_drawing(

@@ -11,8 +11,12 @@ ROD_LEN = 202.0
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H
-ROD_LENGTH_TOLERANCE_MM = 0.25
 
+LEVER_NUMBER = "MHA-059"
+PIN_NUMBER = "MHA-135"
+
+# Rule 5: the rod turns in the pivot blocks' west bores -- the one running
+# surface on the part.
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(ROD_DIA)),
 )
@@ -20,22 +24,40 @@ SURFACE_FINISHES = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodDia"},
     "Rod": {"Depth"},
+    "BackCapProfile": {"CapR"},
+    # U36: the MHA-135 pin hole, located from the flat front end face -- the
+    # part origin sits on that face, so the circle's own anchor IS the
+    # front-end baseline (policy rule 7).
+    "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
 }
 
-DRAWING_NOTES = "\n".join(
+# Decimal places ARE the tolerance statement (policy rule 2); the part authors
+# them and the drawing reads them back.  Two on the banded bearing diameter and
+# the drilled pin hole; one on the length, the crown and the pin station,
+# which the lever's mid-engagement sets at assembly.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "RodProfile": {"RodDia": 2},
+    "Rod": {"Depth": 1},
+    "BackCapProfile": {"CapR": 1},
+    "PinHoleProfile": {"PinHoleDia": 2, "PinHoleZ": 1},
+}
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
+
+# Rule 6: the matched fit rides the pin hole's own callout.
+PIN_HOLE_CALLOUT = "\n".join(
     (
-        f"CROWN BACK END SR{CAP_R} +/-0.25 FULL DOME TO THE {ROD_LEN} RIM "
-        f"({CAP_SAG} REF PROUD; OAL {ROD_LEN + CAP_SAG} REF); "
-        "BLEND SMOOTH, NO STEP.",
-        f"TURN OR CENTRELESS-GRIND THE CYLINDRICAL OD OVER THE {ROD_LEN} "
-        "LENGTH; NO FLATS OR STEPS.",
+        f"MATCH-DRILL THRU AT ASSEMBLY IN {LEVER_NUMBER}",
+        f"HUB; DRIVE {PIN_NUMBER}, PEEN FLUSH",
     )
 )
+DRAWING_NOTES = "BACK-END CROWN BLENDS INTO THE OD WITH NO STEP."
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lift rod bearing cylindricity": "0.01",
-    "front end perpendicularity": "0.05",
-}
