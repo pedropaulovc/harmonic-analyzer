@@ -341,17 +341,15 @@ def _assert_callout_text_uppercase(display: Any, label: str) -> None:
     compartments on a fresh handle, logs them as evidence, and requires an
     uppercase MIN with no lowercase 'min' anywhere.
     """
-    display = _early_bound(display, "IDisplayDimension")
+    annotation = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+    )
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     texts = {
         f"compartment_{index}": str(display.GetText(index) or "")
         for index in range(6)
     }
-    annotation = _sw_type_info.early_bound_or_flag(
-        display.GetAnnotation(), "IAnnotation", "GetDisplayData"
-    )
-    data = _sw_type_info.early_bound_or_flag(
-        annotation.GetDisplayData(), "IDisplayData", "GetTextCount"
-    )
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
     for index in range(int(data.GetTextCount())):
         texts[f"rendered_{index}"] = str(data.GetTextAtIndex(index) or "")
     _telemetry.info(f"{label} callout text: {texts!r}")
@@ -474,7 +472,10 @@ def _add_boss_turned_diameter(
     display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
     display.SetText(1, "<MOD-DIAM>")  # swDimensionTextPrefix
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION["BossDia"], -1, -1, -1)
-    annotation = display.GetAnnotation()
+    # Bound before any call: on a late-bound IAnnotation, pywin32 reads
+    # GetSpecificAnnotation as a property get and then calls the returned
+    # dimension -- 'Member not found' (knife-cc-16).
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"{label}: dimension has no annotation")
     display.ShowParenthesis = False
@@ -525,14 +526,10 @@ def _read_model_boss_diameter_m(adapter: Any) -> float:
 
 def _turned_diameter_state(annotation: Any, model_boss_dia_m: float) -> dict[str, Any]:
     """Value, places, prefix and rendered text on a fresh handle."""
+    annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    annotation = _sw_type_info.early_bound_or_flag(
-        annotation, "IAnnotation", "GetDisplayData"
-    )
-    data = _sw_type_info.early_bound_or_flag(
-        annotation.GetDisplayData(), "IDisplayData", "GetTextCount"
-    )
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
     rendered = [
         str(data.GetTextAtIndex(index) or "")
         for index in range(int(data.GetTextCount()))
@@ -1173,9 +1170,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _suppress_dimension_line_pair(tap_callout, "hanger-stud blind tap callout")
     # Resolved callout text is only current after a rebuild, on a fresh handle.
     rebuild_drawing(adapter, label="hanger-stud blind tap text")
-    _assert_callout_text_uppercase(
-        tap_callout.GetAnnotation().GetSpecificAnnotation(), "hanger-stud blind tap"
-    )
+    _assert_callout_text_uppercase(tap_callout, "hanger-stud blind tap")
 
     # A surface-finish annotation's sheet position is its LOWER-LEFT corner,
     # which is also where its leader starts: hung left of the bore the leader
