@@ -87,7 +87,7 @@ SHEET_SCALE = (2.0, 1.0)
 # title block.  The cropped edge-on view isolates the hub end and axial seam;
 # the side view shows the 18.1 x 8 stock section.
 FRONT_CENTER = (0.145, 0.135)
-TOP_CENTER = (0.145, 0.205)
+TOP_CENTER = (0.145, 0.215)
 RIGHT_CENTER = (0.300, 0.135)
 ISO_CENTER = (0.360, 0.230)
 
@@ -224,11 +224,11 @@ FRONT_KEEP = {
     "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
-    "AnchorOffset": (0.095, 0.158),
+    "AnchorOffset": (0.097, 0.149),
     "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
     "Width": (0.274, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
-    "HubSeatDia": (0.060, 0.166),
+    "HubSeatDia": (0.070, 0.182),
 }
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
@@ -340,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=anchor_edge,
-        callout_xy=(0.150, 0.205),
+        callout_xy=(0.165, 0.195),
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
@@ -386,9 +386,9 @@ async def build(adapter: Any) -> dict[str, str]:
         process=drill_process(HANDLE_PIVOT_HOLE_SPEC),
     )
 
-    if add_note(adapter, "PARTIAL TOP VIEW - HUB END / AXIAL SEAM", 0.038, 0.184) is None:
+    if add_note(adapter, "PARTIAL TOP VIEW - HUB END / AXIAL SEAM", 0.030, 0.248) is None:
         raise RuntimeError("failed to label partial crank-arm top view")
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.220)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
 
     return await finalize_drawing(
