@@ -289,7 +289,7 @@ table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-| cone gears T006–T024 | root-to-bore webs 0.6–1.3 mm | the gears match the book photos (C67500 tip gears) | 2026-09-23 |
+| cone gears T006–T024 | root-to-bore webs below the 1.5 mm floor, at the values the source CAD gives (`build_cone_gear.py` bore table: 0.49–0.83 mm nominal on main, 2026-09-23) | the gears match the book photos (C67500 tip gears) | 2026-09-23 |
 
 ## The gate
 
