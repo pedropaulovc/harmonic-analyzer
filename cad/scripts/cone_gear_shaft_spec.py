@@ -62,7 +62,7 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
 # 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
 # depth) on a soldered, keyless, near-torque-free gear, and in exchange the
-# 20.675 mm terminal journal goes from L/D 26 to 13 -- 16x the bending
+# 17.775 mm terminal journal goes from L/D 22 to 11 -- 16x the bending
 # stiffness, the difference between a land a manual lathe can turn and one
 # that whips off the tool.  It is also the largest step that keeps the shaft
 # monotonically decreasing: the cone is assembled tip-first, and every gear
