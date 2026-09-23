@@ -89,7 +89,6 @@ from knife_mount_spec import (
     BOSS_DIA,
     BOSS_HEIGHT,
     BORE_DIAMETER_TOLERANCE_MM,
-    BORE_FROM_TOP_TOLERANCE_MM,
     BORE_FROM_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -918,12 +917,6 @@ async def build(adapter) -> dict[str, str]:
         "BlockProfile",
         "BoreDia",
         BORE_DIAMETER_TOLERANCE_MM,
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "BlockProfile",
-        "BoreFromTop",
-        BORE_FROM_TOP_TOLERANCE_MM,
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
