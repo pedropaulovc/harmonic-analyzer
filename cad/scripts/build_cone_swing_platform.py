@@ -336,6 +336,16 @@ class SwingHardwareGeometry:
     stop_engaged_gap: float
 
 
+# Designed clear air between the lock-knob collar and the notch mouth at the
+# disengaged stop, so the collar can be tightened onto bare base to fence the
+# mouth.  Sized so the linear worst case keeps >= 2.0 mm (U27) with the plate
+# outline at .X (+/-0.8) and the base stop/stud holes at .XX (+/-0.51/axis):
+# east edge at the stop 2 x 0.8 (lever 105.6 vs SLOT_R 208.4), west edge at the
+# mouth 0.99 x 0.8, stop hole ~1.1, stud hole ~0.59, collar/shank ~0.35 -- 4.41
+# in all.  The base derives its swing-stop hole from this function.
+DISENGAGE_COLLAR_MARGIN = 6.5
+
+
 def swing_hardware_geometry(
     pivot_xz: tuple[float, float],
     *,
@@ -356,7 +366,7 @@ def swing_hardware_geometry(
     incline_rad = math.radians(INCLINE_DEG)
     lock_xz = placed(SLOT_E_X, SLOT_E_Z, incline_rad)
     disengage_deg = math.degrees(
-        (NOTCH_EXIT_TRAVEL + lock_collar_dia / 2.0 + 2.0) / SLOT_R
+        (NOTCH_EXIT_TRAVEL + lock_collar_dia / 2.0 + DISENGAGE_COLLAR_MARGIN) / SLOT_R
     )
     disengaged_rad = incline_rad + math.radians(disengage_deg)
 
