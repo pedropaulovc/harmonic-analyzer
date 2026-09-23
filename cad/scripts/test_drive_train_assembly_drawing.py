@@ -110,6 +110,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
+        drawing.CONSUMABLES_NOTES,
     ):
         for line in text.format(
             cone_gears=20, cylinder_gears=20, cam_pins=2, pivot_blocks=2, cams=2, slotted=4, foot=3

@@ -63,8 +63,10 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 DRAWING_NUMBER = "MHA-A03"
-# swUserPreferenceToggle_e.swViewDisplayHideAllTypes (SOLIDWORKS API help,
-# "Hide or Show All Types Example (VBA)").
+# swUserPreferenceToggle_e.swViewDisplayHideAllTypes = 198, per the
+# developing-solidworks bundle's Hide_or_Show_All_Types_Example_VB; applied
+# with IModelDocExtension::SetUserPreferenceToggle(.., swDetailingNoOptionSpecified)
+# as docs/swconst/ViewHideShow lists.
 VIEW_DISPLAY_HIDE_ALL_TYPES = 198
 
 SHEET_NAMES = (
@@ -399,6 +401,18 @@ INTERFACE_NOTES = "\n".join(
         "MHA-095, {slotted}X MHA-101 AND {foot}X MHA-103.",
         "PAPER DRIVE MHA-A06: T12 CHAIN WHEEL ON MHA-026.",
         "CHANNEL ASSEMBLY MHA-A02: CONNECTING RODS RUN ON THE MHA-027 CAMS.",
+    )
+)
+
+# Main ruling 2026-09-23 on the Fable C6 finding; ISO VG 32 matches the
+# fleet's finish notes.
+CONSUMABLES_NOTES = "\n".join(
+    (
+        "GENERAL ASSEMBLY NOTES",
+        "ADHESIVE: PER THE MHA-013 AND MHA-021 PRINTS.",
+        "OIL THE MHA-027/MHA-028 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
+        "MACHINE OIL. NO THREADLOCKER UNLESS A PRINT CALLS FOR IT.",
+        "#4-40 AND #8-32 SCREWS: SNUG.",
     )
 )
 
@@ -1166,8 +1180,9 @@ def _hide_model_reference_types(adapter: Any) -> None:
     """View > Hide/Show > Hide All Types on the drawing.
 
     Baseline-5 printed the source's PatternAxisX/Y/Z (the explode directions)
-    and a ~65 mm construction circle in every view: about ten centerline-font
-    paths per sheet that the old MHA-A03 print did not carry.
+    and MHA-021's OutsideDiaReference sketch (its 65.15 mm construction tip
+    circle, kept for the part print's OD dimension) in every view: about ten
+    centerline-font paths per sheet that the old MHA-A03 print did not carry.
     """
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     if not extension.SetUserPreferenceToggle(VIEW_DISPLAY_HIDE_ALL_TYPES, 0, True):
@@ -1403,6 +1418,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                     slotted=facts.count("slotted-screw"),
                 ),
             ),
+            ("general assembly notes", CONSUMABLES_NOTES),
         ),
         NOTE_FIELD_RIGHT,
         label=f"sheet {SEQUENCE_SHEET} right note field",
