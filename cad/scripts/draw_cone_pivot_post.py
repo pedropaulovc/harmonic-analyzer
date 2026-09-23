@@ -1046,8 +1046,8 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
-    # Nine note lines run about 40 mm down from this anchor; at 0.052 the
-    # block crossed the bottom inner border by 1.03 mm (r7 audit).
+    # Rule 6 caps the block at four lines (about 18 mm); the anchor keeps the
+    # r7 clearance to the bottom inner border.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.0555)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.
