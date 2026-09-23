@@ -72,3 +72,15 @@ def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
     assert last_sketch == 'create_sketch("Right"'
     assert "ServicePinStation" in drawing.RIGHT_KEEP
     assert '"*Right", *RIGHT_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
+
+
+def test_centerline_pick_hits_barrel_face_not_the_cross_hole() -> None:
+    scale = drawing.VIEW_SCALE[0] / 1000.0
+    x, y = drawing.BARREL_FACE_PICK
+    barrel_bottom = drawing.SIDE_BOTTOM + geometry.HUB_SEAT_LENGTH * scale
+    barrel_top = drawing.SIDE_BOTTOM + geometry.HUB_LENGTH * scale
+    assert barrel_bottom < y < barrel_top
+    assert abs(x - drawing.RIGHT_CENTER[0]) < geometry.HUB_BARREL_DIA / 2.0 * scale
+    hole_x, hole_y = drawing.SERVICE_PIN_CENTER
+    hole_r = drawing.SERVICE_PIN_DIA / 2.0 * scale
+    assert (x - hole_x) ** 2 + (y - hole_y) ** 2 > hole_r**2
