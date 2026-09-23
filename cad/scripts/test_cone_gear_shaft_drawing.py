@@ -242,23 +242,30 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
-    # The journal and all preceding gear-seat endpoints stay put; only the
-    # terminal 1/16-in endpoint follows the stock cup apex.
+    # U40 (option S1, 2026-09-23): each gear-seat shoulder sits one seat
+    # station nearer the big end than the old (154.2, 161.1, 168.0) map,
+    # so the 1/16-in land carries T012 and T006; the terminal endpoint still
+    # follows the stock cup apex and the overall length is unchanged.
     stub_delta = cone_gear_shaft_spec.FRONT_STUB - 12.3
     assert ends[1:-1] == pytest.approx(
         tuple(
             old_end + stub_delta + cone_gear_shaft_spec.GEAR_AXIS_SHIFT
-            for old_end in (154.2, 161.1, 168.0)
+            for old_end in (147.3, 154.2, 161.1)
         )
     )
+    # Printed baseline stations from the big (journal) end, as ruled.
+    assert ends[1:] == pytest.approx((163.792, 170.692, 177.592, 202.267), abs=1e-3)
     assert ends[-1] == pytest.approx(
         cone_gear_shaft_spec.FRONT_STUB + 138.97882594770454
     )
-    # The shortened terminal stub still supports the entire 4 mm bushing.
+    # The longer terminal stub still supports the entire 4 mm bushing.
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
-        122.5853574197016
+        115.6853574197016
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(16.393468528)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(24.6745185280)
+    assert ends[-1] - ends[-2] == pytest.approx(
+        cone_gear_shaft_spec.TIP_STUB_LENGTH
+    )
     assert (
         cone_gear_shaft_spec.TIP_STUB_START_STATION
         <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
@@ -284,8 +291,11 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # the mate behind the gear-seat band -- the solder gap (rule 2; codex
     # 375a122c) -- without adding a check of its own (no MUST), and carries
     # no number but the mate's part number, no tolerance, datum or method
-    # word.  The three-place-stations lines went in the U27 round: the
-    # places already say it.
+    # word -- except the tailstock line, a user-ruled process requirement
+    # (U40, 2026-09-23: the 24.675 mm Ø1.588 tip land at L/D 15.5 is only
+    # turnable supported), so "TURN" is allowed in that one line only.  The
+    # three-place-stations lines went in the U27 round: the places already
+    # say it.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     # The sheet's note text runs ~2.7 mm per character; a line from the
@@ -296,6 +306,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     )
     mate_number = _config.parts("cone-gear")["number"]
     assert not any(character.isdigit() for character in notes.replace(mate_number, ""))
+    tailstock = [line for line in notes.splitlines() if "TAILSTOCK" in line.upper()]
+    assert len(tailstock) == 1
     for forbidden in (
         "R0.",
         "MAX",
@@ -303,10 +315,11 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "DATUM",
         "BASIC",
         "FINISH",
-        "TURN",
         "GRIND",
     ):
         assert forbidden not in notes.upper()
+    # U40: "TURN" appears only in the ruled tailstock line.
+    assert "TURN" not in notes.upper().replace(tailstock[0].upper(), "")
     assert "SOLDER GAP" in notes and f"CONE GEAR BORES, {mate_number}" in notes
     assert "THREE-PLACE" not in notes
     assert (
