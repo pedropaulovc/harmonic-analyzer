@@ -81,7 +81,7 @@ SHEET_NAMES = (
     "CONE SET + CRANK EXPLODED",
     "ALIGNMENT PINION RIG EXPLODED",
     "ASSEMBLY SEQUENCE",
-    "MESH + FIT DETAILS",
+    "ASSEMBLY SEQUENCE CONT. + FIT",
     "CHECKS + SETUP",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
@@ -204,10 +204,12 @@ HEADING_XY = (0.018, 0.263)
 ASSEMBLED_HEADING_XY = (0.222, 0.263)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
-# Sheet 6 is all text: the ruled steps 1-7 (U30-U37) need the whole left
-# column (notes pitch 4.525 mm a line, summing-assembly.pdf, so ~47 lines) and
-# steps 8-17 the whole right one. The station table moved to sheet 7, whose
-# reference view stands for sheet 6's.
+# Notes pitch 4.525 mm a line (summing-assembly.pdf): ~47 lines fit the full
+# left column, ~39 the right one above the title block. With every ruling in,
+# steps 1-7 fill sheet 6's left column and steps 8-9 plus the general notes its
+# right; steps 10-17 continue on sheet 7 beside the station table, whose right
+# field stops above the 1:8 reference view (Main, layout A).
+FIT_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
 # --- BOM identities: released part numbers and descriptions ------------------
@@ -377,14 +379,38 @@ CONE_CRANK_STEPS = "\n".join(
     )
 )
 
-BANK_RIG_STEPS = "\n".join(
+BANK_STEPS = "\n".join(
     (
-        "ASSEMBLY SEQUENCE - CYLINDER BANK AND PINION RIG",
-        "8. SLIDE {cylinder_gears}X MHA-027 ONTO MHA-028, ALL ALIKE, CAM SIDE",
-        "   FRONT; ADD EACH CONNECTING ROD (CHANNEL ASSEMBLY MHA-A02) ON ITS",
-        "   CAM AS ITS GEAR GOES ON. FIT MHA-121 AT EACH END.",
-        "   [PENDING: BANK AXIAL STACK-UP]",
-        "9. FIT BOTH MHA-004 OVER THE ARBOR ENDS AND MHA-125 IN EACH.",
+        "ASSEMBLY SEQUENCE - CYLINDER BANK",
+        # U34c (user/Main 2026-09-23, rev 3 H1, foot 28): pedestals inboard,
+        # arbor cut to the measured strap span, base holes transferred at
+        # assembly. 168.2 is the arbor-axis x from the base hole-table datum
+        # (plinth east face, x = -228.6), not the 161.9 REF arbor length.
+        # Wording from dtscout (dt-bank-pedestal-layout-20260923.md section 3).
+        "8. SLIDE {cylinder_gears}X MHA-027 ONTO UNCUT MHA-028 STOCK (3/8 1018",
+        "   CF X 170), ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING ROD",
+        "   (CHANNEL ASSEMBLY MHA-A02) ON ITS CAM AS ITS GEAR GOES ON. FIT",
+        "   MHA-121 AT EACH END.",
+        "9. CONE SET (MHA-091) NOT YET ON THE BASE. FIT BOTH MHA-004 OVER THE",
+        "   ARBOR ENDS AND STAND THE BANK ON BASE MHA-035. PUSH EACH MHA-121",
+        "   AGAINST ITS END GEAR; SLIDE EACH MHA-004 IN UNTIL A 0.025 IN FEELER",
+        "   BETWEEN STRAP AND DISC IS LIGHTLY PINCHED. SET THE ARBOR AXIS 168.2",
+        "   +/-0.3 FROM THE MHA-035 PLINTH EAST FACE (HOLE-TABLE DATUM) AT BOTH",
+        "   MHA-004 WITH A COMBINATION SQUARE. HOLD; SPOT MHA-035 THROUGH EACH",
+        "   MHA-004 FOOT HOLE WITH AN 11/64 TRANSFER PUNCH. LIFT BANK AND",
+        "   MHA-004 OFF. ON THE MILL, BASE SUPPORTED AT ITS OVERHANG: DRILL #29",
+        "   X 16.5, TAP #8-32 X 14.5 (PLUG, THEN BOTTOMING), 2 PLACES; BLOW OUT",
+        "   CHIPS. REFIT, RE-SET THE FEELER, FIT 2X MHA-143. MEASURE MHA-004",
+        "   OUTER FACE TO OUTER FACE; CUT MHA-028 TO THAT -6.0 AND FACE BOTH",
+        "   ENDS; IT MUST SLIDE FREELY THROUGH BOTH BORES. FIT MHA-125 IN EACH.",
+        "   END PLAY 0.5-0.8 EACH END.",
+        "   PINION RIG: SHEET 7.",
+    )
+)
+
+RIG_STEPS = "\n".join(
+    (
+        "ASSEMBLY SEQUENCE CONT. - PINION RIG",
         "10. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT. MATCH-REAM THE",
         "    MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR SLIDE BY HAND).",
         "11. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
@@ -439,7 +465,7 @@ CHECKS = "\n".join(
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "   [PENDING: PINION BRACKET PLACEMENT AND TOOTH-COUNT RULINGS]",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 6, STEP 15).",
+        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 15).",
     )
 )
 
@@ -836,37 +862,58 @@ def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -
     _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
 
 
-def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any:
-    """The largest visible circular edge of one named instance: its head rim."""
-    view = _early_bound(view, "IView")
-    root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
+def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | None:
+    """The largest visible circular edge of one named instance: its head rim.
+
+    Reads the view exactly as ``_drawing_common._pick_component_anchor_edge``
+    does (the view object as placed, ``GetVisibleEntities2`` of the drawing
+    component's model component), the path that finds these screws' edges on
+    every build. r7 (leaf 20260923T180240Z-1-e6c4ca27) found no circular edge
+    on foot-screw-2 through an early-bound ``IView``; the log could not say
+    whether it saw no edges or no circles, so both counts are logged now.
+    """
+    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
+    if root is None:
+        raise RuntimeError(f"{label}: drawing view has no root component")
     component = None
-    for raw in tuple(root.GetChildren() or ()):
+    for raw in tuple(_early_bound(root, "IDrawingComponent").GetChildren() or ()):
         drawing_component = _early_bound(raw, "IDrawingComponent")
         name = str(drawing_component.Name or "").split("@", 1)[0]
         if name.replace("\\", "/").rsplit("/", 1)[-1] == instance:
-            component = drawing_component.Component
+            component = adapter._attempt(lambda dc=drawing_component: dc.Component, default=None)
             break
     if component is None:
         raise RuntimeError(f"{label}: {instance} is not in the view")
-    edges = tuple(view.GetVisibleEntities2(component, SW_VIEW_ENTITY_EDGE) or ())
-    best, best_radius = None, 0.0
+    edges = tuple(
+        adapter._attempt(
+            lambda: view.GetVisibleEntities2(component, SW_VIEW_ENTITY_EDGE), default=()
+        )
+        or ()
+    )
+    best, best_radius, circles = None, 0.0, 0
     for edge in edges:
-        curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
-        if not curve.IsCircle():
+        curve = adapter._attempt(
+            lambda e=edge: _early_bound(_early_bound(e, "IEdge").GetCurve(), "ICurve"),
+            default=None,
+        )
+        if curve is None or not adapter._attempt(lambda c=curve: bool(c.IsCircle()), default=False):
             continue
+        circles += 1
         radius = float(tuple(curve.CircleParams)[6])
         if radius > best_radius:
             best, best_radius = edge, radius
+    _telemetry.info(
+        f"{label}: head anchor {instance}: {len(edges)} visible edges, {circles} circular, "
+        f"largest r={best_radius * 1000.0:.3f} mm"
+    )
     _telemetry.event(
         "drawing.balloon_head_anchor",
         label=label,
         instance=instance,
         edges=len(edges),
+        circles=circles,
         radius_mm=best_radius * 1000.0,
     )
-    if best is None:
-        raise RuntimeError(f"{label}: {instance} shows no circular edge in the view")
     return best
 
 
@@ -909,8 +956,15 @@ def _head_anchored_balloons(
     items: dict[str, str],
     *,
     label: str,
-) -> list[Any]:
+) -> tuple[list[Any], frozenset[str]]:
+    """Balloons placed on a head rim, and the families they cover.
+
+    The preferred side's instance goes first, then the others. A family with
+    no visible head rim on any instance falls back to the shared picker with a
+    warning: the anchor is cosmetic, and must not fail an eight-sheet package.
+    """
     balloons = []
+    anchored = set()
     for stem, side in HEAD_ANCHORED.get(cluster, {}).items():
         candidates = sorted(
             (
@@ -919,17 +973,25 @@ def _head_anchored_balloons(
                 if instance.stem == stem and instance.name in facts.clusters[cluster]
             ),
             key=lambda instance: instance.origin_mm[2],
+            reverse=side == "north",
         )
-        if not candidates:
-            raise RuntimeError(f"{label}: no {stem} instance to anchor")
-        instance = candidates[0] if side == "south" else candidates[-1]
-        edge = _head_edge(adapter, view, instance.name, label=label)
+        edge = None
+        for instance in candidates:
+            edge = _head_edge(adapter, view, instance.name, label=label)
+            if edge is not None:
+                break
+        if edge is None:
+            _telemetry.warn(
+                f"{label}: no {stem} instance shows a head rim; the shared picker anchors it"
+            )
+            continue
         balloons.append(
             _insert_balloon_on_edge(
                 adapter, view, edge, stem=stem, expected_item=items[stem], label=label
             )
         )
-    return balloons
+        anchored.add(stem)
+    return balloons, frozenset(anchored)
 
 
 def _component_stem(component: Any) -> str:
@@ -1530,8 +1592,9 @@ def _place_cluster_sheet(
         key=lambda stem: int(items[stem]),
     )
     balloon_items = tuple((stem, items[stem]) for stem in stems)
-    anchored = HEAD_ANCHORED.get(cluster, {})
-    balloons = _head_anchored_balloons(adapter, view, cluster, facts, items, label=label)
+    balloons, anchored = _head_anchored_balloons(
+        adapter, view, cluster, facts, items, label=label
+    )
     balloons += add_component_bom_balloons(
         adapter,
         view,
@@ -1577,14 +1640,8 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         adapter,
         (
             (
-                "bank and rig sequence",
-                BANK_RIG_STEPS.format(
-                    cylinder_gears=facts.count("cylinder-gear"),
-                    cam_pins=facts.count("pinion-cam-pin"),
-                    pivot_blocks=facts.count("pinion-pivot-block"),
-                    cams=facts.count("pinion-cam"),
-                    slotted=facts.count("slotted-screw"),
-                ),
+                "cylinder bank sequence",
+                BANK_STEPS.format(cylinder_gears=facts.count("cylinder-gear")),
             ),
             ("general assembly notes", CONSUMABLES_NOTES),
         ),
@@ -1598,15 +1655,32 @@ def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[FIT_SHEET - 1])
     _heading(adapter, FIT_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="fit reference isometric")
-    return _stack_note_field(
+    findings = _stack_note_field(
+        adapter,
+        (
+            (
+                "pinion rig sequence",
+                RIG_STEPS.format(
+                    cam_pins=facts.count("pinion-cam-pin"),
+                    pivot_blocks=facts.count("pinion-pivot-block"),
+                    cams=facts.count("pinion-cam"),
+                    slotted=facts.count("slotted-screw"),
+                ),
+            ),
+        ),
+        NOTE_FIELD_LEFT,
+        label=f"sheet {FIT_SHEET} left note field",
+    )
+    findings += _stack_note_field(
         adapter,
         (
             ("cone station table", station_table_text(facts.cone_rows())),
             ("fit placeholder", FIT_PLACEHOLDER),
         ),
-        NOTE_FIELD_LEFT,
-        label=f"sheet {FIT_SHEET} note field",
+        FIT_RIGHT_FIELD,
+        label=f"sheet {FIT_SHEET} right note field",
     )
+    return findings
 
 
 def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:

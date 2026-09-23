@@ -22,7 +22,9 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # explode step wait for the drive-train integrator's single re-key (Main,
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
-PRE_REGISTERED_NUMBERS = frozenset({"MHA-139", "MHA-140", "MHA-141", "MHA-142"})
+PRE_REGISTERED_NUMBERS = frozenset(
+    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143"}
+)
 
 
 def _builder_stems() -> set[str]:
@@ -95,7 +97,8 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     texts = (
         drawing.ASSEMBLED_HEADING,
         drawing.CONE_CRANK_STEPS,
-        drawing.BANK_RIG_STEPS,
+        drawing.BANK_STEPS,
+        drawing.RIG_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -112,7 +115,8 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
     """3.5 mm text renders about 2.63 mm per character; a field is 194 mm wide."""
     for text in (
         drawing.CONE_CRANK_STEPS,
-        drawing.BANK_RIG_STEPS,
+        drawing.BANK_STEPS,
+        drawing.RIG_STEPS,
         drawing.CHECKS,
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
@@ -130,7 +134,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert len(names) == 8
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
-    assert names[drawing.FIT_SHEET - 1] == "MESH + FIT DETAILS"
+    assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
     assert "SHEET 7" in drawing.BOM_REFERENCE_CAPTION
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
@@ -142,13 +146,14 @@ def test_bom_descriptions_keep_one_line() -> None:
 
 
 def test_rig_is_located_by_its_parked_tip_gap() -> None:
-    steps = drawing.BANK_RIG_STEPS
+    steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
         assert phrase in steps, phrase
-    assert "ACCEPT 2.3-2.7 (SHEET 6, STEP 15)" in drawing.CHECKS
+    assert "ACCEPT 2.3-2.7 (SHEET 7, STEP 15)" in drawing.CHECKS
     assert "15. FACE A MHA-002 TOOTH TIP" in steps
     assert "SEE SHEET 8" in drawing.ASSEMBLED_HEADING
-    assert "SHEET 8" in drawing.BANK_RIG_STEPS
+    assert "SHEET 8" in drawing.RIG_STEPS
+    assert "SHEET 7" in drawing.BANK_STEPS
 
 
 def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
@@ -255,3 +260,91 @@ def test_note_fields_and_ring_fit() -> None:
     assert len(drawing.note_field_violations((0.010, 0.020, 0.300, 0.300), field)) == 4
     shift, overflows = drawing.ring_fit_shift((0.1, 0.1, 0.2, 0.2), (0.0, 0.0, 0.5, 0.5), grow=0.01)
     assert shift == pytest.approx((0.1, 0.1)) and overflows == []
+
+
+class _Adapter:
+    def _attempt(self, fn, default=None):
+        try:
+            return fn()
+        except Exception:
+            return default
+
+
+class _Curve:
+    def __init__(self, radius: float | None):
+        self.radius = radius
+
+    def IsCircle(self) -> bool:  # noqa: N802 - COM name
+        return self.radius is not None
+
+    @property
+    def CircleParams(self):  # noqa: N802 - COM name
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, self.radius)
+
+
+class _Edge:
+    def __init__(self, radius: float | None):
+        self.curve = _Curve(radius)
+
+    def GetCurve(self):  # noqa: N802 - COM name
+        return self.curve
+
+
+class _DrawingComponent:
+    def __init__(self, name: str):
+        self.Name = f"{name}@drive-train"
+        self.Component = name
+
+
+class _View:
+    """A placed view whose components show the given visible edges."""
+
+    def __init__(self, edges: dict[str, list[_Edge]]):
+        self.edges = edges
+        children = [_DrawingComponent(name) for name in edges]
+        self.root = type("Root", (), {"GetChildren": lambda _self: children})()
+
+    def RootDrawingComponent2(self, _flag):  # noqa: N802 - COM name
+        return self.root
+
+    def GetVisibleEntities2(self, component, kind):  # noqa: N802 - COM name
+        assert kind == drawing.SW_VIEW_ENTITY_EDGE
+        return tuple(self.edges[component])
+
+
+def _bank_facts():
+    instances = [
+        spec.Instance("foot-screw-1", "foot-screw", (0.0, 0.0, 80.0)),
+        spec.Instance("foot-screw-2", "foot-screw", (0.0, 0.0, -80.0)),
+    ]
+    return type(
+        "Facts",
+        (),
+        {"instances": instances, "clusters": {"cylinder-bank": ("foot-screw-1", "foot-screw-2")}},
+    )()
+
+
+def test_head_anchor_takes_the_largest_rim_and_falls_through_hidden_instances(monkeypatch):
+    placed = []
+    monkeypatch.setattr(
+        drawing,
+        "_insert_balloon_on_edge",
+        lambda _a, _v, edge, **kw: placed.append((edge, kw["stem"])) or edge,
+    )
+    rim, shank = _Edge(0.0027), _Edge(0.0014)
+    # r7: the south screw (preferred) showed nothing usable; the north one does.
+    view = _View({"foot-screw-1": [_Edge(None), shank, rim], "foot-screw-2": []})
+    balloons, anchored = drawing._head_anchored_balloons(
+        _Adapter(), view, "cylinder-bank", _bank_facts(), {"foot-screw": "26"}, label="t"
+    )
+    assert placed == [(rim, "foot-screw")] and balloons == [rim]
+    assert anchored == {"foot-screw"}
+
+
+def test_head_anchor_without_any_rim_leaves_the_family_to_the_shared_picker(monkeypatch):
+    monkeypatch.setattr(drawing, "_insert_balloon_on_edge", pytest.fail)
+    view = _View({"foot-screw-1": [_Edge(None)], "foot-screw-2": []})
+    balloons, anchored = drawing._head_anchored_balloons(
+        _Adapter(), view, "cylinder-bank", _bank_facts(), {"foot-screw": "26"}, label="t"
+    )
+    assert balloons == [] and anchored == frozenset()
