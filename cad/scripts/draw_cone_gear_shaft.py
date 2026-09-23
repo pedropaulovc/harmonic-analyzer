@@ -2,11 +2,12 @@ r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
 large (faced) end below it and every diameter above it on that same side
-view, each dimension line inside the land it measures.  The three short tip
-lands are 6.9 mm apart, so their diameter texts climb in steps: the tip's
-line rises highest and each text hangs to the RIGHT of its line above every
-line it spans.  A standard isometric supplies pictorial clarity, and one
-note names the gear seats the lands are fitted to.  Source geometry and
+view, each dimension line inside the land it measures.  The two short lands
+ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
+in steps: the tip's line rises highest and each text hangs to the RIGHT of
+its line above every line it spans.  A standard isometric supplies pictorial
+clarity, and the note names the gear seats the lands are fitted to and the
+tailstock support the tip land needs (U40).  Source geometry and
 native model fits stay authoritative: the sheet types no tolerance and no
 precision.
 
@@ -92,31 +93,34 @@ DONOR_CENTER = (0.360, 0.090)
 
 # Axial step stations (extrude depths Sec{i}End), all measured from the
 # large-end datum face: baseline dimensioning below the shaft, shortest
-# nearest the part.  The one radius rides above the journal shoulder it
+# nearest the part, each text centred between the big end and its shoulder.
+# The one radius rides above the journal shoulder it
 # attaches to (the fillet feature's first edge), its leader dropping straight
 # to that corner, right of the Ø9.525 text and left of the pivot finish.
 SIDE_KEEP = {
     "Sec0End": (0.2311, 0.1355),
-    "Sec1End": (0.1672, 0.1265),
-    "Sec2End": (0.1638, 0.1175),
-    "Sec3End": (0.1603, 0.1085),
+    "Sec1End": (0.1707, 0.1265),
+    "Sec2End": (0.1672, 0.1175),
+    "Sec3End": (0.1638, 0.1085),
     "Sec4End": (0.1499, 0.0995),
     "ShoulderR": (0.2000, 0.1920),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
-# land it measures (the big end is at sheet x 0.2526; land 1 spans
-# 0.0819..0.2096, land 2 0.0750..0.0819, land 3 0.0681..0.0750, land 4
-# 0.0503..0.0681); Ø12.231 stands just off the faced end.  The three tip
-# lands are only 6.9 mm apart, so a text spans its right-hand neighbours'
+# land it measures (the big end is at sheet x 0.2526; since U40 land 1 spans
+# 0.0888..0.2096, land 2 0.0819..0.0888, land 3 0.0750..0.0819, land 4
+# 0.0503..0.0750); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
+# only 6.9 mm long, so a tip-end text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
-# down, so no line rises through a text (codex, 18395f30).
+# down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
+# carry their lines mid-land; the tip's line stays 1.7 mm in from the tip
+# face, right of the tip finish glyph.
 SIDE_DIAMETERS = {
     "Sec0Dia": (0.2700, 0.1620),
     "Sec1Dia": (0.1400, 0.1730),
-    "Sec2Dia": (0.0810, 0.1760),
-    "Sec3Dia": (0.0690, 0.1880),
+    "Sec2Dia": (0.0853, 0.1760),
+    "Sec3Dia": (0.0785, 0.1880),
     "Sec4Dia": (0.0520, 0.2000),
 }
 # Sheet width of one diameter text with its stacked band, for the layout test.
@@ -187,6 +191,12 @@ def _add_shaft_axis(adapter: Any, view: Any) -> None:
     )
     if centerline is None:
         raise RuntimeError("failed to sketch the shaft axis centreline")
+    # A sheet sketch line prints in the under-defined sketch blue (run
+    # f2e72b0f); colour it black, as draw_top_frame's owned centrelines are.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0
+    if int(segment.Color) != 0:
+        raise RuntimeError("shaft axis centreline colour did not persist")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
 
