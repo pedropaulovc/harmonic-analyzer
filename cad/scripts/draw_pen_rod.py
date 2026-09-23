@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     _edge_endpoint_key,
@@ -28,6 +28,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
+    run_drawing_build,
 )
 from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
@@ -347,4 +348,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

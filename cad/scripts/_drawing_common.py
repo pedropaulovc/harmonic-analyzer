@@ -14,20 +14,24 @@ import math
 import os
 import sys
 from collections import Counter
+from datetime import UTC, datetime
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
+from typing import Any, Awaitable, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
 
 import _config
 import _telemetry
 from _common import (
+    OUT_FAILURES,
     _build_id,
     _early_bound,
+    _slug,
     _visible_document_paths,
     apply_custom_properties,
     capture_com_failure,
+    run_build,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
@@ -6397,3 +6401,63 @@ def draw_note_table(
         for x, text in zip(column_x, row, strict=True):
             if add_note(adapter, text, x, y) is None:
                 raise RuntimeError(f"failed to add schedule cell {text!r}")
+
+
+# swDocumentTypes_e.swDocDRAWING
+_DOC_DRAWING = 3
+
+
+def export_failure_pdf(adapter: Any, target: str) -> Path | None:
+    """Export the drawing a failed recipe left open, as forensic evidence.
+
+    A recipe failure -- a layout-audit abort, a BOM row that did not persist --
+    never reaches ``capture_com_failure``, so it used to leave nothing to look
+    at: the farm worker's workspace is disposable and the sheets died with it.
+    The PDF lands under ``cad/out/reports/failures/drawing-<target>/<UTC>/``,
+    which the doit parent lists in the leaf log and the farm worker uploads
+    beside ``task.log``. Returns the path, or ``None`` when there was nothing
+    to export (no drawing open yet) or the export failed. Never raises: the
+    evidence must not replace the failure it documents.
+    """
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    path = OUT_FAILURES / _slug(f"drawing-{target}") / stamp / f"{target.replace('_', '-')}.pdf"
+    outcome = "exported"
+    try:
+        model = adapter.currentModel
+        if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != _DOC_DRAWING:
+            outcome = "no_drawing"
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _early_bound(model, "IModelDoc2").SaveAs3(str(path), 0, 0)
+            if not path.is_file():
+                outcome = "no_file"
+    except Exception as exc:  # noqa: BLE001 -- evidence must not mask the failure
+        outcome = f"error: {exc!r}"
+    with contextlib.suppress(Exception):
+        _telemetry.event("drawing.failure_pdf", target=target, path=str(path), outcome=outcome)
+        if outcome == "exported":
+            _telemetry.info(f"drawing failure evidence PDF: {path}", path=str(path))
+        else:
+            _telemetry.warn(
+                f"drawing failure evidence PDF not exported ({outcome}): {path}",
+                path=str(path),
+                outcome=outcome,
+            )
+    return path if outcome == "exported" else None
+
+
+def run_drawing_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
+    """``run_build`` for a drawing recipe: a build that raises first exports the
+    sheets it got to (:func:`export_failure_pdf`), while the drawing is still
+    open -- ``run_build``'s teardown closes every document right after."""
+    script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "draw_drawing"
+    target = script.removeprefix("draw_")
+
+    async def build_or_capture(adapter: Any) -> dict[str, str]:
+        try:
+            return await build(adapter)
+        except Exception:
+            export_failure_pdf(adapter, target)
+            raise
+
+    return run_build(build_or_capture)

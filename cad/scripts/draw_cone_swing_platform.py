@@ -22,7 +22,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -34,6 +34,7 @@ from _drawing_common import (
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.com_variant import double_array
@@ -306,4 +307,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))
