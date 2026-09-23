@@ -13,7 +13,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
-    add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -31,9 +30,14 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
+    BACK_JOURNAL_Z,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
+    FRONT_JOURNAL_Z,
+    HEAD_CAP_SAG,
     HEAD_CENTER_Z,
+    HEAD_FRONT_Z,
+    OVERALL_LEN,
     SHAFT_DIA,
     SURFACE_FINISHES,
 )
@@ -59,16 +63,28 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-# Top-centre anchor. Beside the circle (x >= 0.135), clear of the SR7.3 BACK
-# CROWN note (x <= 0.078, y <= 0.224): below the circle it floated over the
-# 1:1 shaft and read as that view's label (Main, r7 eye-pass).
-DETAIL_LABEL_XY = (DETAIL_CENTER[0] - 0.057, DETAIL_CENTER[1] + 0.013)
+# The native "DETAIL A / SCALE 2:1" label sits centred under its own view,
+# this far below the view outline (its anchor is the label's top edge).
+DETAIL_LABEL_DROP = 0.002
+# Every turned diameter lives in an end-on Front-plane profile sketch, so the
+# end-on donor imports all three and each moves onto the 1:1 profile.
 DONOR_KEEP = {
     "ShaftDia": (0.030, 0.145),
     "NeckDia": (0.055, 0.145),
     "HeadDia": (0.030, 0.215),
 }
+# Profile scale is 1:1 with the head to the right, so model z maps to sheet
+# x = 0.200 - (z - 106.725) / 1000: the front land (z 49-61) spans x
+# 0.246-0.258 and the back land (z 202-214) x 0.093-0.105.  Land lengths ride
+# just above the shaft, each land's diameter hangs below it with its Ra symbol
+# beside it, and the two stations from the head shoulder stack under those.
 PRINCIPAL_KEEP = {
+    "FrontJournalLen": (0.252, 0.188),
+    "BackJournalLen": (0.099, 0.188),
+    "FrontJournalDia": (0.250, 0.150),
+    "BackJournalDia": (0.099, 0.150),
+    "FrontJournalFromHeadRear": (0.283, 0.130),
+    "BackJournalFromHeadRear": (0.207, 0.115),
     "NeckLen": (0.325, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
@@ -89,15 +105,25 @@ DETAIL_KEEP = {
 DIAMETER_POSITIONS = {
     "HeadDia": (0.340, 0.192),
     "NeckDia": (0.300, 0.194),
-    "ShaftDia": (0.235, 0.190),
+    # Below the bond zone, between the two land diameters.
+    "ShaftDia": (0.175, 0.150),
 }
 DIMENSION_CALLOUTS = {
     "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
     "OverallLen": "OVERALL",
     "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
+    "FrontJournalDia": "JOURNAL",
+    "BackJournalDia": "JOURNAL",
 }
-SHAFT_FLANK_Y = PRINCIPAL_CENTER[1] + SHAFT_DIA / 2000.0
+# The turning axis runs the full part and this far past each crown.
+AXIS_OVERSHOOT_MM = 3.0
+# Each land's Ra symbol hangs off the lower flank on the land's head side of
+# its diameter line, clear of the split-line rings at the land ends.
+JOURNAL_FINISHES = {
+    "front_journal": (FRONT_JOURNAL_Z + 2.0, (0.262, 0.150)),
+    "back_journal": (BACK_JOURNAL_Z + 2.0, (0.108, 0.150)),
+}
 
 
 def _move_dimension(
@@ -206,8 +232,51 @@ def _head_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
+def _add_turning_axis(adapter: Any, view: Any) -> None:
+    """Draw one centreline over the whole turned axis.
+
+    The journal split lines cut the Ø8 cylinder into five faces, so a
+    face-derived ``InsertCenterLine2`` would cover a single zone.  The axis is
+    instead a view-sketch centreline between two model points on it, created
+    direct-to-database so screen-space inference cannot snap an end onto the
+    crown apex.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the integral-arbor profile for its axis")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    front_z = HEAD_FRONT_Z - HEAD_CAP_SAG - AXIS_OVERSHOOT_MM
+    points = []
+    for z in (front_z, front_z + OVERALL_LEN + 2.0 * AXIS_OVERSHOOT_MM):
+        x, y = model_point_in_view(
+            adapter, view, (0.0, 0.0, z / 1000.0), label="integral-arbor axis end"
+        )
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateCenterLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if segment is None:
+        raise RuntimeError("failed to create the integral-arbor turning axis")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Color = 0  # COLORREF black, not the under-defined sketch blue.
+    if int(segment.Color) != 0:
+        raise RuntimeError("integral-arbor turning axis colour did not persist")
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+
+
 def _position_detail_label(adapter: Any, detail: Any) -> None:
-    """Keep the native detail label clear of the parent shaft."""
+    """Centre the native detail label under its own detail circle."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
@@ -217,7 +286,10 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
         raise RuntimeError(f"expected one native detail label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (*DETAIL_LABEL_XY, 0.0)
+    outline = tuple(float(value) for value in _early_bound(detail, "IView").GetOutline())
+    if len(outline) != 4:
+        raise RuntimeError("integral-arbor head detail has invalid bounds")
+    target = ((outline[0] + outline[2]) / 2.0, outline[1] - DETAIL_LABEL_DROP, 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native detail label")
     adapter.currentModel.EditRebuild3()
@@ -335,22 +407,24 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
-    add_view_centerline(
-        adapter,
-        principal,
-        face_xy=(PRINCIPAL_CENTER[0], PRINCIPAL_CENTER[1] + 0.001),
-        label="pinion arbor turning axis",
-    )
-    add_surface_finish(
-        adapter,
-        principal,
-        edge_xy=(PRINCIPAL_CENTER[0] + 0.025, SHAFT_FLANK_Y),
-        symbol_xy=(0.265, 0.205),
-        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
-        label="arbor bearing finish",
-        entity_type="SILHOUETTE",
-        char_height=0.0025,
-    )
+    _add_turning_axis(adapter, principal)
+    for key, (station_z, symbol_xy) in JOURNAL_FINISHES.items():
+        land_x, axis_y = model_point_in_view(
+            adapter,
+            principal,
+            (0.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} finish station",
+        )
+        add_surface_finish(
+            adapter,
+            principal,
+            edge_xy=(land_x, axis_y - SHAFT_DIA / 2000.0),
+            symbol_xy=symbol_xy,
+            control=surface_finish_by_key(SURFACE_FINISHES, key),
+            label=f"arbor {key} finish",
+            entity_type="SILHOUETTE",
+            char_height=0.0025,
+        )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _position_detail_label(adapter, detail)
