@@ -51,7 +51,6 @@ from _surface_finish import surface_finish_by_key
 from knife_mount_spec import (
     BLK_HALF_X,
     BORE_DIAMETER_TOLERANCE_MM,
-    BORE_FROM_TOP_TOLERANCE_MM,
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
@@ -564,22 +563,31 @@ def _clear_driven_parentheses_default(drawing_model: Any) -> None:
 
 
 def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
+    # BoreDia keeps its native symmetric band (swTolSYMMETRIC 4); BoreFromTop
+    # rides the title block's .XX (swTolNONE 0), so it must import bare.
     expected = {
-        "BoreDia": BORE_DIAMETER_TOLERANCE_MM,
-        "BoreFromTop": BORE_FROM_TOP_TOLERANCE_MM,
+        "BoreDia": (4, BORE_DIAMETER_TOLERANCE_MM),
+        "BoreFromTop": (0, 0.0),
     }
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        limit_mm = expected.pop(name, None)
-        if limit_mm is None:
+        contract = expected.pop(name, None)
+        if contract is None:
             continue
+        tolerance_type, limit_mm = contract
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        if int(tolerance.Type) != tolerance_type:
+            raise RuntimeError(
+                f"imported {name} tolerance type {int(tolerance.Type)}, "
+                f"expected {tolerance_type}"
+            )
+        if tolerance_type == 0:
+            continue
         limit_m = limit_mm / 1000.0
         if (
-            int(tolerance.Type) != 4
-            or abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
+            abs(float(tolerance.GetMinValue()) + limit_m) > 1e-9
             or abs(float(tolerance.GetMaxValue()) - limit_m) > 1e-9
         ):
             raise RuntimeError(
@@ -587,7 +595,7 @@ def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
             )
     if expected:
         raise RuntimeError(
-            f"native tolerances never reached sheet: {sorted(expected)}"
+            f"tolerance contracts never reached sheet: {sorted(expected)}"
         )
 
 

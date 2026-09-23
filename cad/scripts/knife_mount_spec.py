@@ -135,7 +135,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places carry the ordinary size tolerance and therefore live on the
-# actual model dimensions. BoreFromTop has the tighter explicit native band.
+# actual model dimensions. BoreFromTop prints two places at the title block's
+# .XX, which the interface's crown and gap stacks assume (knife-cc-17).
 # BoreFromSide prints one place: the bore and the tap share one centreline
 # (the tap's side location is only a reference read of it), and 6-mm walls
 # either side leave nothing for .XX to protect (machinist review, knife-cc-6).
@@ -156,6 +157,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BossProfile": {"BossFromEnd": 1},
     "Boss": {"BossHeight": 1},
 }
+
+if (
+    BORE_FROM_TOP_TOLERANCE_MM != knife_hanger.TITLE_BLOCK_XX_MM
+    or DRAWING_PRECISION["BlockProfile"]["BoreFromTop"] != 2
+):
+    raise AssertionError("BoreFromTop no longer prints the band its stacks assume")
 
 _PRECISION_NAMES = [
     (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names

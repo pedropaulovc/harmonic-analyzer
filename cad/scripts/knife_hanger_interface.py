@@ -128,8 +128,10 @@ MOUNT_BLOCK_TOP_Y = CASTING_UNDERSIDE_Y - MOUNT_GAP  # 998.65
 BLOCK_TOP_ABOVE_CROWN_MM = MOUNT_BLOCK_TOP_Y - KNIFE_CONTACT_Y  # 13.816
 # The mount dimensions its bore from the BLOCK top (knife_mount_spec), so the
 # crown's adverse depth below the seat stacks the boss-height band, the
-# BoreFromTop band and half the bore-diameter band.
-BORE_FROM_TOP_TOLERANCE_MM = 0.10
+# BoreFromTop band and half the bore-diameter band. BoreFromTop rides the
+# title block's .XX (Codex knife-cc-17 over-spec; Main 2026-09-23): .X would
+# drop the crown web under its 2.0 target and the fitted-stud gap under 0.25.
+BORE_FROM_TOP_TOLERANCE_MM = TITLE_BLOCK_XX_MM
 BORE_DIAMETER_PLUS_MM = 0.20
 CROWN_WEB_TARGET_MM = 2.0
 BOSS_HEIGHT_MIN_REQUIRED_MM = (
@@ -173,6 +175,12 @@ BOSS_WALL_MIN_MM = (
     BOSS_DIA_MM + BOSS_DIA_DEVIATIONS_MM[0] - THREAD_MAJOR_DIA_MM
 ) / 2.0
 MOUNT_GAP_MIN_MM = MOUNT_GAP + BOSS_HEIGHT_DEVIATIONS_MM[0]
+# With the stud cut to the measured seat-to-knife-line stack (MHA-A07 sheet 4)
+# the knife line is fixed instead: the boss band cancels and the block top
+# follows the crown's height above the bore axis.
+MOUNT_GAP_MIN_FITTED_MM = (
+    MOUNT_GAP - BORE_FROM_TOP_TOLERANCE_MM - BORE_DIAMETER_PLUS_MM / 2.0
+)
 # How far the tallest boss rises into the casting hole, against the crossbar.
 BOSS_PENETRATION_MAX_MM = (
     SHOULDER_SEAT_Y + BOSS_HEIGHT_DEVIATIONS_MM[1] - CASTING_UNDERSIDE_Y
@@ -214,6 +222,12 @@ if MOUNT_GAP_MIN_MM < MOUNT_GAP_MIN_MM_REQUIRED - 1e-9:
     raise AssertionError(
         f"knife-mount block top clears the casting by only {MOUNT_GAP_MIN_MM:.3f} mm "
         "with the boss at its shortest"
+    )
+if MOUNT_GAP_MIN_FITTED_MM < MOUNT_GAP_MIN_MM_REQUIRED - 1e-9:
+    raise AssertionError(
+        f"knife-mount block top clears the casting by only "
+        f"{MOUNT_GAP_MIN_FITTED_MM:.3f} mm with the stud fitted to the knife line "
+        "and the bore at its adverse location"
     )
 if BOSS_PENETRATION_MAX_MM > CASTING_CROSSBAR_HEIGHT_MM / 2.0:
     raise AssertionError(
