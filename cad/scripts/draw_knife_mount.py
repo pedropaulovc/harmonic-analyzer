@@ -300,8 +300,14 @@ TOP_KEEP: dict[str, tuple[float, float]] = {
         TOP_CENTER[1] + SUPPORT_Z_THICK * SHEET_SCALE[0] / 4000.0,
     ),
 }
+# Drawing policy rule 6/7: a process word is allowed where it IS the
+# requirement. The Ø12 knife-bearing bore carries Ra 1.6, which a drill does
+# not leave and a reamer does -- REAM is the requirement (Main, 2026-09-22,
+# reversing the knife-cc-10 DRILL/REAM rejection). The explicit ±0.2 stays:
+# it is the band the crown and rock-clearance stacks assume, and without it
+# the title block's DRILLED HOLES +0.10/0 row would be read instead.
 DIMENSION_CALLOUTS = {
-    "BoreDia": "THRU",
+    "BoreDia": "REAM THRU",
 }
 
 
@@ -326,6 +332,32 @@ def _uppercase_dimension_text(adapter: Any, drawing_model: Any) -> None:
         raise RuntimeError(f"failed to set {name}")
     if not bool(extension.GetUserPreferenceToggle(preference, 0)):
         raise RuntimeError(f"{name} did not persist")
+
+
+def _assert_callout_text_uppercase(display: Any, label: str) -> None:
+    """The rendered tap callout prints the ASME 'MIN', never 'min.'.
+
+    Reads the callout's rendered text (IDisplayData) plus its text
+    compartments on a fresh handle, logs them as evidence, and requires an
+    uppercase MIN with no lowercase 'min' anywhere.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    texts = {
+        f"compartment_{index}": str(display.GetText(index) or "")
+        for index in range(6)
+    }
+    annotation = _sw_type_info.early_bound_or_flag(
+        display.GetAnnotation(), "IAnnotation", "GetDisplayData"
+    )
+    data = _sw_type_info.early_bound_or_flag(
+        annotation.GetDisplayData(), "IDisplayData", "GetTextCount"
+    )
+    for index in range(int(data.GetTextCount())):
+        texts[f"rendered_{index}"] = str(data.GetTextAtIndex(index) or "")
+    _telemetry.info(f"{label} callout text: {texts!r}")
+    combined = " ".join(texts.values())
+    if "min" in combined or "MIN" not in combined:
+        raise RuntimeError(f"{label} does not print an uppercase MIN: {texts!r}")
 
 
 def _assert_boss_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
@@ -405,7 +437,9 @@ def _finish_tap_reference_dimension(
     return display
 
 @_telemetry.traced("drawing.knife_mount_boss_diameter")
-def _add_boss_turned_diameter(adapter: Any, section: Any) -> Any:
+def _add_boss_turned_diameter(
+    adapter: Any, drawing_model: Any, section: Any, model_boss_dia_m: float
+) -> Any:
     """Print the lathe-turned seat boss as a diameter on the side view.
 
     Drawing policy rule 7: a turned diameter is dimensioned on the side view,
@@ -414,6 +448,15 @@ def _add_boss_turned_diameter(adapter: Any, section: Any) -> Any:
     so its two flanks are the diameter's extremes: dimension flank to flank,
     prefix the diameter symbol, read the measured value back. Plain, not a
     reference: it is the boss's controlling size at the title-block .X band.
+
+    A dimension created on the sheet is driven (IsReference reads True by
+    construction), so SolidWorks encloses it in parentheses. Precedent: the
+    stud's 45 deg -- parentheses OFF, read back on a fresh handle together with
+    the rendered text, value gated against the model's own BossDia. Its band is
+    the title block's .X, so no tolerance is written. If the per-dimension
+    switch does not clear the parentheses, this drawing's own "Add parentheses
+    by default" document property is cleared and the switch re-applied
+    (knife-cc-15 failed with the parentheses still on).
     """
     half = BOSS_DIA * SHEET_SCALE[0] / 2000.0
     flank_y = (_front_y(BLK_TOP) + _front_y(SEAT_TOP)) / 2.0
@@ -431,23 +474,96 @@ def _add_boss_turned_diameter(adapter: Any, section: Any) -> Any:
     display = _sw_type_info.early_bound_or_flag(display, "IDisplayDimension", "SetText")
     display.SetText(1, "<MOD-DIAM>")  # swDimensionTextPrefix
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION["BossDia"], -1, -1, -1)
+    annotation = display.GetAnnotation()
+    if annotation is None:
+        raise RuntimeError(f"{label}: dimension has no annotation")
     display.ShowParenthesis = False
     rebuild_drawing(adapter, label=label)
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    actual_mm = abs(float(dimension.SystemValue)) * 1000.0
-    expected_mm = REFERENCE_DIMENSION_NOMINALS_MM["BossDia"]
+    state = _turned_diameter_state(annotation, model_boss_dia_m)
+    _telemetry.info(f"{label} (per-dimension switch): {state!r}")
+    if state["parenthesized"]:
+        _clear_driven_parentheses_default(drawing_model)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ShowParenthesis = False
+        rebuild_drawing(adapter, label=label)
+        state = _turned_diameter_state(annotation, model_boss_dia_m)
+        _telemetry.info(f"{label} (document default cleared): {state!r}")
     problems = []
-    if abs(actual_mm - expected_mm) > 1e-5:
-        problems.append(f"measured {actual_mm:g} mm, expected {expected_mm:g} mm")
-    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION["BossDia"]:
-        problems.append(f"precision {int(display.GetPrimaryPrecision2())}")
-    if "DIAM" not in str(display.GetText(1) or ""):
-        problems.append(f"prefix {display.GetText(1)!r}")
-    if bool(display.ShowParenthesis) or bool(dimension.IsReference()):
-        problems.append("prints as a reference dimension")
+    if abs(state["value_m"] - model_boss_dia_m) > _MODEL_VALUE_TOLERANCE_M:
+        problems.append(
+            f"measured {state['value_m'] * 1000.0!r} mm, model BossDia "
+            f"{model_boss_dia_m * 1000.0!r} mm"
+        )
+    if state["places"] != DRAWING_REFERENCE_PRECISION["BossDia"]:
+        problems.append(f"precision {state['places']}")
+    if "DIAM" not in state["prefix"]:
+        problems.append(f"prefix {state['prefix']!r}")
+    if state["parenthesized"]:
+        problems.append("still prints in parentheses")
     if problems:
-        raise RuntimeError(f"{label}: " + "; ".join(problems))
-    return display
+        raise RuntimeError(f"{label}: " + "; ".join(problems) + f": {state!r}")
+    return _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+
+
+# A drawn-edge dimension and the model's own parameter measure the same
+# B-rep: agreement to 1e-9 m (the stud's FINISHED_VALUE_TOLERANCE_M).
+_MODEL_VALUE_TOLERANCE_M = 1e-9
+# swUserPreferenceToggle_e.swDetailingDimsShowParenthesisByDefault, read off
+# this install's swconst.tlb (R2026x gen_py) -- the drawing subprocess has no
+# swconst constants loaded (knife-cc-14).
+_SHOW_PARENTHESIS_BY_DEFAULT = 48
+
+
+def _read_model_boss_diameter_m(adapter: Any) -> float:
+    """The source part's BossDia, read before the drawing opens."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    parameter = model.Parameter("BossDia@BossProfile")
+    if parameter is None:
+        raise RuntimeError("source part has no BossDia@BossProfile dimension")
+    return abs(float(_early_bound(parameter, "IDimension").SystemValue))
+
+
+def _turned_diameter_state(annotation: Any, model_boss_dia_m: float) -> dict[str, Any]:
+    """Value, places, prefix and rendered text on a fresh handle."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetDisplayData"
+    )
+    data = _sw_type_info.early_bound_or_flag(
+        annotation.GetDisplayData(), "IDisplayData", "GetTextCount"
+    )
+    rendered = [
+        str(data.GetTextAtIndex(index) or "")
+        for index in range(int(data.GetTextCount()))
+    ]
+    prefix = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    suffix = str(display.GetText(2) or "")  # swDimensionTextSuffix
+    show_parenthesis = bool(display.ShowParenthesis)
+    return {
+        "value_m": abs(float(dimension.SystemValue)),
+        "model_m": model_boss_dia_m,
+        "places": int(display.GetPrimaryPrecision2()),
+        "prefix": prefix,
+        "suffix": suffix,
+        "rendered": rendered,
+        "show_parenthesis": show_parenthesis,
+        # Logged, not gated: a sheet-created dimension is driven by construction.
+        "is_reference": bool(dimension.IsReference()),
+        "parenthesized": show_parenthesis
+        or any("(" in text or ")" in text for text in (prefix, suffix, *rendered)),
+    }
+
+
+def _clear_driven_parentheses_default(drawing_model: Any) -> None:
+    """Clear 'Add parentheses by default' on THIS drawing only, read back."""
+    name = "swDetailingDimsShowParenthesisByDefault"
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(_SHOW_PARENTHESIS_BY_DEFAULT, 0, False):
+        raise RuntimeError(f"failed to clear {name}")
+    if bool(extension.GetUserPreferenceToggle(_SHOW_PARENTHESIS_BY_DEFAULT, 0)):
+        raise RuntimeError(f"{name} did not clear")
+    _telemetry.info(f"{name} cleared on this drawing")
 
 
 def _assert_imported_tolerances(adapter: Any, annotations: list[Any]) -> None:
@@ -905,6 +1021,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     source_tap_contracts = _read_source_tap_depth_contracts(adapter)
+    model_boss_dia_m = _read_model_boss_diameter_m(adapter)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -1022,7 +1139,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hanger tap from finished side",
     )
 
-    _add_boss_turned_diameter(adapter, section)
+    _add_boss_turned_diameter(adapter, drawing_model, section, model_boss_dia_m)
 
     # Native Hole Wizard callout owns the thread size/class and blind depth.
     tap_callout = add_native_hole_callout(
@@ -1054,6 +1171,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "hanger-stud blind tap",
     )
     _suppress_dimension_line_pair(tap_callout, "hanger-stud blind tap callout")
+    # Resolved callout text is only current after a rebuild, on a fresh handle.
+    rebuild_drawing(adapter, label="hanger-stud blind tap text")
+    _assert_callout_text_uppercase(
+        tap_callout.GetAnnotation().GetSpecificAnnotation(), "hanger-stud blind tap"
+    )
 
     # A surface-finish annotation's sheet position is its LOWER-LEFT corner,
     # which is also where its leader starts: hung left of the bore the leader
