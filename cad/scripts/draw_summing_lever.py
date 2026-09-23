@@ -173,13 +173,14 @@ def _attach_radial_leaders(
         raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
 
 
-def _assert_reference_text(
+def _assert_arc_centre_text(
     adapter: Any, annotations: Any, names: tuple[str, ...], label: str
 ) -> None:
-    """Read back that the imported R138.8 centre locations print as reference.
+    """Read back that the imported R138.8 centre locations print as controlling.
 
-    The part authors "2X (" / ")" on both (build_summing_lever); this proves the
-    parentheses survived the model-annotation import onto the sheet.
+    The part authors a bare "2X " on both (build_summing_lever); R11 printed
+    them parenthesized, which left the arc with no controlling location (Codex
+    R11 B2), so a stray "(" or ")" fails here.
     """
     seen = set()
     for annotation in annotations:
@@ -190,12 +191,14 @@ def _assert_reference_text(
             annotation.GetSpecificAnnotation(), "IDisplayDimension"
         )
         texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-        if texts != ("2X (", ")"):
-            raise RuntimeError(f"{label}: {name} prints {texts!r}, not as reference")
+        if texts != ("2X ", "") or bool(display.ShowParenthesis):
+            raise RuntimeError(
+                f"{label}: {name} prints {texts!r}, not as a controlling 2X location"
+            )
         seen.add(name)
     missing = sorted(set(names) - seen)
     if missing:
-        raise RuntimeError(f"{label}: no reference dimension named {missing!r}")
+        raise RuntimeError(f"{label}: no arc-centre dimension named {missing!r}")
 
 
 FORM_FRONT_KEEP = {
@@ -683,7 +686,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
     )
-    _assert_reference_text(
+    _assert_arc_centre_text(
         adapter,
         top_dimensions,
         ("SummationArcCentreX", "SummationArcCentreZ"),
