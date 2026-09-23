@@ -39,7 +39,7 @@ def test_bore_has_the_single_machined_finish_contract() -> None:
     assert finish.face.diameter_mm == 8.0
 
 
-def test_mha102_fit_band_has_a_valid_intersection_at_both_shaft_limits() -> None:
+def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
     shaft_limits = (
         arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
         arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
@@ -49,22 +49,23 @@ def test_mha102_fit_band_has_a_valid_intersection_at_both_shaft_limits() -> None
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
     )
     assert shaft_limits == pytest.approx((7.98, 8.00))
-    assert bore_limits == pytest.approx((7.96, 7.98))
+    assert bore_limits == pytest.approx((8.00, 8.10))
+    # A stock 8 mm H7 reamer (8.000-8.015) lands inside the band.
+    assert bore_limits[0] <= 8.000 and 8.015 <= bore_limits[1]
+    minimum_clearance = bore_limits[0] - shaft_limits[1]
+    maximum_clearance = bore_limits[1] - shaft_limits[0]
+    assert minimum_clearance == pytest.approx(0.0)
+    assert maximum_clearance == pytest.approx(0.12)
+    assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
+    assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
 
-    minimum_interference, maximum_interference = (
-        spec.ARBOR_DIAMETRAL_INTERFERENCE_MM
-    )
-    assert (minimum_interference, maximum_interference) == pytest.approx(
-        (0.010, 0.030)
-    )
-    assert 0.0 < minimum_interference < maximum_interference
 
-    for shaft_dia in shaft_limits:
-        bore_for_max_interference = shaft_dia - maximum_interference
-        bore_for_min_interference = shaft_dia - minimum_interference
-        overlap_low = max(bore_limits[0], bore_for_max_interference)
-        overlap_high = min(bore_limits[1], bore_for_min_interference)
-        assert overlap_low < overlap_high
+def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
+    notes = spec.DRAWING_NOTES
+    assert "BOND TO MHA-102 WITH LOCTITE 638." in notes
+    assert "LOCATE DRUM ON ARBOR FROM ITS BACK (j=19) END." in notes
+    for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
+        assert retired not in notes, retired
 
 
 def test_part_metadata_preserves_material_finish_quantity() -> None:

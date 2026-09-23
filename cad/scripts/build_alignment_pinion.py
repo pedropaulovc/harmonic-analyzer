@@ -57,7 +57,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _gear import build_fixed_gear
@@ -70,7 +69,6 @@ from alignment_pinion_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
-    FACE_WIDTH_TOLERANCE_MM,
     GEAR_DATA,
     ISOMETRIC_VIEW_NOTE,
     OUTSIDE_DIA,
@@ -176,12 +174,6 @@ async def build(adapter) -> dict[str, str]:
         "GearBlankProfile",
         "OutsideDia",
         *deviations(OUTSIDE_DIA_BAND),
-    )
-    set_dimension_symmetric_tolerance(
-        adapter,
-        "GearBlank",
-        "FaceWidth",
-        FACE_WIDTH_TOLERANCE_MM,
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 

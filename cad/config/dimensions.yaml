@@ -1795,27 +1795,27 @@ sections:
       - confidence
       rows:
       - - Tooth count
-        - '42'
+        - '32'
         - —
-        - 'counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP'
-        - counted
+        - 'user correction 2026-09-22 (U25), superseding the 42 counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`); same DP as the meshing 120T cylinder gear'
+        - stated
         - high
       - - Pitch diameter
-        - 21.413 mm
-        - '0.843'
-        - 42 / DP 49.82 — same module as the cylinder train it meshes
+        - 16.314 mm
+        - '0.642'
+        - 32 / DP 49.82 — same module as the cylinder train it meshes
         - derived
         - med
       - - Outer diameter
-        - 22.433 mm
-        - '0.883'
-        - (42+2) / DP 49.82
+        - 17.334 mm
+        - '0.682'
+        - (32+2) / DP 49.82
         - derived
         - med
       - - Drum length
         - 143.2 mm
         - '5.638'
-        - 'spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch)'
+        - 'spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch); as modelled the back end stops 0.274 short of the j = 19 face (2.726 of 3.0 engaged), so the drum is located on the arbor from its back end'
         - derived
         - med
       - - Material

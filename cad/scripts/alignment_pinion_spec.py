@@ -53,12 +53,15 @@ BASE_TANGENT_SPAN_BAND = (0.0, -0.100)  # (upper, lower) deviations
 BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
-ARBOR_BORE_BAND = (-0.020, -0.040)  # (upper, lower) deviations; matched press
-# Finish the bore to the measured MHA-102 shaft. This is a matched-pair
-# acceptance range, not an interchangeable limit stack across random parts.
-ARBOR_DIAMETRAL_INTERFERENCE_MM = (0.010, 0.030)
-FACE_WIDTH = 143.2  # ±0.5 keeps all 20 gear stations covered at either limit
-FACE_WIDTH_TOLERANCE_MM = 0.5
+# Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
+# bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
+# stock 8 mm H7 reamer (8.000-8.015); against the MHA-102 SHAFT_H journal
+# (7.98-8.00) it leaves 0.000-0.120 diametral clearance, inside the 0.25 mm
+# bond gap the 638 technical data sheet allows.
+ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
+RETAINING_COMPOUND = "LOCTITE 638"
+RETAINING_COMPOUND_MAX_GAP_MM = 0.25
+FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
 OUTSIDE_DIA_BAND = (0.0, -0.10)  # finished tooth-tip envelope
 
 SURFACE_FINISHES = (
@@ -117,12 +120,10 @@ GEAR_DATA = gear_data_note(
 DRAWING_NOTES = "\n".join(
     (
         "MATES WITH CYLINDER-GEAR BANK MHA-027.",
-        "BORE LIMITS AND MATCHED FIT BOTH APPLY.",
         "MHA-102 ARBOR JOURNAL: DIA 8.00 +0.00/-0.02 (REF).",
-        "MATCH TO MEASURED MHA-102 PINION ARBOR FOR "
-        f"{ARBOR_DIAMETRAL_INTERFERENCE_MM[0]:.3f}-"
-        f"{ARBOR_DIAMETRAL_INTERFERENCE_MM[1]:.3f} DIAMETRAL INTERFERENCE.",
-        "143.2 +/-0.5 ENSURES FULL ENGAGEMENT AT ALL 20 MHA-027 GEAR STATIONS.",
+        "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
+        f"BOND TO MHA-102 WITH {RETAINING_COMPOUND}.",
+        "LOCATE DRUM ON ARBOR FROM ITS BACK (j=19) END.",
         "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND.",
     )
 )
