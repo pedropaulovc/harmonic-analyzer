@@ -77,7 +77,7 @@ RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], 0.125),
 }
 DIMENSION_CALLOUTS = {
-    "ArborBoreDia": "THRU",
+    "ArborBoreDia": "REAM THRU",
     "FaceWidth": "OVERALL; TEETH FULL LENGTH",
 }
 

@@ -35,6 +35,21 @@ _BASE_TOOTH_HALF_ANGLE = (
 _HALF_GAP_ANGLE = math.pi / TEETH - _BASE_TOOTH_HALF_ANGLE
 MIN_CHORD_FLOOR_DIA = 2.0 * _BASE_RADIUS * math.cos(_HALF_GAP_ANGLE)
 AS_CUT_RADIAL_TOOTH_DEPTH = OUTSIDE_DIA / 2.0 - MIN_CHORD_FLOOR_DIA / 2.0
+# Tooth thickness is inspected as a base-tangent span.  Three teeth put the
+# caliper contacts at r8.14, on the flanks at the pitch circle (r8.16).  The
+# model is cut to the standard thickness, which is the upper limit.  The drum
+# swings into the cylinder bank until its flanks seat, so centre distance
+# takes up any thinning; the band only has to keep the flanks present.
+BASE_TANGENT_SPAN_TEETH = 3
+BASE_TANGENT_SPAN = (
+    MODULE_MM
+    * math.cos(_PRESSURE_ANGLE_RAD)
+    * (
+        math.pi * (BASE_TANGENT_SPAN_TEETH - 0.5)
+        + TEETH * (math.tan(_PRESSURE_ANGLE_RAD) - _PRESSURE_ANGLE_RAD)
+    )
+)
+BASE_TANGENT_SPAN_BAND = (0.0, -0.100)  # (upper, lower) deviations
 BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
@@ -91,6 +106,11 @@ GEAR_DATA = gear_data_note(
             f"{AS_CUT_RADIAL_TOOTH_DEPTH:.3f}",
         ),
         ("TOOTH FORM", BASE_CHORD_ROOT_FORM),
+        (
+            f"BASE-TANGENT SPAN, OVER {BASE_TANGENT_SPAN_TEETH} TEETH (mm)",
+            f"{BASE_TANGENT_SPAN:.3f} +{BASE_TANGENT_SPAN_BAND[0]:.3f}"
+            f"/{BASE_TANGENT_SPAN_BAND[1]:.3f}",
+        ),
     ]
 )
 

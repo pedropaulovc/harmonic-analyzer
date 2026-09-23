@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 import _config
@@ -115,3 +117,23 @@ def test_material_readback_names_the_unresolved_text() -> None:
                 "MATERIAL: C36000 free-machining brass",
             ),
         )
+
+
+def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
+    k = spec.BASE_TANGENT_SPAN_TEETH
+    # Unroll the model's own base-circle tooth: k tooth arcs plus k-1 pitches.
+    unrolled = spec._BASE_RADIUS * (
+        2.0 * spec._BASE_TOOTH_HALF_ANGLE + (k - 1) * 2.0 * math.pi / spec.TEETH
+    )
+    assert spec.BASE_TANGENT_SPAN == pytest.approx(unrolled, abs=1e-9)
+    contact_r = math.hypot(spec._BASE_RADIUS, spec.BASE_TANGENT_SPAN / 2.0)
+    assert spec._BASE_RADIUS < contact_r < spec.OUTSIDE_DIA / 2.0
+    assert abs(contact_r - spec.PITCH_DIA / 2.0) < 0.05
+    assert spec.BASE_TANGENT_SPAN_BAND == (0.0, -0.100)
+    assert "BASE-TANGENT SPAN, OVER 3 TEETH (mm):  3.964 +0.000/-0.100" in spec.GEAR_DATA
+
+
+def test_fit_bore_callout_names_its_process() -> None:
+    import draw_alignment_pinion as draw
+
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"] == "REAM THRU"
