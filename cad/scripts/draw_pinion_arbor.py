@@ -35,6 +35,7 @@ from pinion_arbor_spec import (
     BACK_CAP_R,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     HEAD_CENTER_Z,
     HEAD_DIA,
     HEAD_REAR_Z,
@@ -262,8 +263,8 @@ def _detail_diameter(
     display.SetText(1, "<MOD-DIAM>")
     if str(display.GetText(1) or "") != "<MOD-DIAM>":
         raise RuntimeError(f"{label}: diameter prefix did not persist")
-    places = DRAWING_PRECISION_BY_NAME[dimension_name]
-    display.SetPrecision3(places, -1, -1, -1)
+    places = DRAWING_REFERENCE_PRECISION[dimension_name]
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[dimension_name], -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != places:
         raise RuntimeError(
             f"{label}: spec-owned {places}-place precision did not persist"

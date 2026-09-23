@@ -84,6 +84,13 @@ if set(DRAWING_PRECISION_BY_NAME) != (
     raise AssertionError(
         "every imported or drawing-created integral-arbor dimension needs authored places"
     )
+# The head and neck diameters are drawn on the sheet across the detail view's
+# silhouettes: their model dimensions live in end-on profile sketches that the
+# side detail cannot import.  A sheet-derived dimension takes its places from
+# DRAWING_REFERENCE_PRECISION (_drawing_contract), sourced from the same map.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    name: DRAWING_PRECISION_BY_NAME[name] for name in sorted(_DRAWING_CREATED_DIMENSIONS)
+}
 
 CROSS_HOLE_CALLOUT = (
     "MATCH-REAM THRU\n"
