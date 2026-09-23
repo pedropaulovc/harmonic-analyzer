@@ -261,7 +261,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    - **Thread engagement.** A fastener engages **≥ 1.5D** of full thread in
      its receiver at the worst case. Count full threads only: a tap or die
      leaves about 1–1.5 incomplete threads, so give it a thread relief or a
-     deeper tap drill rather than letting them eat the engagement.
+     deeper tap drill rather than letting them eat the engagement. The CAD
+     owns installed engagement: the build's seat-fit and stack asserts
+     (e.g. `require_blind_seat_fit`) prove it. The assembly review checks it
+     only where the package gives the numbers, and otherwise records it as
+     not verifiable, without gating.
    - **Adjust at fit-up rather than stack.** Where loose bands cannot hold a
      worst-case stack, prefer a fit-up adjustment stated on the assembly
      steps (slot, shim, feeler-set, cut-to-fit, match-drill) over tightening

@@ -79,12 +79,12 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   its setting procedure stated without ambiguity.
 - Margins for a first-time builder. Judge fasteners and stacks at the WORST
   CASE of the printed bands, not at nominal and not by root-sum-square.
-  The part drawings cannot see how a screw is installed, so installed
-  engagement is this package's job: every screwed joint states its
-  full-thread engagement, or gives the screw length, clearance stack and
-  tapped depth to compute it. A joint that gives neither is a clarity
-  finding: ask for the engagement to be stated, and do not invent values.
-  Then check that:
+  Installed engagement is proven by the source model's build checks. Check
+  it here where the package gives the numbers (screw length, clearance
+  stack, tapped depth, or a stated engagement). Where it does not, record
+  "engagement not verifiable from the package" in minor; do not invent
+  values or ask the sheet to add them. Where the numbers are given, check
+  that:
   - each screw engages at least 1.5 x its nominal diameter of FULL thread in
     its receiver, counting neither clearance holes nor the one to one and a
     half incomplete threads a tap or die leaves;
@@ -174,9 +174,9 @@ view or item for every finding, and say the fix):
   view group bunched against an edge or visibly unbalanced, balloons or leaders
   crossing, views too small to identify parts, a missing or noncompliant
   Shaded With Edges isometric, a step order that is hard to follow, an exploded
-  view that does not read, an otherwise identifiable matched-fit mate
-  missing its name or assigned drawing/part number, or a screwed joint whose
-  installed engagement is neither stated nor computable.
+  view that does not read, or an otherwise identifiable matched-fit mate
+  missing its name or assigned drawing/part number.
 
-- minor: taste and polish, plus stated accepted exceptions.
+- minor: taste and polish, stated accepted exceptions, and engagement not
+  verifiable from the package.
 An empty list is a valid answer for any category. Never pad a category.
