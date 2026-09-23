@@ -269,21 +269,25 @@ def _assert_arm_end_identity(adapter) -> None:
             if len(_grouped(row["radii"])) == len(radii_wanted)
             and all(
                 abs(got[0] - radius) <= IDENTITY_MM
-                for got, radius in zip(_grouped(row["radii"]), sorted(radii_wanted))
+                for got, radius in zip(
+                    _grouped(row["radii"]), sorted(radii_wanted), strict=True
+                )
             )
         ]
         if len(matches) != 1:
             raise RuntimeError(f"{name}: expected one body with radii {radii_wanted}; census {census}")
         row = matches[0]
         radii = _grouped(row["radii"])
-        for (radius, count), got in zip(sorted(want["radii"]), radii):
+        for (radius, count), got in zip(sorted(want["radii"]), radii, strict=True):
             if count is not None and got[1] != count:
                 raise RuntimeError(f"{name}: {got[1]} cylinder faces at r {radius:g}, expected {count}")
         planes = _grouped(row["planes"])
         wanted = sorted(want["planes"])
         if len(planes) != len(wanted):
             raise RuntimeError(f"{name}: axial faces {planes} != stations {wanted}")
-        for (x, count, area), (got_x, got_count, got_area) in zip(wanted, planes):
+        for (x, count, area), (got_x, got_count, got_area) in zip(
+            wanted, planes, strict=True
+        ):
             if abs(got_x - x) > IDENTITY_MM:
                 raise RuntimeError(f"{name}: axial face at {got_x!r}, expected {x!r} mm")
             if count is not None and got_count != count:
@@ -807,8 +811,11 @@ async def build(adapter) -> dict[str, str]:
         slot_profile,
         label="spring screw slot",
         dims=slot,
-        names=("SlotDepth", "SlotWidth", None, None),
-        drives=('"ScrewSlotDepth"', '"ScrewSlotW"', None, None),
+        # The axial station stays native like the other stations; the height
+        # follows the screw axis ("ArmY") so a LegTop/BendR or slot-width edit
+        # keeps the slot centred on the head.
+        names=("SlotDepth", "SlotWidth", None, "SlotBottomY"),
+        drives=('"ScrewSlotDepth"', '"ScrewSlotW"', None, '"ArmY" - "ScrewSlotW" / 2'),
     )
     await ensure_fully_defined(adapter, "spring screw slot sketch")
     check("exit_sketch spring screw slot", await adapter.exit_sketch())

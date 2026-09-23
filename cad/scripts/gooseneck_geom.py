@@ -57,7 +57,10 @@ SCREW_HEAD_T = 4.2
 # plug are similar-expansion steels, so their centered cold-fit gap is retained
 # to first order through brazing rather than translated into a diametral band.
 PLUG_DIA = 11.85
-PLUG_T = 6.0
+# Policy rule 12 (U27): full-thread engagement >= 1.5D at the printed worst
+# case. The plug prints at .X (+/-0.8), so 7.0 leaves 6.2 = 1.77D of #6-32
+# (the former 6.0 gave 5.2 = 1.48D). The under-head length grows with it.
+PLUG_T = 7.0
 PLUG_BRAZE_RADIAL_CLEARANCE = 0.075
 SPRING_SCREW_PLUG_ENGAGEMENT_MM = PLUG_T
 SPRING_SCREW_UNDERHEAD_LENGTH_MM = (

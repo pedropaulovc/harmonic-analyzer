@@ -60,6 +60,25 @@ def test_screw_slot_leaves_a_two_millimetre_web_at_the_printed_worst_case() -> N
     assert worst >= 2.0
 
 
+def test_screw_engages_one_and_a_half_diameters_at_the_printed_worst_case() -> None:
+    """Policy rule 12 (U27): full-thread engagement >= 1.5D at worst case, with
+    the screw clamped and at the open (eye-installation) gap."""
+    import _config
+    import gooseneck_spec
+
+    rows = {1: "linear_1pl", 2: "linear_2pl", 3: "linear_3pl"}
+
+    def band(name: str) -> float:
+        places = gooseneck_spec.DRAWING_PRECISION_BY_NAME[name]
+        return float(_config.title_block(rows[places])["value_in"]) * 25.4
+
+    plug = geom.PLUG_T - band("PlugDepth")
+    shank = geom.SPRING_SCREW_UNDERHEAD_LENGTH_MM - band("UnderHeadLength")
+    need = 1.5 * geom.SCREW_THREAD_MAJOR_DIA
+    for gap in (geom.SPRING_SCREW_CLAMPED_GAP_MM, geom.SPRING_SCREW_OPEN_GAP_MM):
+        assert min(plug, shank - gap) >= need
+
+
 def test_thicker_head_clears_the_counter_spring_half_turn() -> None:
     """The head grows outboard only; the raised half-turn keeps 1.5 mm to it."""
     import spring_mount_geom
