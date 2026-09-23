@@ -249,3 +249,140 @@ def test_seat_boss_clears_the_casting_hole_and_holds_its_thread_wall() -> None:
         hanger.SHOULDER_SEAT_Y + hanger.BOSS_HEIGHT_DEVIATIONS_MM[1]
         < hanger.CASTING_TOP_Y
     )
+
+
+class _MemberNotFound(Exception):
+    """Stands in for pywintypes.com_error (-2147352573, 'Member not found.')."""
+
+
+class _Dimension:
+    __slots__ = ("SystemValue",)
+    INTERFACE = "IDimension"
+
+    def __init__(self, value_m: float) -> None:
+        self.SystemValue = value_m
+
+    def IsReference(self) -> bool:
+        return True  # a sheet-created dimension is driven by construction
+
+
+class _DisplayData:
+    __slots__ = ("_texts",)
+    INTERFACE = "IDisplayData"
+
+    def __init__(self, texts: list[str]) -> None:
+        self._texts = texts
+
+    def GetTextCount(self) -> int:
+        return len(self._texts)
+
+    def GetTextAtIndex(self, index: int) -> str:
+        return self._texts[index]
+
+
+class _PropertyGetResult:
+    """What a late-bound method read as a property returns: calling it fails."""
+
+    __slots__ = ()
+
+    def __call__(self, *args: object) -> None:
+        raise _MemberNotFound("Member not found.")
+
+
+class _LateBoundAnnotation:
+    """IAnnotation as display.GetAnnotation() hands it back, unbound.
+
+    knife-cc-16: pywin32's dynamic dispatch reads GetSpecificAnnotation as a
+    property get and then calls the result, which is not a method.
+    """
+
+    __slots__ = ("bound",)
+
+    def __init__(self, bound: "_Annotation") -> None:
+        self.bound = bound
+
+    @property
+    def GetSpecificAnnotation(self) -> _PropertyGetResult:
+        return _PropertyGetResult()
+
+    @property
+    def GetDisplayData(self) -> _PropertyGetResult:
+        return _PropertyGetResult()
+
+
+class _Annotation:
+    __slots__ = ("_display", "_data")
+    INTERFACE = "IAnnotation"
+
+    def __init__(self, display: "_DisplayDimension", texts: list[str]) -> None:
+        self._display = display
+        self._data = _DisplayData(texts)
+
+    def GetSpecificAnnotation(self) -> "_DisplayDimension":
+        return self._display
+
+    def GetDisplayData(self) -> _DisplayData:
+        return self._data
+
+
+class _DisplayDimension:
+    __slots__ = ("ShowParenthesis", "_texts", "_dimension", "_annotation")
+    INTERFACE = "IDisplayDimension"
+
+    def __init__(self, value_m: float, compartments: dict[int, str], rendered: list[str]) -> None:
+        self.ShowParenthesis = False
+        self._texts = compartments
+        self._dimension = _Dimension(value_m)
+        self._annotation = _Annotation(self, rendered)
+
+    def GetAnnotation(self) -> _LateBoundAnnotation:
+        return _LateBoundAnnotation(self._annotation)
+
+    def GetDimension2(self, index: int) -> _Dimension:
+        return self._dimension
+
+    def GetText(self, index: int) -> str:
+        return self._texts.get(index, "")
+
+    def GetPrimaryPrecision2(self) -> int:
+        return knife_mount_spec.DRAWING_REFERENCE_PRECISION["BossDia"]
+
+
+def _bind_like_makepy(obj: object, interface: str) -> object:
+    """_early_bound for the doubles: binds the late IAnnotation, checks the rest."""
+    if obj is None:
+        return None
+    if isinstance(obj, _LateBoundAnnotation):
+        obj = obj.bound
+    assert getattr(obj, "INTERFACE", None) == interface, (obj, interface)
+    return obj
+
+
+def test_sheet_dimension_readbacks_bind_the_annotation_before_calling_it(
+    monkeypatch,
+) -> None:
+    """knife-cc-16 died calling GetSpecificAnnotation on an unbound IAnnotation."""
+    import pytest
+
+    import draw_knife_mount as drawing
+
+    monkeypatch.setattr(drawing, "_early_bound", _bind_like_makepy)
+    boss_m = knife_mount_spec.BOSS_DIA / 1000.0
+
+    plain = _DisplayDimension(boss_m, {1: "<MOD-DIAM>"}, ["Ø", "9.5"])
+    # Positive control: the unbound handle fails exactly as the farm leaf did.
+    with pytest.raises(_MemberNotFound):
+        plain.GetAnnotation().GetSpecificAnnotation()
+    state = drawing._turned_diameter_state(plain.GetAnnotation(), boss_m)
+    assert not state["parenthesized"] and state["is_reference"]
+    assert state["value_m"] == boss_m and state["rendered"] == ["Ø", "9.5"]
+
+    wrapped = _DisplayDimension(boss_m, {1: "<MOD-DIAM>"}, ["(", "Ø9.5", ")"])
+    assert drawing._turned_diameter_state(wrapped.GetAnnotation(), boss_m)["parenthesized"]
+
+    upper = _DisplayDimension(0.0, {}, ["Ø3.80 ▽ 14.65", "#10-24 UNC ▽ 10.95 MIN"])
+    drawing._assert_callout_text_uppercase(upper, "tap")
+    for rendered in (["#10-24 UNC ▽ 10.95 min."], ["#10-24 UNC ▽ 10.95"]):
+        lower = _DisplayDimension(0.0, {}, rendered)
+        with pytest.raises(RuntimeError, match="uppercase MIN"):
+            drawing._assert_callout_text_uppercase(lower, "tap")
