@@ -291,8 +291,7 @@ table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-
-No rows are accepted yet.
+| MHA-142 post-to-platform screws (MSC 40923898, 1/4-20 × 3-1/2 slotted fillister, nominal 86.0, cut to fit at assembly: flush to 0.3 short of the MHA-091 underside, never proud) | thread engagement 5.92–6.35 mm (0.93–1.0D) in the MHA-091 1/4 plate as supplied (6.22 stock minimum, less the 0.3 cut-to-fit allowance) | the screw end must not stand proud of the plate, which swings over the base | 2026-09-23 |
 
 Pending: cone gears T006–T024 webs (#846 / U38 study).
 

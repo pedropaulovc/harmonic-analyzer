@@ -161,7 +161,9 @@ FRONT_KEEP = {
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
     "CrankBossDia": (0.132, 0.120),
-    "CrankBoreDia": (0.155, 0.172),
+    # Held 10 mm clear of View B's toleranced crank-above-cone text: at
+    # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
+    "CrankBoreDia": (0.149, 0.172),
 }
 # The Ø44 collar is dimensioned on its true-shape plan circle, not across the
 # elevation: there its dimension line sat directly under the crank-bore size
@@ -1044,7 +1046,9 @@ async def build(adapter: Any) -> dict[str, str]:
         0.202,
         0.104,
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.052)
+    # Nine note lines run about 40 mm down from this anchor; at 0.052 the
+    # block crossed the bottom inner border by 1.03 mm (r7 audit).
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.0555)
 
     # Attaching dimensions and symbols can leave a stale hidden-line display.
     # Reassert each manufacturing view after its final annotation.
