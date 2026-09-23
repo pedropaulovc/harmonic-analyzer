@@ -11,10 +11,12 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
+    _feature_by_name,
     anchor_point_to_origin,
     apply_color,
     apply_material,
@@ -23,6 +25,7 @@ from _common import (
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
+    feature_name_by_type,
     force_rebuild,
     name_bore_axis,
     name_dimensions,
@@ -35,6 +38,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -43,18 +47,24 @@ from _drawing_marks import (
     set_dimension_prefix,
 )
 from _fit_limits import deviations
-from _part_pmi import author_part_pmi
+from _gtol_spec import CylinderFace
+from _part_pmi import _face_geometry, _face_matches, _resolve_faces, author_part_pmi
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
     BACK_CAP_SAG,
+    BACK_JOURNAL_FROM_HEAD_REAR,
+    BACK_JOURNAL_Z,
     CROSS_HOLE_FROM_HEAD_REAR,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     EXPOSED_SHAFT_LEN,
+    FRONT_JOURNAL_FROM_HEAD_REAR,
+    FRONT_JOURNAL_Z,
     HEAD_CAP_R,
     HEAD_CAP_SAG,
     HEAD_CENTER_Z,
@@ -63,6 +73,8 @@ from pinion_arbor_spec import (
     HEAD_LEN,
     HEAD_REAR_Z,
     ISOMETRIC_VIEW_NOTE,
+    JOURNAL_DIA_BAND,
+    JOURNAL_LEN,
     NECK_DIA,
     NECK_END_Z,
     NECK_LEN,
@@ -93,6 +105,10 @@ V_NECK = math.pi * NECK_R**2 * NECK_LEN
 V_HEAD = math.pi * HEAD_R**2 * HEAD_LEN
 V_FRONT_CAP = math.pi * HEAD_CAP_SAG**2 * (3.0 * HEAD_CAP_R - HEAD_CAP_SAG) / 3.0
 V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
+# Split lines reach this far past the shaft flank so the projection crosses
+# the whole Ø8 face on both sides of the Top plane.
+SPLIT_OVERHANG = 2.0
+JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
 
 
 def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float) -> float:
@@ -167,6 +183,173 @@ async def _add_axial_reference(
     return dims.apply(adapter, feature_name)
 
 
+def _shaft_faces(adapter) -> list[object]:
+    spec = CylinderFace(SHAFT_DIA)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    faces = []
+    for body in part.GetBodies2(0, False) or ():
+        face = _early_bound(body, "IBody2").GetFirstFace()
+        while face is not None:
+            geometry = _face_geometry(face)
+            if geometry is not None and _face_matches(geometry, spec):
+                faces.append(geometry.face)
+            face = _early_bound(face, "IFace2").GetNextFace()
+    return faces
+
+
+def _journal_face(adapter, prefix: str, journal_z: float) -> object:
+    label = f"{prefix} land"
+    spec = CylinderFace(SHAFT_DIA, contains_z_mm=journal_z + JOURNAL_LEN / 2.0)
+    return _resolve_faces(adapter.currentModel, {label: spec})[label]
+
+
+async def _add_journal_land(
+    adapter,
+    *,
+    prefix: str,
+    journal_z: float,
+    station_expression: str,
+) -> list[tuple[str, str]]:
+    """Split one MHA-056 journal land off the Ø8 shaft and dimension it.
+
+    One Top-plane sketch owns the land: two real cross lines at its ends
+    (projected both ways they cut the cylinder into its own face), a
+    construction witness on the flank between them, and the three native
+    dimensions the sheet prints -- station from the head shoulder, land
+    length, and the diameter that carries the journal band (policy rule 2).
+    """
+    feature_name = f"{prefix}Reference"
+    start_v = -journal_z
+    end_v = -(journal_z + JOURNAL_LEN)
+    reach = SHAFT_R + SPLIT_OVERHANG
+    dims = SketchDims()
+    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        f"{feature_name} axis",
+        await adapter.add_centerline(0.0, -HEAD_REAR_Z, 0.0, end_v),
+    )
+    near = check(
+        f"{feature_name} head-side split",
+        await adapter.add_line(-reach, start_v, reach, start_v),
+    )
+    far = check(
+        f"{feature_name} crown-side split",
+        await adapter.add_line(-reach, end_v, reach, end_v),
+    )
+    witness = check(
+        f"{feature_name} flank witness",
+        await adapter.add_line(SHAFT_R, start_v, SHAFT_R, end_v),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{witness}: failed to become construction geometry")
+    for line, relation in (
+        (axis, "vertical"),
+        (witness, "vertical"),
+        (near, "horizontal"),
+        (far, "horizontal"),
+    ):
+        check(
+            f"{feature_name} {line} {relation}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    for first, second, relation in (
+        (f"{axis}.end", far, "midpoint"),
+        (f"{near}.start", f"{far}.start", "vertical_points"),
+        (f"{near}.end", f"{far}.end", "vertical_points"),
+        (f"{witness}.start", f"{near}.start", "horizontal_points"),
+        (f"{witness}.end", f"{axis}.end", "horizontal_points"),
+    ):
+        check(
+            f"{feature_name} {first} {relation} {second}",
+            await adapter.add_sketch_constraint(first, second, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, -HEAD_REAR_Z, f"{feature_name} shoulder"
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} split reach",
+        await adapter.add_sketch_dimension(
+            f"{far}.start", f"{far}.end", "horizontal_distance", 2.0 * reach
+        ),
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} station",
+        await adapter.add_sketch_dimension(
+            f"{axis}.start",
+            f"{witness}.start",
+            "vertical_distance",
+            journal_z - HEAD_REAR_Z,
+        ),
+    )
+    dims.record(f"{prefix}FromHeadRear", station_expression)
+    check(
+        f"{feature_name} length",
+        await adapter.add_sketch_dimension(
+            f"{witness}.start", f"{witness}.end", "vertical_distance", JOURNAL_LEN
+        ),
+    )
+    dims.record(f"{prefix}Len", '"JournalLen"')
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{witness}.start",
+        (SHAFT_R + 5.0, (start_v + end_v) / 2.0),
+        f"{prefix}Dia",
+    )
+    dims.record(f"{prefix}Dia", '"ShaftDia"')
+    await ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    drive_jobs = dims.apply(adapter, feature_name)
+
+    # Projected split line: the sketch at mark 4, the Ø8 face it cuts at mark 1.
+    before = len(_shaft_faces(adapter))
+    target = _journal_face(adapter, prefix, journal_z)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        feature_name, "SKETCH", 0.0, 0.0, 0.0, False, 4, null_callout(), 0
+    ):
+        raise RuntimeError(f"{feature_name}: failed to select the split sketch")
+    selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.Mark = 1
+    if not _early_bound(target, "IEntity").Select4(True, selection_data):
+        raise RuntimeError(f"{feature_name}: failed to select the Ø8 shaft face")
+    previous = feature_name_by_type(adapter, "PLine")
+    model.InsertSplitLineProject(False, False)  # both directions: a full ring
+    model.ClearSelection2(True)
+    split = feature_name_by_type(adapter, "PLine")
+    if not split or split == previous:
+        raise RuntimeError(f"{feature_name}: projected split line was not created")
+    _feature_by_name(adapter, split).Name = f"{prefix}Split"
+    after = len(_shaft_faces(adapter))
+    if after != before + 2:
+        raise RuntimeError(
+            f"{prefix}Split: Ø8 shaft faces went {before} -> {after}; "
+            "expected the land split off as its own face"
+        )
+    area = float(_early_bound(_journal_face(adapter, prefix, journal_z), "IFace2").GetArea())
+    area_mm2 = area * 1e6
+    if abs(area_mm2 - JOURNAL_AREA) > 0.01 * JOURNAL_AREA:
+        raise RuntimeError(
+            f"{prefix}Split: land face area {area_mm2:.1f} mm^2 != "
+            f"{JOURNAL_AREA:.1f} mm^2"
+        )
+    _telemetry.success(
+        f"{prefix}Split: Ø8 shaft faces {before} -> {after}, land {area_mm2:.1f} mm^2",
+        faces=after,
+        land_area_mm2=area_mm2,
+    )
+    return drive_jobs
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
@@ -189,6 +372,9 @@ async def build(adapter) -> dict[str, str]:
         "BackRimFromHeadRear": BACK_RIM_FROM_HEAD_REAR,
         "CrossHoleFromHeadRear": CROSS_HOLE_FROM_HEAD_REAR,
         "OverallLen": OVERALL_LEN,
+        "JournalLen": JOURNAL_LEN,
+        "FrontJournalFromHeadRear": FRONT_JOURNAL_FROM_HEAD_REAR,
+        "BackJournalFromHeadRear": BACK_JOURNAL_FROM_HEAD_REAR,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -461,7 +647,20 @@ async def build(adapter) -> dict[str, str]:
         end_v=-(SHAFT_LEN + BACK_CAP_SAG),
         drive_expression='"OverallLen"',
     )
-
+    drive_jobs += await _add_journal_land(
+        adapter,
+        prefix="FrontJournal",
+        journal_z=FRONT_JOURNAL_Z,
+        station_expression='"FrontJournalFromHeadRear"',
+    )
+    drive_jobs += await _add_journal_land(
+        adapter,
+        prefix="BackJournal",
+        journal_z=BACK_JOURNAL_Z,
+        station_expression='"BackJournalFromHeadRear"',
+    )
+    if len(_shaft_faces(adapter)) != 5:
+        raise RuntimeError("the Ø8 shaft must read as two journal lands and three plain zones")
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
@@ -474,6 +673,12 @@ async def build(adapter) -> dict[str, str]:
 
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "FrontJournalReference", "FrontJournalDia", *deviations(JOURNAL_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BackJournalReference", "BackJournalDia", *deviations(JOURNAL_DIA_BAND)
     )
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
