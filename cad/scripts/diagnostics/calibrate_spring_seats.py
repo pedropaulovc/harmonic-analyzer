@@ -3,14 +3,19 @@
 The production assemblies insert every supplier spring at a FIXED measured
 placement and only certify it (zero native overlap, bounded separation). That
 table goes stale whenever an anchor part moves -- the channel lever's spring
-hole, the gooseneck's arm end, the summing lever's tap stations, or a supplier
-end loop. This driver re-measures it with the same native predicates the gate
-uses, on the same three-part fixtures the retired in-build search used:
+hole, the summing lever's tap stations, or a supplier end loop. This driver
+re-measures the channel rows with the same native predicates the gate uses, on
+the same three-part fixture the retired in-build search used:
 
-* channel: ``channel-lever`` (at the station's solved tilt) + ``spring-hook``
-  + one ``9432K31`` length variant, per distinct calibrated amplitude;
-* counter: ``boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``gooseneck``, per preset (the gooseneck height is the measured output).
+``channel-lever`` (at the station's solved tilt) + ``spring-hook`` + one
+``9432K31`` length variant, per distinct calibrated amplitude.
+
+The counter seats (``presets.<name>.counter``) do NOT come from here. The
+counter eye is clamped between the gooseneck's screw head and its tube end, and
+bears on the tube's OD corner, so its seat couples X and Y; a Y-only contact
+bracket can never clear it (spring-seats-r4 spent 40 min reaching that
+refusal). ``calibrate_summing_clamp.py`` certifies that pose natively and
+merges it with its own ``--apply-report``.
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -61,34 +66,24 @@ import _config  # noqa: E402
 import _telemetry  # noqa: E402
 import channel_kinematics  # noqa: E402
 import channel_spring_stock_geom as channel_stock  # noqa: E402
-import gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
-    component_origin,
     component_transform,
     place_component,
     place_components_batch,
 )
 from _common import (  # noqa: E402
-    SPRING_BLACK,
     _early_bound,
-    apply_color,
-    apply_material,
     check,
-    force_rebuild,
     run_build,
-    save_part_and_images,
 )
 from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
-from _stock_fastener import _blank_recipe_references  # noqa: E402
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rot_z_rows  # noqa: E402
 from build_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
-from cone_pivot_post_installation import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
-from diagnostics.diag_build_1330K524 import build_1330K524  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 SPRINGS_YAML = ROOT / "cad/config/machine/springs.yaml"
@@ -294,171 +289,16 @@ async def _calibrate_channel(
     raise RuntimeError(f"channel a={amplitude:g}: native seating did not converge")
 
 
-# --------------------------------------------------------------- counter
-
-
-async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
-    check("create_part", await adapter.create_part())
-    try:
-        await build_1330K524(adapter, None, length_mm=length_mm)
-    finally:
-        if hasattr(adapter, "_mcm_com_map"):
-            delattr(adapter, "_mcm_com_map")
-    _blank_recipe_references(adapter)
-    await force_rebuild(adapter)
-    await apply_material(adapter, str(_config.parts("counter-spring")["material"]))
-    await apply_color(adapter, SPRING_BLACK)
-    await save_part_and_images(adapter, name, [])
-    _close_active_part(adapter)
-
-
-async def _calibrate_counter(
-    adapter, preset: str, amplitudes: list[float], report: dict
-) -> dict:
-    """Measure one preset's counter seat; returns the ``presets.<name>.counter`` row."""
-    balance = spring_mounts.solve_bank_balance(amplitudes)
-    if not balance.static_balance or balance.counter_pose is None:
-        raise RuntimeError(f"{preset}: counter cannot balance the channel bank")
-    seed = balance.counter_pose
-    ux, uy = seed.axis_xy
-    gooseneck_y = (
-        seed.upper_eye_xy[1]
-        + spring_mounts.counter_upper_support_offset(seed.axis_xy)
-        - gooseneck_geom.ARM_Y
-    )
-    variant = f"counter-spring-calib-{preset}"
-    await _build_counter_variant(adapter, variant, seed.length_mm)
-    lower_direction = (-ux, -uy, 0.0)
-    upper_direction = (0.0, -1.0, 0.0)
-    bracket = spring_mounts.MIN_CLEARANCE_MM / 2.0
-    titles: list[str] = []
-    try:
-        check("create counter seat fixture", await adapter.create_assembly())
-        fixture = _early_bound(adapter.currentModel, "IModelDoc2")
-        boss, counter, gooseneck = await place_components_batch(
-            adapter,
-            [
-                {
-                    "part": "boss-hook",
-                    "position": [*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z],
-                    "rotation": [0.0, 0.0, 0.0],
-                    "rows": IDENTITY,
-                    "ground": True,
-                },
-                {
-                    "part": variant,
-                    "position": [*seed.centre_xy, SUMMING_Z],
-                    "rotation": euler_from_rows(seed.rotation_rows),
-                    "rows": seed.rotation_rows,
-                    "ground": True,
-                },
-                {
-                    "part": "gooseneck",
-                    "position": [spring_mounts.COLUMN_X, gooseneck_y, SUMMING_Z],
-                    "rotation": [0.0, 180.0, 0.0],
-                    "rows": ROT_Y_180,
-                    "ground": True,
-                },
-            ],
-            label="counter seat fixture",
-        )
-        titles = _owned_titles(adapter, fixture, [boss, counter, gooseneck])
-        allowance = _allowance_mm()
-        lower = solve_component_contact(
-            adapter,
-            counter,
-            boss,
-            lower_direction,
-            bracket,
-            label=f"{preset} counter lower",
-            locate_only=True,
-        )
-        _land(adapter, counter, lower_direction, _correction_mm(lower, allowance))
-        upper = solve_component_contact(
-            adapter,
-            gooseneck,
-            counter,
-            upper_direction,
-            bracket,
-            label=f"{preset} counter upper",
-            locate_only=True,
-        )
-        _land(adapter, gooseneck, upper_direction, _correction_mm(upper, allowance))
-        lower_check = solve_component_contact(
-            adapter,
-            counter,
-            boss,
-            lower_direction,
-            bracket,
-            label=f"{preset} counter lower verify",
-            locate_only=True,
-        )
-        upper_check = solve_component_contact(
-            adapter,
-            gooseneck,
-            counter,
-            upper_direction,
-            bracket,
-            label=f"{preset} counter upper verify",
-            locate_only=True,
-        )
-        for label, contact in (("lower", lower_check), ("upper", upper_check)):
-            if not _seated(f"{preset} counter {label}", contact, allowance):
-                raise RuntimeError(
-                    f"{preset} counter {label}: landed pose is not seated ({contact!r})"
-                )
-        check_no_interference(adapter)
-        actual_centre = component_origin(adapter, counter)
-        actual_gooseneck_y = component_origin(adapter, gooseneck)[1]
-    finally:
-        _close_all(adapter, titles)
-    dx, dy = (actual_centre[i] - seed.centre_xy[i] for i in range(2))
-    pose = replace(
-        seed,
-        centre_xy=tuple(actual_centre[:2]),
-        lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
-        upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
-    )
-    report["counter"].append(
-        {
-            "preset": preset,
-            "seed": _pose_record(seed),
-            "seed_gooseneck_origin_y_mm": gooseneck_y,
-            "lower": asdict(lower),
-            "upper": asdict(upper),
-            "lower_verify": asdict(lower_check),
-            "upper_verify": asdict(upper_check),
-        }
-    )
-    _telemetry.success(
-        f"{preset} counter: spring moved {_correction_mm(lower, allowance):.9g} mm along -axis, gooseneck "
-        f"{_correction_mm(upper, allowance):.9g} mm along -Y; L={pose.length_mm:.9f}, eyes x "
-        f"{pose.lower_eye_xy[0]:.6f}/{pose.upper_eye_xy[0]:.6f}, gooseneck y {actual_gooseneck_y:.9f}"
-    )
-    return {
-        "pose": _pose_record(pose),
-        "gooseneck_origin_y_mm": actual_gooseneck_y,
-        "final_distance_mm": {
-            "lower": lower_check.seed_distance_mm,
-            "upper": upper_check.seed_distance_mm,
-        },
-    }
-
-
 # ---------------------------------------------------------------- driver
 
 
-def _merge_yaml(
-    channel_rows: list[dict], counters: dict[str, dict], source: str
-) -> None:
+def _merge_yaml(channel_rows: list[dict], source: str) -> None:
     import yaml
 
     document = yaml.safe_load(SPRINGS_YAML.read_text(encoding="utf-8"))
     springs = document["springs"]
     springs["source"] = source
     springs["channel_seats"] = channel_rows
-    for preset, counter in counters.items():
-        springs["presets"][preset]["counter"] = counter
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
     header = "\n".join(
         line
@@ -480,11 +320,17 @@ def apply_report(path: Path, source: str) -> int:
             f"--apply-report merges a completed report only; {path} has status "
             f"{report.get('status')!r}"
         )
+    if report.get("counters") or report.get("counter"):
+        raise SystemExit(
+            f"{path} carries a seat-fixture counter pass; counter seats come from "
+            "calibrate_summing_clamp.py --apply-report, and merging these would "
+            "overwrite its clamp-certified rows"
+        )
     channel_rows = report.get("channel_seats")
-    counters = report.get("counters")
-    for key, value in (("channel_seats", channel_rows), ("counters", counters)):
-        if not value:
-            raise SystemExit(f"--apply-report needs a non-empty {key}; {path} has {value!r}")
+    if not channel_rows:
+        raise SystemExit(
+            f"--apply-report needs a non-empty channel_seats; {path} has {channel_rows!r}"
+        )
     table = _config.machine("springs", "presets")
     # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
     # amplitude exactly (no fit, no interpolation), so a report that calibrated
@@ -503,14 +349,7 @@ def apply_report(path: Path, source: str) -> int:
             f"must cover all configured amplitudes; missing {missing}. Calibrate "
             f"{sorted(table)} together, or drop --apply-report."
         )
-    stale = sorted(set(table) - set(report.get("presets") or []))
-    if stale:
-        raise SystemExit(
-            "--apply-report rewrites only the presets the report carries, so the "
-            f"report must cover every configured preset; missing {stale}. Calibrate "
-            f"{sorted(table)} together, or drop --apply-report."
-        )
-    _merge_yaml(channel_rows, counters, source)
+    _merge_yaml(channel_rows, source)
     print(f"--apply-report read {path}")
     print(f"--apply-report wrote {SPRINGS_YAML}")
     return 0
@@ -553,24 +392,17 @@ async def calibrate(
         "status": "started",
         "presets": presets,
         "channel": [],
-        "counter": [],
     }
     channel_rows: list[dict] = []
-    counters: dict[str, dict] = {}
     try:
         for index, amplitude in enumerate(amplitudes):
             channel_rows.append(
                 await _calibrate_channel(adapter, amplitude, index, report)
             )
-        for name in presets:
-            counters[name] = await _calibrate_counter(
-                adapter, name, [float(a) for a in table[name]["amplitudes_mm"]], report
-            )
         report["channel_seats"] = channel_rows
-        report["counters"] = counters
         report["status"] = "completed"
         if write:
-            _merge_yaml(channel_rows, counters, source)
+            _merge_yaml(channel_rows, source)
             report["written"] = str(SPRINGS_YAML)
         return {"report": str(output)}
     except BaseException:

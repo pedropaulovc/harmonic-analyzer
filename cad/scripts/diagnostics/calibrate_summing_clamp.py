@@ -29,21 +29,31 @@ import counter_spring_stock_geom as stock  # noqa: E402
 import gooseneck_geom as goose  # noqa: E402
 import spring_mount_geom as mounts  # noqa: E402
 from _assembly import component_transform, place_components_batch  # noqa: E402
-from _common import _early_bound, check, force_rebuild, run_build  # noqa: E402
+from _common import (  # noqa: E402
+    SPRING_BLACK,
+    _early_bound,
+    apply_color,
+    apply_material,
+    check,
+    force_rebuild,
+    run_build,
+    save_part_and_images,
+)
 from _cwm import put_component_pose  # noqa: E402
 from _native_spring_contact import native_component_interference  # noqa: E402
+from _stock_fastener import _blank_recipe_references  # noqa: E402
 from _transforms import ROT_Y_180, euler_from_rows  # noqa: E402
 from cone_pivot_post_installation import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import solve_component_contact  # noqa: E402
 from diagnostics.calibrate_spring_seats import (  # noqa: E402
     _allowance_mm,
-    _build_counter_variant,
     _close_active_part,
     _close_all,
     _owned_titles,
     _pose_record,
     _seated,
 )
+from diagnostics.diag_build_1330K524 import build_1330K524  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 PARTS = ROOT / "cad/out/sldprt"
@@ -60,6 +70,21 @@ FACE_BODY = {"plug": "plug", "tube": "tube", "head": "screw", "shank": "screw"}
 # Identity tolerances, never contact/placement allowances.
 IDENTITY_MM = 1e-5
 IDENTITY_AREA_MM2 = 1e-4
+
+
+async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
+    check("create_part", await adapter.create_part())
+    try:
+        await build_1330K524(adapter, None, length_mm=length_mm)
+    finally:
+        if hasattr(adapter, "_mcm_com_map"):
+            delattr(adapter, "_mcm_com_map")
+    _blank_recipe_references(adapter)
+    await force_rebuild(adapter)
+    await apply_material(adapter, str(_config.parts("counter-spring")["material"]))
+    await apply_color(adapter, SPRING_BLACK)
+    await save_part_and_images(adapter, name, [])
+    _close_active_part(adapter)
 
 
 def _values(raw, count, label):

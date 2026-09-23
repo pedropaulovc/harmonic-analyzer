@@ -9,7 +9,9 @@ the clear endpoint never inside the interfering region.
 
 from __future__ import annotations
 
+import json
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -228,3 +230,65 @@ def test_driver_takes_the_seat_only_when_no_parent_holds_it(monkeypatch, held) -
 
     assert driver.main() == "built"
     assert taken == ([] if held else ["calibrate-spring-seats"])
+
+
+def _channel_report(tmp_path, **extra) -> Path:
+    rows = _config.machine("springs", "channel_seats")
+    report = {"status": "completed", "channel_seats": rows, **extra}
+    path = tmp_path / "report.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return path
+
+
+def test_apply_report_refuses_a_seat_fixture_counter_pass(
+    monkeypatch, tmp_path
+) -> None:
+    """Counter seats come from calibrate_summing_clamp, never from this fixture.
+
+    Its Y-only bracket cannot clear the clamped eye on the tube's OD corner
+    (spring-seats-r4), so an old report's counters are stale geometry; merging
+    them would overwrite the clamp-certified rows.
+    """
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    before = springs.read_bytes()
+    report = _channel_report(
+        tmp_path, counters={"neutral": {"gooseneck_origin_y_mm": 0.0}}
+    )
+
+    with pytest.raises(SystemExit, match="calibrate_summing_clamp"):
+        driver.apply_report(report, source="test")
+    assert springs.read_bytes() == before
+
+
+def test_apply_report_merges_channel_rows_and_keeps_the_counters(
+    monkeypatch, tmp_path
+) -> None:
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    springs.write_bytes(driver.SPRINGS_YAML.read_bytes())
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    rows = _config.machine("springs", "channel_seats")
+    moved = [
+        {**rows[0], "final_distance_mm": {"lower": 1.25e-5, "upper": 1.5e-5}},
+        *rows[1:],
+    ]
+    report = tmp_path / "report.json"
+    report.write_text(
+        json.dumps({"status": "completed", "channel_seats": moved}), encoding="utf-8"
+    )
+
+    assert driver.apply_report(report, source="test") == 0
+    merged = yaml.safe_load(springs.read_text(encoding="utf-8"))["springs"]
+    original = yaml.safe_load(driver.SPRINGS_YAML.read_text(encoding="utf-8"))[
+        "springs"
+    ]
+    assert merged["channel_seats"] == moved
+    for preset, row in original["presets"].items():
+        assert merged["presets"][preset]["counter"] == row["counter"]
