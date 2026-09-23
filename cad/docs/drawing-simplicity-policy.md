@@ -273,7 +273,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 ## Named exceptions
 
 Accepted shortfalls against rule 12. Each is specific to the parts named; it
-is not precedent for anything else.
+is not precedent for anything else. The blind reviewer sees only the sheets,
+so it reports a row's shortfall as a blocker unless the package itself states
+the exception. A blocker that matches a row (same parts, shortfall within the
+recorded range) is recorded against that row and does not gate. Any other
+finding on those parts still gates.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
@@ -301,7 +305,8 @@ all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
 A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. Minor findings are recorded, not gating. Regression tests must defend
+finding. A `FIX` whose only gating findings are blockers matching a named
+exception counts as `SHIP`. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
 line counts, or mocked API-call sequences. Native drawing generation must verify
 persisted dimension values, tolerances, reference state, and required view modes;

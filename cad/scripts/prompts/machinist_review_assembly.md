@@ -78,7 +78,11 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.
 - Margins for a first-time builder. Judge fasteners and stacks at the WORST
-  CASE of the printed bands, not at nominal and not by root-sum-square:
+  CASE of the printed bands, not at nominal and not by root-sum-square.
+  Apply these checks only where the package itself gives the lengths,
+  depths and bands they need (a BOM screw length, a stated stack, a
+  cut-to-fit step). Where it does not, the part drawings own that check:
+  do not invent values or flag it. Otherwise check that:
   - each screw engages at least 1.5 x its nominal diameter of FULL thread in
     its receiver, counting neither clearance holes nor the one to one and a
     half incomplete threads a tap or die leaves;
