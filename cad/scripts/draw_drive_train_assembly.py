@@ -205,11 +205,13 @@ ASSEMBLED_HEADING_XY = (0.222, 0.263)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
 # Notes pitch 4.525 mm a line (summing-assembly.pdf): ~47 lines fit the full
-# left column, ~39 the right one above the title block. With every ruling in,
-# steps 1-7 fill sheet 6's left column and steps 8-9 plus the general notes its
-# right; steps 10-17 continue on sheet 7 beside the station table, whose right
-# field stops above the 1:8 reference view (Main, layout A).
-FIT_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
+# left column, ~24 the right one above the 1:8 reference view that every sheet
+# needs for its title-block property links (finalize_drawing refuses a sheet
+# without a view: r8, leaf 20260923T214354Z-1-4126331f). With every ruling in,
+# sheet 6 carries steps 1-7 and the general notes on the left and steps 8-9 on
+# the right; steps 10-17 continue on sheet 7 beside the station table (Main,
+# layout A).
+ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
 # --- BOM identities: released part numbers and descriptions ------------------
@@ -330,12 +332,14 @@ CONE_CRANK_STEPS = "\n".join(
         # slotted fillister, through the unchanged 6.02 counterbore. Its floor
         # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
         # length could end 0.98 proud; each screw is cut to its own hole
-        # (pivot). Engagement is capped by the 6.35 plate: a named, user-
-        # accepted exception to the 1.5D rule of docs/machining-dfm.md.
+        # (pivot). Engagement is capped by the plate, printed as 1/4 1018 CF
+        # flat bar as supplied (U41, 6.22 min less the 0.3 cut: 5.92 = 0.93D
+        # worst case, swing): a named, user-accepted exception to the 1.5D
+        # rule of docs/machining-dfm.md.
         "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
-        "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 6.05-6.35",
-        "   (0.95-1.0D): ACCEPTED EXCEPTION TO THE 1.5D RULE.",
+        "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
+        "   (0.93-1.0D): ACCEPTED EXCEPTION TO THE 1.5D RULE.",
         # U30 (user, 2026-09-23, option (a)): one #6-32 SHCS up through the
         # MHA-091 slot, height and side set by the shim pack at fit-up. Wording
         # from swing (dt-tip-block-attachment-options-20260923.md section 2(a)).
@@ -399,7 +403,7 @@ BANK_STEPS = "\n".join(
         "   MHA-004 WITH A COMBINATION SQUARE. HOLD; SPOT MHA-035 THROUGH EACH",
         "   MHA-004 FOOT HOLE WITH AN 11/64 TRANSFER PUNCH. LIFT BANK AND",
         "   MHA-004 OFF. ON THE MILL, BASE SUPPORTED AT ITS OVERHANG: DRILL #29",
-        "   X 16.5, TAP #8-32 X 14.5 (PLUG, THEN BOTTOMING), 2 PLACES; BLOW OUT",
+        "   X 19.5, TAP #8-32 X 16.0 (PLUG, THEN BOTTOMING), 2 PLACES; BLOW OUT",
         "   CHIPS. REFIT, RE-SET THE FEELER, FIT 2X MHA-143. MEASURE MHA-004",
         "   OUTER FACE TO OUTER FACE; CUT MHA-028 TO THAT -6.0 AND FACE BOTH",
         "   ENDS; IT MUST SLIDE FREELY THROUGH BOTH BORES. FIT MHA-125 IN EACH.",
@@ -1625,6 +1629,9 @@ def _place_cluster_sheet(
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[SEQUENCE_SHEET - 1])
     _heading(adapter, SEQUENCE_SHEET)
+    _reference_iso(
+        adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric"
+    )
     findings = _stack_note_field(
         adapter,
         (
@@ -1632,6 +1639,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 "cone and crank sequence",
                 CONE_CRANK_STEPS.format(cone_gears=facts.count("cone-gear")),
             ),
+            ("general assembly notes", CONSUMABLES_NOTES),
         ),
         NOTE_FIELD_LEFT,
         label=f"sheet {SEQUENCE_SHEET} left note field",
@@ -1643,9 +1651,8 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 "cylinder bank sequence",
                 BANK_STEPS.format(cylinder_gears=facts.count("cylinder-gear")),
             ),
-            ("general assembly notes", CONSUMABLES_NOTES),
         ),
-        NOTE_FIELD_RIGHT,
+        ISO_RIGHT_FIELD,
         label=f"sheet {SEQUENCE_SHEET} right note field",
     )
     return findings
@@ -1677,7 +1684,7 @@ def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
             ("cone station table", station_table_text(facts.cone_rows())),
             ("fit placeholder", FIT_PLACEHOLDER),
         ),
-        FIT_RIGHT_FIELD,
+        ISO_RIGHT_FIELD,
         label=f"sheet {FIT_SHEET} right note field",
     )
     return findings
@@ -1695,7 +1702,6 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
         NOTE_FIELD_LEFT,
         label=f"sheet {CHECKS_SHEET} left note field",
     )
-    right_field = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
     findings += _stack_note_field(
         adapter,
         (
@@ -1707,7 +1713,7 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 ),
             ),
         ),
-        right_field,
+        ISO_RIGHT_FIELD,
         label=f"sheet {CHECKS_SHEET} right note field",
     )
     return findings

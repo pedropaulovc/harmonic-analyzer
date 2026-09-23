@@ -348,3 +348,20 @@ def test_head_anchor_without_any_rim_leaves_the_family_to_the_shared_picker(monk
         _Adapter(), view, "cylinder-bank", _bank_facts(), {"foot-screw": "26"}, label="t"
     )
     assert balloons == [] and anchored == frozenset()
+
+
+def test_every_text_sheet_places_a_view_for_its_title_block() -> None:
+    """finalize_drawing refuses a sheet with no view (r8 leaf 20260923T214354Z-1-4126331f)."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    placers = {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("_place_")
+    }
+    for name in ("_place_sequence_sheet", "_place_fit_sheet", "_place_checks_sheet"):
+        calls = {
+            call.func.id
+            for call in ast.walk(placers[name])
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+        }
+        assert "_reference_iso" in calls, name
