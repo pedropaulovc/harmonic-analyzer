@@ -3,11 +3,12 @@ r"""Create the curated manufacturing drawing for through hub MHA-137."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -29,7 +30,9 @@ from crank_hub_spec import (
     CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HUB_BARREL_DIA,
     HUB_LENGTH,
+    HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
     SEAT_CALLOUT,
     SERVICE_PIN_HOLE_SPEC,
@@ -52,37 +55,65 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-FRONT_CENTER = (0.090, 0.155)  # outboard end view, looking inboard
-RIGHT_CENTER = (0.225, 0.155)  # axial section/silhouette view
-ISO_CENTER = (0.355, 0.215)
-SIDE_BOTTOM = RIGHT_CENTER[1] - HUB_LENGTH * VIEW_SCALE[0] / 2000.0
-SERVICE_PIN_CENTER = (
-    RIGHT_CENTER[0],
-    SIDE_BOTTOM + SERVICE_PIN_STATION * VIEW_SCALE[0] / 1000.0,
-)
+_S = VIEW_SCALE[0] / 1000.0  # sheet metres per model millimetre
+# Turned part, laid as it sits in the lathe (policy rule 7): the *Right view
+# rotated a quarter turn so the axis is horizontal, inboard end on the left
+# and the faced outboard end on the right.  +90 degrees sends model +Y to
+# paper-left and model +Z (the six-o'clock MHA-138 seam) to paper-down.  The
+# outboard end view is the *Bottom orientation turned half a turn, which is
+# exactly the third-angle RIGHT view of that profile: it sits on the profile's
+# axis to its right, with the seam at six o'clock as the notes call it.
+SIDE_VIEW_ANGLE = math.pi / 2.0
+END_VIEW_ANGLE = math.pi
+SIDE_CENTER = (0.200, 0.160)
+END_CENTER = (0.295, SIDE_CENTER[1])
+ISO_CENTER = (0.380, 0.225)
+
+
+def _sheet_x(station_mm: float) -> float:
+    """Sheet X of a model-Y station (0 = outboard face) on the side view."""
+    return SIDE_CENTER[0] - (station_mm - HUB_LENGTH / 2.0) * _S
+
+
+def _sheet_y(z_mm: float) -> float:
+    """Sheet Y of a model-Z offset from the axis on the side view (+Z down)."""
+    return SIDE_CENTER[1] - z_mm * _S
+
+
+OUTBOARD_X = _sheet_x(0.0)
+SHOULDER_X = _sheet_x(HUB_SEAT_LENGTH)
+INBOARD_X = _sheet_x(HUB_LENGTH)
+SERVICE_PIN_CENTER = (_sheet_x(SERVICE_PIN_STATION), SIDE_CENTER[1])
 SERVICE_PIN_DIA = blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC)
-# Pick the barrel's cylindrical face off-axis and above the MHA-024 cross-hole.
-# The through hole is seen end-on here, so a pick inside its circle sees no
-# face (run 20260923T023246758Z-97bfca38 picked 2 mm below its centre).
-BARREL_FACE_PICK = (
-    RIGHT_CENTER[0] + 0.012,
-    SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA * VIEW_SCALE[0] / 2000.0 + 0.007,
+SERVICE_PIN_TOP_RIM = (
+    SERVICE_PIN_CENTER[0],
+    SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA / 2.0 * _S,
 )
-# Every size and callout sits outside the silhouettes.  The bore callout
-# stands above the end view.  The side view's three lengths share the faced
-# outboard end as one baseline on the left; its diameters stand above (barrel)
-# and below (seat), which leaves the right side clear for the cross-hole
-# callout's leader.
-SIDE_TOP = SIDE_BOTTOM + HUB_LENGTH * VIEW_SCALE[0] / 1000.0
-FRONT_KEEP = {"BoreDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.070)}
-RIGHT_KEEP = {
-    "SeatLength": (RIGHT_CENTER[0] - 0.036, SIDE_BOTTOM + 0.012),
-    "ServicePinStation": (RIGHT_CENTER[0] - 0.050, SIDE_BOTTOM + 0.026),
-    "HubLength": (RIGHT_CENTER[0] - 0.064, SIDE_BOTTOM + 0.045),
-    "BarrelDia": (RIGHT_CENTER[0], SIDE_TOP + 0.012),
-    "SeatDia": (RIGHT_CENTER[0] - 0.075, SIDE_BOTTOM - 0.014),
+BARREL_TOP = _sheet_y(-HUB_BARREL_DIA / 2.0)
+BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
+# Pick the barrel's cylindrical face between the inboard end and the MHA-024
+# cross-hole, above the axis.  The through hole is seen end-on here, so a pick
+# inside its circle sees no face (run 20260923T023246758Z-97bfca38).
+BARREL_FACE_PICK = (INBOARD_X + 0.008, SIDE_CENTER[1] + 0.015)
+# Every size and callout sits outside the silhouettes.
+# - Lengths: one baseline from the faced outboard end, stacked below the
+#   profile shortest-first so no extension line crosses a dimension line.
+# - Barrel diameter: left of the inboard end.  Seat diameter: between the
+#   profile and the end view, its value and matched-fit callout above.
+# - Cross-hole callout: above the barrel, its leader rising almost straight
+#   from the hole's top rim, clear of the barrel diameter's extension lines.
+# - Bore callout: below the end view.
+_ROW_Y = (0.120, 0.108, 0.096)
+END_KEEP = {"BoreDia": (END_CENTER[0], 0.105)}
+SIDE_KEEP = {
+    "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
+    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[1]),
+    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[2]),
+    "BarrelDia": (INBOARD_X - 0.020, SIDE_CENTER[1]),
+    "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
-HOLE_CALLOUT_XY = (0.330, 0.140)
+HOLE_CALLOUT_XY = (0.150, 0.222)
+ISO_NOTE_XY = (0.345, 0.185)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
@@ -130,8 +161,17 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Bottom", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    front = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=VIEW_SCALE)
+    right = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    for view, angle, label in (
+        (front, END_VIEW_ANGLE, "outboard end view"),
+        (right, SIDE_VIEW_ANGLE, "side view"),
+    ):
+        native = _early_bound(view, "IView")
+        native.Angle = angle
+        if abs(math.remainder(float(native.Angle) - angle, 2.0 * math.pi)) > 1e-9:
+            raise RuntimeError(f"failed to rotate the crank-hub {label}")
+    drawing_model.EditRebuild3()
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
@@ -139,14 +179,14 @@ async def build(adapter: Any) -> dict[str, str]:
     front_annotations = curate_view_dimensions(
         adapter,
         front,
-        keep=FRONT_KEEP,
+        keep=END_KEEP,
         view_label="outboard end",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     right_annotations = curate_view_dimensions(
         adapter,
         right,
-        keep=RIGHT_KEEP,
+        keep=SIDE_KEEP,
         view_label="side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -167,16 +207,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         right,
-        edge_xy=(
-            SERVICE_PIN_CENTER[0],
-            SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA * VIEW_SCALE[0] / 2000.0,
-        ),
+        edge_xy=SERVICE_PIN_TOP_RIM,
         callout_xy=HOLE_CALLOUT_XY,
         label="MHA-024 hub pilot",
         process=f"{CROSS_HOLE_CALLOUT}\n{drill_process(SERVICE_PIN_HOLE_SPEC)}",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.175)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

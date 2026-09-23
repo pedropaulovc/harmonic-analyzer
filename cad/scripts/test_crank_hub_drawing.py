@@ -46,7 +46,7 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     assert DRAWINGS_BY_NAME["crank_hub"].script == Path(drawing.__file__).resolve()
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/crank-hub.SLDDRW")
     marked = set().union(*crank_hub_spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) == marked
+    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
@@ -70,17 +70,43 @@ def test_notes_obey_the_four_line_rule_and_clear_the_title_block() -> None:
     assert max(len(line) for line in lines) <= 72
 
 
-def test_side_view_lengths_baseline_left_and_clear_the_callout_side() -> None:
+def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
+    # Axis horizontal, faced outboard end on the right, seam (+Z) at the bottom.
+    assert drawing.OUTBOARD_X > drawing.SHOULDER_X > drawing.INBOARD_X
+    assert drawing._sheet_y(geometry.AXIAL_PIN_RADIUS_FROM_AXIS) < drawing.SIDE_CENTER[1]
+    assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
+    assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
     lengths = ("SeatLength", "ServicePinStation", "HubLength")
-    xs = [drawing.RIGHT_KEEP[name][0] for name in lengths]
-    left_edge = drawing.RIGHT_CENTER[0] - geometry.HUB_BARREL_DIA / 2.0 * (
-        drawing.VIEW_SCALE[0] / 1000.0
-    )
-    assert xs == sorted(xs, reverse=True) and xs[0] < left_edge
-    assert all(b - a >= 0.010 for a, b in zip(xs[1:], xs[:-1]))
-    assert drawing.HOLE_CALLOUT_XY[0] > drawing.RIGHT_CENTER[0]
-    assert drawing.RIGHT_KEEP["SeatDia"][1] < drawing.SIDE_BOTTOM
-    assert drawing.RIGHT_KEEP["BarrelDia"][1] > drawing.SIDE_TOP
+    rows = [drawing.SIDE_KEEP[name][1] for name in lengths]
+    assert rows == sorted(rows, reverse=True) and rows[0] < drawing.BARREL_BOTTOM
+    assert all(upper - lower >= 0.010 for lower, upper in zip(rows[1:], rows[:-1]))
+
+
+def test_callouts_stand_clear_of_views_and_each_other() -> None:
+    # ~2.5 mm per character at the sheet's text height; callout lines are
+    # centred on their value, so the widest line sets each block's extent.
+    char_w = 0.0025
+
+    def half(text: str) -> float:
+        return max(len(line) for line in text.splitlines()) * char_w / 2.0
+
+    seat_x, seat_y = drawing.SIDE_KEEP["SeatDia"]
+    seat_half = half(crank_hub_spec.SEAT_CALLOUT)
+    seat_block = (seat_x - seat_half, seat_x + seat_half)
+    hole_x, hole_y = drawing.HOLE_CALLOUT_XY
+    hole_text = f"{crank_hub_spec.CROSS_HOLE_CALLOUT}\n#14 DRILL 0 4.62 THRU ALL"
+    hole_block = (hole_x - half(hole_text), hole_x + half(hole_text))
+    # The cross-hole leader rises from the hole's top rim to the block's
+    # right end; the seat callout must start right of that leader.
+    assert hole_block[1] < drawing.SERVICE_PIN_TOP_RIM[0] < seat_block[0]
+    assert seat_y - 4 * 0.006 > drawing.BARREL_TOP
+    assert hole_y - 5 * 0.006 > drawing.BARREL_TOP
+    end_left = drawing.END_CENTER[0] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
+    bore_x, bore_y = drawing.END_KEEP["BoreDia"]
+    assert bore_x - half(crank_hub_spec.BORE_CALLOUT) > drawing.OUTBOARD_X
+    assert bore_y < drawing.END_CENTER[1] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
+    assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
+    assert drawing.SIDE_KEEP["BarrelDia"][0] < drawing.INBOARD_X
 
 
 def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
@@ -93,31 +119,14 @@ def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
     head = source[: source.index('name_last_feature(adapter, "ServicePinStationReference")')]
     last_sketch = head[head.rindex("create_sketch(") :].split(")", 1)[0]
     assert last_sketch == 'create_sketch("Right"'
-    assert "ServicePinStation" in drawing.RIGHT_KEEP
-    assert '"*Right", *RIGHT_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "ServicePinStation" in drawing.SIDE_KEEP
+    assert '"*Right", *SIDE_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
 
 
 def test_centerline_pick_hits_barrel_face_not_the_cross_hole() -> None:
-    scale = drawing.VIEW_SCALE[0] / 1000.0
     x, y = drawing.BARREL_FACE_PICK
-    barrel_bottom = drawing.SIDE_BOTTOM + geometry.HUB_SEAT_LENGTH * scale
-    barrel_top = drawing.SIDE_BOTTOM + geometry.HUB_LENGTH * scale
-    assert barrel_bottom < y < barrel_top
-    assert abs(x - drawing.RIGHT_CENTER[0]) < geometry.HUB_BARREL_DIA / 2.0 * scale
+    assert drawing.INBOARD_X < x < drawing.SHOULDER_X
+    assert drawing.BARREL_BOTTOM < y < drawing.BARREL_TOP
     hole_x, hole_y = drawing.SERVICE_PIN_CENTER
-    hole_r = drawing.SERVICE_PIN_DIA / 2.0 * scale
+    hole_r = drawing.SERVICE_PIN_DIA / 2.0 * drawing._S
     assert (x - hole_x) ** 2 + (y - hole_y) ** 2 > hole_r**2
-
-
-def test_seat_callout_stands_clear_of_the_seat_extension_lines() -> None:
-    # ~2.5 mm per character at the sheet's text height; the callout is
-    # centred under its value, so its widest line must end left of the
-    # seat's left extension line instead of printing across it.
-    char_w = 0.0025
-    x = drawing.RIGHT_KEEP["SeatDia"][0]
-    half = max(len(line) for line in crank_hub_spec.SEAT_CALLOUT.splitlines()) * char_w / 2
-    seat_left = drawing.RIGHT_CENTER[0] - geometry.HUB_SEAT_DIA / 2.0 * (
-        drawing.VIEW_SCALE[0] / 1000.0
-    )
-    assert x + half < seat_left
-    assert x - half > drawing.FRONT_CENTER[0]
