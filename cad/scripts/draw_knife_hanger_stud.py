@@ -153,10 +153,15 @@ CHAMFER_TEXT_HALF_WIDTH_M = 0.016
 # "0.5 max. X 45°". Main accepted SolidWorks' "max." (2026-09-22; a fleet
 # debt tracks a supported uppercase path), so the case is logged, not gated.
 SW_ALL_UPPERCASE_DIMENSIONS = 754
-# The tip thread's callout: below the axis, under the threaded shank, so its
-# leader meets the tip without crossing the tip length's witness lines above
-# or the faced end's reference witness line to the right.
+# The tip thread's callout: below the axis, under the shank, so its leader
+# meets the tip without crossing the tip length's witness lines above. It is
+# centred between the overall reference's two witness lines (bearing face and
+# faced end), which also run below the axis: stud-19 (leaf 20260923T010416Z)
+# right-aligned it on the tip and its text ran left across the bearing face's
+# witness line. Its text measured 67.3 mm wide on that sheet (text start to
+# leader shelf); GetExtent also takes in the leader, so it cannot size it.
 THREAD_CALLOUT_OUT_M = 0.005
+THREAD_CALLOUT_WIDTH_M = 0.068
 SUFFIX = 2  # swDimensionTextSuffix
 
 # The free upper-right cell the pictorial lives in, on this 0.4318 x 0.2794 m
@@ -1223,6 +1228,20 @@ def _thread_callout_problem(callout: str, view_notes: list[str]) -> str | None:
     return None
 
 
+def _callout_left(bearing_x: float, faced_end_x: float) -> float:
+    """Left edge that centres the thread callout between the overall
+    reference's witness lines, or why it cannot fit between them."""
+    low, high = sorted((bearing_x, faced_end_x))
+    slack = (high - low) - THREAD_CALLOUT_WIDTH_M
+    if slack < 2.0 * THREAD_CALLOUT_OUT_M:
+        raise RuntimeError(
+            f"thread callout ({THREAD_CALLOUT_WIDTH_M * 1000.0:.1f} mm) does not fit "
+            f"between the reference's witness lines {low * 1000.0:.1f}.."
+            f"{high * 1000.0:.1f} mm"
+        )
+    return low + slack / 2.0
+
+
 def _note_text(note: Any) -> str:
     return str(_early_bound(note, "INote").GetText() or "")
 
@@ -1246,9 +1265,11 @@ def _import_tip_thread(adapter: Any, front: Any) -> Any:
     note = _early_bound(callout, "INote")
     tip_mid = (SHOULDER_Y_MM + TIP_END_Y_MM) / 2.0
     under = _out_from(adapter, front, -SHANK_DIA / 2.0, tip_mid, THREAD_CALLOUT_OUT_M)
-    extent = _note_box(note, label="thread callout")
+    bearing = _station(adapter, front, 0.0, BEARING_CIRCLE[1])
+    faced_end = _station(adapter, front, 0.0, FACED_END_CIRCLE[1])
+    left = _callout_left(bearing[0], faced_end[0])
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    if not annotation.SetPosition2(under[0] - (extent[2] - extent[0]), under[1], 0.0):
+    if not annotation.SetPosition2(left, under[1], 0.0):
         raise RuntimeError("cannot position the tip thread callout")
     rebuild_drawing(adapter, label="tip thread callout")
     notes = _read_member(_early_bound(front, "IView"), "GetNotes") or ()

@@ -739,3 +739,16 @@ def test_lowercase_max_is_logged_not_fatal(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "_display_text_box", lambda _display: straddle)
     with pytest.raises(RuntimeError, match="straddles"):
         drawing._assert_chamfer_text(_Annotation(), boundary)
+
+
+def test_thread_callout_centres_between_the_reference_witnesses() -> None:
+    # stud-19's census: bearing witness x 113.91, faced end x 202.77 mm. Its
+    # right-aligned callout [112.4..191.8] crossed the bearing witness.
+    left = drawing._callout_left(0.11391, 0.20277)
+    right = left + drawing.THREAD_CALLOUT_WIDTH_M
+    assert 0.11391 + drawing.THREAD_CALLOUT_OUT_M <= left
+    assert right <= 0.20277 - drawing.THREAD_CALLOUT_OUT_M
+    assert left - 0.11391 == pytest.approx(0.20277 - right)
+    assert drawing._callout_left(0.20277, 0.11391) == pytest.approx(left)
+    with pytest.raises(RuntimeError, match="does not fit"):
+        drawing._callout_left(0.100, 0.170)
