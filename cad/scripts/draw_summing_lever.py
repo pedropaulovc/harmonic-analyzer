@@ -173,6 +173,31 @@ def _attach_radial_leaders(
         raise RuntimeError(f"{label}: no radial dimension named {missing!r}")
 
 
+def _assert_reference_text(
+    adapter: Any, annotations: Any, names: tuple[str, ...], label: str
+) -> None:
+    """Read back that the imported R138.8 centre locations print as reference.
+
+    The part authors "2X (" / ")" on both (build_summing_lever); this proves the
+    parentheses survived the model-annotation import onto the sheet.
+    """
+    seen = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in names:
+            continue
+        display = _early_bound(
+            annotation.GetSpecificAnnotation(), "IDisplayDimension"
+        )
+        texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if texts != ("2X (", ")"):
+            raise RuntimeError(f"{label}: {name} prints {texts!r}, not as reference")
+        seen.add(name)
+    missing = sorted(set(names) - seen)
+    if missing:
+        raise RuntimeError(f"{label}: no reference dimension named {missing!r}")
+
+
 FORM_FRONT_KEEP = {
     # Upper left, so the diameter line crosses the collar clear of the R15.2 leader
     # that drops onto the top of the same circle.
@@ -655,6 +680,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _attach_radial_leaders(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
+    )
+    _assert_reference_text(
+        adapter,
+        top_dimensions,
+        ("SummationArcCentreX", "SummationArcCentreZ"),
+        "form top",
     )
     # This is a read-only measurement of the actual knife-ridge endpoints,
     # not a second calculated model dimension.  Resolve the two model vertices
