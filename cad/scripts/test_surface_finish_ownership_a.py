@@ -121,7 +121,14 @@ CASES = (
         cone_swing_platform_spec,
         build_cone_swing_platform,
         draw_cone_swing_platform,
-        cone_swing_platform_spec.SURFACE_FINISHES,
+        (
+            SurfaceFinishControl(
+                "post_seat",
+                SEAT_UM,
+                PlanarFace((0, 1, 0), cone_swing_platform_spec.PLATE_THICKNESS),
+            ),
+            SurfaceFinishControl("base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)),
+        ),
     ),
     (
         connecting_rod_spec,
