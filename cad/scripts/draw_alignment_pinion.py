@@ -84,7 +84,7 @@ DIMENSION_CALLOUTS = {
 
 def _bind_title_material_specification(
     drawing_model: Any, material_specification: str
-) -> None:
+) -> tuple[Any, str, str]:
     """Retarget this sheet's material cell to the make-critical stock grade."""
     if not material_specification.strip():
         raise RuntimeError("alignment-pinion material specification is blank")
@@ -121,12 +121,29 @@ def _bind_title_material_specification(
             "alignment-pinion template must contain exactly one Material "
             f"property link, found {matched}"
         )
+    return binding
+
+
+def _verify_title_material_specification(
+    drawing_model: Any, binding: tuple[Any, str, str]
+) -> None:
+    """Read the retargeted cell back once a model view can resolve it.
+
+    ``$PRPSHEET`` resolves against the sheet's property view, which only
+    exists after the first model view is placed (run 6da5050a failed reading
+    it back on the bare template).  The explicit CustomPropertyView pin stays
+    in ``finalize_drawing``'s guarded path; until then SolidWorks' default
+    source is the first view, which is the front view here.
+    """
     drawing_model.ForceRebuild3(False)
     note, linked_text, resolved_text = binding
-    if str(note.PropertyLinkedText) != linked_text or str(note.GetText()) != resolved_text:
+    actual_link = str(note.PropertyLinkedText)
+    actual_text = str(note.GetText())
+    if actual_link != linked_text or actual_text != resolved_text:
         raise RuntimeError(
-            "alignment-pinion material title link did not resolve to "
-            f"{material_specification!r}"
+            "alignment-pinion material title link did not resolve: "
+            f"expected {resolved_text!r}, got {actual_text!r} "
+            f"from {actual_link!r}"
         )
 
 
@@ -201,7 +218,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    _bind_title_material_specification(
+    material_binding = _bind_title_material_specification(
         drawing_model, properties["Material Specification"]
     )
     stamp_drawing_summary(
@@ -227,6 +244,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    _verify_title_material_specification(drawing_model, material_binding)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="toothed end"

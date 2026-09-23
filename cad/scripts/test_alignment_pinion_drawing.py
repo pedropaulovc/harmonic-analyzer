@@ -70,3 +70,48 @@ def test_part_metadata_preserves_material_finish_quantity() -> None:
     assert config["material_specification"] == "C36000 free-machining brass"
     assert config["finish"] == "polished brass; tooth surfaces as cut"
     assert int(config["quantity"]) == 1
+
+
+class _FakeNote:
+    def __init__(self, linked: str, resolved: str) -> None:
+        self.PropertyLinkedText = linked
+        self._resolved = resolved
+
+    def GetText(self) -> str:
+        return self._resolved
+
+
+class _FakeDrawing:
+    def __init__(self) -> None:
+        self.rebuilds = 0
+
+    def ForceRebuild3(self, top_only: bool) -> bool:
+        self.rebuilds += 1
+        return True
+
+
+def test_material_readback_rebuilds_before_comparing_resolved_text() -> None:
+    import draw_alignment_pinion as draw
+
+    linked = 'MATERIAL: $PRPSHEET:"Material Specification"'
+    resolved = "MATERIAL: C36000 free-machining brass"
+    drawing = _FakeDrawing()
+    draw._verify_title_material_specification(
+        drawing, (_FakeNote(linked, resolved), linked, resolved)
+    )
+    assert drawing.rebuilds == 1
+
+
+def test_material_readback_names_the_unresolved_text() -> None:
+    import draw_alignment_pinion as draw
+
+    linked = 'MATERIAL: $PRPSHEET:"Material Specification"'
+    with pytest.raises(RuntimeError, match="got 'MATERIAL: '"):
+        draw._verify_title_material_specification(
+            _FakeDrawing(),
+            (
+                _FakeNote(linked, "MATERIAL: "),
+                linked,
+                "MATERIAL: C36000 free-machining brass",
+            ),
+        )
