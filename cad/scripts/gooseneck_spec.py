@@ -48,7 +48,8 @@ for _partition in (
 # place: the arm run enters the counter moment about 1:1, so +/-0.8 on it is
 # about +/-1% of moment against the purchased spring's +/-10%, which setup
 # re-tensions anyway. So do the screw's under-head length (the through thread
-# adjusts it) and the plug length (thread engagement, not a fit).
+# adjusts it), the plug length (thread engagement, not a fit) and the screw
+# head (sized so the slot web holds 2 mm at the worst case of this band).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
@@ -58,7 +59,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ScrewShankDia": 3,
         "UnderHeadLength": 1,
         "ScrewHeadDia": 2,
-        "HeadThickness": 2,
+        "HeadThickness": 1,
     },
     "ScrewSlotProfile": {"SlotDepth": 2, "SlotWidth": 2},
 }

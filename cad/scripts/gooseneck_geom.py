@@ -42,13 +42,13 @@ SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
 # clearance against this head and the arm end.
 # User ruling: machined webs 2 mm target, 1.5 floor, judged at the WORST case
-# of the printed bands. Head and slot print at .XX (title block +/-0.51), so
-# the web under the 0.8 slot is 3.9 - 0.51 - (0.8 + 0.51) = 2.08 mm at worst
-# (the 2.8 head gave 0.98). The underside (HEAD_X, the clamp face) is
-# unchanged; only the slotted end face moves outboard. It stays 1.66 mm from
-# the counter spring's raised half-turn, which plateaus from T = 3.2 (1.92 at
-# the old 2.0), and 3.72 mm from its coil.
-SCREW_HEAD_T = 3.9
+# of the printed bands, fixed by geometry so bands can be LOOSE. The head prints
+# at .X (+/-0.8) and the 0.8 slot at .XX (+/-0.51), so the web under the slot is
+# 4.2 - 0.8 - (0.8 + 0.51) = 2.09 mm at worst (the 2.8 head at .XX gave 0.98).
+# The underside (HEAD_X, the clamp face) is unchanged; only the slotted end face
+# moves outboard. It stays 1.66 mm from the counter spring's raised half-turn,
+# which plateaus from T = 3.2 (1.92 at the old 2.0), and 3.72 mm from its coil.
+SCREW_HEAD_T = 4.2
 # Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
 # radial gap). The drawing does not assume stock-ID accuracy: it match-turns
 # this identified plug to the actual assigned bore for the filler supplier's
