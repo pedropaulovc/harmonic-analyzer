@@ -50,31 +50,46 @@ ADJUSTER_EMBED = 9.5
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
 MCM_94025A164_CUP_DEPTH = 1.2065
 T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A164_CUP_DEPTH
-TIP_STUB_START_STATION = 155.7 + GEAR_AXIS_SHIFT
+# U40 (option S1, 2026-09-23): every small-shaft land moves one gear station
+# toward the big end, so the 1/16 in terminal land now starts in the air gap
+# between T018 and T012 (legacy station 148.8, formerly 155.7 between T012
+# and T006).  One constant feeds both the 1/8 in section end and the tip stub
+# start, so they cannot drift apart.
+TIP_LAND_START_STATION = 148.8 + GEAR_AXIS_SHIFT
+TIP_STUB_START_STATION = TIP_LAND_START_STATION
 TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 
 # (diameter in inches, section end station in mm from the front stub end).
-# Diameters mirror build_cone_gear.bore_dia_in (snug perpendicular gear seats).
+# Diameters are typed here in inches and must agree with
+# build_cone_gear.bore_dia_in (snug perpendicular gear seats), which U40
+# moved one station toward the big end together with this shaft: 3/8 in
+# T030..T120, 1/4 in T024, 1/8 in T018, 1/16 in T012 and T006.  Each shoulder
+# therefore sits one 6.9 seat pitch nearer the big end than before (legacy
+# stations 135.0 / 141.9 / 148.8, formerly 141.9 / 148.8 / 155.7), still in
+# the air gap between two gear faces; the overall length is unchanged.
+#
 # The terminal land is 1/16 in, not the 1/32 in a literal "bore = shaft
 # section at the seat" first produced.  At DP 49.82 / PA 14.5 a 6-tooth gear
 # is cut as involute flanks closed by a chord on the base circle -- the
 # project's own DXF profile, cut with a self-made form cutter -- so T006's
 # minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
 # 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
-# depth) on a soldered, keyless, near-torque-free gear, and in exchange the
-# 17.775 mm terminal journal goes from L/D 22 to 11 -- 16x the bending
-# stiffness, the difference between a land a manual lathe can turn and one
-# that whips off the tool.  It is also the largest step that keeps the shaft
-# monotonically decreasing: the cone is assembled tip-first, and every gear
-# OD exceeds the next inboard gear's bore (T006 4.08 > T012 bore 3.175;
-# T012 7.14 > T018 6.35; T018 10.20 > T024 9.525), so no single gear can be
-# made integral with the shaft unless all twenty are.
+# depth) on a soldered, keyless, near-torque-free gear.  Since U40 the land
+# carries T012 as well, so it runs 24.675 mm at L/D 15.5 (it was 17.775 at
+# L/D 11; at 1/32 in it would be L/D 31).  A manual lathe turns that only with
+# the tip held on a tailstock centre -- unsupported, it whips off the tool --
+# which is why the tailstock note below is a requirement (U40), not a method.
+# The shaft still decreases monotonically toward the tip: the cone is
+# assembled tip-first, and every gear OD exceeds the next inboard gear's bore
+# (T006 OD 4.08 > T012 bore 1.5875; T012 7.14 > T018 3.175; T018 10.20 >
+# T024 6.35; T024 13.26 > T030 9.525), so no single gear can be made integral
+# with the shaft unless all twenty are.
 SECTIONS: tuple[tuple[float, float], ...] = (
     (JOURNAL_DIA / MM_PER_IN, JOURNAL_END),  # integral v2-post bearing journal
-    (0.375, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),
-    (0.25, FRONT_STUB + 148.8 + GEAR_AXIS_SHIFT),
-    (0.125, FRONT_STUB + 155.7 + GEAR_AXIS_SHIFT),
-    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T006 seat + tip journal
+    (0.375, FRONT_STUB + 135.0 + GEAR_AXIS_SHIFT),  # 64T + T120..T030 seats
+    (0.25, FRONT_STUB + 141.9 + GEAR_AXIS_SHIFT),  # T024 seat
+    (0.125, FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
+    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T012 + T006 seats, tip journal
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
@@ -86,8 +101,8 @@ SHAFT_LENGTH = SECTION_ENDS[-1]
 #
 # The two lands that RUN keep the shared ground-shaft h band: the Ø12.231
 # journal turns in the pivot post's Ø12.2808 bore (0.05 nominal clearance),
-# and the Ø1.588 tip land -- T006's seat AND the journal -- turns in the cone
-# tip bushing's 1.5875 +0.05/0 bore, 0..0.07 running clearance.
+# and the Ø1.588 tip land -- the T012 and T006 seats AND the journal -- turns
+# in the cone tip bushing's 1.5875 +0.05/0 bore, 0..0.07 running clearance.
 RUNNING_DIA_BAND = SHAFT_H
 # GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
 # soldered gears.  The upper limit stays at nominal, so every gear still
@@ -100,10 +115,10 @@ RUNNING_DIA_BAND = SHAFT_H
 GEAR_SEAT_BAND = (0.000, -0.050)
 SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     RUNNING_DIA_BAND,  # Sec0: pivot journal
-    GEAR_SEAT_BAND,  # Sec1: T024-T120 seats
-    GEAR_SEAT_BAND,  # Sec2: T018 seat
-    GEAR_SEAT_BAND,  # Sec3: T012 seat
-    RUNNING_DIA_BAND,  # Sec4: T006 seat + tip journal
+    GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
+    GEAR_SEAT_BAND,  # Sec2: T024 seat
+    GEAR_SEAT_BAND,  # Sec3: T018 seat
+    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + tip journal
 )
 
 # Shoulder root radius.  Each step sits in the ~0.39 mm axial air gap between
@@ -135,12 +150,16 @@ SURFACE_FINISHES = (
 # is a reason, not a fitting instruction (review 2026-09-23).  The old lines
 # explaining the three-place stations went: the places already say it.  No
 # check the shop cannot make (codex, 375a122c), no digits but the mate's
-# number, no method words.  Lines stay short: the note block starts 58 mm in
-# and the title block begins at 216 mm.
+# number, no method words but one.  Lines stay short: the note block starts
+# 58 mm in and the title block begins at 216 mm.  The tailstock line is that
+# one process word, by user ruling (U40, 2026-09-23): the 24.675 mm
+# Ø1.588 terminal land (L/D 15.5) cannot be turned unsupported, so the
+# support IS the requirement (rule 6's exception), not a method preference.
 DRAWING_NOTES = "\n".join(
     (
         "GEAR SEAT LIMITS LEAVE A SOLDER GAP",
         "IN THE CONE GEAR BORES, MHA-013.",
+        "TURN THE TIP JOURNAL WITH TAILSTOCK SUPPORT.",
     )
 )
 
@@ -168,8 +187,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # .XXX general grade (+-0.13) and no explicit band.  This is a location
 # requirement, not a spelling: gears are soldered at the 6.8889 mm seat pitch
 # with 6.5 mm faces, and each of these three steps has to fall inside the
-# ~0.39 mm air gap between two neighbouring gear faces (T024 north 141.72 |
-# step 141.9 | T018 south 142.11, and so on), 0.18..0.21 from either face.
+# ~0.39 mm air gap between two neighbouring gear faces (U40, legacy stations:
+# T030 north 134.83 | step 135.0 | T024 south 135.22, then T024|T018 and
+# T018|T012 one pitch on), 0.17..0.22 from either face.
 # +-0.13 keeps the step in the gap; the .XX grade (+-0.51) would let the
 # larger land run up to 0.3 mm under the small-bore gear's face, so that gear
 # could not pass the land to reach its pitch station.  The R0.10 root radius
