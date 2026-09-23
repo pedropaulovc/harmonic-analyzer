@@ -114,14 +114,15 @@ FRONT_CENTER = (0.105, 0.150)
 RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 BORE_CALLOUT_LANE_X = 0.045
-# Top-aligned with the manufacturing notes: the 15-line block (header + 14
-# rows) measured 49.1 mm tall natively (e91d2581 layout audit), above the
-# largest side view (top 0.197) with FaceWidth below it.  Its widest row may
+# Top-aligned with the manufacturing notes: the 14-line block (header + 13
+# rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
+# line; the 15-line block ends ~52.6 mm down, still above the largest side
+# view (top 0.197) with FaceWidth below it.  Its widest row may
 # not pass the MATES WITH row (66 characters, ~122 mm): the sheet count sits
 # at x 0.3496 (a 78-character row reached 0.3588 and failed the audit).
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
-GEAR_DATA_HEIGHT = 0.050
+GEAR_DATA_HEIGHT = 0.056
 GEAR_DATA_MAX_LINE_CHARS = 66
 TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 MANUFACTURING_NOTES_POS = (0.015, 0.263)

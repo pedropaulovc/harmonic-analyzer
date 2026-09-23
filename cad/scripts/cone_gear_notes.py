@@ -66,6 +66,10 @@ def gear_data(teeth: int, backlash_mm: Sequence[float]) -> str:
             f"{minimum:.2f} TO {maximum:.2f}",
         ),
         ("TOOTH THICKNESS IN VIEW", "ARC LENGTH AT PITCH DIAMETER"),
+        # No catalogue cutter exists at 49.82 DP; the tooth-thickness band and
+        # the assembly backlash are the acceptance, so the nearest standard
+        # cutter of the drum's 14.5 deg system is allowed (Fable, 2026-09-23).
+        ("STANDARD CUTTER OK", "48 DP, 14.5 DEG, CUTTER NO. FOR TOOTH COUNT"),
     )
     return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
 

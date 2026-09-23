@@ -145,11 +145,34 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ToothThicknessReference": {"ToothThickness"},
 }
 
+# Tip-diameter band, (upper, lower) deviations.  The tip sets how deep the
+# cone teeth reach into the 120T drum on the backed-off oblique mesh, so the
+# title-block .XX +/-0.51 (a whole addendum) is too loose: at -0.51 the
+# nominal 0.459 mm interleave halves (Fable review, 2026-09-23).  Main ruled
+# the band by contact ratio (U27: the looser +/-0.25 only if it keeps CR >= 1.1
+# at the worst case).  Worst case of every printed band -- this band, drum OD
+# +0/-0.10, bore-on-land, journal, drum-bore and arbor float -- leaves CR
+# 0.09/0.42/0.46 (T006/T060/T120) at +/-0.10 and 0.01/0.28/0.30 at +/-0.25,
+# with the drum floor still clear (+0.83 / +0.75), so +/-0.10 prints: turning
+# the blank OD to a micrometer before cutting teeth is a novice-holdable step.
+BLANK_DIA_BAND = (0.10, -0.10)
+
+
+def configuration_number(part_number: str, teeth: int) -> str:
+    """Return one configuration sheet's drawing number, e.g. ``MHA-013-T006``."""
+    if teeth not in CONFIGURATION_TEETH:
+        raise ValueError(f"unsupported cone-gear tooth count {teeth}")
+    number = part_number.strip().upper()
+    if not number:
+        raise ValueError("cone-gear part number must not be blank")
+    return f"{number}-T{teeth:03d}"
+
+
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
 # on the two fit dimensions: the bore and circular tooth thickness.  Tip
-# diameter stays at the two-place general grade (it sets the mesh depth); face
+# diameter prints two places with its own BLANK_DIA_BAND (below); face
 # width takes one place, the loosest title-block band (.X +/-0.8), which the
 # 6.0 nominal clears against the 6.889 seat pitch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {

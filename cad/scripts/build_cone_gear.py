@@ -87,6 +87,7 @@ from _part_pmi import author_part_pmi
 import cone_gear_shaft_spec
 from cone_gear_notes import DRAWING_NOTES, gear_data, tooth_thickness_band
 from cone_gear_spec import (
+    BLANK_DIA_BAND,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -95,6 +96,7 @@ from cone_gear_spec import (
     TOOTH_THICKNESS,
     base_chord_root_radius_mm,
     bore_dia_mm,
+    configuration_number,
     material_specification,
 )
 from _common import (
@@ -1353,11 +1355,12 @@ async def build(adapter) -> dict[str, str]:
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
     grouped_spec = _config.parts(PART_NAME)
+    part_number = str(grouped_spec.get("number", ""))
     description = str(grouped_spec.get("description", "")).strip()
     apply_grouped_bom_properties(
         adapter,
         [name for name, _teeth in CONFIGS],
-        part_number=str(grouped_spec.get("number", "")),
+        part_number=part_number,
         description=description,
     )
     apply_custom_properties(adapter, {"Description": description})
@@ -1369,6 +1372,9 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    set_dimension_bilateral_tolerance(
+        adapter, "BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)
+    )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
     )
@@ -1392,6 +1398,11 @@ async def build(adapter) -> dict[str, str]:
             adapter,
             configuration,
             {
+                # The title block's DWG. NO. reads $PRPSHEET:"Number", and a
+                # configuration property wins over the file one, so each sheet
+                # names its own gear (Fable, 2026-09-23: twenty sheets carried
+                # one number).  The grouped BOM keeps MHA-013 (AlternateName).
+                "Number": configuration_number(part_number, teeth),
                 "Gear Data": gear_data(teeth, BACKLASH_MM),
                 "Material Specification": material_specification(teeth),
             },
