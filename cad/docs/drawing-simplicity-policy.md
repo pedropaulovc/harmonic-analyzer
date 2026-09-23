@@ -278,7 +278,10 @@ the exception itself; the table is the backstop. The blind reviewer sees only th
 so it reports a row's shortfall as a blocker unless the package itself states
 the exception. A blocker that matches a row (same parts, shortfall within the
 recorded range) is recorded against that row by the person running the gate
-rather than fixed; any other finding on those parts still gates.
+rather than fixed; any other finding on those parts still gates. The reviewer
+cannot see this table either, so it files any exception a sheet states under
+minor. The person running the gate checks each such minor entry against the
+table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
