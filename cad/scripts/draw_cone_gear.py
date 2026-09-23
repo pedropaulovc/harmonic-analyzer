@@ -51,6 +51,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from build_cone_gear import assert_saved_configuration_topology
 from cone_gear_spec import (
     BORE_SURFACE_FINISHES,
@@ -114,11 +115,14 @@ RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 BORE_CALLOUT_LANE_X = 0.045
 # Top-aligned with the manufacturing notes: the 15-line block (header + 14
-# rows, ~3.15 mm pitch measured on the 13-line render) ends ~0.048 below its
-# top, above the largest side view (top 0.197) with FaceWidth below it.
+# rows) measured 49.1 mm tall natively (e91d2581 layout audit), above the
+# largest side view (top 0.197) with FaceWidth below it.  Its widest row may
+# not pass the MATES WITH row (66 characters, ~122 mm): the sheet count sits
+# at x 0.3496 (a 78-character row reached 0.3588 and failed the audit).
 GEAR_DATA_POS = (0.215, 0.263)
-# Rendered height of the Gear Data block, for the layout test.
-GEAR_DATA_HEIGHT = 0.048
+# Rendered height/width budget of the Gear Data block, for the layout test.
+GEAR_DATA_HEIGHT = 0.050
+GEAR_DATA_MAX_LINE_CHARS = 66
 TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
@@ -411,12 +415,14 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME center mark on {configuration}")
 
         finish_edge, finish_symbol = bore_finish_xy(teeth)
+        # This sheet's configuration-owned finish rows (part spec).
+        SURFACE_FINISHES = BORE_SURFACE_FINISHES[teeth]  # noqa: N806
         add_surface_finish(
             adapter,
             front,
             edge_xy=finish_edge,
             symbol_xy=finish_symbol,
-            control=BORE_SURFACE_FINISHES[teeth],
+            control=surface_finish_by_key(SURFACE_FINISHES, "cone_gear_bore"),
             label=f"{configuration} cone-gear bore finish",
             char_height=0.0025,
         )
