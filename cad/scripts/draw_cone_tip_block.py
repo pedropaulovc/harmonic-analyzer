@@ -35,6 +35,7 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FOOT_BORE_DIA,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
@@ -66,6 +67,9 @@ LEFT_CENTER = (0.238, FRONT_CENTER[1])
 BACK_CENTER = (0.310, FRONT_CENTER[1])
 SECTION_CENTER = (0.190, 0.225)
 ISO_CENTER = (0.350, 0.215)
+# U30 hold-down tap: the only feature on the foot, so the bottom view sits in
+# the free band under the front view and carries just its callout.
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.040)
 
 
 def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
@@ -358,7 +362,8 @@ async def build(adapter: Any) -> dict[str, str]:
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=SHEET_SCALE)
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=SHEET_SCALE)
-    for view in (front, top, right, left, back, iso):
+    bottom = place_view(adapter, str(SOURCE), "*Bottom", *BOTTOM_CENTER, scale=SHEET_SCALE)
+    for view in (front, top, right, left, back, iso, bottom):
         set_hidden_lines_removed(adapter, view)
 
     # The top-view cutting plane passes through both orthogonal bore axes.  The
@@ -400,6 +405,13 @@ async def build(adapter: Any) -> dict[str, str]:
         radius_mm=PINCH_CLEARANCE_DIA / 2.0,
         center_y_mm=PINCH_HEIGHT,
         label="pinch entry-jaw clearance",
+    )
+    foot_tap_edge = _circle_entity(
+        adapter,
+        bottom,
+        radius_mm=FOOT_BORE_DIA / 2.0,
+        center_y_mm=0.0,
+        label="foot hold-down thread",
     )
     pinch_thread_edge = _circle_entity(
         adapter,
@@ -497,6 +509,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (right, "pinch clearance entry"),
         (left, "pinch threaded entry"),
         (back, "adjuster threaded entry"),
+        (bottom, "foot hold-down entry"),
     ):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add centre marks to {label} view")
@@ -537,6 +550,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinch opposite-jaw thread",
     )
     _set_pinch_thread_callout_text(pinch_thread_callout)
+    foot_tap_callout = add_native_hole_callout(
+        adapter,
+        bottom,
+        edge=foot_tap_edge,
+        callout_xy=(BOTTOM_CENTER[0] + 0.040, BOTTOM_CENTER[1] + 0.004),
+        label="foot hold-down thread",
+    )
+    set_hole_callout_precision(
+        foot_tap_callout,
+        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+        label="foot tap depths",
+    )
     _audit_isometric_annotation_provenance(adapter, iso)
 
     _hide_section_cosmetic_threads(adapter, section)
@@ -545,6 +570,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
         ("LEFT VIEW\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
         ("ADJUSTER ENTRY", adjuster_center[0] - 0.054, 0.185),
+        ("BOTTOM VIEW", BOTTOM_CENTER[0] - 0.047, BOTTOM_CENTER[1] + 0.004),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
@@ -586,7 +612,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Annotation insertion can regenerate a view with inherited display state;
     # every manufacturing view is explicitly HLR at export.
-    for view in (front, top, right, left, back, section):
+    for view in (front, top, right, left, back, section, bottom):
         set_hidden_lines_removed(adapter, view)
 
     return await finalize_drawing(
