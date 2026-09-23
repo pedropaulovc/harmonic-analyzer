@@ -87,40 +87,59 @@ HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+HOLE_PATTERN_SPAN = (HOLE_COUNT - 1) * CHANNEL_PITCH
 
-# Drawing prose stays in ``summing_lever_notes`` so a wording edit does not
-# rebuild the summing assembly.  The manufacturing-dimension and precision
-# contracts belong here with the geometry: the part build authors them on the
-# SLDPRT and the drawing only imports and verifies them.
+# Manufacturing-dimension and precision contracts live with the geometry: the
+# part build authors them on the SLDPRT and the drawing only imports and
+# verifies them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
     "CoefficientsPlate": {"PlateThickness"},
     "CylinderProfile": {"CylDia"},
     "HexKnifeFront": {"HexKnifeFrontDepth"},
+    "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat"},
+    "EdgeRibFront": {"EdgeRibThickness"},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR"},
     "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
+    "SummationPlateProfile": {"SummationArcRadius"},
+    "SummationArcReference": {"SummationArcCentreX", "SummationArcCentreZ"},
+    "SummationPlate": {"WebThickness"},
     "SummationAnchorProfile": {"AnchorOuterX", "AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
+    "MiddleRibProfile": {"MidRibArcR", "MidRibLeftX", "MidRibRightX"},
+    "MiddleRib": {"MiddleRibThickness"},
     "SpringHoleSeed": {"HoleSeedX"},
     "SpringHolePattern": {"HolePitch"},
-    "PatternReferences": {"HoleStartOffset"},
+    "PatternReferences": {"HoleEndOffsetLast", "HoleFirstFromEnd"},
+    "BossAxialReference": {"BossAxialLocation"},
 }
 
 # Decimal places carry the title-block tolerance and therefore live on the
-# model.  The spring-pattern coordinates are BASIC on the sheet, but their
-# display precision is still authored here rather than rewritten at render
-# time.  The knife envelope and first-hole offset are construction-sketch
-# dimensions tied to the same globals that drive the solid.
+# model.  The ordinary spring-pattern locations and total span avoid a chained
+# 19-pitch tolerance stack; HolePitch prints parenthetically as the equal-space
+# reference.
+DRAWING_REFERENCE_PRECISION = 2
+
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PlateProfile": {"PlateWidth": 2, "PlateLength": 1},
+    "PlateProfile": {"PlateWidth": 1, "PlateLength": 1},
     "CoefficientsPlate": {"PlateThickness": 2},
     "CylinderProfile": {"CylDia": 1},
-    "HexKnifeFront": {"HexKnifeFrontDepth": 2},
+    "HexKnifeFront": {"HexKnifeFrontDepth": 1},
+    "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat": 2},
+    "EdgeRibFront": {"EdgeRibThickness": 2},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 1},
     "KnifeEnvelopeReference": {"HexWidth": 2, "HexHeight": 2},
+    "SummationPlateProfile": {"SummationArcRadius": 1},
+    "SummationArcReference": {"SummationArcCentreX": 1, "SummationArcCentreZ": 1},
+    "SummationPlate": {"WebThickness": 2},
     "SummationAnchorProfile": {"AnchorOuterX": 1, "AnchorOuterDia": 2},
     "SummationAnchor": {"AnchorHeight": 2},
-    "SpringHoleSeed": {"HoleSeedX": 2},
+    "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 1, "MidRibRightX": 1},
+    "MiddleRib": {"MiddleRibThickness": 2},
+    "SpringHoleSeed": {"HoleSeedX": 1},
     "SpringHolePattern": {"HolePitch": 2},
-    "PatternReferences": {"HoleStartOffset": 2},
+    "PatternReferences": {"HoleEndOffsetLast": 2, "HoleFirstFromEnd": 2},
+    "BossAxialReference": {"BossAxialLocation": 1},
 }
 
 _PRECISION_NAMES = [
@@ -139,25 +158,3 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The three coordinates that feed the one surviving position frame are BASIC
-# on the source model.  The drawing verifies this state; it never changes a
-# tolerance after import.
-BASIC_DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "SpringHoleSeed": {"HoleSeedX"},
-    "SpringHolePattern": {"HolePitch"},
-    "PatternReferences": {"HoleStartOffset"},
-}
-if any(
-    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
-    for feature, names in BASIC_DRAWING_DIMENSIONS.items()
-    for name in names
-):
-    raise AssertionError("BASIC_DRAWING_DIMENSIONS names an unmarked dimension")
-
-# Rule 3 permits one position frame for the 20-hole spring pattern.  The knife
-# ridge retains its part-owned finish and is datum A for that pattern; the
-# counter-spring boss is located by ordinary model dimensions, not another
-# frame.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "spring-hole pattern position": "0.30",
-}

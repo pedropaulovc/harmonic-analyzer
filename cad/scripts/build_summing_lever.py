@@ -63,11 +63,13 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     IN,
     SketchDims,
     _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
@@ -99,13 +101,13 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_prefix,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
-from summing_lever_notes import ISOMETRIC_VIEW_NOTE
+from _visibility import blank_reference_geometry
 from summing_lever_spec import (
     ANCHOR_H,
-    BASIC_DRAWING_DIMENSIONS,
     CHANNEL_PITCH,
     CHANNEL_Z0,
     DRAWING_DIMENSIONS,
@@ -182,6 +184,13 @@ MID_RIB_PLATE_REACH = HOLE_X - 4.1  # 35.75 local +X: clears the (shifted) hole 
 
 # Spring-hole Z stations (world Z); the Top-plane sketch maps world Z to -sketchY.
 HOLE_Z = [CHANNEL_Z0 + CHANNEL_PITCH * j + HOLE_Z_OFFSET for j in range(HOLE_COUNT)]
+
+# The drawing-reference sketches restate geometry the solid owns, so each of
+# their points must sit ON that geometry, not near it (the gate below).
+REFERENCE_COINCIDENCE_TOL_MM = 1e-6
+# Each arm of the construction cross that marks the R138.8 centre (2.5 mm on
+# the 1:2 sheet).
+CENTRE_CROSS_ARM = 5.0
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -392,6 +401,8 @@ async def _pivot_cylinder(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "PivotCylinder")
+    [pivot_length] = name_dimensions(adapter, "PivotCylinder", ["PivotLength"])
+    drive_jobs.append((pivot_length, '"PlateL"'))
 
 
 async def _hex_collar(
@@ -438,7 +449,7 @@ async def _hex_collar(
             f"{stem}TopY",
             f"{stem}S0dx",
             f"{stem}S0dy",
-            f"{stem}S1dy",
+            f"{stem}SideFlat",
             f"{stem}S2dx",
             f"{stem}S2dy",
             f"{stem}S3dx",
@@ -510,6 +521,30 @@ async def _edge_rib(
     drive_jobs += rib.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, RIB_T, RIB_OFFSET, flip=flip)
     name_last_feature(adapter, stem)
+    thickness_name = (
+        "EdgeRibThickness" if stem == "EdgeRibFront" else "EdgeRibBackThickness"
+    )
+    rib_depths = name_dimensions(
+        adapter, stem, [thickness_name, f"{stem}Start"]
+    )
+    drive_jobs.extend(
+        (
+            (rib_depths[0], '"RibT"'),
+            (rib_depths[1], '"PlateL" / 2 - "RibT"'),
+        )
+    )
+
+
+
+def _summation_top_arc_points() -> tuple[
+    tuple[float, float], tuple[float, float], tuple[float, float]
+]:
+    """Base end, tip end and interior point of the +Z summation side arc."""
+    return (
+        (0.0, SUM_BASE),
+        (TIP_X, ANCHOR_R),
+        (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV),
+    )
 
 
 async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -520,15 +555,13 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     sd = SketchDims()
     check("create_sketch summation plate", await adapter.create_sketch("Top"))
     p1 = (0.0, -SUM_BASE)
-    p2 = (0.0, SUM_BASE)
-    p3 = (TIP_X, ANCHOR_R)
+    p2, p3, top_int = _summation_top_arc_points()
     p4 = (TIP_X, -ANCHOR_R)
-    top_int = (SX * SUM_H / 2.0, SUM_BASE / 2.0 - SUM_CURV)
     bot_int = (SX * SUM_H / 2.0, -SUM_BASE / 2.0 + SUM_CURV)
 
     set_sketch_direct_db(adapter, True)
     base = check("summation base edge", await adapter.add_line(*p1, *p2))
-    top_arc, top_c, _ = await _three_point_arc(
+    top_arc, _top_c, top_r = await _three_point_arc(
         adapter, p2, p3, top_int, "summation top"
     )
     tip = check("summation tip edge", await adapter.add_line(*p3, *p4))
@@ -573,16 +606,16 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         "summation tip",
     )
     sd.record("SumTipHeight", '2 * "AnchorR"')
-    # The base/tip lines pin all four corners; each curved side is then defined
-    # by anchoring its (circumcentre) centre -- endpoints already lie on the arc,
-    # so the radius is implied and a radial dim would over-define (cf. the
-    # magnifying-lever dome caps). Both centres are general points (x, y both
-    # nonzero) -> two dims each, no clean global knob, left auto-named.
-    await anchor_point_to_origin(
-        adapter, f"{top_arc}.center", *top_c, "summation top centre"
+    # The top side is controlled directly by its actual three-point-derived
+    # radius plus the fixed base/tip endpoints.  This turns the shape the shop
+    # cuts into a native driving model dimension; no duplicate reference curve
+    # or post-hoc calculated nominal is involved.  The mirrored lower side keeps
+    # its existing fixed circumcentre because both endpoints already define it.
+    check(
+        "summation side profile radius",
+        await adapter.add_sketch_dimension(top_arc, None, "radial", top_r),
     )
-    sd.record(None, None)
-    sd.record(None, None)
+    sd.record("SummationArcRadius")
     await anchor_point_to_origin(
         adapter, f"{bot_arc}.center", *bot_c, "summation bottom centre"
     )
@@ -599,6 +632,8 @@ async def _summation_plate(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "SummationPlate")
+    web_depth = name_dimensions(adapter, "SummationPlate", ["WebThickness"])
+    drive_jobs.append((web_depth[0], '"PlateT"'))
 
 
 async def _summation_anchor(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -721,6 +756,8 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
         ),
     )
     name_last_feature(adapter, "MiddleRib")
+    middle_depth = name_dimensions(adapter, "MiddleRib", ["MiddleRibThickness"])
+    drive_jobs.append((middle_depth[0], '"RibT"'))
 
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -839,20 +876,53 @@ async def _drawing_reference_sketches(
     pattern = SketchDims()
     check("create pattern reference", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
+    # A Top-plane sketch's y is MODEL -Z, while the Hole Wizard seed is placed
+    # in true model Z.  The field is not symmetric (9.90 from the -Z end, 8.43
+    # from the +Z end), so authoring these at +HOLE_Z mirrored every printed
+    # location 1.47 mm off the hole centres (R6 render; Codex R5/R6).
     first_offset = check(
         "first spring-hole offset reference",
         await adapter.add_line(
             HOLE_X,
-            -PLATE_L / 2.0,
+            PLATE_L / 2.0,
             HOLE_X,
-            HOLE_Z[0],
+            -HOLE_Z[0],
         ),
     )
+    pattern_span = check(
+        "spring-hole total span reference",
+        await adapter.add_line(HOLE_X, -HOLE_Z[0], HOLE_X, -HOLE_Z[-1]),
+    )
+    end_offset = check(
+        "last spring-hole offset reference",
+        await adapter.add_line(HOLE_X, -HOLE_Z[-1], HOLE_X, -PLATE_L / 2.0),
+    )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, first_offset)
+    for entity in (first_offset, pattern_span, end_offset):
+        _as_construction(adapter, entity)
     check(
         "first spring-hole offset vertical",
         await adapter.add_sketch_constraint(first_offset, None, "vertical"),
+    )
+    check(
+        "spring-hole total span vertical",
+        await adapter.add_sketch_constraint(pattern_span, None, "vertical"),
+    )
+    check(
+        "last spring-hole offset vertical",
+        await adapter.add_sketch_constraint(end_offset, None, "vertical"),
+    )
+    check(
+        "spring-hole span starts at first station",
+        await adapter.add_sketch_constraint(
+            f"{pattern_span}.start", f"{first_offset}.end", "coincident"
+        ),
+    )
+    check(
+        "last spring-hole offset starts at last station",
+        await adapter.add_sketch_constraint(
+            f"{end_offset}.start", f"{pattern_span}.end", "coincident"
+        ),
     )
     await dimension_between(
         adapter,
@@ -870,32 +940,495 @@ async def _drawing_reference_sketches(
         adapter,
         f"{first_offset}.start",
         HOLE_X,
-        -PLATE_L / 2.0,
+        PLATE_L / 2.0,
         "first spring-hole offset start",
     )
     pattern.record("PatternRefX", '"HoleX"')
     pattern.record("PatternRefEnd", '"PlateL" / 2')
+    # Both terminal holes are located from the SAME (model +Z) plate end -- this and
+    # HoleEndOffsetLast -- so the print baselines the field instead of chaining
+    # end -> first hole -> span (drawing policy rule 7; Codex R5 clarity).
+    await dimension_between(
+        adapter,
+        f"{first_offset}.end",
+        f"{end_offset}.end",
+        "vertical_distance",
+        PLATE_L / 2.0 - HOLE_Z[0],
+        "first spring-hole from the +Z plate end",
+    )
+    pattern.record(
+        "HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")'
+    )
+    await dimension_between(
+        adapter,
+        f"{end_offset}.start",
+        f"{end_offset}.end",
+        "vertical_distance",
+        PLATE_L / 2.0 - HOLE_Z[-1],
+        "last spring-hole offset",
+    )
+    pattern.record(
+        "HoleEndOffsetLast",
+        f'"PlateL" / 2 - ("ChannelZ0" + {HOLE_COUNT - 1} * '
+        '"ChannelPitch" + "HoleZOffset")',
+    )
     await ensure_fully_defined(adapter, "pattern reference sketch")
     check("exit pattern reference", await adapter.exit_sketch())
     name_last_feature(adapter, "PatternReferences")
     drive_jobs += pattern.apply(adapter, "PatternReferences")
 
+    # The boss's axial location is its own sketch so the spring-pattern view can
+    # hide its construction line: it prints no boss dimension, and R7 showed the
+    # line there as a stray dash-dot stroke from the boss to the plate end.
+    boss = SketchDims()
+    check("create boss axial reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    boss_location = check(
+        "boss axial location reference",
+        await adapter.add_line(TIP_X, -PLATE_L / 2.0, TIP_X, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, boss_location)
+    check(
+        "boss axial location vertical",
+        await adapter.add_sketch_constraint(boss_location, None, "vertical"),
+    )
+    await dimension_between(
+        adapter,
+        f"{boss_location}.start",
+        f"{boss_location}.end",
+        "vertical_distance",
+        PLATE_L / 2.0,
+        "boss axial location",
+    )
+    boss.record("BossAxialLocation", '"PlateL" / 2')
+    await anchor_point_to_origin(
+        adapter,
+        f"{boss_location}.start",
+        TIP_X,
+        -PLATE_L / 2.0,
+        "boss axial location start",
+    )
+    boss.record("BossRefX", '"SumH"')
+    boss.record("BossRefEnd", '"PlateL" / 2')
+    await ensure_fully_defined(adapter, "boss axial reference sketch")
+    check("exit boss axial reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossAxialReference")
+    drive_jobs += boss.apply(adapter, "BossAxialReference")
 
-def _apply_basic_drawing_dimensions(adapter) -> None:
-    """Author and read back the pattern's source-model BASIC coordinates."""
-    for feature_name, dimension_names in BASIC_DRAWING_DIMENSIONS.items():
-        for dimension_name in dimension_names:
-            _display, dimension = _named_dimension(
-                adapter, feature_name, dimension_name
+
+async def _summation_arc_reference(
+    adapter, drive_jobs: list[tuple[str, str]]
+) -> None:
+    """Locate the R138.8 summation arc centre for the print (rule 11, R3 B2).
+
+    The arc runs from the boss quadrant to the plate-end corner ON the cylinder
+    axis, which is buried in the cylinder, so radius plus the one visible end
+    does not lay the arc out.  The centre is circumcentre-derived (no clean
+    global) and already implied by the profile, so it lives here as a reference
+    sketch whose two driving dims ARE the printed values, measured from the plate
+    end face on the cylinder axis.  Construction line A is one trunnion's
+    centreline (sketch +y is model -Z; the arcs are mirror-symmetric) (its start is that datum, its end clears the trunnion for the
+    witness line).  Four short construction arms from the centre print as the
+    centre's cross, the visible target both reference dimensions end on.  A
+    native drawing centre mark on the arc (R8) re-anchored both dimensions'
+    witness lines out at the arc's quadrants instead, running the 2X 123.2 one
+    up through the front view.  Values restate the model's own
+    ``_circumcenter`` of the same three points, so no geometry moves.
+    """
+    base_end, tip_end, interior = _summation_top_arc_points()
+    cx, cy = _circumcenter(base_end, tip_end, interior)
+    arc = SketchDims()
+    check("create summation-arc reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "summation-arc datum on the trunnion axis",
+        await adapter.add_line(0.0, SUM_BASE, 0.0, HEX_Z_OUTER),
+    )
+    centre = check(
+        "summation-arc centre cross +x arm",
+        await adapter.add_line(cx, cy, cx + CENTRE_CROSS_ARM, cy),
+    )
+    arms = [
+        (
+            check(
+                f"summation-arc centre cross {name} arm",
+                await adapter.add_line(cx, cy, cx + dx, cy + dy),
+            ),
+            constraint,
+        )
+        for name, dx, dy, constraint in (
+            ("-x", -CENTRE_CROSS_ARM, 0.0, "horizontal"),
+            ("+y", 0.0, CENTRE_CROSS_ARM, "vertical"),
+            ("-y", 0.0, -CENTRE_CROSS_ARM, "vertical"),
+        )
+    ]
+    set_sketch_direct_db(adapter, False)
+    for entity in (axis, centre, *(arm for arm, _constraint in arms)):
+        _as_construction(adapter, entity)
+    check(
+        "summation-arc datum vertical",
+        await adapter.add_sketch_constraint(axis, None, "vertical"),
+    )
+    check(
+        "summation-arc centre cross +x arm horizontal",
+        await adapter.add_sketch_constraint(centre, None, "horizontal"),
+    )
+    for arm, constraint in arms:
+        check(
+            f"summation-arc centre cross arm {constraint}",
+            await adapter.add_sketch_constraint(arm, None, constraint),
+        )
+        check(
+            "summation-arc centre cross arm on the centre",
+            await adapter.add_sketch_constraint(
+                f"{arm}.start", f"{centre}.start", "coincident"
+            ),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, SUM_BASE, "summation-arc datum"
+    )
+    arc.record("SummationArcDatumZ", '"PlateL" / 2')
+    await dimension_between(
+        adapter,
+        f"{axis}.start",
+        f"{axis}.end",
+        "vertical_distance",
+        HEX_Z_OUTER - SUM_BASE,
+        "summation-arc datum length",
+    )
+    arc.record("SummationArcDatumLength", '"HexDepth"')
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{axis}.end",
+        "horizontal_distance",
+        abs(cx),
+        "summation-arc centre from the cylinder axis",
+    )
+    arc.record("SummationArcCentreX")
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{axis}.start",
+        "vertical_distance",
+        cy - SUM_BASE,
+        "summation-arc centre beyond the plate end",
+    )
+    arc.record("SummationArcCentreZ")
+    await dimension_between(
+        adapter,
+        f"{centre}.start",
+        f"{centre}.end",
+        "horizontal_distance",
+        CENTRE_CROSS_ARM,
+        "summation-arc centre cross +x arm length",
+    )
+    arc.record(None)
+    for arm, constraint in arms:
+        await dimension_between(
+            adapter,
+            f"{arm}.start",
+            f"{arm}.end",
+            f"{constraint}_distance",
+            CENTRE_CROSS_ARM,
+            "summation-arc centre cross arm length",
+        )
+        arc.record(None)
+    await ensure_fully_defined(adapter, "summation-arc reference sketch")
+    check("exit summation-arc reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "SummationArcReference")
+    drive_jobs += arc.apply(adapter, "SummationArcReference")
+
+
+Point = tuple[float, float, float]
+# A target is ("axis", (origin, unit direction)) or ("plane", (unit normal, root)),
+# all lengths in mm.
+Target = tuple[str, tuple[Point, Point]]
+
+
+def _axis_offset_mm(point: Point, axis: tuple[Point, Point]) -> float:
+    """Perpendicular distance from ``point`` to the line through ``axis``."""
+    origin, direction = axis
+    rel = [point[i] - origin[i] for i in range(3)]
+    along = sum(rel[i] * direction[i] for i in range(3))
+    return math.sqrt(sum((rel[i] - along * direction[i]) ** 2 for i in range(3)))
+
+
+def _plane_offset_mm(point: Point, plane: tuple[Point, Point]) -> float:
+    normal, root = plane
+    return abs(sum((point[i] - root[i]) * normal[i] for i in range(3)))
+
+
+def _target_offset_mm(point: Point, target: Target) -> float:
+    kind, geometry = target
+    if kind == "axis":
+        return _axis_offset_mm(point, geometry)
+    return _plane_offset_mm(point, geometry)
+
+
+def _parallel(direction: Point, index: int) -> bool:
+    return abs(abs(direction[index]) - 1.0) <= 1e-9
+
+
+def _distinct(rows: list, key) -> list:
+    """First row per rounded key -- a surface split into several faces counts once."""
+    seen: dict = {}
+    for row in rows:
+        seen.setdefault(key(row), row)
+    return list(seen.values())
+
+
+def _reference_claims(
+    cylinders: list[tuple[Point, Point, float]],
+    planes: list[tuple[Point, Point]],
+) -> dict[str, tuple[dict[str, Target], list[tuple[str, set[str]]], int]]:
+    """Name the real features each drawing-reference sketch claims to locate.
+
+    ``cylinders`` are (origin, axis, radius) and ``planes`` (normal, root), read
+    off the finished B-rep in mm.  The radius / plane-position tolerance here only
+    IDENTIFIES a feature; the coincidence itself is asserted separately at
+    ``REFERENCE_COINCIDENCE_TOL_MM`` against the B-rep values.  Returns, per
+    sketch: its candidate targets, the targets that must each be hit by at least
+    one sketch point, and how many sketch points may hit nothing (the centre
+    cross's free arm ends).
+    """
+
+    def cylinders_of(radius: float, index: int) -> list[tuple[Point, Point, float]]:
+        rows = [
+            row
+            for row in cylinders
+            if abs(row[2] - radius) <= 1e-3 and _parallel(row[1], index)
+        ]
+        # Axis position across the two coordinates the axis does not run along.
+        others = [i for i in range(3) if i != index]
+        return _distinct(
+            rows, lambda row: tuple(round(row[0][i], 4) for i in others)
+        )
+
+    def z_planes_at(z: float) -> list[tuple[Point, Point]]:
+        rows = [
+            row
+            for row in planes
+            if _parallel(row[0], 2) and abs(abs(row[1][2]) - z) <= 1e-3
+        ]
+        return _distinct(rows, lambda row: round(row[1][2], 4))
+
+    def expect(rows: list, count: int, what: str) -> list:
+        if len(rows) != count:
+            raise RuntimeError(
+                f"reference gate: expected {count} {what} in the B-rep, found "
+                f"{len(rows)}"
             )
-            tolerance = _early_bound(
-                dimension.Tolerance, "IDimensionTolerance"
+        return rows
+
+    holes = expect(
+        cylinders_of(blind_cut_dia_mm(HOLE_SPEC) / 2.0, 1),
+        HOLE_COUNT,
+        "spring-hole axes",
+    )
+    holes.sort(key=lambda row: row[0][2])
+    hole_targets = {
+        f"spring hole z={row[0][2]:+.3f}": ("axis", (row[0], row[1])) for row in holes
+    }
+    first_hole, last_hole = next(iter(hole_targets)), list(hole_targets)[-1]
+    [boss] = expect(cylinders_of(ANCHOR_R, 1), 1, "summation-anchor boss axes")
+    [pivot] = expect(cylinders_of(CYL_R, 2), 1, "pivot-cylinder axes")
+    base_end, tip_end, interior = _summation_top_arc_points()
+    web_r = math.dist(_circumcenter(base_end, tip_end, interior), base_end)
+    webs = expect(cylinders_of(web_r, 1), 2, f"R{web_r:.3f} summation-arc axes")
+    plate_ends = expect(z_planes_at(PLATE_L / 2.0), 2, "plate-end faces")
+    trunnion_ends = expect(z_planes_at(HEX_Z_OUTER), 2, "trunnion-end faces")
+
+    plate_targets = {
+        f"plate end z={row[1][2]:+.3f}": ("plane", row) for row in plate_ends
+    }
+    trunnion_targets = {
+        f"trunnion end z={row[1][2]:+.3f}": ("plane", row) for row in trunnion_ends
+    }
+    web_targets = {
+        f"summation-arc axis z={row[0][2]:+.3f}": ("axis", (row[0], row[1]))
+        for row in webs
+    }
+    boss_target = {"summation-anchor axis": ("axis", (boss[0], boss[1]))}
+    pivot_target = {"pivot axis": ("axis", (pivot[0], pivot[1]))}
+    return {
+        "PatternReferences": (
+            {**hole_targets, **plate_targets},
+            [
+                ("the first spring hole", {first_hole}),
+                ("the last spring hole", {last_hole}),
+                *((name, {name}) for name in plate_targets),
+            ],
+            0,
+        ),
+        "BossAxialReference": (
+            {**plate_targets, **boss_target},
+            [
+                ("the summation-anchor axis", set(boss_target)),
+                ("a plate end", set(plate_targets)),
+            ],
+            0,
+        ),
+        "SummationArcReference": (
+            {**pivot_target, **plate_targets, **trunnion_targets, **web_targets},
+            [
+                ("the pivot axis", set(pivot_target)),
+                ("a plate end", set(plate_targets)),
+                ("a trunnion end", set(trunnion_targets)),
+                ("a summation-arc centre", set(web_targets)),
+            ],
+            # The centre cross's four free arm ends.
+            4,
+        ),
+    }
+
+
+def _reference_misses(
+    points: list[Point],
+    targets: dict[str, Target],
+    required: list[tuple[str, set[str]]],
+    exempt: int,
+) -> tuple[list[str], float]:
+    """Return (problems, worst matched offset) for one reference sketch."""
+    hit: set[str] = set()
+    strays: list[str] = []
+    worst = 0.0
+    for point in points:
+        offsets = {name: _target_offset_mm(point, t) for name, t in targets.items()}
+        on = {name for name, off in offsets.items() if off <= REFERENCE_COINCIDENCE_TOL_MM}
+        if on:
+            hit |= on
+            worst = max(worst, *(offsets[name] for name in on))
+            continue
+        nearest = min(offsets, key=offsets.get)
+        strays.append(
+            f"({point[0]:.4f}, {point[1]:.4f}, {point[2]:.4f}) is "
+            f"{offsets[nearest]:.6g} mm off {nearest}"
+        )
+    problems = strays if len(strays) > exempt else []
+    problems += [
+        f"no point lands on {what}" for what, names in required if not names & hit
+    ]
+    return problems, worst
+
+
+def _brep_surfaces_mm(
+    adapter,
+) -> tuple[list[tuple[Point, Point, float]], list[tuple[Point, Point]]]:
+    """Every cylinder (origin, axis, radius) and plane (normal, root) of the body."""
+    bodies = list(
+        _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or []
+    )
+    if len(bodies) != 1:
+        raise RuntimeError(f"reference gate: expected one solid body, found {len(bodies)}")
+    faces = list(_early_bound(bodies[0], "IBody2").GetFaces() or [])
+    cylinders: list[tuple[Point, Point, float]] = []
+    planes: list[tuple[Point, Point]] = []
+    for index, raw_face in enumerate(faces, 1):
+        surface = _early_bound(
+            _early_bound(raw_face, "IFace2").GetSurface(), "ISurface"
+        )
+        if surface.IsCylinder():
+            p = [float(value) for value in surface.CylinderParams]
+            cylinders.append(
+                (tuple(v * 1000.0 for v in p[0:3]), tuple(p[3:6]), p[6] * 1000.0)
             )
-            tolerance.Type = 1  # swTolType_e.swTolBASIC
-            if int(tolerance.Type) != 1:
-                raise RuntimeError(
-                    f"{dimension_name}@{feature_name}: BASIC tolerance did not persist"
-                )
+        elif surface.IsPlane():
+            p = [float(value) for value in surface.PlaneParams]
+            planes.append((tuple(p[0:3]), tuple(v * 1000.0 for v in p[3:6])))
+        if index % 25 == 0:
+            _telemetry.debug(f"reference gate: read {index}/{len(faces)} faces")
+    return cylinders, planes
+
+
+def _sketch_points_mm(adapter, part, sketch_name: str) -> list[Point]:
+    """Distinct line endpoints of a sketch, mapped through its REAL plane
+    transform -- the sketch-to-model mapping is exactly what went wrong in R1-R6,
+    so it is read from SolidWorks, never assumed."""
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    feature = part.FeatureByName(sketch_name)
+    if feature is None:
+        raise RuntimeError(f"reference gate: sketch {sketch_name!r} not found")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    to_model = _early_bound(
+        _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse(),
+        "IMathTransform",
+    )
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points: dict[tuple[float, ...], Point] = {}
+    # Segment endpoints read the way _common's rectangle helper reads them (the
+    # derived ISketchLine binding has no build-script precedent).
+    for segment in sketch.GetSketchSegments() or []:
+        for accessor in ("GetStartPoint2", "GetEndPoint2"):
+            local = _read_member(segment, accessor)
+            xyz = [float(_read_member(local, axis)) for axis in ("X", "Y", "Z")]
+            mapped = _early_bound(
+                _early_bound(
+                    math_utility.CreatePoint(double_array(xyz)),
+                    "IMathPoint",
+                ).MultiplyTransform(to_model),
+                "IMathPoint",
+            )
+            point = tuple(float(v) * 1000.0 for v in list(mapped.ArrayData)[:3])
+            points.setdefault(tuple(round(v, 6) for v in point), point)
+    if not points:
+        raise RuntimeError(f"reference gate: sketch {sketch_name!r} has no lines")
+    return list(points.values())
+
+
+@_telemetry.traced("gate.reference_sketches_on_geometry")
+def _assert_reference_sketches_on_geometry(adapter) -> None:
+    """Every drawing-reference point must coincide with the feature it locates.
+
+    The reference sketches are drawn from constants, not bound to the solid, so
+    nothing else notices when one drifts off the geometry it dimensions: R1-R6
+    authored PatternReferences in +Z on a Top-plane sketch (whose y is model -Z),
+    printing both terminal-hole locations 1.47 mm off the real holes, and every
+    gate stayed green.  This reads the finished B-rep and each sketch through its
+    own plane transform and fails unless every point sits on a real hole axis,
+    boss axis, pivot axis, arc axis or end face within
+    ``REFERENCE_COINCIDENCE_TOL_MM``.
+    """
+    from solidworks_mcp.adapters import sw_type_info
+
+    cylinders, planes = _brep_surfaces_mm(adapter)
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    for sketch_name, (targets, required, exempt) in _reference_claims(
+        cylinders, planes
+    ).items():
+        points = _sketch_points_mm(adapter, part, sketch_name)
+        problems, worst = _reference_misses(points, targets, required, exempt)
+        if problems:
+            raise RuntimeError(
+                f"{sketch_name} is not on the geometry it dimensions: "
+                + "; ".join(problems)
+            )
+        _telemetry.success(
+            f"{sketch_name}: {len(points)} points on the real features "
+            f"(worst offset {worst:.3g} mm)"
+        )
+
+
+def _set_parenthetical_dimension(
+    adapter, feature_name: str, dimension_name: str, *, prefix: str = ""
+) -> None:
+    """Author and verify model-owned reference display text."""
+    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    expected_prefix = f"{prefix}("
+    display.SetText(1, expected_prefix)
+    display.SetText(2, ")")
+    if (
+        str(display.GetText(1) or "") != expected_prefix
+        or str(display.GetText(2) or "") != ")"
+    ):
+        raise RuntimeError(
+            f"{dimension_name}@{feature_name}: reference text did not persist"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -975,6 +1508,7 @@ async def build(adapter) -> dict[str, str]:
     await _middle_rib(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
     await _drawing_reference_sketches(adapter, drive_jobs)
+    await _summation_arc_reference(adapter, drive_jobs)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -992,6 +1526,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
+    _assert_reference_sketches_on_geometry(adapter)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no
@@ -1001,10 +1536,31 @@ async def build(adapter) -> dict[str, str]:
     # knife axis (Axis3) = the hex top-vertex ridge (local y +HEX_H/2) = the true
     # rock/suspension line the lever hangs from; the pivot revolute moves here
     # once the top-plate bearing supports are modeled.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis")
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis")
-    await name_bore_axis(
+    pivot_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "pivot axis"
+    )
+    anchor_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", TIP_X, "anchor axis"
+    )
+    knife_axis = await name_bore_axis(
         adapter, "Top Plane", HEX_H / 2.0, "Right Plane", 0.0, "knife axis"
+    )
+    # Blank the three named axes and the two unnamed offset planes that
+    # name_bore_axis leaves behind (hard-named, per build_cone_swing_platform):
+    # the pivot axis intersects two base planes at offset 0 and creates none;
+    # the anchor axis creates Plane1 (Right Plane - 76.2, the stray dashed line
+    # at the tip in the top and isometric views); the knife axis creates Plane2
+    # (Top Plane + 5.134).  All stay selectable -- BlankRefGeom hides, it does
+    # not suppress -- so the named axes still carry their mates.
+    blank_reference_geometry(
+        adapter,
+        (
+            ("Plane1", "PLANE"),
+            ("Plane2", "PLANE"),
+            (pivot_axis, "AXIS"),
+            (anchor_axis, "AXIS"),
+            (knife_axis, "AXIS"),
+        ),
     )
 
     await apply_material(adapter, MATERIAL)
@@ -1019,13 +1575,32 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _apply_basic_drawing_dimensions(adapter)
-    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
+    # A prefix occupies swDimensionTextPrefix, which is exactly where the radius
+    # symbol lives: a RADIAL dimension carrying a multiplier must therefore spell
+    # the R itself ("2X R") or the multiplier displaces it -- the R1 render at
+    # C:/src/summing-logs/lever-0e4dfc4b/sheet-1.png printed "2X 15.2".  The two
+    # LINEAR dims displace no native symbol and print correctly as "2X 21.7" and
+    # "2X 5.08", so they keep the bare "2X ".
+    set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
+    set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
+    set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X R")
+    set_dimension_prefix(
+        adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
     )
+    # Both arc centres, one per side, mirror about the boss axis.  CONTROLLING:
+    # the arc's other defining end sits on the cylinder axis, buried in the
+    # cylinder, so the print lays the arc out from this centre and R138.8 (Codex
+    # R11 B2; the R11 reference parentheses left it uncontrolled).
+    for name in ("SummationArcCentreX", "SummationArcCentreZ"):
+        set_dimension_prefix(adapter, "SummationArcReference", name, "2X ")
+    _set_parenthetical_dimension(
+        adapter,
+        "SpringHolePattern",
+        "HolePitch",
+        prefix=f"{HOLE_COUNT - 1} EQ SP ",
+    )
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(adapter, PART_NAME)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -1034,7 +1609,6 @@ async def build(adapter) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Isometric View Note",
         ),
     )
     return artefacts

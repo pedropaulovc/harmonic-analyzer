@@ -1,7 +1,7 @@
 summing-lever:
   number: MHA-073
   material_family: ferrous_noncritical
-  finish: GREEN ENAMEL; MASK TAPPED HOLES AND KNIFE EDGES; OIL BARE MACHINED SURFACES
+  finish: GREEN ENAMEL; MASK TAPPED HOLES AND HEX KNIFE BEARING RIDGES; OIL BARE MACHINED SURFACES
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
