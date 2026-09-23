@@ -29,13 +29,13 @@ gear faces (stations below quoted from the legacy pivot end):
 * 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/16 in x 143.2599 -- T006 seat and tip journal; contacts the exact
-  McMaster 94025A150 conical cup apex at 6 mm thread engagement.  Its
-  20.675 mm terminal land also carries the 4 mm tip bushing.  It was
+* 1/16 in x 140.3599 -- T006 seat and tip journal; contacts the exact
+  McMaster 94025A150 conical cup apex at 8.9 mm thread engagement.  Its
+  17.775 mm terminal land also carries the 4 mm tip bushing.  It was
   1/32 in while the bore rule was read literally off the gear seat; at
-  L/D 26 that land could not be turned in steel.  1/16 in is the largest
+  L/D 22 that land could not be turned in steel.  1/16 in is the largest
   step the T006 rim tolerates (0.543 mm under the as-cut base-chord root)
-  and leaves L/D 13 -- see cone_gear_shaft_spec.SECTIONS.
+  and leaves L/D 11 -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat

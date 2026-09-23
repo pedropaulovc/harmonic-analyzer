@@ -27,11 +27,13 @@ JOURNAL_END = 43.011
 FRONT_STUB = 61.9068609979
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
-# the 12 mm tip block.  McMaster 94025A150 is threaded 6 mm into the block's
-# north face, placing its stock cup rim at station 141.27232594770454.  The
-# vendor Sketch2 profile puts the conical cup apex 1.98755 mm beyond that rim
-# (6.35 - 4.36245), so the terminal shaft endpoint contacts that apex rather
-# than extending through it as the former nominal 5 mm insertion did.
+# the 12 mm tip block.  McMaster 94025A150 is threaded 8.9 mm into the
+# block's north face (U30, 2026-09-23: >= 8 mm of 5/16-18 engagement in the
+# block's 9.5 mm full thread), placing its stock cup rim at station
+# 138.37232594770454.  The vendor Sketch2 profile puts the conical cup apex
+# 1.98755 mm beyond that rim (6.35 - 4.36245), so the terminal shaft endpoint
+# contacts that apex rather than extending through it; the tip still reaches
+# 5.09 mm inside the block's south face.
 T006_CENTER_STATION = 126.02232594770454
 T006_FACE_WIDTH = 6.5
 TIP_BUSHING_LENGTH = 4.0
@@ -43,7 +45,7 @@ TIP_BUSHING_END_STATION = TIP_BUSHING_START_STATION + TIP_BUSHING_LENGTH
 TIP_BLOCK_NORTH_FACE_STATION = (
     TIP_BUSHING_END_STATION + TIP_BLOCK_CLEARANCE + TIP_BLOCK_LENGTH
 )
-ADJUSTER_EMBED = 6.0
+ADJUSTER_EMBED = 8.9
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
 MCM_94025A150_CUP_DEPTH = 1.98755
 T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A150_CUP_DEPTH
@@ -59,7 +61,7 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
 # 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
 # depth) on a soldered, keyless, near-torque-free gear, and in exchange the
-# 20.675 mm terminal journal goes from L/D 26 to 13 -- 16x the bending
+# 17.775 mm terminal journal goes from L/D 22 to 11 -- 16x the bending
 # stiffness, the difference between a land a manual lathe can turn and one
 # that whips off the tool.  It is also the largest step that keeps the shaft
 # monotonically decreasing: the cone is assembled tip-first, and every gear

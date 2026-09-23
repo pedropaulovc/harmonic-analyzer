@@ -195,12 +195,12 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
         147.27232594770454
     )
-    assert cone_gear_shaft_spec.ADJUSTER_EMBED == pytest.approx(6.0)
+    assert cone_gear_shaft_spec.ADJUSTER_EMBED == pytest.approx(8.9)
     assert cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        141.27232594770454
+        138.37232594770454
     )
     assert cone_gear_shaft_spec.MCM_94025A150_CUP_DEPTH == pytest.approx(1.98755)
-    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(143.25987594770454)
+    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(140.35987594770454)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
@@ -214,13 +214,13 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         )
     )
     assert ends[-1] == pytest.approx(
-        cone_gear_shaft_spec.FRONT_STUB + 143.25987594770454
+        cone_gear_shaft_spec.FRONT_STUB + 140.35987594770454
     )
     # The shortened terminal stub still supports the entire 4 mm bushing.
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
         122.5853574197016
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(20.6745185280)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(17.7745185280)
     assert (
         cone_gear_shaft_spec.TIP_STUB_START_STATION
         <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
