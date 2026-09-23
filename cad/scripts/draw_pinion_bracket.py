@@ -134,7 +134,6 @@ FRONT_KEEP = {
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
-    "PinSeatCz": (0.060, 0.090),
     "PinSeatCy": (0.130, 0.125),
     # r6 eye-pass: beside the view its widest callout line ran across the
     # flank; above the view the leader crosses only the outline.
@@ -158,7 +157,7 @@ PIVOT_FINISH_XY = (0.155, 0.095)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nBLIND FLAT-BOTTOM\nREAM",
+    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nCENTRED ON THICKNESS\nBLIND FLAT-BOTTOM\nREAM",
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
 
