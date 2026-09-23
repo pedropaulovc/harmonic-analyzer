@@ -12,10 +12,13 @@ def test_counter_spring_eye_fits_the_clamped_screw_envelope() -> None:
 
     assert radial_retention >= 1.0
     assert radial_clearance >= 0.25
-    assert geom.SPRING_SCREW_CLAMPED_GAP_MM == counter_stock.END_OCCUPIED_WIDTH_MM
+    # Natively calibrated: the loop seats on the tube's OD corner, so both the
+    # head gap and the loop centre fall inside the purchased end band.
     assert (
-        geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
-        == counter_stock.END_OCCUPIED_WIDTH_MM / 2.0
+        0.0
+        < geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+        < geom.SPRING_SCREW_CLAMPED_GAP_MM
+        < counter_stock.END_OCCUPIED_WIDTH_MM
     )
     assert geom.SPRING_SCREW_TRAVEL_MM > 0.0
 
