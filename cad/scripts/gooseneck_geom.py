@@ -16,7 +16,6 @@ part X. Sliding the post sets spring tension, not the part's dimensions.
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
-from counter_spring_stock_geom import END_OCCUPIED_WIDTH_MM
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)
@@ -31,14 +30,25 @@ ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
 SCREW_SHANK_DIA = 3.6  # conservative external envelope used by assembly checks
 SCREW_THREAD_MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]
 SPRING_SCREW_OPEN_GAP_MM = 8.0
-SPRING_SCREW_CLAMPED_GAP_MM = END_OCCUPIED_WIDTH_MM
+# Native clamp calibration (verify:calibrate_summing_clamp, run
+# 20260923T001401277Z-691cdb38; neutral/square mean, spread 4e-5 mm). The
+# 1330K524 end loop is widest outside the tube OD, so it seats on the tube end's
+# OD corner, 0.231 mm past the full-band position, and the head closes onto it.
+SPRING_SCREW_CLAMPED_GAP_MM = 4.616832947108421
 SPRING_SCREW_TRAVEL_MM = SPRING_SCREW_OPEN_GAP_MM - SPRING_SCREW_CLAMPED_GAP_MM
-SPRING_EYE_CENTRE_FROM_ARM_END_MM = SPRING_SCREW_CLAMPED_GAP_MM / 2.0
+SPRING_EYE_CENTRE_FROM_ARM_END_MM = 2.2090440562497236
 SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The former Ø10 head left only 0.2502 mm nominal radial overlap. Ø12 gives
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
 # clearance against this head and the arm end.
-SCREW_HEAD_T = 2.0  # head thickness (low)
+# User ruling: machined webs 2 mm target, 1.5 floor, judged at the WORST case
+# of the printed bands, fixed by geometry so bands can be LOOSE. The head prints
+# at .X (+/-0.8) and the 0.8 slot at .XX (+/-0.51), so the web under the slot is
+# 4.2 - 0.8 - (0.8 + 0.51) = 2.09 mm at worst (the 2.8 head at .XX gave 0.98).
+# The underside (HEAD_X, the clamp face) is unchanged; only the slotted end face
+# moves outboard. It stays 1.66 mm from the counter spring's raised half-turn,
+# which plateaus from T = 3.2 (1.92 at the old 2.0), and 3.72 mm from its coil.
+SCREW_HEAD_T = 4.2
 # Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
 # radial gap). The drawing does not assume stock-ID accuracy: it match-turns
 # this identified plug to the actual assigned bore for the filler supplier's
