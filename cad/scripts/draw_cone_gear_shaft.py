@@ -27,7 +27,6 @@ from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     add_surface_finish,
-    add_view_centerline,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -156,6 +155,42 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
     return face
 
 
+# A centreline runs a short way past the part it marks.
+AXIS_OVERRUN = 0.003
+
+
+def _add_shaft_axis(adapter: Any, view: Any) -> None:
+    """Draw the shaft axis end to end as ONE sheet centreline.
+
+    A face-derived centreline (``add_view_centerline``) stops at its own land,
+    so the first sheet showed an axis under the journal only (review
+    2026-09-23), and ``InsertCenterLine2`` returned nothing for the third land
+    (Ø6.35) on the farm (run 772bf5f3), after the first two had succeeded.
+    So the axis is sketched on the sheet, as the swing platform's cone axis
+    is: through the projected axis the finish leaders already attach to,
+    checked against the view outline's mid-height, and AXIS_OVERRUN past each
+    end face.
+    """
+    big_end_x = SIDE_CENTER[0] + SHAFT_LENGTH / 2000.0
+    tip_end_x = big_end_x - SHAFT_LENGTH / 1000.0
+    axis_y = SIDE_CENTER[1]
+    outline = tuple(float(value) for value in view.GetOutline())
+    if abs(0.5 * (outline[1] + outline[3]) - axis_y) > 0.0005:
+        raise RuntimeError(
+            f"side view outline {outline!r} is not centred on the axis y={axis_y}"
+        )
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.EditSheet()
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = manager.CreateCenterLine(
+        tip_end_x - AXIS_OVERRUN, axis_y, 0.0, big_end_x + AXIS_OVERRUN, axis_y, 0.0
+    )
+    if centerline is None:
+        raise RuntimeError("failed to sketch the shaft axis centreline")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+
+
 def _move_dimension(
     adapter: Any,
     annotation: Any,
@@ -237,17 +272,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
 
-    land_faces = [_cylindrical_face(adapter, side, dia) for dia in SECTION_DIAS]
-    pivot_face, tip_face = land_faces[0], land_faces[-1]
-    # One axis per land, so the centreline runs the shaft's full length rather
-    # than only under the journal (review 2026-09-23).
-    for index, face in enumerate(land_faces):
-        add_view_centerline(
-            adapter,
-            side,
-            label=f"shaft longitudinal axis, land {index}",
-            entity=face,
-        )
+    pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
+    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
+    _add_shaft_axis(adapter, side)
 
     # The donor is curated FIRST so the diameters cannot be claimed (and then
     # deleted) by a view that cannot show them.
