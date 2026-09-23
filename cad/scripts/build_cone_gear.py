@@ -43,9 +43,11 @@ Prototype scope notes:
   to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
   smallest gears; no evidence supports a key, pin, set screw, or hub.
 * Circular tooth thickness is a native DRIVING dimension in a construction
-  authoring sketch.  Its witness is centred on the bottom pitch chord so the
-  imported extension lines begin at the tooth flanks instead of crossing the
-  bore.  Its asymmetric band is derived from the configured ``gear_mesh``
+  authoring sketch.  Its witness is the pitch chord of the +X tooth -- the
+  tooth every configuration seeds on local +X, so the witness brackets a
+  TOOTH for every even count (the retired bottom chord at 270 deg bracketed a
+  GAP whenever N/2 is odd: T006, T018 ... T114).  The chord is the sketch's
+  only line: no radial construction line runs through the bore and body.  Its asymmetric band is derived from the configured ``gear_mesh``
   backlash; it is not a drawing/model reference-status dimension.
 * Root geometry is simplified: the gap floor is the chord at the base circle,
   not the true root circle + trochoid fillet (for N >= 96 the base circle is
@@ -100,7 +102,6 @@ from _common import (
     SketchDims,
     _early_bound,
     _read_member,
-    anchor_point_to_origin,
     apply_custom_properties,
     apply_material,
     check,
@@ -189,7 +190,14 @@ def _as_construction(adapter, entity_id: str) -> None:
 
 
 async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
-    """Author the model-owned thickness dimension at the bottom pitch chord."""
+    """Author the model-owned thickness dimension on the +X tooth's pitch chord.
+
+    Every configuration seeds a tooth centred on local +X, so a vertical chord
+    at x = pitch radius, centred on the X axis, spans a tooth for every even
+    tooth count.  Its lower end is dimensioned straight from the sketch origin
+    (pitch radius across, half thickness down), so the sketch needs no radial
+    construction line through the bore.
+    """
     tooth_reference = SketchDims()
     check(
         "create_sketch tooth-thickness reference",
@@ -197,50 +205,26 @@ async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
     )
     pitch_radius_mm = DEFAULT_TEETH / DP * 25.4 / 2.0
     set_sketch_direct_db(adapter, True)
-    pitch_radius_line = check(
-        "tooth-thickness pitch-radius witness",
-        await adapter.add_line(0.0, 0.0, 0.0, -pitch_radius_mm),
-    )
     tooth_line = check(
         "tooth-thickness reference line",
         await adapter.add_line(
+            pitch_radius_mm,
             -TOOTH_THICKNESS / 2.0,
-            -pitch_radius_mm,
+            pitch_radius_mm,
             TOOTH_THICKNESS / 2.0,
-            -pitch_radius_mm,
         ),
     )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, pitch_radius_line)
     _as_construction(adapter, tooth_line)
     check(
-        "tooth-thickness pitch radius vertical",
-        await adapter.add_sketch_constraint(
-            pitch_radius_line, None, "vertical"
-        ),
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{pitch_radius_line}.start",
-        0.0,
-        0.0,
-        "tooth-thickness pitch radius",
-    )
-    check(
-        "tooth-thickness reference centred on pitch radius",
-        await adapter.add_sketch_constraint(
-            f"{pitch_radius_line}.end", tooth_line, "midpoint"
-        ),
-    )
-    check(
-        "tooth-thickness reference horizontal",
-        await adapter.add_sketch_constraint(tooth_line, None, "horizontal"),
+        "tooth-thickness reference vertical",
+        await adapter.add_sketch_constraint(tooth_line, None, "vertical"),
     )
     await dimension_between(
         adapter,
-        f"{pitch_radius_line}.start",
-        f"{pitch_radius_line}.end",
-        "vertical_distance",
+        f"{tooth_line}.start",
+        "origin",
+        "horizontal_distance",
         pitch_radius_mm,
         "tooth-thickness pitch radius",
     )
@@ -251,8 +235,17 @@ async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
     await dimension_between(
         adapter,
         f"{tooth_line}.start",
+        "origin",
+        "vertical_distance",
+        TOOTH_THICKNESS / 2.0,
+        "tooth-thickness chord centred on the X axis",
+    )
+    tooth_reference.record("ToothHalfThickness", '"ToothThickness" / 2')
+    await dimension_between(
+        adapter,
+        f"{tooth_line}.start",
         f"{tooth_line}.end",
-        "horizontal_distance",
+        "vertical_distance",
         TOOTH_THICKNESS,
         "circular tooth thickness",
     )
@@ -1194,11 +1187,11 @@ async def build(adapter) -> dict[str, str]:
     # Native tooth-system acceptance size.  The involute is generated from the
     # gear equations and exposes no stable feature dimension for circular tooth
     # thickness, so policy rule 2's authoring-reference-sketch pattern gives the
-    # print one DRIVING model dimension.  The horizontal witness is centred at
-    # the bottom pitch radius: the imported extension lines consequently start
-    # on the tooth flanks instead of running from the model origin through the
-    # bore and body.  Both construction lines remain volume-neutral and hidden,
-    # but blanking the sketch would also suppress the dimension.
+    # print one DRIVING model dimension.  The vertical witness is the +X
+    # tooth's pitch chord, a tooth for every even count: the imported
+    # extension lines start on that tooth's flanks.  The construction chord is
+    # volume-neutral; the drawing hides the sketch in its side and isometric
+    # views (blanking it in the part would also suppress the dimension).
     tooth_reference = await _author_tooth_thickness_reference(adapter)
     tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
     drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
