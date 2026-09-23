@@ -283,8 +283,6 @@ rather than fixed; any other finding on those parts still gates.
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
 | cone gears T006–T024 | root-to-bore webs 0.6–1.3 mm | the gears match the book photos (C67500 tip gears) | 2026-09-23 |
-| MHA-142 post-to-platform screws (MSC 40923898, 1/4-20 × 3-1/2 slotted fillister, nominal 86.0, cut to fit at assembly: flush to 0.3 short of the MHA-091 underside, never proud) | thread engagement 6.05–6.35 mm (0.95–1.0D) in the 6.35 plate | the screw end must not stand proud of the plate, which swings over the base | 2026-09-23 |
-| MHA-139 crank handle pivot screw (#10-24 slotted, Ø3.4 thread relief) in the tapped 5/16 in steel crank arm | full-thread engagement about 1.35D nominal, 1.17D at the printed worst case | the arm is 5/16 flat bar as photographed, and a steel screw in a steel tap reaches full strength at about 1D | 2026-09-23 |
 
 ## The gate
 
