@@ -307,6 +307,28 @@ DIMENSION_CALLOUTS = {
 }
 
 
+def _uppercase_dimension_text(adapter: Any, drawing_model: Any) -> None:
+    """Print the tap's MIN thread depth the ASME Y14.5 way, not 'min.'.
+
+    SolidWorks renders a swTolMIN dimension with a lowercase 'min.' suffix
+    (knife-cc-12/13). The supported switch is the drafting-standard document
+    property 'All uppercase for dimensions and hole callouts'
+    (DP_DraftingStandard), set here on this drawing's document and read back
+    -- never a hand-typed override that would break the callout's model link.
+    """
+    from _common import _preference_id
+
+    name = "swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts"
+    preference = _preference_id(adapter, name)
+    if preference is None:
+        raise RuntimeError(f"{name} does not resolve on this install")
+    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(preference, 0, True):
+        raise RuntimeError(f"failed to set {name}")
+    if not bool(extension.GetUserPreferenceToggle(preference, 0)):
+        raise RuntimeError(f"{name} did not persist")
+
+
 def _assert_boss_from_end_prints_plain(adapter: Any, annotations: list[Any]) -> None:
     """The imported 9.0 is a controlling dimension, not a reference read.
 
@@ -841,6 +863,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _uppercase_dimension_text(adapter, drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
