@@ -42,9 +42,22 @@ def test_adjustment_screw_thread_and_slot_fit_the_body() -> None:
     assert geom.SCREW_SLOT_W < geom.SCREW_HEAD_DIA
 
 
-def test_screw_slot_leaves_a_two_millimetre_web() -> None:
-    """User ruling: machined webs target 2 mm (1.5 mm floor), fixed by geometry."""
-    assert round(geom.SCREW_HEAD_T - geom.SCREW_SLOT_DEPTH, 9) >= 2.0
+def test_screw_slot_leaves_a_two_millimetre_web_at_the_printed_worst_case() -> None:
+    """User ruling: machined webs >= 2 mm (1.5 floor) at the worst case of the
+    printed bands, fixed by geometry (a thicker head), not a tighter band."""
+    import _config
+    import gooseneck_spec
+
+    rows = {1: "linear_1pl", 2: "linear_2pl", 3: "linear_3pl"}
+
+    def band(name: str) -> float:
+        places = gooseneck_spec.DRAWING_PRECISION_BY_NAME[name]
+        return float(_config.title_block(rows[places])["value_in"]) * 25.4
+
+    worst = (geom.SCREW_HEAD_T - band("HeadThickness")) - (
+        geom.SCREW_SLOT_DEPTH + band("SlotDepth")
+    )
+    assert worst >= 2.0
 
 
 def test_thicker_head_clears_the_counter_spring_half_turn() -> None:
