@@ -1124,6 +1124,13 @@ async def build(adapter: Any) -> dict[str, str]:
         (ISO_REGION[1] + ISO_REGION[3]) / 2.0,
         scale=ISO_SCALE,
     )
+    # finalize_drawing switches every pictorial to precise Shaded With Edges;
+    # SetDisplayMode4 ignores a same-mode set, cosmetic-thread quality
+    # included, so the template's default shaded iso kept draft threads and
+    # failed that readback (stud-15, leaf 20260923T001325Z). Leaving it in
+    # hidden-lines-removed makes finalize's set a real change, as in
+    # draw_platen_guide.
+    set_hidden_lines_removed(adapter, iso)
     _orient_as_in_the_lathe(adapter, front)
     _fit_view(adapter, front, FRONT_REGION, FRONT_FIT_MARGIN_M, label="front")
     set_hidden_lines_removed(adapter, front)
