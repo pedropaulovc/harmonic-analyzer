@@ -2806,43 +2806,13 @@ def task_check():
     )
     specs = {
         "math": {
-            # truth_model reads harmonics/phases/amplitudes/magnification from
-            # _config + the YAML layer, so those must invalidate the math stamp
-            # too (codex review). The base-footprint gate reads placement +
-            # footprint constants straight off these build modules -- folded via
-            # module_deps_of so the geometry contracts they import (the
-            # *_spec.py single-source modules) invalidate the stamp too (codex
-            # review #353: a FOOT_WIDTH edit in arbor_pedestal_spec.py must
-            # re-run the gate, not leave its stamp valid).
-            "file_dep": [
-                str(VERIFY_PY),
-                *sorted(
-                    {
-                        str(Path(dep).resolve())
-                        for module in (
-                            "truth_model.py",
-                            "build_drive_train_assembly.py",
-                            "build_cone_pivot_post.py",
-                            "build_cone_pivot_screw.py",
-                            "build_swing_stop_screw.py",
-                            "build_cone_swing_platform.py",
-                            "build_cone_lock_knob.py",
-                            "build_cone_tip_block.py",
-                            "build_cone_tip_bushing.py",
-                            "build_cone_tip_adjuster.py",
-                            "build_cone_tip_pinch_screw.py",
-                            "build_arbor_pedestal.py",
-                            "build_harmonic_base.py",
-                        )
-                        for dep in (
-                            SCRIPTS_DIR / module,
-                            *module_deps_of(SCRIPTS_DIR / module),
-                        )
-                    }
-                ),
-                config_py,
-                *_CONFIG_YAMLS,
-            ],
+            # The import closure of verify.py (truth_model, the base-footprint
+            # build modules and the *_spec.py single-source modules they import,
+            # build_summing_assembly for the counter-spring hang, ...) is derived
+            # below from the command's entry point, like every gate's. Only the
+            # YAML layer truth_model reads outside the _config accessors is
+            # declared here (codex review).
+            "file_dep": [config_py, *_CONFIG_YAMLS],
             "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
         },
         "config": {
@@ -3090,9 +3060,26 @@ def task_check():
     )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
+        # A gate's stamp must go stale whenever code or config it EXECUTES changes,
+        # so every .py entry point on its command line contributes its local import
+        # closure (lazy imports included) and the config that closure reads. Hand
+        # lists drifted: check:math never listed build_summing_assembly.py or
+        # gooseneck_geom.py, so a gooseneck edit left it green without running
+        # (2026-09-23). The hand-listed deps above stay for what an import graph
+        # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
+        # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
+        executed = {
+            path
+            for entry in (Path(arg) for arg in spec["cmd"] if arg.endswith(".py"))
+            for path in (
+                str(entry.resolve()),
+                *module_deps_of(entry),
+                *_config_deps(entry),
+            )
+        }
         yield {
             "name": name,
-            "file_dep": spec["file_dep"],
+            "file_dep": sorted({*spec["file_dep"], *executed}),
             "targets": [stamp],
             "actions": [(_run_stamped, [spec["cmd"], f"check {name}", stamp])],
             "clean": True,
