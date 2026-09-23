@@ -104,13 +104,12 @@ HANGER_FIT_SHEET_SCALE = (1.0, 1.0)
 HANGER_PARENT_SCALE = (1.0, 2.0)
 HANGER_SECTION_SCALE = (1.0, 2.0)
 HANGER_DETAIL_SCALE = (3.0, 1.0)
-NOTES_SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: EXPLODED_SCALE,
     SHEET_NAMES[2]: INSTRUCTION_SCALE,
     SHEET_NAMES[3]: HANGER_FIT_SHEET_SCALE,
-    SHEET_NAMES[4]: NOTES_SHEET_SCALE,
+    SHEET_NAMES[4]: INSTRUCTION_SCALE,
 }
 
 ASSEMBLED_FRONT_CENTER = (0.065, 0.158)
@@ -118,6 +117,11 @@ ASSEMBLED_RIGHT_CENTER = (0.185, 0.158)
 ASSEMBLED_ISO_CENTER = (0.330, 0.158)
 EXPLODED_ISO_CENTER = (0.105, 0.158)
 INSTRUCTION_ISO_CENTER = (0.345, 0.190)
+# Sheet 5 carries a reference isometric under its right notes: the finalizer
+# links title-block properties through a view, and a notes-only sheet has
+# none (summing-asm-r13). It also shows the parts the checks name.
+CHECKS_ISO_CENTER = (0.345, 0.125)
+CHECKS_ISO_CAPTION_XY = (0.300, 0.078)
 HANGER_PARENT_CENTER = (0.060, 0.205)
 HANGER_SECTION_CENTER = (0.300, 0.205)
 # Where the knife-mount top on the hanger axis lands on sheet 4. The views
@@ -1895,6 +1899,25 @@ def _place_package(adapter: Any) -> None:
     field_findings += _place_hanger_fit_sheet(adapter)
 
     _activate_sheet(adapter, SHEET_NAMES[4])
+    checks_iso = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *CHECKS_ISO_CENTER,
+        scale=INSTRUCTION_SCALE,
+    )
+    _set_exploded_state(adapter, checks_iso, False, label="checks isometric")
+    set_high_quality_shaded_with_edges(
+        adapter,
+        checks_iso,
+        label="summing checks isometric",
+    )
+    _add_note_block(
+        adapter,
+        "FINISHED ASSEMBLY 1:6 - CHECK REFERENCE",
+        CHECKS_ISO_CAPTION_XY,
+        label="checks-isometric caption",
+    )
     field_findings += _stack_note_field(
         adapter,
         (("assembly functional checks", ASSEMBLY_CHECKS),),

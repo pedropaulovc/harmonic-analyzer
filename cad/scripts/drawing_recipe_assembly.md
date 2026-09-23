@@ -108,9 +108,11 @@ Inspect every page and complete the blind machinist review before release.
    notes in the right note field. Before dimensioning, the drawing measures E
    between the built mount and stud solids (`_assert_built_hanger_engagement`).
    E is the fit acceptance (the MHA-119 under-head length stays reference).
-5. **CHECKS + SETUP** (notes only): the assembly-only functional checks, the
-   neutral/free-rocking setup and the external installation interfaces. The
-   sheet is appended after sheet 4 so the MHA-119 cross-reference stays valid.
+5. **CHECKS + SETUP** (1:6): the assembly-only functional checks, the
+   neutral/free-rocking setup and the external installation interfaces, with a
+   reference isometric under the right notes. The finalizer links title-block
+   properties through a view, so no sheet may be notes-only. The sheet is
+   appended after sheet 4 so the MHA-119 cross-reference stays valid.
 
 Note blocks stack top-down in the `NOTE_FIELD_*` fields at 3.5 mm text (the ASME
 Y14.2 minimum on B size is 3 mm). Each block's rendered `INote.GetExtent` is
