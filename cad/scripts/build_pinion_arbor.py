@@ -476,6 +476,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
     )
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
+    set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

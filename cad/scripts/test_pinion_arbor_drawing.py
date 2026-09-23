@@ -116,3 +116,11 @@ def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> Non
     assert set(spec.DRAWING_PRECISION_BY_NAME) == carried
     assert set(drawing.DIAMETER_POSITIONS) <= carried
     assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
+
+
+def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
+    assert spec.DRAWING_DIMENSIONS["BackCapProfile"] == {"BackCapR", "BackCapSagDim"}
+    assert spec.DRAWING_PRECISION_BY_NAME["BackCapR"] == 1
+    assert "BackCapR" in drawing.PRINCIPAL_KEEP
+    assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
+    assert not any("SR" in text for text in drawing.DIMENSION_CALLOUTS.values())
