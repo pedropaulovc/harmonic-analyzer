@@ -374,3 +374,15 @@ def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
     assert "segment.Color = 0" in source
     assert "segment.Style = _SW_LINE_CENTER" in source
     assert "int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER" in source
+
+
+def test_crank_boss_od_is_labelled_as_the_boss() -> None:
+    """The elevation sees the boss's far end: its Ø is the boss, not a spotface."""
+    assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
+    assert "SPOTFACE" not in drawing.DIMENSION_CALLOUTS.values()
+
+
+def test_section_caption_states_no_scale_at_sheet_scale() -> None:
+    assert drawing.SECTION_SCALE == drawing.SHEET_SCALE
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'expected = "<VLNAME> <VLLABEL>"\n' in source

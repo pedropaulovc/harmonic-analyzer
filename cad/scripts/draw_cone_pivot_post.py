@@ -185,12 +185,13 @@ JOURNAL_KEEP = {
     "JournalBoreDia": (0.292, 0.153),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
-# a particular cutting method.  The separate Ø21.93 footprint and 21.3753 mm
-# station identify the real local crank spotface without inventing a uniform
-# depth against the curved collar.
+# a particular cutting method.  Ø21.93 is the crank boss OD -- the elevation
+# looks at the boss's far end, so it is labelled as the boss, not as the
+# spot-faced near face -- and the 21.3753 mm station locates that near face
+# from the post axis without inventing a depth against the curved collar.
 DIMENSION_CALLOUTS = {
     "HeadDia": "COLLAR",
-    "CrankBossDia": "SPOTFACE",
+    "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
@@ -623,7 +624,11 @@ def _configure_section_caption(drawing_model: Any) -> None:
 
 
 def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
-    """Retain the linked native caption fields, scale, and clear placement."""
+    """Retain the linked native caption fields and place them clear.
+
+    The section is drawn at the sheet scale, so its caption states no scale:
+    ASME Y14.3 asks for one only when a view differs from the title block.
+    """
     candidates = []
     for raw_note in _early_bound(view, "IView").GetNotes() or ():
         note = _early_bound(raw_note, "INote")
@@ -634,7 +639,7 @@ def _show_section_scale_in_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"expected one native cone-section caption, found {len(candidates)}"
         )
-    expected = "<VLNAME> <VLLABEL>\nSCALE <VLSCALEV>"
+    expected = "<VLNAME> <VLLABEL>"
     note = candidates[0]
     note.PropertyLinkedText = expected
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
