@@ -262,8 +262,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      its receiver at the worst case. Count full threads only: a tap or die
      leaves about 1–1.5 incomplete threads, so give it a thread relief or a
      deeper tap drill rather than letting them eat the engagement. The CAD
-     owns installed engagement: the build's seat-fit and stack asserts
-     (e.g. `require_blind_seat_fit`) prove it. The assembly review checks it
+     owns installed engagement, and the build's seat-fit and stack asserts
+     (e.g. `require_blind_seat_fit`) are where it is enforced. Today those
+     asserts check only ≥ 1D; raising them to 1.5D at the worst case is
+     part of the rule-12 audit (#846). The assembly review checks it
      only where the package gives the numbers, and otherwise records it as
      not verifiable, without gating.
    - **Adjust at fit-up rather than stack.** Where loose bands cannot hold a
