@@ -63,6 +63,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 DRAWING_NUMBER = "MHA-A03"
+# swUserPreferenceToggle_e.swViewDisplayHideAllTypes (SOLIDWORKS API help,
+# "Hide or Show All Types Example (VBA)").
+VIEW_DISPLAY_HIDE_ALL_TYPES = 198
 
 SHEET_NAMES = (
     "ASSEMBLED VIEWS",
@@ -93,15 +96,19 @@ FIT_SHEET = 7
 CHECKS_SHEET = 8
 
 ASSEMBLED_SCALE = (1.0, 3.0)
-ASSEMBLED_ISO_SCALE = (1.0, 4.0)
+ASSEMBLED_ISO_SCALE = (1.0, 3.0)
 REFERENCE_ISO_SCALE = (1.0, 8.0)
-CLUSTER_SCALE = (1.0, 3.0)
+# At 1:3 the bank and rig explodes filled about a fifth of their sheets (Fable
+# review of baseline-5); the cone-crank ring already spans ~170 x 150 mm there.
+CLUSTER_SCALES: dict[Cluster, tuple[float, float]] = {
+    "cylinder-bank": (1.0, 2.0),
+    "cone-crank": (1.0, 3.0),
+    "pinion-rig": (1.0, 2.0),
+}
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: REFERENCE_ISO_SCALE,
-    SHEET_NAMES[2]: CLUSTER_SCALE,
-    SHEET_NAMES[3]: CLUSTER_SCALE,
-    SHEET_NAMES[4]: CLUSTER_SCALE,
+    **{SHEET_NAMES[number - 1]: CLUSTER_SCALES[c] for c, number in CLUSTER_SHEETS.items()},
     SHEET_NAMES[5]: REFERENCE_ISO_SCALE,
     SHEET_NAMES[6]: REFERENCE_ISO_SCALE,
     SHEET_NAMES[7]: REFERENCE_ISO_SCALE,
@@ -117,7 +124,9 @@ SHEET_SCALES = {
 PROJECTED_GROUP_ORIGIN = (0.024, 0.068)
 PROJECTED_GAP = 0.014
 PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
-ASSEMBLED_ISO_CENTER = (0.360, 0.175)
+# The right half between the heading (bottom ~0.243) and the title block
+# (top 0.0655): a 1:3 isometric outline is ~130 mm, 1.5x baseline-5's 1:4.
+ASSEMBLED_ISO_CENTER = (0.320, 0.155)
 VIEW_CAPTION_GAP = 0.004
 
 # --- sheet 2: BOM in two columns + reference isometric -----------------------
@@ -284,11 +293,7 @@ BOM_NORMALIZED_ALIASES = {
 # every quoted fit/process is the wording already printed on that part's sheet.
 # "[PENDING ...]" marks a joint whose hardware or ruling has not landed; the
 # package is not released while any remains.
-ASSEMBLED_HEADING = (
-    "SAVED WORKING POSE: CONE SET ENGAGED, ALIGNMENT PINION PARKED CLEAR,\n"
-    "CAMS ECCENTRIC DOWN, CRANK ARM DOWN. FREE: CRANK, CONE SWING, PINION\n"
-    "SWING, LIFT ROD. SEE SHEET 8 FOR SETUP."
-)
+ASSEMBLED_HEADING = "SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET 8 FOR SETUP."
 
 CONE_CRANK_STEPS = "\n".join(
     (
@@ -317,8 +322,9 @@ BANK_RIG_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK AND PINION RIG",
         "8. SLIDE {cylinder_gears}X MHA-027 ONTO MHA-028, ALL ALIKE, CAM SIDE",
-        "   FRONT; ADD EACH CHANNEL CONNECTING ROD ON ITS CAM AS ITS GEAR",
-        "   GOES ON. FIT MHA-121 AT EACH END. [PENDING: BANK AXIAL STACK-UP]",
+        "   FRONT; ADD EACH CONNECTING ROD (CHANNEL ASSEMBLY MHA-A02) ON ITS",
+        "   CAM AS ITS GEAR GOES ON. FIT MHA-121 AT EACH END.",
+        "   [PENDING: BANK AXIAL STACK-UP]",
         "9. FIT BOTH MHA-004 OVER THE ARBOR ENDS AND MHA-125 IN EACH.",
         "10. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT. MATCH-REAM THE",
         "    MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR SLIDE BY HAND).",
@@ -326,24 +332,26 @@ BANK_RIG_STEPS = "\n".join(
         "12. JOURNAL MHA-102 IN THE MHA-056 TOP BORES; HANG BOTH MHA-056 ON",
         "    MHA-062 THROUGH {pivot_blocks}X MHA-061.",
         "13. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
-        "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK WITH ITS SET SCREW.",
+        "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
+        "    SCREW SUPPLIED WITH MHA-104.",
         "    [PENDING: MHA-059 TO MHA-060 PIN MHA-135]",
         # Main ruling 2026-09-23 (U28 corollary): the rig is located by its
         # parked tip gap, and MHA-035 carries its hold-down and spring seats as
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
         # equal gap change; 2.5 is the physical rest gap, not the CAD gap
         # (pinioncluster, PR #837).
-        "14. LOCATE THE RIG ON MHA-035; ITS SEATS ARE TRANSFERRED, NOT",
-        "    PRE-DRILLED. SET BOTH MHA-061 LOOSE ON THE BASE, MHA-114 FITTED.",
+        "14. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
+        "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
+        "    ON THE BASE WITH MHA-114 FITTED.",
         "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
         "15. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
-        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL AND TAP #8-32",
-        "    UNC-2B, {slotted} PLACES. SET MHA-114 WITH ITS TERMINAL FLAT ON THE",
-        "    PARKED BACK MHA-056; SPOT THROUGH ITS FOOT HOLE; DRILL AND TAP",
-        "    #4-40 UNC-2B, 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
+        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL AND TAP #8-32,",
+        "    {slotted} PLACES. SET MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED",
+        "    BACK MHA-056; SPOT THROUGH ITS FOOT HOLE; DRILL AND TAP #4-40,",
+        "    1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
         "17. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
     )
 )
@@ -387,10 +395,10 @@ SETUP_NOTES = "\n".join(
 INTERFACE_NOTES = "\n".join(
     (
         "EXTERNAL INTERFACES - NOT BOM ITEMS",
-        "HARMONIC BASE MHA-035 RECEIVES MHA-094, MHA-093, MHA-095,",
-        "{slotted}X MHA-101 AND {foot}X MHA-103.",
-        "PAPER DRIVE: T12 CHAIN WHEEL ON MHA-026.",
-        "CHANNEL ASSEMBLY: CONNECTING RODS RUN ON THE MHA-027 CAMS.",
+        "BASE MHA-035 (FRAME ASSEMBLY MHA-A04) RECEIVES MHA-094, MHA-093,",
+        "MHA-095, {slotted}X MHA-101 AND {foot}X MHA-103.",
+        "PAPER DRIVE MHA-A06: T12 CHAIN WHEEL ON MHA-026.",
+        "CHANNEL ASSEMBLY MHA-A02: CONNECTING RODS RUN ON THE MHA-027 CAMS.",
     )
 )
 
@@ -1154,8 +1162,23 @@ def _link_view_to_bom(view: Any, bom_name: str, *, label: str) -> None:
 # ============================ sheets ============================================
 
 
+def _hide_model_reference_types(adapter: Any) -> None:
+    """View > Hide/Show > Hide All Types on the drawing.
+
+    Baseline-5 printed the source's PatternAxisX/Y/Z (the explode directions)
+    and a ~65 mm construction circle in every view: about ten centerline-font
+    paths per sheet that the old MHA-A03 print did not carry.
+    """
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(VIEW_DISPLAY_HIDE_ALL_TYPES, 0, True):
+        raise RuntimeError("drive-train drawing refused Hide All Types")
+    if not extension.GetUserPreferenceToggle(VIEW_DISPLAY_HIDE_ALL_TYPES, 0):
+        raise RuntimeError("drive-train drawing Hide All Types did not persist")
+
+
 def _create_package_sheets(adapter: Any) -> None:
     new_project_drawing(adapter, layout=SPEC.layout, scale=ASSEMBLED_SCALE)
+    _hide_model_reference_types(adapter)
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="drive-train assembly package")
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
@@ -1301,7 +1324,8 @@ def _place_cluster_sheet(
     number = CLUSTER_SHEETS[cluster]
     _activate_sheet(adapter, SHEET_NAMES[number - 1])
     label = f"{cluster} exploded isometric"
-    view = place_view(adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=CLUSTER_SCALE)
+    scale = CLUSTER_SCALES[cluster]
+    view = place_view(adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=scale)
     _set_exploded_state(adapter, view, True, label=label)
     names = frozenset(facts.clusters[cluster])
     _isolate_instances(adapter, view, names, label=label)
@@ -1341,7 +1365,7 @@ def _place_cluster_sheet(
         adapter,
         number,
         f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
-        f"{int(CLUSTER_SCALE[0])}:{int(CLUSTER_SCALE[1])}; ITEMS PER SHEET 2",
+        f"{int(scale[0])}:{int(scale[1])}; ITEMS PER SHEET 2",
     )
 
 
