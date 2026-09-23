@@ -69,7 +69,7 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(17.2105, abs=1e-3)
+    assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(19.8)
     assert far - spec.JOURNAL_START == pytest.approx(89.2449, abs=1e-3)
     assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(118.0)
     assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(132.0)
@@ -85,10 +85,10 @@ def test_notes_stay_within_rule_six() -> None:
 def test_face_shift_preserves_every_inboard_world_station() -> None:
     assert spec.SHAFT_LENGTH == 130.0
     assert spec.JOURNAL_START == pytest.approx(40.755105572)
-    assert spec.JOURNAL_END == pytest.approx(112.789505572)
-    assert spec.JOURNAL_LENGTH == pytest.approx(72.0344)
+    assert spec.JOURNAL_END == pytest.approx(110.2)
+    assert spec.JOURNAL_LENGTH == pytest.approx(69.4449, abs=1e-4)
     assert -183.0 + spec.JOURNAL_START == pytest.approx(-142.244894428)
-    assert -183.0 + spec.JOURNAL_END == pytest.approx(-70.210494428)
+    assert -183.0 + spec.JOURNAL_END == pytest.approx(-72.8)
     assert part.SEAT_T12 == pytest.approx(25.5)
     assert part.SEAT_PINION == pytest.approx(113.039505572)
     assert not hasattr(part, "SEAT_ARM")
@@ -215,3 +215,14 @@ def test_part_registry_retains_make_critical_properties() -> None:
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+def test_pinion_land_is_turnable_at_the_printed_band() -> None:
+    # U27: the 0.25 land left by a journal running the full post bore was
+    # unturnable.  The journal stops short; the land between its shoulder
+    # and the pinion seat keeps 2 mm at the .X band on the printed station.
+    land = part.SEAT_PINION - spec.JOURNAL_END
+    assert land == pytest.approx(2.8395, abs=1e-4)
+    assert land - geometry.GENERAL_1PL_TOL_MM >= 2.0
+    post_bore = 104.789505572 - 32.755105572
+    assert spec.JOURNAL_LENGTH / post_bore > 0.96

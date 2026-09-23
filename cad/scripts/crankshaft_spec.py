@@ -33,7 +33,12 @@ JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
 JOURNAL_DIA_BAND = (0.00, -0.02)  # (upper, lower) deviations
 JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
-JOURNAL_END = 104.789505572 + CRANK_FACE_SHIFT
+# The post bore ends 0.25 short of the pinion seat (station 113.04), too
+# narrow a land to turn.  The journal stops at 110.2 instead: a 2.84 land,
+# still 2.0 at the .X band on its far-end station, and the last 2.6 of the
+# bore rides over the Ø9.525 shaft (96% of the bore still bears).  No gear,
+# bearing or seat moves.
+JOURNAL_END = 110.2
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
 SURFACE_FINISHES = (
     SurfaceFinishControl(

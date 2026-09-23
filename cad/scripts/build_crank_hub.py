@@ -1,7 +1,7 @@
 r"""Build separate through hub MHA-137.
 
-The local +Y axis runs inboard from the arm's outboard face.  The O15 seat is
-flush through the 8-mm arm; the O18.1 rear barrel supplies the inboard shoulder
+The local +Y axis runs inboard from the arm's outboard face.  The O19.5 seat is
+flush through the 8-mm arm; the O25.4 rear barrel supplies the inboard shoulder
 and carries the removable MHA-024 hub-to-shaft cross-hole.  MHA-138 is an axial
 seam groove at local +Z (six o'clock after assembly), match-reamed through arm
 and hub for only half the arm thickness.

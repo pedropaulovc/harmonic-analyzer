@@ -24,10 +24,11 @@ def test_required_drawing_paths() -> None:
 
 
 def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
-    assert spec.ARM_WIDTH == geometry.ARM_WIDTH == 18.1
+    assert spec.ARM_WIDTH == geometry.ARM_WIDTH == pytest.approx(25.4)
     assert spec.ARM_THICKNESS == geometry.ARM_THICKNESS == 8.0
-    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 15.0
-    assert spec.HALF_WIDTH == pytest.approx(9.05)
+    assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.5
+    assert spec.HALF_WIDTH == pytest.approx(12.7)
+    assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
     assert spec.HUB_SEAT_CALLOUT.startswith("MATCH-FIT TO ASSIGNED MHA-137")
     assert "LIGHT ARBOR-PRESS" in spec.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
@@ -35,12 +36,12 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
 
 
 def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
-    assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == 3.4
+    assert spec.AXIAL_PIN_DIA == geometry.AXIAL_PIN_DIA == 4.0
     assert spec.AXIAL_PIN_LENGTH == geometry.AXIAL_PIN_LENGTH == spec.ARM_THICKNESS / 2.0
-    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 7.5
+    assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.75
     assert spec.AXIAL_PIN_Y == 0.0
     assert drive.CRANK_HUB_PIN_ORIGIN == pytest.approx(
-        [drive.X_CRANK, drive.Y_CRANK - 7.5, drive.CRANK_FACE_Z]
+        [drive.X_CRANK, drive.Y_CRANK - 9.75, drive.CRANK_FACE_Z]
     )
     assert drive.CRANK_HUB_PIN_ROWS == drive.IDENTITY
 
@@ -64,8 +65,8 @@ def test_reference_dimensions_remain_model_owned() -> None:
         "Width",
     }
     assert spec.DRAWING_DIMENSIONS["HubSeatProfile"] == {"HubSeatDia"}
-    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(4.55)
-    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(94.05)
+    assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.2)
+    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(97.7)
     assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
 
 

@@ -48,7 +48,7 @@ SQUARE_END_OVERHANG = 10.0
 HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
 
 # The axial MHA-138 groove is match-drilled in the assembled arm/hub.  Its
-# centre rides the O15 interface at six o'clock (toward the hanging handle);
+# centre rides the hub-seat interface at six o'clock (toward the hanging handle);
 # the 4-mm length is shared as exactly half the 8-mm arm thickness.
 AXIAL_PIN_X = AXIAL_PIN_RADIUS_FROM_AXIS
 AXIAL_PIN_Y = 0.0
@@ -146,14 +146,15 @@ HUB_SEAT_CALLOUT = (
     "NO TURN OR SLIDE BY HAND"
 )
 # Policy rule 6: at most four short lines, each under ~75 characters so the
-# block stays left of the title block.  The hub-wall check belongs to the
-# MHA-137 print, and MHA-138's own print says how the pin is driven.
+# block stays left of the title block.  The section line is a requirement,
+# not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
+# the mill's width tolerance, not at the .X band.
 DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
+        "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED.",
         "MATCHED ASSEMBLY WITH MHA-137 HUB: SHOULDER SEATED, FACES FLUSH.",
-        "AT SIX O'CLOCK MATCH-REAM AXIAL SEAM WITH MHA-137 FOR MHA-138:",
-        "LIGHT DRIVE FIT.",
+        "AT SIX O'CLOCK MATCH-REAM AXIAL SEAM WITH MHA-137 FOR MHA-138.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

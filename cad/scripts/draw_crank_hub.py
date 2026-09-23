@@ -53,8 +53,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (3.0, 1.0)
-VIEW_SCALE = (3, 1)
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / 1000.0  # sheet metres per model millimetre
 # Turned part, laid as it sits in the lathe (policy rule 7): the *Right view
 # rotated a quarter turn so the axis is horizontal, inboard end on the left
@@ -67,7 +67,7 @@ SIDE_VIEW_ANGLE = math.pi / 2.0
 END_VIEW_ANGLE = math.pi
 SIDE_CENTER = (0.200, 0.160)
 END_CENTER = (0.295, SIDE_CENTER[1])
-ISO_CENTER = (0.380, 0.225)
+ISO_CENTER = (0.380, 0.228)
 
 
 def _sheet_x(station_mm: float) -> float:
@@ -113,7 +113,7 @@ SIDE_KEEP = {
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
 HOLE_CALLOUT_XY = (0.150, 0.222)
-ISO_NOTE_XY = (0.345, 0.185)
+ISO_NOTE_XY = (0.345, 0.180)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,

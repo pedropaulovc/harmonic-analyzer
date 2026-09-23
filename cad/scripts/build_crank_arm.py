@@ -1,6 +1,6 @@
 r"""Build crank arm MHA-020 for the separate through-hub construction.
 
-The arm is a plain 8-mm plate with an O15 match-fitted MHA-137 seat.  It no
+The arm is a plain 8-mm plate with an O19.5 match-fitted MHA-137 seat.  It no
 longer mounts directly on the crankshaft and no longer carries the MHA-024
 cross-hole.  A blind axial seam groove enters the outboard face at six o'clock,
 parallel to the shaft, and accepts MHA-138 for half the arm thickness.  The

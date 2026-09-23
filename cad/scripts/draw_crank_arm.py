@@ -83,12 +83,13 @@ _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  At 2:1 the 94.1-mm overall arm remains clear of the
+# Sheet layout (meters).  At 2:1 the 97.7-mm overall arm remains clear of the
 # title block.  The cropped edge-on view isolates the hub end and axial seam;
-# the side view shows the 18.1 x 8 stock section.
-FRONT_CENTER = (0.145, 0.135)
+# the side view shows the 25.4 x 8 stock section.  The principal view sits so
+# its lower edge keeps the dimension rows' height below it.
+FRONT_CENTER = (0.145, 0.142)
 TOP_CENTER = (0.145, 0.225)
-RIGHT_CENTER = (0.300, 0.135)
+RIGHT_CENTER = (0.300, FRONT_CENTER[1])
 ISO_CENTER = (0.360, 0.230)
 
 
@@ -224,9 +225,9 @@ FRONT_KEEP = {
     "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
-    "AnchorOffset": (0.097, 0.149),
-    "AxisOffset": (0.245, FRONT_CENTER[1] + 0.008),
-    "Width": (0.274, FRONT_CENTER[1]),
+    "AnchorOffset": (0.097, FRONT_CENTER[1] + 0.017),
+    "AxisOffset": (0.252, FRONT_CENTER[1] + 0.013),
+    "Width": (0.279, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
     "HubSeatDia": (0.123, 0.195),
 }
@@ -340,7 +341,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=anchor_edge,
-        callout_xy=(0.195, 0.172),
+        callout_xy=(0.195, 0.182),
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
