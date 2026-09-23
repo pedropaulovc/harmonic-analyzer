@@ -26,6 +26,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm, drill_process
 from crank_hub_spec import (
     BORE_CALLOUT,
+    CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     HUB_LENGTH,
@@ -67,14 +68,21 @@ BARREL_FACE_PICK = (
     RIGHT_CENTER[0] + 0.012,
     SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA * VIEW_SCALE[0] / 2000.0 + 0.007,
 )
-FRONT_KEEP = {"BoreDia": (0.035, FRONT_CENTER[1] + 0.022)}
+# Every size and callout sits outside the silhouettes.  The bore callout
+# stands above the end view.  The side view's three lengths share the faced
+# outboard end as one baseline on the left; its diameters stand above (barrel)
+# and below (seat), which leaves the right side clear for the cross-hole
+# callout's leader.
+SIDE_TOP = SIDE_BOTTOM + HUB_LENGTH * VIEW_SCALE[0] / 1000.0
+FRONT_KEEP = {"BoreDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.070)}
 RIGHT_KEEP = {
-    "HubLength": (RIGHT_CENTER[0] - 0.040, RIGHT_CENTER[1]),
-    "SeatLength": (RIGHT_CENTER[0] + 0.045, SIDE_BOTTOM + 0.012),
-    "SeatDia": (RIGHT_CENTER[0] - 0.030, SIDE_BOTTOM + 0.010),
-    "BarrelDia": (RIGHT_CENTER[0] + 0.030, RIGHT_CENTER[1] + 0.018),
-    "ServicePinStation": (RIGHT_CENTER[0] + 0.055, SERVICE_PIN_CENTER[1]),
+    "SeatLength": (RIGHT_CENTER[0] - 0.036, SIDE_BOTTOM + 0.012),
+    "ServicePinStation": (RIGHT_CENTER[0] - 0.050, SIDE_BOTTOM + 0.026),
+    "HubLength": (RIGHT_CENTER[0] - 0.064, SIDE_BOTTOM + 0.045),
+    "BarrelDia": (RIGHT_CENTER[0], SIDE_TOP + 0.012),
+    "SeatDia": (RIGHT_CENTER[0], SIDE_BOTTOM - 0.014),
 }
+HOLE_CALLOUT_XY = (0.330, 0.140)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
@@ -163,9 +171,9 @@ async def build(adapter: Any) -> dict[str, str]:
             SERVICE_PIN_CENTER[0],
             SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA * VIEW_SCALE[0] / 2000.0,
         ),
-        callout_xy=(0.305, 0.120),
+        callout_xy=HOLE_CALLOUT_XY,
         label="MHA-024 hub pilot",
-        process=f"{drill_process(SERVICE_PIN_HOLE_SPEC)}\nMATCH-REAM WITH MHA-026",
+        process=f"{drill_process(SERVICE_PIN_HOLE_SPEC)}\n{CROSS_HOLE_CALLOUT}",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.175)

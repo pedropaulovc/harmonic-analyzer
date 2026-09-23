@@ -52,12 +52,35 @@ def test_drawing_registry_and_marks_are_complete() -> None:
 
 def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
     notes = crank_hub_spec.DRAWING_NOTES
+    cross_hole = crank_hub_spec.CROSS_HOLE_CALLOUT
     assert "MATCHED ASSEMBLY" in notes
     assert "MHA-138" in notes and "SIX O'CLOCK" in notes
-    assert "MHA-024" in notes and "MHA-026" in notes
+    assert "LIGHT DRIVE FIT" in notes
+    # The taper-pin cross-hole names both mates and the fit on its callout.
+    assert "MHA-024" in cross_hole and "MHA-026" in cross_hole
+    assert "LIGHT DRIVE FIT" in cross_hole
     assert "RADIAL" not in notes
     assert "SHOULDER SEATED" in notes and "FACES FLUSH" in notes
     assert "0.50 MIN HUB WALL" in notes and "AFTER EDGE BREAK" in notes
+
+
+def test_notes_obey_the_four_line_rule_and_clear_the_title_block() -> None:
+    lines = crank_hub_spec.DRAWING_NOTES.splitlines()
+    assert len(lines) <= 4
+    assert max(len(line) for line in lines) <= 72
+
+
+def test_side_view_lengths_baseline_left_and_clear_the_callout_side() -> None:
+    lengths = ("SeatLength", "ServicePinStation", "HubLength")
+    xs = [drawing.RIGHT_KEEP[name][0] for name in lengths]
+    left_edge = drawing.RIGHT_CENTER[0] - geometry.HUB_BARREL_DIA / 2.0 * (
+        drawing.VIEW_SCALE[0] / 1000.0
+    )
+    assert xs == sorted(xs, reverse=True) and xs[0] < left_edge
+    assert all(b - a >= 0.010 for a, b in zip(xs[1:], xs[:-1]))
+    assert drawing.HOLE_CALLOUT_XY[0] > drawing.RIGHT_CENTER[0]
+    assert drawing.RIGHT_KEEP["SeatDia"][1] < drawing.SIDE_BOTTOM
+    assert drawing.RIGHT_KEEP["BarrelDia"][1] > drawing.SIDE_TOP
 
 
 def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:

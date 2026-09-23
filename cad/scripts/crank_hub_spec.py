@@ -65,15 +65,22 @@ SEAT_CALLOUT = (
     "MATCH-FIT TO ASSIGNED MHA-020 BORE\n"
     "LIGHT ARBOR-PRESS TO SHOULDER; NO TURN OR SLIDE BY HAND"
 )
+# The cross-hole is taper-reamed through hub and shaft together; the wording
+# matches the crankshaft MHA-026 callout for the same operation.
+CROSS_HOLE_CALLOUT = (
+    "MATCH TAPER-REAM 1:48\n"
+    "WITH CRANKSHAFT MHA-026\n"
+    "TO TAPER PIN MHA-024:\n"
+    "LIGHT DRIVE FIT"
+)
+# Policy rule 6: at most four short lines, each under ~70 characters so the
+# block stays left of the title block.  The cross-hole operation lives on its
+# callout, and MHA-138's own drawing says how the pin is driven.
 DRAWING_NOTES = "\n".join(
     (
-        "KEEP MHA-020 ARM AND MHA-137 HUB AS A MATCHED ASSEMBLY.",
-        "WITH SHOULDER SEATED, FINISH OUTBOARD HUB AND ARM FACES FLUSH.",
-        "AT SIX O'CLOCK MATCH-DRILL/REAM AXIAL SEAM GROOVE TO ACTUAL MHA-138.",
-        "LIGHT DRIVE FIT; DRIVE FROM OUTBOARD; PIN OUTER END FLUSH.",
-        "VERIFY 0.50 MIN HUB WALL FROM FINISHED MHA-138 SEAM TO SHAFT BORE "
-        "AFTER EDGE BREAK.",
-        "MATCH-REAM #14 CROSS-HOLE WITH MHA-026 FOR MHA-024 TAPER PIN.",
+        "MATCHED ASSEMBLY WITH MHA-020 ARM: SHOULDER SEATED, FACES FLUSH.",
+        "AT SIX O'CLOCK MATCH-REAM SEAM WITH MHA-020 TO MHA-138: LIGHT DRIVE FIT.",
+        "VERIFY 0.50 MIN HUB WALL, MHA-138 SEAM TO BORE, AFTER EDGE BREAK.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

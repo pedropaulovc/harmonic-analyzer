@@ -145,3 +145,15 @@ def test_part_registry_retains_make_critical_properties() -> None:
     assert part["material"] == part["material_specification"]
     assert part["finish"]
     assert int(part["quantity"]) == 1
+
+
+def test_notes_and_seat_callout_stay_inside_their_sheet_regions() -> None:
+    # ~2.5 mm per character at the sheet's note height (measured on the
+    # 5b164b70 render, where the old two-line callout ran off the border).
+    char_w = 0.0025
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len(lines) <= 4
+    assert 0.016 + max(len(line) for line in lines) * char_w < 0.218  # title block
+    seat_x = drawing.FRONT_KEEP["HubSeatDia"][0]
+    half = max(len(line) for line in spec.HUB_SEAT_CALLOUT.splitlines()) * char_w / 2
+    assert seat_x - half > 0.0128 + 0.003  # inner border plus air

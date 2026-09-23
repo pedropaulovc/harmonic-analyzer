@@ -138,19 +138,22 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
+# Three short lines: the callout is centred under the diameter, so its widest
+# line sets how close to the left border the hub-end dimension can stand.
 HUB_SEAT_CALLOUT = (
     "MATCH-FIT TO ASSIGNED MHA-137 HUB\n"
-    "LIGHT ARBOR-PRESS TO SHOULDER; NO TURN OR SLIDE BY HAND"
+    "LIGHT ARBOR-PRESS TO SHOULDER;\n"
+    "NO TURN OR SLIDE BY HAND"
 )
+# Policy rule 6: at most four short lines, each under ~75 characters so the
+# block stays left of the title block.  The hub-wall check belongs to the
+# MHA-137 print, and MHA-138's own print says how the pin is driven.
 DRAWING_NOTES = "\n".join(
     (
-        "PUNCH FIDUCIAL MARK WHERE SHOWN.",
-        "KEEP MHA-020 ARM AND MHA-137 HUB AS A MATCHED ASSEMBLY.",
-        "WITH SHOULDER SEATED, FINISH OUTBOARD HUB AND ARM FACES FLUSH.",
-        "AT SIX O'CLOCK MATCH-DRILL/REAM AXIAL SEAM TO ACTUAL MHA-138.",
-        "LIGHT DRIVE FIT; DRIVE AXIALLY FROM OUTBOARD; PIN FLUSH.",
-        "VERIFY 0.50 MIN HUB WALL FROM FINISHED MHA-138 SEAM TO SHAFT BORE "
-        "AFTER EDGE BREAK.",
+        "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
+        "MATCHED ASSEMBLY WITH MHA-137 HUB: SHOULDER SEATED, FACES FLUSH.",
+        "AT SIX O'CLOCK MATCH-REAM AXIAL SEAM WITH MHA-137 FOR MHA-138:",
+        "LIGHT DRIVE FIT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
