@@ -130,7 +130,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BoreDia",
     },
     "Block": {"Depth"},
-    "BossProfile": {"BossDia", "BossFromEnd"},
+    "BossProfile": {"BossFromEnd"},
     "Boss": {"BossHeight"},
 }
 
@@ -142,8 +142,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # BossFromEnd prints one place: it locates the boss (and the tap concentric
 # with it) from ONE end face, and its .X band still leaves both axial walls
 # >= 1.2 mm (test_end_located_hanger_tap_retains_axial_wall_at_limits). The
-# boss diameter and height print one place too: the interface derives the boss
-# height, gap and clearances from the .X band.
+# boss height prints one place too: the interface derives the boss height, gap
+# and clearances from the .X band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {
         "BlockWidth": 1,
@@ -153,7 +153,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": 2,
     },
     "Block": {"Depth": 1},
-    "BossProfile": {"BossDia": 1, "BossFromEnd": 1},
+    "BossProfile": {"BossFromEnd": 1},
     "Boss": {"BossHeight": 1},
 }
 
@@ -178,15 +178,21 @@ DRAWING_NOMINALS_MM: dict[str, float] = {
     "BoreDia": 2.0 * R_BORE,
     "BoreFromTop": BORE_FROM_TOP,
     "BoreFromSide": BLK_HALF_X,
-    "BossDia": BOSS_DIA,
     "BossHeight": BOSS_HEIGHT,
     "BossFromEnd": SUPPORT_Z_THICK / 2.0,
 }
+# Sheet-side dimensions: measured on the view, never model-imported.
+# TapFromSide is a parenthesized reference. BossDia is the lathe-turned boss
+# printed as a turned diameter on the side (section) view per drawing policy
+# rule 7; the model's circle dimension only reads on the end view, where rule 7
+# forbids leader-piled diameters. It prints plain, at the interface's .X band.
 REFERENCE_DIMENSION_NOMINALS_MM = {
     "TapFromSide": BLK_HALF_X,
+    "BossDia": BOSS_DIA,
 }
 DRAWING_REFERENCE_PRECISION = {
     "TapFromSide": 1,  # a read of BoreFromSide's centreline, same precision
+    "BossDia": 1,  # .X: knife_hanger_interface.BOSS_DIA_DEVIATIONS_MM
 }
 # The native tap definition and the bore-location/size bands close the adverse
 # uninterrupted-crown stack; the drawing's center section shows that geometry.
