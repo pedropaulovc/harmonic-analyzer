@@ -62,8 +62,11 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
 
 def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
     notes = spec.DRAWING_NOTES
-    assert "BOND TO MHA-102 WITH LOCTITE 638." in notes
-    assert "LOCATE DRUM ON ARBOR FROM ITS BACK (j=19) END." in notes
+    assert "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638." in notes
+    assert (
+        "ON ASSEMBLY: LOCATE DRUM ON ARBOR FROM THE END AT THE LAST "
+        "MHA-027 GEAR (j=19)." in notes
+    )
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
         assert retired not in notes, retired
 
@@ -71,7 +74,7 @@ def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
 def test_part_metadata_preserves_material_finish_quantity() -> None:
     config = _config.parts("alignment-pinion")
     assert config["material_specification"] == "C36000 free-machining brass"
-    assert config["finish"] == "polished brass; tooth surfaces as cut"
+    assert config["finish"] == "end faces polished; bore as reamed; teeth as cut"
     assert int(config["quantity"]) == 1
 
 
