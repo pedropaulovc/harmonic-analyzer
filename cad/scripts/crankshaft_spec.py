@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
 
 from __future__ import annotations
 
-from _hole_spec import HoleSpec
+from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from crank_hub_geometry import (
@@ -43,13 +43,16 @@ SURFACE_FINISHES = (
             JOURNAL_DIA,
             contains_y_mm=JOURNAL_START + JOURNAL_LENGTH / 2.0,
         ),
-        production_method="BEARING JOURNAL",
     ),
 )
 # MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
+# Every printed length runs from ONE origin: the dome root (local y=0), the
+# plane where the arm and through hub MHA-137 finish flush and from which the
+# hub's own MHA-024 station is measured.  The overall to the dome tip is a
+# construction-only reference sketch (no geometry), printed as a reference.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
@@ -57,34 +60,37 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "JournalStartPlane": {"JournalStart"},
     "JournalProfile": {"JournalDiaDim"},
     "Journal": {"JournalLength"},
+    "PinHoleStationPlane": {"PinHoleHeight"},
+    "OverallReference": {"OverallLength"},
 }
-# The cross-hole's Ø/THRU callout comes from the associative native Hole Wizard
-# annotation. Its axial station is a drawing-native basic dimension from the
-# crank-end face to the hole axis.
-
-# Lines kept short (<~66 chars) so the left-anchored block stays clear of the
-# title block (x >= 0.264 m); it grows DOWNWARD from its anchor.
-DRAWING_NOTES = "\n".join(
-    (
-        "PUNCH FIDUCIAL MARK WHERE SHOWN.",
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "MATCH-REAM WITH CRANK HUB MHA-137 TO FIT CUSTOM TAPER PIN",
-        "MHA-024; ASSEMBLY OPERATION OUTSIDE THIS PART DRAWING.",
-        f"DIA {JOURNAL_DIA:.3f} BEARING JOURNAL RUNS IN DIA",
-        f"{JOURNAL_BORE_DIA:.3f} POST BORE: "
-        f"{JOURNAL_CLEARANCE:.2f} DIAMETRAL CLEARANCE.",
-        "KEEP DIA 9.525 ON T12, PINION, AND CRANK-HUB SEATS.",
-    )
-)
-END_VIEW_NOTE = "CRANK-END VIEW SCALE 2:1"
-CRANK_END_NOTE = (
-    "OUTBOARD CYLINDER ENDS FLUSH WITH MHA-020/MHA-137; "
-    "ONLY INTEGRAL DOME PROJECTS"
-)
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "end-face perpendicularity": "0.05",
-    "cross-hole true position": "0.20",
+# Decimal places ARE the tolerance (policy rule 2).  The two diameters are
+# functional fits and keep their three-place size bands; every length on this
+# hand-cranked shaft is routine (.X).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "ShaftProfile": {"ShaftDiaDim": 3},
+    "Shaft": {"Depth": 1},
+    "ShaftDomeProfile": {"DomeHeight": 1},
+    "JournalStartPlane": {"JournalStart": 1},
+    "JournalProfile": {"JournalDiaDim": 3},
+    "Journal": {"JournalLength": 1},
+    "PinHoleStationPlane": {"PinHoleHeight": 1},
+    "OverallReference": {"OverallLength": 1},
 }
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked crankshaft dimension needs authored places")
+# The overall is a read-only restatement of Depth + DomeHeight.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+
+# Matched-fit requirement on the feature callout (rule 6), above the native
+# drill size; mirrors the hub's "MATCH-REAM WITH MHA-026".
+CROSS_HOLE_PROCESS = (
+    "MATCH-REAM WITH MHA-137 TO FIT MHA-024\n"
+    f"{drill_process(PIN_HOLE_SPEC)}"
+)
+DRAWING_NOTES = "PUNCH FIDUCIAL MARK WHERE SHOWN."
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

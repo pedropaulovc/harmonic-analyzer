@@ -1,15 +1,17 @@
-r"""Create the curated machinist drawing for the crankshaft.
+r"""Create the crankshaft MHA-026 manufacturing drawing under the simplicity policy.
 
-The SLDPRT remains authoritative. This recipe supplies the crankshaft views,
-dimension layout, cross-hole callout, and manufacturing notes; every shared
-sheet/template, import, curation, and export behavior lives in
-``_drawing_common``.
+The SLDPRT remains authoritative.  A shaft carries no datum and no
+geometric-control frame (policy rule 3): the two running/seat diameters keep
+their native size bands, the journal keeps one bearing-surface finish, and
+every length is an ordinary model dimension at its part-authored places.
 
-The model's shaft axis runs along +Y.  The cylinder begins at the shared
-arm/hub outboard plane; only the integral dome projects outboard.  The
-standard side views therefore show the shaft VERTICAL: the crank-end dome is
-the ``*Bottom`` orientation and the length view is ``*Right`` (dome at the
-view bottom, the hub-to-shaft cross-hole facing the viewer at station 12).
+The model's shaft axis runs along +Y from the dome root (local y=0, the plane
+where MHA-020 and MHA-137 finish flush).  The single longitudinal view is the
+``*Right`` orientation rotated a quarter turn in the sheet so the shaft lies
+horizontal, as it sits in the lathe: dome on the left, far end on the right,
+the MHA-024 cross-hole seen as a true circle.  The crank-end view is the
+``*Bottom`` orientation, which is exactly the third-angle LEFT view of that
+rotated profile, so it sits on the profile's axis to its left at sheet scale.
 
 Run with SolidWorks open::
 
@@ -19,50 +21,49 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
-
-from crankshaft_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_edge_dimension,
-    add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    add_view_centerline,
+    assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_arc_endpoints_to_center,
-    set_basic_dimension,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
-    add_view_centerline,
+    view_name,
 )
-from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
+    CROSS_HOLE_PROCESS,
+    DRAWING_PRECISION_BY_NAME,
     JOURNAL_DIA,
     JOURNAL_LENGTH,
     JOURNAL_START,
-    PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
-    SHAFT_DIA,
+    PIN_HOLE_SPEC,
+    REFERENCE_DIMENSIONS,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    dimension_name,
     place_view,
 )
 
@@ -80,123 +81,76 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 
-SHEET_SCALE = (1.0, 1.0)
-END_VIEW_SCALE = 2.0
-# Crank-end dome view (the *Bottom orientation: looking along +Y) at 2:1.
-FRONT_CENTER = (0.060, 0.150)
-# Side view (the *Right orientation: shaft vertical, dome at the view bottom)
-# at 1:1.
-RIGHT_CENTER = (0.150, 0.150)
-ISO_CENTER = (0.345, 0.197)
-DATUM_A_RIGHT = (
-    FRONT_CENTER[0] + JOURNAL_DIA * END_VIEW_SCALE / 2000.0,
-    FRONT_CENTER[1],
-)
+# Both orthographic views print at the sheet scale, so neither needs a caption.
+SHEET_SCALE = (2.0, 1.0)
+VIEW_SCALE = (2, 1)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1]
+SIDE_CENTER = (0.210, 0.170)
+# Third-angle left view of the dome end, on the profile's axis.
+END_CENTER = (0.036, SIDE_CENTER[1])
+ISO_CENTER = (0.390, SIDE_CENTER[1])
+ISO_SCALE = (1, 1)
+# The *Right view rotated -90 degrees: model +Y runs to paper-right.
+SIDE_VIEW_ANGLE = -math.pi / 2.0
 
-# Derived sheet anchors (meters).  The view is centred on the full model bbox
-# from dome tip -DomeHeight through shaft far end +ShaftLength.
-_OUTBOARD_TIP_Y = RIGHT_CENTER[1] - (
-    SHAFT_LENGTH + SHAFT_DOME_HEIGHT
-) / 2000.0
-_CYLINDER_FACE_Y = _OUTBOARD_TIP_Y + SHAFT_DOME_HEIGHT / 1000.0
-_FAR_END_Y = _CYLINDER_FACE_Y + SHAFT_LENGTH / 1000.0
-# The cross-hole faces the viewer in the side view; its station is measured
-# inboard from the common cylinder/arm/hub outboard plane, not the dome tip.
-_PIN_CENTER = (
-    RIGHT_CENTER[0],
-    _CYLINDER_FACE_Y + PIN_HOLE_HEIGHT / 1000.0,
-)
+# The side view is centred on the model bbox, dome tip (-DomeHeight) through
+# the far end (+ShaftLength).
+_BBOX_MID_Y = (SHAFT_LENGTH - SHAFT_DOME_HEIGHT) / 2.0
 
-FRONT_KEEP = {
-    "ShaftDiaDim": (
-        max(
-            0.030,
-            FRONT_CENTER[0] - SHAFT_DIA * END_VIEW_SCALE / 1000.0 - 0.022,
-        ),
-        FRONT_CENTER[1] + 0.008,
-    ),
-    "JournalDiaDim": (0.102, FRONT_CENTER[1] + 0.020),
+
+def _sheet_x(model_y_mm: float) -> float:
+    """Sheet X of a model-Y station on the horizontal side view."""
+    return SIDE_CENTER[0] + (model_y_mm - _BBOX_MID_Y) * _S / 1000.0
+
+
+def _sheet_y(radius_mm: float) -> float:
+    """Sheet Y of a point ``radius_mm`` above the shaft axis (model +Z up)."""
+    return SIDE_CENTER[1] + radius_mm * _S / 1000.0
+
+
+DOME_TIP_X = _sheet_x(-SHAFT_DOME_HEIGHT)
+DOME_ROOT_X = _sheet_x(0.0)
+PIN_X = _sheet_x(PIN_HOLE_HEIGHT)
+JOURNAL_START_X = _sheet_x(JOURNAL_START)
+JOURNAL_END_X = _sheet_x(JOURNAL_START + JOURNAL_LENGTH)
+FAR_END_X = _sheet_x(SHAFT_LENGTH)
+JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
+
+# Baseline rows below the profile, all from the dome root; rows are 13 mm
+# apart because the text sits ~3 mm above its requested point and the
+# dimension line ~5 mm below it.
+_ROW_Y = (0.149, 0.136, 0.123, 0.108)
+# The two diameters are authored in end-profile sketches; the end view
+# receives them first and they are then dragged onto the profile (rule 7:
+# diameters on the side view).  Their temporary end-view spots are clear of
+# everything else on the sheet.
+END_KEEP = {
+    "ShaftDiaDim": (0.036, 0.215),
+    "JournalDiaDim": (0.036, 0.230),
 }
-RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0] - 0.030, RIGHT_CENTER[1]),
-    "DomeHeight": (RIGHT_CENTER[0] - 0.022, _OUTBOARD_TIP_Y - 0.007),
-    "JournalStart": (RIGHT_CENTER[0] + 0.035, _CYLINDER_FACE_Y + 0.020),
-    "JournalLength": (
-        RIGHT_CENTER[0] + 0.052,
-        _CYLINDER_FACE_Y + (JOURNAL_START + JOURNAL_LENGTH / 2.0) / 1000.0,
-    ),
+SIDE_KEEP = {
+    "DomeHeight": (DOME_TIP_X - 0.020, 0.200),
+    "PinHoleHeight": ((DOME_ROOT_X + PIN_X) / 2.0, _ROW_Y[0]),
+    "JournalStart": ((DOME_ROOT_X + JOURNAL_START_X) / 2.0, _ROW_Y[1]),
+    "JournalLength": ((JOURNAL_START_X + JOURNAL_END_X) / 2.0, _ROW_Y[1]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[2]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[3]),
 }
-DIMENSION_CALLOUTS = {}
-
-
-def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
-    """Return the requested modeled OD face in the crankshaft side view."""
-    expected_radius_m = diameter_mm / 2000.0
-    candidates: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        faces = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(
-                    c, 3
-                ),  # swViewEntityType_Face
-                default=(),
-            )
-            or ()
-        )
-        for face in faces:
-            face = _early_bound(face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
-            if not surface.IsCylinder():
-                continue
-            parameters = surface.CylinderParams
-            if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
-                continue
-            candidates.append((float(face.GetArea()), face))
-    if not candidates:
-        raise RuntimeError(
-            f"crankshaft side view has no visible cylindrical face at "
-            f"radius {expected_radius_m:g} m"
-        )
-    return max(candidates, key=lambda candidate: candidate[0])[1]
-
-
-def _visible_journal_silhouette(adapter: Any, view: Any) -> Any:
-    """Return the longest silhouette: the v2-post bearing journal OD."""
-    candidates: list[tuple[float, Any]] = []
-    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
-    for component in components:
-        silhouettes = (
-            adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 4),
-                default=(),
-            )
-            or ()
-        )
-        for raw_silhouette in silhouettes:
-            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
-            start = adapter._attempt(lambda s=silhouette: s.GetStartPoint())
-            end = adapter._attempt(lambda s=silhouette: s.GetEndPoint())
-            if start is None or end is None:
-                continue
-            start_xyz = adapter._get_attr_or_call(start, "ArrayData")
-            end_xyz = adapter._get_attr_or_call(end, "ArrayData")
-            if not start_xyz or not end_xyz:
-                continue
-            length = (
-                sum((float(a) - float(b)) ** 2 for a, b in zip(start_xyz, end_xyz))
-                ** 0.5
-            )
-            candidates.append((length, silhouette))
-    if not candidates:
-        raise RuntimeError("crankshaft side view has no usable silhouette edges")
-    length, silhouette = max(candidates, key=lambda candidate: candidate[0])
-    if length < JOURNAL_LENGTH * 0.8 / 1000.0:
-        raise RuntimeError(
-            "could not identify the crankshaft journal silhouette: "
-            f"longest visible silhouette is only {length * 1000:g} mm"
-        )
-    return silhouette
+# A dragged diameter prints its dimension line at the requested X with the
+# text to its left: Ø9.525 on the dome-side seat right of the cross-hole,
+# Ø11.388 on the journal right of its finish symbol.
+DIAMETER_POSITIONS = {
+    "ShaftDiaDim": (JOURNAL_START_X - 0.022, 0.200),
+    "JournalDiaDim": (JOURNAL_END_X - 0.040, 0.200),
+}
+# One Ø9.525 dimension governs both 3/8-in seats.
+CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
+CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
+FINISH_PICK = (JOURNAL_START_X + 0.022, JOURNAL_FLANK_Y)
+FINISH_SYMBOL = (JOURNAL_START_X + 0.032, 0.203)
+HOLE_CALLOUT_XY = (0.062, 0.240)
+NOTES_XY = (0.016, 0.062)
+ISO_NOTE_XY = (0.368, 0.108)
 
 
 def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
@@ -237,33 +191,78 @@ def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
     return candidates[0]
 
 
-def _visible_shaft_end_edges(adapter: Any, view: Any) -> list[tuple[float, Any]]:
-    """Return shaft end edges ordered from crank end to far end."""
-    expected_radius_m = SHAFT_DIA / 2000.0
+def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
+    """Return the requested modeled OD face in the crankshaft side view."""
+    expected_radius_m = diameter_mm / 2000.0
     candidates: list[tuple[float, Any]] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
     for component in components:
-        edges = (
+        faces = (
             adapter._attempt(
-                lambda c=component: view.GetVisibleEntities2(c, 1),
+                lambda c=component: view.GetVisibleEntities2(
+                    c, 3
+                ),  # swViewEntityType_Face
                 default=(),
             )
             or ()
         )
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
+        for face in faces:
+            face = _early_bound(face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if not surface.IsCylinder():
                 continue
-            parameters = curve.CircleParams
+            parameters = surface.CylinderParams
             if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
                 continue
-            candidates.append((float(parameters[1]), edge))
+            candidates.append((float(face.GetArea()), face))
     if not candidates:
         raise RuntimeError(
-            f"drawing view has no shaft end edge at radius {expected_radius_m:g} m"
+            f"crankshaft side view has no visible cylindrical face at "
+            f"radius {expected_radius_m:g} m"
         )
-    return sorted(candidates, key=lambda candidate: candidate[0])
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move a native model dimension and verify its new drawing-view owner."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name,
+        "DIMENSION",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
+    ddoc.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    matches = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -280,18 +279,16 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Crank End Note",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Crank End Note",
             "Manufacturing Notes",
-            "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -309,137 +306,80 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Bottom", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, right, iso):
+    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=VIEW_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    native_side = _early_bound(side, "IView")
+    native_side.Angle = SIDE_VIEW_ANGLE
+    if abs(math.remainder(float(native_side.Angle) - SIDE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
+        raise RuntimeError("failed to lay the crankshaft profile horizontal")
+    drawing_model.EditRebuild3()
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (end, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    end_annotations = curate_view_dimensions(
+        adapter, end, keep=END_KEEP, view_label="crank-end"
     )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    side_annotations = curate_view_dimensions(
+        adapter, side, keep=SIDE_KEEP, view_label="side"
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    # Ø9.525 is the exact 3/8 in conversion and Ø11.388 is the post-bearing
-    # journal; three decimals preserve both fit-defining values.
-    set_dimension_precision(
-        adapter,
-        [*front_annotations, *right_annotations],
-        {
-            "ShaftDiaDim": 3,
-            "DomeHeight": 1,
-            "JournalDiaDim": 3,
-            "JournalStart": 3,
-            "JournalLength": 3,
-        },
-    )
+    moved = [
+        _move_dimension(
+            adapter,
+            annotation,
+            side,
+            DIAMETER_POSITIONS[dimension_name(adapter, annotation)],
+            source_view=end,
+        )
+        for annotation in end_annotations
+    ]
+    annotations = [*moved, *side_annotations]
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one crankshaft {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
+
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
     # ASME centre mark, the side view marks the cross-hole circle.
-    for view, label in ((front, "end"), (right, "side")):
+    for view, label in ((end, "end"), (side, "side")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
-
-    journal_face = _visible_cylindrical_face(adapter, right, JOURNAL_DIA)
-    journal_silhouette = _visible_journal_silhouette(adapter, right)
     add_view_centerline(
         adapter,
-        right,
-        label="crankshaft bearing axis",
-        face=journal_face,
+        side,
+        label="crankshaft turning axis",
+        face=_visible_cylindrical_face(adapter, side, JOURNAL_DIA),
     )
 
-    if not any(
-        dimension_name(adapter, annotation) == "ShaftDiaDim"
-        for annotation in front_annotations
-    ):
-        raise RuntimeError("crankshaft end view is missing ShaftDiaDim annotation")
-    # Establish datum A from the cylindrical OD itself.  A datum tag associated
-    # with the diameter display dimension renders correctly but reports its
-    # primitive geometry in the dimension's model coordinate frame, which makes
-    # the sheet-space layout audit read a false off-sheet leader.  The visible
-    # circular rim is the same cylindrical datum feature and reports truthful
-    # sheet-space tag geometry.
-    right_end_edges = _visible_shaft_end_edges(adapter, right)
-    far_end_edge = right_end_edges[-1][1]
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=DATUM_A_RIGHT,
-        symbol_xy=(FRONT_CENTER[0] + 0.027, FRONT_CENTER[1]),
-        datum="A",
-        label="bearing-journal datum axis",
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        symbol_xy=(0.175, _FAR_END_Y),
-        datum="B",
-        label="far-end datum face",
-        entity=far_end_edge,
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        frame_xy=(0.185, 0.235),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["end-face perpendicularity"],
-        datums=("A",),
-        quantity="FAR END FACE",
-        label="far-end perpendicularity",
-        entity=far_end_edge,
-    )
-
-    # The tapered-pin cross-hole's associative wizard callout carries the
-    # diameter/THRU specification.  Its basic axial station is measured from
-    # the real far-end datum face; the common arm/hub plane at the dome base is
-    # a geometric seam rather than a planar datum feature.
-    cross_hole_edge = _visible_cross_hole_edge(adapter, right)
-    pin_station = add_edge_dimension(
-        adapter,
-        right,
-        p0=(RIGHT_CENTER[0] - SHAFT_DIA / 2000.0, _FAR_END_Y),
-        p1=(RIGHT_CENTER[0], _PIN_CENTER[1] + _PIN_HOLE_DIA / 2000.0),
-        text_xy=(0.125, 0.155),
-        label="cross-hole station from far end",
-        orientation="vertical",
-    )
-    set_arc_endpoints_to_center(adapter, pin_station, label="cross-hole station from far end")
-    set_basic_dimension(adapter, pin_station, label="cross-hole station from far end")
     add_native_hole_callout(
         adapter,
-        right,
-        callout_xy=(0.095, 0.082),
+        side,
+        callout_xy=HOLE_CALLOUT_XY,
         label="tapered-pin cross-hole",
-        edge=cross_hole_edge,
+        edge=_visible_cross_hole_edge(adapter, side),
+        process=CROSS_HOLE_PROCESS,
     )
-    add_feature_control_frame(
-        adapter,
-        right,
-        frame_xy=(0.100, 0.055),
-        characteristic="position",
-        tolerance=GEOMETRIC_TOLERANCES_MM["cross-hole true position"],
-        datums=("A", "B"),
-        diameter=True,
-        label="cross-hole true position",
-        entity=cross_hole_edge,
-    )
-    add_property_linked_note(adapter, "Crank End Note", 0.250, 0.090)
-
     add_surface_finish(
         adapter,
-        right,
-        symbol_xy=(0.205, 0.145),
+        side,
+        edge_xy=FINISH_PICK,
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
         label="crankshaft bearing-journal finish",
-        edge_entity=journal_silhouette,
         entity_type="SILHOUETTE",
+        char_height=0.0025,
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.014, 0.045)
-    # Identify the enlarged circular projection without relying on its position.
-    add_property_linked_note(adapter, "End View Note", 0.018, 0.112)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,
