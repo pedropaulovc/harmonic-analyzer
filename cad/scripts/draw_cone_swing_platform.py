@@ -50,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
@@ -76,7 +77,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)  # 1:3 sheet; the 1:2 plan keeps the 266 mm envelope in-zone
+SHEET_SCALE = (1.0, 2.0)  # title block states the principal (plan) scale; iso and section carry their own
 
 # Sheet layout (meters).  Three 1:2 plan views separate the profile, hole
 # pattern and lock-notch definitions instead of routing unrelated leaders
@@ -86,7 +87,16 @@ PROFILE_CENTER = (0.075, 0.190)
 FEATURE_CENTER = (0.180, 0.190)
 NOTCH_CENTER = (0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
-SECTION_CENTER = (0.335, 0.105)
+# The section group sits up and right in the open field below the isometric,
+# clear of the lock-notch caption; every section annotation shares this shift.
+SECTION_SHIFT = (0.020, 0.015)
+
+
+def _shifted(x: float, y: float) -> tuple[float, float]:
+    return (x + SECTION_SHIFT[0], y + SECTION_SHIFT[1])
+
+
+SECTION_CENTER = _shifted(0.335, 0.105)
 
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
@@ -114,13 +124,14 @@ NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
     "NorthEdgeZ": (0.270, 0.150),
-    "CapECx": (0.250, 0.258),
+    # Text between its witnesses: outside, it read as spanning from the corner.
+    "CapECx": (0.2652, 0.258),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.259),
 }
 SECTION_KEEP = {
-    "PlateThk": (0.300, 0.120),
-    "PivotBearingReliefDepth": (0.365, 0.115),
+    "PlateThk": _shifted(0.300, 0.120),
+    "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
 
 
@@ -189,7 +200,7 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"expected one native section label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (0.335, 0.085, 0.0)
+    target = (*_shifted(0.335, 0.085), 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native section label")
     adapter.currentModel.EditRebuild3()
@@ -254,6 +265,53 @@ def _horizontal_section_edge(
         raise RuntimeError(f"pivot section has no {label} edge at y={y_mm:.3f} mm")
     key_index = 1 if prefer_right else 0
     return max(candidates, key=lambda item: item[key_index])[2]
+
+
+def _add_section_hole_axis(adapter: Any, section: Any) -> None:
+    """Draw the pivot-hole axis between the two cut slices of section A-A.
+
+    The cut-face-only section shows the hole as a bare gap; without its axis a
+    reader takes the right slice for an unrelated fragment.
+    """
+    radius_mm = PIVOT_HOLE_DIA / 2.0
+    walls: dict[int, Any] = {}
+    for raw_edge in visible_view_entities(section, 1, label="pivot hole wall edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = tuple(float(v) * 1000.0 for v in _early_bound(start, "IVertex").GetPoint())
+        p1 = tuple(float(v) * 1000.0 for v in _early_bound(end, "IVertex").GetPoint())
+        if abs(p0[1] - p1[1]) < 1.0:
+            continue
+        for side in (-1, 1):
+            if all(abs(p[0] - side * radius_mm) <= 0.01 for p in (p0, p1)):
+                walls[side] = edge
+                print(f"pivot hole wall {side:+d}: {p0} -> {p1}")
+    if set(walls) != {-1, 1}:
+        raise RuntimeError(f"section A-A shows {len(walls)} pivot hole walls, expected 2")
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section A-A for the hole axis")
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for index, side in enumerate((-1, 1)):
+        data = selection_manager.CreateSelectData()
+        data.View = section
+        if not _early_bound(walls[side], "IEntity").Select4(index > 0, data):
+            raise RuntimeError(f"failed to select pivot hole wall {side:+d}")
+    if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
+        raise RuntimeError("pivot hole axis needs exactly the two wall edges selected")
+    centerline = ddoc.InsertCenterLine2()
+    draw.ClearSelection2(True)
+    if centerline is None:
+        raise RuntimeError("failed to insert the pivot hole axis in section A-A")
+    rebuild_drawing(adapter, label="section A-A pivot hole axis")
+    lines = tuple(_read_member(section, "GetCenterLines") or ())
+    if not lines:
+        raise RuntimeError("section A-A lost its pivot hole axis")
+    print(f"section A-A centerlines: {len(lines)}")
 
 
 def _section_edge_midpoint(
@@ -437,6 +495,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
+    _add_section_hole_axis(adapter, section)
 
     profile_annotations = curate_view_dimensions(
         adapter,
@@ -513,7 +572,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.222, 0.107),
+        callout_xy=(0.215, 0.107),
         label="pivot close-clearance hole",
         edge=pivot_edge,
         process="DRILL",
@@ -531,7 +590,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.291, 0.087),
+        symbol_xy=_shifted(0.291, 0.087),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
@@ -544,7 +603,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.365, 0.120),
+        symbol_xy=_shifted(0.365, 0.120),
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
@@ -599,11 +658,14 @@ async def build(adapter: Any) -> dict[str, str]:
         witnesses = [
             segment for segment in thickness_geometry[0].segments
             if abs(segment.y0 - segment.y1) < 1e-8
-            and any(abs(segment.y0 - level) < 0.0001 for level in (0.09865, 0.11135))
+            and any(
+                abs(segment.y0 - SECTION_SHIFT[1] - level) < 0.0001
+                for level in (0.09865, 0.11135)
+            )
         ]
         if len(witnesses) != 2 or any(
-            abs(max(segment.x0, segment.x1) - 0.309) > 0.0005
-            or abs(min(segment.x0, segment.x1) - 0.299) > 0.0005
+            abs(max(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.309) > 0.0005
+            or abs(min(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.299) > 0.0005
             for segment in witnesses
         ):
             raise RuntimeError(f"plate thickness witnesses did not shorten to the cut edge: {witnesses}")
