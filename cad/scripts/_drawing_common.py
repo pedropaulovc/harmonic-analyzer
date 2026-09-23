@@ -6415,35 +6415,53 @@ def export_failure_pdf(adapter: Any, target: str) -> Path | None:
     at: the farm worker's workspace is disposable and the sheets died with it.
     The PDF lands under ``cad/out/reports/failures/drawing-<target>/<UTC>/``,
     which the doit parent lists in the leaf log and the farm worker uploads
-    beside ``task.log``. Returns the path, or ``None`` when there was nothing
-    to export (no drawing open yet) or the export failed. Never raises: the
-    evidence must not replace the failure it documents.
+    beside ``task.log``.
+
+    The export is the same ``SaveAs3`` every finished drawing ships through,
+    and ``finalize_drawing`` already holds that call to one page per sheet
+    (:func:`sanitize_pdf_metadata`) on every multi-sheet drawing the fleet
+    builds. The page count is still read back against ``GetSheetNames``: a
+    short PDF is kept (partial evidence beats none) but reported as
+    ``partial``. Returns the path when a PDF exists, else ``None`` (no drawing
+    open yet, or the export failed). Never raises: the evidence must not
+    replace the failure it documents.
     """
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     path = OUT_FAILURES / _slug(f"drawing-{target}") / stamp / f"{target.replace('_', '-')}.pdf"
     outcome = "exported"
+    counts: dict[str, int] = {}
     try:
         model = adapter.currentModel
         if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != _DOC_DRAWING:
             outcome = "no_drawing"
         else:
+            sheets = tuple(_early_bound(model, "IDrawingDoc").GetSheetNames() or ())
             path.parent.mkdir(parents=True, exist_ok=True)
             _early_bound(model, "IModelDoc2").SaveAs3(str(path), 0, 0)
             if not path.is_file():
                 outcome = "no_file"
+            else:
+                from pypdf import PdfReader
+
+                counts = {"pages": len(PdfReader(str(path)).pages), "sheets": len(sheets)}
+                if counts["pages"] != counts["sheets"]:
+                    outcome = "partial"
     except Exception as exc:  # noqa: BLE001 -- evidence must not mask the failure
         outcome = f"error: {exc!r}"
     with contextlib.suppress(Exception):
-        _telemetry.event("drawing.failure_pdf", target=target, path=str(path), outcome=outcome)
+        _telemetry.event(
+            "drawing.failure_pdf", target=target, path=str(path), outcome=outcome, **counts
+        )
         if outcome == "exported":
-            _telemetry.info(f"drawing failure evidence PDF: {path}", path=str(path))
+            _telemetry.info(f"drawing failure evidence PDF: {path}", path=str(path), **counts)
         else:
             _telemetry.warn(
-                f"drawing failure evidence PDF not exported ({outcome}): {path}",
+                f"drawing failure evidence PDF {outcome} {counts}: {path}",
                 path=str(path),
                 outcome=outcome,
+                **counts,
             )
-    return path if outcome == "exported" else None
+    return path if outcome in ("exported", "partial") else None
 
 
 def run_drawing_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:

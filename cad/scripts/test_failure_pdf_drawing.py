@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pypdf import PdfWriter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -23,8 +24,19 @@ import _drawing_common  # noqa: E402
 
 
 class _Model:
-    def __init__(self, doc_type: int, *, fails: Exception | None = None) -> None:
+    """A drawing (type 3) or part (type 1) whose SaveAs3 writes ``pages`` PDF pages."""
+
+    def __init__(
+        self,
+        doc_type: int,
+        *,
+        sheets: tuple[str, ...] = ("Sheet1", "Sheet2"),
+        pages: int | None = None,
+        fails: Exception | None = None,
+    ) -> None:
         self.doc_type = doc_type
+        self.sheets = sheets
+        self.pages = len(sheets) if pages is None else pages
         self.fails = fails
         self.saved: list[str] = []
         self.open = True
@@ -32,11 +44,18 @@ class _Model:
     def GetType(self) -> int:
         return self.doc_type
 
+    def GetSheetNames(self) -> tuple[str, ...]:
+        return self.sheets
+
     def SaveAs3(self, path: str, version: int, options: int) -> int:
         assert self.open, "the PDF must be exported before teardown closes the drawing"
         if self.fails is not None:
             raise self.fails
-        Path(path).write_bytes(b"%PDF-sheets")
+        writer = PdfWriter()
+        for _ in range(self.pages):
+            writer.add_blank_page(width=792, height=612)
+        with open(path, "wb") as handle:
+            writer.write(handle)
         self.saved.append(path)
         return 0
 
@@ -60,7 +79,7 @@ def test_the_open_drawing_is_exported_under_the_failure_tree(tmp_path, events) -
         type("Adapter", (), {"currentModel": model})(), "drive_train_assembly"
     )
 
-    assert path is not None and path.read_bytes() == b"%PDF-sheets"
+    assert path is not None and path.read_bytes().startswith(b"%PDF")
     relative = path.relative_to(tmp_path / "failures")
     assert relative.parts[0] == "drawing-drive_train_assembly"
     assert relative.parts[2] == "drive-train-assembly.pdf"
@@ -70,8 +89,22 @@ def test_the_open_drawing_is_exported_under_the_failure_tree(tmp_path, events) -
             "target": "drive_train_assembly",
             "path": str(path),
             "outcome": "exported",
+            "pages": 2,
+            "sheets": 2,
         }
     ]
+
+
+def test_a_pdf_short_of_the_sheet_count_is_kept_but_reported_partial(events) -> None:
+    """Partial evidence beats none, but it must not read as the whole drawing."""
+    model = _Model(3, sheets=("Sheet1", "Sheet2", "Sheet3"), pages=1)
+    path = _drawing_common.export_failure_pdf(
+        type("Adapter", (), {"currentModel": model})(), "drive_train_assembly"
+    )
+
+    assert path is not None and path.is_file()
+    (event,) = events
+    assert (event["outcome"], event["pages"], event["sheets"]) == ("partial", 1, 3)
 
 
 def test_nothing_is_exported_before_a_drawing_is_open(events) -> None:
