@@ -70,7 +70,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         assembly.HANDLE_ROWS,
         (0.0, 0.0, 0.0),
     )
-    expected_axis = (-16.077263315132342, 90.518, -138.41241221957347)
+    # The 32T alignment drum (MHA-002) shrinks TIP_APINION by 2.549 mm, so the
+    # arbor axis sits 2.549 mm closer to the drum than the 42T cutover pinned.
+    expected_axis = (-18.626440352466744, 90.518, -138.41241221957347)
     released_head_stations = (
         released_origin[2] - 9.0 / 2.0,
         released_origin[2] + 9.0 / 2.0,
@@ -102,11 +104,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (12.924585870040456, 76.99421562429762, -138.41241221957347),
+            (10.375408832706054, 76.99421562429762, -138.41241221957347),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-45.98542028734179, 104.46440263744309, -138.41241221957347),
+            (-48.53459732467619, 104.46440263744309, -138.41241221957347),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)
