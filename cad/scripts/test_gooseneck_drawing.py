@@ -42,6 +42,21 @@ def test_adjustment_screw_thread_and_slot_fit_the_body() -> None:
     assert geom.SCREW_SLOT_W < geom.SCREW_HEAD_DIA
 
 
+def test_screw_slot_leaves_a_two_millimetre_web() -> None:
+    """User ruling: machined webs target 2 mm (1.5 mm floor), fixed by geometry."""
+    assert round(geom.SCREW_HEAD_T - geom.SCREW_SLOT_DEPTH, 9) >= 2.0
+
+
+def test_thicker_head_clears_the_counter_spring_half_turn() -> None:
+    """The head grows outboard only; the raised half-turn keeps 1.5 mm to it."""
+    import spring_mount_geom
+
+    pose = spring_mount_geom.COUNTER_REFERENCE_POSE
+    screw_y = spring_mount_geom.GOOSENECK_ORIGIN_Y + geom.ARM_Y
+    _tube_gap, head_gap = spring_mount_geom.counter_half_turn_clearances(pose, screw_y)
+    assert head_gap >= 1.5
+
+
 
 
 def test_gooseneck_consumers_import_against_this_geometry() -> None:
