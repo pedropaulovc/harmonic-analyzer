@@ -102,9 +102,40 @@ HARVESTED_MASS_KG = 0.821351
 #   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-026)
 #   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-014)
 #
-# Nothing else on this casting is an accuracy feature, so nothing else carries
-# a band: the title block's general grades govern.
+# Apart from the spacing between them (below), nothing else on this casting is
+# an accuracy feature, so nothing else carries a band: the title block's
+# general grades govern.
 RUNNING_BORE_BAND = (0.005, -0.025)
+
+# Crank-above-cone bore spacing (user ruling U31, 2026-09-23, option 3a).  The
+# crank axis is located FROM THE CONE AXIS, not from the foot: the 16T:64T
+# crank mesh closes on that spacing alone, and two foot-referenced .XX heights
+# stacked to +/-1.02 mm -- enough to jam the pair or let it skip.  The band is
+# the mesh contract less every other contributor, worst case (numbers from
+# build_drive_train_assembly, 14.5 deg pressure angle):
+#
+#   centre-distance contract dC (depth band)          -0.150 .. +0.540
+#   running float, loaded: gears push apart, so it only OPENS the mesh:
+#     crank 0.0375 + 0.075/72.03 * 5.65 overhang       0      .. +0.043
+#     cone  0.0375 + 0.075/42.01 * 5.68 overhang       0      .. +0.048
+#   cone-bore plan angle +/-1 deg (title block):
+#     64T 26.69 from the post axis -> dDX 0.444 * DX/C 0.142  +/-0.063
+#   64T axial station +/-0.5 on the inclined shaft -> dC  +/-0.015
+#   left for this spacing (dC)                        -0.072 .. +0.371
+#   / dC/dDY = DY/C = 39.332/39.735 = 0.990           -0.073 .. +0.374
+#
+# The close side is then set by the assembly CHECK, not by running: backlash
+# is read with the crank at rest, where gravity drops the crankshaft up to
+# 0.043 toward the 64T.  B = 0.28 + 0.517 * dC (14.5 deg), so the static
+# reading at a spacing of -0.002 (39.33 +0 against the 39.332 model) is
+# 0.28 - 0.517 * (0.002 + 0.078 + 0.043) = 0.216, and at +0.368 it is
+# 0.28 + 0.517 * (0.364 + 0.078 + 0.048) = 0.533: the drive-train sheet's
+# 0.20-0.55 acceptance.  Printed 39.33 +0.37/0 (aim 39.51) is the post's one
+# tight band, held by boring both journals in one setup (DRAWING_NOTES); a
+# post bored outside it is rescued by opening the crank bore for an eccentric
+# bushing, not scrapped.
+CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
+CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
 # Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
 # plan angle between the crank axis and the cone-journal axis is REAL model
@@ -148,14 +179,17 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ConeShaftBoss": {"ConeBossLen"},
     "JournalBoreProfile": {"JournalBoreDia"},
     "JournalPlanReference": {"CrankBossStartZ", "InclineAngle"},
+    "BoreSpacingReference": {"CrankAboveCone"},
 }
 
 # Decimal places are product definition: they select the title-block general
 # band (.X +/-0.8, .XX +/-0.51, .XXX +/-0.13), so the PART owns them and the
 # sheet only proves they survived the import (drawing-simplicity-policy rule 2).
 # The as-cast collar diameter and the cast body/boss sizes take one place --
-# nothing mates on them.  The two bearing-axis heights, the two mounting-hole
-# stations and the machined spot-face station take two.  The plan angle takes
+# nothing mates on them.  The cone-axis height, the crank-above-cone spacing
+# (which carries its own explicit band), the crank-axis height the print
+# repeats only as a reference, the two mounting-hole stations and the machined
+# spot-face station take two.  The plan angle takes
 # one: the title block holds angles to +/-1 deg, so a second place would only
 # suggest a precision nobody sets up for.  Only the two running bores take
 # three, and only because their size limits are what deliver the
@@ -173,6 +207,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ConeShaftBoss": {"ConeBossLen": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
     "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 1},
+    "BoreSpacingReference": {"CrankAboveCone": 2},
 }
 
 _PRECISION_NAMES = [
@@ -199,6 +234,10 @@ DRAWING_NOTES = "\n".join(
         "CRANK AND CONE BORE AXES INTERSECT THE POST AXIS.",
         "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS.",
         "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
+        "BORE CRANK AND CONE BORES IN ONE SETUP FROM ONE DRO ZERO,",
+        "INDEXING THE POST; INSPECT BORE-TO-BORE BEFORE UNCLAMPING.",
+        "DRILL MOUNTING HOLES FROM THE TOP FACE; CHECK CLEARANCE TO",
+        "THE CONE BORE AT BREAKOUT.",
     )
 )
 

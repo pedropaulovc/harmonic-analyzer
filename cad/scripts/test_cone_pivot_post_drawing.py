@@ -84,6 +84,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "MountWestX",
         "MountEastX",
         "CrankAxisY",
+        "CrankAboveCone",
         "CrankBossDia",
         "CrankBossLen",
         "ConeBossLen",
@@ -106,10 +107,15 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 
 
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
-    """The cone-axis view alone exposes the boss OD and bore in true shape."""
+    """The cone-axis view alone exposes the boss OD and bore in true shape.
+
+    It is also the one view showing both bores, so the crank-above-cone
+    spacing chains off the cone-axis height there.
+    """
     cone_owned = (
         spec.DRAWING_DIMENSIONS["ConeBossProfile"]
         | spec.DRAWING_DIMENSIONS["JournalBoreProfile"]
+        | spec.DRAWING_DIMENSIONS["BoreSpacingReference"]
     )
     assert set(drawing.JOURNAL_KEEP) == cone_owned
     assert drawing.CONE_AXIS_VIEW == part.CONE_AXIS_VIEW == "CONE JOURNAL"
@@ -174,9 +180,10 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     grade is the whole specification.
     """
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("set_dimension_bilateral_tolerance(") == 2
+    assert source.count("set_dimension_bilateral_tolerance(") == 3
     assert "set_dimension_symmetric_tolerance" not in source
-    assert "deviations(RUNNING_BORE_BAND)" in source
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
+    assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
 
@@ -303,7 +310,7 @@ def test_v2_feature_topology_uses_midplane_extrusions_and_hole_wizard() -> None:
     assert "_revolved_cylinder" not in source
     assert "create_revolve" not in source
     assert source.count("both_directions=True") == 2
-    assert source.count('create_sketch("ConeShaftNormal")') == 2
+    assert source.count('create_sketch("ConeShaftNormal")') == 3
     assert "angle=-INCLINE_DEG" in source
     assert 'HoleSpec(\n    "counterbore_fillister",\n    "1/4"' in source
     assert source.count("wizard_holes(") == 1
@@ -395,3 +402,56 @@ def test_spotface_station_has_one_driving_global() -> None:
     assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
     assert 'drive_jobs.append(("D1@CrankInterfacePlane", \'"CrankBossNearZ"\'))' in source
     assert 'plan.record("CrankBossStartZ", \'"CrankBossNearZ"\')' in source
+
+
+def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
+    """U31: the 16T:64T mesh closes on the bore spacing, so the print states it.
+
+    Re-adds the spec's stated worst-case contributors and proves the printed
+    band, read against the model nominal, stays inside what the centre-distance
+    contract leaves for the spacing.
+    """
+    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.332
+    assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
+    window_lo, window_hi = -0.150, 0.540
+    crank_float = 0.0375 + 0.075 / 72.03 * 5.65
+    cone_float = 0.0375 + 0.075 / 42.01 * 5.68
+    float_open = crank_float + cone_float
+    plan_angle = 0.063
+    station = 0.015
+    dc_ddy = 39.332 / 39.735
+    lo = (window_lo + plan_angle + station) / dc_ddy
+    hi = (window_hi - float_open - plan_angle - station) / dc_ddy
+    printed = round(spec.CRANK_ABOVE_CONE, 2)
+    upper, lower = spec.CRANK_ABOVE_CONE_BAND
+    assert lo < printed + lower - spec.CRANK_ABOVE_CONE
+    assert printed + upper - spec.CRANK_ABOVE_CONE < hi
+    # The assembly check reads backlash at rest (crank dropped by gravity):
+    # every in-print post must land inside the drive-train sheet's 0.20-0.55.
+    backlash_lo = 0.28 + 0.517 * (
+        dc_ddy * (printed + lower - spec.CRANK_ABOVE_CONE)
+        - plan_angle
+        - station
+        - crank_float
+    )
+    backlash_hi = 0.28 + 0.517 * (
+        dc_ddy * (printed + upper - spec.CRANK_ABOVE_CONE)
+        + plan_angle
+        + station
+        + cone_float
+    )
+    assert 0.20 <= backlash_lo < backlash_hi <= 0.55
+    # The foot-to-crank height stays on the front view only as a reference.
+    assert "CrankAxisY" in drawing.FRONT_KEEP
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'label="crank axis height reference"' in drawing_source
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert """set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')""" in source
+    assert "ONE SETUP" in spec.DRAWING_NOTES
+    assert "BORE-TO-BORE" in spec.DRAWING_NOTES
+
+
+def test_deep_mounting_holes_carry_a_drilling_note() -> None:
+    """U37: the 2X mounting holes run the full post height in cast iron."""
+    assert "DRILL MOUNTING HOLES FROM THE TOP FACE" in spec.DRAWING_NOTES
+    assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
