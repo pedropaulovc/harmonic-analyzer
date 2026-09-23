@@ -34,6 +34,18 @@ TIP_DIA_MM = joint.THREAD_MAJOR_DIA_MM
 TIP_LENGTH_MM = joint.STUD_TIP_LENGTH_MM
 TIP_LENGTH_DEVIATIONS_MM = joint.STUD_TIP_LENGTH_DEVIATIONS_MM
 TIP_CHAMFER_MM = joint.STUD_TIP_CHAMFER_MAX_MM
+# The stud's external class (the mount's tap is joint.THREAD_CLASS_INTERNAL)
+# and the UN series of a 24-pitch #10. The callout names the thread and its
+# extent; its length is the banded TipLength less the chamfer, bounded by the
+# runout note, so no second length is printed against the same feature.
+TIP_THREAD_SERIES = "UNC"
+TIP_THREAD_CLASS = "2A"
+TIP_THREAD_CALLOUT = (
+    f"{joint.THREAD} {TIP_THREAD_SERIES}-{TIP_THREAD_CLASS} TO SHOULDER"
+)
+# The cosmetic thread's minor line: ASME B1.1's basic minor diameter,
+# d - 1.082532 P.
+TIP_THREAD_MINOR_DIA_MM = joint.THREAD_MAJOR_DIA_MM - 1.082532 * joint.THREAD_PITCH_MM
 # A band equal to the title block's .XX prints as the bare two-place value
 # (swTolGeneral, policy rule 2); any other band prints itself (swTolBILAT).
 TIP_LENGTH_TOLERANCE_TYPE = (

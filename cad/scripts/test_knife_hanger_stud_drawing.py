@@ -258,15 +258,37 @@ def test_tip_detail_frames_the_whole_tip_end() -> None:
     crest = math.hypot(build.TIP_RADIUS_MM, sheet.detail_offset_mm)
     assert reach_end < sheet.fence_radius_mm
     assert crest < sheet.fence_radius_mm
-    # The chamfer's dimension line sits inside the boundary, >= 0.3 mm of
-    # model (1.8 mm of paper) from it, so its ink needs no crossing.
+    # The chamfer's witness lines and the start of its dimension line sit
+    # inside the boundary, >= 0.3 mm of model (1.8 mm of paper) from it; the
+    # line then runs out once to its text, clear of the boundary.
     scale = sheet.detail_scale[0] / sheet.detail_scale[1]
-    text = (
+    line = (
         build.TIP_RADIUS_MM + drawing.CHAMFER_TEXT_OUT_M * 1000.0 / scale,
-        sheet.detail_offset_mm - spec.TIP_CHAMFER_MM / 2.0,
+        sheet.detail_offset_mm,
     )
-    assert math.hypot(*text) <= sheet.fence_radius_mm - 0.3
-    assert drawing.DETAIL_BOUNDARY_CROSSINGS == {}
+    assert math.hypot(*line) <= sheet.fence_radius_mm - 0.3
+    assert drawing.DETAIL_BOUNDARY_CROSSINGS == {"TipChamfer": 1}
+
+
+def test_chamfer_text_sits_clear_right_of_the_boundary() -> None:
+    # The text is centred CLEAR + HALF_WIDTH right of the boundary; at the
+    # worst measured boundary (1.276 x the nominal fence) it stays off the
+    # detail label and under the pictorial's cell.
+    sheet = drawing.SHEET
+    for ratio in (1.0, 1.276):
+        radius = ratio * sheet.fence_radius_mm * sheet.detail_scale[0] / 1000.0
+        center_x = sheet.detail_center[0] + radius + drawing.CHAMFER_TEXT_CLEAR_M
+        center_x += drawing.CHAMFER_TEXT_HALF_WIDTH_M
+        y = sheet.detail_center[1] + (
+            build.TIP_RADIUS_MM * sheet.detail_scale[0] / 1000.0
+            + drawing.CHAMFER_TEXT_OUT_M
+        )
+        half = drawing.CHAMFER_TEXT_HALF_WIDTH_M
+        box = (center_x - half, y - 0.003, center_x + half, y + 0.003)
+        boundary = (sheet.detail_center, radius)
+        assert drawing._text_boundary_problem(box, boundary) is None
+        assert not _overlap(box, _label_box())
+        assert not _overlap(box, drawing.ISO_REGION)
 
 
 def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
@@ -363,9 +385,9 @@ def test_self_crossing_lines_are_rejected() -> None:
     assert len(problems) == 1 and "cross at" in problems[0]
 
 
-def test_no_dimension_may_cross_the_tip_detail_boundary() -> None:
+def test_undeclared_dimension_may_not_cross_the_tip_detail_boundary() -> None:
     problems = drawing._dimension_ink_problems(
-        _ink(lines=[((0.265, 0.150), (0.400, 0.150))]),
+        _ink(lines=[((0.265, 0.150), (0.400, 0.150))], name="Other"),
         owner=DETAIL,
         obstacles={},
         region=REGION,
@@ -542,3 +564,95 @@ def test_faced_end_circle_is_inside_the_tip_chamfer() -> None:
     radius, axial = drawing.FACED_END_CIRCLE
     assert axial == build.TIP_END_Y_MM
     assert radius == pytest.approx(build.TIP_RADIUS_MM - spec.TIP_CHAMFER_MM)
+
+
+def test_chamfer_line_out_to_its_text_is_the_one_allowed_crossing() -> None:
+    line = ((0.265, 0.150), (0.400, 0.150))
+    ok = drawing._dimension_ink_problems(
+        _ink(lines=[line]), owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
+    )
+    assert ok == []
+    # A witness line stretched out of the circle as well is a second crossing.
+    stretched = ((0.265, 0.150), (0.265, 0.250))
+    problems = drawing._dimension_ink_problems(
+        _ink(lines=[line, stretched]),
+        owner=DETAIL,
+        obstacles={},
+        region=REGION,
+        boundary=BOUNDARY,
+    )
+    assert len(problems) == 1 and "2 time(s); 1 allowed" in problems[0]
+
+
+def test_text_must_not_straddle_the_detail_boundary() -> None:
+    center, radius = BOUNDARY
+    inside = (
+        center[0] - 0.005,
+        center[1] - 0.002,
+        center[0] + 0.005,
+        center[1] + 0.002,
+    )
+    outside = (
+        center[0] + radius + 0.001,
+        center[1],
+        center[0] + radius + 0.03,
+        center[1] + 0.004,
+    )
+    # stud-16: "0.5 max. X 45°" printed across the fence.
+    straddle = (
+        center[0] - 0.015,
+        center[1] + radius - 0.002,
+        center[0] + 0.015,
+        center[1] + radius + 0.002,
+    )
+    assert drawing._text_boundary_problem(inside, BOUNDARY) is None
+    assert drawing._text_boundary_problem(outside, BOUNDARY) is None
+    assert "straddles" in drawing._text_boundary_problem(straddle, BOUNDARY)
+
+
+def test_chamfer_limit_prints_uppercase() -> None:
+    assert drawing._uppercase_problem(["0.5 MAX X 45°"]) is None
+    assert drawing._uppercase_problem(["0.5", " MAX", " X 45°"]) is None
+    # stud-16's render.
+    assert drawing._uppercase_problem(["0.5 max. X 45°"])
+    assert drawing._uppercase_problem(["0.5 X 45°"])
+    assert drawing.SW_ALL_UPPERCASE_DIMENSIONS == 754
+
+
+def test_text_overlaps_names_the_crowded_boxes() -> None:
+    box = (0.0, 0.0, 1.0, 1.0)
+    others = {"near": (0.5, 0.5, 2.0, 2.0), "far": (1.5, 1.5, 2.0, 2.0)}
+    assert drawing._text_overlaps(box, others) == [
+        "near [500.0,500.0]..[2000.0,2000.0]mm"
+    ]
+
+
+def test_tip_thread_callout_names_size_class_and_extent() -> None:
+    assert spec.TIP_THREAD_CALLOUT == f"{joint.THREAD} UNC-2A TO SHOULDER"
+    assert spec.TIP_THREAD_CALLOUT.startswith("#10-24 UNC-2A")
+    # 24 TPI is the coarse series for a #10 (the fine is 32).
+    assert joint.THREAD == "#10-24" and spec.TIP_THREAD_SERIES == "UNC"
+    # ASME B1.1 basic minor diameter of #10-24: 0.1449 in.
+    assert spec.TIP_THREAD_MINOR_DIA_MM == pytest.approx(0.1449 * 25.4, abs=0.005)
+    assert spec.TIP_THREAD_MINOR_DIA_MM < build.TIP_RADIUS_MM * 2.0
+
+
+def test_thread_callout_gate() -> None:
+    wanted = spec.TIP_THREAD_CALLOUT
+    assert drawing._thread_callout_problem(wanted, []) is None
+    assert drawing._thread_callout_problem(wanted, [wanted]) is None
+    assert (
+        drawing._thread_callout_problem(" #10-24  UNC-2A TO SHOULDER ", [wanted])
+        is None
+    )
+    # stud-16: the thread carried no callout text.
+    assert drawing._thread_callout_problem("", [])
+    assert drawing._thread_callout_problem(wanted, [wanted, "#10-24 UNC"])
+    assert drawing._thread_callout_problem(wanted, [wanted, wanted])
+
+
+def test_stock_name_says_turned_not_shortened() -> None:
+    from _fastener_catalog import fastener
+
+    name = fastener("knife-hanger-stud").stock_name
+    assert "(Turned and Threaded)" in name and "Shortened" not in name

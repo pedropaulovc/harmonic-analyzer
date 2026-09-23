@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from functools import wraps
+import json
 import math
 import sys
 
+import _telemetry
 from _common import (
     SketchDims,
     _early_bound,
@@ -50,7 +52,8 @@ from knife_hanger_stud_spec import (
     TIP_LENGTH_DEVIATIONS_MM,
     TIP_LENGTH_MM,
     TIP_LENGTH_TOLERANCE_TYPE,
-    TIP_THREAD,
+    TIP_THREAD_CALLOUT,
+    TIP_THREAD_MINOR_DIA_MM,
 )
 
 PART_NAME = "knife-hanger-stud"
@@ -252,21 +255,50 @@ async def _turn_stepped_tip(adapter) -> None:
 
 
 async def _thread_tip(adapter) -> None:
-    """Cosmetic #10-24 thread over the whole turned tip."""
+    """Cosmetic thread over the whole turned tip, callout and minor explicit.
+
+    stud-16 passed only a standard and a size: the thread carried no minor
+    diameter and no callout, so the lathe view drew no thread and no
+    "#10-24" (render of leaf 20260923T001846Z). With no standard the
+    thread's minor line and callout come from this spec alone, and both are
+    read back from the feature.
+    """
     from solidworks_mcp.adapters.base import AddThreadParameters
 
     check(
-        f"cosmetic thread {TIP_THREAD}",
+        f"cosmetic thread {TIP_THREAD_CALLOUT}",
         await adapter.add_thread(
             AddThreadParameters(
                 edge_point=[TIP_RADIUS_MM, TIP_END_Y_MM + TIP_CHAMFER_MM, 0.0],
-                standard="ansi_inch",
-                size=TIP_THREAD,
+                standard="none",
+                diameter=TIP_THREAD_MINOR_DIA_MM,
                 end_type="blind",
                 depth=TIP_LENGTH_MM - TIP_CHAMFER_MM,
+                note=TIP_THREAD_CALLOUT,
             )
         ),
     )
+    name_last_feature(adapter, "TipThread")
+    feature = adapter.currentModel.FeatureByName("TipThread")
+    if feature is None:
+        raise RuntimeError("TipThread feature is missing after its creation")
+    data = _early_bound(
+        _early_bound(feature, "IFeature").GetDefinition(), "ICosmeticThreadFeatureData"
+    )
+    state = {
+        "callout": str(data.ThreadCallout or ""),
+        "diameter_mm": float(data.Diameter) * 1000.0,
+        "depth_mm": float(data.BlindDepth) * 1000.0,
+    }
+    _telemetry.info("tip thread: " + json.dumps(state, sort_keys=True))
+    if (
+        state["callout"] != TIP_THREAD_CALLOUT
+        or not math.isclose(state["diameter_mm"], TIP_THREAD_MINOR_DIA_MM, abs_tol=1e-6)
+        or not math.isclose(
+            state["depth_mm"], TIP_LENGTH_MM - TIP_CHAMFER_MM, abs_tol=1e-6
+        )
+    ):
+        raise RuntimeError(f"tip thread reads back {state!r}")
 
 
 def _manufacturing_controls(adapter) -> None:
