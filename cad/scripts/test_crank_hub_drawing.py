@@ -13,11 +13,24 @@ import draw_crank_hub as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_outboard_proportions_are_scaled_not_millimetre_literals() -> None:
-    scale = geometry.SHAFT_DIA / 1.65
-    assert geometry.ARM_WIDTH == pytest.approx(3.14 * scale, abs=0.05)
-    assert geometry.HUB_SEAT_DIA == pytest.approx(2.60 * scale, abs=0.02)
-    assert geometry.AXIAL_PIN_DIA == pytest.approx(0.59 * scale, abs=0.01)
+def test_outboard_proportions_follow_the_u29_enlargement() -> None:
+    unit = geometry.SHAFT_DIA / geometry.PHOTO_SHAFT
+    scale = geometry.OUTBOARD_SCALE
+    assert scale == 1.3
+    assert geometry.HUB_SEAT_DIA == 19.5
+    assert geometry.HUB_SEAT_DIA == pytest.approx(2.60 * unit * scale, abs=0.05)
+    # Stock sizes: the pin is the dowel just under 1.3x, the arm is 1-in bar.
+    assert geometry.AXIAL_PIN_DIA == 4.0 < 0.59 * unit * scale
+    assert geometry.ARM_WIDTH == pytest.approx(25.4)
+    # Named ratio deviation from the photograph (U29).
+    assert geometry.ARM_TO_HUB_RATIO == pytest.approx(1.303, abs=1e-3)
+    assert geometry.PHOTO_ARM_TO_HUB_RATIO == pytest.approx(1.208, abs=1e-3)
+
+
+def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
+    assert geometry.WALL_TARGET_MM == 2.0
+    assert geometry.SEAM_WEB_WORST_MM == pytest.approx(2.054, abs=1e-3)
+    assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.01, abs=1e-3)
 
 
 def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
@@ -61,7 +74,7 @@ def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
     assert "LIGHT DRIVE FIT" in cross_hole
     assert "RADIAL" not in notes
     assert "SHOULDER SEATED" in notes and "FACES FLUSH" in notes
-    assert "0.50 MIN HUB WALL" in notes and "AFTER EDGE BREAK" in notes
+    assert "HUB WALL" not in notes
 
 
 def test_notes_obey_the_four_line_rule_and_clear_the_title_block() -> None:

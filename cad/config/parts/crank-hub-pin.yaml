@@ -1,9 +1,9 @@
 crank-hub-pin:
   number: MHA-138
-  material: AISI 1018 cold-finished steel rod
-  material_specification: AISI 1018 cold-finished steel rod
-  finish: smooth turned, deburred, oiled
+  material: 4 mm m6 steel dowel pin, ISO 2338
+  material_specification: 4 mm m6 steel dowel pin, ISO 2338
+  finish: ends faced, deburred, oiled
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "turned straight pin; match-reamed axial seam fit"
+  process: "dowel stock cut to length; match-reamed axial seam fit"

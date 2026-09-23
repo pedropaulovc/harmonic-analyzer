@@ -76,12 +76,12 @@ CROSS_HOLE_CALLOUT = (
 )
 # Policy rule 6: at most four short lines, each under ~70 characters so the
 # block stays left of the title block.  The cross-hole operation lives on its
-# callout, and MHA-138's own drawing says how the pin is driven.
+# callout, and MHA-138's own drawing says how the pin is driven.  The U29 hub
+# leaves a 2-mm seam web at the printed bands, so no matched wall check.
 DRAWING_NOTES = "\n".join(
     (
         "MATCHED ASSEMBLY WITH MHA-020 ARM: SHOULDER SEATED, FACES FLUSH.",
         "AT SIX O'CLOCK MATCH-REAM SEAM WITH MHA-020 TO MHA-138: LIGHT DRIVE FIT.",
-        "VERIFY 0.50 MIN HUB WALL, MHA-138 SEAM TO BORE, AFTER EDGE BREAK.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

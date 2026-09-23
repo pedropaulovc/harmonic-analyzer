@@ -16,15 +16,13 @@ def test_pin_length_is_half_the_shared_arm_thickness() -> None:
     assert pin_spec.PIN_LEN == geometry.ARM_THICKNESS / 2.0 == 4.0
 
 
-def test_six_oclock_seam_has_a_coupled_finished_wall_acceptance() -> None:
-    assert geometry.SEAM_WEB_NOMINAL_MM >= geometry.SEAM_WEB_MIN_MM
-    assert geometry.SEAM_WEB_GENERAL_WORST_MM < geometry.SEAM_WEB_MIN_MM
-    assert geometry.SEAM_REQUIRES_MATCHED_INSPECTION
-    assert geometry.HUB_SEAT_DIA_MIN_GENERAL == pytest.approx(14.2)
-    assert geometry.AXIAL_PIN_DIA_MAX_GENERAL == pytest.approx(4.2)
+def test_six_oclock_seam_leaves_the_u27_web_without_a_matched_check() -> None:
+    assert geometry.HUB_SEAT_DIA_MIN_GENERAL == pytest.approx(18.7)
+    assert geometry.AXIAL_PIN_DIA_STOCK_MAX == pytest.approx(4.012)
     assert geometry.HUB_BORE_DIA_MAX == pytest.approx(9.58)
-    assert geometry.SEAM_WEB_NOMINAL_MM == pytest.approx(0.51)
-    assert geometry.SEAM_WEB_GENERAL_WORST_MM == pytest.approx(-0.29)
+    assert geometry.SEAM_WEB_WORST_MM >= geometry.WALL_TARGET_MM
+    assert "DOWEL STOCK" in pin_spec.DRAWING_NOTES
+    assert len(pin_spec.DRAWING_NOTES.splitlines()) <= 4
 
 
 def test_drawing_registry_and_native_dimensions_are_complete() -> None:
