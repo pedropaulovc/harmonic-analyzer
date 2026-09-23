@@ -40,7 +40,11 @@ BASE_CHORD_ROOT_FORM = "INVOLUTE FLANKS; GAP FLOOR CHORD AT BASE CIRCLE"
 TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
-FACE_WIDTH = 6.5
+# U27 face width (Main ruling, 2026-09-23): 6.0 at the .X band keeps the
+# widest gear (6.8) inside the 6.889 seat pitch; 6.5 +/-0.51 could reach
+# 7.01 and overlap a neighbour.  The drum's engaged zone spans
+# [-0.75, +1.35] mm about the narrowed gear's centre, inside the 5.2 minimum.
+FACE_WIDTH = 6.0
 
 
 def base_chord_root_radius_mm(teeth: int) -> float:
@@ -92,6 +96,24 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
+# U27 (drive-train ruling): machined webs target >= 2.0 mm with a hard floor
+# of 1.5 mm at the worst case of the printed bands.  The four smallest gears
+# sit on the stepped shaft's 1/16, 1/8, 1/4 and 3/8 in lands and fall under
+# the floor between the base-chord root and the maximum bore.  USER ruling
+# 2026-09-23 (~02:50Z, via Main-cc): "Smallest gears will probably be an
+# exception to the 1.5mm floor ... the gears match well the book pics" --
+# book-fidelity evidence: comparison pair ch12-p002-img09 (cone set plan
+# view) overlays the taper down to T006.  Each entry is the accepted web at
+# maximum bore (mm); every other configuration must meet the U27 target.
+MACHINED_WEB_FLOOR_MM = 1.5
+MACHINED_WEB_TARGET_MM = 2.0
+SMALL_GEAR_WEB_EXCEPTIONS_MM: dict[int, float] = {
+    6: 0.611,
+    12: 1.323,
+    18: 1.225,
+    24: 1.123,
+}
+
 def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
     """Return the bore finish control qualified by this configuration's bore."""
     return SurfaceFinishControl(
@@ -102,13 +124,13 @@ def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
     )
 
 
-# Part PMI is authored while the default T120 configuration is active.  Drawing
-# sheets select their own configuration's control from
-# ``BORE_SURFACE_FINISHES`` so native face validation follows each configured
-# bore, and the drawing-purity gate sees a part-spec-sourced control.
+# Part PMI is authored while the default T120 configuration is active.  Each
+# drawing sheet resolves "cone_gear_bore" from ITS configuration's finish rows
+# in ``BORE_SURFACE_FINISHES`` so native face validation follows that sheet's
+# bore (the T120 row would reject the T006 1/16 in bore).
 SURFACE_FINISHES = (bore_surface_finish(TEETH),)
-BORE_SURFACE_FINISHES: dict[int, SurfaceFinishControl] = {
-    teeth: bore_surface_finish(teeth) for teeth in CONFIGURATION_TEETH
+BORE_SURFACE_FINISHES: dict[int, tuple[SurfaceFinishControl, ...]] = {
+    teeth: (bore_surface_finish(teeth),) for teeth in CONFIGURATION_TEETH
 }
 
 # The three blank sizes and the tooth-system acceptance size.  ToothThickness
@@ -127,10 +149,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
 # on the two fit dimensions: the bore and circular tooth thickness.  Tip
-# diameter and face width stay at the two-place general grade.
+# diameter stays at the two-place general grade (it sets the mesh depth); face
+# width takes one place, the loosest title-block band (.X +/-0.8), which the
+# 6.0 nominal clears against the 6.889 seat pitch.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 2},
-    "Blank": {"FaceWidth": 2},
+    "Blank": {"FaceWidth": 1},
     "BoreProfile": {"BoreCutDia": 3},
     "ToothThicknessReference": {"ToothThickness": 3},
 }

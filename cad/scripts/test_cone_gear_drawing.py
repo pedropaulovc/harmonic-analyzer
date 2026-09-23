@@ -54,7 +54,7 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
 def test_model_owns_precision_for_both_fit_dimensions() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "BlankDia": 2,
-        "FaceWidth": 2,
+        "FaceWidth": 1,
         "BoreCutDia": 3,
         "ToothThickness": 3,
     }
@@ -128,12 +128,16 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert f"{part.BACKLASH_MM[0]:.2f} TO {part.BACKLASH_MM[1]:.2f}" in data
         # The operating mesh is not a reference-centre-distance mesh; say so
         # beside the mate, and say where the view's thickness is measured.
-        assert (
-            "OPERATING MESH:  PARTIAL DEPTH ON INCLINED AXES; "
-            "CENTRE DISTANCE FROM ASSEMBLY"
-        ) in data
         assert "TOOTH THICKNESS IN VIEW:  ARC LENGTH AT PITCH DIAMETER" in data
-        assert len(data.splitlines()) * 0.00315 <= drawing.GEAR_DATA_HEIGHT
+        assert len(data.splitlines()) * 0.00327 <= drawing.GEAR_DATA_HEIGHT
+        # 144.2 mm for 78 characters natively: the block must end before the
+        # sheet count at x 0.3496.
+        widest = max(len(line) for line in data.splitlines())
+        assert widest <= drawing.GEAR_DATA_MAX_LINE_CHARS
+        assert (
+            drawing.GEAR_DATA_POS[0] + widest * 0.00185 < drawing.SHEET_COUNT_POS[0] - 0.003
+        )
+        assert "OPERATING MESH:  PARTIAL DEPTH ON INCLINED AXES (SEE ASSEMBLY)" in data
         # These values are native imported dimensions, never parallel typed rows.
         for duplicate in (
             "OUTSIDE DIAMETER",
@@ -259,3 +263,21 @@ def test_invalid_family_member_is_rejected() -> None:
         spec.material_specification(7)
     with pytest.raises(ValueError):
         notes.gear_data(7, part.BACKLASH_MM)
+
+
+def test_root_to_bore_webs_meet_u27_except_the_user_ruled_small_gears() -> None:
+    # U27 floor/target at the maximum bore; T006..T024 are a named USER
+    # exception (book-fidelity, ch12-p002-img09), not a loosened threshold.
+    upper = part.BORE_DIA_BAND[0]
+    for teeth in spec.CONFIGURATION_TEETH:
+        web = spec.base_chord_root_radius_mm(teeth) - (
+            spec.bore_dia_mm(teeth) + upper
+        ) / 2.0
+        if teeth in spec.SMALL_GEAR_WEB_EXCEPTIONS_MM:
+            assert 0.0 < web < spec.MACHINED_WEB_FLOOR_MM, teeth
+            assert web == pytest.approx(
+                spec.SMALL_GEAR_WEB_EXCEPTIONS_MM[teeth], abs=0.001
+            ), teeth
+            continue
+        assert web >= spec.MACHINED_WEB_TARGET_MM, teeth
+    assert set(spec.SMALL_GEAR_WEB_EXCEPTIONS_MM) == {6, 12, 18, 24}
