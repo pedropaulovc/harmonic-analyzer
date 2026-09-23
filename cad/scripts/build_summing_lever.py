@@ -195,9 +195,12 @@ REFERENCE_COINCIDENCE_TOL_MM = 1e-6
 CENTRE_CROSS_ARM = 5.0
 # Model Z of the construction line that carries the pivot cylinder's diameter
 # across its top-view silhouette: between the mid rib and the -Z end rib, level
-# with the clear web field the dimension text sits in.  The front view cannot
-# carry it -- the R15.2 rib outline hides the cylinder there (Fable R14b B1).
-CYLINDER_REFERENCE_Z = -15.0
+# with the dimension line under the text in the clear web field.  The front
+# view cannot carry it -- the R15.2 rib outline hides the cylinder there (Fable
+# R14b B1).  At -15 the dimension line landed 4 mm below the dashed chord, and
+# chord + witness lines + dimension line boxed a phantom hidden feature (Fable
+# R15c clarity); here the chord lies under the dimension line.
+CYLINDER_REFERENCE_Z = -7.5
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -1378,10 +1381,55 @@ def _reference_misses(
     return problems, worst
 
 
+def _slab_misses(slab_faces: list[tuple[Point, Point, float]]) -> list[str]:
+    """Where the summation web and the coefficients plate are NOT one slab.
+
+    ``slab_faces`` are the Y-normal planar faces as (normal, root, face-box
+    centre X), in mm.  The print gives the web no thickness of its own -- the
+    plate's 5.08 carries "PLATE AND WEB" -- which is true only while both arms
+    have a face on each of the plate's two planes.  The cylinder parts them
+    (R12.7 > PLATE_T / 2), so the box centre's side of the axis tells them apart.
+    """
+    problems = []
+    for region, on_side in (
+        ("summation web", lambda x: x < 0.0),
+        ("coefficients plate", lambda x: x > 0.0),
+    ):
+        for sign in (1.0, -1.0):
+            level = (0.0, sign * PLATE_T / 2.0, 0.0)
+            if not any(
+                _parallel(normal, 1)
+                and on_side(centre_x)
+                and _plane_offset_mm(level, (normal, root))
+                <= REFERENCE_COINCIDENCE_TOL_MM
+                for normal, root, centre_x in slab_faces
+            ):
+                problems.append(f"no {region} face on y={level[1]:+.2f}")
+    return problems
+
+
+@_telemetry.traced("gate.web_and_plate_one_slab")
+def _assert_web_and_plate_one_slab(slab_faces: list[tuple[Point, Point, float]]) -> None:
+    problems = _slab_misses(slab_faces)
+    if problems:
+        raise RuntimeError(
+            "PLATE AND WEB 5.08 is not one slab: " + "; ".join(problems)
+        )
+    _telemetry.success(
+        f"web and plate share the +-{PLATE_T / 2.0:g} planes "
+        f"({len(slab_faces)} Y-normal faces read)"
+    )
+
+
 def _brep_surfaces_mm(
     adapter,
-) -> tuple[list[tuple[Point, Point, float]], list[tuple[Point, Point]]]:
-    """Every cylinder (origin, axis, radius) and plane (normal, root) of the body."""
+) -> tuple[
+    list[tuple[Point, Point, float]],
+    list[tuple[Point, Point]],
+    list[tuple[Point, Point, float]],
+]:
+    """Every cylinder (origin, axis, radius) and plane (normal, root) of the body,
+    plus each Y-normal plane's face-box centre X (see ``_slab_misses``)."""
     bodies = list(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or []
     )
@@ -1390,10 +1438,10 @@ def _brep_surfaces_mm(
     faces = list(_early_bound(bodies[0], "IBody2").GetFaces() or [])
     cylinders: list[tuple[Point, Point, float]] = []
     planes: list[tuple[Point, Point]] = []
+    slab_faces: list[tuple[Point, Point, float]] = []
     for index, raw_face in enumerate(faces, 1):
-        surface = _early_bound(
-            _early_bound(raw_face, "IFace2").GetSurface(), "ISurface"
-        )
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
         if surface.IsCylinder():
             p = [float(value) for value in surface.CylinderParams]
             cylinders.append(
@@ -1401,10 +1449,14 @@ def _brep_surfaces_mm(
             )
         elif surface.IsPlane():
             p = [float(value) for value in surface.PlaneParams]
-            planes.append((tuple(p[0:3]), tuple(v * 1000.0 for v in p[3:6])))
+            plane = (tuple(p[0:3]), tuple(v * 1000.0 for v in p[3:6]))
+            planes.append(plane)
+            if _parallel(plane[0], 1):
+                box = [float(value) for value in face.GetBox()]
+                slab_faces.append((*plane, (box[0] + box[3]) * 500.0))
         if index % 25 == 0:
             _telemetry.debug(f"reference gate: read {index}/{len(faces)} faces")
-    return cylinders, planes
+    return cylinders, planes, slab_faces
 
 
 def _sketch_points_mm(adapter, part, sketch_name: str) -> list[Point]:
@@ -1460,7 +1512,8 @@ def _assert_reference_sketches_on_geometry(adapter) -> None:
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    cylinders, planes = _brep_surfaces_mm(adapter)
+    cylinders, planes, slab_faces = _brep_surfaces_mm(adapter)
+    _assert_web_and_plate_one_slab(slab_faces)
     part = sw_type_info.early_bound_doc(adapter.currentModel)
     for sketch_name, (targets, required, exempt) in _reference_claims(
         cylinders, planes

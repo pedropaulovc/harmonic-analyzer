@@ -305,12 +305,38 @@ def test_plate_and_web_are_one_slab_by_construction() -> None:
     }
     assert _is_one_slab(_slab_sources(source))
     # Negative controls: a split global, and a web built to its own depth.
-    split = source.replace(
-        """web_depth[0], '"PlateT"'""", """web_depth[0], '"WebT"'"""
-    )
+    split = source.replace("""web_depth[0], '"PlateT"'""", """web_depth[0], '"WebT"'""")
     assert split != source and not _is_one_slab(_slab_sources(split))
     body = inspect.getsource(build._summation_plate)
-    own_depth = source.replace(
-        body, body.replace("depth=PLATE_T", "depth=WEB_T")
-    )
+    own_depth = source.replace(body, body.replace("depth=PLATE_T", "depth=WEB_T"))
     assert own_depth != source and not _is_one_slab(_slab_sources(own_depth))
+
+
+def _slab_faces(web_half: float):
+    """Y-normal faces of the two arms: (normal, root, box centre X)."""
+    import build_summing_lever as build
+
+    plate_half = build.PLATE_T / 2.0
+    return [
+        ((0.0, sign, 0.0), (x, sign * half, 7.0), x)
+        for x, half in ((-45.0, web_half), (28.0, plate_half))
+        for sign in (1.0, -1.0)
+    ]
+
+
+def test_web_and_plate_gate_accepts_one_slab() -> None:
+    """Positive control: both arms on the plate's +-2.54 planes."""
+    import build_summing_lever as build
+
+    assert build._slab_misses(_slab_faces(build.PLATE_T / 2.0)) == []
+
+
+def test_web_and_plate_gate_rejects_a_thicker_web() -> None:
+    """Negative control: a web 1e-5 mm proud of the plate on each face."""
+    import build_summing_lever as build
+
+    problems = build._slab_misses(_slab_faces(build.PLATE_T / 2.0 + 1e-5))
+    assert problems == [
+        "no summation web face on y=+2.54",
+        "no summation web face on y=-2.54",
+    ]

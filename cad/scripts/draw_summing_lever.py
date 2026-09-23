@@ -245,12 +245,16 @@ def _assert_arc_centre_text(
 
 
 FORM_FRONT_KEEP = {
-    "AnchorHeight": (0.0980, 0.2300),
+    # Dimension line close to the boss: its long witness lines read as a bar
+    # beside the boss to two blind reviewers (Fable R14b B2, R15c B1).
+    "AnchorHeight": (0.1080, 0.2300),
     # "MID RIB" below: 2 mm right of R14b so the label clears its own leader.
     "MidRibArcR": (0.1720, 0.2420),
     # Past its own arrows (between them the witness lines ruled through the
-    # text), below the plate so "PLATE AND WEB" clears the note block.
-    "PlateThickness": (0.2050, 0.2120),
+    # text), below the plate so "PLATE AND WEB" clears the note block, and close
+    # to the plate end: longer witness lines read as the plate running on
+    # (Fable R15c B1).
+    "PlateThickness": (0.1950, 0.2120),
     # Both carry "RIB APEX" above the value (DIMENSION_CALLOUTS).  35.8 sits past
     # its +X witness so that label clears the shared cylinder-axis witness.
     # 2.5 mm lower than R14b: room for "END RIBS" under the 2X R15.2 above,
@@ -287,9 +291,8 @@ FORM_TOP_KEEP = {
     "SummationArcCentreX": (0.1295, 0.1833),
     "SummationArcCentreZ": (0.2029, 0.1591),
     "BossAxialLocation": (0.0900, 0.0860),
-    # In the clear web field left of the tube, just below its construction line
-    # (build_summing_lever.CYLINDER_REFERENCE_Z), so the witness lines run on
-    # the silhouettes.  The census sizes the text from its string, "<MOD-DIAM>"
+    # In the clear web field left of the tube; its dimension line lands on the
+    # construction chord (build_summing_lever.CYLINDER_REFERENCE_Z).  The census sizes the text from its string, "<MOD-DIAM>"
     # token included (27 mm estimated for "Ø25.4"), and R15b's seat put that
     # box across the cylinder-axis witness of PlateWidth: this one keeps the
     # estimate short of it while the real text stays clear of the web arc.
