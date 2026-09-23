@@ -454,3 +454,31 @@ def test_deep_mounting_holes_carry_a_drilling_note() -> None:
     """U37: the 2X mounting holes run the full post height in cast iron."""
     assert "DRILL MOUNTING HOLES FROM THE TOP FACE" in spec.DRAWING_NOTES
     assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
+
+
+def test_point_relations_use_the_point_relation_types() -> None:
+    """swConstraintType_HORIZONTAL/VERTICAL apply only to lines.
+
+    r6 (farm, 2026-09-23) related BoreSpacingReference's start point to the
+    origin with plain "horizontal": SOLIDWORKS returned a relation, but the
+    sketch stayed under-defined.  A point pair must use the *_points type.
+    """
+    import re as _re
+
+    from solidworks_mcp.adapters.solidworks.sketch import RELATION_NAME_MAP
+
+    assert RELATION_NAME_MAP["horizontal_points"] == 25  # swConstraintType_HORIZPOINTS
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    calls = _re.findall(
+        r"add_sketch_constraint\(\s*([^,]+),\s*([^,]+),\s*\"(\w+)\"", source
+    )
+    assert calls, "no sketch relations found"
+    for entity1, entity2, relation in calls:
+        is_point_pair = entity2.strip() != "None" and (
+            ".start" in entity1 or ".end" in entity1 or ".center" in entity1
+        )
+        if is_point_pair and relation in {"horizontal", "vertical"}:
+            raise AssertionError(
+                f"line-only relation {relation!r} on points {entity1} / {entity2}"
+            )
+    assert '"origin", "horizontal_points"' in source
