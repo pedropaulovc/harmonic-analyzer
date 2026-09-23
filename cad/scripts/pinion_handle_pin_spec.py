@@ -8,13 +8,8 @@ dimensions and the manufacturing drawing imports those dimensions verbatim.
 
 from __future__ import annotations
 
-
-# AISI 1018 cold-finished stock is the registry material for this part.  The
-# stock is a simple straight cylinder, with flat ends, local +Z from z=0 to
-# PIN_LEN.  The match-reamed assembly hole establishes the functional fit; no
-# independent fit band belongs on this pin.
-PIN_DIA = 2.0
-PIN_LEN = 10.5
+from pinion_handle_pin_geometry import PIN_DIA as PIN_DIA
+from pinion_handle_pin_geometry import PIN_LEN as PIN_LEN
 
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

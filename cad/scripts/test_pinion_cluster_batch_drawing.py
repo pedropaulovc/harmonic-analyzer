@@ -100,6 +100,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
     drawing_only = {
         "pinion_cam_spec.py",
         "pinion_cam_pin_spec.py",
+        "pinion_handle_pin_spec.py",
         "pinion_handle_spec.py",
         "pinion_lever_spec.py",
         "pinion_spring_spec.py",
@@ -109,6 +110,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
         "pinion_cam_geometry.py",
         "pinion_cam_pin_geometry.py",
         "pinion_handle_geometry.py",
+        "pinion_handle_pin_geometry.py",
         "pinion_lever_geometry.py",
         "pinion_spring_geometry.py",
     } <= deps

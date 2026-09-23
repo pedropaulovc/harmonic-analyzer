@@ -817,7 +817,7 @@ from pinion_handle_geometry import (  # noqa: E402
     TUBE_LEN as HANDLE_TUBE_LEN,
     WALL_T as HANDLE_WALL_T,
 )
-from pinion_handle_pin_spec import (  # noqa: E402
+from pinion_handle_pin_geometry import (  # noqa: E402
     PIN_DIA as HANDLE_PIN_DIA,
     PIN_LEN as HANDLE_PIN_LEN,
 )
