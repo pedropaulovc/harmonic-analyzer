@@ -621,8 +621,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Cone Tip Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks auto-inserts one descriptive "... Tapped Hole" note per
+        # tapped Hole Wizard hole it shows: the adjuster's, and since U30 the
+        # #6-32 foot tap's (run 66084ed9 removed 2 against an expected 1).
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
+        expected_redundant_notes=2,
     )
 
 
