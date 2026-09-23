@@ -918,25 +918,57 @@ def _close_screw(fixture):
         raise RuntimeError("native under-head contact not bracketed between 8 and 0 mm gap")
 
 
+# A face-normal contact opens by the full withdrawal: keep 0.04 of 0.05 mm.
+FACE_NORMAL_WITHDRAWAL_FLOOR_MM = 0.04
+FACE_NORMAL_WITHDRAWAL_MM = (0.05,)
+# The arm end can bear on a CORNER (r4: the eye wire wraps the tube's OD edge),
+# where an axial withdrawal opens only by |n_x| of it. Prove separation without
+# assuming the contact normal: clear, past the contact limit, strictly opening.
+EDGE_WITHDRAWAL_MM = (0.05, 0.10)
+
+
+def _withdrawal_refusal(face_role, withdrawals, distance_limit):
+    """Why a finite-face withdrawal failed to prove separation, or None."""
+    for row in withdrawals:
+        if row["native"]["state"] != "clear" or row["native"]["volume_mm3"] != 0.0:
+            return f"native overlap after {row['withdrawn_mm']} mm withdrawal"
+    # An upper bound alone cannot prove separation: take the smaller of the
+    # certified witness and the independent raw distance channel.
+    opened = [min(row["distance"]["distance_mm"], row["distance"]["raw_closest_distance"]["distance_mm"])
+              for row in withdrawals]
+    if face_role not in ARM_END_FACES:
+        if min(opened) < FACE_NORMAL_WITHDRAWAL_FLOOR_MM:
+            return f"face-normal withdrawal opened only {opened!r} mm"
+        return None
+    if opened[0] <= distance_limit:
+        return f"withdrawal did not leave the contact limit: {opened!r} mm"
+    if any(later <= earlier for earlier, later in zip(opened, opened[1:])):
+        return f"withdrawal distance did not strictly increase: {opened!r} mm"
+    return None
+
+
 def _positive_controls(fixture, final_gap, rooting_faces):
     """Exercise the finite-face channels independently of shank bearing."""
-    controls = {}
+    # Held in the evidence while it fills, so a refused control still reports
+    # what it measured in the failed report.
+    controls = fixture.evidence["positive_controls"] = {}
     original = {key: list(value) for key, value in fixture.expected.items()}
     arm_end = [(role, FACE_BODY[role], -1.0) for role in rooting_faces]
     try:
         for face_role, body_role, direction in (("head", "screw", 1.0), *arm_end):
-            at_contact = fixture.require_contact(face_role)
-            fixture.shift(body_role, (direction, 0.0, 0.0), 0.05)
-            withdrawn = fixture.face_distance(face_role, certify=True)
-            native = fixture.state(body_role)
-            # An upper bound alone cannot prove separation: retain the
-            # independent raw distance channel as well as refusing the same
-            # transported finite-contact certificate after the real movement.
-            if (native["state"] != "clear" or native["volume_mm3"] != 0.0
-                    or withdrawn["distance_mm"] < 0.04
-                    or withdrawn["raw_closest_distance"]["distance_mm"] < 0.04):
-                raise RuntimeError(f"{face_role}: finite-face withdrawal positive control failed")
-            controls[face_role] = {"contact": at_contact, "withdrawn_0_05_mm": withdrawn, "native": native}
+            row = controls[face_role] = {"contact": fixture.require_contact(face_role), "withdrawals": []}
+            steps = EDGE_WITHDRAWAL_MM if face_role in ARM_END_FACES else FACE_NORMAL_WITHDRAWAL_MM
+            for amount in steps:
+                fixture.put(original)
+                fixture.shift(body_role, (direction, 0.0, 0.0), amount)
+                row["withdrawals"].append({
+                    "withdrawn_mm": amount,
+                    "distance": fixture.face_distance(face_role, certify=True),
+                    "native": fixture.state(body_role),
+                })
+            refusal = _withdrawal_refusal(face_role, row["withdrawals"], fixture.distance_limit)
+            if refusal is not None:
+                raise RuntimeError(f"{face_role}: finite-face withdrawal positive control failed: {refusal}")
             fixture.put(original)
         face_gap = fixture.distance(fixture.faces["plug"], fixture.faces["head"])
         if abs(face_gap["distance_mm"] - final_gap) > fixture.guard:

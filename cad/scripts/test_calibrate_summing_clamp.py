@@ -114,3 +114,60 @@ def test_root_backs_out_of_a_seed_already_inside_the_arm_end(monkeypatch) -> Non
     landed = clamp._arm_end_root(fixture, seed=None)
 
     assert 1e-4 < landed["parameter_mm"] <= 1e-4 + 2e-5
+
+
+def _withdrawal(amount, distance, raw=None, native=CLEAR):
+    raw = distance if raw is None else raw
+    return {"withdrawn_mm": amount, "native": dict(native),
+            "distance": {"distance_mm": distance, "raw_closest_distance": {"distance_mm": raw}}}
+
+
+def test_face_normal_head_withdrawal_keeps_the_0_04_floor() -> None:
+    assert clamp._withdrawal_refusal("head", [_withdrawal(0.05, 0.0499)], 1.7e-5) is None
+    assert "face-normal" in clamp._withdrawal_refusal("head", [_withdrawal(0.05, 0.03)], 1.7e-5)
+    # the raw channel is independent: a low raw reading refuses on its own
+    assert clamp._withdrawal_refusal("head", [_withdrawal(0.05, 0.05, raw=0.01)], 1.7e-5)
+
+
+def test_edge_contact_on_the_tube_corner_passes_the_direction_agnostic_proof() -> None:
+    """r4: the eye wire wraps the tube's OD corner, so a 0.05 mm axial
+    withdrawal opens only ~0.05*|n_x|. That is separation, not a failure."""
+    rows = [_withdrawal(0.05, 0.012), _withdrawal(0.10, 0.024)]
+
+    assert clamp._withdrawal_refusal("tube", rows, 1.7e-5) is None
+    # the same readings would fail a face-normal floor
+    assert clamp._withdrawal_refusal("head", rows[:1], 1.7e-5) is not None
+
+
+@pytest.mark.parametrize(
+    ("rows", "reason"),
+    [
+        ([_withdrawal(0.05, 1e-5), _withdrawal(0.10, 0.02)], "contact limit"),
+        ([_withdrawal(0.05, 0.02), _withdrawal(0.10, 0.02)], "strictly increase"),
+        ([_withdrawal(0.05, 0.02), _withdrawal(0.10, 0.03, raw=0.01)], "strictly increase"),
+        ([_withdrawal(0.05, 0.02, native=HIT), _withdrawal(0.10, 0.04)], "native overlap"),
+    ],
+)
+def test_edge_withdrawal_refuses_what_does_not_prove_separation(rows, reason) -> None:
+    assert reason in clamp._withdrawal_refusal("tube", rows, 1.7e-5)
+
+
+def test_refused_control_still_reports_what_it_measured() -> None:
+    """The failed report must carry the withdrawn distances (r4 lost them)."""
+    fixture = SimpleNamespace(
+        evidence={}, expected={"screw": [0.0] * 16, "tube": [0.0] * 16}, distance_limit=1.7e-5,
+        require_contact=lambda role: {"role": role, "distance_mm": 0.0},
+        put=lambda targets: None, shift=lambda role, direction, amount: None,
+        face_distance=lambda role, certify=False: {
+            "distance_mm": 0.05 if role == "head" else 0.01,
+            "raw_closest_distance": {"distance_mm": 0.05 if role == "head" else 0.01},
+        },
+        state=lambda role: dict(CLEAR),
+    )
+
+    with pytest.raises(RuntimeError, match="tube: finite-face withdrawal positive control failed"):
+        clamp._positive_controls(fixture, 4.6, ["tube"])
+
+    tube = fixture.evidence["positive_controls"]["tube"]
+    assert [row["withdrawn_mm"] for row in tube["withdrawals"]] == [0.05, 0.10]
+    assert fixture.evidence["positive_controls"]["head"]["withdrawals"][0]["withdrawn_mm"] == 0.05
