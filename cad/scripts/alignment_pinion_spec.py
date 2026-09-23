@@ -62,7 +62,9 @@ ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
-OUTSIDE_DIA_BAND = (0.0, -0.10)  # finished tooth-tip envelope
+# The tooth-tip OD prints at the .XX general grade (U27).  At the worst of
+# +/-0.51, the drum tip keeps >= 0.21 mm to the 120T gap floor and the mesh
+# keeps a contact ratio >= 1.13 (test_alignment_pinion_drawing).
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("drum_bore", MACHINED_UM, CylinderFace(BORE_DIA)),

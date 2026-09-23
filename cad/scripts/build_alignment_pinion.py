@@ -72,7 +72,6 @@ from alignment_pinion_spec import (
     GEAR_DATA,
     ISOMETRIC_VIEW_NOTE,
     OUTSIDE_DIA,
-    OUTSIDE_DIA_BAND,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -168,12 +167,6 @@ async def build(adapter) -> dict[str, str]:
         "ArborBoreProfile",
         "ArborBoreDia",
         *deviations(ARBOR_BORE_BAND),
-    )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "GearBlankProfile",
-        "OutsideDia",
-        *deviations(OUTSIDE_DIA_BAND),
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 

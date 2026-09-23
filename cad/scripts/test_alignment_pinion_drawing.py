@@ -138,3 +138,36 @@ def test_fit_bore_callout_names_its_process() -> None:
     import draw_alignment_pinion as draw
 
     assert draw.DIMENSION_CALLOUTS["ArborBoreDia"] == "REAM THRU"
+
+
+def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
+    """The .XX (+/-0.51) OD band is functionally enough for the 120T mesh."""
+    import cylinder_gear_spec as gear
+
+    general = 0.51
+    alpha = math.radians(spec.PRESSURE_ANGLE_DEG)
+    inv = math.tan(alpha) - alpha
+    engaged_c2c = float(_config.machine("alignment_pinion", "engaged_center_distance_mm"))
+    gear_base_r = gear.TEETH * spec.MODULE_MM * math.cos(alpha) / 2.0
+    gear_floor_r = gear_base_r * math.cos(
+        math.pi / gear.TEETH - (math.pi / (2.0 * gear.TEETH) + inv)
+    )
+    gear_tip_r = gear.OUTSIDE_DIA / 2.0
+    # The base-chord gap floor stops the 120T tips 0.24 short of standard depth.
+    seated_c2c = gear_tip_r + spec.MIN_CHORD_FLOOR_DIA / 2.0
+    assert seated_c2c - engaged_c2c == pytest.approx(0.2425, abs=1e-3)
+
+    def contact_ratio(c2c: float, tip_r: float) -> float:
+        working = math.acos((spec._BASE_RADIUS + gear_base_r) / c2c)
+        path = (
+            math.sqrt(tip_r**2 - spec._BASE_RADIUS**2)
+            + math.sqrt(gear_tip_r**2 - gear_base_r**2)
+            - c2c * math.sin(working)
+        )
+        return path / (math.pi * spec.MODULE_MM * math.cos(alpha))
+
+    for c2c in (engaged_c2c, seated_c2c):
+        largest_tip_r = (spec.OUTSIDE_DIA + general) / 2.0
+        smallest_tip_r = (spec.OUTSIDE_DIA - general) / 2.0
+        assert c2c - largest_tip_r - gear_floor_r > 0.20
+        assert contact_ratio(c2c, smallest_tip_r) > 1.1
