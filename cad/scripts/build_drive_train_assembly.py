@@ -760,10 +760,6 @@ from pinion_arbor_spec import (  # noqa: E402
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
-    CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
-    CAM_RELIEF_ENVELOPE_RADIUS as STRAP_CAM_RELIEF_ENVELOPE_R,
-    CAM_RELIEF_PARK_CENTER as STRAP_CAM_RELIEF_PARK,
-    CAM_RELIEF_RADIUS as STRAP_CAM_RELIEF_R,
     C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
@@ -1421,7 +1417,18 @@ if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.2
 # check below is the one exception -- it relies on the gated east side.
 SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
-SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 106.365: back strap
+# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
+# the 2026-10 thickness re-derive (5.0 -> 8.0) grows the strap OUTBOARD from
+# there.  The 4.0-wide leaf therefore stays referenced to that inner face --
+# SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
+# keeps its authored z (and with it the base's foot-screw hole), and riding the
+# strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
+STRAP_Z_INNER = (
+    APINION_Z_FRONT - STRAP_AIR,  # -40.085
+    APINION_Z_BACK + STRAP_AIR,  # +103.865
+)
+SPRING_BLADE_INSET = 0.5  # blade inner edge, in from the strap's inner face
+SPRING_Z = STRAP_Z_INNER[1] + SPRING_BLADE_INSET + SPRING_W / 2.0  # 106.365
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
 _SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
@@ -1439,7 +1446,7 @@ if abs(SPR_BLADE_TILT_DEG - STRAP_LEAN_DEG) > 0.01:
     raise AssertionError("spring blade is not parallel to the parked strap")
 if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
     raise AssertionError("spring blade touches the parked strap flank")
-if SPRING_W / 2.0 > STRAP_T / 2.0:
+if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
 if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
     raise AssertionError("spring blade fouls the lift rod")  # perpendicular
@@ -1528,11 +1535,15 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # and (back cam) the spring foot crossing beneath, at EVERY azimuth of the
 # free cam spin (codex review 2026-07-05: a mid-mounted collar put the boss
 # 0.8 into the pin's band on the engaged side, invisible to the parked gate).
-_STRAP_MID_Z = (
-    APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -42.335
-    APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +106.365
-)
-CAM_PIN_STATION = 7.0  # pin plane, from the collar front face
+_STRAP_MID_Z = tuple(
+    z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
+)  # -44.085, +107.865
+# 7.5 (was 7.0 at the 5.0 strap): the 2026-10 thickness re-derive pushed each
+# strap's mid-plane 1.5 OUTBOARD while the leaf spring stayed put, so the back
+# collar had to come 0.5 further forward to keep its boss band clear of the
+# spring foot (the binding constraint: boss top <= spring band - 0.25 needs
+# station >= 7.05).  CAM_LEN - 1 = 8.0 still leaves the pin on the collar.
+CAM_PIN_STATION = 7.5  # pin plane, from the collar front face
 CAM_Z0 = tuple(z - CAM_PIN_STATION for z in _STRAP_MID_Z)
 for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
@@ -1651,59 +1662,20 @@ if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
     raise AssertionError("engaged pinion lever left the photographed +X-side range")
 
 
-# Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
-# so its centre traces an arc in the bracket's local frame. The part carries
-# two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
-# must cover the full collar sweep plus 0.25 air over the intervening arc.
-def _lift_axis_in_strap(lean_rad: float) -> tuple[float, float]:
-    dx, dy = LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y
-    c, s = math.cos(lean_rad), math.sin(lean_rad)
-    return (-dx * c - dy * s, -dx * s + dy * c)
-
-
-_RELIEF_PARK_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG))
-_RELIEF_ENG_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG) + _PHI_ENG)
-for _label, _actual, _authored in (
-    ("parked", _RELIEF_PARK_ACTUAL, STRAP_CAM_RELIEF_PARK),
-    ("engaged", _RELIEF_ENG_ACTUAL, STRAP_CAM_RELIEF_ENGAGED),
-):
-    if math.dist(_actual, _authored) > 0.001:
-        raise AssertionError(
-            f"bracket cam relief {_label} centre {_authored} != linkage {_actual}"
-        )
-_RELIEF_CENTRE_CHORD = math.dist(_RELIEF_PARK_ACTUAL, _RELIEF_ENG_ACTUAL)
-_RELIEF_ARC_SAGITTA = math.hypot(LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y) * (
-    1.0 - math.cos(_PHI_ENG / 2.0)
-)
-_RELIEF_REQUIRED_R = (
-    math.hypot(STRAP_CAM_RELIEF_ENVELOPE_R, _RELIEF_CENTRE_CHORD / 2.0)
-    + _RELIEF_ARC_SAGITTA
-)
-if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
+# Follower-seat integrity in the uncut strap. The complete Ø4 mouth must land
+# on the straight -X flank, and the 4-deep blind seat must leave solid stock
+# before the opposite flank.
+_PIN_SEAT_Y = -FPIN_DROP
+_PIN_SEAT_R = FPIN_DIA / 2.0
+if _PIN_SEAT_Y - _PIN_SEAT_R < 0.0 or _PIN_SEAT_Y + _PIN_SEAT_R > STRAP_C2C:
+    raise AssertionError("follower-seat mouth leaves the bracket's straight flank")
+_PIN_SEAT_ENTRY_X = -STRAP_R_END
+_PIN_SEAT_BOTTOM_X = _PIN_SEAT_ENTRY_X + FPIN_SEAT
+_PIN_SEAT_REMAINING_WALL = STRAP_R_END - _PIN_SEAT_BOTTOM_X
+if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
     raise AssertionError(
-        f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
-        f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
-    )
-# Seat mouth: on the straight flank when the stud sits between the two bores
-# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
-_PIN_SEAT_SURFACE_X = (
-    -STRAP_R_END
-    if 0.0 <= -FPIN_DROP <= STRAP_C2C
-    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
-)
-_PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
-_PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
-for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
-    _dy = -FPIN_DROP - _cy
-    if abs(_dy) < STRAP_CAM_RELIEF_R:
-        _PIN_SEAT_OPEN_X = max(
-            _PIN_SEAT_OPEN_X,
-            _cx + math.sqrt(STRAP_CAM_RELIEF_R**2 - _dy**2),
-        )
-_PIN_SEAT_REMAINING = _PIN_SEAT_BOTTOM_X - _PIN_SEAT_OPEN_X
-if _PIN_SEAT_REMAINING < 1.5:
-    raise AssertionError(
-        f"cam scallop leaves only {_PIN_SEAT_REMAINING:.3f} mm follower-stud seat"
+        f"follower seat leaves only {_PIN_SEAT_REMAINING_WALL:.3f} mm "
+        "before the opposite flank"
     )
 
 # Full-rotation sweep of collar + set-pin boss about the rod axis. The boss
