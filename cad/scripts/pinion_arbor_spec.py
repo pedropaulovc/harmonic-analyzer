@@ -50,6 +50,8 @@ SURFACE_FINISHES = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
+    "HeadProfile": {"HeadDia"},
+    "NeckProfile": {"NeckDia"},
     "ShaftProfile": {"ShaftDia"},
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapSagDim"},
@@ -77,20 +79,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-_DRAWING_CREATED_DIMENSIONS = {"HeadDia", "NeckDia"}
-if set(DRAWING_PRECISION_BY_NAME) != (
-    set().union(*DRAWING_DIMENSIONS.values()) | _DRAWING_CREATED_DIMENSIONS
-):
-    raise AssertionError(
-        "every imported or drawing-created integral-arbor dimension needs authored places"
-    )
-# The head and neck diameters are drawn on the sheet across the detail view's
-# silhouettes: their model dimensions live in end-on profile sketches that the
-# side detail cannot import.  A sheet-derived dimension takes its places from
-# DRAWING_REFERENCE_PRECISION (_drawing_contract), sourced from the same map.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    name: DRAWING_PRECISION_BY_NAME[name] for name in sorted(_DRAWING_CREATED_DIMENSIONS)
-}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked integral-arbor dimension needs authored places")
 
 CROSS_HOLE_CALLOUT = (
     "MATCH-REAM THRU\n"
