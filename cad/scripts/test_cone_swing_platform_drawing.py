@@ -26,6 +26,8 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
         set(drawing.FEATURE_KEEP),
         set(drawing.NOTCH_KEEP),
         set(drawing.SECTION_KEEP),
+        set(drawing.DETAIL_KEEP),
+        set(drawing.SLOT_SECTION_KEEP),
     )
     kept = set().union(*view_sets)
     assert kept == marked
