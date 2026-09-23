@@ -91,6 +91,12 @@ FRONT_CENTER = (0.145, 0.142)
 TOP_CENTER = (0.145, 0.225)
 RIGHT_CENTER = (0.300, FRONT_CENTER[1])
 ISO_CENTER = (0.360, 0.230)
+# Hub-end crop fence for the partial top view.  The view outline pads the
+# fence by ~9 sheet mm, so a 2-mm model margin on the U29 12.7 boss reached
+# the anchor tap (run 20260923T043713858Z-1c79f387: outline right 0.1132 vs
+# anchor 0.1127).  1 mm still takes in the boss extreme and the seam groove.
+TOP_CROP_RADIUS = (HALF_WIDTH + 1.0) * SHEET_SCALE[0] / 1000.0
+TOP_VIEW_OUTLINE_PAD = 0.0092
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -163,7 +169,7 @@ def _crop_top_view_to_hub(adapter: Any, view: Any) -> None:
     draw.ClearSelection2(True)
 
     crop_center = (_sheet_x(0.0), TOP_CENTER[1])
-    crop_radius = (HALF_WIDTH + 2.0) * SHEET_SCALE[0] / 1000.0
+    crop_radius = TOP_CROP_RADIUS
     sketch = _early_bound(native_view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -178,7 +184,16 @@ def _crop_top_view_to_hub(adapter: Any, view: Any) -> None:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
+    # Direct to the database: with inference on, the radius point snaps to
+    # nearby view geometry by a screen-pixel tolerance, so the fence size
+    # depends on the seat's zoom (dt-logs/flakes/report-20260922.md #2).
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        fence = sketch_manager.CreateCircle(*points[0], *points[1])
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if fence is None:
         raise RuntimeError("failed to create hub-end crop fence")
 
     # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
