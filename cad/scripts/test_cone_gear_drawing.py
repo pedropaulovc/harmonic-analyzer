@@ -61,6 +61,30 @@ def test_model_owns_precision_for_both_fit_dimensions() -> None:
     assert "draw_cone_gear.py" in PRECISION_MIGRATED_DRAWINGS
 
 
+def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
+    # Main ruling (2026-09-23): the title-block .XX +/-0.51 is a whole
+    # addendum; the contact-ratio stack kept +/-0.25 below CR 1.1, so the
+    # tip prints +/-0.10, applied on the model like the other two bands.
+    assert spec.BLANK_DIA_BAND == (0.10, -0.10)
+    assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert (
+        '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
+    )
+
+
+def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
+    number = str(_config.parts("cone-gear")["number"])
+    assert spec.configuration_number(number, 6) == f"{number}-T006"
+    assert spec.configuration_number(number, 120) == f"{number}-T120"
+    numbers = {spec.configuration_number(number, t) for t in spec.CONFIGURATION_TEETH}
+    assert len(numbers) == len(spec.CONFIGURATION_TEETH)
+    with pytest.raises(ValueError):
+        spec.configuration_number(number, 7)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '"Number": configuration_number(part_number, teeth)' in source
+
+
 def test_bore_band_is_derived_live_from_shaft_limits_and_fit_class() -> None:
     minimum, maximum = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
     land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BAND
@@ -129,7 +153,8 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         # The operating mesh is not a reference-centre-distance mesh; say so
         # beside the mate, and say where the view's thickness is measured.
         assert "TOOTH THICKNESS IN VIEW:  ARC LENGTH AT PITCH DIAMETER" in data
-        assert len(data.splitlines()) * 0.00327 <= drawing.GEAR_DATA_HEIGHT
+        # 49.1 mm measured for 14 lines natively (e91d2581 layout audit).
+        assert len(data.splitlines()) * 0.00351 <= drawing.GEAR_DATA_HEIGHT
         # 144.2 mm for 78 characters natively: the block must end before the
         # sheet count at x 0.3496.
         widest = max(len(line) for line in data.splitlines())
@@ -138,6 +163,7 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
             drawing.GEAR_DATA_POS[0] + widest * 0.00185 < drawing.SHEET_COUNT_POS[0] - 0.003
         )
         assert "OPERATING MESH:  PARTIAL DEPTH ON INCLINED AXES (SEE ASSEMBLY)" in data
+        assert "STANDARD CUTTER OK:  48 DP, 14.5 DEG" in data
         # These values are native imported dimensions, never parallel typed rows.
         for duplicate in (
             "OUTSIDE DIAMETER",
