@@ -40,6 +40,7 @@ from _drawing_common import (
     model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
+    set_dimension_callouts,
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
@@ -90,16 +91,17 @@ SECTION_CENTER = (0.335, 0.105)
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
     "NorthEastX": (0.045, 0.105),
-    "NorthEdgeZ": (0.078, 0.150),
     "NorthWestX": (0.100, 0.115),
     "SouthWestX": (0.104, 0.258),
     "SouthEastX": (0.045, 0.259),
     # Radial rays must meet actual trimmed corners, not circle extensions.
-    # CornerNE/R10 is left and CornerNW/R8 is right in this view.
-    "CornerNER": (0.045, 0.138),
+    # CornerNE/R10 is left and CornerNW/R8 is right in this view.  R10 and
+    # R12 shelves sit just above horizontal enough to land inside their arcs
+    # while clearing the 223.4 witness lines.
+    "CornerNER": (0.045, 0.139),
     "CornerNWR": (0.135, 0.118),
     "CornerSWR": (0.110, 0.249),
-    "CornerSER": (0.040, 0.240),
+    "CornerSER": (0.040, 0.2435),
 }
 FEATURE_KEEP = {
     "PivotBearingReliefDia": (0.150, 0.155),
@@ -109,6 +111,9 @@ FEATURE_KEEP = {
     "PostMountEastZ": (0.130, 0.175),
 }
 NOTCH_KEEP = {
+    # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
+    # profile the R8 corner ray has no path that clears this dimension.
+    "NorthEdgeZ": (0.270, 0.150),
     "CapECx": (0.250, 0.258),
     "CapECz": (0.305, 0.180),
     "CapEDia": (0.285, 0.259),
@@ -249,6 +254,25 @@ def _horizontal_section_edge(
         raise RuntimeError(f"pivot section has no {label} edge at y={y_mm:.3f} mm")
     key_index = 1 if prefer_right else 0
     return max(candidates, key=lambda item: item[key_index])[2]
+
+
+def _section_edge_midpoint(
+    adapter: Any, view: Any, edge: Any, *, label: str
+) -> tuple[float, float]:
+    """Return the sheet point at the middle of one broad-face section edge."""
+    points = [
+        tuple(float(value) for value in _early_bound(vertex, "IVertex").GetPoint())
+        for vertex in (edge.GetStartVertex(), edge.GetEndVertex())
+    ]
+    middle = tuple(0.5 * (points[0][i] + points[1][i]) for i in range(3))
+    if abs(middle[0]) * 1000.0 <= PIVOT_HOLE_DIA / 2.0 + 0.5:
+        raise RuntimeError(f"{label} edge midpoint falls in the pivot hole: {middle}")
+    sheet = model_point_in_view(adapter, view, middle, label=f"{label} edge midpoint")
+    print(
+        f"{label} finish attach: edge_model_m={points} middle_model_m={middle} "
+        f"sheet_m=({sheet[0]:.5f},{sheet[1]:.5f})"
+    )
+    return (sheet[0], sheet[1])
 
 
 def _assert_corner_radius_attachment(
@@ -429,6 +453,10 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Name the relief so the reader ties the diameter to the fit note.
+    set_dimension_callouts(
+        adapter, feature_annotations, {"PivotBearingReliefDia": "SPOTFACE"}
+    )
     notch_annotations = curate_view_dimensions(
         adapter,
         notch,
@@ -480,12 +508,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center marks to feature plan")
 
     pivot_edge, mount_edge = _visible_plan_controls(adapter, feature)
+    # Below the section line, between the A arrows: right of the plate the
+    # 189.26 dimension line crosses any callout wider than ~40 mm.
     add_native_hole_callout(
         adapter,
         feature,
-        callout_xy=(0.215, 0.150),
+        callout_xy=(0.222, 0.107),
         label="pivot close-clearance hole",
         edge=pivot_edge,
+        process="DRILL",
     )
     add_native_hole_callout(
         adapter,
@@ -494,14 +525,21 @@ async def build(adapter: Any) -> dict[str, str]:
         label="v2 post-mount tapped holes",
         edge=mount_edge,
     )
+    # The section shows the top seat at the bottom.  Arrows land mid-face so
+    # neither symbol reads as controlling a corner, hole wall or outer edge.
+    seat_edge = _horizontal_section_edge(section, 6.35, label="top seat")
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=(0.300, 0.128),
+        symbol_xy=(0.291, 0.087),
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
-        entity=_horizontal_section_edge(section, 6.35, label="top seat"),
+        entity=seat_edge,
+        leader_attach_xy=_section_edge_midpoint(adapter, section, seat_edge, label="top seat"),
+    )
+    slide_edge = _horizontal_section_edge(
+        section, 0.0, label="base slide", prefer_right=True
     )
     add_surface_finish(
         adapter,
@@ -510,9 +548,8 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
-        entity=_horizontal_section_edge(
-            section, 0.0, label="base slide", prefer_right=True
-        ),
+        entity=slide_edge,
+        leader_attach_xy=_section_edge_midpoint(adapter, section, slide_edge, label="base slide"),
     )
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
@@ -533,6 +570,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
         ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
         ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
+        ("CornerSER", "CornerSE", 0.012, (0.0660, 0.2398)),
     ):
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
