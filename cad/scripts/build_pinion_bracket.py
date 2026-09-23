@@ -15,8 +15,8 @@ pivot bore there -- a through bore at drop 2 would cut into it.)
 
 Layout: pivot bore at the origin, arbor bore at (0, C2C), strap up +Y,
 thickness z 0..THICKNESS; the blind follower seat runs along X into the
--X edge at (y -PIN_DROP, z mid), PIN_SEAT deep from a tangent plane at
-x -R_END.  PIN_DROP is negative, so the seat sits ABOVE the pivot on the
+-X edge at (y -PIN_DROP, z mid), PIN_SEAT deep from the flat flank face
+at x -R_END.  PIN_DROP is negative, so the seat sits ABOVE the pivot on the
 STRAIGHT flank -- clear of both cap arcs.  The solid flank preserves the
 complete follower-seat mouth around its axis.
 The assembly composes a Ry(180) into the strap's lean pose, so local -x (the
@@ -34,10 +34,12 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 from _common import (
     POLISHED_STEEL,
     SketchDims,
+    _early_bound,
     apply_color,
     apply_material,
     check,
@@ -87,6 +89,70 @@ from pinion_bracket_spec import (
 )
 
 import _telemetry
+
+
+def _flank_face(model: Any, point_mm: tuple[float, float, float]) -> Any:
+    """Return the planar -X flank face whose bounds contain ``point_mm``."""
+    body = (_early_bound(model, "IPartDoc").GetBodies2(0, False) or [None])[0]
+    body = _early_bound(body, "IBody2")
+    for face in body.GetFaces() or []:
+        face = _early_bound(face, "IFace2")
+        normal = tuple(face.Normal)
+        if normal[0] > -0.99:
+            continue
+        box = [v * 1000.0 for v in face.GetBox()]
+        if abs(box[0] - point_mm[0]) > 1e-3:
+            continue
+        if box[1] <= point_mm[1] <= box[4] and box[2] <= point_mm[2] <= box[5]:
+            return face
+    raise RuntimeError(f"no planar -X flank face contains {point_mm}")
+
+
+def _open_flank_sketch(
+    adapter: Any, point_mm: tuple[float, float, float]
+) -> tuple[float, float]:
+    """Open a sketch ON the flank face; return ``point_mm`` in sketch coords.
+
+    The seat depth must dimension from the face the drill enters. A sketch on a
+    reference plane coincident with that face displays its blind depth from
+    the (blanked) plane, and Section B-B drew it outward into air; a face
+    sketch anchors the imported depth on the real flank edge. The face's
+    sketch axes are SolidWorks' choice, so the caller maps through
+    ``ModelToSketchTransform`` instead of assuming an orientation.
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    face = _flank_face(model, point_mm)
+    model.ClearSelection2(True)
+    if not _early_bound(face, "IEntity").Select2(False, 0):
+        raise RuntimeError("pin seat: flank face Select2 failed")
+    adapter.currentSketchManager = model.SketchManager
+    adapter._reset_sketch_entity_registry()
+    model.SketchManager.InsertSketch(True)
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError("pin seat: no active sketch on the flank face")
+    # Mirror the adapter's create_sketch bookkeeping so exit_sketch and the
+    # cut resolve this sketch as the profile.
+    adapter.currentSketch = active
+    adapter._sketch_count += 1
+    adapter._last_sketch_name = str(active.Name)
+    sketch = _early_bound(active, "ISketch")
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    point = math_util.CreatePoint(
+        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [v / 1000.0 for v in point_mm])
+    )
+    mapped = _early_bound(
+        _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+    )
+    u, v, w = (c * 1000.0 for c in mapped.ArrayData)
+    if abs(w) > 1e-4:
+        raise RuntimeError(f"pin seat centre is {w:g} mm off the flank sketch")
+    return u, v
+
 
 PART_NAME = "pinion-bracket"
 MATERIAL = "Plain Carbon Steel"  # p.68: bright steel strap
@@ -261,52 +327,46 @@ async def build(adapter) -> dict[str, str]:
 
 
     # Blind cam-pin seat (PR8): O4 along X into the -X edge at (y -PIN_DROP,
-    # z mid), PIN_SEAT deep from a tangent plane at x -R_END. Both signs are
-    # computed UP FRONT, not probed by exception-retry (#194): the seat is on
-    # the -X edge, so the offset plane sits at Right - R_END (global x -7.5);
-    # and the sketch rides that Right-parallel plane, whose local +u maps to
-    # global -Z (SolidWorks' standard Right-plane orientation), so the circle
-    # centre sits at u = -THICKNESS/2 to land at global z = +THICKNESS/2 --
-    # mid-thickness, INSIDE the 0..THICKNESS body. The mirror combo
-    # (u = +THICKNESS/2 -> z = -THICKNESS/2) lands outside the body, so
-    # FeatureCut3 rejects the empty profile ("Parameter not optional") -- the
-    # self-correcting retry #194 removed. The centre-u dim is an UNSIGNED
-    # distance from the origin, so it displays as its magnitude and the drive
-    # '"StrapThickness" / 2' is positive on the flipped side (unit-safe). Two
-    # assertions keep a wrong plane handedness or a mislocated circle LOUD: the
-    # removed volume vs analytic (the strap is x-symmetric BEFORE this cut, so
-    # a volumetric pass alone cannot tell the -x seat from its +x mirror) and
-    # the centre-of-mass x sign (material removed at -x pushes the COM to +x).
+    # z mid), PIN_SEAT deep from the flat flank face at x -R_END. The sketch
+    # sits ON that face, so the cut's depth dimension anchors on the entry
+    # edge a drawing section shows. Its sketch axes are mapped, never assumed
+    # (_open_flank_sketch), and the centre offsets are UNSIGNED distances from
+    # the projected origin, so their drives stay positive whichever way the
+    # face sketch is oriented. Two assertions keep a mislocated circle LOUD:
+    # the removed volume vs analytic (the strap is x-symmetric BEFORE this cut,
+    # so a volumetric pass alone cannot tell the -x seat from its +x mirror)
+    # and the centre-of-mass x sign (material removed at -x pushes the COM to +x).
     v_bore = _pin_bore_removed()
     res = await adapter.get_mass_properties()
     vol_before = res.data.volume
     com_before = res.data.center_of_mass
     com_before_x = com_before[0] * 1000.0 if com_before is not None else None
-    check(
-        f"create_plane PinSeatPlane (Right, {-R_END:+g})",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Right Plane",
-                offset=-R_END,
-            )
-        ),
-    )
-    name_last_feature(adapter, "PinSeatPlane")
     seat = SketchDims()
-    u_mid = -THICKNESS / 2.0
-    check("create_sketch pin seat", await adapter.create_sketch("PinSeatPlane"))
+    u, v = _open_flank_sketch(adapter, (-R_END, -PIN_DROP, THICKNESS / 2.0))
+    # The face's sketch axes may carry model z or model y; name and drive each
+    # unsigned centre offset by the model axis it measures.
+    if abs(abs(u) - THICKNESS / 2.0) < 1e-4 and abs(abs(v) - abs(PIN_DROP)) < 1e-4:
+        names = ("PinSeatCz", "PinSeatCy", "PinSeatDia")
+        drives = ('"StrapThickness" / 2', 'abs("PinDrop")', '"PinBore"')
+    elif abs(abs(v) - THICKNESS / 2.0) < 1e-4 and abs(abs(u) - abs(PIN_DROP)) < 1e-4:
+        names = ("PinSeatCy", "PinSeatCz", "PinSeatDia")
+        drives = ('abs("PinDrop")', '"StrapThickness" / 2', '"PinBore"')
+    else:
+        raise RuntimeError(
+            f"pin seat centre mapped to unexpected sketch ({u:g}, {v:g})"
+        )
+    _telemetry.debug(f"pin seat flank sketch centre ({u:+g}, {v:+g})")
     await define_circle(
         adapter,
-        u_mid,
-        -PIN_DROP,
+        u,
+        v,
         PIN_BORE / 2.0,
         "pin seat",
         dims=seat,
-        names=("PinSeatCz", "PinSeatCy", "PinSeatDia"),
+        names=names,
         # PinSeatCy is an UNSIGNED distance; PinDrop is signed (negative = the
         # seat above the pivot), so drive the magnitude.
-        drives=('"StrapThickness" / 2', 'abs("PinDrop")', '"PinBore"'),
+        drives=drives,
     )
     await ensure_fully_defined(adapter, "pin seat sketch")
     check("exit_sketch pin seat", await adapter.exit_sketch())
@@ -330,7 +390,7 @@ async def build(adapter) -> dict[str, str]:
             "the -x seat must move the COM farther +x"
         )
     _telemetry.success(
-        f"pin seat (plane {-R_END:+g}, u {u_mid:+g}) removed "
+        f"pin seat (flank face, sketch {u:+g}, {v:+g}) removed "
         f"{removed:.1f} mm^3 (analytic {v_bore:.1f}), COM x {com_x:+.3f}"
     )
     name_last_feature(adapter, "PinSeat")
@@ -394,7 +454,6 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
-            ("PinSeatPlane", "PLANE"),
             ("Plane2", "PLANE"),
             ("Plane3", "PLANE"),
             ("Plane4", "PLANE"),
