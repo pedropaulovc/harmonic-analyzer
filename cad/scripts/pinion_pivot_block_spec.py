@@ -36,7 +36,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 # hold-down screws straddle the pivot bore; the lift bore sits out near the west
 # end, 18.5 from the pivot, so the plain (uncut) swing strap clears the eccentric
 # lift cam by placement (U12) instead of by a relief.
-# Layout: the PIVOT bore is the part origin (datum B); the lift bore is at
+# Layout: the PIVOT bore is the part origin; the lift bore is at
 # (-LIFT_BORE_SPACING, LIFT_BORE_RISE), block x -BLOCK_WEST..+BLOCK_EAST,
 # y -BORE_UP..BLOCK_HEIGHT-BORE_UP, z 0..BLOCK_DEPTH.  (Part -X = machine
 # WEST: the assembly places the block mirrored.) ---
@@ -97,13 +97,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Block": {"Depth"},
 }
 
-# True free-text instructions only. Geometry, datum structure, form/orientation
-# live in native dimensions / datum tags / FCFs / surface symbols. The part
+# True free-text instructions only. Geometry lives in native dimensions and
+# the one running-bore surface symbol (policy rule 3: a block carries no
+# frames or datums). The part
 # build stamps these strings into the SLDPRT; the drawing displays only
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "HOLD-DOWN HOLES SYMMETRIC ABOUT THE PIVOT BORE (DATUM B).",
         "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
         "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",
         "HOLD-DOWN HOLES: #8 NORMAL CLEARANCE Ø4.978 THRU, 2 PLACES,",
@@ -113,10 +113,3 @@ DRAWING_NOTES = "\n".join(
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lift-bore parallelism": "0.10",
-    "hold-down hole position": "0.25",
-}

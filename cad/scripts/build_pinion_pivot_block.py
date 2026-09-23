@@ -6,7 +6,7 @@ cross-bored TWICE for the two parallel Ø6.35 rods -- the strap torque
 shaft (east bore) and the lever lift rod (west bore). The slotted screw
 heads on the plates are simplified away.
 
-Layout (U28, 2026-09-23): the PIVOT bore is the part origin (datum B); the
+Layout (U28, 2026-09-23): the PIVOT bore is the part origin; the
 lift bore sits LIFT_BORE_SPACING toward local -X and LIFT_BORE_RISE above it;
 the two hold-down holes straddle the pivot bore at +-SCREW_HALF_SPACING -- the
 photographed lift | screw | pivot | screw order.  Both bores run along Z,
@@ -128,7 +128,7 @@ async def build(adapter) -> dict[str, str]:
         (-BLOCK_WEST, BLOCK_HEIGHT - BORE_UP),
     ]
     entities = await add_line_chain(adapter, block_rect)
-    # Pivot bore ON the origin (datum B): only its diameter is recorded.  The
+    # Pivot bore ON the origin: only its diameter is recorded.  The
     # lift bore's two unsigned centre dims are its spacing and rise from it.
     await define_circle(
         adapter,

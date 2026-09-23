@@ -91,20 +91,19 @@ def test_hole_states_are_annotated() -> None:
     }
 
 
-def test_native_gdt_replaces_form_orientation_notes() -> None:
+def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
+    # Drawing-simplicity policy rules 3/4: blocks are not on the GD&T
+    # allowlist, so no datum tags, no feature-control frames, no basic boxes.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert (
-        "        edge_xy=pivot_edge,\n"
-        "        symbol_xy=(_front_x(0.0) + 0.0145, _front_y(0.0) - 0.026),\n"
-        '        datum="B",\n'
-        '        label="pivot bore axis",\n' in source
-    )
-    assert 'characteristic="parallelism"' in source
-    assert 'characteristic="position"' in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "set_basic_dimension(" not in source
+    assert not hasattr(pinion_pivot_block_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert "DATUM" not in pinion_pivot_block_spec.DRAWING_NOTES
     assert "add_surface_finish(" in source
-    assert "set_basic_dimension(" in source  # the 17 hold-down spacing
+    # The hold-downs are ordinary coordinates from the west end.
+    assert '"west hold-down station"' in source
+    assert '"east hold-down station"' in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
