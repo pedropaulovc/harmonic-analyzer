@@ -808,6 +808,8 @@ from pinion_spring_geometry import (  # noqa: E402
     HOLE_FROM_END as SPR_HOLE_FROM_END,
     HOLE_SPEC as SPR_HOLE_SPEC,
     KINK_START as SPR_CREST_L,
+    PAD_LEN as SPR_PAD_LEN,
+    PAD_WIDTH as SPR_PAD_WIDTH,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
     THICK as SPRING_T,
@@ -1498,6 +1500,11 @@ if (
     raise AssertionError("spring flat tip reaches the strap's arbor end cap")
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
+# The foot's screw pad (r7) widens the free end symmetrically about the strip.
+# Booked at the printed .XX worst case (+0.51 on the width): the pad lies on the
+# base top beside the back block, west of the lift rod.
+if SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0 > BLOCK_BACK_Z0 - 0.25:
+    raise AssertionError("spring foot pad reaches the back pivot block")
 # West foot corridor (PR7 item 11): the strip crosses UNDER the lift rod and
 # the back cam collar; its screw head must clear the rod flank. (The rod now
 # rides at LIFT_Y, PR8; the collar sweep is bounded in the cam block below.)
