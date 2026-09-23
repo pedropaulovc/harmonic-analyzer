@@ -73,6 +73,8 @@ from cone_pivot_post_spec import (
     CONE_AXIS_VIEW,
     CONE_BOSS_DIA,
     CONE_BOSS_LENGTH,
+    CRANK_ABOVE_CONE,
+    CRANK_ABOVE_CONE_BAND,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_DIA,
@@ -315,10 +317,10 @@ async def build(adapter: Any) -> dict[str, str]:
         "HeadHeight": HEAD_HEIGHT,
         "CrankBossDia": CRANK_BOSS_DIA,
         "CrankBoreDia": CRANK_BORE_DIA,
-        "CrankAxisY": CRANK_BORE_HEIGHT,
         "ConeBossDia": CONE_BOSS_DIA,
         "JournalBoreDia": BORE_DIA,
         "JournalAxisY": BORE_HEIGHT,
+        "CrankAboveCone": CRANK_ABOVE_CONE,
         "MountSpacing": ATTACHMENT_SPACING,
         "MountThruDia": ATTACHMENT_THRU_DIA,
         "MountCboreDia": ATTACHMENT_CBORE_DIA,
@@ -330,6 +332,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
     await set_global(adapter, "ConeIncline", f"{INCLINE_DEG}deg")
+    # The crank axis is located FROM THE CONE AXIS (U31): the 16T:64T mesh
+    # closes on that spacing, so it is the independent value and the height
+    # above the foot only follows it.
+    await set_global(adapter, "CrankAxisY", '"JournalAxisY" + "CrankAboveCone"')
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -722,6 +728,53 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "JournalPlanReference")
     drive_jobs += plan.apply(adapter, "JournalPlanReference")
 
+    # 7. Bore-spacing reference sketch.  Both bore axes cross the post axis,
+    # which is ConeShaftNormal's local X axis (pointing down model -Y), so one
+    # construction centreline on it runs from the cone-bore centre to the
+    # crank-bore centre.  Its length is the driving crank-above-cone spacing
+    # the print locates the crank bore by, and the one dimension that carries
+    # the mesh band; in the cone-axis view it reads as the centreline joining
+    # the two bores.
+    spacing = SketchDims()
+    check(
+        "create sketch BoreSpacingReference",
+        await adapter.create_sketch("ConeShaftNormal"),
+    )
+    set_sketch_direct_db(adapter, True)
+    spacing_line = check(
+        "cone-to-crank bore spacing centreline",
+        await adapter.add_centerline(-BORE_HEIGHT, 0.0, -CRANK_BORE_HEIGHT, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        "bore spacing line along the post axis",
+        await adapter.add_sketch_constraint(spacing_line, None, "horizontal"),
+    )
+    check(
+        "bore spacing line rooted on the post axis",
+        await adapter.add_sketch_constraint(
+            f"{spacing_line}.start", "origin", "horizontal"
+        ),
+    )
+    check(
+        "cone bore centre height",
+        await adapter.add_sketch_dimension(
+            f"{spacing_line}.start", "origin", "horizontal_distance", BORE_HEIGHT
+        ),
+    )
+    spacing.record("SpacingConeY", '"JournalAxisY"')
+    check(
+        "crank above cone spacing",
+        await adapter.add_sketch_dimension(
+            spacing_line, None, "linear", CRANK_ABOVE_CONE
+        ),
+    )
+    spacing.record("CrankAboveCone", '"CrankAboveCone"')
+    await ensure_fully_defined(adapter, "BoreSpacingReference")
+    check("exit sketch BoreSpacingReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreSpacingReference")
+    drive_jobs += spacing.apply(adapter, "BoreSpacingReference")
+
     # Apply all neutral equations only after every referenced dimension exists.
     await force_rebuild(adapter)
     for dimension, expression in drive_jobs:
@@ -733,11 +786,12 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
-    # The two running bores are the only accuracy features on this casting, and
-    # they carry the ONE band that closes the `shaft_in_bushing` fit class
-    # against their turned shafts (cad/docs/tolerance-policy.md).  Everything
-    # else -- cast body and collar diameters, boss diameters, boss extents,
-    # mounting-hole stations -- runs at the title block's general grade.
+    # Three accuracy features on this casting: the two running bores carry the
+    # ONE band that closes the `shaft_in_bushing` fit class against their
+    # turned shafts (cad/docs/tolerance-policy.md), and the spacing between
+    # them carries the 16T:64T mesh band.  Everything else -- cast body and
+    # collar diameters, boss diameters, boss extents, mounting-hole stations,
+    # the cone axis above the foot -- runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
         adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
     )
@@ -746,6 +800,14 @@ async def build(adapter: Any) -> dict[str, str]:
         "JournalBoreProfile",
         "JournalBoreDia",
         *deviations(RUNNING_BORE_BAND),
+    )
+    # The mesh band on the bore-to-bore spacing (derivation in
+    # cone_pivot_post_spec.CRANK_ABOVE_CONE_BAND).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BoreSpacingReference",
+        "CrankAboveCone",
+        *deviations(CRANK_ABOVE_CONE_BAND),
     )
 
     # Semantic, name-selected assembly references.  The journal axis is taken

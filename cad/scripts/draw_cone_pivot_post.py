@@ -42,6 +42,7 @@ from _drawing_common import (
     assert_imported_precision,
     curate_view_dimensions,
     create_section_view,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -50,6 +51,7 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     set_high_quality_shaded_with_edges,
     stamp_drawing_summary,
     visible_view_entities,
@@ -154,6 +156,8 @@ CONE_SECTION_LINE = (
 FRONT_KEEP = {
     "MainBodyHt": (0.040, FRONT_CENTER[1]),
     "MainBodyDia": (0.150, 0.080),
+    # A REFERENCE since U31: the crank bore is located from the cone bore
+    # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
     "CrankBossDia": (0.132, 0.120),
@@ -179,8 +183,13 @@ TOP_KEEP = {
 SECTION_KEEP = {
     "ConeBossLen": (0.355, 0.235),
 }
+# The crank bore is located from the cone bore (U31), so its spacing chains
+# off the cone-axis height on the same dimension line, in the one view that
+# shows both bores.  Its toleranced text stands off the line like 33.37's,
+# between the crank-bore size callout and the section-axes label.
 JOURNAL_KEEP = {
     "JournalAxisY": (0.208, 0.156),
+    "CrankAboveCone": (0.208, 0.170),
     "ConeBossDia": (0.292, 0.172),
     "JournalBoreDia": (0.292, 0.153),
 }
@@ -740,39 +749,40 @@ def _assert_native_layout(
             "cone pivot post must expose three native Ra text boxes: "
             f"{len(surface_boxes)}"
         )
-    journal_dimensions = [
-        annotation
-        for annotation in sheet.annotations
-        if annotation.label == "JournalAxisY"
-    ]
-    if len(journal_dimensions) != 1:
-        raise RuntimeError(
-            "expected one native JournalAxisY annotation, found "
-            f"{len(journal_dimensions)}"
+    own_overlaps = {}
+    for label in ("JournalAxisY", "CrankAboveCone"):
+        dimensions = [
+            annotation for annotation in sheet.annotations if annotation.label == label
+        ]
+        if len(dimensions) != 1:
+            raise RuntimeError(
+                f"expected one visible native {label} annotation, found "
+                f"{len(dimensions)}"
+            )
+        dimension = dimensions[0]
+        text_interiors = [
+            Box(
+                box.xmin + DEFAULT_TEXT_TOUCH_TOL_M,
+                box.ymin + DEFAULT_TEXT_TOUCH_TOL_M,
+                box.xmax - DEFAULT_TEXT_TOUCH_TOL_M,
+                box.ymax - DEFAULT_TEXT_TOUCH_TOL_M,
+            )
+            for box in dimension.text_boxes
+        ]
+        own_overlap = max(
+            (
+                segment_box_overlap_length(segment, box)
+                for box in text_interiors
+                for segment in dimension.segments
+            ),
+            default=0.0,
         )
-    journal_dimension = journal_dimensions[0]
-    text_interiors = [
-        Box(
-            box.xmin + DEFAULT_TEXT_TOUCH_TOL_M,
-            box.ymin + DEFAULT_TEXT_TOUCH_TOL_M,
-            box.xmax - DEFAULT_TEXT_TOUCH_TOL_M,
-            box.ymax - DEFAULT_TEXT_TOUCH_TOL_M,
-        )
-        for box in journal_dimension.text_boxes
-    ]
-    own_overlap = max(
-        (
-            segment_box_overlap_length(segment, box)
-            for box in text_interiors
-            for segment in journal_dimension.segments
-        ),
-        default=0.0,
-    )
-    if own_overlap > DEFAULT_TEXT_TOUCH_TOL_M:
-        raise RuntimeError(
-            "JournalAxisY's own dimension ink crosses its text by "
-            f"{own_overlap * 1000.0:.3f} mm"
-        )
+        if own_overlap > DEFAULT_TEXT_TOUCH_TOL_M:
+            raise RuntimeError(
+                f"{label}'s own dimension ink crosses its text by "
+                f"{own_overlap * 1000.0:.3f} mm"
+            )
+        own_overlaps[label] = round(own_overlap * 1000.0, 3)
     findings = audit_sheet(sheet)
     if findings:
         raise RuntimeError(
@@ -784,7 +794,7 @@ def _assert_native_layout(
         f"journal={journal_box.format_mm()}; "
         f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
         f"Ra={[box.format_mm() for box in surface_boxes]}; "
-        f"JournalAxisY self-overlap={own_overlap * 1000.0:.3f}mm"
+        f"self-overlap mm={own_overlaps}"
     )
 
 
@@ -899,6 +909,18 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    crank_height = [
+        annotation
+        for annotation in front_annotations
+        if dimension_name(adapter, annotation) == "CrankAxisY"
+    ]
+    if len(crank_height) != 1:
+        raise RuntimeError(
+            f"expected one CrankAxisY in the front view, found {len(crank_height)}"
+        )
+    set_reference_dimension(
+        adapter, crank_height[0], label="crank axis height reference"
+    )
     # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
@@ -908,13 +930,18 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter,
         journal_annotations,
-        {"JournalAxisY": (0.190, 0.157)},
+        {"JournalAxisY": (0.190, 0.157), "CrankAboveCone": (0.193, 0.183)},
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
     # azimuth.  Other projections have no use for that witness geometry.
     for view in (front, journal, iso):
         _hide_witness_sketch(adapter, view, "JournalPlanReference")
+    # The cone-axis view keeps BoreSpacingReference: its centreline joins the
+    # two bore centres and carries the spacing.  Elsewhere it only doubles the
+    # post axis.
+    for view in (front, top, iso):
+        _hide_witness_sketch(adapter, view, "BoreSpacingReference")
     for view, label in ((front, "front"), (top, "top"), (journal, "cone journal")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label} view")
