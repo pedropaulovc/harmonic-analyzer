@@ -10,8 +10,7 @@ The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored slot
 for the tip block's hidden hold-down screw (U30).  The three plan views run
-1:2, pivot section A-A 2:1, slot detail B and slot section C-C 1:1, and the
-isometric 1:3.
+1:2, pivot section A-A 2:1, slot detail B 1:1 and the isometric 1:3.
 
 Run with SolidWorks open::
 
@@ -65,6 +64,7 @@ from cone_swing_platform_spec import (
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
+    TIP_CBORE_DEPTH,
     TIP_CBORE_W,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
@@ -142,24 +142,31 @@ SECTION_KEEP = {
 }
 
 # U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
-# enlarges the pivot-to-slot region of the hole-location plan to 1:1 (hidden
-# lines shown, so the underside counterbored slot reads dashed), and SECTION
-# C-C, cut along the cone axis through the slot, shows the counterbore depth.
+# enlarges the pivot-to-slot region of the hole-location plan to 1:1, with
+# hidden lines shown so the underside counterbored slot reads dashed.  It
+# sits in the free band between the relief-fit note (x <= 0.113) and the
+# title block (x >= 0.216).  The counterbore depth rides the width callout,
+# formatted from the same spec constant the model cuts, the way a Hole Wizard
+# callout carries its depth: a separate section view has no room here.
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
 DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
-DETAIL_RADIUS_MM = 13.0
-DETAIL_CENTER = (0.150, 0.045)
+DETAIL_RADIUS_MM = 12.0
+DETAIL_CENTER = (0.160, 0.047)
+_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z / 1000.0
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) / 1000.0
 DETAIL_KEEP = {
-    "TipSlotZ": (DETAIL_CENTER[0] - 0.024, DETAIL_CENTER[1]),
-    "TipSlotEastCx": (DETAIL_CENTER[0] - 0.008, DETAIL_CENTER[1] + 0.020),
-    "TipSlotWestCx": (DETAIL_CENTER[0] + 0.008, DETAIL_CENTER[1] + 0.020),
-    "TipSlotW": (DETAIL_CENTER[0] + 0.018, _SLOT_Y),
-    "TipCboreW": (DETAIL_CENTER[0] + 0.032, _SLOT_Y),
-}
-SLOT_SECTION_CENTER = (0.200, 0.045)
-SLOT_SECTION_KEEP = {
-    "TipCboreDepth": (SLOT_SECTION_CENTER[0], SLOT_SECTION_CENTER[1] - 0.022),
+    # Right of the circle, between the pivot and slot centrelines.
+    "TipSlotZ": (DETAIL_CENTER[0] + 0.020, 0.5 * (_PIVOT_Y + _SLOT_Y) - 0.003),
+    # Above the circle, each 2.00 outside its own extension lines.
+    "TipSlotEastCx": (DETAIL_CENTER[0] - 0.014, DETAIL_CENTER[1] + 0.019),
+    "TipSlotWestCx": (DETAIL_CENTER[0] + 0.014, DETAIL_CENTER[1] + 0.019),
+    # Lower left, under the relief-fit note (y >= 0.0476, x <= 0.1146) and
+    # clear of the 2.00 row above: the through slot and its cutter, callout
+    # lines hanging below the value.
+    "TipSlotW": (DETAIL_CENTER[0] - 0.032, DETAIL_CENTER[1] - 0.003),
+    # Upper right, below the view caption (y >= 0.0805) and left of the title
+    # block (x >= 0.216): the counterbored slot, its cutter and depth.
+    "TipCboreW": (DETAIL_CENTER[0] + 0.036, DETAIL_CENTER[1] + 0.025),
 }
 
 
@@ -311,17 +318,37 @@ def _create_detail_view(
     draw.ClearSelection2(True)
     if detail is None:
         raise RuntimeError(f"CreateDetailViewAt4 returned no view ({label})")
-    detail = _sw_type_info.early_bound_or_flag(detail, "IView", "SetViewPosition")
-    if not detail.SetViewPosition(
-        double_array([float(view_xy[0]), float(view_xy[1])]), False
-    ):
-        raise RuntimeError(f"failed to position the detail view ({label})")
+    detail = _sw_type_info.early_bound_or_flag(
+        detail, "IView", "SetViewPosition", "Position"
+    )
     rebuild_drawing(adapter, label=f"create detail view {detail_label}")
+    # A detail view's Position is its model-origin anchor, not the circle
+    # centre (run 2b643c17 placed the circle 99 mm below the request).  Move
+    # the anchor until the circle's model centre lands on ``view_xy``.
+    for attempt in range(2):
+        landed = model_point_in_view(
+            adapter, detail, center_m, label=f"{label} centre, pass {attempt}"
+        )
+        anchor = tuple(float(v) for v in detail.Position)
+        if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) < 0.0002:
+            break
+        moved = (
+            anchor[0] + view_xy[0] - landed[0],
+            anchor[1] + view_xy[1] - landed[1],
+        )
+        if not detail.SetViewPosition(double_array(list(moved)), False):
+            raise RuntimeError(f"failed to position the detail view ({label})")
+        rebuild_drawing(adapter, label=f"place detail view {detail_label}")
+    landed = model_point_in_view(adapter, detail, center_m, label=f"{label} centre")
     print(
         f"detail {detail_label}: parent_sheet_centre={sheet[0]} "
-        f"sketch_centre={points[0]} view_xy={view_xy} "
+        f"sketch_centre={points[0]} requested={view_xy} landed={landed} "
         f"outline={tuple(float(v) for v in detail.GetOutline())}"
     )
+    if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) > 0.0005:
+        raise RuntimeError(
+            f"detail {detail_label} centre landed at {landed}, requested {view_xy}"
+        )
     return detail
 
 
@@ -629,28 +656,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="tip screw slot detail",
     )
     _set_hidden_lines_visible(detail, label="tip screw slot detail")
-    slot_south = model_point_in_view(
-        adapter, detail, (0.0, 0.0, (TIP_SCREW_LOCAL_Z - 8.0) / 1000.0),
-        label="slot section south end",
-    )
-    slot_north = model_point_in_view(
-        adapter, detail, (0.0, 0.0, 9.0 / 1000.0), label="slot section north end"
-    )
-    slot_section = create_section_view(
-        adapter,
-        detail,
-        line_start=slot_south,
-        line_end=slot_north,
-        view_xy=SLOT_SECTION_CENTER,
-        section_label="C",
-        scale=(1, 1),
-        partial=True,
-        label="tip screw slot section",
-    )
-    slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
-    slot_cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="slot section cut faces only")
-    set_hidden_lines_removed(adapter, slot_section)
 
     profile_annotations = curate_view_dimensions(
         adapter,
@@ -715,16 +720,12 @@ async def build(adapter: Any) -> dict[str, str]:
         detail_annotations,
         # The +0.10/0 width band is the cutter's own size: name the cutter.
         {
-            "TipSlotW": f"\u00d8{TIP_SLOT_W:g} END MILL\nSLOT THRU",
-            "TipCboreW": f"\u00d8{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\nFROM UNDERSIDE",
+            "TipSlotW": f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL\nSLOT THRU",
+            "TipCboreW": (
+                f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\n"
+                f"{TIP_CBORE_DEPTH:.2f} DEEP\nFROM UNDERSIDE"
+            ),
         },
-    )
-    slot_section_annotations = curate_view_dimensions(
-        adapter,
-        slot_section,
-        keep=SLOT_SECTION_KEEP,
-        view_label="tip screw slot section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     relief_annotations = [
         item for item in section_annotations
@@ -741,7 +742,6 @@ async def build(adapter: Any) -> dict[str, str]:
         *notch_annotations,
         *section_annotations,
         *detail_annotations,
-        *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
@@ -801,7 +801,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, slot_section, iso):
+    for view in (profile, feature, notch, section, iso):
         set_hidden_lines_removed(adapter, view)
     _set_hidden_lines_visible(detail, label="tip screw slot detail")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
