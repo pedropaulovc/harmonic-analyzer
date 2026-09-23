@@ -56,7 +56,8 @@ def test_model_owns_places_and_bands() -> None:
     assert "draw_crank_handle_pivot_screw.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    running_fit = {"ShoulderDia", "ShoulderLength"}
+    # The running fit, and the relief width that holds the U33b floor.
+    running_fit = {"ShoulderDia", "ShoulderLength", "ReliefWidth"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
@@ -164,19 +165,20 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
     # Nominal: min(9.0 - 0.5, arm 8.0) - 1.5 = 6.5 of full thread, 1.35 D.
     assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.5)
     assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 4.826)
-    # Stock 5/16-in arm: min(8.0, 7.9375) - (1.5 + the .X band 0.8) = 5.64,
-    # 1.17 D.  The arm governs.
-    assert geometry.GENERAL_1PL_TOL_MM == pytest.approx(0.8)
+    # Stock 5/16-in arm: min(8.0, 7.9375 - the 0.25 exit break) - (1.5 + the
+    # .XX band 0.51) = 5.68, 1.18 D.  The arm governs.
+    assert geometry.GENERAL_2PL_TOL_MM == pytest.approx(0.51)
+    assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
-    assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.3)
-    assert spec.FULL_THREAD_WORST == pytest.approx(5.6375)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.168, abs=1e-3)
+    assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.01)
+    assert spec.FULL_THREAD_WORST == pytest.approx(5.6775)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.176, abs=1e-3)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum 8.8: min(8.0, 8.8) - 2.3 = 5.7, 1.18 D; the
-    # screw governs there.
+    # Arm at its printed maximum 8.8: min(8.0, 8.8 - 0.25) - 2.01 = 5.99,
+    # 1.24 D; the screw governs there.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.7)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(1.181, abs=1e-3)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.99)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(1.241, abs=1e-3)
     for engaged in (spec.FULL_THREAD_WORST, spec.FULL_THREAD_WORST_PRINTED_ARM):
         assert engaged >= spec.ENGAGEMENT_FLOOR
     # The 1.5 D rule itself is not met; that is the accepted exception.

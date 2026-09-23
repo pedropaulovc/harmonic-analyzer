@@ -76,17 +76,12 @@ FIDUCIAL_Y = _FIDUCIAL_AXIS
 
 # Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
 # face clamps the brass eyelet that once tethered removable pin MHA-024.
+# Tapped THRU the 5/16 bar (policy rule 12, audit W7): a blind 6.5 drill left
+# its point 0.76 from the inboard face nominal and through it at the printed
+# band; through, the screw has 7.94 of thread (2.79D) and nothing to bottom on.
 ANCHOR_SCREW_X = 20.0
 ANCHOR_SCREW_Y = 4.5
-ANCHOR_THREAD_DEPTH = 5.5
-ANCHOR_DRILL_DEPTH = 6.5
-ANCHOR_HOLE_SPEC = HoleSpec(
-    "tapped_bottoming",
-    "#4-40",
-    end="blind",
-    depth_mm=ANCHOR_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
-)
+ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
 # MHA-020 is match-fitted to MHA-137 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
@@ -151,11 +146,6 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # dimension to import. Its places are still specification, so the sheet
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
-# Native hole-callout depth fields have no model dimension to carry places
-# either; the blind anchor tap's two depths print at .X like every length.
-HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
-    "anchor tap": {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-}
 
 # Short lines: the callout is centred under the diameter, so its widest line
 # sets how close to the left border the hub-end dimension can stand.  The

@@ -38,7 +38,6 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_hole_callout_precision,
     set_hidden_lines_removed,
     set_arc_endpoints_to_max,
     set_reference_dimension,
@@ -59,7 +58,6 @@ from crank_arm_spec import (
     DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
-    HOLE_CALLOUT_PRECISION,
     HUB_SEAT_CALLOUT,
     SEAM_CALLOUT,
 )
@@ -276,7 +274,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _sheet_x(ARM_C2C),
         FRONT_CENTER[1] + _HANDLE_PIVOT_HOLE_DIA * SHEET_SCALE[0] / 2000.0,
     )
-    # Anchor tap: size and both depths on a native Hole Wizard callout; its
+    # Anchor tap: size and THRU on a native Hole Wizard callout; its
     # station from the bore axis and its offset from the top long edge are the
     # part's StationReference dims imported above.
     anchor_edge = (
@@ -292,11 +290,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
-    set_hole_callout_precision(
-        anchor_callout,
-        HOLE_CALLOUT_PRECISION["anchor tap"],
-        label="anchor tap depths",
-    )
     # The true overall (boss extreme to arm end), as a reference below the
     # 85.0 centre-to-end chain so nobody saws the stock 8 mm short
     # (Harvey #25).  Picked at the boss arc's outer extreme so the default

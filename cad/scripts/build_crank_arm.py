@@ -279,7 +279,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after punch witness: {vol:.1f} mm^3")
 
-    # Keeper-ring anchor: a blind #4-40 tap in the front face (ch11 p.14), the
+    # Keeper-ring anchor: a #4-40 tap through the arm (ch11 p.14), the
     # brass fillister-screw clamps the wire eyelet's tail under its head.
     anchor_cut = wizard_holes(
         adapter,

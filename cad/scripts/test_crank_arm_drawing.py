@@ -139,9 +139,11 @@ def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:
     assert drive.CRANK_ARM_Z0 - wire_back == pytest.approx(0.02)
     insertion = drive.ANCHOR_HEAD_Z + screw.SHANK_LEN - drive.CRANK_ARM_Z0
     assert insertion == pytest.approx(5.33)
-    assert screw.SHANK_DIA < insertion <= spec.ANCHOR_HOLE_SPEC.overrides_mm["ThreadDepth"]
-    assert spec.ANCHOR_HOLE_SPEC.depth_mm - insertion == pytest.approx(1.17)
-    assert drive.ANCHOR_BACK_WALL >= 0.5
+    # Tapped THRU the stock bar (rule 12, W7): no drill point, no bottom, and
+    # the tip stays inside the inboard face.
+    assert spec.ANCHOR_HOLE_SPEC.end == "through_all"
+    assert screw.SHANK_DIA < insertion < spec.ARM_THICKNESS
+    assert drive.ANCHOR_TIP_RESERVE == pytest.approx(2.67)
 
 
 def test_part_registry_retains_make_critical_properties() -> None:

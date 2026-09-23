@@ -34,6 +34,7 @@ from crank_hub_geometry import (
     ARM_THICKNESS,
     EDGE_BREAK_MAX_MM,
     GENERAL_1PL_TOL_MM,
+    GENERAL_2PL_TOL_MM,
     MM_PER_IN,
 )
 
@@ -147,7 +148,14 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
 # printed 8.0 carries the .X title-block band.
 ARM_STOCK_THICKNESS = 0.3125 * MM_PER_IN
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
-RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
+# The relief width prints at .XX (Main, on the rule-12 audit note): at .X its
+# +0.8 alone took the stock-arm case under the U33b floor once the tapped
+# hole's exit edge break is counted.  A lathe shoulder length holds 0.5 as
+# easily as the shoulder's own 0.25.
+RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_2PL_TOL_MM, 6)
+# The title-block edge break on the tapped hole's inboard exit edge takes up
+# to its size of thread off the arm end of the engagement.
+TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
 # The tip chamfer's threads are partial, so full thread ends TIP_CHAMFER short
 # of the tip: FULL_THREAD_REACH is the full-thread end measured from the seat
 # face.  Which side governs each case is the smaller term of the min().
@@ -156,16 +164,23 @@ FULL_THREAD_REACH_MIN = round(THREAD_LENGTH_MIN - TIP_CHAMFER, 6)
 FULL_THREAD_NOMINAL = round(
     min(FULL_THREAD_REACH_NOMINAL, ARM_THICKNESS) - RELIEF_WIDTH, 6
 )
-# Worst case in the stock arm: min(full-thread reach, arm 7.94) - relief 2.3.
+# Worst case in the stock arm: min(full-thread reach, arm 7.94 less the exit
+# break) - relief 2.01.
 FULL_THREAD_WORST = round(
-    min(FULL_THREAD_REACH_MIN, ARM_STOCK_THICKNESS) - RELIEF_WIDTH_MAX, 6
+    min(FULL_THREAD_REACH_MIN, ARM_STOCK_THICKNESS - TAP_EXIT_BREAK)
+    - RELIEF_WIDTH_MAX,
+    6,
 )
 ENGAGEMENT_GOVERNED_BY = (
-    "arm" if ARM_STOCK_THICKNESS <= FULL_THREAD_REACH_MIN else "screw"
+    "arm"
+    if ARM_STOCK_THICKNESS - TAP_EXIT_BREAK <= FULL_THREAD_REACH_MIN
+    else "screw"
 )
 # Worst case in an arm at its printed maximum 8.8: the screw always governs.
 FULL_THREAD_WORST_PRINTED_ARM = round(
-    min(FULL_THREAD_REACH_MIN, ARM_PRINTED_THICKNESS_MAX) - RELIEF_WIDTH_MAX, 6
+    min(FULL_THREAD_REACH_MIN, ARM_PRINTED_THICKNESS_MAX - TAP_EXIT_BREAK)
+    - RELIEF_WIDTH_MAX,
+    6,
 )
 FULL_THREAD_NOMINAL_DIAMETERS = FULL_THREAD_NOMINAL / THREAD_MODEL_DIA
 FULL_THREAD_WORST_DIAMETERS = FULL_THREAD_WORST / THREAD_MODEL_DIA
@@ -267,7 +282,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StationReference": {"OverallLength"},
 }
 # Decimal places ARE the tolerance (policy rule 2): the two shoulder sizes are
-# the running fit and print their bands at two places; every other size is
+# the running fit and print their bands at two places, and the relief width
+# prints at two places for the U33b engagement floor; every other size is
 # routine (.X).  The thread length carries its own +0/-0.5 band at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
@@ -277,7 +293,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ShoulderLength": 2,
         "ThreadLength": 1,
         "ReliefDia": 1,
-        "ReliefWidth": 1,
+        "ReliefWidth": 2,
         "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},

@@ -482,7 +482,6 @@ from crank_arm_spec import (  # noqa: E402
     ANCHOR_HOLE_SPEC,
     ANCHOR_SCREW_X,
     ANCHOR_SCREW_Y,
-    ANCHOR_THREAD_DEPTH,
     ARM_C2C,
     ARM_THICKNESS,
     ARM_WIDTH,
@@ -576,7 +575,6 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.  Hub and arm seat to one another at the shaft origin.
-from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
@@ -633,18 +631,15 @@ EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
 )
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
-ANCHOR_BOTTOM_CLEARANCE = ANCHOR_HOLE_SPEC.depth_mm - ANCHOR_THREAD_ENGAGEMENT
-ANCHOR_BACK_WALL = ARM_THICKNESS - (
-    ANCHOR_HOLE_SPEC.depth_mm + blind_cut_dia_mm(ANCHOR_HOLE_SPEC) / 2.0 * DRILL_POINT_H
-)
-if ANCHOR_THREAD_ENGAGEMENT > ANCHOR_THREAD_DEPTH:
-    raise AssertionError("anchor screw bottoms in the crank arm's tap")
+# The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
+# screw tip must stay short of the inboard face.
+ANCHOR_TIP_RESERVE = ARM_THICKNESS - ANCHOR_THREAD_ENGAGEMENT
+if ANCHOR_HOLE_SPEC.end != "through_all":
+    raise AssertionError("crank-arm anchor tap is no longer through the arm")
 if ANCHOR_THREAD_ENGAGEMENT < 2.0:
     raise AssertionError("anchor screw has under 2.0 thread engagement in the arm")
-if ANCHOR_BOTTOM_CLEARANCE < 0.5:
-    raise AssertionError("anchor screw has under 0.5 clearance to the drill shoulder")
-if ANCHOR_BACK_WALL < 0.5:
-    raise AssertionError("anchor tap drill leaves under 0.5 back-face wall")
+if ANCHOR_TIP_RESERVE < 0.5:
+    raise AssertionError("anchor screw tip stands within 0.5 of the arm's inboard face")
 # The plate origin is its inboard face (-175): the Ry(180)-composed pose maps
 # the +z extrusion toward machine -z, filling the arm from -175 to -183.
 
