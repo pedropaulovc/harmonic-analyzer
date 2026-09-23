@@ -218,9 +218,12 @@ def test_bom_split_keeps_the_second_column_no_taller() -> None:
     assert drawing.bom_split_row(42) == 21
     with pytest.raises(ValueError):
         drawing.bom_split_row(1)
-    # Two columns side by side stay left of the reference isometric.
-    right = drawing.BOM_SECOND_COLUMN_X + drawing.BOM_COLUMN_WIDTH
-    assert right < drawing.BOM_REFERENCE_ISO_CENTER[0] - 0.030
+    # The reference isometric sits under the taller first column. The farm
+    # measured a 124.2 mm header + 19-row piece, so the header is ~10.2 mm;
+    # a 1:8 reference view's outline is ~49 mm tall.
+    first_bottom = drawing.BOM_ANCHOR[1] - (0.0102 + 20 * drawing.BOM_ROW_HEIGHT)
+    assert drawing.BOM_REFERENCE_ISO_CENTER[1] + 0.0247 < first_bottom - 0.010
+    assert drawing.BOM_REFERENCE_ISO_CENTER[0] < drawing.BOM_SECOND_COLUMN_X
 
 
 def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:

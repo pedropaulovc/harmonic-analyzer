@@ -110,9 +110,13 @@ SHEET_SCALES = {
 # --- sheet 1: projected front/top/right group + isometric ---------------------
 # The projected group's lower-left lands here; the views are aligned on the
 # model origin (ASME third angle: top above front, right to the right of it).
-PROJECTED_GROUP_ORIGIN = (0.024, 0.080)
+# At 1:3 the group is ~177 mm tall (front y ~42 + gap + top z ~121, the old
+# MHA-A03 sheet); the 175 mm the first region allowed failed on the farm (leaf
+# 20260923T045245Z-1-b34a8422). The origin sits just above the title block
+# (top y=0.0655) and the region top 4.5 mm under the zone border.
+PROJECTED_GROUP_ORIGIN = (0.024, 0.068)
 PROJECTED_GAP = 0.014
-PROJECTED_REGION = (0.018, 0.072, 0.300, 0.255)
+PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
 ASSEMBLED_ISO_CENTER = (0.360, 0.175)
 VIEW_CAPTION_GAP = 0.004
 
@@ -128,12 +132,15 @@ BOM_COLUMN_WIDTH = sum(BOM_COLUMN_WIDTHS.values())
 # kept one line and the 47-character MHA-030 row wrapped to 10.195 mm
 # (farm leaf 20260923T044055Z-1-20b23f24, swmaker000005).
 BOM_DESCRIPTION_MAX_CHARS = 41
-BOM_ANCHOR = (0.018, 0.258)
+BOM_ANCHOR = (0.018, 0.252)
 BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_SHEET_CLEARANCE = 0.003
-BOM_REFERENCE_ISO_CENTER = (0.385, 0.200)
+# Under the first BOM column, where sheet 6 already proved the same 1:8 view
+# and caption clear the sheet number; beside the BOM its centred caption ran
+# into the second column and past the right border.
+BOM_REFERENCE_ISO_CENTER = (0.110, 0.068)
 # The MHA-013 station pointer lives here, not in its BOM cell: on the grouped
 # 20-configuration row SolidWorks kept a written description only up to its
 # second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
@@ -144,21 +151,24 @@ BOM_REFERENCE_CAPTION = (
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
 CLUSTER_VIEW_CENTER = (0.200, 0.165)
-CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.252)
+# Top keeps baseline-4's ~5 mm clearance under the two-line sheet heading.
+CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.248)
 CLUSTER_BALLOON_MARGIN = 0.012
 BALLOON_DIAMETER = 0.010
 
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
 # Tops sit under the one-line sheet heading at HEADING_XY.
-NOTE_FIELD_LEFT = (0.018, 0.255, 0.212, 0.035)
-NOTE_FIELD_RIGHT = (0.222, 0.255, 0.415, 0.072)
+NOTE_FIELD_LEFT = (0.018, 0.252, 0.212, 0.035)
+NOTE_FIELD_RIGHT = (0.222, 0.252, 0.415, 0.072)
 NOTE_FIELD_INSET = 0.0005
 NOTE_ANCHOR_PASSES = 3
 NOTE_ANCHOR_SETTLE = 0.00005
 NOTE_BLOCK_GAP = 0.006
-HEADING_XY = (0.018, 0.268)
+# A note's anchor is its top edge: y=0.268 crossed the top zone border by
+# 1.5 mm on every sheet; summing's headings at 0.263 pass.
+HEADING_XY = (0.018, 0.263)
 # Sheet 1's four-line heading sits over the isometric, clear of the top view.
-ASSEMBLED_HEADING_XY = (0.222, 0.268)
+ASSEMBLED_HEADING_XY = (0.222, 0.263)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
 # Sheet 6 needs the whole right column for steps 8-17, so its reference view
@@ -1392,7 +1402,7 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[CHECKS_SHEET - 1])
     _heading(adapter, CHECKS_SHEET)
     _reference_iso(
-        adapter, caption="FINISHED ASSEMBLY 1:8 - CHECK REFERENCE", label="checks reference isometric"
+        adapter, caption="CHECK REFERENCE 1:8", label="checks reference isometric"
     )
     findings = _stack_note_field(
         adapter,
