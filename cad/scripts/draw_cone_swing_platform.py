@@ -46,6 +46,8 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     dimension_name,
@@ -61,6 +63,7 @@ from cone_swing_platform_spec import (
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
+    TIP_SCREW_LOCAL_Z,
 )
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
@@ -132,6 +135,27 @@ NOTCH_KEEP = {
 SECTION_KEEP = {
     "PlateThk": _shifted(0.300, 0.120),
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
+}
+
+# U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
+# enlarges the pivot-to-slot region of the hole-location plan to 1:1 (hidden
+# lines shown, so the underside counterbored slot reads dashed), and SECTION
+# C-C, cut along the cone axis through the slot, shows the counterbore depth.
+# Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
+DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
+DETAIL_RADIUS_MM = 13.0
+DETAIL_CENTER = (0.150, 0.045)
+_SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) / 1000.0
+DETAIL_KEEP = {
+    "TipSlotZ": (DETAIL_CENTER[0] - 0.024, DETAIL_CENTER[1]),
+    "TipSlotEastCx": (DETAIL_CENTER[0] - 0.008, DETAIL_CENTER[1] + 0.020),
+    "TipSlotWestCx": (DETAIL_CENTER[0] + 0.008, DETAIL_CENTER[1] + 0.020),
+    "TipSlotW": (DETAIL_CENTER[0] + 0.018, _SLOT_Y),
+    "TipCboreW": (DETAIL_CENTER[0] + 0.032, _SLOT_Y),
+}
+SLOT_SECTION_CENTER = (0.200, 0.045)
+SLOT_SECTION_KEEP = {
+    "TipCboreDepth": (SLOT_SECTION_CENTER[0], SLOT_SECTION_CENTER[1] - 0.022),
 }
 
 
@@ -210,6 +234,99 @@ def _position_section_label(adapter: Any, section: Any) -> None:
             f"native section label position did not persist: {actual}; "
             f"requested={target}"
         )
+
+
+def _create_detail_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    model_center_mm: tuple[float, float, float],
+    radius_mm: float,
+    view_xy: tuple[float, float],
+    detail_label: str,
+    scale: tuple[int, int],
+    label: str,
+) -> Any:
+    """Create a circular detail view around one model point of ``parent_view``.
+
+    The circle is sketched in the parent view's own sketch space: the model
+    point is projected to the sheet, then through the sketch transform, the same
+    path ``create_section_view`` uses for its cutting line.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    if not ddoc.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError(f"failed to activate detail parent view ({label})")
+    draw.ClearSelection2(True)
+    center_m = tuple(value / 1000.0 for value in model_center_mm)
+    rim_m = (center_m[0] + radius_mm / 1000.0, center_m[1], center_m[2])
+    sheet = [
+        model_point_in_view(adapter, parent_view, point, label=f"{label} {name}")
+        for name, point in (("centre", center_m), ("rim", rim_m))
+    ]
+    sketch = _early_bound(_early_bound(parent_view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet:
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        circle = sketch_manager.CreateCircle(*points[0], *points[1])
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError(f"failed to sketch the detail circle ({label})")
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = parent_view
+    selectable = _sw_type_info.early_bound_or_flag(circle, "ISketchSegment", "Select4")
+    if not selectable.Select4(False, selection_data):
+        raise RuntimeError(f"failed to select the detail circle ({label})")
+    detail = ddoc.CreateDetailViewAt4(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        0,  # swDetViewSTANDARD
+        float(scale[0]),
+        float(scale[1]),
+        detail_label,
+        1,  # swDetCircleCIRCLE
+        True,  # FullOutline
+        False,  # JaggedOutline
+        False,  # NoOutline
+        5,
+    )
+    draw.ClearSelection2(True)
+    if detail is None:
+        raise RuntimeError(f"CreateDetailViewAt4 returned no view ({label})")
+    detail = _sw_type_info.early_bound_or_flag(detail, "IView", "SetViewPosition")
+    if not detail.SetViewPosition(
+        double_array([float(view_xy[0]), float(view_xy[1])]), False
+    ):
+        raise RuntimeError(f"failed to position the detail view ({label})")
+    rebuild_drawing(adapter, label=f"create detail view {detail_label}")
+    print(
+        f"detail {detail_label}: parent_sheet_centre={sheet[0]} "
+        f"sketch_centre={points[0]} view_xy={view_xy} "
+        f"outline={tuple(float(v) for v in detail.GetOutline())}"
+    )
+    return detail
+
+
+def _set_hidden_lines_visible(view: Any, *, label: str) -> None:
+    """Show hidden edges dashed, so the underside counterbore is readable."""
+    bound = _early_bound(view, "IView")
+    bound.SetDisplayMode4(False, 1, False, False, True)  # swHIDDEN_GREYED
+    if int(bound.GetDisplayMode2()) != 1:
+        raise RuntimeError(f"{label} did not take the hidden-lines-visible mode")
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -497,6 +614,40 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(adapter, section)
 
+    detail = _create_detail_view(
+        adapter,
+        feature,
+        model_center_mm=(0.0, PLATE_THICKNESS, DETAIL_MODEL_Z),
+        radius_mm=DETAIL_RADIUS_MM,
+        view_xy=DETAIL_CENTER,
+        detail_label="B",
+        scale=(1, 1),
+        label="tip screw slot detail",
+    )
+    _set_hidden_lines_visible(detail, label="tip screw slot detail")
+    slot_south = model_point_in_view(
+        adapter, detail, (0.0, 0.0, (TIP_SCREW_LOCAL_Z - 8.0) / 1000.0),
+        label="slot section south end",
+    )
+    slot_north = model_point_in_view(
+        adapter, detail, (0.0, 0.0, 9.0 / 1000.0), label="slot section north end"
+    )
+    slot_section = create_section_view(
+        adapter,
+        detail,
+        line_start=slot_south,
+        line_end=slot_north,
+        view_xy=SLOT_SECTION_CENTER,
+        section_label="C",
+        scale=(1, 1),
+        partial=True,
+        label="tip screw slot section",
+    )
+    slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
+    slot_cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="slot section cut faces only")
+    set_hidden_lines_removed(adapter, slot_section)
+
     profile_annotations = curate_view_dimensions(
         adapter,
         profile,
@@ -548,6 +699,25 @@ async def build(adapter: Any) -> dict[str, str]:
                     raise RuntimeError("plate thickness witness gap did not persist")
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
+    detail_annotations = curate_view_dimensions(
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="tip screw slot detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    set_dimension_callouts(
+        adapter,
+        detail_annotations,
+        {"TipSlotW": "SLOT THRU", "TipCboreW": "C'BORE SLOT\nFROM UNDERSIDE"},
+    )
+    slot_section_annotations = curate_view_dimensions(
+        adapter,
+        slot_section,
+        keep=SLOT_SECTION_KEEP,
+        view_label="tip screw slot section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     relief_annotations = [
         item for item in section_annotations
         if dimension_name(adapter, item) == "PivotBearingReliefDepth"
@@ -562,6 +732,8 @@ async def build(adapter: Any) -> dict[str, str]:
         *feature_annotations,
         *notch_annotations,
         *section_annotations,
+        *detail_annotations,
+        *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
@@ -621,8 +793,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, iso):
+    for view in (profile, feature, notch, section, slot_section, iso):
         set_hidden_lines_removed(adapter, view)
+    _set_hidden_lines_visible(detail, label="tip screw slot detail")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")

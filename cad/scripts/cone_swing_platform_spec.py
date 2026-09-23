@@ -57,6 +57,49 @@ POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 
 
+# U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
+# socket head cap screw (McMaster 91251A148) coming up from under the plate
+# through a lateral slot; a counterbored slot sinks the head below the slide
+# face. The slot runs across the cone axis so the block can be shifted +/-2.25
+# at fit-up; a shim pack under the foot sets its height. Both slots share the
+# same two end centres, TIP_SCREW_HALF_TRAVEL either side of the cone axis, at
+# the tip block's station (11.0 south of the pivot, from the drive-train
+# layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
+TIP_SCREW_LOCAL_Z = -11.0
+TIP_SCREW_HALF_TRAVEL = 2.0
+TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
+TIP_SCREW_HEAD_DIA = (5.54, 5.74)  # ASME B18.3 #6 SHCS head min/max
+TIP_SCREW_HEAD_H_MAX = 3.505
+# The slot widths are cut in one pass by an end mill of that size, so they
+# carry the same one-sided +0.10/0 band as the title block's DRILLED HOLES
+# row: the cutter makes the size, the machinist holds nothing tight.
+TIP_SLOT_W = 4.0
+TIP_CBORE_W = 6.5
+TIP_SLOT_W_BAND = (0.0, 0.10)
+TIP_CBORE_DEPTH = 4.2  # .XX
+_XX = 0.51
+TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W - TIP_SCREW_MAJOR
+TIP_SLOT_HEAD_BEARING = (
+    TIP_SCREW_HEAD_DIA[0] - (TIP_SLOT_W + TIP_SLOT_W_BAND[1])
+) / 2.0
+TIP_CBORE_HEAD_CLEARANCE = TIP_CBORE_W - TIP_SCREW_HEAD_DIA[1]
+TIP_HEAD_RECESS = TIP_CBORE_DEPTH - _XX - TIP_SCREW_HEAD_H_MAX
+TIP_LEDGE_RANGE = (
+    PLATE_THICKNESS - TIP_CBORE_DEPTH - _XX,
+    PLATE_THICKNESS - TIP_CBORE_DEPTH + _XX,
+)
+if TIP_SLOT_SCREW_CLEARANCE < 0.25:
+    raise AssertionError("tip-block screw slot does not clear the #6-32 major")
+if TIP_SLOT_HEAD_BEARING < 0.5:
+    raise AssertionError("tip-block screw head bears on under 0.5 mm per side")
+if TIP_CBORE_HEAD_CLEARANCE < 0.25:
+    raise AssertionError("tip-block counterbore slot does not clear the screw head")
+if TIP_HEAD_RECESS < 0.1:
+    raise AssertionError("tip-block screw head can stand proud of the slide face")
+if TIP_LEDGE_RANGE[0] < 1.5:
+    raise AssertionError("tip-block counterbore ledge is below the U27 1.5 floor")
+
+
 # Only functional sliding/locating surfaces carry roughness.  The existing
 # close-clearance pivot hole needs no bearing-finish control; the top locates
 # the post and tip block, and the underside slides on the harmonic-base deck.
@@ -93,6 +136,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PostMountEastZ",
     },
     "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
+    "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
+    "TipScrewCboreProfile": {"TipCboreW"},
+    "TipScrewCbore": {"TipCboreDepth"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -128,6 +174,15 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastZ": 2,
     },
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
+    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74.
+    "TipScrewSlotProfile": {
+        "TipSlotEastCx": 2,
+        "TipSlotWestCx": 2,
+        "TipSlotZ": 2,
+        "TipSlotW": 1,
+    },
+    "TipScrewCboreProfile": {"TipCboreW": 1},
+    "TipScrewCbore": {"TipCboreDepth": 2},
     "CornerNE": {"CornerNER": 1},
     "CornerNW": {"CornerNWR": 1},
     "CornerSW": {"CornerSWR": 1},

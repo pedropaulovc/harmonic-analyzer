@@ -80,6 +80,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
@@ -105,6 +106,12 @@ from cone_swing_platform_spec import (
     POST_MOUNT_TAP_DIA,
     PROFILE_VIEW_NOTE,
     SURFACE_FINISHES,
+    TIP_CBORE_DEPTH,
+    TIP_CBORE_W,
+    TIP_SCREW_HALF_TRAVEL,
+    TIP_SCREW_LOCAL_Z,
+    TIP_SLOT_W,
+    TIP_SLOT_W_BAND,
 )
 
 PART_NAME = "cone-swing-platform"
@@ -320,6 +327,71 @@ async def _add_notch_run_angle(
     if int(_read_member(dimension, "DrivenState")) != 1:
         raise RuntimeError("notch run angle did not become driven")
     dims.record("NotchRunAngle")
+
+
+async def _sketch_tip_screw_slot(
+    adapter, *, width: float, label: str, prefix: str
+) -> SketchDims:
+    """Top-plane straight slot across the cone axis at the tip-block station.
+
+    Two lines and two end arcs whose centres sit TIP_SCREW_HALF_TRAVEL either
+    side of the pivot's cone-axis line, so the shop sets each end from the
+    pivot centre. The width is dimensioned between the two lines (it is the
+    end-mill size); tangency makes the arcs full radius."""
+    dims = SketchDims()
+    c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
+    y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
+    check(f"create_sketch {label}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    line_a = check(f"{label} line a", await adapter.add_line(-c, y - r, c, y - r))
+    arc_w = check(
+        f"{label} west arc", await adapter.add_arc(c, y, c, y - r, c, y + r)
+    )
+    line_b = check(f"{label} line b", await adapter.add_line(c, y + r, -c, y + r))
+    arc_e = check(
+        f"{label} east arc", await adapter.add_arc(-c, y, -c, y + r, -c, y - r)
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{arc_e}.center", -c, y, f"{label} east end")
+    dims.record(f"{prefix}EastCx")
+    dims.record(f"{prefix}Z")
+    check(
+        f"{label} end centres level",
+        await adapter.add_sketch_constraint(
+            f"{arc_e}.center", f"{arc_w}.center", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{arc_w}.center", "origin", "horizontal_distance", c,
+        f"{label} west end",
+    )
+    dims.record(f"{prefix}WestCx")
+    check(
+        f"horizontal {label} line a",
+        await adapter.add_sketch_constraint(line_a, None, "horizontal"),
+    )
+    for junction, e1, e2 in (
+        ("a-west", line_a, arc_w),
+        ("west-b", arc_w, line_b),
+        ("b-east", line_b, arc_e),
+        ("east-a", arc_e, line_a),
+    ):
+        check(
+            f"{label} tangent {junction}",
+            await adapter.add_sketch_constraint(e1, e2, "tangent"),
+        )
+    await dimension_between(
+        adapter, f"{line_a}.start", f"{line_b}.end", "vertical_distance", width,
+        f"{label} width",
+    )
+    dims.record(f"{prefix}W")
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
+
+
+def _slot_area(width: float) -> float:
+    return math.pi * (width / 2.0) ** 2 + width * 2.0 * TIP_SCREW_HALF_TRAVEL
 
 
 STOP_LOCAL_Z = -105.0
@@ -695,6 +767,45 @@ async def build(adapter) -> dict[str, str]:
         adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
     )
 
+    # U30 tip-block hold-down: a through slot for the #6-32 shank, then a
+    # counterbored slot from the underside that sinks the socket head below
+    # the slide face. Same end centres, so the head bears on a uniform ledge.
+    tip_slot = await _sketch_tip_screw_slot(
+        adapter, width=TIP_SLOT_W, label="tip screw slot", prefix="TipSlot"
+    )
+    name_last_feature(adapter, "TipScrewSlotProfile")
+    drive_jobs += tip_slot.apply(adapter, "TipScrewSlotProfile")
+    check(
+        "cut tip screw slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "TipScrewSlot")
+    v_tip_slot = _slot_area(TIP_SLOT_W) * PLATE_T
+    volume = await volume_check(
+        adapter, "tip screw slot", volume - v_tip_slot, 0.01 * v_tip_slot
+    )
+    tip_cbore = await _sketch_tip_screw_slot(
+        adapter, width=TIP_CBORE_W, label="tip screw counterbore", prefix="TipCbore"
+    )
+    name_last_feature(adapter, "TipScrewCboreProfile")
+    drive_jobs += tip_cbore.apply(adapter, "TipScrewCboreProfile")
+    # Sketched on the plate underside (Top Plane); the cut runs +Y into the
+    # plate, against the default into-the-sketch-normal direction.
+    check(
+        "cut tip screw counterbore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=TIP_CBORE_DEPTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "TipScrewCbore")
+    name_dimensions(adapter, "TipScrewCbore", ["TipCboreDepth"])
+    v_tip_cbore = (_slot_area(TIP_CBORE_W) - _slot_area(TIP_SLOT_W)) * TIP_CBORE_DEPTH
+    volume = await volume_check(
+        adapter, "tip screw counterbore", volume - v_tip_cbore, 0.01 * v_tip_cbore
+    )
+
     # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
     # past the west edge, opening the mouth) + ONE end-cap circle cut at the
     # closed engaged end. The mouth crossing is a straight line, so the
@@ -888,6 +999,13 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for feature_name, dimension_name in (
+        ("TipScrewSlotProfile", "TipSlotW"),
+        ("TipScrewCboreProfile", "TipCboreW"),
+    ):
+        set_dimension_bilateral_tolerance(
+            adapter, feature_name, dimension_name, *TIP_SLOT_W_BAND
+        )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole
     )
