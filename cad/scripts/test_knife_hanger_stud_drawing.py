@@ -75,6 +75,8 @@ def test_runout_note_never_exceeds_the_interface_relief() -> None:
     assert printed <= joint.STUD_THREAD_RELIEF_MAX_MM
     assert joint.STUD_THREAD_RELIEF_MAX_MM - printed < 0.1
     line = f"INCOMPLETE THREAD {spec.THREAD_RUNOUT_MAX_TEXT} MAX."
+    # Codex (stud-20): the requirement, not the tool -- no "DIE-CUT".
+    assert "DIE" not in spec.DRAWING_NOTES
     assert line in spec.DRAWING_NOTES
     assert spec.DRAWING_NOTES.startswith("FIT SHOULDER TO STACK PER MHA-A07 SHEET 4")
 
@@ -258,15 +260,37 @@ def test_tip_detail_frames_the_whole_tip_end() -> None:
     crest = math.hypot(build.TIP_RADIUS_MM, sheet.detail_offset_mm)
     assert reach_end < sheet.fence_radius_mm
     assert crest < sheet.fence_radius_mm
-    # The chamfer's dimension line sits inside the boundary, >= 0.3 mm of
-    # model (1.8 mm of paper) from it, so its ink needs no crossing.
+    # The chamfer's witness lines and the start of its dimension line sit
+    # inside the boundary, >= 0.3 mm of model (1.8 mm of paper) from it; the
+    # line then runs out once to its text, clear of the boundary.
     scale = sheet.detail_scale[0] / sheet.detail_scale[1]
-    text = (
+    line = (
         build.TIP_RADIUS_MM + drawing.CHAMFER_TEXT_OUT_M * 1000.0 / scale,
-        sheet.detail_offset_mm - spec.TIP_CHAMFER_MM / 2.0,
+        sheet.detail_offset_mm,
     )
-    assert math.hypot(*text) <= sheet.fence_radius_mm - 0.3
-    assert drawing.DETAIL_BOUNDARY_CROSSINGS == {}
+    assert math.hypot(*line) <= sheet.fence_radius_mm - 0.3
+    assert drawing.DETAIL_BOUNDARY_CROSSINGS == {"TipChamfer": 1}
+
+
+def test_chamfer_text_sits_clear_right_of_the_boundary() -> None:
+    # The text is centred CLEAR + HALF_WIDTH right of the boundary; at the
+    # worst measured boundary (1.276 x the nominal fence) it stays off the
+    # detail label and under the pictorial's cell.
+    sheet = drawing.SHEET
+    for ratio in (1.0, 1.276):
+        radius = ratio * sheet.fence_radius_mm * sheet.detail_scale[0] / 1000.0
+        center_x = sheet.detail_center[0] + radius + drawing.CHAMFER_TEXT_CLEAR_M
+        center_x += drawing.CHAMFER_TEXT_HALF_WIDTH_M
+        y = sheet.detail_center[1] + (
+            build.TIP_RADIUS_MM * sheet.detail_scale[0] / 1000.0
+            + drawing.CHAMFER_TEXT_OUT_M
+        )
+        half = drawing.CHAMFER_TEXT_HALF_WIDTH_M
+        box = (center_x - half, y - 0.003, center_x + half, y + 0.003)
+        boundary = (sheet.detail_center, radius)
+        assert drawing._text_boundary_problem(box, boundary) is None
+        assert not _overlap(box, _label_box())
+        assert not _overlap(box, drawing.ISO_REGION)
 
 
 def test_iso_fit_translation_centres_the_outline_with_clearance() -> None:
@@ -363,9 +387,9 @@ def test_self_crossing_lines_are_rejected() -> None:
     assert len(problems) == 1 and "cross at" in problems[0]
 
 
-def test_no_dimension_may_cross_the_tip_detail_boundary() -> None:
+def test_undeclared_dimension_may_not_cross_the_tip_detail_boundary() -> None:
     problems = drawing._dimension_ink_problems(
-        _ink(lines=[((0.265, 0.150), (0.400, 0.150))]),
+        _ink(lines=[((0.265, 0.150), (0.400, 0.150))], name="Other"),
         owner=DETAIL,
         obstacles={},
         region=REGION,
@@ -542,3 +566,191 @@ def test_faced_end_circle_is_inside_the_tip_chamfer() -> None:
     radius, axial = drawing.FACED_END_CIRCLE
     assert axial == build.TIP_END_Y_MM
     assert radius == pytest.approx(build.TIP_RADIUS_MM - spec.TIP_CHAMFER_MM)
+
+
+def test_chamfer_line_out_to_its_text_is_the_one_allowed_crossing() -> None:
+    line = ((0.265, 0.150), (0.400, 0.150))
+    ok = drawing._dimension_ink_problems(
+        _ink(lines=[line]), owner=DETAIL, obstacles={}, region=REGION, boundary=BOUNDARY
+    )
+    assert ok == []
+    # A witness line stretched out of the circle as well is a second crossing.
+    stretched = ((0.265, 0.150), (0.265, 0.250))
+    problems = drawing._dimension_ink_problems(
+        _ink(lines=[line, stretched]),
+        owner=DETAIL,
+        obstacles={},
+        region=REGION,
+        boundary=BOUNDARY,
+    )
+    assert len(problems) == 1 and "2 time(s); 1 allowed" in problems[0]
+
+
+def test_text_must_not_straddle_the_detail_boundary() -> None:
+    center, radius = BOUNDARY
+    inside = (
+        center[0] - 0.005,
+        center[1] - 0.002,
+        center[0] + 0.005,
+        center[1] + 0.002,
+    )
+    outside = (
+        center[0] + radius + 0.001,
+        center[1],
+        center[0] + radius + 0.03,
+        center[1] + 0.004,
+    )
+    # stud-16: "0.5 max. X 45°" printed across the fence.
+    straddle = (
+        center[0] - 0.015,
+        center[1] + radius - 0.002,
+        center[0] + 0.015,
+        center[1] + radius + 0.002,
+    )
+    assert drawing._text_boundary_problem(inside, BOUNDARY) is None
+    assert drawing._text_boundary_problem(outside, BOUNDARY) is None
+    assert "straddles" in drawing._text_boundary_problem(straddle, BOUNDARY)
+
+
+def test_chamfer_limit_case_is_classified() -> None:
+    # Logged, not gated: stud-18 proved property 754 leaves SolidWorks'
+    # "max." suffix lowercase, and Main accepted it (2026-09-22).
+    assert drawing._uppercase_problem(["0.5 MAX X 45°"]) is None
+    assert drawing._uppercase_problem(["0.5", " MAX", " X 45°"]) is None
+    assert drawing._uppercase_problem([" 0.5 max. X 45° "])
+    assert drawing._uppercase_problem(["0.5 X 45°"])
+    assert drawing.SW_ALL_UPPERCASE_DIMENSIONS == 754
+
+
+def test_text_overlaps_names_the_crowded_boxes() -> None:
+    box = (0.0, 0.0, 1.0, 1.0)
+    others = {"near": (0.5, 0.5, 2.0, 2.0), "far": (1.5, 1.5, 2.0, 2.0)}
+    assert drawing._text_overlaps(box, others) == [
+        "near [500.0,500.0]..[2000.0,2000.0]mm"
+    ]
+
+
+def test_tip_thread_callout_names_size_class_and_extent() -> None:
+    assert spec.TIP_THREAD_CALLOUT == f"{joint.THREAD} UNC-2A TO SHOULDER"
+    assert spec.TIP_THREAD_CALLOUT.startswith("#10-24 UNC-2A")
+    # 24 TPI is the coarse series for a #10 (the fine is 32).
+    assert joint.THREAD == "#10-24" and spec.TIP_THREAD_SERIES == "UNC"
+    # ASME B1.1 basic minor diameter of #10-24: 0.1449 in.
+    assert spec.TIP_THREAD_MINOR_DIA_MM == pytest.approx(0.1449 * 25.4, abs=0.005)
+    assert spec.TIP_THREAD_MINOR_DIA_MM < build.TIP_RADIUS_MM * 2.0
+
+
+def test_thread_callout_gate() -> None:
+    wanted = spec.TIP_THREAD_CALLOUT
+    assert drawing._thread_callout_problem(wanted, []) is None
+    assert drawing._thread_callout_problem(wanted, [wanted]) is None
+    assert (
+        drawing._thread_callout_problem(" #10-24  UNC-2A TO SHOULDER ", [wanted])
+        is None
+    )
+    # stud-16: the thread carried no callout text.
+    assert drawing._thread_callout_problem("", [])
+    assert drawing._thread_callout_problem(wanted, [wanted, "#10-24 UNC"])
+    assert drawing._thread_callout_problem(wanted, [wanted, wanted])
+
+
+def test_stock_name_says_turned_not_shortened() -> None:
+    from _fastener_catalog import fastener
+
+    name = fastener("knife-hanger-stud").stock_name
+    assert "(Turned and Threaded)" in name and "Shortened" not in name
+
+
+class _BoundAs:
+    """What an early-bound wrapper exposes: only its interface's members."""
+
+    def __init__(self, interface: str, members: dict) -> None:
+        self.interface = interface
+        for name, value in members.items():
+            setattr(self, name, value)
+
+
+def test_tip_thread_readback_binds_ipartdoc(monkeypatch) -> None:
+    # stud-17: FeatureByName through the IModelDoc2 handle raised on the farm.
+    data = _BoundAs(
+        "ICosmeticThreadFeatureData",
+        {
+            "ThreadCallout": spec.TIP_THREAD_CALLOUT,
+            "Diameter": spec.TIP_THREAD_MINOR_DIA_MM / 1000.0,
+            "BlindDepth": (spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM) / 1000.0,
+        },
+    )
+    feature = object()
+    looked_up = []
+
+    def early_bound(obj, interface):
+        if interface == "IPartDoc":
+            return _BoundAs(
+                "IPartDoc",
+                {"FeatureByName": lambda name: looked_up.append(name) or feature},
+            )
+        if interface == "IFeature":
+            assert obj is feature
+            return _BoundAs("IFeature", {"GetDefinition": lambda: data})
+        if interface == "ICosmeticThreadFeatureData":
+            return obj
+        raise AssertionError(f"unexpected binding {interface}")
+
+    monkeypatch.setattr(build, "_early_bound", early_bound)
+    state = build._read_tip_thread(_BoundAs("IModelDoc2", {}), "CosmeticThread1")
+    assert looked_up == ["CosmeticThread1"]
+    assert build._tip_thread_problem(state) is None
+
+
+def test_tip_thread_problem_names_the_drift() -> None:
+    good = {
+        "callout": spec.TIP_THREAD_CALLOUT,
+        "diameter_mm": spec.TIP_THREAD_MINOR_DIA_MM,
+        "depth_mm": spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM,
+    }
+    assert build._tip_thread_problem(good) is None
+    # stud-16's thread: no callout, no minor diameter.
+    assert "callout" in build._tip_thread_problem({**good, "callout": ""})
+    assert "minor" in build._tip_thread_problem({**good, "diameter_mm": 0.0})
+    assert "depth" in build._tip_thread_problem(
+        {**good, "depth_mm": spec.TIP_LENGTH_MM}
+    )
+
+
+def test_lowercase_max_is_logged_not_fatal(monkeypatch) -> None:
+    texts = [" 0.5 max. X 45° "]
+    # stud-18's text box, clear right of the boundary.
+    box = (0.25972, 0.1247, 0.29444, 0.1282)
+    boundary = ((0.235, 0.109), 0.02168)
+    events = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_display_texts", lambda _display: texts)
+    monkeypatch.setattr(drawing, "_display_text_box", lambda _display: box)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append(name)
+    )
+
+    class _Annotation:
+        def GetSpecificAnnotation(self):
+            return self
+
+    assert drawing._assert_chamfer_text(_Annotation(), boundary) == box
+    assert events == ["drawing.lowercase_tolerance_suffix"]
+    # The boundary gate still fails a straddling text.
+    straddle = (0.245, 0.1247, 0.270, 0.1282)
+    monkeypatch.setattr(drawing, "_display_text_box", lambda _display: straddle)
+    with pytest.raises(RuntimeError, match="straddles"):
+        drawing._assert_chamfer_text(_Annotation(), boundary)
+
+
+def test_thread_callout_centres_between_the_reference_witnesses() -> None:
+    # stud-19's census: bearing witness x 113.91, faced end x 202.77 mm. Its
+    # right-aligned callout [112.4..191.8] crossed the bearing witness.
+    left = drawing._callout_left(0.11391, 0.20277)
+    right = left + drawing.THREAD_CALLOUT_WIDTH_M
+    assert 0.11391 + drawing.THREAD_CALLOUT_OUT_M <= left
+    assert right <= 0.20277 - drawing.THREAD_CALLOUT_OUT_M
+    assert left - 0.11391 == pytest.approx(0.20277 - right)
+    assert drawing._callout_left(0.20277, 0.11391) == pytest.approx(left)
+    with pytest.raises(RuntimeError, match="does not fit"):
+        drawing._callout_left(0.100, 0.170)

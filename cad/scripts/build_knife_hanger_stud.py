@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from functools import wraps
+import json
 import math
 import sys
+from typing import Any
 
+import _telemetry
 from _common import (
     SketchDims,
     _early_bound,
@@ -50,7 +53,8 @@ from knife_hanger_stud_spec import (
     TIP_LENGTH_DEVIATIONS_MM,
     TIP_LENGTH_MM,
     TIP_LENGTH_TOLERANCE_TYPE,
-    TIP_THREAD,
+    TIP_THREAD_CALLOUT,
+    TIP_THREAD_MINOR_DIA_MM,
 )
 
 PART_NAME = "knife-hanger-stud"
@@ -251,22 +255,72 @@ async def _turn_stepped_tip(adapter) -> None:
     await force_rebuild(adapter)
 
 
+def _tip_thread_problem(state: dict[str, object]) -> str | None:
+    """Why the cosmetic thread read back from the part is not the spec's."""
+    if state["callout"] != TIP_THREAD_CALLOUT:
+        return f"tip thread callout reads {state['callout']!r}"
+    if not math.isclose(
+        float(state["diameter_mm"]), TIP_THREAD_MINOR_DIA_MM, abs_tol=1e-6
+    ):
+        return f"tip thread minor reads {state['diameter_mm']!r} mm"
+    if not math.isclose(
+        float(state["depth_mm"]), TIP_LENGTH_MM - TIP_CHAMFER_MM, abs_tol=1e-6
+    ):
+        return f"tip thread depth reads {state['depth_mm']!r} mm"
+    return None
+
+
+def _read_tip_thread(part: Any, name: str) -> dict[str, object]:
+    """Read the cosmetic thread ``name`` back through the part's IPartDoc.
+
+    ``FeatureByName`` is declared on IPartDoc, not IModelDoc2 (stud-17, leaf
+    20260923T003348Z), and a cosmetic thread is a sub-feature of the face's
+    feature, so it is found by the name its creator returned -- renaming "the
+    last feature" renamed the StudTurn cut instead.
+    """
+    feature = _early_bound(part, "IPartDoc").FeatureByName(name)
+    if feature is None:
+        raise RuntimeError(f"cosmetic thread {name!r} is missing after its creation")
+    data = _early_bound(
+        _early_bound(feature, "IFeature").GetDefinition(), "ICosmeticThreadFeatureData"
+    )
+    return {
+        "name": name,
+        "callout": str(data.ThreadCallout or ""),
+        "diameter_mm": float(data.Diameter) * 1000.0,
+        "depth_mm": float(data.BlindDepth) * 1000.0,
+    }
+
+
 async def _thread_tip(adapter) -> None:
-    """Cosmetic #10-24 thread over the whole turned tip."""
+    """Cosmetic thread over the whole turned tip, callout and minor explicit.
+
+    stud-16 passed only a standard and a size: the thread carried no minor
+    diameter and no callout, so the lathe view drew no thread and no
+    "#10-24" (render of leaf 20260923T001846Z). With no standard the
+    thread's minor line and callout come from this spec alone, and both are
+    read back from the feature.
+    """
     from solidworks_mcp.adapters.base import AddThreadParameters
 
-    check(
-        f"cosmetic thread {TIP_THREAD}",
+    created = check(
+        f"cosmetic thread {TIP_THREAD_CALLOUT}",
         await adapter.add_thread(
             AddThreadParameters(
                 edge_point=[TIP_RADIUS_MM, TIP_END_Y_MM + TIP_CHAMFER_MM, 0.0],
-                standard="ansi_inch",
-                size=TIP_THREAD,
+                standard="none",
+                diameter=TIP_THREAD_MINOR_DIA_MM,
                 end_type="blind",
                 depth=TIP_LENGTH_MM - TIP_CHAMFER_MM,
+                note=TIP_THREAD_CALLOUT,
             )
         ),
     )
+    state = _read_tip_thread(adapter.currentModel, str(created["name"]))
+    _telemetry.info("tip thread: " + json.dumps(state, sort_keys=True))
+    problem = _tip_thread_problem(state)
+    if problem is not None:
+        raise RuntimeError(f"{problem}: {state!r}")
 
 
 def _manufacturing_controls(adapter) -> None:

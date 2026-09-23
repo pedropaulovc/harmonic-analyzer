@@ -39,6 +39,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _layout_geometry import estimate_text_box
 from _stock_trim_drawing import TrimSheet
 from build_knife_hanger_stud import (
     HEAD_AF,
@@ -50,6 +51,7 @@ from build_knife_hanger_stud import (
     UNDERHEAD_Y_MM,
 )
 from diagnostics.diag_build_91247A720 import GB_WASHER_T
+from knife_hanger_interface import THREAD
 from knife_hanger_stud_spec import (
     DIMENSION_PRECISION,
     DRAWING_DIMENSIONS,
@@ -61,6 +63,7 @@ from knife_hanger_stud_spec import (
     TIP_LENGTH_DEVIATIONS_MM,
     TIP_LENGTH_MM,
     TIP_LENGTH_TOLERANCE_TYPE,
+    TIP_THREAD_CALLOUT,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -134,8 +137,31 @@ SHEET = TrimSheet(
     parent_letter_offset=(0.014, -0.004),
     detail_center_x_mm=0.0,
 )
-# The chamfer's dimension line runs this far out from the tip's crest.
+# The chamfer's dimension line runs this far out from the tip's crest; its
+# text sits CLEAR of the detail boundary, right of it along that line. Inside,
+# "0.5 MAX X 45°" cannot fit above the tip: stud-16 (leaf 20260923T001846Z)
+# printed it across the boundary with the fence at r 21.7 mm of paper.
 CHAMFER_TEXT_OUT_M = 0.004
+CHAMFER_TEXT_CLEAR_M = 0.004
+# A dimension's keep point is its text CENTRE (stud-16 census: TipChamfer's
+# box centred on the requested point); the printed "0.5 MAX X 45°" measured
+# ~31 mm wide on that render.
+CHAMFER_TEXT_HALF_WIDTH_M = 0.016
+# swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts, read off this
+# install's swconst.tlb (R2026x) as draw_knife_mount does. It does NOT reach
+# the swTolMAX suffix: stud-18 (leaf 20260923T010115Z) still printed
+# "0.5 max. X 45°". Main accepted SolidWorks' "max." (2026-09-22; a fleet
+# debt tracks a supported uppercase path), so the case is logged, not gated.
+SW_ALL_UPPERCASE_DIMENSIONS = 754
+# The tip thread's callout: below the axis, under the shank, so its leader
+# meets the tip without crossing the tip length's witness lines above. It is
+# centred between the overall reference's two witness lines (bearing face and
+# faced end), which also run below the axis: stud-19 (leaf 20260923T010416Z)
+# right-aligned it on the tip and its text ran left across the bearing face's
+# witness line. Its text measured 67.3 mm wide on that sheet (text start to
+# leader shelf); GetExtent also takes in the leader, so it cannot size it.
+THREAD_CALLOUT_OUT_M = 0.005
+THREAD_CALLOUT_WIDTH_M = 0.068
 SUFFIX = 2  # swDimensionTextSuffix
 
 # The free upper-right cell the pictorial lives in, on this 0.4318 x 0.2794 m
@@ -154,8 +180,9 @@ DIMENSION_ARC_RADIUS_MAX_M = 0.030
 DIMENSION_ARC_SWEEP_MAX_DEG = 60.0
 ARC_SAMPLES = 32
 # Ink segments allowed to cross the tip detail's boundary circle, per
-# dimension: none -- the chamfer's dimension line runs inside the fence.
-DETAIL_BOUNDARY_CROSSINGS: dict[str, int] = {}
+# dimension: the chamfer's dimension line, once, out to its text clear of the
+# boundary (Main's one-crossing precedent, 2026-09-22).
+DETAIL_BOUNDARY_CROSSINGS = {"TipChamfer": 1}
 # Proper crossings between a dimension's own lines (e.g. its leader through
 # its witness line) are measured apart from shared endpoints by this much.
 SELF_CROSSING_END_M = 0.0005
@@ -1011,21 +1038,108 @@ def _assert_finished_display(annotation: Any, model_value: float) -> None:
         raise RuntimeError(f"{problem}: {state!r}")
 
 
-def _import_tip_controls(adapter: Any, front: Any, detail: Any) -> tuple[Any, Any]:
+def _display_texts(display: Any) -> list[str]:
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    return [
+        str(data.GetTextAtIndex(index) or "")
+        for index in range(int(data.GetTextCount()))
+    ]
+
+
+def _display_text_box(display: Any) -> Box:
+    """The dimension's rendered text block, from its own display geometry.
+
+    Each ``IDisplayData`` text item is boxed by :func:`estimate_text_box` at its
+    REAL position, height and anchor corner; the union is the printed block.
+    """
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    boxes = []
+    for index in range(int(data.GetTextCount())):
+        position = tuple(
+            float(value) for value in (data.GetTextPositionAtIndex(index) or ())
+        )
+        if len(position) < 2:
+            continue
+        box = estimate_text_box(
+            str(data.GetTextAtIndex(index) or ""),
+            anchor=(position[0], position[1]),
+            height=float(data.GetTextHeightAtIndex(index)),
+            reference=int(data.GetTextRefPositionAtIndex(index)),
+            angle=float(data.GetTextAngleAtIndex(index)),
+        )
+        if box is not None:
+            boxes.append((box.xmin, box.ymin, box.xmax, box.ymax))
+    if not boxes:
+        raise RuntimeError("dimension reports no text to box")
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
+def _text_boundary_problem(box: Box, boundary: tuple[Point, float]) -> str | None:
+    """Why a text block straddles the detail boundary: it must sit wholly
+    inside the circle or wholly clear of it."""
+    center, radius = boundary
+    corners = [(box[0], box[1]), (box[0], box[3]), (box[2], box[1]), (box[2], box[3])]
+    if all(math.dist(corner, center) < radius for corner in corners):
+        return None
+    nearest = (
+        min(max(center[0], box[0]), box[2]),
+        min(max(center[1], box[1]), box[3]),
+    )
+    if math.dist(nearest, center) > radius:
+        return None
+    return (
+        f"text {_format_box(box)} straddles the detail boundary "
+        f"{_mm(center)} r {radius * 1000.0:.1f} mm"
+    )
+
+
+def _uppercase_problem(texts: list[str]) -> str | None:
+    """Why the chamfer's limit does not print as ASME's "MAX"."""
+    rendered = "".join(texts)
+    if "MAX" in rendered and "max" not in rendered:
+        return None
+    return f"tip chamfer renders {texts!r}, not an uppercase MAX"
+
+
+def _set_uppercase_dimensions(draw: Any) -> None:
+    """Print a swTolMAX limit as "MAX", the drafting-standard way.
+
+    The document property 'All uppercase for dimensions and hole callouts' is
+    set on this drawing and read back -- never hand-typed text, which would
+    break the dimension's model link (as draw_knife_mount).
+    """
+    extension = _early_bound(draw.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceToggle(SW_ALL_UPPERCASE_DIMENSIONS, 0, True):
+        raise RuntimeError("failed to set all-uppercase dimensions")
+    if not bool(extension.GetUserPreferenceToggle(SW_ALL_UPPERCASE_DIMENSIONS, 0)):
+        raise RuntimeError("all-uppercase dimensions did not persist")
+
+
+def _import_tip_controls(
+    adapter: Any, front: Any, detail: Any, boundary: tuple[Point, float]
+) -> tuple[Any, Any]:
     """Import TipChamfer into the tip detail and TipLength into the lathe view.
 
     The detail claims its control first (as in ``draw_spring_hook``), then
-    both are re-proved as the model's driving, banded controls.
+    both are re-proved as the model's driving, banded controls. The chamfer's
+    text goes right of the detail boundary on its own dimension line.
     """
     chamfer_mid = TIP_END_Y_MM + TIP_CHAMFER_MM / 2.0
+    line = _out_from(adapter, detail, TIP_RADIUS_MM, chamfer_mid, CHAMFER_TEXT_OUT_M)
+    (center_x, _center_y), radius = boundary
+    chamfer_xy = (
+        center_x + radius + CHAMFER_TEXT_CLEAR_M + CHAMFER_TEXT_HALF_WIDTH_M,
+        line[1],
+    )
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,
-        keep={
-            "TipChamfer": _out_from(
-                adapter, detail, TIP_RADIUS_MM, chamfer_mid, CHAMFER_TEXT_OUT_M
-            )
-        },
+        keep={"TipChamfer": chamfer_xy},
         view_label="tip chamfer",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -1068,14 +1182,107 @@ def _import_tip_controls(adapter: Any, front: Any, detail: Any) -> tuple[Any, An
     return front_annotations[0], detail_annotations[0]
 
 
-def _import_tip_thread(adapter: Any, front: Any) -> None:
-    """The tip's cosmetic #10-24 thread and its callout, on the lathe view."""
+def _assert_chamfer_text(annotation: Any, boundary: tuple[Point, float]) -> Box:
+    """The chamfer's text sits clear of the boundary; its case is logged."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    texts = _display_texts(display)
+    box = _display_text_box(display)
+    _telemetry.info(
+        "tip chamfer text: "
+        + json.dumps({"texts": texts, "box_mm": [round(v * 1000.0, 2) for v in box]})
+    )
+    case = _uppercase_problem(texts)
+    if case is not None:
+        _telemetry.info(f"accepted lowercase tolerance suffix: {case}")
+        _telemetry.event("drawing.lowercase_tolerance_suffix", texts=json.dumps(texts))
+    problem = _text_boundary_problem(box, boundary)
+    if problem is not None:
+        raise RuntimeError(problem)
+    return box
+
+
+def _text_overlaps(box: Box, others: dict[str, Box]) -> list[str]:
+    """The named boxes ``box`` overlaps."""
+    return [
+        f"{label} {_format_box(other)}"
+        for label, other in others.items()
+        if box[0] < other[2]
+        and other[0] < box[2]
+        and box[1] < other[3]
+        and other[1] < box[3]
+    ]
+
+
+def _thread_callout_problem(callout: str, view_notes: list[str]) -> str | None:
+    """Why the lathe view does not carry exactly the tip thread's one callout.
+
+    ``callout`` is the thread's own callout note; ``view_notes`` are the view's
+    notes naming the thread, which may or may not list that callout itself.
+    """
+    wanted = TIP_THREAD_CALLOUT
+    if " ".join(callout.split()) != wanted:
+        return f"{THREAD} callout reads {callout!r}, expected {wanted!r}"
+    strays = [text for text in view_notes if " ".join(text.split()) != wanted]
+    if strays or len(view_notes) > 1:
+        return f"the lathe view names {THREAD} more than once: {view_notes!r}"
+    return None
+
+
+def _callout_left(bearing_x: float, faced_end_x: float) -> float:
+    """Left edge that centres the thread callout between the overall
+    reference's witness lines, or why it cannot fit between them."""
+    low, high = sorted((bearing_x, faced_end_x))
+    slack = (high - low) - THREAD_CALLOUT_WIDTH_M
+    if slack < 2.0 * THREAD_CALLOUT_OUT_M:
+        raise RuntimeError(
+            f"thread callout ({THREAD_CALLOUT_WIDTH_M * 1000.0:.1f} mm) does not fit "
+            f"between the reference's witness lines {low * 1000.0:.1f}.."
+            f"{high * 1000.0:.1f} mm"
+        )
+    return low + slack / 2.0
+
+
+def _note_text(note: Any) -> str:
+    return str(_early_bound(note, "INote").GetText() or "")
+
+
+def _import_tip_thread(adapter: Any, front: Any) -> Any:
+    """The tip's cosmetic thread and its one callout, placed under the shank.
+
+    Returns the callout note. stud-16 imported a thread with no callout; the
+    gate reads every note on the view naming the thread, not a count.
+    """
     seeds, instances = import_cosmetic_threads(adapter, front)
     _telemetry.info(f"tip cosmetic threads: {seeds} seed(s), {instances} instance(s)")
     if (seeds, instances) != (1, 1):
         raise RuntimeError(
             f"expected the tip's one cosmetic thread, got {seeds}/{instances}"
         )
+    thread = _early_bound(_early_bound(front, "IView").GetFirstCThread(), "ICThread")
+    callout = thread.ThreadCallout
+    if callout is None:
+        raise RuntimeError("the tip's cosmetic thread has no callout note")
+    note = _early_bound(callout, "INote")
+    tip_mid = (SHOULDER_Y_MM + TIP_END_Y_MM) / 2.0
+    under = _out_from(adapter, front, -SHANK_DIA / 2.0, tip_mid, THREAD_CALLOUT_OUT_M)
+    bearing = _station(adapter, front, 0.0, BEARING_CIRCLE[1])
+    faced_end = _station(adapter, front, 0.0, FACED_END_CIRCLE[1])
+    left = _callout_left(bearing[0], faced_end[0])
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(left, under[1], 0.0):
+        raise RuntimeError("cannot position the tip thread callout")
+    rebuild_drawing(adapter, label="tip thread callout")
+    notes = _read_member(_early_bound(front, "IView"), "GetNotes") or ()
+    texts = [_note_text(item) for item in notes if THREAD in _note_text(item)]
+    callout_text = _note_text(note)
+    _telemetry.info(
+        "tip thread callout: "
+        + json.dumps({"callout": callout_text, "view_notes": texts}, ensure_ascii=False)
+    )
+    problem = _thread_callout_problem(callout_text, texts)
+    if problem is not None:
+        raise RuntimeError(problem)
+    return note
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1097,6 +1304,7 @@ async def build(adapter: Any) -> dict[str, str]:
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _set_uppercase_dimensions(draw)
     stamp_drawing_summary(
         adapter,
         draw,
@@ -1124,6 +1332,13 @@ async def build(adapter: Any) -> dict[str, str]:
         (ISO_REGION[1] + ISO_REGION[3]) / 2.0,
         scale=ISO_SCALE,
     )
+    # finalize_drawing switches every pictorial to precise Shaded With Edges;
+    # SetDisplayMode4 ignores a same-mode set, cosmetic-thread quality
+    # included, so the template's default shaded iso kept draft threads and
+    # failed that readback (stud-15, leaf 20260923T001325Z). Leaving it in
+    # hidden-lines-removed makes finalize's set a real change, as in
+    # draw_platen_guide.
+    set_hidden_lines_removed(adapter, iso)
     _orient_as_in_the_lathe(adapter, front)
     _fit_view(adapter, front, FRONT_REGION, FRONT_FIT_MARGIN_M, label="front")
     set_hidden_lines_removed(adapter, front)
@@ -1142,8 +1357,9 @@ async def build(adapter: Any) -> dict[str, str]:
     manufacturing_notes = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.085, char_height=0.003
     )
-    tip_length, tip_chamfer = _import_tip_controls(adapter, front, detail)
-    _import_tip_thread(adapter, front)
+    boundary = _detail_boundary(front, _view_box(detail, label="tip detail"))
+    tip_length, tip_chamfer = _import_tip_controls(adapter, front, detail, boundary)
+    thread_callout = _import_tip_thread(adapter, front)
     finished = _add_finished_reference(adapter, front)
     _assert_finished_display(finished, model_finished)
     silhouette = _part_silhouette(adapter, front)
@@ -1155,6 +1371,10 @@ async def build(adapter: Any) -> dict[str, str]:
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
     front_box = _view_box(front, label="front")
     detail_box = _view_box(detail, label="tip detail")
+    chamfer_text_box = _assert_chamfer_text(tip_chamfer, boundary)
+    thread_callout_box = _note_box(
+        _early_bound(thread_callout, "INote"), label="thread callout"
+    )
     iso_note_box = _note_box(_early_bound(iso_note, "INote"), label="isometric note")
     detail_label_box = _note_box(
         _early_bound(_read_member(detail, "GetNotes")[0], "INote"), label="detail label"
@@ -1163,13 +1383,30 @@ async def build(adapter: Any) -> dict[str, str]:
         _early_bound(manufacturing_notes, "INote"), label="manufacturing notes"
     )
     _assert_finished_display(finished, model_finished)
+    crowded = _text_overlaps(
+        chamfer_text_box,
+        {
+            "front view": front_box,
+            "isometric": iso_box,
+            "isometric note": iso_note_box,
+            "detail label": detail_label_box,
+            "manufacturing notes": notes_box,
+            "thread callout": thread_callout_box,
+        },
+    )
+    if crowded:
+        raise RuntimeError("tip chamfer text overlaps " + ", ".join(crowded))
     _audit_sheet_layout(
         adapter,
         {
             "TipLength": (
                 tip_length,
                 front_box,
-                {"tip detail": detail_box, "isometric": iso_box},
+                {
+                    "tip detail": detail_box,
+                    "isometric": iso_box,
+                    "thread callout": thread_callout_box,
+                },
                 None,
                 silhouette,
             ),
@@ -1189,7 +1426,11 @@ async def build(adapter: Any) -> dict[str, str]:
             "FinishedOverall": (
                 finished,
                 front_box,
-                {"tip detail": detail_box, "isometric": iso_box},
+                {
+                    "tip detail": detail_box,
+                    "isometric": iso_box,
+                    "thread callout": thread_callout_box,
+                },
                 None,
                 silhouette,
             ),
