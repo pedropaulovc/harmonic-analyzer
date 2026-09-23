@@ -53,6 +53,15 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+# Sheet-derived diameters are created here, not imported: _detail_diameter
+# reads their DRAWING_REFERENCE_PRECISION places back itself, so only the
+# imported names go through assert_imported_precision.
+IMPORTED_PRECISION_BY_NAME = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in DRAWING_REFERENCE_PRECISION
+}
+
 SPEC = DRAWINGS_BY_NAME["pinion_arbor"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -383,7 +392,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *detail_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, IMPORTED_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",

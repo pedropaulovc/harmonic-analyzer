@@ -39,6 +39,13 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
         for name in ("HeadDia", "NeckDia")
     } == {"HeadDia": 1, "NeckDia": 1}
     assert spec.DRAWING_REFERENCE_PRECISION == {"HeadDia": 1, "NeckDia": 1}
+    # Imported and sheet-derived names split the printed set with no overlap:
+    # a derived name left in the imported check can never be matched natively.
+    imported = set(drawing.IMPORTED_PRECISION_BY_NAME)
+    derived = set(spec.DRAWING_REFERENCE_PRECISION)
+    assert imported.isdisjoint(derived)
+    assert imported | derived == set(spec.DRAWING_PRECISION_BY_NAME)
+    assert imported == marked
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
