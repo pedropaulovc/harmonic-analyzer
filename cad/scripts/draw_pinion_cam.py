@@ -103,8 +103,10 @@ SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
     "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
 }
+# The tap-drill callout sits LEFT of the end view, under the profile view:
+# placed right of it, its diameter line ran out past the view (render r1).
 BOTTOM_KEEP = {
-    "TapDrillDia": (0.360, 0.105),
+    "TapDrillDia": (0.262, 0.100),
     "TapCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {

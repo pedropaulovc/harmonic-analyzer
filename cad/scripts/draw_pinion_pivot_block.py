@@ -113,11 +113,16 @@ FRONT_KEEP = {
     "LiftBoreX": (_front_x(-LIFT_BORE_SPACING / 2.0), 0.165),
     "BlockHeight": (0.226, 0.123),
     "AnchorZ": (0.212, 0.113),
-    "LiftBoreCz": (0.070, 0.1435),
+    # BETWEEN the bores: the witnesses leave each centre toward the other and
+    # stop at the dimension line, so neither crosses the other bore (render r1:
+    # placed left, the pivot-centre witness ran through the lift bore).
+    "LiftBoreCz": (_front_x(-LIFT_BORE_SPACING / 2.0), 0.1365),
     # Every horizontal/vertical witness from the pivot centre crosses its rim
-    # at 0/90/180/270 deg, so the diameter leader climbs at ~70 deg into the
-    # band under the top view, leaving ~30 deg free for the bore's Ra symbol.
-    "PivotBoreDia": (0.180, 0.195),
+    # at 0/90/180/270 deg.  The leader runs to the NEAR end of the text's
+    # shoulder, so the text sits right of the bore (render r1: centred at
+    # 0.180 the leader ran straight up LiftBoreX's east witness) and the
+    # leader climbs at ~65 deg, clear of the Ra symbol's ~30 deg sector.
+    "PivotBoreDia": (0.212, 0.195),
     # Shallow, to the left: the parallelism frame's leader climbs from the
     # lift bore's top above this one, so the two never cross.
     "LiftBoreDia": (0.045, 0.168),
@@ -281,9 +286,11 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="C",
         label="block broad face",
     )
+    # 120 deg on the lift-bore rim: the top point (90 deg) is where
+    # LiftBoreX's west witness leaves the bore.
     lift_edge = (
-        _front_x(-LIFT_BORE_SPACING),
-        _front_y(LIFT_BORE_RISE) + BORE_R_SHEET,
+        _front_x(-LIFT_BORE_SPACING) - BORE_R_SHEET * 0.5,
+        _front_y(LIFT_BORE_RISE) + BORE_R_SHEET * 0.866,
     )
     add_feature_control_frame(
         adapter,
@@ -296,15 +303,19 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="lift-bore parallelism",
     )
-    west_screw_edge = (
-        _front_x(-SCREW_HALF_SPACING),
+    # The pattern is called out on the EAST hole, from the clear sheet right of
+    # the top view: led from the left margin to the west hole, the size and
+    # position leaders crossed over the block (render r1).  The frame sits
+    # under the size callout, so its leader stays below the callout's.
+    east_screw_edge = (
+        _front_x(SCREW_HALF_SPACING),
         TOP_CENTER[1] + SCREW_R_SHEET,
     )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=west_screw_edge,
-        callout_xy=(0.052, 0.252),
+        edge_xy=east_screw_edge,
+        callout_xy=(0.245, 0.250),
         label="hold-down screw hole",
     )
     # Position frame stacked directly UNDER the 2X size callout, led to the
@@ -312,8 +323,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         top,
-        edge_xy=west_screw_edge,
-        frame_xy=(0.052, 0.240),
+        edge_xy=east_screw_edge,
+        frame_xy=(0.225, 0.236),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["hold-down hole position"],
         datums=("A", "B", "C"),
