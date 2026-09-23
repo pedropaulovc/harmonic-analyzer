@@ -17,23 +17,58 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+# Which NAMED band each land rides (U27, 2026-09-23): the two running lands
+# keep the shared h band, the three soldered seats open to GEAR_SEAT_BAND.
+_EXPECTED_LAND_BANDS = (
+    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("GEAR_SEAT_BAND", cone_gear_shaft_spec.GEAR_SEAT_BAND),
+    ("RUNNING_DIA_BAND", _fit_limits.SHAFT_H),
+)
+
+
+def _lands_ride_named_bands(bands: tuple[tuple[float, float], ...]) -> bool:
+    """True when every land's band IS its named class, not an equal retype."""
+    return len(bands) == len(_EXPECTED_LAND_BANDS) and all(
+        band is getattr(cone_gear_shaft_spec, name) is expected
+        for band, (name, expected) in zip(bands, _EXPECTED_LAND_BANDS)
+    )
+
+
 def test_section_fits_are_toleranced_on_the_model() -> None:
-    """All five turned lands ride ONE shared fit class, applied to the model.
+    """Each turned land rides its NAMED fit class, applied to the model.
 
     Spelled as callout text the band is frozen: SolidWorks prints it verbatim
     and never re-renders it, so the mm->inch flip in issue #290 would leave
     "+0.00/-0.02" reading as inches on every land. The identity assertion also
-    stops a local retype from silently forking the shared class.
+    stops a local retype from silently forking a named class.
     """
-    assert cone_gear_shaft_spec.SECTION_DIA_BAND is _fit_limits.SHAFT_H
-    # Applied in a loop over the five sections, so the AST reports the f-string
-    # source rather than five literal keys.
+    spec = cone_gear_shaft_spec
+    assert spec.RUNNING_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.GEAR_SEAT_BAND == (0.000, -0.050)
+    assert _lands_ride_named_bands(spec.SECTION_DIA_BANDS)
+    # Positive control: an equal-valued local retype of either class is caught.
+    forked = list(spec.SECTION_DIA_BANDS)
+    forked[2] = (0.000, -0.050)
+    assert forked[2] == spec.GEAR_SEAT_BAND
+    assert not _lands_ride_named_bands(tuple(forked))
+    forked = list(spec.SECTION_DIA_BANDS)
+    forked[0] = (0.000, -0.020)
+    assert not _lands_ride_named_bands(tuple(forked))
+    # The running tip land still clears the bushing bore it turns in.
+    import cone_tip_bushing_spec as bushing
+
+    tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
+    assert bushing.BORE_DIA + bushing.BORE_DIA_BAND[1] - tip_max >= 0.0
+    # Applied in ONE loop over the named bands, so the AST reports the
+    # f-string source rather than five literal keys.
     assert model_toleranced_dimensions(part) == {
-        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): (
-            "*deviations(SECTION_DIA_BAND)"
-        )
+        ("f'Sec{section}Profile'", "f'Sec{section}Dia'"): "*deviations(band)"
     }
-    assert "for section in range(5)" in Path(part.__file__).read_text(encoding="utf-8")
+    assert "for section, band in enumerate(SECTION_DIA_BANDS)" in Path(
+        part.__file__
+    ).read_text(encoding="utf-8")
 
 
 def test_display_precision_is_owned_by_the_part() -> None:
@@ -246,9 +281,11 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # One feature, one dimension, one quantity prefix -- not four dimensions.
     assert drawing.DIMENSION_CALLOUTS == {"ShoulderR": "4X"}
     # The old "SHOULDER ROOTS R0.10 MAX" note is gone.  What remains names
-    # the mates behind the h band and the three-place stations (rule 2)
-    # without adding a check of its own (no MUST), and carries no number
-    # but the mate's part number, no tolerance, datum or method word.
+    # the mate behind the gear-seat band -- the solder gap (rule 2; codex
+    # 375a122c) -- without adding a check of its own (no MUST), and carries
+    # no number but the mate's part number, no tolerance, datum or method
+    # word.  The three-place-stations lines went in the U27 round: the
+    # places already say it.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     # The sheet's note text runs ~2.7 mm per character; a line from the
@@ -270,8 +307,8 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
         "GRIND",
     ):
         assert forbidden not in notes.upper()
-    assert "SLIP FIT" in notes and f"CONE GEAR BORES, {mate_number}" in notes
-    assert "SOLDERED CONE GEAR SEATS" in notes
+    assert "SOLDER GAP" in notes and f"CONE GEAR BORES, {mate_number}" in notes
+    assert "THREE-PLACE" not in notes
     assert (
         'apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})'
         in source
