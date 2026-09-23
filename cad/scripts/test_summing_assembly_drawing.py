@@ -226,3 +226,54 @@ def test_note_fields_report_every_escaping_block_in_one_pass(
     assert len(too_wide) == 2
     assert "wide leaves its note field: right" in too_wide[0]
     assert "tall leaves its note field: bottom" in too_wide[1]
+
+
+class _FakeBalloonAnnotation:
+    def __init__(self, position: tuple[float, float], attach: tuple[float, float]) -> None:
+        self.position = (*position, 0.0)
+        self.attach = attach
+
+    def GetPosition(self) -> tuple[float, float, float]:
+        return self.position
+
+    def SetPosition(self, x: float, y: float, z: float) -> bool:
+        self.position = (x, y, z)
+        return True
+
+    def GetLeaderPointsAtIndex(self, _index: int) -> tuple[float, ...]:
+        return (self.position[0], self.position[1], 0.0, *self.attach, 0.0)
+
+
+class _FakeBalloon:
+    def __init__(self, name: str, annotation: _FakeBalloonAnnotation) -> None:
+        self.name = name
+        self.annotation = annotation
+
+    def GetName(self) -> str:
+        return self.name
+
+    def GetAnnotation(self) -> _FakeBalloonAnnotation:
+        return self.annotation
+
+
+class _FakeRebuildAdapter:
+    class currentModel:  # noqa: N801 - mirrors the adapter attribute
+        @staticmethod
+        def EditRebuild3() -> bool:
+            return True
+
+
+def test_balloons_on_one_ray_swap_slots_until_their_leaders_clear() -> None:
+    # summing-asm-r12: balloons 4 and 5 point at attachments on one vertical
+    # ray under the view centre and crossed at (89.6, 94.3) mm.
+    four = _FakeBalloonAnnotation((0.1041, 0.0474), (0.0886, 0.0976))
+    five = _FakeBalloonAnnotation((0.0909, 0.0457), (0.0889, 0.1210))
+    balloons = [_FakeBalloon("4", four), _FakeBalloon("5", five)]
+    segments = [draw_summing_assembly._balloon_leader(b.annotation, b.name) for b in balloons]
+    assert draw_summing_assembly.find_leader_leader_crossings(segments)
+    draw_summing_assembly._uncross_balloon_leaders(
+        _FakeRebuildAdapter(), balloons, label="test"
+    )
+    segments = [draw_summing_assembly._balloon_leader(b.annotation, b.name) for b in balloons]
+    assert draw_summing_assembly.find_leader_leader_crossings(segments) == []
+    assert four.position[:2] == (0.0909, 0.0457)

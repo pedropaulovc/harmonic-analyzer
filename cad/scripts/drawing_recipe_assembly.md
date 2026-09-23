@@ -101,7 +101,7 @@ Inspect every page and complete the blind machinist review before release.
    marks.
 4. **HANGER FIT + INSPECTION** (1:1 sheet): a hanger-station parent isolated to
    MHA-037/MHA-131/MHA-119 (1:2), its hanger-axis section A-A (1:2, with the
-   bolts and washers drawn unsectioned per ASME Y14.3), and detail B at 4:1
+   bolts and washers drawn unsectioned per ASME Y14.3), and detail B at 3:1
    carrying the associative actual-edge engagement dimension E (MHA-037 tap
    mouth to MHA-119 finished tip) in the printed general `.XX` band, plus the
    per-side trim construction (CUT L = T + W + G + E) and as-built inspection

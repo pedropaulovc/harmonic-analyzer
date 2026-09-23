@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import argparse
 import math
+from datetime import UTC, datetime
 import hashlib
 import sys
 from pathlib import Path
 from typing import Any, Callable, Literal
 
 import _telemetry
-from _common import _early_bound, _read_member, check, run_build
+from _common import OUT_FAILURES, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_component_bom_balloons,
@@ -33,9 +34,14 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
 )
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    place_view,
+    remove_notes_matching,
+)
 from summing_assembly_spec import (
     BOM_COMPONENTS,
     BOM_DESCRIPTIONS,
@@ -97,7 +103,7 @@ INSTRUCTION_SCALE = (1.0, 6.0)
 HANGER_FIT_SHEET_SCALE = (1.0, 1.0)
 HANGER_PARENT_SCALE = (1.0, 2.0)
 HANGER_SECTION_SCALE = (1.0, 2.0)
-HANGER_DETAIL_SCALE = (4.0, 1.0)
+HANGER_DETAIL_SCALE = (3.0, 1.0)
 NOTES_SHEET_SCALE = (1.0, 1.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
@@ -119,11 +125,15 @@ HANGER_SECTION_CENTER = (0.300, 0.205)
 # model point, not by their outline.
 HANGER_PARENT_ANCHOR_XY = (0.040, 0.200)
 HANGER_SECTION_ANCHOR_XY = (0.140, 0.200)
-HANGER_DETAIL_CENTER = (0.095, 0.085)
+HANGER_DETAIL_CENTER = (0.095, 0.092)
 # The native detail label letter. The sheet heading and the MHA-119 stud note
 # reference it; test_summing_assembly_drawing.py pins the cross-reference.
 HANGER_DETAIL_LABEL = "B"
-HANGER_DETAIL_LABEL_XY = (0.070, 0.142)
+# The detail's own label hangs under its outline (summing-asm-r12: parked
+# inside the 4:1 outline it overlapped the view), inset from the left edge so
+# it clears the sheet-number note.
+HANGER_DETAIL_LABEL_GAP = 0.003
+HANGER_DETAIL_LABEL_INSET_X = 0.010
 # Built-solid readback tolerances: circle y/r agreement, and how far a circle
 # centre may sit off the nominal hanger axis and still belong to that station.
 BUILT_GEOMETRY_TOLERANCE_MM = 1e-4
@@ -159,6 +169,9 @@ NOTE_BLOCK_GAP = 0.006
 # heading, above the caption. The ring is the view outline grown by the
 # balloon margin plus one rendered balloon diameter.
 EXPLODED_RING_REGION = (0.020, 0.040, 0.160, 0.252)
+# r12: at y 37 the caption's top met balloon 5; it now sits between the ring
+# and the sheet-number note.
+EXPLODED_CAPTION_XY = (0.018, 0.032)
 EXPLODED_BALLOON_MARGIN = 0.012
 BALLOON_DIAMETER = 0.010
 # Only assembly-level requirements live here. Part drawings own component
@@ -525,6 +538,55 @@ def ring_fit_shift(
     return shift, overflows
 
 
+def _balloon_leader(annotation: Any, name: str) -> LeaderSegment:
+    """A balloon's straight leader: balloon end -> attachment, sheet meters."""
+    points = tuple(
+        float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ())
+    )
+    if len(points) < 6:
+        raise RuntimeError(f"{name}: balloon leader is unreadable: {points!r}")
+    return LeaderSegment(name, "note", points[0], points[1], points[-3], points[-2])
+
+
+def _uncross_balloon_leaders(
+    adapter: Any,
+    balloons: list[Any],
+    *,
+    label: str,
+) -> None:
+    """Swap the ring slots of any two balloons whose leaders cross.
+
+    The shared ring orders slots by each attachment's angle about the view
+    centre, which cannot separate two attachments on one ray (summing-asm-r12:
+    items 4 and 5 both at x 88.7 mm, crossing at (89.6, 94.3) mm). Swapping the
+    two balloons' positions uncrosses a pair; the layout audit stays the gate.
+    """
+    annotations = {}
+    for balloon in balloons:
+        note = _early_bound(balloon, "INote")
+        annotations[str(note.GetName() or "")] = _early_bound(
+            note.GetAnnotation(), "IAnnotation"
+        )
+    swaps = []
+    for _attempt in range(len(annotations)):
+        segments = [
+            _balloon_leader(annotation, name)
+            for name, annotation in annotations.items()
+        ]
+        crossings = find_leader_leader_crossings(segments)
+        if not crossings:
+            break
+        first, second = crossings[0].a.label, crossings[0].b.label
+        a, b = annotations[first], annotations[second]
+        pa = tuple(float(value) for value in a.GetPosition())
+        pb = tuple(float(value) for value in b.GetPosition())
+        if not (a.SetPosition(*pb) and b.SetPosition(*pa)):
+            raise RuntimeError(f"{label}: cannot swap balloons {first} and {second}")
+        adapter.currentModel.EditRebuild3()
+        swaps.append((first, second))
+    _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
+
+
 def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
     """Run the layout audit on every sheet and fail on any finding at all,
     including the note-field findings collected while the sheets were placed.
@@ -540,10 +602,36 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
             )
         except RuntimeError as exc:
             failures.append(f"sheet {number} {sheet_name}: {exc}")
-    if failures:
-        raise RuntimeError(
-            "summing package layout audit failed:\n" + "\n".join(failures)
-        )
+    if not failures:
+        return
+    _export_failure_pdf(adapter)
+    raise RuntimeError(
+        "summing package layout audit failed:\n" + "\n".join(failures)
+    )
+
+
+def _export_failure_pdf(adapter: Any) -> None:
+    """Export the failing package as a PDF under the forensic tree, which the
+    farm uploads on a failed leaf, so a failed audit still yields a render to
+    inspect (r12 failed without one). Best effort: never masks the audit.
+    """
+    path = (
+        OUT_FAILURES
+        / "summing-package-layout"
+        / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        / f"{ARTIFACT_STEM}.pdf"
+    )
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _early_bound(adapter.currentModel, "IModelDoc2").SaveAs3(str(path), 0, 0)
+    except Exception as exc:  # noqa: BLE001 - evidence must not mask the audit
+        _telemetry.warn(f"layout-failure PDF export failed: {exc!r}")
+        return
+    if not path.is_file():
+        _telemetry.warn(f"layout-failure PDF export produced no file: {path}")
+        return
+    _telemetry.event("drawing.layout_failure_pdf", path=str(path))
+    _telemetry.info(f"layout-failure evidence PDF: {path}")
 
 
 def _component_point_in_assembly(
@@ -904,7 +992,16 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    # AddToDB bypasses sketch inference: without it the fence snaps to nearby
+    # model geometry within a SCREEN-PIXEL tolerance, so its size depends on
+    # the seat's window state (flake report 2026-09-22, stud-4/5/6).
+    add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = add_to_db
+    if fence is None:
         raise RuntimeError("failed to create native hanger detail fence")
     detail = drawing.CreateDetailViewAt4(
         *HANGER_DETAIL_CENTER,
@@ -943,10 +1040,16 @@ def _create_hanger_detail(adapter: Any, section: Any) -> Any:
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
         raise RuntimeError(f"hanger detail has {len(notes)} native labels")
-    note = _early_bound(notes[0], "INote")
-    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    if not annotation.SetPosition2(*HANGER_DETAIL_LABEL_XY, 0.0):
-        raise RuntimeError("failed to position hanger detail label")
+    detail_outline = _view_outline(detail)
+    _anchor_note(
+        adapter,
+        _early_bound(notes[0], "INote"),
+        (
+            detail_outline[0] + HANGER_DETAIL_LABEL_INSET_X,
+            detail_outline[1] - HANGER_DETAIL_LABEL_GAP,
+        ),
+        label="hanger detail label",
+    )
     circles = tuple(_read_member(section, "GetDetailCircles") or ())
     if len(circles) != 1:
         raise RuntimeError(f"hanger section has {len(circles)} detail fences")
@@ -1123,6 +1226,7 @@ def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
     detail = _create_hanger_detail(adapter, section)
     set_hidden_lines_removed(adapter, detail)
     _record_cosmetic_threads(adapter, detail, label="hanger fit detail")
+    _remove_auto_hole_notes(adapter, label="hanger fit sheet")
     _add_hanger_engagement_dimension(adapter, detail)
     return _stack_note_field(
         adapter,
@@ -1138,6 +1242,28 @@ def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
         NOTE_FIELD_RIGHT,
         label="sheet 4 note field",
     )
+
+
+def _remove_auto_hole_notes(adapter: Any, *, label: str) -> None:
+    """Delete the "Tapped Hole" notes the cosmetic-thread import drops.
+
+    Importing the section's threads also imports the knife mount's Hole Wizard
+    callout (summing-asm-r12: "1/2-13 Tapped Hole" over the construction
+    notes); the tap belongs to the MHA-037 print, not the assembly. Gated on
+    the deletion, never on a count: which view receives it is a lottery.
+    """
+    removed = remove_notes_matching(adapter, "Tapped Hole")
+    remaining = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.event(
+        "drawing.auto_hole_notes_removed",
+        label=label,
+        removed=removed,
+        remaining=remaining,
+    )
+    if remaining:
+        raise RuntimeError(
+            f"{label}: {remaining} auto Tapped Hole note(s) survived deletion"
+        )
 
 
 def _record_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> None:
@@ -1712,13 +1838,14 @@ def _place_package(adapter: Any) -> None:
         label="summing",
     )
     balloon_items = _validate_summing_bom(adapter, table)
-    add_component_bom_balloons(
+    balloons = add_component_bom_balloons(
         adapter,
         exploded,
         items=balloon_items,
         label="summing exploded-view BOM coverage",
         margin=EXPLODED_BALLOON_MARGIN,
     )
+    _uncross_balloon_leaders(adapter, balloons, label="summing exploded view")
     _add_note_block(
         adapter,
         "EXPLODED ISOMETRIC 1:4",
@@ -1728,7 +1855,7 @@ def _place_package(adapter: Any) -> None:
     _add_note_block(
         adapter,
         "SEE SHEET 3 FOR ASSEMBLY, SHEET 4 FOR HANGER FIT, SHEET 5 FOR CHECKS",
-        (0.018, 0.037),
+        EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )
 
