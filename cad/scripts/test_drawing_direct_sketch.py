@@ -308,6 +308,24 @@ def test_direct_sketch_refuses_to_run_through_inference() -> None:
     assert manager.DisplayWhenAdded is False
 
 
+def test_direct_sketch_undoes_a_setup_that_fails_part_way() -> None:
+    """AddToDB accepted, then DisplayWhenAdded raises: the manager must not be
+    left in direct-to-DB mode on the shared seat."""
+
+    class _Flaky(_Manager):
+        def __setattr__(self, name, value):
+            if name == "DisplayWhenAdded" and value is True and self._armed:
+                raise RuntimeError("COM write failed")
+            super().__setattr__(name, value)
+
+    manager = _Flaky(add_to_db=False)
+    manager._armed = True
+    with pytest.raises(RuntimeError, match="COM write failed"):
+        with _drawing_common.direct_sketch(manager):
+            raise AssertionError("the block must not run")
+    assert (manager.AddToDB, manager.DisplayWhenAdded) == (False, False)
+
+
 class _View:
     def __init__(self, info: list[float]) -> None:
         self.info = info

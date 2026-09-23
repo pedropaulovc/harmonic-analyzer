@@ -1214,9 +1214,10 @@ def direct_sketch(manager: Any) -> Iterator[Any]:
     """
     previous_add_to_db = bool(manager.AddToDB)
     previous_display = bool(manager.DisplayWhenAdded)
-    manager.AddToDB = True
-    manager.DisplayWhenAdded = True
     try:
+        # Inside the try: a write that raises part-way must still be undone.
+        manager.AddToDB = True
+        manager.DisplayWhenAdded = True
         if not bool(manager.AddToDB):
             raise RuntimeError(
                 "the sketch manager refused AddToDB = True; its entities would "
