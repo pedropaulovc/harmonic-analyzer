@@ -750,10 +750,13 @@ async def build(adapter: Any) -> dict[str, str]:
         "bore spacing line along the post axis",
         await adapter.add_sketch_constraint(spacing_line, None, "horizontal"),
     )
+    # A point pair takes HORIZPOINTS: swConstraintType_HORIZONTAL applies only
+    # to lines, and on a point and the origin it was accepted without holding
+    # the point (r6 farm: the sketch stayed under-defined).
     check(
         "bore spacing line rooted on the post axis",
         await adapter.add_sketch_constraint(
-            f"{spacing_line}.start", "origin", "horizontal"
+            f"{spacing_line}.start", "origin", "horizontal_points"
         ),
     )
     check(
