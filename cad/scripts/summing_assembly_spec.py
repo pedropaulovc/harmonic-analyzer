@@ -74,3 +74,8 @@ SAVED_SETUP = "neutral"
 SAVED_FREE_DOF = "lever_rock"
 DEFINED_ALTERNATE_CONFIGURATIONS: tuple[str, ...] = ()
 
+
+# --- sheet 4 (hanger fit) print values -------------------------------------
+# Places each drawing-created dimension prints (policy rule 2). E, the actual
+# engagement, prints two places and takes the title-block .XX band.
+DRAWING_REFERENCE_PRECISION = {"HangerEngagement": 2}

@@ -49,6 +49,7 @@ from summing_assembly_spec import (
     BOM_NORMALIZED_ALIASES,
     BOM_PART_NUMBERS,
     BOM_QUANTITIES,
+    DRAWING_REFERENCE_PRECISION,
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
 )
@@ -57,10 +58,8 @@ from build_knife_mount import STUD_TAP_DIA
 from build_summing_assembly import (
     DRAWING_NUMBER,
     HANGER_COMPLETE_MALE_START_DEPTH_MM,
-    HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM,
     HANGER_ENGAGEMENT_MAX_MM,
     HANGER_ENGAGEMENT_MIN_MM,
-    HANGER_ENGAGEMENT_PRECISION,
     HANGER_ENGAGEMENT_TARGET_MM,
     HANGER_TAP_DRILL_SHOULDER_MIN_MM,
     HANGER_TAP_FULL_THREAD_MIN_MM,
@@ -614,14 +613,15 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
     )
 
 
-def _export_failure_pdf(adapter: Any) -> None:
+def _export_failure_pdf(adapter: Any, stage: str = "layout") -> None:
     """Export the failing package as a PDF under the forensic tree, which the
-    farm uploads on a failed leaf, so a failed audit still yields a render to
-    inspect (r12 failed without one). Best effort: never masks the audit.
+    farm uploads on a failed leaf, so a failed audit or finalize still yields
+    a render to inspect (r12 and r13 failed without one). Best effort: never
+    masks the failure.
     """
     path = (
         OUT_FAILURES
-        / "summing-package-layout"
+        / f"summing-package-{stage}"
         / datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         / f"{ARTIFACT_STEM}.pdf"
     )
@@ -629,13 +629,13 @@ def _export_failure_pdf(adapter: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         _early_bound(adapter.currentModel, "IModelDoc2").SaveAs3(str(path), 0, 0)
     except Exception as exc:  # noqa: BLE001 - evidence must not mask the audit
-        _telemetry.warn(f"layout-failure PDF export failed: {exc!r}")
+        _telemetry.warn(f"{stage}-failure PDF export failed: {exc!r}")
         return
     if not path.is_file():
-        _telemetry.warn(f"layout-failure PDF export produced no file: {path}")
+        _telemetry.warn(f"{stage}-failure PDF export produced no file: {path}")
         return
-    _telemetry.event("drawing.layout_failure_pdf", path=str(path))
-    _telemetry.info(f"layout-failure evidence PDF: {path}")
+    _telemetry.event("drawing.failure_pdf", stage=stage, path=str(path))
+    _telemetry.info(f"{stage}-failure evidence PDF: {path}")
 
 
 def _component_point_in_assembly(
@@ -1129,23 +1129,17 @@ def _add_hanger_engagement_dimension(adapter: Any, detail: Any) -> Any:
             f"{measured_mm:g} mm, expected {HANGER_ENGAGEMENT_TARGET_MM:g} mm"
         )
     if int(
-        display.SetPrecision3(HANGER_ENGAGEMENT_PRECISION, -1, -1, -1)
+        display.SetPrecision3(
+            DRAWING_REFERENCE_PRECISION["HangerEngagement"], -1, -1, -1
+        )
     ) < 0:
         raise RuntimeError("failed to set hanger engagement precision")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = HANGER_ENGAGEMENT_GENERAL_TOLERANCE_MM / 1000.0
-    tolerance.Type = 11
-    if not tolerance.SetValues(-band, band):
-        raise RuntimeError("hanger engagement general tolerance was rejected")
     draw.EditRebuild3()
-    if int(display.GetPrimaryPrecision2()) != HANGER_ENGAGEMENT_PRECISION:
-        raise RuntimeError("hanger engagement precision did not persist")
     if (
-        int(tolerance.Type) != 11
-        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
-        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
+        int(display.GetPrimaryPrecision2())
+        != DRAWING_REFERENCE_PRECISION["HangerEngagement"]
     ):
-        raise RuntimeError("hanger engagement general tolerance did not persist")
+        raise RuntimeError("hanger engagement precision did not persist")
     return display
 
 
@@ -1973,16 +1967,20 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         _validate_persisted_explode(source_model)
         _place_package(adapter)
-        artifacts = await finalize_drawing(
-            adapter,
-            OUTPUTS,
-            layout=SPEC.layout,
-            pdf_title="Summing Assembly Drawing Package",
-            scale=ASSEMBLED_SCALE,
-            expected_sheet_names=SHEET_NAMES,
-            sheet_layouts=SHEET_LAYOUTS,
-            sheet_scales=SHEET_SCALES,
-        )
+        try:
+            artifacts = await finalize_drawing(
+                adapter,
+                OUTPUTS,
+                layout=SPEC.layout,
+                pdf_title="Summing Assembly Drawing Package",
+                scale=ASSEMBLED_SCALE,
+                expected_sheet_names=SHEET_NAMES,
+                sheet_layouts=SHEET_LAYOUTS,
+                sheet_scales=SHEET_SCALES,
+            )
+        except Exception:
+            _export_failure_pdf(adapter, "finalize")
+            raise
     finally:
         primary_error = sys.exception()
         cleanup_errors: list[str] = []
