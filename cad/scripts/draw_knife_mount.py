@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined, heat-treated steel block (24 wide x ~29.6 tall x 18 deep) with a
+A machined, heat-treated steel block (24 wide x ~28.8 tall x 18 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
@@ -264,8 +264,8 @@ def _front_y(model_y_mm: float) -> float:
 
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    # 29.6 sits 8 mm further out and the Ø12.00 THRU callout 3 mm further in:
-    # at -0.060/-0.048 the callout's shoulder crossed the 29.6 dimension line
+    # 28.8 sits 8 mm further out and the Ø12.00 callout 3 mm further in:
+    # at -0.060/-0.048 the callout's shoulder crossed the height dimension line
     # and its Ø glyph straddled it (knife-cc-6 render).
     "BlockHeight": (FRONT_CENTER[0] - 0.068, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.045, _front_y(BORE_CY) + 0.026),
@@ -667,8 +667,9 @@ def _read_source_tap_depth_contracts(
                 f"source StudTap has {len(values)} native {variable} dimensions"
             )
         contract = values[0]
+        places = HOLE_CALLOUT_PRECISION[variable]
         if (
-            (contract.precision, contract.tolerance_precision) != (2, 2)
+            (contract.precision, contract.tolerance_precision) != (places, places)
             or contract.tolerance_type != _TAP_DEPTH_TOLERANCE_TYPES[variable]
         ):
             raise RuntimeError(
