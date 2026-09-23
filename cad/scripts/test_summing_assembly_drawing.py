@@ -443,3 +443,77 @@ def test_summing_contract_is_loaded_by_name_and_kept_out_of_other_recipes() -> N
         Path(dep).name for dep in module_deps_of(scripts / "build_summing_assembly.py")
     }
     assert owned <= summing
+
+
+def test_balloon_attachment_gate_names_every_mismatch() -> None:
+    expected = {"knife-mount": "1", "knife-hanger-washer": "2", "knife-hanger-stud": "3"}
+    clean = [
+        ("DetailItem1", "1", ("knife-mount",)),
+        ("DetailItem2", "2", ("knife-hanger-washer",)),
+        ("DetailItem3", "3", ("knife-hanger-stud",)),
+    ]
+    assert draw_summing_assembly.balloon_attachment_violations(clean, expected) == []
+    # Main's r14 reading: item 2's leader ends on the knife block, not a washer.
+    misread = [
+        ("DetailItem1", "1", ("knife-mount",)),
+        ("DetailItem2", "2", ("knife-mount",)),
+        ("DetailItem3", "3", ("knife-hanger-stud", "knife-mount")),
+    ]
+    findings = draw_summing_assembly.balloon_attachment_violations(misread, expected)
+    assert findings == [
+        "DetailItem2 shows item 2 but attaches to knife-mount (item 1)",
+        "DetailItem3 (item 3) attaches to ['knife-hanger-stud', 'knife-mount']",
+        "knife-hanger-stud (item 3) carries 0 balloons, expected 1",
+        "knife-hanger-washer (item 2) carries 0 balloons, expected 1",
+        "knife-mount (item 1) carries 2 balloons, expected 1",
+    ]
+
+
+def test_hanger_section_crop_keeps_one_station_only() -> None:
+    # The crop spans one station in z and must stop short of the other one,
+    # which sits 2 x HEX_Z_MID away, with room for its own washer (~27 across).
+    half = draw_summing_assembly.HANGER_SECTION_CROP_HALF_Z_MM
+    assert half >= 27.0 / 2.0 + 5.0
+    assert half + 27.0 / 2.0 < 2.0 * build_summing_assembly.HEX_Z_MID
+
+
+def test_section_crop_gate_accepts_r16_padded_outline_and_refuses_misses() -> None:
+    # r16: the crop worked (174 mm two-station section -> one station) but the
+    # padded outline read 27.4 mm against the 25.0 mm crop.
+    cropped = (0.16985, 0.17574, 0.19721, 0.23323)
+    uncropped = (0.05, 0.17, 0.23, 0.235)
+    station_x = 0.1835
+    check = draw_summing_assembly.section_crop_violations
+    assert check(uncropped, cropped, station_x) == []
+    assert check(uncropped, uncropped, station_x) == [
+        "cropped outline is 180.0 mm wide, not under 0.5 x the uncropped 180.0 mm",
+        "cropped outline centre is -43.5 mm off the station",
+    ]
+    assert check(uncropped, cropped, station_x + 0.010) == [
+        "cropped outline centre is -10.0 mm off the station"
+    ]
+
+
+def test_detail_fence_is_found_by_the_view_it_owns(monkeypatch) -> None:
+    # r17: cropping section A-A added its crop profile to GetDetailCircles.
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(draw_summing_assembly, "_early_bound", lambda obj, _iface: obj)
+
+    def view(name):
+        return SimpleNamespace(GetName2=lambda: name)
+
+    def circle(name, label, owned):
+        return SimpleNamespace(
+            GetName=lambda: name, GetLabel=lambda: label, GetDetailView=lambda: owned
+        )
+
+    detail = view("Drawing View9")
+    fence = circle("Detail Circle1", "B", detail)
+    crop = circle("Crop1", "", None)
+    parent = SimpleNamespace(GetDetailCircles=lambda: (crop, fence))
+    assert draw_summing_assembly._detail_fence_of(parent, detail) is fence
+    with pytest.raises(RuntimeError, match="0 fences own detail 'Drawing View9'"):
+        draw_summing_assembly._detail_fence_of(
+            SimpleNamespace(GetDetailCircles=lambda: (crop,)), detail
+        )

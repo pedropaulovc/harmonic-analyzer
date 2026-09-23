@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 import hashlib
 import sys
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Sequence
 
 import _telemetry
 from _common import OUT_FAILURES, _early_bound, _read_member, check, run_build
@@ -56,10 +56,11 @@ from summing_assembly_spec import (
     SOURCE_CONFIGURATION,
 )
 import knife_hanger_interface as hanger
-from build_knife_hanger_stud import SHANK_DIA as STUD_SHANK_DIA
-from knife_mount_spec import R_BORE, SUPPORT_Z_THICK
+from build_knife_hanger_stud import HEAD_H, SHANK_DIA as STUD_SHANK_DIA
+from knife_mount_spec import BLK_BOT, BLK_TOP, R_BORE, SUPPORT_Z_THICK
 from build_summing_assembly import (
     DRAWING_NUMBER,
+    HANGER_WASHER_TOP_Y,
     HEX_Z_MID,
     KNIFE,
     measure_hanger_joint,
@@ -126,6 +127,20 @@ HANGER_SECTION_CENTER = (0.300, 0.205)
 HANGER_PARENT_ANCHOR_XY = (0.040, 0.200)
 HANGER_SECTION_ANCHOR_XY = (0.140, 0.200)
 HANGER_DETAIL_CENTER = (0.095, 0.092)
+# Section A-A cuts both hanger stations (they differ only in z), so r14 drew
+# two stacks under one centred caption and read as two views. The section is
+# cropped to the detailed station: +/- this half-width in z (the SAE washer is
+# about 27 across; the other station is 2 x HEX_Z_MID away), and this margin
+# past the block bottom and the stud head top.
+HANGER_SECTION_CROP_HALF_Z_MM = 25.0
+HANGER_SECTION_CROP_MARGIN_MM = 5.0
+# IView.GetOutline pads the ink (r16: 27.4 mm outline for a 25.0 mm crop),
+# so the crop is gated relative to the uncropped outline and the station:
+# it must at least halve the width and stay centred on the station.
+HANGER_SECTION_CROP_MAX_WIDTH_RATIO = 0.5
+HANGER_SECTION_CROP_CENTRE_TOLERANCE = 0.003
+# The section's own label hangs this far under its cropped outline.
+HANGER_SECTION_LABEL_GAP = 0.003
 # The native detail label letter. The sheet heading and the MHA-119 stud note
 # reference it; test_summing_assembly_drawing.py pins the cross-reference.
 HANGER_DETAIL_LABEL = "B"
@@ -583,6 +598,102 @@ def _uncross_balloon_leaders(
     _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
 
 
+def balloon_attachment_violations(
+    records: Sequence[tuple[str, str, tuple[str, ...]]],
+    expected: dict[str, str],
+) -> list[str]:
+    """Findings for balloons whose attached component is not their BOM item.
+
+    ``records`` holds (balloon, displayed item, attached component stems);
+    ``expected`` maps each ballooned stem to its BOM item. Every balloon must
+    attach to exactly one component whose item it displays, and every expected
+    stem must be ballooned exactly once.
+    """
+    findings = []
+    seen: dict[str, int] = {}
+    for name, item, stems in records:
+        if len(stems) != 1:
+            findings.append(f"{name} (item {item}) attaches to {list(stems)!r}")
+            continue
+        stem = stems[0]
+        seen[stem] = seen.get(stem, 0) + 1
+        want = expected.get(stem)
+        if want is None:
+            findings.append(f"{name} (item {item}) attaches to unballooned {stem}")
+        elif want != item:
+            findings.append(
+                f"{name} shows item {item} but attaches to {stem} (item {want})"
+            )
+    for stem, item in sorted(expected.items()):
+        if seen.get(stem, 0) != 1:
+            findings.append(
+                f"{stem} (item {item}) carries {seen.get(stem, 0)} balloons, expected 1"
+            )
+    return findings
+
+
+def _verify_balloon_attachments(
+    balloons: Sequence[Any],
+    items: Sequence[tuple[str, str]],
+    *,
+    label: str,
+) -> None:
+    """Prove each balloon's leader lands on the component its item names.
+
+    Main's r14 eye pass read balloon 2 (MHA-131 washer) as ending on a knife
+    block corner. The item number alone cannot settle that: it is what the
+    balloon displays, not what its leader touches. Read the attached entity's
+    owning component instead, log component -> item -> attach point, and fail
+    on any mismatch.
+    """
+    records = []
+    evidence = []
+    for balloon in balloons:
+        note = _early_bound(balloon, "INote")
+        name = str(note.GetName() or "")
+        item = str(note.GetBomBalloonText(True) or "").strip()
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        entities = tuple(annotation.GetAttachedEntities3() or ())
+        types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+        stems = []
+        components = []
+        for entity, kind in zip(entities, types):
+            if kind == 0 or entity is None:  # swSelNOTHING
+                continue
+            component = _early_bound(entity, "IEntity").GetComponent()
+            if component is None:
+                continue
+            component = _early_bound(component, "IComponent2")
+            components.append(str(component.Name2 or ""))
+            stems.append(_component_stem(component))
+        leader = _balloon_leader(annotation, name)
+        records.append((name, item, tuple(sorted(set(stems)))))
+        evidence.append(
+            {
+                "balloon": name,
+                "item": item,
+                "components": tuple(components),
+                "attach_mm": (leader.x1 * 1000.0, leader.y1 * 1000.0),
+            }
+        )
+    violations = balloon_attachment_violations(records, dict(items))
+    _telemetry.event(
+        "drawing.balloon_attachment",
+        label=label,
+        balloons=repr(evidence),
+        violations=tuple(violations),
+    )
+    for row in evidence:
+        _telemetry.debug(
+            f"{label}: balloon {row['item']} -> {', '.join(row['components'])} "
+            f"at ({row['attach_mm'][0]:.1f}, {row['attach_mm'][1]:.1f}) mm"
+        )
+    if violations:
+        raise RuntimeError(
+            f"{label}: balloon attachment mismatch: " + "; ".join(violations)
+        )
+
+
 def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
     """Run the layout audit on every sheet and fail on any finding at all,
     including the note-field findings collected while the sheets were placed.
@@ -600,18 +711,21 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
             failures.append(f"sheet {number} {sheet_name}: {exc}")
     if not failures:
         return
-    _export_failure_pdf(adapter)
     raise RuntimeError(
         "summing package layout audit failed:\n" + "\n".join(failures)
     )
 
 
-def _export_failure_pdf(adapter: Any, stage: str = "layout") -> None:
+def _export_failure_pdf(adapter: Any, stage: str) -> None:
     """Export the failing package as a PDF under the forensic tree, which the
-    farm uploads on a failed leaf, so a failed audit or finalize still yields
-    a render to inspect (r12 and r13 failed without one). Best effort: never
-    masks the failure.
+    farm uploads on a failed leaf, so any failed build still yields a render
+    to inspect (r12, r13 and r17 failed without one). Best effort: never
+    masks the failure, and skipped until the drawing is the active document.
     """
+    model = adapter.currentModel
+    if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != 3:
+        _telemetry.warn(f"{stage}-failure PDF skipped: no active drawing")
+        return
     path = (
         OUT_FAILURES
         / f"summing-package-{stage}"
@@ -840,6 +954,192 @@ def _exclude_fasteners_from_section(
     _telemetry.success(f"{label}: drawn unsectioned {', '.join(excluded)}")
 
 
+def _sheet_to_view_sketch(
+    adapter: Any, view: Any, point: tuple[float, float]
+) -> tuple[float, float, float]:
+    """Map a sheet point into a view's sketch space (for sketch entities)."""
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    math_point = _early_bound(
+        utility.CreatePoint(double_array([point[0], point[1], 0.0])),
+        "IMathPoint",
+    )
+    projected = _early_bound(math_point.MultiplyTransform(transform), "IMathPoint")
+    return tuple(float(value) for value in projected.ArrayData)
+
+
+def section_crop_violations(
+    before: tuple[float, float, float, float],
+    after: tuple[float, float, float, float],
+    station_x: float,
+) -> list[str]:
+    """Findings for a crop that did not reduce the section to one station."""
+    findings = []
+    before_width = before[2] - before[0]
+    after_width = after[2] - after[0]
+    if after_width >= HANGER_SECTION_CROP_MAX_WIDTH_RATIO * before_width:
+        findings.append(
+            f"cropped outline is {after_width * 1000.0:.1f} mm wide, not under "
+            f"{HANGER_SECTION_CROP_MAX_WIDTH_RATIO:g} x the uncropped "
+            f"{before_width * 1000.0:.1f} mm"
+        )
+    offset = (after[0] + after[2]) / 2.0 - station_x
+    if abs(offset) > HANGER_SECTION_CROP_CENTRE_TOLERANCE:
+        findings.append(
+            f"cropped outline centre is {offset * 1000.0:+.1f} mm off the station"
+        )
+    return findings
+
+
+def _crop_section_to_station(
+    adapter: Any,
+    section: Any,
+    station_z_mm: float,
+    *,
+    label: str,
+) -> None:
+    """Crop the hanger section to one station so it reads as ONE view.
+
+    The cut plane holds both hanger axes, so the uncropped section drew both
+    stations side by side under one caption centred between them (r14: Main
+    read three views and could not tell which was the section).
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    section = _early_bound(section, "IView")
+    before = _view_outline(section)
+    bottom_y = (
+        hanger.MOUNT_BLOCK_TOP_Y - (BLK_TOP - BLK_BOT) - HANGER_SECTION_CROP_MARGIN_MM
+    )
+    top_y = HANGER_WASHER_TOP_Y + HEAD_H + HANGER_SECTION_CROP_MARGIN_MM
+    corners = [
+        model_point_in_view(
+            adapter,
+            section,
+            (KNIFE[0] / 1000.0, y / 1000.0, z / 1000.0),
+            label=f"{label} crop corner",
+        )[:2]
+        for y, z in (
+            (bottom_y, station_z_mm - HANGER_SECTION_CROP_HALF_Z_MM),
+            (top_y, station_z_mm + HANGER_SECTION_CROP_HALF_Z_MM),
+        )
+    ]
+    xs = sorted(corner[0] for corner in corners)
+    ys = sorted(corner[1] for corner in corners)
+    station_x = model_point_in_view(
+        adapter,
+        section,
+        (KNIFE[0] / 1000.0, hanger.SHOULDER_SEAT_Y / 1000.0, station_z_mm / 1000.0),
+        label=f"{label} station",
+    )[0]
+    if not drawing.ActivateView(str(section.GetName2() or "")):
+        raise RuntimeError(f"{label}: failed to activate the section for its crop")
+    draw.ClearSelection2(True)
+    first = _sheet_to_view_sketch(adapter, section, (xs[0], ys[0]))
+    second = _sheet_to_view_sketch(adapter, section, (xs[1], ys[1]))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    # AddToDB: no sketch inference snapping (see _create_hanger_detail).
+    add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segments = tuple(manager.CreateCornerRectangle(*first, *second) or ())
+    finally:
+        manager.AddToDB = add_to_db
+    if len(segments) < 4:
+        raise RuntimeError(f"{label}: crop rectangle returned {len(segments)} segments")
+    draw.ClearSelection2(True)
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError(f"{label}: failed to select the crop rectangle")
+    status = int(section.Crop2(False, True, 1))
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    after = _view_outline(section)
+    _telemetry.event(
+        "drawing.section_crop",
+        label=label,
+        status=status,
+        crop_mm=(xs[0] * 1000.0, ys[0] * 1000.0, xs[1] * 1000.0, ys[1] * 1000.0),
+        before_mm=tuple(value * 1000.0 for value in before),
+        after_mm=tuple(value * 1000.0 for value in after),
+        station_x_mm=station_x * 1000.0,
+    )
+    if status != 1:  # swCropViewErrors_NoError
+        raise RuntimeError(f"{label}: Crop2 returned {status}")
+    if not bool(section.IsCropped()):
+        raise RuntimeError(f"{label}: section does not read cropped")
+    findings = section_crop_violations(before, after, station_x)
+    if findings:
+        raise RuntimeError(f"{label}: " + "; ".join(findings))
+
+
+def _anchor_section_label(adapter: Any, section: Any, *, label: str) -> None:
+    """Centre the section's native label directly under its (cropped) outline."""
+    notes = [
+        _early_bound(note, "INote")
+        for note in (_read_member(section, "GetNotes") or ())
+    ]
+    texts = [str(note.GetText() or "") for note in notes]
+    # The native label is field-linked: GetText reads blank or "SECTION ...".
+    labels = [
+        note
+        for note, text in zip(notes, texts)
+        if not text.strip() or "SECTION" in text.upper()
+    ]
+    if len(labels) != 1:
+        raise RuntimeError(f"{label}: no unique section label among {texts!r}")
+    note = labels[0]
+    outline = _view_outline(section)
+    extent = _note_extent(adapter, note, label=label)
+    width = extent[2] - extent[0]
+    _anchor_note(
+        adapter,
+        note,
+        (
+            (outline[0] + outline[2]) / 2.0 - width / 2.0,
+            outline[1] - HANGER_SECTION_LABEL_GAP,
+        ),
+        label=label,
+    )
+
+
+def _detail_fence_of(parent: Any, detail: Any) -> Any:
+    """The parent's IDetailCircle whose detail view IS ``detail``.
+
+    A cropped parent reports its crop profile among GetDetailCircles too
+    (summing-asm-r17: "2 detail fences" once section A-A was cropped), so the
+    fence is found by the view it owns, never by counting.
+    """
+    detail_name = str(_early_bound(detail, "IView").GetName2() or "")
+    circles = [
+        _early_bound(circle, "IDetailCircle")
+        for circle in (_read_member(parent, "GetDetailCircles") or ())
+    ]
+    census = []
+    owners = []
+    for circle in circles:
+        owned = circle.GetDetailView()
+        owned_name = (
+            str(_early_bound(owned, "IView").GetName2() or "") if owned else ""
+        )
+        census.append(
+            (str(circle.GetName() or ""), str(circle.GetLabel() or ""), owned_name)
+        )
+        if owned_name == detail_name:
+            owners.append(circle)
+    _telemetry.event(
+        "drawing.detail_fences",
+        detail=detail_name,
+        fences=repr(census),
+    )
+    if len(owners) != 1:
+        raise RuntimeError(
+            f"{len(owners)} fences own detail {detail_name!r}; census {census!r}"
+        )
+    return owners[0]
+
+
 def _create_hanger_detail(adapter: Any, parent: Any) -> Any:
     """Enlarge the seated shoulder, boss and knife bore from the front parent."""
     draw = adapter.currentModel
@@ -934,10 +1234,7 @@ def _create_hanger_detail(adapter: Any, parent: Any) -> Any:
         ),
         label="hanger detail label",
     )
-    circles = tuple(_read_member(parent, "GetDetailCircles") or ())
-    if len(circles) != 1:
-        raise RuntimeError(f"hanger parent has {len(circles)} detail fences")
-    detail_circle = _early_bound(circles[0], "IDetailCircle")
+    detail_circle = _detail_fence_of(parent, detail)
     parent_label = (center[0] + 0.014, center[1] + 0.010)
     detail_circle.SetLabelPosition(*parent_label)
     draw.EditRebuild3()
@@ -1120,11 +1417,23 @@ def _place_hanger_fit_sheet(adapter: Any) -> list[str]:
         component_stems=("knife-hanger-stud", "knife-hanger-washer"),
         label="hanger-axis assembly section",
     )
-    _assert_built_hanger_engagement(section, station_z_mm=SUMMING_Z + HEX_Z_MID)
+    station_z = SUMMING_Z + HEX_Z_MID
+    _assert_built_hanger_engagement(section, station_z_mm=station_z)
+    _crop_section_to_station(
+        adapter, section, station_z, label="hanger-axis assembly section"
+    )
+    _place_view_by_model_point(
+        adapter,
+        section,
+        (KNIFE[0], hanger.SHOULDER_SEAT_Y, station_z),
+        HANGER_SECTION_ANCHOR_XY,
+        label="hanger-axis section station placement",
+    )
     _record_cosmetic_threads(adapter, section, label="hanger-axis assembly section")
     detail = _create_hanger_detail(adapter, parent)
     set_hidden_lines_removed(adapter, detail)
     _remove_auto_hole_notes(adapter, label="hanger fit sheet")
+    _anchor_section_label(adapter, section, label="hanger section label")
     _add_seat_to_knife_line_dimension(adapter, detail)
     return _stack_note_field(
         adapter,
@@ -1744,6 +2053,9 @@ def _place_package(adapter: Any) -> None:
         margin=EXPLODED_BALLOON_MARGIN,
     )
     _uncross_balloon_leaders(adapter, balloons, label="summing exploded view")
+    _verify_balloon_attachments(
+        balloons, balloon_items, label="summing exploded view"
+    )
     _add_note_block(
         adapter,
         "EXPLODED ISOMETRIC 1:4",
@@ -1865,9 +2177,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     artifacts: dict[str, str] | None = None
     try:
-        _validate_persisted_explode(source_model)
-        _place_package(adapter)
         try:
+            _validate_persisted_explode(source_model)
+            _place_package(adapter)
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
@@ -1879,7 +2191,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 sheet_scales=SHEET_SCALES,
             )
         except Exception:
-            _export_failure_pdf(adapter, "finalize")
+            _export_failure_pdf(adapter, "build")
             raise
     finally:
         primary_error = sys.exception()
