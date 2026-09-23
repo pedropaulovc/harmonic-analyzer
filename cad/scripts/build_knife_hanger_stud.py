@@ -292,6 +292,91 @@ def _read_tip_thread(part: Any, name: str) -> dict[str, object]:
     }
 
 
+# swCosmeticStandardType_e.swStandardNone and swCosmeticEndConditions_e
+# .swEndConditionBlind: no standard, so the minor and callout are the spec's.
+COSMETIC_STANDARD_NONE = -2
+COSMETIC_END_BLIND = 0
+# Model-space match for the chamfer-to-tip circle: 1 um is far below any
+# neighbouring circle's offset and far above the kernel's round-off.
+EDGE_MATCH_TOL_M = 1e-6
+
+
+def _circle_candidates(part: Any) -> list[tuple[dict[str, object], Any]]:
+    """Every circular edge of the part's solid bodies, with its circle."""
+    candidates = []
+    for raw_body in _early_bound(part, "IPartDoc").GetBodies2(0, True) or ():
+        for raw_edge in _early_bound(raw_body, "IBody2").GetEdges() or ():
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            # CircleParams = (centre xyz, axis xyz, radius), metres.
+            params = [float(value) for value in curve.CircleParams]
+            circle = {
+                "radius_mm": round(params[6] * 1000.0, 4),
+                "centre_mm": [round(value * 1000.0, 4) for value in params[0:3]],
+                "axis": [round(value, 6) for value in params[3:6]],
+            }
+            candidates.append((circle, raw_edge))
+    return candidates
+
+
+def _is_tip_thread_circle(circle: dict[str, object]) -> bool:
+    """The chamfer-to-tip circle: tip radius, on the Y axis, at the chamfer top."""
+    tol_mm = EDGE_MATCH_TOL_M * 1000.0
+    x, y, z = circle["centre_mm"]
+    return (
+        math.isclose(float(circle["radius_mm"]), TIP_RADIUS_MM, abs_tol=tol_mm)
+        and math.isclose(y, TIP_END_Y_MM + TIP_CHAMFER_MM, abs_tol=tol_mm)
+        and math.isclose(x, 0.0, abs_tol=tol_mm)
+        and math.isclose(z, 0.0, abs_tol=tol_mm)
+        and math.isclose(abs(float(circle["axis"][1])), 1.0, abs_tol=1e-6)
+    )
+
+
+def _tip_thread_edge(part: Any) -> Any:
+    """The circular edge the tip thread starts on, found in the model itself.
+
+    summing-int-b1 (leaf 20260923T051125Z, a seat restarted 30 min earlier)
+    lost the old coordinate pick at this same edge: ``SelectByID2`` hit-tests
+    the point's screen projection, and nothing on the part path fits the view,
+    so the pick depended on the seat's viewport. Enumerating the body's edges
+    has no view in it. Anything but one match logs every circle it saw.
+    """
+    candidates = _circle_candidates(part)
+    matches = [edge for circle, edge in candidates if _is_tip_thread_circle(circle)]
+    if len(matches) == 1:
+        return matches[0]
+    circles = [circle for circle, _edge in candidates]
+    _telemetry.event(
+        "thread.edge_candidates", matches=len(matches), circles=json.dumps(circles)
+    )
+    _telemetry.error(
+        f"tip thread edge: {len(matches)} matches among {len(circles)} circles: "
+        + json.dumps(circles)
+    )
+    raise RuntimeError(
+        f"tip thread edge: expected one circle r={TIP_RADIUS_MM} mm at "
+        f"y={TIP_END_Y_MM + TIP_CHAMFER_MM:.4f} mm, found {len(matches)} among "
+        f"{json.dumps(circles)}"
+    )
+
+
+def _select_tip_thread_edge(adapter: Any, edge: Any) -> None:
+    """Select ``edge`` alone, with the early-bound Select4 of the rack bore finish."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    data = _early_bound(manager.CreateSelectData(), "ISelectData")
+    data.Mark = 0
+    if not _early_bound(edge, "IEntity").Select4(False, data):
+        raise RuntimeError("tip thread edge selection failed")
+    if int(manager.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError("tip thread requires exactly one selected edge")
+    if int(adapter.swApp.IsSame(manager.GetSelectedObject6(1, -1), edge)) != 1:
+        raise RuntimeError("tip thread selected a different edge")
+
+
 async def _thread_tip(adapter) -> None:
     """Cosmetic thread over the whole turned tip, callout and minor explicit.
 
@@ -299,24 +384,27 @@ async def _thread_tip(adapter) -> None:
     diameter and no callout, so the lathe view drew no thread and no
     "#10-24" (render of leaf 20260923T001846Z). With no standard the
     thread's minor line and callout come from this spec alone, and both are
-    read back from the feature.
+    read back from the feature. The adapter's ``add_thread`` clears the
+    selection and re-picks by coordinate, so the thread is inserted here on
+    the edge found by :func:`_tip_thread_edge`.
     """
-    from solidworks_mcp.adapters.base import AddThreadParameters
-
-    created = check(
-        f"cosmetic thread {TIP_THREAD_CALLOUT}",
-        await adapter.add_thread(
-            AddThreadParameters(
-                edge_point=[TIP_RADIUS_MM, TIP_END_Y_MM + TIP_CHAMFER_MM, 0.0],
-                standard="none",
-                diameter=TIP_THREAD_MINOR_DIA_MM,
-                end_type="blind",
-                depth=TIP_LENGTH_MM - TIP_CHAMFER_MM,
-                note=TIP_THREAD_CALLOUT,
-            )
-        ),
+    model = adapter.currentModel
+    edge = _tip_thread_edge(model)
+    _select_tip_thread_edge(adapter, edge)
+    feature = _early_bound(model.FeatureManager, "IFeatureManager").InsertCosmeticThread3(
+        COSMETIC_STANDARD_NONE,
+        "",
+        "",
+        TIP_THREAD_MINOR_DIA_MM / 1000.0,
+        COSMETIC_END_BLIND,
+        (TIP_LENGTH_MM - TIP_CHAMFER_MM) / 1000.0,
+        TIP_THREAD_CALLOUT,
     )
-    state = _read_tip_thread(adapter.currentModel, str(created["name"]))
+    _early_bound(model, "IModelDoc2").ClearSelection2(True)
+    if feature is None:
+        raise RuntimeError(f"cosmetic thread {TIP_THREAD_CALLOUT} was not created")
+    _telemetry.success(f"cosmetic thread {TIP_THREAD_CALLOUT}")
+    state = _read_tip_thread(model, str(_read_member(feature, "Name")))
     _telemetry.info("tip thread: " + json.dumps(state, sort_keys=True))
     problem = _tip_thread_problem(state)
     if problem is not None:

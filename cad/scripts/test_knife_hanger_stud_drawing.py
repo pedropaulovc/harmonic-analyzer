@@ -717,6 +717,183 @@ def test_tip_thread_problem_names_the_drift() -> None:
     )
 
 
+class _Curve:
+    def __init__(self, circle) -> None:
+        self.circle = circle
+
+    def IsCircle(self) -> bool:
+        return self.circle is not None
+
+    @property
+    def CircleParams(self):
+        radius_mm, centre_y_mm = self.circle
+        return (0.0, centre_y_mm / 1000.0, 0.0, 0.0, -1.0, 0.0, radius_mm / 1000.0)
+
+
+class _Edge:
+    def __init__(self, circle=None) -> None:
+        self.curve = _Curve(circle)
+
+    def GetCurve(self):
+        return self.curve
+
+
+class _Body:
+    def __init__(self, edges) -> None:
+        self.edges = edges
+
+    def GetEdges(self):
+        return tuple(self.edges)
+
+
+class _Part:
+    def __init__(self, bodies) -> None:
+        self.bodies = bodies
+
+    def GetBodies2(self, body_type, visible_only):
+        assert (body_type, visible_only) == (0, True)
+        return tuple(self.bodies)
+
+
+_EDGE_BINDINGS = {"IPartDoc": _Part, "IBody2": _Body, "IEdge": _Edge, "ICurve": _Curve}
+
+
+def _bind_fakes(obj, interface):
+    assert isinstance(obj, _EDGE_BINDINGS[interface]), (interface, obj)
+    return obj
+
+
+def _turned_tip_edges() -> dict[str, _Edge]:
+    """The turned tip's circles: shoulder corner, chamfer top, faced end."""
+    tip_r = build.TIP_RADIUS_MM
+    return {
+        "shoulder": _Edge((tip_r, build.SHOULDER_Y_MM)),
+        "chamfer_top": _Edge((tip_r, build.TIP_END_Y_MM + spec.TIP_CHAMFER_MM)),
+        "faced_end": _Edge((tip_r - spec.TIP_CHAMFER_MM, build.TIP_END_Y_MM)),
+        "line": _Edge(None),
+    }
+
+
+def test_tip_thread_edge_is_found_in_the_model_not_by_screen_pick(monkeypatch) -> None:
+    # summing-int-b1: the SelectByID2 pick at this edge failed on a restarted seat.
+    monkeypatch.setattr(build, "_early_bound", _bind_fakes)
+    edges = _turned_tip_edges()
+    part = _Part([_Body(list(edges.values()))])
+    assert build._tip_thread_edge(part) is edges["chamfer_top"]
+
+
+def test_tip_thread_edge_miss_logs_every_candidate(monkeypatch) -> None:
+    monkeypatch.setattr(build, "_early_bound", _bind_fakes)
+    events, errors = [], []
+    monkeypatch.setattr(build._telemetry, "event", lambda name, **a: events.append((name, a)))
+    monkeypatch.setattr(build._telemetry, "error", errors.append)
+    edges = _turned_tip_edges()
+    off_station_y = build.TIP_END_Y_MM + spec.TIP_CHAMFER_MM + 0.3
+    edges["chamfer_top"] = _Edge((build.TIP_RADIUS_MM, off_station_y))
+    with pytest.raises(RuntimeError, match="found 0") as raised:
+        build._tip_thread_edge(_Part([_Body(list(edges.values()))]))
+    for y_mm in (build.SHOULDER_Y_MM, off_station_y, build.TIP_END_Y_MM):
+        assert f"{round(y_mm, 4)}" in str(raised.value)
+    assert events[0][0] == "thread.edge_candidates"
+    assert events[0][1]["matches"] == 0
+    assert "3 circles" in errors[0]
+
+
+def test_tip_thread_edge_rejects_a_duplicate_circle(monkeypatch) -> None:
+    monkeypatch.setattr(build, "_early_bound", _bind_fakes)
+    monkeypatch.setattr(build._telemetry, "event", lambda name, **a: None)
+    monkeypatch.setattr(build._telemetry, "error", lambda message: None)
+    edges = list(_turned_tip_edges().values())
+    duplicate = _Edge((build.TIP_RADIUS_MM, build.TIP_END_Y_MM + spec.TIP_CHAMFER_MM))
+    with pytest.raises(RuntimeError, match="found 2"):
+        build._tip_thread_edge(_Part([_Body([*edges, duplicate])]))
+
+
+def test_tip_thread_is_inserted_on_the_selected_edge(monkeypatch) -> None:
+    import asyncio
+
+    edge = object()
+    calls = []
+
+    class Data:
+        Mark = None
+
+    data = Data()
+
+    class Manager:
+        def CreateSelectData(self):
+            return data
+
+        def GetSelectedObjectCount2(self, mark):
+            return 1
+
+        def GetSelectedObject6(self, index, mark):
+            return edge
+
+    class Entity:
+        def Select4(self, append, select_data):
+            calls.append(("select", append, select_data.Mark))
+            return True
+
+    class Features:
+        def InsertCosmeticThread3(self, *args):
+            calls.append(("insert", *args))
+            return "feature"
+
+    class Model:
+        SelectionManager = Manager()
+        FeatureManager = Features()
+
+        def ClearSelection2(self, everything):
+            calls.append(("clear",))
+
+    model = Model()
+
+    class Adapter:
+        currentModel = model
+
+        class swApp:
+            @staticmethod
+            def IsSame(first, second):
+                return int(first is second)
+
+        async def add_thread(self, params):
+            raise AssertionError("the coordinate pick must not be used")
+
+    def early_bound(obj, interface):
+        return Entity() if interface == "IEntity" else obj
+
+    monkeypatch.setattr(build, "_early_bound", early_bound)
+    monkeypatch.setattr(build, "_tip_thread_edge", lambda part: edge)
+    monkeypatch.setattr(build, "_read_member", lambda obj, name: "Cosmetic Thread1")
+    monkeypatch.setattr(
+        build,
+        "_read_tip_thread",
+        lambda part, name: {
+            "name": name,
+            "callout": spec.TIP_THREAD_CALLOUT,
+            "diameter_mm": spec.TIP_THREAD_MINOR_DIA_MM,
+            "depth_mm": spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM,
+        },
+    )
+    asyncio.run(build._thread_tip(Adapter()))
+    assert calls == [
+        ("clear",),
+        ("select", False, 0),
+        (
+            "insert",
+            -2,
+            "",
+            "",
+            pytest.approx(spec.TIP_THREAD_MINOR_DIA_MM / 1000.0),
+            0,
+            pytest.approx((spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM) / 1000.0),
+            spec.TIP_THREAD_CALLOUT,
+        ),
+        ("clear",),
+    ]
+
+
 def test_lowercase_max_is_logged_not_fatal(monkeypatch) -> None:
     texts = [" 0.5 max. X 45° "]
     # stud-18's text box, clear right of the boundary.
