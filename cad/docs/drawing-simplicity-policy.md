@@ -273,7 +273,8 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
 ## Named exceptions
 
 Accepted shortfalls against rule 12. Each is specific to the parts named; it
-is not precedent for anything else. The blind reviewer sees only the sheets,
+is not precedent for anything else. Every sheet a row affects should state
+the exception itself; the table is the backstop. The blind reviewer sees only the sheets,
 so it reports a row's shortfall as a blocker unless the package itself states
 the exception. A blocker that matches a row (same parts, shortfall within the
 recorded range) is recorded against that row and does not gate. Any other
