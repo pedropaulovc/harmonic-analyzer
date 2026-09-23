@@ -1,8 +1,8 @@
 knife-mount:
   number: MHA-037
   material: HARDENED STEEL, 58-60 HRC
-  material_specification: HARDENED STEEL, HARDEN AND TEMPER TO 58-60 HRC
-  finish: harden and temper; unpainted
+  material_specification: HARDENED STEEL, HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING
+  finish: harden and temper after machining; unpainted
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
