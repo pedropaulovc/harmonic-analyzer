@@ -147,6 +147,33 @@ def _verify_title_material_specification(
         )
 
 
+def _match_bore_tolerance_places(adapter: Any, annotations: list[Any]) -> None:
+    """Print the bore band with its nominal's two places (+0.10 / 0.00).
+
+    The model's tolerance helper stores the fewest places that spell the band
+    (+0.1 / 0.0), which reads as a one-place tolerance on a two-place size.
+    Only the tolerance places move here; the primary places stay the part's.
+    """
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "ArborBoreDia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one ArborBoreDia annotation, found {len(matches)}")
+    annotation = _sw_type_info.early_bound_or_flag(
+        matches[0], "IAnnotation", "GetSpecificAnnotation"
+    )
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    places = DRAWING_PRECISION_BY_NAME["ArborBoreDia"]
+    # -1 = swDimensionPrecisionSettings_e do-not-change: primary and dual stay.
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(
+            f"ArborBoreDia tolerance did not take the nominal's {places} places"
+        )
+
+
 def _use_single_arrow_od_leader(adapter: Any, annotations: list[Any]) -> None:
     matches = [
         annotation
@@ -256,6 +283,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _match_bore_tolerance_places(adapter, front_annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to drum bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
