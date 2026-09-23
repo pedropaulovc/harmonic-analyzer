@@ -80,7 +80,7 @@ RIGHT_KEEP = {
     "ServicePinStation": (RIGHT_CENTER[0] - 0.050, SIDE_BOTTOM + 0.026),
     "HubLength": (RIGHT_CENTER[0] - 0.064, SIDE_BOTTOM + 0.045),
     "BarrelDia": (RIGHT_CENTER[0], SIDE_TOP + 0.012),
-    "SeatDia": (RIGHT_CENTER[0], SIDE_BOTTOM - 0.014),
+    "SeatDia": (RIGHT_CENTER[0] - 0.075, SIDE_BOTTOM - 0.014),
 }
 HOLE_CALLOUT_XY = (0.330, 0.140)
 DIMENSION_CALLOUTS = {
@@ -173,7 +173,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         callout_xy=HOLE_CALLOUT_XY,
         label="MHA-024 hub pilot",
-        process=f"{drill_process(SERVICE_PIN_HOLE_SPEC)}\n{CROSS_HOLE_CALLOUT}",
+        process=f"{CROSS_HOLE_CALLOUT}\n{drill_process(SERVICE_PIN_HOLE_SPEC)}",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.175)
