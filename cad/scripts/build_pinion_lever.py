@@ -419,11 +419,14 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     rod.record("RodBaseY", '"RodY0"')
-    check(
-        "rod root radius",
-        await adapter.add_sketch_dimension(r_base, None, "linear", ROD_ROOT_R),
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{r_base}.end",
+        (8.0, ROD_Y0 + 5.0),
+        "rod root diameter",
     )
-    rod.record("RodRootR", '"RodRootDia" / 2')
+    rod.record("RodRootDia", '"RodRootDia"')
     await add_diametric_linear_dimension(
         adapter,
         centerline,

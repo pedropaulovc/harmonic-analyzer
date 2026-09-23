@@ -77,7 +77,8 @@ ISO_CENTER = (0.355, 0.175)
 DETAIL_CENTER = (0.245, 0.170)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
-DETAIL_LABEL_XY = (0.228, 0.128)
+# r7 eye-pass: at (0.228, 0.128) the label sat on the 8.0 FLAT BOTTOM text.
+DETAIL_LABEL_XY = (0.300, 0.128)
 _DS = DETAIL_SCALE[0] / 1000.0
 
 
@@ -85,22 +86,29 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
+ROD_ROOT_TEXT_Y = 20.0  # model height of the root-diameter text, clear of the hub
+
+
 FRONT_KEEP = {
     "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.010),
     "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
     "RodTipDia": (0.100, _front_y(ROD_LEN) + 0.012),
-    "GripHalfAngle": (0.100, FRONT_CENTER[1] + 0.020),
+    "RodRootDia": (0.105, _front_y(ROD_ROOT_TEXT_Y)),
 }
 TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
 # In the side view B (the mouth face, model z +5) is the LEFT end and the
 # crown the right; the detail keeps that orientation at 3:1.
+# r7 eye-pass: the GRIP AXIS and TO CROWN ROOT texts ran into each other, and
+# the pin-hole callout sat across the hub outline.  The two top stations now
+# spread apart, and the callout goes above them with its leader dropping
+# between.
 DETAIL_KEEP = {
-    "GripFromB": (DETAIL_CENTER[0] - 2.5 * _DS, DETAIL_CENTER[1] + 0.032),
-    "EndWall": (DETAIL_CENTER[0] + 0.020, DETAIL_CENTER[1] + 0.032),
+    "GripFromB": (DETAIL_CENTER[0] - 0.020, DETAIL_CENTER[1] + 0.032),
+    "EndWall": (DETAIL_CENTER[0] + 0.045, DETAIL_CENTER[1] + 0.032),
     "PinHoleFromB": (DETAIL_CENTER[0] - 3.0 * _DS, DETAIL_CENTER[1] - 0.031),
     "BoreDepth": (DETAIL_CENTER[0] - 1.0 * _DS, DETAIL_CENTER[1] - 0.041),
-    "PinHoleDia": (DETAIL_CENTER[0] + 0.050, DETAIL_CENTER[1] + 0.004),
+    "PinHoleDia": (DETAIL_CENTER[0] + 0.055, DETAIL_CENTER[1] + 0.075),
 }
 DIMENSION_CALLOUTS = {
     "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
@@ -108,6 +116,7 @@ DIMENSION_CALLOUTS = {
     "EndWall": "TO CROWN ROOT",
     "RodTipY": "FROM HUB AXIS",
     "RodTipDia": "AT TIP",
+    "RodRootDia": "AT ROOT",
     "GripFromB": "GRIP AXIS",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }

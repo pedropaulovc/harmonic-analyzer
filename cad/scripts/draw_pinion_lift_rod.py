@@ -98,7 +98,9 @@ RIGHT_KEEP = {
     "CapR": (RIGHT_CENTER[0] - HALF_SPAN - 0.012, RIGHT_CENTER[1] + 0.024),
 }
 DETAIL_KEEP = {
-    "PinHoleDia": (DETAIL_CENTER[0] + 0.040, DETAIL_CENTER[1] + 0.030),
+    # r7 eye-pass: above the detail the callout ran over the DETAIL A label
+    # and past the right border; the open field left of the detail fits it.
+    "PinHoleDia": (DETAIL_CENTER[0] - 0.090, DETAIL_CENTER[1] + 0.028),
     "PinHoleZ": (DETAIL_CENTER[0] + 0.004, DETAIL_CENTER[1] - 0.034),
 }
 DIMENSION_CALLOUTS = {
@@ -268,6 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
         label="lift rod bearing finish",
         entity_type="SILHOUETTE",
+        char_height=0.0025,  # the pivot-block size; the default read oversized
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)

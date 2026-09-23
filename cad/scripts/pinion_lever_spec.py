@@ -43,7 +43,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    "RodProfile": {"RodTipY", "RodTipDia", "GripHalfAngle"},
+    # The taper prints as root and tip diameters over the 86.0 height.  The
+    # r7 render showed the 0.7-degree half-angle's extension line running to
+    # the cone's virtual apex, 163 mm below the root and off the sheet.
+    "RodProfile": {"RodTipY", "RodTipDia", "RodRootDia"},
     "CapProfile": {"CapR"},
     "PinHoleProfile": {"PinHoleDia"},
     # Rule 2 reference sketches: the grip axis and the pin-hole station are
@@ -62,7 +65,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BarrelProfile": {"HubOd": 1, "HubBore": 3},
     "Barrel": {"BoreDepth": 1},
     "Wall": {"EndWall": 2},
-    "RodProfile": {"RodTipY": 1, "RodTipDia": 1, "GripHalfAngle": 1},
+    "RodProfile": {"RodTipY": 1, "RodTipDia": 1, "RodRootDia": 1},
     "CapProfile": {"CapR": 1},
     "PinHoleProfile": {"PinHoleDia": 2},
     "GripStationReference": {"GripFromB": 2},
