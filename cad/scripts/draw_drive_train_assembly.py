@@ -130,6 +130,13 @@ BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_SHEET_CLEARANCE = 0.003
 BOM_REFERENCE_ISO_CENTER = (0.385, 0.200)
+# The MHA-013 station pointer lives here, not in its BOM cell: on the grouped
+# 20-configuration row SolidWorks kept a written description only up to its
+# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
+BOM_REFERENCE_CAPTION = (
+    "REFERENCE 1:8 - BALLOONS ON SHEETS 3-5\n"
+    "MHA-013 CONE GEAR STATIONS: SHEET 6"
+)
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
 CLUSTER_VIEW_CENTER = (0.200, 0.165)
@@ -209,7 +216,7 @@ BOM_DESCRIPTIONS = {
     "cylinder-gear": "CYLINDER GEAR WITH CAM, 120T",
     "foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "cone-gear-shaft": "CONE GEAR SHAFT",
-    "cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH, SEE SHEET 6",
+    "cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
     "crank-drive-gear": "CRANK DRIVE GEAR, 64T",
     "cone-swing-platform": "CONE SWING PLATFORM",
     "cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
@@ -1233,7 +1240,7 @@ def _place_bom_sheet(adapter: Any, facts: SourceFacts) -> tuple[str, dict[str, s
     _caption_under(
         adapter,
         view,
-        "REFERENCE 1:8 - BALLOONS ON SHEETS 3-5",
+        BOM_REFERENCE_CAPTION,
         label="BOM reference caption",
     )
     return bom_name, dict(items)

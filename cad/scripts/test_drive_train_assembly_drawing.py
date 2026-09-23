@@ -124,7 +124,8 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "MESH + FIT DETAILS"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
-    assert "SEE SHEET 6" in drawing.BOM_DESCRIPTIONS["cone-gear"]
+    assert "SHEET 6" in drawing.BOM_REFERENCE_CAPTION
+    assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
     assert "SEE SHEET 8" in drawing.ASSEMBLED_HEADING
     assert "SHEET 8" in drawing.BANK_RIG_STEPS
 
