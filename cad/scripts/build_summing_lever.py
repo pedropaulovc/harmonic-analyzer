@@ -102,6 +102,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_prefix,
+    set_dimension_symmetric_tolerance,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -117,6 +118,7 @@ from summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    HOOK_ARM_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -1527,6 +1529,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
     _assert_reference_sketches_on_geometry(adapter)
+    # The hook arm is a gain term (error_budget.yaml summing_hook_arm): every
+    # hole of the one-row field sits at HoleSeedX from the knife line.
+    set_dimension_symmetric_tolerance(
+        adapter, "SpringHoleSeed", "HoleSeedX", HOOK_ARM_TOLERANCE_MM
+    )
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no
