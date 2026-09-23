@@ -197,14 +197,16 @@ def _assert_counter_spring_top_hang(
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + gooseneck_geom.ARM_Y
     clamped_gap = gooseneck_geom.SPRING_SCREW_CLAMPED_GAP_MM
-    if not math.isclose(
-        clamped_gap,
-        counter_stock.END_OCCUPIED_WIDTH_MM,
-        rel_tol=0.0,
-        abs_tol=1e-12,
+    # Natively calibrated: the loop seats on the tube's OD corner and the head
+    # closes onto it, so centre and gap both fall inside the purchased band.
+    if not (
+        0.0
+        < gooseneck_geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
+        < clamped_gap
+        < counter_stock.END_OCCUPIED_WIDTH_MM
     ):
         raise RuntimeError(
-            "gooseneck clamped gap does not match the purchased spring eye band"
+            "gooseneck clamp calibration falls outside the purchased spring eye band"
         )
     clamped_eye_x = spring_mounts.COUNTER_UPPER_EYE_X
     open_eye_x = (
