@@ -71,7 +71,7 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     far = spec.SHAFT_LENGTH
     assert far - (spec.JOURNAL_START + spec.JOURNAL_LENGTH) == pytest.approx(19.8)
     assert far - spec.JOURNAL_START == pytest.approx(89.2449, abs=1e-3)
-    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(118.0)
+    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(116.4)
     assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(132.0)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
@@ -111,7 +111,7 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert part.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
-    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == 12.0
+    assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
     # The matched fit identifies both mating parts on the feature callout.
     process = spec.CROSS_HOLE_PROCESS
     assert "TAPER-REAM" in process

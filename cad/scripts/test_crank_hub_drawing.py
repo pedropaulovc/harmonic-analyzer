@@ -33,6 +33,19 @@ def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.01, abs=1e-3)
 
 
+def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
+    # The hub rear stays at 20 (the T12 air gap), so the ream is centred in the
+    # 12-mm barrel and located from the shoulder at .XX: both ligaments 2.12.
+    assert geometry.HUB_LENGTH == 20.0 and geometry.HUB_BARREL_LENGTH == 12.0
+    assert geometry.SERVICE_PIN_FROM_SHOULDER == 5.6
+    assert geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
+    assert crank_hub_spec.DRAWING_PRECISION["ServicePinStationReference"] == {
+        "ServicePinFromShoulder": 2
+    }
+    assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(2.121, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(2.121, abs=1e-3)
+
+
 def test_named_shaft_fit_class_bounds_the_through_bore() -> None:
     shaft_limits = (
         geometry.SHAFT_DIA + geometry.SHAFT_DIA_BAND[1],
@@ -67,11 +80,15 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # Policy rule 6: no general notes; each matched fit sits on its feature.
     assert not hasattr(crank_hub_spec, "DRAWING_NOTES")
     seat = crank_hub_spec.SEAT_CALLOUT
-    assert seat.startswith("MATCH-FIT TO MHA-020 ARM")
+    assert seat.startswith("MATCH-FIT TO MHA-020 ARM BORE")
     assert "SHOULDER" in seat and "FACES FLUSH" in seat
+    # The arm bore is made first and carries the band; the hub seat is fitted
+    # to it, so its nominal prints as a reference.
+    assert crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = crank_hub_spec.SEAM_CALLOUT
     assert "MHA-020" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
-    assert "<MOD-DIAM>4.0 <HOLE-DEPTH> 4.0" in seam
+    assert "AT ASSEMBLY" in seam and "SEAM" in seam
+    assert "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0" in seam
     assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates and the fit on its callout.
     cross_hole = crank_hub_spec.CROSS_HOLE_CALLOUT
@@ -87,9 +104,11 @@ def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> No
     r = geometry.AXIAL_PIN_DIA / 2.0 * drawing._S
     assert (x - cx) ** 2 + (y - cy) ** 2 == pytest.approx(r**2)
     assert cy < drawing.END_CENTER[1] and y > cy  # six o'clock, hub-side arc
-    # The seam block sits left of the bore block's right-shifted text and
-    # right of the side view's outboard end.
+    # The seam block sits below the end view, right of the side view's
+    # outboard end; the bore block stands right of the end view.
     assert drawing.SEAM_CALLOUT_XY[0] > drawing.OUTBOARD_X
+    end_bottom = drawing.END_CENTER[1] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
+    assert drawing.SEAM_CALLOUT_XY[1] < end_bottom
     assert drawing.END_KEEP["BoreDia"][0] > drawing.END_CENTER[0]
 
 
@@ -99,10 +118,15 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     assert drawing._sheet_y(geometry.AXIAL_PIN_RADIUS_FROM_AXIS) < drawing.SIDE_CENTER[1]
     assert drawing.END_CENTER[0] > drawing.OUTBOARD_X  # third-angle right view
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
-    lengths = ("SeatLength", "ServicePinStation", "HubLength")
-    rows = [drawing.SIDE_KEEP[name][1] for name in lengths]
+    # Seat from the faced end, then the pin station and the barrel from the
+    # shoulder (policy rule 12); the parenthesised overall on the bottom row.
+    seat_row = drawing.SIDE_KEEP["SeatLength"][1]
+    assert drawing.SIDE_KEEP["ServicePinFromShoulder"][1] == seat_row
+    rows = [seat_row, drawing.SIDE_KEEP["BarrelLength"][1], drawing._ROW_Y[2]]
     assert rows == sorted(rows, reverse=True) and rows[0] < drawing.BARREL_BOTTOM
     assert all(upper - lower >= 0.010 for lower, upper in zip(rows[1:], rows[:-1]))
+    assert drawing.SHOULDER_X > drawing.SERVICE_PIN_CENTER[0] > drawing.INBOARD_X
+    assert crank_hub_spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
 
 
 def test_callouts_stand_clear_of_views_and_each_other() -> None:
@@ -125,9 +149,12 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     assert seat_y - 4 * 0.006 > drawing.BARREL_TOP
     assert hole_y - 5 * 0.006 > drawing.BARREL_TOP
     end_left = drawing.END_CENTER[0] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
+    end_right = drawing.END_CENTER[0] + geometry.HUB_BARREL_DIA / 2.0 * drawing._S
     bore_x, bore_y = drawing.END_KEEP["BoreDia"]
-    assert bore_x - half(crank_hub_spec.BORE_CALLOUT) > drawing.OUTBOARD_X
-    assert bore_y < drawing.END_CENTER[1] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
+    # Right of the end view, so its leader enters the bore from the right,
+    # clear of the six-o'clock seam and its callout.
+    assert bore_x - half(crank_hub_spec.BORE_CALLOUT) > end_right
+    assert bore_y < drawing.END_CENTER[1]
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     assert drawing.SIDE_KEEP["BarrelDia"][0] < drawing.INBOARD_X
 
@@ -142,7 +169,7 @@ def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
     head = source[: source.index('name_last_feature(adapter, "ServicePinStationReference")')]
     last_sketch = head[head.rindex("create_sketch(") :].split(")", 1)[0]
     assert last_sketch == 'create_sketch("Right"'
-    assert "ServicePinStation" in drawing.SIDE_KEEP
+    assert "ServicePinFromShoulder" in drawing.SIDE_KEEP
     assert '"*Right", *SIDE_CENTER' in Path(drawing.__file__).read_text(encoding="utf-8")
 
 

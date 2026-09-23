@@ -53,6 +53,7 @@ from crank_handle_pivot_screw_spec import (
     HEAD_LENGTH,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
+    RELIEF_CALLOUT,
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
@@ -137,11 +138,10 @@ SIDE_KEEP = {
     "ShoulderDia": (SEAT_X + 0.050, SIDE_CENTER[1] + 0.030),
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1]),
     # The thread-relief groove against the seat face.  Its width from the seat
-    # face reads above it, one row over the 45-degree lead's axial leg, whose
-    # text stands right of the seat face over the shoulder; its Ø reads below
-    # it, the dimension line standing on the floor so nothing crosses.
-    "ReliefLead": (SEAT_X + 0.010, SIDE_CENTER[1] + 0.015),
-    "ReliefWidth": (RELIEF_MID_X, SIDE_CENTER[1] + 0.026),
+    # face reads above it alone; its Ø reads below it with the 45-degree lead
+    # as its callout, the dimension line standing on the floor so nothing
+    # crosses.
+    "ReliefWidth": (RELIEF_MID_X, SIDE_CENTER[1] + 0.022),
     "ReliefDia": (RELIEF_FLOOR_MID_X, SIDE_CENTER[1] - 0.016),
     # The tip chamfer's axial leg reads below-left of the tip, clear of the
     # thread size's extension line at the tip and of the callout above.
@@ -149,14 +149,18 @@ SIDE_KEEP = {
     # The slot shows as a notch in the head face; its depth reads above it.
     "SlotDepth": (HEAD_FACE_X - 0.0015, SIDE_CENTER[1] + 0.026),
 }
+# The 3-mm slot is narrower than the text, so the value stands above its
+# extension lines rather than between them.
 END_KEEP = {
-    "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1]),
+    "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1] + 0.010),
 }
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, the full-thread portion's own end edge in the side view (the
 # relief-flank edge at the other end would read as pointing at the groove).
+# The note stands up and right so its leader slants down-left onto that edge
+# instead of running along the chamfer's own extension line.
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
-THREAD_NOTE_XY = (0.030, SIDE_CENTER[1] + 0.040)
+THREAD_NOTE_XY = (0.068, SIDE_CENTER[1] + 0.042)
 # The running shoulder's upper flank, right of the Ø dimension line.
 FINISH_PICK = (UNDERHEAD_X - 0.060, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.050, SIDE_CENTER[1] + 0.030)
@@ -230,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     annotations = [*side_annotations, *end_annotations]
     set_dimension_callouts(
-        adapter, annotations, {"ReliefLead": CHAMFER_CALLOUT}, location="above"
+        adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
     )
     set_dimension_callouts(
         adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"

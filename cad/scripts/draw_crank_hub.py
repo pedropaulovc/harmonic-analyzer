@@ -12,6 +12,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
+    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     add_view_centerline,
@@ -22,6 +23,8 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
+    set_reference_dimensions,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -33,10 +36,13 @@ from crank_hub_spec import (
     CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     HUB_BARREL_DIA,
     HUB_LENGTH,
+    HUB_SEAT_DIA,
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
+    REFERENCE_DIMENSIONS,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
     SERVICE_PIN_HOLE_SPEC,
@@ -100,16 +106,17 @@ BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
 # inside its circle sees no face (run 20260923T023246758Z-97bfca38).
 BARREL_FACE_PICK = (INBOARD_X + 0.008, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
-# - Lengths: one baseline from the faced outboard end, stacked below the
-#   profile shortest-first so no extension line crosses a dimension line.
+# - Lengths: the seat from the faced outboard end, then the barrel and the
+#   MHA-024 station from the arm shoulder (policy rule 12), stacked below the
+#   profile shortest-first; the parenthesised overall is the bottom row.
 # - Barrel diameter: left of the inboard end.  Seat diameter: between the
 #   profile and the end view, its value and matched-fit callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
-# - Bore callout: below and right of the end view; the MHA-138 seam callout
-#   below and left of it, its short leader rising to the six-o'clock seam.
+# - Bore callout: right of the end view, its leader entering the bore from the
+#   right, clear of the six-o'clock seam; the seam callout below the end view.
 _ROW_Y = (0.120, 0.108, 0.096)
-END_KEEP = {"BoreDia": (END_CENTER[0] + 0.055, 0.105)}
+END_KEEP = {"BoreDia": (END_CENTER[0] + 0.070, END_CENTER[1] - 0.020)}
 # The hub's half of the seam is the arc bulging from the seat edge toward the
 # bore; the callout attaches 45 degrees up its right flank.
 SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
@@ -117,11 +124,14 @@ SEAM_EDGE_PICK = (
     SEAM_CENTER[0] + AXIAL_PIN_DIA / 2.0 * _S * math.cos(math.pi / 4.0),
     SEAM_CENTER[1] + AXIAL_PIN_DIA / 2.0 * _S * math.sin(math.pi / 4.0),
 )
-SEAM_CALLOUT_XY = (0.228, 0.128)
+SEAM_CALLOUT_XY = (0.255, 0.120)
+# The overall is picked on the two end-face edges seen edge-on, above the axis
+# where the seat and barrel circles -- not the bore -- project.
+OVERALL_PICK_Y = SIDE_CENTER[1] + 0.8 * HUB_SEAT_DIA / 2.0 * _S
 SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
-    "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[1]),
-    "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[2]),
+    "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[0]),
+    "BarrelLength": ((SHOULDER_X + INBOARD_X) / 2.0, _ROW_Y[1]),
     "BarrelDia": (INBOARD_X - 0.020, SIDE_CENTER[1]),
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
 }
@@ -131,6 +141,45 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
 }
+
+
+def _add_overall_reference(adapter: Any, view: Any) -> None:
+    """Print the parenthesised overall under the shoulder-based length chain.
+
+    Every controlling length is a model dimension whose places the part
+    authored; the overall is their read-only sum with no model dimension to
+    import, so its places come from the spec's ``DRAWING_REFERENCE_PRECISION``
+    -- never a literal typed here.  ``SetPrecision3`` reports rejection
+    through its return status rather than by raising, so it is read back.
+    """
+    label = "overall length reference"
+    overall = add_edge_dimension(
+        adapter,
+        view,
+        p0=(OUTBOARD_X, OVERALL_PICK_Y),
+        p1=(INBOARD_X, OVERALL_PICK_Y),
+        text_xy=((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[2]),
+        label=label,
+        orientation="horizontal",
+    )
+    display = _early_bound(overall, "IDisplayDimension")
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    places = DRAWING_REFERENCE_PRECISION[label]
+    # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
+    # tolerance places.  The subscript is written out again because
+    # _drawing_contract only accepts a spec lookup here.
+    adapter._attempt(
+        lambda: display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    )
+    applied = adapter._attempt(display.GetPrimaryPrecision2)
+    if applied != places:
+        raise RuntimeError(
+            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
+        )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured - HUB_LENGTH) > 1e-5:
+        raise RuntimeError(f"{label}: measured {measured:g}, expected {HUB_LENGTH:g} mm")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -204,6 +253,8 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    _add_overall_reference(adapter, right)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to crank-hub end view")

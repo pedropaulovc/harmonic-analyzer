@@ -42,7 +42,7 @@ from crank_hub_geometry import (
     HUB_SEAT_DIA,
     WALL_TARGET_MM,
     seam_callout,
-    seat_callout,
+    seat_bore_callout,
 )
 
 
@@ -160,7 +160,7 @@ HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
 # Short lines: the callout is centred under the diameter, so its widest line
 # sets how close to the left border the hub-end dimension can stand.  The
 # matched fit's acceptance lives here, on the feature (policy rule 6).
-HUB_SEAT_CALLOUT = seat_callout("MHA-137 HUB")
+HUB_SEAT_CALLOUT = seat_bore_callout("MHA-137 HUB")
 # Policy rule 6: at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at

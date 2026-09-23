@@ -29,8 +29,9 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.5
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
-    assert spec.HUB_SEAT_CALLOUT.startswith("MATCH-FIT TO MHA-137 HUB")
-    assert "LIGHT ARBOR-PRESS" in spec.HUB_SEAT_CALLOUT
+    # The arm bore is made first and keeps its band; the hub is fitted to it.
+    assert spec.HUB_SEAT_CALLOUT.startswith("MHA-137 HUB IS MATCH-FIT")
+    assert "TO THIS BORE" in spec.HUB_SEAT_CALLOUT
     assert "FACES FLUSH" in spec.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
@@ -78,7 +79,8 @@ def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     assert "DIMPLE" not in notes
     seam = spec.SEAM_CALLOUT
     assert "MHA-137" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
-    assert "<MOD-DIAM>4.0 <HOLE-DEPTH> 4.0" in seam
+    assert "AT ASSEMBLY" in seam
+    assert "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0" in seam
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
     assert all("AxialPin" not in name for name in marked)
@@ -120,7 +122,8 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
     assert drive.CRANK_ARM_ORIGIN_Z == -175.0
-    assert drive.CRANK_PIN_Z == -171.0
+    # MHA-024 moved 1.6 inboard with the rule-12 hub station (13.6).
+    assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     assert drive.CRANK_HUB_REAR_Z == -163.0
     assert drive.REMOVABLE_Z0 - drive.CRANK_HUB_REAR_Z == pytest.approx(5.5)
     assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-53.0)

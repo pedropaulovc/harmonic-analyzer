@@ -17,6 +17,7 @@ shaft's spherical dome projects outboard.  Positive station runs inboard.
 from __future__ import annotations
 
 import _config
+from crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
 
 
 MM_PER_IN = 25.4
@@ -43,10 +44,13 @@ HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
 ARM_TO_HUB_RATIO = ARM_WIDTH / HUB_SEAT_DIA
 PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 
-# MHA-024 remains at its established world station after the common crank face
-# moves 8 mm outboard.  At station 12 its #14/#9 match-ream is fully behind the
-# 8-mm arm and still leaves a 5.5-mm air gap from the hub rear to the T12 face.
-SERVICE_PIN_STATION = 12.0
+# MHA-024's match-ream is fully behind the 8-mm arm, located from the arm
+# shoulder it must not break into.  The hub rear stays at station 20 (BDT pins
+# the 5.5-mm T12 air gap), so the 12-mm barrel -- printed from the shoulder --
+# holds the 1:48 ream with a centred station: policy rule 12 ligaments below.
+HUB_BARREL_LENGTH = HUB_LENGTH - HUB_SEAT_LENGTH
+SERVICE_PIN_FROM_SHOULDER = 5.6
+SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
 CRANK_FACE_SHIFT = ARM_THICKNESS
 
 # Shared shaft-in-bushing fit class, re-expressed as a bore nominal/band against
@@ -91,10 +95,27 @@ EDGE_BREAK_MAX_MM = float(_config.title_block("edge_break")["chamfer_max_mm"])
 HUB_SEAT_DIA_MIN_GENERAL = HUB_SEAT_DIA - GENERAL_1PL_TOL_MM
 HUB_SEAT_DIA_MAX_GENERAL = HUB_SEAT_DIA + GENERAL_1PL_TOL_MM
 HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
+GENERAL_2PL_TOL_MM = round(
+    float(_config.title_block("linear_2pl")["value_in"]) * MM_PER_IN, 2
+)
+# Policy rule 12 (U27): MHA-024 ream ligaments at the worst case of the printed
+# bands -- the .XX station from the shoulder and the .X barrel length.  The
+# ream never exceeds the pin's big end, which stands proud of the hub.
+SERVICE_PIN_REAM_RADIUS_MAX = SERVICE_PIN_BIG_END_DIA / 2.0
+SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
+    SERVICE_PIN_FROM_SHOULDER - SERVICE_PIN_REAM_RADIUS_MAX - GENERAL_2PL_TOL_MM
+)
+SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
+    HUB_BARREL_LENGTH
+    - SERVICE_PIN_FROM_SHOULDER
+    - SERVICE_PIN_REAM_RADIUS_MAX
+    - GENERAL_1PL_TOL_MM
+    - GENERAL_2PL_TOL_MM
+)
 
 
 def seat_callout(mate: str) -> str:
-    """Matched hub-seat fit and its acceptance, for the seat on either part."""
+    """Hub-seat fit on MHA-137, the part turned second to fit ``mate``'s bore."""
     return "\n".join(
         (
             f"MATCH-FIT TO {mate}",
@@ -105,13 +126,19 @@ def seat_callout(mate: str) -> str:
     )
 
 
+def seat_bore_callout(mate: str) -> str:
+    """The arm's seat bore, made first: its printed size governs, ``mate`` fits it."""
+    return "\n".join((f"{mate} IS MATCH-FIT", "TO THIS BORE; FACES FLUSH"))
+
+
 def seam_callout(mate: str) -> str:
-    """MHA-138 seam, match-drilled with ``mate``: nominal pin size and depth."""
+    """MHA-138 seam, match-drilled with ``mate``: the pin sets the size."""
     return "\n".join(
         (
             f"MATCH-DRILL/REAM WITH {mate}",
+            "AT ASSEMBLY, CENTRED ON THE SEAM",
             "FOR MHA-138: LIGHT DRIVE FIT",
-            f"<MOD-DIAM>{AXIAL_PIN_DIA:.1f} <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
+            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
         )
     )
 
@@ -130,6 +157,8 @@ ARM_CHEEK_WORST_MM = wall_after_edge_break(
 for _wall, _label in (
     (SEAM_WEB_WORST_MM, "MHA-137 seam-to-bore web"),
     (ARM_CHEEK_WORST_MM, "MHA-020 cheek around the hub seat"),
+    (SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM, "MHA-024 ream to the MHA-137 shoulder"),
+    (SERVICE_PIN_REAR_LIGAMENT_WORST_MM, "MHA-024 ream to the MHA-137 rear face"),
 ):
     if _wall < WALL_TARGET_MM:
         raise AssertionError(f"{_label} is only {_wall:.3f} mm at worst case")

@@ -187,8 +187,9 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
     assert "ACCEPTED EXCEPTION TO THE 1.5D RULE" in spec.DRAWING_NOTES
-    assert "1.15D" in spec.DRAWING_NOTES
-    assert "U33b" in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES.startswith("THREAD ENGAGEMENT 1.15D MIN")
+    # The ruling ID stays in the spec source; the sheet reader never sees it.
+    assert "U33b" not in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) == 1
     assert len(spec.DRAWING_NOTES) <= 72
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -307,11 +308,16 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The Ø stands on the floor, clear of the lead.
     lead_foot_x = drawing.SEAT_X - spec.RELIEF_LEAD * drawing.SHEET_SCALE[0] / 1000.0
     assert drawing.RELIEF_END_X < drawing.SIDE_KEEP["ReliefDia"][0] < lead_foot_x
-    # The lead's text stands right of the seat face, below the relief width.
-    lead_xy = drawing.SIDE_KEEP["ReliefLead"]
-    assert drawing.SEAT_X < lead_xy[0] < drawing.SIDE_KEEP["ShoulderDia"][0] - 0.020
-    assert drawing.SHOULDER_TOP_Y < lead_xy[1] < drawing.SIDE_KEEP["ReliefWidth"][1]
+    # The 45-degree lead rides the Ø callout; only the width stands above.
+    assert "ReliefLead" not in drawing.SIDE_KEEP
+    assert spec.RELIEF_CALLOUT == "0.5 X 45 DEG LEAD"
     assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.RELIEF_TOP_Y
+    # The thread note stands up and right of its pick, so the leader slants.
+    note_x, note_y = drawing.THREAD_NOTE_XY
+    assert note_x - drawing.THREAD_PICK[0] > 0.010
+    assert note_y - drawing.SIDE_KEEP["ReliefWidth"][1] > 0.015
+    # The slot value stands clear of its 3-mm-apart extension lines.
+    assert drawing.END_KEEP["SlotWidth"][1] - drawing.END_CENTER[1] > 0.005
     assert (
         drawing.SIDE_KEEP["ThreadLength"][1] + 0.010
         < drawing.SIDE_KEEP["ReliefDia"][1]

@@ -93,6 +93,9 @@ RELIEF_WIDTH = 1.5
 # an equation, and printed as a callout on the lead's axial size.
 RELIEF_LEAD = 0.5
 CHAMFER_CALLOUT = "X 45 DEG"
+# The 45-degree lead rides the relief's Ø callout rather than a third
+# dimension crowded into the 1.5-mm groove at 3:1 (machinist review).
+RELIEF_CALLOUT = f"{RELIEF_LEAD:.1f} {CHAMFER_CALLOUT} LEAD"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 
 SEAT_STATION = HEAD_LENGTH + SHOULDER_LENGTH
@@ -172,9 +175,10 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
 # The tip may stand proud of the arm's inboard face by up to this much.
 PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
 # The one manufacturing note: the accepted exception, rendered from the floor.
+# The ruling ID (U33b) stays here; it means nothing to the book's reader.
 DRAWING_NOTES = (
-    "ACCEPTED EXCEPTION TO THE 1.5D RULE: THREAD ENGAGEMENT "
-    f"{ENGAGEMENT_EXCEPTION_FLOOR_D:.2f}D MIN (U33b)."
+    f"THREAD ENGAGEMENT {ENGAGEMENT_EXCEPTION_FLOOR_D:.2f}D MIN, "
+    "ACCEPTED EXCEPTION TO THE 1.5D RULE."
 )
 
 # Flat seat annulus that bears on the arm face, outside the 45-degree lead:
@@ -256,7 +260,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
-        "ReliefLead",
         "TipChamfer",
     },
     "SlotProfile": {"SlotWidth"},
@@ -275,7 +278,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 1,
-        "ReliefLead": 1,
         "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
