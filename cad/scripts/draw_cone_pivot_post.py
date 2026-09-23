@@ -166,7 +166,12 @@ FRONT_KEEP = {
 TOP_KEEP = {
     "HeadDia": (0.071, 0.188),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
-    "CrankBossStartZ": (0.1255, 0.2225),
+    # The spot-face station stands between the crank-boss length and the
+    # circle, its value on its own dimension line.  On the right its upper
+    # witness line ran level with the counterbore callout's shelf and that
+    # callout's leader crossed its dimension line, so its text had to be
+    # offset to a distant shelf, where a blind reader took it for a note.
+    "CrankBossStartZ": (0.0655, 0.2338),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
@@ -191,7 +196,6 @@ DIMENSION_CALLOUTS = {
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
-    "CrankBossStartZ": "SPOTFACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
@@ -532,6 +536,7 @@ def _prepare_cone_section(adapter: Any, view: Any) -> None:
 # ASME Y14.2 runs a centerline a short, uniform distance past the feature it
 # marks; 3 mm clears the boss end faces without reaching the 42.0 witness lines.
 _CENTERLINE_OVERSHOOT_MM = 3.0
+_SW_LINE_CENTER = 4  # swLineStyles_e.swLineCENTER
 
 
 def _add_cone_section_centerline(adapter: Any, view: Any) -> None:
@@ -580,8 +585,18 @@ def _add_cone_section_centerline(adapter: Any, view: Any) -> None:
     )
     if centerline is None:
         raise RuntimeError("failed to create the cone-bore centerline in Section A-A")
+    # A sheet sketch line otherwise prints in the under-defined sketch blue;
+    # override the layer so it prints like every native centerline.
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0  # COLORREF black
+    segment.Style = _SW_LINE_CENTER
     adapter.currentModel.ClearSelection2(True)
     rebuild_drawing(adapter, label="cone section bore axis")
+    if int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER:
+        raise RuntimeError(
+            "cone-bore centerline did not keep black centerline font: "
+            f"color={int(segment.Color)}, style={int(segment.Style)}"
+        )
     _telemetry.info(
         f"cone section bore axis drawn {ends[0]!r} -> {ends[1]!r} through {middle!r}"
     )
@@ -889,15 +904,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
-    )
-    # The station's dimension line has to stay left of the counterbore
-    # callout's shelf, which runs level with its upper extension line.  The
-    # short text sits just right of that line, below the shelf and above the
-    # angle, so it reads as the dimension it is rather than a distant note.
-    offset_dimension_text(
-        adapter,
-        top_annotations,
-        {"CrankBossStartZ": (0.148, 0.230)},
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore

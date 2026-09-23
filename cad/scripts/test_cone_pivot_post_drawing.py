@@ -351,3 +351,21 @@ def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
     assert "SECTION A-A" not in spec.DRAWING_NOTES
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_add_cone_section_centerline(adapter, section)" in source
+
+
+def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
+    """The 21.38 station is a plain dimension: no label, no offset shelf."""
+    assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"CrankBossStartZ":' not in source
+    # Left of the Ø44 circle and right of the crank-boss length's line.
+    x, _y = drawing.TOP_KEEP["CrankBossStartZ"]
+    assert drawing.TOP_KEEP["CrankBossLen"][0] < x < drawing._top_x(-spec.HEAD_DIA / 2.0)
+
+
+def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert drawing._SW_LINE_CENTER == 4
+    assert "segment.Color = 0" in source
+    assert "segment.Style = _SW_LINE_CENTER" in source
+    assert "int(segment.Color) != 0 or int(segment.Style) != _SW_LINE_CENTER" in source
