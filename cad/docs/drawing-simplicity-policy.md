@@ -240,6 +240,46 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    decision. A reviewer can still be wrong: validate the premise rather than
    blindly implementing the proposed fix.
 
+12. **Walls, margins and stacks are judged at the worst case for a novice
+   shop.** The builder is a first-time hobby machinist, so a design earns
+   loose tolerances rather than demanding tight ones.
+   - **Walls and webs.** Every machined wall or web has a target of
+     **≥ 2.0 mm** and a hard floor of **1.5 mm**. That includes the
+     thread-major envelope to an edge or another bore, a counterbore or
+     countersink to an outside surface, and the ligament over a cross-hole.
+   - **Worst case, not nominal.** Judge each wall at the worst case of the
+     printed bands: the title block (`.X` ±0.8, `.XX` ±0.51, DRILLED HOLES
+     `+0.10 / 0`) or the explicit band on the dimension, plus realistic drill
+     wander for deep drilling. Not at nominal, and not by RSS.
+   - **Fix with geometry.** A thin wall or razor margin is fixed by changing
+     the geometry so the tolerances can be LOOSER, never by tightening a band
+     or accepting a DFM minimum.
+   - **Aim for the title-block bands.** A tighter band needs a functional
+     reason. A unilateral band that one cutter pass produces on its own (a
+     slot `+0.10 / 0` cut in one pass with a named end mill) is acceptable
+     and counts as loose.
+   - **Thread engagement.** A fastener engages **≥ 1.5D** of full thread in
+     its receiver at the worst case. Count full threads only: a tap or die
+     leaves about 1–1.5 incomplete threads, so give it a thread relief or a
+     deeper tap drill rather than letting them eat the engagement.
+   - **Adjust at fit-up rather than stack.** Where loose bands cannot hold a
+     worst-case stack, prefer a fit-up adjustment stated on the assembly
+     steps (slot, shim, feeler-set, cut-to-fit, match-drill) over tightening
+     part tolerances.
+   - **Named exceptions.** A shortfall is acceptable only by the user's
+     ruling, recorded by name in the table below. The thresholds above are
+     never loosened to admit it, and a new row needs a new ruling.
+
+## Named exceptions
+
+Accepted shortfalls against rule 12. Each is specific to the parts named; it
+is not precedent for anything else.
+
+| parts | shortfall | why accepted | ruled |
+|---|---|---|---|
+| cone gears T006–T024 | root-to-bore webs 0.6–1.3 mm | the gears match the book photos (C67500 tip gears) | 2026-09-23 |
+| MHA-142 post-to-platform screws (MSC 40923898, 1/4-20 × 3-1/2 slotted fillister, nominal 86.0, cut to fit at assembly: flush to 0.3 short of the MHA-091 underside, never proud) | thread engagement 6.05–6.35 mm (0.95–1.0D) in the 6.35 plate | the screw end must not stand proud of the plate, which swings over the base | 2026-09-23 |
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
@@ -249,8 +289,12 @@ different model family from whoever authored or last edited the drawing
 script.** An agent running on a Claude model (Fable, Opus, Sonnet) reviews with
 `--reviewer codex`; an agent running on a Codex/GPT model reviews with
 `--reviewer claude`. A same-family review shares the author's blind spots and
-does not count as the gate, even when it returns `SHIP`; if the cross-family
-reviewer is over quota, the package waits for it rather than falling back.
+does not count as the gate, even when it returns `SHIP`. If the cross-family
+reviewer is over quota, the user's standing last-resort rule applies and its
+verdict counts: work authored by Sol or Opus is reviewed by a stronger model
+(Astra or Fable), and work authored by Astra or Fable is reviewed by Astra or
+Fable at high reasoning. `--reviewer claude` defaults to `claude-fable-5-1` at
+medium effort, which is the Opus fallback.
 Part and assembly packages render every native PDF page at 300 dpi and submit
 all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.

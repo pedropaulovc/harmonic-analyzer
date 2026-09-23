@@ -68,7 +68,8 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   Instrument resolution is not accuracy. Without stated equipment accuracy,
   condition or temperature control, describe burden and uncertainty; do not
   invent quantified capability, stock/catalog limits or categorical
-  impossibility. Use no numeric cutoff. Scrutinize proposed replacements the
+  impossibility. Use no numeric cutoff for capability (the thread-engagement
+  minimum below is a design rule, not a capability claim). Scrutinize proposed replacements the
   same way: widening a band alone does not justify it. Prefer an adequate
   general tolerance or functional acceptance; state dependencies on unseen
   mating limits rather than inventing replacement numbers. Do not reopen
@@ -76,6 +77,18 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
 - Setup and adjustment: anything with a parked and an engaged state, an
   adjustment screw, a zero, a spring tension, has its as-shipped state and
   its setting procedure stated without ambiguity.
+- Margins for a first-time builder. Judge fasteners and stacks at the WORST
+  CASE of the printed bands, not at nominal and not by root-sum-square:
+  - each screw engages at least 1.5 x its nominal diameter of FULL thread in
+    its receiver, counting neither clearance holes nor the one to one and a
+    half incomplete threads a tap or die leaves;
+  - where parts stack up to a gap, clearance or alignment the package
+    checks, either the loose bands hold it or a stated fit-up adjustment
+    (slot, shim, feeler-set, cut-to-fit, match-drill) covers the whole
+    worst-case range. A stack that silently depends on tight part bands is
+    a blocker; the fix is an adjustment at fit-up, not a tighter part band.
+  A shortfall the package explicitly states as an accepted exception is
+  recorded in minor, not flagged as a defect.
 - Consumables and loose items: lubricant, thread locker, pins supplied loose,
   shims, all named.
 - Nothing more. Part tolerances, materials and finishes belong on the part
@@ -140,7 +153,9 @@ view or item for every finding, and say the fix):
   or adjustment with no mating target, acceptance criterion or procedure,
   incompatible controlled fit ranges, missing essential interchangeability
   requirements, functionally essential precision with a substantiated setting
-  or verification capability conflict as defined above, an ambiguous
+  or verification capability conflict as defined above, full-thread
+  engagement under 1.5D or an adjustment range that does not cover the
+  worst-case stack, an ambiguous
   parked/engaged state, inconsistent BOM rows or balloon mappings
   across sheets, a setup sequence that conflicts across sheets, or any
   contradiction between sheets or between a view and a note.
@@ -155,5 +170,5 @@ view or item for every finding, and say the fix):
   view that does not read, or an otherwise identifiable matched-fit mate
   missing its name or assigned drawing/part number.
 
-- minor: taste and polish.
+- minor: taste and polish, plus stated accepted exceptions.
 An empty list is a valid answer for any category. Never pad a category.
