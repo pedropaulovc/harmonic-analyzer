@@ -125,7 +125,9 @@ def _flank_y(model_y_mm: float) -> float:
 FRONT_KEEP = {
     "ArborBoreDia": (0.256, 0.214),
     "ArborBoreCz": (0.240, 0.151),
-    "BottomCapRadius": (0.250, 0.080),
+    # r6 eye-pass: at (0.250, 0.080) it overprinted the pivot bore's REAM
+    # THRU; the lower-left field is clear of the pivot Ra and the title block.
+    "BottomCapRadius": (0.170, 0.072),
     "TopCapRadius": (0.188, 0.245),
     "PivotBoreDia": (0.256, 0.086),
 }
@@ -135,7 +137,9 @@ LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCz": (0.060, 0.090),
     "PinSeatCy": (0.130, 0.125),
-    "PinSeatDia": (0.040, 0.160),
+    # r6 eye-pass: beside the view its widest callout line ran across the
+    # flank; above the view the leader crosses only the outline.
+    "PinSeatDia": (0.050, 0.245),
 }
 SECTION_CENTER = (0.350, 0.115)
 SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
@@ -311,6 +315,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=ARBOR_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
+        char_height=0.0025,  # the pivot-block size; the default read oversized
     )
     add_surface_finish(
         adapter,
@@ -319,6 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
+        char_height=0.0025,
     )
     _seat_depth_dimension(adapter, seat_section)
 
