@@ -550,3 +550,21 @@ def test_seat_plane_edge_prefers_the_mount_then_falls_back_and_reports(monkeypat
     )
     with pytest.raises(RuntimeError, match=r"census \(1 edges\): x line"):
         draw_summing_assembly._seat_plane_edge(object(), 0.0)
+
+
+def test_hanger_engagement_is_measured_from_the_boss_top_seat_not_the_block() -> None:
+    # knife CodeRabbit (2x major): under option D the tap mouth is the boss-top
+    # seat, 6.0 above the block top. The static stack's E = seat - tip must be
+    # the stud's 10.40 tip inside [1.5D, usable thread], and the built judge
+    # must refuse a joint read from the block-top datum (negative control).
+    engagement = build_summing_assembly.HANGER_SHOULDER_Y - build_summing_assembly.HANGER_TIP_Y
+    assert build_summing_assembly.HANGER_SHOULDER_Y == pytest.approx(hanger.SHOULDER_SEAT_Y)
+    assert engagement == pytest.approx(hanger.STUD_TIP_LENGTH_MM)
+    assert hanger.REQUIRED_ENGAGEMENT_MM <= engagement <= hanger.TAP_THREAD_DEPTH_MIN_MM
+    assert hanger.SHOULDER_SEAT_Y - hanger.MOUNT_BLOCK_TOP_Y == pytest.approx(
+        hanger.BOSS_HEIGHT_MM
+    )
+    violations = build_summing_assembly.hanger_joint_violations
+    assert violations(_joint()) == []
+    block_datum = violations(_joint(mount_top=hanger.MOUNT_BLOCK_TOP_Y))
+    assert any("is not the seat plane" in item for item in block_datum)
