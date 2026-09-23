@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from pathlib import Path
 
 import _config
 import _fit_limits
@@ -94,3 +95,20 @@ def test_the_isometric_note_states_the_only_off_sheet_scale() -> None:
     ratio = re.search(r"(\d+)\s*:\s*(\d+)", spec.ISOMETRIC_VIEW_NOTE)
     assert ratio is not None, f"missing view scale in {spec.ISOMETRIC_VIEW_NOTE!r}"
     assert (int(ratio.group(1)), int(ratio.group(2))) == drawing.ISO_SCALE
+
+
+def test_the_length_is_a_cut_to_fit_reference() -> None:
+    """U34b: the fitter cuts the arbor to the span over both pedestals.
+
+    The modelled length is that nominal span less the fit shortfall, so the
+    REF value the sheet prints agrees with the callout that governs it.
+    """
+    strap_span = 75.202 - (-72.652)
+    outer_span = strap_span + 2 * arbor_pedestal_spec.STRAP_T
+    assert round(outer_span - spec.FIT_SHORTFALL, 1) == spec.SHAFT_LENGTH
+    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
+    assert "CUT TO FIT" in spec.LENGTH_CALLOUT
+    assert "MHA-004" in spec.LENGTH_CALLOUT
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_reference_dimension(adapter, length_annotations[0]' in source
+    assert '{"Depth": LENGTH_CALLOUT}' in source

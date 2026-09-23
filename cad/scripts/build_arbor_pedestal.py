@@ -1,7 +1,8 @@
 r"""Reproduction script: cylinder-arbor pedestal (book ch. 13 / video 4).
 
-Black tapered bearing post that clamps the south end of the stationary
-cylinder arbor. The gears spin freely on the arbor (dimensions.yaml
+Black tapered bearing post that clamps one end of the stationary
+cylinder arbor (two per machine; the north one is the same casting turned
+180 about Y). The gears spin freely on the arbor (dimensions.yaml
 ch. 13 "M6.2 keyway refutation"), so the post only holds the arbor
 still. Still `t00393` / keyframe `v4_pinion_008` (engineerguy video 4)
 show its true shape -- NOT the old plain green block: a black-finished
@@ -9,13 +10,15 @@ ferrous pedestal, likely steel plate but equally machinable from gray iron,
 with a low rectangular foot flange carrying a thin strap that tapers up to a
 semicircular dome around the arbor clamp bore
 
-Layout: foot flange standing on the Top plane, centred at the origin
-in plan (X width x Z depth); tapered strap up +Y, FLUSH with the
-foot's +Z (machine-north) face so the flange extends -Z only -- the
-casting is an L in side view, not an upside-down T (PR7 review item;
-v4_pinion_008 shows the strap rising from one end of the foot with the
-hold-down screw on the exposed flange). Dome + bore along Z at
-y = BORE_HEIGHT; a O3.2 fillister-screw hole drops through the flange.
+Layout: foot flange standing on the Top plane, centred on X in plan
+(X width x Z depth); tapered strap up +Y, FLUSH with the foot's +Z
+(inner) face so the flange extends -Z only -- the casting is an L in side
+view, not an upside-down T (PR7 review item; v4_pinion_008 shows the strap
+rising from one end of the foot with the hold-down screw on the exposed
+flange). The strap band keeps local z -2..+8 about the origin; U34c grew
+the foot OUTBOARD only, to an 18 ledge (local z -20..-2) centred on one
+#8 close-clearance hole (ch12 p.18 img09). Dome + bore along Z at
+y = BORE_HEIGHT.
 The strap profile is a trapezoid + a full circle boss (its upper half
 proud of the trapezoid = the dome) -- no arcs, only proven primitives
 (see build_connecting_rod's head for the anchored-polygon pattern).
@@ -34,12 +37,13 @@ import sys
 
 from _common import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     check,
-    define_centered_rectangle,
     define_circle,
+    define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
     extrude_at_offset,
@@ -70,10 +74,13 @@ from arbor_pedestal_spec import (
     DRAWING_PRECISION,
     FOOT_DEPTH,
     FOOT_HEIGHT,
+    FOOT_NEAR_Z,
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
     SCREW_Z,
+    STRAP_INNER_Z,
+    STRAP_ROOT_Z,
     STRAP_T,
     SURFACE_FINISHES,
     TAPER_TANGENT_X,
@@ -90,12 +97,11 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # marked dimensions — so a spec correction rebuilds the SLDPRT from the same
 # values the print annotates (foot envelope, strap, dome, journal bore).
 #
-# STRAP_T: band local z (FOOT_DEPTH/2 - STRAP_T)..(FOOT_DEPTH/2) = -2..+8.
-# Keeps the arbor's 7.5 engagement from the north face; the -Z flange carries
-# #4 normal-clearance pass-through for the exact Ø2.8448 x 9.525 stock
-# foot screw. Its 4.525-mm pedestal engagement enters the base past this
-# 5.0-mm flange.
-# SCREW_Z (spec): hole centre on the exposed flange, local z (machine -95.5).
+# STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z = -2..+8, unchanged by
+# U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-143
+# #8-32 x 3/4 fillister (McMaster 90280A197); the base seat under it is
+# transfer-punched through this hole at assembly.
+# SCREW_Z (spec): hole centre on the ledge, local z -11.
 
 BORE_RADIUS = BORE_DIA / 2.0
 
@@ -113,6 +119,7 @@ async def build(adapter) -> dict[str, str]:
     # so they carry no drive job; they stay declared knobs like the exemplars.
     await set_global(adapter, "FootWidth", f"{FOOT_WIDTH}mm")
     await set_global(adapter, "FootDepth", f"{FOOT_DEPTH}mm")
+    await set_global(adapter, "StrapInnerZ", f"{STRAP_INNER_Z}mm")
     await set_global(adapter, "FootHeight", f"{FOOT_HEIGHT}mm")
     await set_global(adapter, "StrapThickness", f"{STRAP_T}mm")
     await set_global(adapter, "TopRadius", f"{TOP_RADIUS}mm")
@@ -124,20 +131,27 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Foot flange on the Top plane (sketch y = global -Z): an origin-centred
-    # rectangle, width along X x depth along Z, extruded up.
+    # Foot flange on the Top plane (sketch y = global -Z): X-centred, its far
+    # edge on the strap inner face (z +8) and running 28 outboard to z -20, so
+    # the rectangle is anchored at its inner-west corner rather than centred.
     foot = SketchDims()
     check("create_sketch foot", await adapter.create_sketch("Top"))
-    await define_centered_rectangle(
+    half_width = FOOT_WIDTH / 2.0
+    foot_points = [
+        (-half_width, -STRAP_INNER_Z),
+        (half_width, -STRAP_INNER_Z),
+        (half_width, -FOOT_NEAR_Z),
+        (-half_width, -FOOT_NEAR_Z),
+    ]
+    foot_lines = await add_line_chain(adapter, foot_points)
+    await define_rectilinear_chain(
         adapter,
-        FOOT_WIDTH / 2.0,
-        FOOT_DEPTH / 2.0,
-        "foot",
+        foot_lines,
+        foot_points,
+        label="foot",
         dims=foot,
-        name_width="Width",
-        drive_width='"FootWidth"',
-        name_depth="Depth",
-        drive_depth='"FootDepth"',
+        names=["Width", "Depth", "FootWest", "FootInner"],
+        drives=['"FootWidth"', '"FootDepth"', '"FootWidth" / 2', '"StrapInnerZ"'],
     )
     await ensure_fully_defined(adapter, "foot sketch")
     check("exit_sketch foot", await adapter.exit_sketch())
@@ -220,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += strap.apply(adapter, "StrapProfile")
     # L, not T: the strap band hugs the foot's +Z face (local z -2..+8), so
     # the extrude starts at an offset instead of straddling the mid-plane.
-    extrude_at_offset(adapter, STRAP_T, FOOT_DEPTH / 2.0 - STRAP_T)
+    extrude_at_offset(adapter, STRAP_T, STRAP_ROOT_Z)
     name_last_feature(adapter, "Strap")
     a_strap = (FOOT_WIDTH + 2.0 * half_tangent) / 2.0 * strap_rise
     v_strap = a_strap * STRAP_T
@@ -245,7 +259,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch dome", await adapter.exit_sketch())
     name_last_feature(adapter, "DomeProfile")
     drive_jobs += dome.apply(adapter, "DomeProfile")
-    extrude_at_offset(adapter, STRAP_T, FOOT_DEPTH / 2.0 - STRAP_T)
+    extrude_at_offset(adapter, STRAP_T, STRAP_ROOT_Z)
     name_last_feature(adapter, "Dome")
     chord_offset = tangent_y - BORE_HEIGHT
     cap_area = TOP_RADIUS**2 * math.acos(chord_offset / TOP_RADIUS) - (
@@ -276,7 +290,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut bore",
         await adapter.create_cut_extrude(
-            # Mid-plane TOTAL about the Front sketch plane: the strap band now
+            # Mid-plane TOTAL about the Front sketch plane: the strap band
             # sits offset (-2..+8), so the cut spans generously past it.
             ExtrusionParameters(depth=2.0 * FOOT_DEPTH, both_directions=True)
         ),
@@ -285,17 +299,17 @@ async def build(adapter) -> dict[str, str]:
     v_bore = math.pi * BORE_RADIUS**2 * STRAP_T
     volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
 
-    # Flange hold-down screw hole (PR7): ONE native Hole Wizard #4 clearance
-    # feature (through-all along Y) through the exposed -Z flange at (x 0,
-    # z SCREW_Z), drilled from the foot bottom (y=0) -- the fillister screw
-    # bolts the casting to the base. The foot bottom is a clean rectangle (the
+    # Flange hold-down screw hole (U34c): ONE native Hole Wizard #8 close
+    # clearance feature (through-all along Y) through the exposed -Z ledge at
+    # (x 0, z SCREW_Z), drilled from the foot bottom (y=0) -- the MHA-143
+    # fillister bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
     screw_cut = wizard_holes(
         adapter,
         SCREW_HOLE_SPEC,
         [[0.0, 0.0, SCREW_Z]],
         (0.0, -1.0, 0.0),
-        "flange hold-down hole (#4 clearance)",
+        "flange hold-down hole (#8 close clearance)",
         name="ScrewHole",
         placement_dims=[((None, None), ("ScrewZ", '"ScrewZ"'))],
     )

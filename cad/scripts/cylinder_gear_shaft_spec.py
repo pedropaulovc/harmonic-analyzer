@@ -10,16 +10,18 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 SHAFT_DIA = 0.375 * MM_PER_IN  # ch13: = cam bore (legacy parameters.kcl)
-SHAFT_LENGTH = 187.0  # ch13 stack + journals; installed -54.585..+132.415:
+# U34b: the pedestals stand inboard against the end discs and the arbor is CUT
+# TO FIT at assembly, so its length is a REFERENCE value, not a machining
+# target. Nominal strap span 147.854 (inner faces -72.652 / +75.202) plus the
+# two 10.0 straps is 167.854 over the outer faces; less FIT_SHORTFALL (3.0 per
+# end) leaves 7.0 seated in each strap bore and 161.854 overall.
+FIT_SHORTFALL = 6.0  # total: 3.0 short of each strap's outer face
+SHAFT_LENGTH = 161.9  # REF; see LENGTH_CALLOUT
 SHAFT_DIA_BAND = SHAFT_H
-# 7.0 mm seated in the north arbor-pedestal bore band
-# (PR8, ch12 img09 -- the base-
-# standing north clamp restored; the pedestal foot sits just clear of the
-# rocker-arm-support footprint). Was 168, clear of the old solid
-# rocker-arm-support north upright (shortened from 200, 2026-06-19); south end
-# The fixed-post recenter moves the former -90..+97 envelope slightly rearward
-# as a unit; the south end still stops inside its pedestal bore. See
-# build_drive_train_assembly.ARBOR_LENGTH / ARBOR_SOUTH_Z.
+# The print's one statement of how the length is set: the fitter measures the
+# span over both installed MHA-004 straps and cuts the arbor FIT_SHORTFALL
+# under it (drive-train assembly steps 8-9 carry the same measurement).
+LENGTH_CALLOUT = f"CUT TO FIT: SPAN OVER BOTH MHA-004 LESS {FIT_SHORTFALL:.1f}"
 
 # The arbor is one plain cylinder extruded +Y from the origin (y 0..SHAFT_LENGTH,
 # NOT mid-plane), so the bearing face resolves by diameter alone.  The 20
@@ -47,7 +49,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # would print 9.525 as 9.53 and contradict the bore mates built on the exact
 # inch conversion, and the O.D. carries the running band anyway.  The overall
 # length is a free dimension -- one place puts it on the title block's .X row
-# instead of claiming the .XX band a trailing 187.00 would.
+# instead of claiming the .XX band a trailing 161.90 would, and the sheet
+# parenthesizes it: the cut-to-fit callout, not the nominal, sets it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDia": 3},
     "Shaft": {"Depth": 1},
@@ -66,15 +69,18 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# Two part-specific facts a machinist cannot read off the views (policy rule 6).
-# The O.D. IS a catalog stock size, so the 20 um running band is a stock buy
-# rather than a grind between centres, and a 187:9.5 slender bar is turned
-# between centres -- saying the centre holes may stay saves a phone call (both
-# ends finish up inside a pedestal bore, where they do no harm).
+# Three part-specific facts a machinist cannot read off the views (policy
+# rule 6). The O.D. IS a catalog stock size, so the 20 um running band is a
+# stock buy rather than a grind between centres, and a 162:9.5 slender bar is
+# turned between centres -- saying the centre holes may stay saves a phone
+# call (both ends finish up inside a pedestal bore, where they do no harm).
+# The length is cut at assembly, so the shop supplies the bar long (170 covers
+# the nominal span plus facing stock).
 DRAWING_NOTES = "\n".join(
     (
         "3/8 IN GROUND STOCK OK.",
         "CENTRES OK.",
+        "SUPPLY 170 LONG, UNCUT.",
     )
 )
 # The title block declares 1:1, so the off-scale pictorial must say so

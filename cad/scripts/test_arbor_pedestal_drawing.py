@@ -108,25 +108,47 @@ def test_screw_hole_contract_is_part_owned() -> None:
     spec = arbor_pedestal_spec.SCREW_HOLE_SPEC
     assert part.SCREW_HOLE_SPEC is spec
     assert spec.kind == "clearance"
-    assert spec.size == "#4"
-    assert spec.fit == "normal"
+    assert spec.size == "#8"
+    assert spec.fit == "close"
     assert arbor_pedestal_spec.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
     assert part.SCREW_HOLE_DIA == blind_cut_dia_mm(spec)
 
 
-def test_hold_down_hole_sits_clear_inside_the_exposed_ledge() -> None:
-    """The plan locates the hole off the foot's far face, so the print is only
-    honest if the hole clears both the near edge and the strap it hides under."""
-    half_depth = arbor_pedestal_spec.FOOT_DEPTH / 2.0
-    strap_face = half_depth - arbor_pedestal_spec.STRAP_T
-    radius = arbor_pedestal_spec.SCREW_HOLE_DIA / 2.0
-    to_near_edge = arbor_pedestal_spec.SCREW_Z + half_depth
-    to_strap_face = strap_face - arbor_pedestal_spec.SCREW_Z
-    assert to_near_edge > radius
-    assert to_strap_face > radius
-    # Dimensioned from the far face, the printed value is the whole depth less
-    # the ledge offset -- one datum for every Z on the plan.
-    assert half_depth - arbor_pedestal_spec.SCREW_Z == 13.0
+def test_foot_grew_outboard_only_around_an_unmoved_strap() -> None:
+    """U34c: the strap band and part origin stay put; only the ledge grew."""
+    spec = arbor_pedestal_spec
+    assert (spec.STRAP_ROOT_Z, spec.STRAP_INNER_Z) == (-2.0, 8.0)
+    assert spec.FOOT_DEPTH == 28.0
+    assert spec.LEDGE_DEPTH == 18.0
+    assert spec.FOOT_NEAR_Z == -20.0
+    assert spec.SCREW_Z == -11.0
+
+
+def test_hold_down_hole_webs_hold_u27_at_the_printed_worst_case() -> None:
+    """The plan locates the hole off the strap inner face at one place (±0.8),
+    and the foot depth and strap depth print at one place too. Every web the
+    hole leaves must keep the 2.0 target with those bands stacked against it,
+    plus the title block's +0.10 drilled-hole oversize."""
+    import _config
+
+    spec = arbor_pedestal_spec
+    band_1pl = 0.8
+    assert _config.title_block("linear_1pl")["display"] == "±0.8"
+    radius = spec.SCREW_HOLE_DIA / 2.0 + 0.05
+    to_strap_root = spec.STRAP_ROOT_Z - spec.SCREW_Z - radius
+    to_ledge_end = spec.SCREW_Z - spec.FOOT_NEAR_Z - radius
+    to_side = spec.FOOT_WIDTH / 2.0 - radius
+    assert to_strap_root - 2 * band_1pl >= 2.0
+    assert to_ledge_end - 2 * band_1pl >= 2.0
+    assert to_side - band_1pl - band_1pl / 2.0 >= 2.0
+    # The MHA-143 head (Ø6.858) floats with the shank in the hole; it must
+    # still clear the strap root it is tightened beside.
+    head_r = 6.858 / 2.0
+    float_r = (spec.SCREW_HOLE_DIA - 4.1656) / 2.0
+    assert spec.STRAP_ROOT_Z - spec.SCREW_Z - head_r - 2 * band_1pl - float_r >= 2.0
+    # Dimensioned from the strap inner face, the printed value is the strap
+    # plus half the ledge -- one datum for every Z on the plan.
+    assert spec.STRAP_INNER_Z - spec.SCREW_Z == 19.0
 
 
 def test_no_dead_band_between_wizard_correction_and_the_builder_assert() -> None:
@@ -226,10 +248,14 @@ def test_projected_views_stay_aligned_and_ordered() -> None:
     dome_top = drawing._front_y(
         arbor_pedestal_spec.BORE_HEIGHT + arbor_pedestal_spec.TOP_RADIUS
     )
-    plan_bottom = drawing._top_y(arbor_pedestal_spec.FOOT_DEPTH / 2.0)
-    assert dome_top < plan_bottom
-    # The plan's near edge (the exposed hold-down ledge) projects to its top.
-    assert drawing._top_y(-arbor_pedestal_spec.FOOT_DEPTH / 2.0) > plan_bottom
+    plan_bottom = drawing._top_y(arbor_pedestal_spec.STRAP_INNER_Z)
+    # Air for the crown callout between the elevation and the plan.
+    assert plan_bottom - dome_top >= 0.012
+    # The plan's near edge (the exposed hold-down ledge) projects to its top,
+    # and the view is centred on its bounding box, not on model z 0.
+    plan_top = drawing._top_y(arbor_pedestal_spec.FOOT_NEAR_Z)
+    assert plan_top > plan_bottom
+    assert abs((plan_top + plan_bottom) / 2.0 - drawing.TOP_CENTER[1]) < 1e-12
     assert drawing._front_y(0.0) < drawing._front_y(arbor_pedestal_spec.FOOT_HEIGHT)
 
 

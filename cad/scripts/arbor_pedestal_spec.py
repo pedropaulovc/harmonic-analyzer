@@ -5,7 +5,7 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 """
 
 from __future__ import annotations
-from math import atan2, degrees, sqrt
+from math import sqrt
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _gtol_spec import CylinderFace, PlanarFace
@@ -14,14 +14,25 @@ from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
-# Black japanned gray-iron bearing post that clamps the south end of the
+# Black japanned gray-iron bearing post that clamps one end of the
 # stationary cylinder arbor: a low rectangular foot flange, a tapered strap
-# rising to a semicircular dome around the arbor clamp bore, and a #4 flange
-# hold-down hole.
+# rising to a semicircular dome around the arbor clamp bore, and one #8
+# hold-down hole through the outboard ledge (U34c: ch12 p.18 img09 shows a
+# single slotted fillister centred on a flange about 18 long outboard of the
+# strap root).
 FOOT_WIDTH = 24.0  # X plan width of the foot flange
-FOOT_DEPTH = 16.0  # Z plan depth of the foot flange
+FOOT_DEPTH = 28.0  # Z plan depth of the foot flange: 10 strap + 18 ledge
 FOOT_HEIGHT = 5.0  # low flange height under the strap
 STRAP_T = 10.0  # strap depth; far face is coplanar with the foot far face
+# Local Z stations. The part origin sits in the strap band, and the band never
+# moved when U34c grew the foot outboard, so every station hangs off the
+# strap's INNER face -- the one the end disc runs against and the foot's far
+# face is flush with. The drive train anchors each pedestal on that face.
+STRAP_INNER_Z = 8.0  # strap inner face = foot far face (local +Z)
+STRAP_ROOT_Z = STRAP_INNER_Z - STRAP_T  # strap outer face / ledge root, -2
+FOOT_NEAR_Z = STRAP_INNER_Z - FOOT_DEPTH  # outboard end of the ledge, -20
+FOOT_MID_Z = (STRAP_INNER_Z + FOOT_NEAR_Z) / 2.0  # plan centre of the foot, -6
+LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
 TOP_RADIUS = 10.0  # dome radius = strap half-width at the top
 BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
 BORE_DIA_BAND = (0.03, 0.0)  # 9.550–9.580 mm running-bore limits
@@ -38,16 +49,17 @@ TAPER_TANGENT_Y = (
     + (-(TOP_RADIUS**2) * _CENTER_RISE + TOP_RADIUS * _ROOT_HALF_WIDTH * _TANGENT_DISC)
     / _TANGENT_DENOM
 )
-TAPER_ANGLE_DEG = degrees(
-    atan2(_ROOT_HALF_WIDTH - TAPER_TANGENT_X, TAPER_TANGENT_Y - FOOT_HEIGHT)
-)
-SCREW_HOLE_SPEC = HoleSpec("clearance", "#4")
+# #8 close clearance (Ø4.572, 0.180 in) for the MHA-143 #8-32 fillister. The
+# base seat is transfer-punched through this hole at assembly, so the close
+# fit keeps an 11/64 punch centred to about 0.1 while the Ø6.86 head still
+# bears on a 1.1 annulus.
+SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
-# Hold-down hole centre on the exposed flange, local z (machine -95.5): the
-# strap band leaves a 6-mm ledge at -8..-2 and the hole sits in the middle of
-# it. Shared, because the plan view dimensions the hole from the foot's far
-# face and must not restate the number.
-SCREW_Z = -5.0
+# Hold-down hole centre, local z: centred on the 18 ledge, 9 outboard of the
+# strap root (machine -91.652 south / +94.202 north). Shared, because the
+# plan view dimensions the hole from the strap inner face and must not
+# restate the number.
+SCREW_Z = STRAP_ROOT_Z - LEDGE_DEPTH / 2.0
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -96,6 +108,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "overall height": 2,
     "crown radius": 1,
     "strap depth": 1,
+    # One place (.X, ±0.8): the base seat is transferred from this hole at
+    # assembly, so its location only has to keep the webs, and the U27 worst
+    # case at ±0.8 still leaves 5.0 to the strap root and to the ledge end.
     "hold-down hole location": 1,
 }
 

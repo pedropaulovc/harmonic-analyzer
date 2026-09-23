@@ -20,7 +20,9 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
     view_name,
 )
@@ -29,6 +31,7 @@ from _surface_finish import surface_finish_by_key
 from cylinder_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    LENGTH_CALLOUT,
     SHAFT_DIA,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
@@ -64,7 +67,7 @@ PROFILE_CENTER = (0.140, 0.190)
 PROFILE_ROTATION = -math.pi / 2.0  # model +Y (arbor axis) -> sheet +x
 SHAFT_FLANK_Y = PROFILE_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 2000.0
 SHAFT_LEFT_X = PROFILE_CENTER[0] - SHAFT_LENGTH * SHEET_SCALE[0] / 2000.0
-# The 187 shaft's isometric silhouette is a mostly-VERTICAL slender bar (~0.153
+# The 162 shaft's isometric silhouette is a mostly-VERTICAL slender bar (~0.153
 # m long at 1:1 -- taller than the drawable band), so the pictorial renders at
 # 1:2 and says so in its own note.
 ISO_CENTER = (0.330, 0.175)
@@ -223,6 +226,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, profile_annotations, DRAWING_PRECISION_BY_NAME)
+    # U34b: the arbor is cut to fit between the installed pedestals, so the
+    # modelled length prints as a REFERENCE value and the callout under it is
+    # the requirement. Keyed on the parametric name, like every other lookup.
+    length_annotations = [
+        annotation
+        for annotation in profile_annotations
+        if dimension_name(adapter, annotation) == "Depth"
+    ]
+    if len(length_annotations) != 1:
+        raise RuntimeError("profile view does not carry exactly one arbor length")
+    set_reference_dimension(adapter, length_annotations[0], label="arbor length")
+    set_dimension_callouts(adapter, length_annotations, {"Depth": LENGTH_CALLOUT})
 
     # A bare rectangle does not say which pair of lines is the O.D.; the axis
     # does, and it is what the shop indicates the bar on.  The face pick sits

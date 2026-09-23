@@ -12,7 +12,8 @@ M6.2). The arbor is clamped in the pedestal supports at both ends.
 Dimensions: cad/DIMENSIONS.md "Chapter 13" - dia legacy (med), length
 derived from the stack + eight-views 8/8 pedestals (low).
 
-Layout: arbor axis along +Y from the origin, plain cylinder y 0..187.
+Layout: arbor axis along +Y from the origin, plain cylinder y 0..161.9
+(a REFERENCE length: U34b cuts the arbor to fit between the pedestals).
 
 Run (SolidWorks already open)::
 
@@ -106,7 +107,7 @@ async def build(adapter) -> dict[str, str]:
     depth_dim = name_dimensions(adapter, "Shaft", ["Depth"])
     drive_jobs += [(depth_dim[0], '"ShaftLength"')]
     v_shaft = math.pi * SHAFT_RADIUS**2 * SHAFT_LENGTH
-    # expected: pi * 4.7625^2 * 187 = ~13,321 mm^3
+    # expected: pi * 4.7625^2 * 161.9 = ~11,536 mm^3
     await volume_check(adapter, "shaft", v_shaft, 0.005 * v_shaft)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the

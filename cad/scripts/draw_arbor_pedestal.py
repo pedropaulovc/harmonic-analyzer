@@ -33,12 +33,14 @@ from arbor_pedestal_spec import (
     BORE_HEIGHT,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    FOOT_DEPTH,
     FOOT_HEIGHT,
+    FOOT_MID_Z,
+    FOOT_NEAR_Z,
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
     SCREW_Z,
-    STRAP_T,
+    STRAP_INNER_Z,
+    STRAP_ROOT_Z,
     SURFACE_FINISHES,
     TOP_RADIUS,
 )
@@ -68,12 +70,14 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # The part spans model y 0 (foot seat) to 49.718 (dome top); centre the front
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
 # above the elevation; the isometric balances the aligned group from the
-# right. The elevation sits low so the plan clears the crown callouts and
-# still leaves a dimension lane above itself under the sheet border.
+# right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
+# the crown callout and still leaves a dimension lane above itself under the
+# sheet border: elevation 0.065..0.165, crown text ~0.173, plan 0.182..0.238,
+# foot-width lane 0.250.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
-FRONT_CENTER = (0.115, 0.130)
+FRONT_CENTER = (0.115, 0.115)
 TOP_CENTER = (FRONT_CENTER[0], 0.210)
 ISO_CENTER = (0.325, 0.155)
 
@@ -88,9 +92,11 @@ def _top_y(model_z: float) -> float:
 
     A ``*Top`` view placed above the elevation projects model +Z downward, so
     the foot's far face (+Z, where the strap is flush) is the plan's BOTTOM
-    edge and the exposed hold-down ledge is at the top.
+    edge and the exposed hold-down ledge is at the top. The view is centred on
+    its bounding box, and the foot runs -20..+8 about the part origin, so the
+    sheet centre is the foot's mid-depth, not model z 0.
     """
-    return TOP_CENTER[1] - model_z * _S
+    return TOP_CENTER[1] - (model_z - FOOT_MID_Z) * _S
 
 
 # The elevation carries the height chain off the foot seat plus the fitted
@@ -104,8 +110,10 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
 }
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], _top_y(-FOOT_DEPTH / 2.0) + 0.012),
-    "Depth": (TOP_CENTER[0] - 0.048, TOP_CENTER[1]),
+    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.012),
+    # Outer left lane; its text sits above the hold-down lane's text so the
+    # two nested dimensions never read side by side.
+    "Depth": (TOP_CENTER[0] - 0.048, _top_y(FOOT_NEAR_Z) - 0.012),
 }
 # X on this part is stated once, in words, by the two features that sit on the
 # symmetry axis: a digit-free callout beats a pair of half-width dimensions
@@ -469,11 +477,11 @@ async def build(adapter: Any) -> dict[str, str]:
     strap_near_entity = _top_depth_edge(
         adapter,
         top,
-        FOOT_DEPTH / 2.0 - STRAP_T,
+        STRAP_ROOT_Z,
         label="strap near-face",
     )
     far_face_entity = _top_depth_edge(
-        adapter, top, FOOT_DEPTH / 2.0, label="foot and strap far-face"
+        adapter, top, STRAP_INNER_Z, label="foot and strap far-face"
     )
     # Both plan depths work off the foot's far face -- the one face the strap
     # is flush with, so a shop can set the whole Z chain from a single edge.
@@ -483,7 +491,7 @@ async def build(adapter: Any) -> dict[str, str]:
         far_face_entity,
         screw_entity,
         orientation="vertical",
-        position=(TOP_CENTER[0] - 0.036, TOP_CENTER[1] - 0.003),
+        position=(TOP_CENTER[0] - 0.036, _top_y((STRAP_INNER_Z + SCREW_Z) / 2.0)),
         label="hold-down hole location",
         arc_endpoint="center",
     )
@@ -493,7 +501,7 @@ async def build(adapter: Any) -> dict[str, str]:
         strap_near_entity,
         far_face_entity,
         orientation="vertical",
-        position=(TOP_CENTER[0] + 0.036, TOP_CENTER[1] - 0.006),
+        position=(TOP_CENTER[0] + 0.036, _top_y((STRAP_INNER_Z + STRAP_ROOT_Z) / 2.0)),
         label="strap depth",
     )
     _set_reference_precision(hold_down_dimension, "hold-down hole location")
