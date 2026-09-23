@@ -86,7 +86,8 @@ def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:
     assert finish.roughness_um == 1.6
     assert finish.face.diameter_mm == spec.SHAFT_DIA
     assert "MHA-056" in spec.DRAWING_NOTES
-    assert "MHA-002" in spec.DRAWING_NOTES
+    assert "BOND INTO MHA-002 WITH LOCTITE 638." in spec.DRAWING_NOTES
+    assert "PRESSES INTO" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
