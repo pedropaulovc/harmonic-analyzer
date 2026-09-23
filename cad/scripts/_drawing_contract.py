@@ -248,10 +248,20 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
 
 
 REFERENCE_PRECISION_NAME = "DRAWING_REFERENCE_PRECISION"
+# Hole Wizard callout places have no model-side home: ``SetPrecision3`` cannot
+# set a callout's per-variable places, so ``set_hole_callout_precision`` must
+# write them from the sheet.  The next-closest source of truth is the part's
+# spec, so the helper is allowed ONLY with the spec's ``HOLE_CALLOUT_PRECISION``
+# (or an item of it) -- never a literal map (policy rule 2).
+HOLE_CALLOUT_PRECISION_NAME = "HOLE_CALLOUT_PRECISION"
+_HOLE_CALLOUT_SETTER = "set_hole_callout_precision"
 
 
-def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
-    """Local bindings of a ``*_spec`` module's ``DRAWING_REFERENCE_PRECISION``."""
+def _reference_precision_names(
+    tree: ast.AST, constant: str = REFERENCE_PRECISION_NAME
+) -> frozenset[str]:
+    """Local bindings of a ``*_spec`` module's ``constant`` (by default
+    ``DRAWING_REFERENCE_PRECISION``)."""
     names: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.ImportFrom):
@@ -260,15 +270,17 @@ def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
         if not leaf.endswith("_spec") or leaf.startswith("_"):
             continue
         names.update(
-            alias.asname or alias.name
-            for alias in node.names
-            if alias.name == REFERENCE_PRECISION_NAME
+            alias.asname or alias.name for alias in node.names if alias.name == constant
         )
     return frozenset(names)
 
 
 def _reference_precision_sourced(
-    expression: ast.expr, *, names: frozenset[str], modules: frozenset[str]
+    expression: ast.expr,
+    *,
+    names: frozenset[str],
+    modules: frozenset[str],
+    constant: str = REFERENCE_PRECISION_NAME,
 ) -> bool:
     """Whether ``expression`` IS the spec's ``DRAWING_REFERENCE_PRECISION`` (or an
     item of it) -- the one value a sheet may pass to ``SetPrecision3``. Any other
@@ -280,7 +292,7 @@ def _reference_precision_sourced(
         return expression.id in names
     if isinstance(expression, ast.Attribute):
         return (
-            expression.attr == REFERENCE_PRECISION_NAME
+            expression.attr == constant
             and isinstance(expression.value, ast.Name)
             and expression.value.id in modules
         )
@@ -839,6 +851,9 @@ def drawing_specification_violations(
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
     reference_precision_names = _reference_precision_names(tree)
+    hole_callout_precision_names = _reference_precision_names(
+        tree, HOLE_CALLOUT_PRECISION_NAME
+    )
     finish_lookup_direct, finish_lookup_modules = _imported_functions(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
@@ -1056,11 +1071,28 @@ def drawing_specification_violations(
                     if name in _PRECISION_SETTERS
                     else precision_direct.get(str(name), str(name))
                 )
-                add(
-                    node,
-                    "drawing-owned-precision",
-                    f"{setter}(...) rewrites display precision at render time",
+                places = next(
+                    (kw.value for kw in node.keywords if kw.arg == "precision"),
+                    node.args[1] if len(node.args) > 1 else None,
                 )
+                if setter != _HOLE_CALLOUT_SETTER:
+                    add(
+                        node,
+                        "drawing-owned-precision",
+                        f"{setter}(...) rewrites display precision at render time",
+                    )
+                elif places is None or not _reference_precision_sourced(
+                    places,
+                    names=hole_callout_precision_names,
+                    modules=part_spec_modules,
+                    constant=HOLE_CALLOUT_PRECISION_NAME,
+                ):
+                    add(
+                        node,
+                        "drawing-owned-precision",
+                        f"{setter}(...) writes callout places that are not the "
+                        f"spec's {HOLE_CALLOUT_PRECISION_NAME}",
+                    )
             if (
                 isinstance(node.func, ast.Attribute)
                 and node.func.attr in _DIRECT_PRECISION_METHODS

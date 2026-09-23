@@ -356,7 +356,8 @@ THREAD = "1/4-20 UNC"
 # NEW finding and on any entry that no longer fires, so this list only shrinks.
 # Keyed by (script, evidence), not line, so an unrelated edit cannot shift it.
 _HOLE_CALLOUT = (
-    "set_hole_callout_precision(...) rewrites display precision at render time"
+    "set_hole_callout_precision(...) writes callout places that are not the "
+    "spec's HOLE_CALLOUT_PRECISION"
 )
 KNOWN_PRECISION_DEBT = Counter(
     {
@@ -560,13 +561,46 @@ drawing.set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="module
 """
     violations = drawing_specification_violations(source)
     assert [(item.line, item.rule, item.evidence) for item in violations] == [
-        (
-            line,
-            "drawing-owned-precision",
-            "set_hole_callout_precision(...) rewrites display precision at render time",
-        )
-        for line in (6, 7, 8)
+        (line, "drawing-owned-precision", _HOLE_CALLOUT) for line in (6, 7, 8)
     ]
+
+
+def test_hole_callout_places_are_allowed_only_from_the_spec_constant() -> None:
+    """Callout places have no model-side home, so the part spec's
+    HOLE_CALLOUT_PRECISION (direct, aliased, module attribute, or an item of it,
+    positional or ``precision=``) is the one allowed source. A literal map, a
+    local alias, or any other *_spec value still fires."""
+    source = """
+import crank_arm_spec
+from _drawing_common import set_hole_callout_precision
+from knife_mount_spec import HOLE_CALLOUT_PRECISION
+from top_frame_spec import HOLE_CALLOUT_PRECISION as FRAME_PLACES, TAP_DEPTH
+
+set_hole_callout_precision(display, HOLE_CALLOUT_PRECISION, label="direct")
+set_hole_callout_precision(display, FRAME_PLACES["socket"], label="aliased item")
+set_hole_callout_precision(
+    display, precision=crank_arm_spec.HOLE_CALLOUT_PRECISION, label="module"
+)
+set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="literal")
+LOCAL = HOLE_CALLOUT_PRECISION
+set_hole_callout_precision(display, LOCAL, label="local alias")
+set_hole_callout_precision(display, TAP_DEPTH, label="other spec value")
+set_hole_callout_precision(display, crank_arm_spec.DRAWING_REFERENCE_PRECISION, label="x")
+set_hole_callout_precision(display, label="missing")
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.evidence) for item in violations] == [
+        (line, _HOLE_CALLOUT) for line in (12, 14, 15, 16, 17)
+    ]
+
+
+def test_hole_callout_constant_does_not_launder_set_precision3() -> None:
+    source = """
+from crank_arm_spec import HOLE_CALLOUT_PRECISION
+
+display.SetPrecision3(HOLE_CALLOUT_PRECISION["tap"], -1, -1, -1)
+"""
+    assert _rules(source) == ["drawing-owned-precision"]
 
 
 def test_new_precision_rules_are_scoped_to_migrated_drawings(tmp_path: Path) -> None:
