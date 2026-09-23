@@ -787,10 +787,13 @@ def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label:
         raise RuntimeError(f"{label}: drawing view has no root component")
     root = _early_bound(root, "IDrawingComponent")
     shown: set[str] = set()
+    seen: list[str] = []
     hidden = 0
     for raw in tuple(root.GetChildren() or ()):
         drawing_component = _early_bound(raw, "IDrawingComponent")
-        name = str(drawing_component.Name or "").split("@", 1)[0].rsplit("/", 1)[-1]
+        raw_name = str(drawing_component.Name or "")
+        seen.append(raw_name)
+        name = raw_name.split("@", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
         visible = name in names
         drawing_component.Visible = visible
         if visible:
@@ -809,7 +812,10 @@ def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label:
         outline_mm=tuple(value * 1000.0 for value in _view_outline(view)),
     )
     if missing:
-        raise RuntimeError(f"{label}: instances not in the view: {missing!r}")
+        raise RuntimeError(
+            f"{label}: instances not in the view: {missing!r}; "
+            f"drawing components seen (first 12): {seen[:12]!r}"
+        )
 
 
 def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
@@ -904,20 +910,28 @@ def _validate_source(source_model: Any) -> SourceFacts:
         origin = tuple(float(value) * 1000.0 for value in tuple(base)[9:12])
         instances.append(Instance(name=name, stem=stem, origin_mm=origin))
         configurations[name] = str(component.ReferencedConfiguration or "")
+        # A lightweight component has no loaded model; its Number is then
+        # unreadable here (the offline registry test still pins it).
         model = component.GetModelDoc2()
-        if model is None:
-            raise RuntimeError(f"{name}: component model is not loaded")
-        number = str(_early_bound(model, "IModelDoc2").GetCustomInfoValue("", "Number") or "")
-        numbers.setdefault(stem, set()).add(number)
+        if model is not None:
+            number = str(
+                _early_bound(model, "IModelDoc2").GetCustomInfoValue("", "Number") or ""
+            )
+            numbers.setdefault(stem, set()).add(number)
     facts = SourceFacts(instances, configurations)
     findings = source_violations(facts.counts)
     for stem, seen in sorted(numbers.items()):
         want = BOM_PART_NUMBERS.get(stem)
         if want is not None and seen != {want}:
             findings.append(f"{stem} model Number {sorted(seen)!r} != released {want!r}")
+    unread = sorted(set(facts.counts) - set(numbers))
+    if unread:
+        _telemetry.warn(f"drive-train source: Number unreadable (not loaded) for {unread!r}")
     _telemetry.event(
         "drawing.drive_train_source",
         counts=repr(facts.counts),
+        numbers_read=tuple(sorted(numbers)),
+        numbers_unread=tuple(unread),
         pending_present=tuple(sorted(PENDING_STEMS & set(facts.counts))),
         findings=tuple(findings),
     )
