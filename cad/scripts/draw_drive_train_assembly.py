@@ -24,6 +24,8 @@ import _telemetry
 from _common import OUT_FAILURES, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    _balloon_item_number,
+    _spread_balloons,
     add_component_bom_balloons,
     check_drawing_layout,
     create_blank_drawing_sheets,
@@ -32,6 +34,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_hidden_lines_removed,
     set_high_quality_shaded_with_edges,
 )
@@ -48,7 +51,7 @@ from drive_train_assembly_spec import (
     unclassified_stems,
 )
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
@@ -159,7 +162,7 @@ BOM_REFERENCE_ISO_CENTER = (0.110, 0.068)
 # second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
 BOM_REFERENCE_CAPTION = (
     "REFERENCE 1:8 - BALLOONS ON SHEETS 3-5\n"
-    "MHA-013 CONE GEAR STATIONS: SHEET 6"
+    "MHA-013 CONE GEAR STATIONS: SHEET 7"
 )
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
@@ -168,6 +171,23 @@ CLUSTER_VIEW_CENTER = (0.200, 0.165)
 CLUSTER_RING_REGION = (0.020, 0.072, 0.415, 0.248)
 CLUSTER_BALLOON_MARGIN = 0.012
 BALLOON_DIAMETER = 0.010
+# Extra arc clearance between neighbouring ring balloons. The shared ring keeps
+# circles 1.5 apart; on sheet 5 the left-block attachments bunch so tightly that
+# items 17/18/19/20/26 read as one converging knot (Main eye-pass of r6b).
+# Placement stays in attachment-angle order, so widening cannot add a crossing.
+CLUSTER_BALLOON_CLEARANCE = {
+    "cylinder-bank": 0.0015,
+    "cone-crank": 0.0015,
+    "pinion-rig": 0.008,
+}
+# Families whose balloon lands on the head of one chosen instance instead of
+# the first visible edge the shared picker meets. Sheet 3's pedestal flange
+# screw balloon (r6b item 26) pointed at the north screw, which hides behind
+# its upright; the south one stands clear in the exploded view.
+HEAD_ANCHORED: dict[Cluster, dict[str, Literal["south", "north"]]] = {
+    "cylinder-bank": {"foot-screw": "south"},
+}
+SW_VIEW_ENTITY_EDGE = 1  # swViewEntityType_e.swViewEntityType_Edge
 
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
 # Tops sit under the one-line sheet heading at HEADING_XY.
@@ -184,11 +204,10 @@ HEADING_XY = (0.018, 0.263)
 ASSEMBLED_HEADING_XY = (0.222, 0.263)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
-# Sheet 6 needs the whole right column for steps 8-17, so its reference view
-# sits under the left column's cone steps and station table. Notes pitch
-# 4.525 mm a line (summing-assembly.pdf): 29 left lines end near y=0.118.
-SEQUENCE_REFERENCE_ISO_CENTER = (0.110, 0.068)
-SEQUENCE_LEFT_FIELD = (NOTE_FIELD_LEFT[0], NOTE_FIELD_LEFT[1], NOTE_FIELD_LEFT[2], 0.100)
+# Sheet 6 is all text: the ruled steps 1-7 (U30-U37) need the whole left
+# column (notes pitch 4.525 mm a line, summing-assembly.pdf, so ~47 lines) and
+# steps 8-17 the whole right one. The station table moved to sheet 7, whose
+# reference view stands for sheet 6's.
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
 # --- BOM identities: released part numbers and descriptions ------------------
@@ -279,7 +298,7 @@ BOM_DESCRIPTIONS = {
     "pinion-cam-pin": "PINION CAM FOLLOWER PIN",
     "pinion-cam": "PINION ECCENTRIC CAM",
     "pinion-lever": "PINION LEVER",
-    "pinion-lever-pin": "PINION LEVER CROSS PIN",
+    "pinion-lever-pin": "PINION LEVER PIN, 1/16 X 13 STEEL",
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
@@ -304,21 +323,57 @@ CONE_CRANK_STEPS = "\n".join(
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
         "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS PER THE MHA-013",
         "   PRINT, TIP FIRST: T006 AT THE BACK THROUGH T120 AT THE FRONT",
-        "   (STATION TABLE). BOND MHA-021 FRONT OF T120 PER ITS PRINT.",
-        "2. JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB AGAINST",
-        "   T006 AND SEAT MHA-092 OVER IT. [PENDING: MHA-016 AND MHA-092",
-        "   FASTENING TO MHA-091]",
-        "3. THREAD MHA-097 INTO MHA-092 TO TAKE UP THE CONE-STACK END PLAY;",
-        "   LOCK WITH MHA-098 ACROSS THE SLIT. [PENDING: END-PLAY LIMIT]",
-        "4. FIT MHA-026 IN THE MHA-016 CRANK BORE. MESH MHA-025 WITH MHA-021",
-        "   TOOTH IN GAP; MATCH-DRILL AND REAM FOR MHA-134 AT BOSS MID-LENGTH",
-        "   WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE MHA-025 PRINT.",
+        "   (STATION TABLE, SHEET 7). BOND MHA-021 FRONT OF T120 PER ITS PRINT.",
+        # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
+        # slotted fillister, through the unchanged 6.02 counterbore. Its floor
+        # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
+        # length could end 0.98 proud; each screw is cut to its own hole
+        # (pivot). Engagement is capped by the 6.35 plate: a named, user-
+        # accepted exception to the 1.5D rule of docs/machining-dfm.md.
+        "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
+        "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
+        "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 6.05-6.35",
+        "   (0.95-1.0D): ACCEPTED EXCEPTION TO THE 1.5D RULE.",
+        # U30 (user, 2026-09-23, option (a)): one #6-32 SHCS up through the
+        # MHA-091 slot, height and side set by the shim pack at fit-up. Wording
+        # from swing (dt-tip-block-attachment-options-20260923.md section 2(a)).
+        "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB AGAINST",
+        "   T006. SET MHA-092 ON A 1.10 MHA-141 SHIM PACK OVER THE MHA-091",
+        "   SLOT; MHA-140 UP THROUGH THE SLOT, FINGER-TIGHT. RUN MHA-097 IN",
+        "   UNTIL ITS CUP SEATS THE TIP. SLIDE MHA-092 IN THE SLOT AND CHANGE",
+        "   SHIMS UNTIL MHA-014 SPINS FREE, NO TIGHT SPOT AT THE MHA-016",
+        "   JOURNAL; SNUG MHA-140 AND RECHECK. RECORD THE SHIM STACK.",
+        # U32 (user, 2026-09-23): option 1A turn-set, dt-pending-rulings
+        # packet section 1; 5/16-18 is 1.411 a turn, so 1/8 turn is ~0.18.
+        "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
+        "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN (APPROX. 0.18); TIGHTEN",
+        "   MHA-098 ACROSS THE SLIT. END PLAY 0.05-0.40, BY FEEL OR INDICATOR.",
+        # U31 (user, 2026-09-23, option 3a): MHA-016 bores the crank-above-cone
+        # spacing 39.33 +0.37/0 in one setup, so the mesh is checked, not
+        # set; 14.5 deg PA gives 0.517 backlash per mm of centre distance.
+        # Wording from pivot (DT-ConePivotPost-cc-20260923.md, U31).
+        "4. FIT MHA-026 IN THE MHA-016 CRANK BORE. SLIDE MHA-025 ON, NOT YET",
+        "   PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP. CHECK BACKLASH",
+        "   0.20-0.55 AT THE MHA-025 PITCH LINE, FREE THROUGH ONE FULL MHA-021",
+        "   TURN. OUT OF BAND: STOP - MHA-016 BORE SPACING IS OUT (SEE ITS",
+        "   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION 0.25 OFF THE SPOT",
+        "   FACE WITH A FEELER. ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
+        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE MHA-025",
+        "   PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
-        "6. FIT MHA-020 ON MHA-026; TAPER-REAM 1:48 THROUGH ARM AND SHAFT",
-        "   TOGETHER; FIT MHA-024, LIGHT DRIVE, REMOVABLE BY TAP ON SMALL END.",
-        "   HANG MHA-128 FROM THE PIN HEAD; CLAMP MHA-130 UNDER MHA-030.",
-        "   [PENDING: MHA-137/MHA-138 CRANK HUB CONSTRUCTION]",
-        "7. FIT MHA-022 ON THE ARM PIVOT. [PENDING: HANDLE RETENTION]",
+        # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
+        # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
+        # MHA-024 cross-hole runs behind the arm through the hub barrel. The
+        # handle rides the MHA-139 shoulder screw. Wording from crankhub.
+        "6. PRESS MHA-137 INTO MHA-020 TO THE SHOULDER, FACES FLUSH.",
+        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH.",
+        "   SLIDE ONTO MHA-026, SHAFT END FLUSH, PUNCH MARKS ALIGNED.",
+        "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
+        "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
+        "   CLAMP MHA-130 UNDER MHA-030.",
+        "7. SLIDE MHA-022 ONTO MHA-139. THREAD MHA-139 INTO THE MHA-020",
+        "   PIVOT TAP WITH LOCTITE 222 (REMOVABLE); SEAT THE SHOULDER TIGHT",
+        "   ON THE ARM FACE. HANDLE TURNS FREELY; END PLAY 0.25-1.0.",
     )
 )
 
@@ -337,8 +392,10 @@ BANK_RIG_STEPS = "\n".join(
         "    MHA-062 THROUGH {pivot_blocks}X MHA-061.",
         "13. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
-        "    SCREW SUPPLIED WITH MHA-104.",
-        "    [PENDING: MHA-059 TO MHA-060 PIN MHA-135]",
+        "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
+        "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
+        "    THROUGH HUB AND ROD AT MID-ENGAGEMENT (4.0 FROM THE BORE FLOOR);",
+        "    DRIVE MHA-135; PEEN BOTH ENDS FLUSH.",
         # Main ruling 2026-09-23 (U28 corollary): the rig is located by its
         # parked tip gap, and MHA-035 carries its hold-down and spring seats as
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
@@ -365,13 +422,13 @@ CHECKS = "\n".join(
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
         "1. CRANK TURNS FREELY THROUGH FULL TURNS; ONE CRANK TURN TURNS THE",
         "   CONE SET 1/4 TURN (16T:64T).",
-        "2. MHA-025/MHA-021 BACKLASH PER THE MHA-021 PRINT; EACH CONE GEAR",
-        "   MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
-        # C:/src/dt-logs/handoffs/dt-crank-mesh-under-spec-20260923.md: the
-        # 16T:64T centre distance is the difference of two .XX heights on
-        # MHA-016 and nothing sets it at assembly (open user decision).
-        "   [PENDING: 16T:64T CENTRE-DISTANCE SETTING - OPEN RULING]",
+        # U31: the bored MHA-016 spacing sets the 16T:64T mesh (step 4).
+        "2. MHA-025/MHA-021 BACKLASH 0.20-0.55 AT THE MHA-025 PITCH LINE, CRANK",
+        "   AT REST, NO TIGHT SPOT THROUGH ONE FULL MHA-021 TURN; EACH CONE",
+        "   GEAR MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
+        "   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO 0.56 (AT LEAST",
+        "   81% OF THE RING WIDTH STAYS ON THE CAM).",
         "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
         "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
         "   TIGHTEN MHA-093; ALL {cone_gears} MESHES RE-ENGAGE.",
@@ -413,17 +470,20 @@ CONSUMABLES_NOTES = "\n".join(
         "GENERAL ASSEMBLY NOTES",
         "ADHESIVE: PER THE MHA-013 AND MHA-021 PRINTS.",
         "OIL THE MHA-027/MHA-028 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
-        "MACHINE OIL. NO THREADLOCKER UNLESS A PRINT CALLS FOR IT.",
-        "#4-40 AND #8-32 SCREWS: SNUG.",
+        "MACHINE OIL. NO THREADLOCKER UNLESS A STEP OR PRINT CALLS FOR IT",
+        "(LOCTITE 222 ON MHA-139, STEP 7). #4-40, #6-32, #8-32 SCREWS: SNUG.",
     )
 )
 
 FIT_PLACEHOLDER = "\n".join(
     (
+        # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
+        "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY BY",
+        "BACKLASH (CHECK 2).",
         "MESH + FIT DETAILS - PENDING",
-        "CONE/CYLINDER STATION MESH, 16T:64T MESH, ALIGNMENT PINION",
-        "ENGAGEMENT AND TAPER-PIN STATION DETAILS FOLLOW THE PINION",
-        "BRACKET, TOOTH-COUNT, CRANK-HUB AND MHA-135 RULINGS.",
+        "CONE/CYLINDER STATION MESH, ALIGNMENT PINION ENGAGEMENT AND",
+        "TAPER-PIN STATION DETAILS FOLLOW THE PINION BRACKET, TOOTH-COUNT,",
+        "CRANK-HUB AND MHA-135 RULINGS.",
     )
 )
 
@@ -774,6 +834,102 @@ def _uncross_balloon_leaders(adapter: Any, balloons: list[Any], *, label: str) -
         adapter.currentModel.EditRebuild3()
         swaps.append((first, second))
     _telemetry.event("drawing.balloon_uncross", label=label, swaps=tuple(swaps))
+
+
+def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any:
+    """The largest visible circular edge of one named instance: its head rim."""
+    view = _early_bound(view, "IView")
+    root = _early_bound(view.RootDrawingComponent2(False), "IDrawingComponent")
+    component = None
+    for raw in tuple(root.GetChildren() or ()):
+        drawing_component = _early_bound(raw, "IDrawingComponent")
+        name = str(drawing_component.Name or "").split("@", 1)[0]
+        if name.replace("\\", "/").rsplit("/", 1)[-1] == instance:
+            component = drawing_component.Component
+            break
+    if component is None:
+        raise RuntimeError(f"{label}: {instance} is not in the view")
+    edges = tuple(view.GetVisibleEntities2(component, SW_VIEW_ENTITY_EDGE) or ())
+    best, best_radius = None, 0.0
+    for edge in edges:
+        curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        radius = float(tuple(curve.CircleParams)[6])
+        if radius > best_radius:
+            best, best_radius = edge, radius
+    _telemetry.event(
+        "drawing.balloon_head_anchor",
+        label=label,
+        instance=instance,
+        edges=len(edges),
+        radius_mm=best_radius * 1000.0,
+    )
+    if best is None:
+        raise RuntimeError(f"{label}: {instance} shows no circular edge in the view")
+    return best
+
+
+def _insert_balloon_on_edge(
+    adapter: Any, view: Any, edge: Any, *, stem: str, expected_item: str, label: str
+) -> Any:
+    """``_drawing_common``'s component balloon, on a chosen edge."""
+    draw = adapter.currentModel
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: failed to activate the {stem} view")
+    draw.ClearSelection2(True)
+    if not view.SelectEntity(edge, False):
+        raise RuntimeError(f"{label}: failed to select the {stem} head edge")
+    options = _early_bound(
+        _early_bound(draw.Extension, "IModelDocExtension").CreateBalloonOptions(),
+        "IBalloonOptions",
+    )
+    options.Style = 1
+    options.Size = 2
+    options.UpperTextContent = 1
+    options.ShowQuantity = False
+    options.ItemNumberStart = 1
+    options.ItemNumberIncrement = 1
+    options.ItemOrder = 1
+    note = _early_bound(draw.Extension, "IModelDocExtension").InsertBOMBalloon2(options)
+    draw.ClearSelection2(True)
+    if note is None:
+        raise RuntimeError(f"{label}: failed to insert the {stem} balloon")
+    item = _balloon_item_number(adapter, note, label=label)
+    if item != expected_item:
+        raise RuntimeError(f"{label}: {stem} resolved item {item}, expected {expected_item}")
+    return note
+
+
+def _head_anchored_balloons(
+    adapter: Any,
+    view: Any,
+    cluster: Cluster,
+    facts: SourceFacts,
+    items: dict[str, str],
+    *,
+    label: str,
+) -> list[Any]:
+    balloons = []
+    for stem, side in HEAD_ANCHORED.get(cluster, {}).items():
+        candidates = sorted(
+            (
+                instance
+                for instance in facts.instances
+                if instance.stem == stem and instance.name in facts.clusters[cluster]
+            ),
+            key=lambda instance: instance.origin_mm[2],
+        )
+        if not candidates:
+            raise RuntimeError(f"{label}: no {stem} instance to anchor")
+        instance = candidates[0] if side == "south" else candidates[-1]
+        edge = _head_edge(adapter, view, instance.name, label=label)
+        balloons.append(
+            _insert_balloon_on_edge(
+                adapter, view, edge, stem=stem, expected_item=items[stem], label=label
+            )
+        )
+    return balloons
 
 
 def _component_stem(component: Any) -> str:
@@ -1374,13 +1530,25 @@ def _place_cluster_sheet(
         key=lambda stem: int(items[stem]),
     )
     balloon_items = tuple((stem, items[stem]) for stem in stems)
-    balloons = add_component_bom_balloons(
+    anchored = HEAD_ANCHORED.get(cluster, {})
+    balloons = _head_anchored_balloons(adapter, view, cluster, facts, items, label=label)
+    balloons += add_component_bom_balloons(
         adapter,
         view,
-        items=balloon_items,
+        items=tuple(item for item in balloon_items if item[0] not in anchored),
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGIN,
     )
+    # One ring over every balloon, anchored ones included, at this sheet's
+    # clearance; the shared call above ringed only its own.
+    _spread_balloons(
+        adapter,
+        view,
+        balloons,
+        margin=CLUSTER_BALLOON_MARGIN,
+        clearance=CLUSTER_BALLOON_CLEARANCE[cluster],
+    )
+    rebuild_drawing(adapter, label=f"{label} ring")
     _uncross_balloon_leaders(adapter, balloons, label=label)
     _verify_balloon_attachments(balloons, balloon_items, label=label)
     _heading(
@@ -1394,12 +1562,6 @@ def _place_cluster_sheet(
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[SEQUENCE_SHEET - 1])
     _heading(adapter, SEQUENCE_SHEET)
-    _reference_iso(
-        adapter,
-        caption="FINISHED ASSEMBLY 1:8",
-        label="sequence reference isometric",
-        center=SEQUENCE_REFERENCE_ISO_CENTER,
-    )
     findings = _stack_note_field(
         adapter,
         (
@@ -1407,9 +1569,8 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 "cone and crank sequence",
                 CONE_CRANK_STEPS.format(cone_gears=facts.count("cone-gear")),
             ),
-            ("cone station table", station_table_text(facts.cone_rows())),
         ),
-        SEQUENCE_LEFT_FIELD,
+        NOTE_FIELD_LEFT,
         label=f"sheet {SEQUENCE_SHEET} left note field",
     )
     findings += _stack_note_field(
@@ -1433,13 +1594,16 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return findings
 
 
-def _place_fit_sheet(adapter: Any) -> list[str]:
+def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[FIT_SHEET - 1])
     _heading(adapter, FIT_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="fit reference isometric")
     return _stack_note_field(
         adapter,
-        (("fit placeholder", FIT_PLACEHOLDER),),
+        (
+            ("cone station table", station_table_text(facts.cone_rows())),
+            ("fit placeholder", FIT_PLACEHOLDER),
+        ),
         NOTE_FIELD_LEFT,
         label=f"sheet {FIT_SHEET} note field",
     )
@@ -1482,7 +1646,7 @@ def _place_package(adapter: Any, facts: SourceFacts) -> None:
     for cluster in CLUSTER_SHEETS:
         _place_cluster_sheet(adapter, cluster, facts, bom_name=bom_name, items=items)
     findings += _place_sequence_sheet(adapter, facts)
-    findings += _place_fit_sheet(adapter)
+    findings += _place_fit_sheet(adapter, facts)
     findings += _place_checks_sheet(adapter, facts)
     _check_package_layout(adapter, findings)
 
