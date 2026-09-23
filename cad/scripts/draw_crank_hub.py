@@ -60,6 +60,13 @@ SERVICE_PIN_CENTER = (
     SIDE_BOTTOM + SERVICE_PIN_STATION * VIEW_SCALE[0] / 1000.0,
 )
 SERVICE_PIN_DIA = blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC)
+# Pick the barrel's cylindrical face off-axis and above the MHA-024 cross-hole.
+# The through hole is seen end-on here, so a pick inside its circle sees no
+# face (run 20260923T023246758Z-97bfca38 picked 2 mm below its centre).
+BARREL_FACE_PICK = (
+    RIGHT_CENTER[0] + 0.012,
+    SERVICE_PIN_CENTER[1] + SERVICE_PIN_DIA * VIEW_SCALE[0] / 2000.0 + 0.007,
+)
 FRONT_KEEP = {"BoreDia": (0.035, FRONT_CENTER[1] + 0.022)}
 RIGHT_KEEP = {
     "HubLength": (RIGHT_CENTER[0] - 0.040, RIGHT_CENTER[1]),
@@ -146,7 +153,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_view_centerline(
         adapter,
         right,
-        face_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + 0.004),
+        face_xy=BARREL_FACE_PICK,
         label="crank hub axis centerline",
     )
     add_native_hole_callout(
