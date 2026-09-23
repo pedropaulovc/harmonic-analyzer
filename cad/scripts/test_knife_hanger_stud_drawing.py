@@ -656,3 +656,59 @@ def test_stock_name_says_turned_not_shortened() -> None:
 
     name = fastener("knife-hanger-stud").stock_name
     assert "(Turned and Threaded)" in name and "Shortened" not in name
+
+
+class _BoundAs:
+    """What an early-bound wrapper exposes: only its interface's members."""
+
+    def __init__(self, interface: str, members: dict) -> None:
+        self.interface = interface
+        for name, value in members.items():
+            setattr(self, name, value)
+
+
+def test_tip_thread_readback_binds_ipartdoc(monkeypatch) -> None:
+    # stud-17: FeatureByName through the IModelDoc2 handle raised on the farm.
+    data = _BoundAs(
+        "ICosmeticThreadFeatureData",
+        {
+            "ThreadCallout": spec.TIP_THREAD_CALLOUT,
+            "Diameter": spec.TIP_THREAD_MINOR_DIA_MM / 1000.0,
+            "BlindDepth": (spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM) / 1000.0,
+        },
+    )
+    feature = object()
+    looked_up = []
+
+    def early_bound(obj, interface):
+        if interface == "IPartDoc":
+            return _BoundAs(
+                "IPartDoc",
+                {"FeatureByName": lambda name: looked_up.append(name) or feature},
+            )
+        if interface == "IFeature":
+            assert obj is feature
+            return _BoundAs("IFeature", {"GetDefinition": lambda: data})
+        if interface == "ICosmeticThreadFeatureData":
+            return obj
+        raise AssertionError(f"unexpected binding {interface}")
+
+    monkeypatch.setattr(build, "_early_bound", early_bound)
+    state = build._read_tip_thread(_BoundAs("IModelDoc2", {}), "CosmeticThread1")
+    assert looked_up == ["CosmeticThread1"]
+    assert build._tip_thread_problem(state) is None
+
+
+def test_tip_thread_problem_names_the_drift() -> None:
+    good = {
+        "callout": spec.TIP_THREAD_CALLOUT,
+        "diameter_mm": spec.TIP_THREAD_MINOR_DIA_MM,
+        "depth_mm": spec.TIP_LENGTH_MM - spec.TIP_CHAMFER_MM,
+    }
+    assert build._tip_thread_problem(good) is None
+    # stud-16's thread: no callout, no minor diameter.
+    assert "callout" in build._tip_thread_problem({**good, "callout": ""})
+    assert "minor" in build._tip_thread_problem({**good, "diameter_mm": 0.0})
+    assert "depth" in build._tip_thread_problem(
+        {**good, "depth_mm": spec.TIP_LENGTH_MM}
+    )
