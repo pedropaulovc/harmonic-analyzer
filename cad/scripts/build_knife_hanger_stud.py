@@ -1,4 +1,4 @@
-"""Build the shortened knife-hanger bolt from McMaster 91247A720 stock."""
+"""Build the turned-and-threaded knife-hanger stud from McMaster 91247A720 stock."""
 
 from __future__ import annotations
 
@@ -6,13 +6,23 @@ from functools import wraps
 import math
 import sys
 
-from _common import _early_bound, _read_member, run_build
+from _common import (
+    SketchDims,
+    _early_bound,
+    _read_member,
+    add_line_chain,
+    check,
+    dimension_between,
+    drive_dimension,
+    force_rebuild,
+    name_last_feature,
+    run_build,
+)
 from _drawing_marks import (
     _named_dimension,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_angular_tolerance,
 )
 from _fastener_catalog import fastener
 from _saved_part_guard import require_saved_drawing_properties
@@ -26,15 +36,21 @@ from diagnostics.diag_build_91247A720 import (
     GB_WASHER_T,
     build_91247A720,
 )
+from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from knife_hanger_stud_spec import (
-    CHAMFER_ANGLE_DEG,
-    CHAMFER_ANGLE_TOLERANCE_DEG,
-    CHAMFER_WIDTH_MM,
     DIMENSION_PRECISION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     FINISHED_UNDERHEAD_MM,
     ISOMETRIC_VIEW_NOTE,
+    SHOULDER_UNDERHEAD_MM,
+    TIP_CHAMFER_MM,
+    TIP_CHAMFER_TOLERANCE_TYPE,
+    TIP_DIA_MM,
+    TIP_LENGTH_DEVIATIONS_MM,
+    TIP_LENGTH_MM,
+    TIP_LENGTH_TOLERANCE_TYPE,
+    TIP_THREAD,
 )
 
 PART_NAME = "knife-hanger-stud"
@@ -45,19 +61,21 @@ HEAD_AF = GB_HW
 HEAD_H = GB_HH
 SHANK_DIA = 2.0 * GB_MAJOR_R
 STOCK_SHANK_LEN = GB_LEN
-SHANK_LEN = FINISHED_UNDERHEAD_MM
+# Bearing face (washer lower face) to the faced end: the assembly places the
+# stud by it (HANGER_STUD_Y = washer top - UNDERHEAD_LEN).
 UNDERHEAD_LEN = FINISHED_UNDERHEAD_MM
+SHOULDER_LEN = SHOULDER_UNDERHEAD_MM
 UNDERHEAD_Y_MM = GB_UNDERSIDE - GB_WASHER_T
-THREAD_TIP_Y_MM = UNDERHEAD_Y_MM - UNDERHEAD_LEN
+SHOULDER_Y_MM = UNDERHEAD_Y_MM - SHOULDER_LEN
+TIP_END_Y_MM = UNDERHEAD_Y_MM - UNDERHEAD_LEN
+TIP_RADIUS_MM = TIP_DIA_MM / 2.0
 
-# These are source-owned fit/readback values for the measured-stack assembly
-# gate. The post-purchase cut's flat is the modeled thread-root radius.
-THREAD_MAJOR_RADIUS_MM = GB_MAJOR_R
-THREAD_TIP_ROOT_RADIUS_MM = THREAD_MAJOR_RADIUS_MM - CHAMFER_WIDTH_MM
-THREAD_TIP_ROOT_DIAMETER_MM = 2.0 * THREAD_TIP_ROOT_RADIUS_MM
-THREAD_TIP_CHAMFER_RADIAL_MM = CHAMFER_WIDTH_MM
-THREAD_TIP_CHAMFER_AXIAL_MM = CHAMFER_WIDTH_MM
-THREAD_TIP_CHAMFER_ANGLE_DEG = CHAMFER_ANGLE_DEG
+# The turning cutter's outside: past the stock thread's crest, and below the
+# faced end, so the revolve removes all stock around the tip and no sliver.
+TURN_CUTTER_CLEARANCE_MM = 1.0
+TURN_CUTTER_RADIUS_MM = GB_MAJOR_R + TURN_CUTTER_CLEARANCE_MM
+# The faced end in the trim sketch's own terms, so the turn follows a refit.
+TIP_END_EQUATION = '"FinishedOverall@StockTrimProfile" - "StockEyeTop@StockTrimProfile"'
 
 
 def _clear_native_tolerance(adapter, feature: str, name: str) -> None:
@@ -69,19 +87,201 @@ def _clear_native_tolerance(adapter, feature: str, name: str) -> None:
         raise RuntimeError(f"{name}@{feature}: native tolerance did not clear")
 
 
+def _set_tolerance(
+    adapter, feature: str, name: str, kind: int, lower_mm: float, upper_mm: float
+) -> None:
+    """Give one control its swTolType_e ``kind`` and signed deviations."""
+    _, dimension = _named_dimension(adapter, feature, name)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = kind
+    tolerance.SetValues(lower_mm / 1000.0, upper_mm / 1000.0)
+    state = (
+        int(tolerance.Type),
+        float(tolerance.GetMinValue()) * 1000.0,
+        float(tolerance.GetMaxValue()) * 1000.0,
+    )
+    if state[0] != kind or not all(
+        math.isclose(read, wanted, abs_tol=1e-6)
+        for read, wanted in zip(state[1:], (lower_mm, upper_mm), strict=True)
+    ):
+        raise RuntimeError(
+            f"{name}@{feature}: tolerance reads {state!r}, wanted "
+            f"{(kind, lower_mm, upper_mm)!r}"
+        )
+
+
+async def _turn_stepped_tip(adapter) -> None:
+    """Turn the #10-24 tip below the shoulder and chamfer its end.
+
+    One revolve cut, profile on Front (x radial, y axial): the chamfer, the
+    tip at the thread's major diameter up to the shoulder face, the shoulder
+    out past the stock crest, and the cutter's outside. ``TipLength`` runs
+    from the shoulder face's OUTER corner (the stock crest, a drawn corner)
+    to the faced end, so its imported extension lines leave real edges.
+    """
+    from solidworks_mcp.adapters.base import RevolveParameters
+
+    end_y, shoulder_y = TIP_END_Y_MM, SHOULDER_Y_MM
+    r_tip, chamfer = TIP_RADIUS_MM, TIP_CHAMFER_MM
+    below = end_y - TURN_CUTTER_CLEARANCE_MM
+    dims = SketchDims()
+    with no_sketch_inference(adapter):
+        check("create stud turn sketch", await adapter.create_sketch("Front"))
+        lines = await add_line_chain(
+            adapter,
+            [
+                [r_tip - chamfer, end_y],
+                [r_tip, end_y + chamfer],
+                [r_tip, shoulder_y],
+                [GB_MAJOR_R, shoulder_y],
+                [TURN_CUTTER_RADIUS_MM, shoulder_y],
+                [TURN_CUTTER_RADIUS_MM, below],
+                [r_tip - chamfer, below],
+            ],
+        )
+        for line, direction in zip(
+            lines[1:],
+            (
+                "vertical",
+                "horizontal",
+                "horizontal",
+                "vertical",
+                "horizontal",
+                "vertical",
+            ),
+            strict=True,
+        ):
+            check(
+                "stud turn profile relation",
+                await adapter.add_sketch_constraint(line, None, direction),
+            )
+        # The faced end, from the origin: the chamfer's small end sits on it.
+        await dimension_between(
+            adapter,
+            f"{lines[0]}.start",
+            "origin",
+            "vertical_distance",
+            abs(end_y),
+            "faced end",
+        )
+        dims.record("TipEnd", TIP_END_EQUATION)
+        await dimension_between(
+            adapter,
+            f"{lines[1]}.start",
+            "origin",
+            "horizontal_distance",
+            r_tip,
+            "tip radius",
+        )
+        dims.record("TipRadius")
+        await dimension_between(
+            adapter,
+            f"{lines[0]}.start",
+            f"{lines[0]}.end",
+            "horizontal_distance",
+            chamfer,
+            "tip chamfer radial",
+        )
+        dims.record("TipChamferRadial")
+        await dimension_between(
+            adapter,
+            f"{lines[0]}.start",
+            f"{lines[0]}.end",
+            "vertical_distance",
+            chamfer,
+            "tip chamfer",
+        )
+        dims.record("TipChamfer")
+        await dimension_between(
+            adapter,
+            f"{lines[3]}.start",
+            f"{lines[0]}.start",
+            "vertical_distance",
+            TIP_LENGTH_MM,
+            "tip length",
+        )
+        dims.record("TipLength")
+        await dimension_between(
+            adapter,
+            f"{lines[3]}.start",
+            "origin",
+            "horizontal_distance",
+            GB_MAJOR_R,
+            "shoulder outer radius",
+        )
+        dims.record("ShoulderRadius")
+        await dimension_between(
+            adapter,
+            f"{lines[4]}.start",
+            "origin",
+            "horizontal_distance",
+            TURN_CUTTER_RADIUS_MM,
+            "turn cutter radius",
+        )
+        dims.record("CutterRadius")
+        await dimension_between(
+            adapter,
+            f"{lines[5]}.start",
+            f"{lines[0]}.start",
+            "vertical_distance",
+            TURN_CUTTER_CLEARANCE_MM,
+            "turn cutter below the end",
+        )
+        dims.record("CutterBelow")
+        axis = adapter.currentSketchManager.CreateCenterLine(
+            0, (below - 1.0) / 1000, 0, 0, (shoulder_y + 1.0) / 1000, 0
+        )
+        if axis is None:
+            raise RuntimeError("stud turn axis failed")
+        axis_id = adapter._register_sketch_entity("Line", axis)
+        check(
+            "fix stud axis",
+            await adapter.add_sketch_constraint(axis_id, None, "fix"),
+        )
+        check("close stud turn sketch", await adapter.exit_sketch())
+        name_last_feature(adapter, "StudTurnProfile")
+        drives = dims.apply(adapter, "StudTurnProfile")
+        check(
+            "turn the stud tip",
+            await adapter.create_revolve(RevolveParameters(angle=360, is_cut=True)),
+        )
+        name_last_feature(adapter, "StudTurn")
+    for name, expression in drives:
+        await drive_dimension(adapter, name, expression)
+    await force_rebuild(adapter)
+
+
+async def _thread_tip(adapter) -> None:
+    """Cosmetic #10-24 thread over the whole turned tip."""
+    from solidworks_mcp.adapters.base import AddThreadParameters
+
+    check(
+        f"cosmetic thread {TIP_THREAD}",
+        await adapter.add_thread(
+            AddThreadParameters(
+                edge_point=[TIP_RADIUS_MM, TIP_END_Y_MM + TIP_CHAMFER_MM, 0.0],
+                standard="ansi_inch",
+                size=TIP_THREAD,
+                end_type="blind",
+                depth=TIP_LENGTH_MM - TIP_CHAMFER_MM,
+            )
+        ),
+    )
+
+
 def _manufacturing_controls(adapter) -> None:
-    """Set and mark the native trim and end-deburr controls before saving."""
+    """Set and mark the native turned-tip controls before saving."""
     clear_dimensions_for_drawing(adapter)
     for feature, name, nominal in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_UNDERHEAD_MM / 1000),
-        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_MM / 1000),
-        ("StockDeburrProfile", "ChamferAngle", math.radians(CHAMFER_ANGLE_DEG)),
+        ("StudTurnProfile", "TipLength", TIP_LENGTH_MM / 1000),
+        ("StudTurnProfile", "TipChamfer", TIP_CHAMFER_MM / 1000),
     ):
         display, dimension = _named_dimension(adapter, feature, name)
         if int(dimension.DrivenState) != 2:
             raise RuntimeError(f"{name}@{feature} must control the cutting sketch")
         if not math.isclose(float(dimension.SystemValue), nominal, abs_tol=1e-9):
-            raise RuntimeError(f"{name}@{feature}: modified stock nominal changed")
+            raise RuntimeError(f"{name}@{feature}: turned stud nominal changed")
         display = _early_bound(display, "IDisplayDimension")
         digits = DIMENSION_PRECISION[name]
         result = display.SetPrecision3(digits, -1, -1, -1)
@@ -91,24 +291,16 @@ def _manufacturing_controls(adapter) -> None:
         ):
             raise RuntimeError(f"{name}@{feature}: native precision did not persist")
     _clear_native_tolerance(adapter, "StockTrimProfile", "FinishedOverall")
-    _clear_native_tolerance(adapter, "StockDeburrProfile", "ChamferWidth")
-    set_dimension_symmetric_angular_tolerance(
-        adapter, "StockDeburrProfile", "ChamferAngle", CHAMFER_ANGLE_TOLERANCE_DEG
+    _set_tolerance(
+        adapter, "StudTurnProfile", "TipChamfer", TIP_CHAMFER_TOLERANCE_TYPE, 0.0, 0.0
     )
-    _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferAngle")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = math.radians(CHAMFER_ANGLE_TOLERANCE_DEG)
-    tolerance.Type = 11  # swTolType_e.swTolGeneral
-    if not tolerance.SetValues(-band, band):
-        raise RuntimeError("ChamferAngle@StockDeburrProfile: general tolerance rejected")
-    if (
-        int(tolerance.Type) != 11
-        or not math.isclose(float(tolerance.GetMinValue()), -band, abs_tol=1e-9)
-        or not math.isclose(float(tolerance.GetMaxValue()), band, abs_tol=1e-9)
-    ):
-        raise RuntimeError(
-            "ChamferAngle@StockDeburrProfile: general tolerance readback changed"
-        )
+    _set_tolerance(
+        adapter,
+        "StudTurnProfile",
+        "TipLength",
+        TIP_LENGTH_TOLERANCE_TYPE,
+        *TIP_LENGTH_DEVIATIONS_MM,
+    )
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_properties(
@@ -123,8 +315,10 @@ def _manufacturing_controls(adapter) -> None:
 
 @wraps(build_91247A720)
 async def _prepared_stud(adapter, truth=None, **parameters):
-    """Build and author the post-purchase trim controls before the final save."""
+    """Cut, turn and thread the purchased bolt before the final save."""
     receipt = await build_91247A720(adapter, truth, **parameters)
+    await _turn_stepped_tip(adapter)
+    await _thread_tip(adapter)
     _manufacturing_controls(adapter)
     return receipt
 
