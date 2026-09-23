@@ -240,6 +240,28 @@ def _tolerance_hole_depth(
     if definition is None:
         raise RuntimeError(f"{feature_name}: Hole Wizard definition is unavailable")
     definition = _early_bound(definition, "IWizardHoleFeatureData2")
+    # The volume gate cannot see a Ø3.8 drill off by millimetres, nor the
+    # thread depth at all: prove both native depths ARE the spec's before the
+    # cached part reaches the assembly (Fable review, PR #822).
+    native_depths = {
+        "TapDrillDepth": (
+            float(definition.TapDrillDepth) * 1000.0,
+            STUD_TAP_DRILL_DEPTH_MM,
+        ),
+        "ThreadDepth": (
+            float(definition.ThreadDepth) * 1000.0,
+            STUD_TAP_THREAD_DEPTH_MM,
+        ),
+    }
+    wrong = {
+        name: values
+        for name, values in native_depths.items()
+        if abs(values[0] - values[1]) > 1e-6
+    }
+    if wrong:
+        raise RuntimeError(
+            f"{feature_name}: native depths (mm, got vs spec) differ: {wrong!r}"
+        )
     matches = []
     thread_depth_candidates = []
     inventory = []
