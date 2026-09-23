@@ -63,10 +63,12 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 DRAWING_NUMBER = "MHA-A03"
-# swUserPreferenceToggle_e.swViewDisplayHideAllTypes = 198, per the
-# developing-solidworks bundle's Hide_or_Show_All_Types_Example_VB; applied
-# with IModelDocExtension::SetUserPreferenceToggle(.., swDetailingNoOptionSpecified)
-# as docs/swconst/ViewHideShow lists.
+# swUserPreferenceToggle_e.swViewDisplayHideAllTypes = 198: read by reflection
+# from the installed SOLIDWORKS 3DEXPERIENCE R2026x
+# SolidWorks.Interop.swconst.dll (2026-09-23), matching the API help's "Hide or
+# Show All Types" example. Applied with IModelDocExtension::
+# SetUserPreferenceToggle(.., swDetailingNoOptionSpecified), as the API help's
+# View > Hide/Show table lists it.
 VIEW_DISPLAY_HIDE_ALL_TYPES = 198
 
 SHEET_NAMES = (
@@ -905,8 +907,13 @@ def _check_package_layout(adapter: Any, field_findings: list[str]) -> None:
 
 def _export_failure_pdf(adapter: Any, stage: str) -> None:
     """Export the failing package under the forensic tree the farm uploads."""
-    model = adapter.currentModel
-    if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != 3:
+    try:
+        model = adapter.currentModel
+        is_drawing = model is not None and int(_early_bound(model, "IModelDoc2").GetType()) == 3
+    except Exception as exc:  # noqa: BLE001 - evidence must not mask the failure
+        _telemetry.warn(f"{stage}-failure PDF skipped: active model unreadable: {exc!r}")
+        return
+    if not is_drawing:
         _telemetry.warn(f"{stage}-failure PDF skipped: no active drawing")
         return
     path = (
