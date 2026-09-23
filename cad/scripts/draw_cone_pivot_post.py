@@ -189,7 +189,7 @@ JOURNAL_KEEP = {
 # station identify the real local crank spotface without inventing a uniform
 # depth against the curved collar.
 DIMENSION_CALLOUTS = {
-    "HeadDia": "AS CAST",
+    "HeadDia": "COLLAR",
     "CrankBossDia": "SPOTFACE",
     "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",

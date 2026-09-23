@@ -341,7 +341,12 @@ def test_collar_diameter_lives_on_its_plan_circle() -> None:
     """The front-view crank-bore leaders must not cross a collar dimension line."""
     assert "HeadDia" in drawing.TOP_KEEP
     assert "HeadDia" not in drawing.FRONT_KEEP
-    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "AS CAST"
+    # Names the feature, not a process: the part may be turned from bar stock.
+    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "COLLAR"
+
+
+def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
+    assert "CONE BOSS END FACES ARE SYMMETRIC ABOUT THE POST AXIS." in spec.DRAWING_NOTES
 
 
 def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:
