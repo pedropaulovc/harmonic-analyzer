@@ -610,11 +610,12 @@ def test_text_must_not_straddle_the_detail_boundary() -> None:
     assert "straddles" in drawing._text_boundary_problem(straddle, BOUNDARY)
 
 
-def test_chamfer_limit_prints_uppercase() -> None:
+def test_chamfer_limit_case_is_classified() -> None:
+    # Logged, not gated: stud-18 proved property 754 leaves SolidWorks'
+    # "max." suffix lowercase, and Main accepted it (2026-09-22).
     assert drawing._uppercase_problem(["0.5 MAX X 45°"]) is None
     assert drawing._uppercase_problem(["0.5", " MAX", " X 45°"]) is None
-    # stud-16's render.
-    assert drawing._uppercase_problem(["0.5 max. X 45°"])
+    assert drawing._uppercase_problem([" 0.5 max. X 45° "])
     assert drawing._uppercase_problem(["0.5 X 45°"])
     assert drawing.SW_ALL_UPPERCASE_DIMENSIONS == 754
 
@@ -712,3 +713,29 @@ def test_tip_thread_problem_names_the_drift() -> None:
     assert "depth" in build._tip_thread_problem(
         {**good, "depth_mm": spec.TIP_LENGTH_MM}
     )
+
+
+def test_lowercase_max_is_logged_not_fatal(monkeypatch) -> None:
+    texts = [" 0.5 max. X 45° "]
+    # stud-18's text box, clear right of the boundary.
+    box = (0.25972, 0.1247, 0.29444, 0.1282)
+    boundary = ((0.235, 0.109), 0.02168)
+    events = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_display_texts", lambda _display: texts)
+    monkeypatch.setattr(drawing, "_display_text_box", lambda _display: box)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append(name)
+    )
+
+    class _Annotation:
+        def GetSpecificAnnotation(self):
+            return self
+
+    assert drawing._assert_chamfer_text(_Annotation(), boundary) == box
+    assert events == ["drawing.lowercase_tolerance_suffix"]
+    # The boundary gate still fails a straddling text.
+    straddle = (0.245, 0.1247, 0.270, 0.1282)
+    monkeypatch.setattr(drawing, "_display_text_box", lambda _display: straddle)
+    with pytest.raises(RuntimeError, match="straddles"):
+        drawing._assert_chamfer_text(_Annotation(), boundary)

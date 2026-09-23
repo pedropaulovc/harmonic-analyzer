@@ -148,8 +148,10 @@ CHAMFER_TEXT_CLEAR_M = 0.004
 # ~31 mm wide on that render.
 CHAMFER_TEXT_HALF_WIDTH_M = 0.016
 # swDraftingStandardAllUppercaseForDimensionsAndHoleCallouts, read off this
-# install's swconst.tlb (R2026x) as draw_knife_mount does: without it the
-# swTolMAX chamfer prints "0.5 max." (stud-16).
+# install's swconst.tlb (R2026x) as draw_knife_mount does. It does NOT reach
+# the swTolMAX suffix: stud-18 (leaf 20260923T010115Z) still printed
+# "0.5 max. X 45°". Main accepted SolidWorks' "max." (2026-09-22; a fleet
+# debt tracks a supported uppercase path), so the case is logged, not gated.
 SW_ALL_UPPERCASE_DIMENSIONS = 754
 # The tip thread's callout: below the axis, under the threaded shank, so its
 # leader meets the tip without crossing the tip length's witness lines above
@@ -1176,7 +1178,7 @@ def _import_tip_controls(
 
 
 def _assert_chamfer_text(annotation: Any, boundary: tuple[Point, float]) -> Box:
-    """The chamfer prints "MAX" and its text sits clear of the boundary."""
+    """The chamfer's text sits clear of the boundary; its case is logged."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     texts = _display_texts(display)
     box = _display_text_box(display)
@@ -1184,16 +1186,13 @@ def _assert_chamfer_text(annotation: Any, boundary: tuple[Point, float]) -> Box:
         "tip chamfer text: "
         + json.dumps({"texts": texts, "box_mm": [round(v * 1000.0, 2) for v in box]})
     )
-    problems = [
-        problem
-        for problem in (
-            _uppercase_problem(texts),
-            _text_boundary_problem(box, boundary),
-        )
-        if problem is not None
-    ]
-    if problems:
-        raise RuntimeError("; ".join(problems))
+    case = _uppercase_problem(texts)
+    if case is not None:
+        _telemetry.info(f"accepted lowercase tolerance suffix: {case}")
+        _telemetry.event("drawing.lowercase_tolerance_suffix", texts=json.dumps(texts))
+    problem = _text_boundary_problem(box, boundary)
+    if problem is not None:
+        raise RuntimeError(problem)
     return box
 
 
