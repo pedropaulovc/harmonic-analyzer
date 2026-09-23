@@ -306,9 +306,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "CoefficientsPlate")
-    plate_depth = name_dimensions(
-        adapter, "CoefficientsPlate", ["PlateThickness"]
-    )
+    plate_depth = name_dimensions(adapter, "CoefficientsPlate", ["PlateThickness"])
     drive_jobs.append((plate_depth[0], '"PlateT"'))
     # The plate is a plain rectangular prism, so an exact analytic volume gate
     # anchors the hole-field tripwires below (the WHOLE part has no analytic
@@ -369,9 +367,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # Native readback enumerates D3 (7.0565 mm spacing) before D1 (20
     # instances, displayed through the length-valued COM dimension wrapper).
     # Name and drive the measured spacing; leave the instance count untouched.
-    pitch_dimension = name_dimensions(
-        adapter, "SpringHolePattern", ["HolePitch", None]
-    )
+    pitch_dimension = name_dimensions(adapter, "SpringHolePattern", ["HolePitch", None])
     drive_jobs.append((pitch_dimension[0], '"ChannelPitch"'))
     await volume_check(
         adapter,
@@ -478,9 +474,7 @@ async def _hex_collar(
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
     name_last_feature(adapter, stem)
-    depth_dimension = name_dimensions(
-        adapter, stem, [f"{stem}Depth"]
-    )
+    depth_dimension = name_dimensions(adapter, stem, [f"{stem}Depth"])
     drive_jobs.append((depth_dimension[0], '"HexDepth"'))
 
 
@@ -538,16 +532,13 @@ async def _edge_rib(
     thickness_name = (
         "EdgeRibThickness" if stem == "EdgeRibFront" else "EdgeRibBackThickness"
     )
-    rib_depths = name_dimensions(
-        adapter, stem, [thickness_name, f"{stem}Start"]
-    )
+    rib_depths = name_dimensions(adapter, stem, [thickness_name, f"{stem}Start"])
     drive_jobs.extend(
         (
             (rib_depths[0], '"RibT"'),
             (rib_depths[1], '"PlateL" / 2 - "RibT"'),
         )
     )
-
 
 
 def _summation_top_arc_points() -> tuple[
@@ -970,9 +961,7 @@ async def _drawing_reference_sketches(
         PLATE_L / 2.0 - HOLE_Z[0],
         "first spring-hole from the +Z plate end",
     )
-    pattern.record(
-        "HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")'
-    )
+    pattern.record("HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")')
     await dimension_between(
         adapter,
         f"{end_offset}.start",
@@ -1073,9 +1062,7 @@ async def _drawing_reference_sketches(
     drive_jobs += cylinder.apply(adapter, "CylinderReference")
 
 
-async def _summation_arc_reference(
-    adapter, drive_jobs: list[tuple[str, str]]
-) -> None:
+async def _summation_arc_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Locate the R138.8 summation arc centre for the print (rule 11, R3 B2).
 
     The arc runs from the boss quadrant to the plate-end corner ON the cylinder
@@ -1262,9 +1249,7 @@ def _reference_claims(
         ]
         # Axis position across the two coordinates the axis does not run along.
         others = [i for i in range(3) if i != index]
-        return _distinct(
-            rows, lambda row: tuple(round(row[0][i], 4) for i in others)
-        )
+        return _distinct(rows, lambda row: tuple(round(row[0][i], 4) for i in others))
 
     def z_planes_at(z: float) -> list[tuple[Point, Point]]:
         rows = [
@@ -1364,7 +1349,9 @@ def _reference_misses(
     worst = 0.0
     for point in points:
         offsets = {name: _target_offset_mm(point, t) for name, t in targets.items()}
-        on = {name for name, off in offsets.items() if off <= REFERENCE_COINCIDENCE_TOL_MM}
+        on = {
+            name for name, off in offsets.items() if off <= REFERENCE_COINCIDENCE_TOL_MM
+        }
         if on:
             hit |= on
             worst = max(worst, *(offsets[name] for name in on))
@@ -1409,12 +1396,12 @@ def _slab_misses(slab_faces: list[tuple[Point, Point, float]]) -> list[str]:
 
 
 @_telemetry.traced("gate.web_and_plate_one_slab")
-def _assert_web_and_plate_one_slab(slab_faces: list[tuple[Point, Point, float]]) -> None:
+def _assert_web_and_plate_one_slab(
+    slab_faces: list[tuple[Point, Point, float]],
+) -> None:
     problems = _slab_misses(slab_faces)
     if problems:
-        raise RuntimeError(
-            "PLATE AND WEB 5.08 is not one slab: " + "; ".join(problems)
-        )
+        raise RuntimeError("PLATE AND WEB 5.08 is not one slab: " + "; ".join(problems))
     _telemetry.success(
         f"web and plate share the +-{PLATE_T / 2.0:g} planes "
         f"({len(slab_faces)} Y-normal faces read)"
@@ -1434,7 +1421,9 @@ def _brep_surfaces_mm(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or []
     )
     if len(bodies) != 1:
-        raise RuntimeError(f"reference gate: expected one solid body, found {len(bodies)}")
+        raise RuntimeError(
+            f"reference gate: expected one solid body, found {len(bodies)}"
+        )
     faces = list(_early_bound(bodies[0], "IBody2").GetFaces() or [])
     cylinders: list[tuple[Point, Point, float]] = []
     planes: list[tuple[Point, Point]] = []
@@ -1707,9 +1696,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X R")
-    set_dimension_prefix(
-        adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
-    )
+    set_dimension_prefix(adapter, "SummationPlateProfile", "SummationArcRadius", "2X R")
     # A silhouette width that is the cylinder's diameter prints as one.
     set_dimension_prefix(adapter, "CylinderReference", "CylRefDia", "<MOD-DIAM>")
     # Both arc centres, one per side, mirror about the boss axis.  CONTROLLING:

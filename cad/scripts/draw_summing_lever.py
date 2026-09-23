@@ -130,6 +130,7 @@ def _top_xy(
         center[1] + mz * factor / 1000.0,
     )
 
+
 def _assert_uses_sheet_scale(view: Any, label: str) -> None:
     """Prove a view follows the native sheet scale printed in the title block."""
     bound = _early_bound(view, "IView")
@@ -156,9 +157,7 @@ def _attach_radial_leaders(
         name = dimension_name(adapter, annotation)
         if name not in wanted:
             continue
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         display.ArcExtensionLineOrOppositeSide = False
         if bool(display.ArcExtensionLineOrOppositeSide):
             raise RuntimeError(
@@ -204,9 +203,7 @@ def _label_dimensions(
         if name not in wanted:
             continue
         part, text = wanted[name]
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         display.SetText(part, text)
         if str(display.GetText(part) or "") != text:
             raise RuntimeError(f"{label}: {name} callout {text!r} did not persist")
@@ -230,9 +227,7 @@ def _assert_arc_centre_text(
         name = dimension_name(adapter, annotation)
         if name not in names:
             continue
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         if texts != ("2X ", "") or bool(display.ShowParenthesis):
             raise RuntimeError(
@@ -324,7 +319,11 @@ MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
     ("KNIFE RIDGES SHARP; NO EDGE BREAK", 0.230, 0.237),
     # The Ra value lives on the model's finish control (Detail A's symbol); the
     # note only scopes it, so the sheet never restates a manufacturing value.
-    ("DETAIL A FINISH ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS", 0.230, 0.228),
+    (
+        "DETAIL A FINISH ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS",
+        0.230,
+        0.228,
+    ),
 )
 
 
@@ -410,7 +409,9 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
 
 def _place_detail_letter(adapter: Any, front: Any) -> None:
     """Seat the parent circle's letter in clear air, proved by read-back."""
-    circles = tuple(_read_member(_early_bound(front, "IView"), "GetDetailCircles") or ())
+    circles = tuple(
+        _read_member(_early_bound(front, "IView"), "GetDetailCircles") or ()
+    )
     if len(circles) != 1:
         raise RuntimeError(f"expected one knife-detail circle, found {len(circles)}")
     circle = _early_bound(circles[0], "IDetailCircle")
@@ -468,8 +469,7 @@ def _audit_lines_through_text(adapter: Any) -> None:
     blocking = [finding for finding in findings if finding.kind == "text-on-line"]
     if blocking:
         raise RuntimeError(
-            "a line runs through annotation text:\n"
-            + format_layout_findings(blocking)
+            "a line runs through annotation text:\n" + format_layout_findings(blocking)
         )
 
 
@@ -527,11 +527,10 @@ def _omit_default_thread_class(display: Any, expected_class: str, label: str) ->
             f"string {expected_class!r}"
         )
 
-    definitions = {
-        part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)
-    }
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     matches = [
-        part for part, definition in definitions.items()
+        part
+        for part, definition in definitions.items()
         if "<hw-threadclass>" in definition
     ]
     if len(matches) != 1:
@@ -587,10 +586,8 @@ def _assert_model_thread_class(
     actual = str(definition.ThreadClass or "")
     if actual != expected_class:
         raise RuntimeError(
-            f"{label}: model Hole Wizard thread class {actual!r} != "
-            f"{expected_class!r}"
+            f"{label}: model Hole Wizard thread class {actual!r} != {expected_class!r}"
         )
-
 
 
 # SolidWorks attaches one of its own automatic "Tapped Hole" notes to a view
@@ -738,9 +735,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, front_dimensions, ("MidRibArcR", "EdgeRibFrontArcR"), "form front"
     )
-    _attach_radial_leaders(
-        adapter, top_dimensions, ("SummationArcRadius",), "form top"
-    )
+    _attach_radial_leaders(adapter, top_dimensions, ("SummationArcRadius",), "form top")
     _label_dimensions(
         adapter,
         front_dimensions,
@@ -821,7 +816,9 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{measured_overall_mm:g}, expected {expected_overall_mm:g} mm"
         )
     if int(overall_dimension.GetToleranceType()) != 0:  # swTolNONE
-        raise RuntimeError("overall trunnion reference unexpectedly carries a tolerance")
+        raise RuntimeError(
+            "overall trunnion reference unexpectedly carries a tolerance"
+        )
     overall_text_xy = (0.045, 0.105)
     if not overall_annotation.SetPosition2(*overall_text_xy, 0.0):
         raise RuntimeError("failed to position overall trunnion reference text")
