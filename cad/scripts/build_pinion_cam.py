@@ -6,7 +6,7 @@ ON its OD from above, so turning the lever (rod + both cams spin as
 one) raises the surface under the pin and swings the drum into mesh.
 
 U28 (user, 2026-09-23): Ø14.6 OD, eccentricity 2.0 (4.0 full lift), so the
-thin side keeps 2.115 of wall over the Ø6.37 bore (U27 target 2.0, 2.04 at
+thin side keeps 2.10 of wall over the Ø6.40 bore (U27 target 2.0, 2.01 at
 the printed worst case).  The former raised set-pin dome is gone -- a pad
 proud of a turned OD cannot be turned -- and an M2.5 set screw now sits
 sub-flush in the 6.1-thick heavy side, which never meets the follower.

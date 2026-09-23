@@ -45,7 +45,9 @@ from pinion_bracket_geometry import (
 # were habit, not specification, and are gone. ---
 PIVOT_BORE_BAND = REAM_SLIDE  # torque shaft turns in it
 ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
-PIN_SEAT_DIA_BAND = REAM_H7  # follower stud is pressed into it
+# The MHA-116 drill-rod stud slips into this seat and is bonded with LOCTITE
+# 638 (U27; pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
+PIN_SEAT_DIA_BAND = REAM_H7
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_pinion_bracket`` marks exactly these; ``draw_pinion_bracket``

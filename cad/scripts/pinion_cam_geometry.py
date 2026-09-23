@@ -14,10 +14,12 @@ thick wall, which never meets the follower over the whole engage throw.
 
 from __future__ import annotations
 
-CAM_OD = 14.6  # K = OD/2 - ECC = 5.3 above the bore axis -> 2.115 thin-side wall
+CAM_OD = 14.6  # K = OD/2 - ECC = 5.3 above the bore axis -> 2.10 thin-side wall
 CAM_LEN = 9.0  # collar length along the rod
 ECC = 2.0  # bore offset -> 4.0 full lift; holds the photographed -71.8 deg lever
-BORE = 6.37  # nominal reamed running fit on the Ø6.35 lift rod
+# U27 (Main, 2026-09-23): the cam is set-screwed to the lift rod, so its bore
+# needs only a slip fit -- a stock 6.4 mm reamer, not a 15 um band.
+BORE = 6.40  # stock 6.4 mm reamer; slip fit on the Ø6.35 lift rod
 SET_SCREW_Z = 4.5  # M2.5 set-screw axis station from the front face (mid-length)
 TAP_DRILL_DIA = 2.05  # M2.5 x 0.45 coarse-thread tap drill
 

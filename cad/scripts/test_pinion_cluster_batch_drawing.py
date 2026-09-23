@@ -498,6 +498,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
     }
+    # U27 (Main, 2026-09-23): the follower studs slip line-to-line into
+    # their H7 seats and are bonded, so the drive train allows them NO
+    # overlap -- the former press allowance is gone.
     cam_pairs = {
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
@@ -507,7 +510,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
-        "drive-train": cam_pairs | crank_pairs,
+        "drive-train": crank_pairs,
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -517,12 +520,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             assert allowed[pair] == pytest.approx(expected_limit)
         assert all(limit > 0.0 and math.isfinite(limit) for limit in allowed.values())
 
-    cam_limits = {
-        _interference_contracts.allowed_interference_pairs("drive-train")[pair]
-        for pair in cam_pairs
-    }
-    assert len(cam_limits) == 1
-    assert 0.40 < cam_limits.pop() < 0.45
+    drive_train_allowed = _interference_contracts.allowed_interference_pairs(
+        "drive-train"
+    )
+    assert not cam_pairs & set(drive_train_allowed)
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
     assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
     assert _interference_contracts.allowed_interference_pairs("channel") == {}

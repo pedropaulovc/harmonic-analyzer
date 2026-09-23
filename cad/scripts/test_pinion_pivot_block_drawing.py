@@ -65,8 +65,13 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = pinion_pivot_block_spec.DRAWING_NOTES
-    assert "#8 NORMAL CLEARANCE Ø4.978 THRU" in notes
-    assert "1/4 IN REAM THRU" in notes
+    # Fable review r4: the notes no longer restate the REAM and hold-down
+    # callouts; they name each running bore's mate (rule 2).
+    assert "Ø4.978" not in notes
+    assert "REAM" not in notes
+    assert "MHA-062 TORQUE SHAFT" in notes
+    assert "MHA-060 LIFT ROD" in notes
+    assert "TURNS FREELY BY HAND" in notes
     assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
@@ -152,3 +157,26 @@ def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
         assert "pinion_pivot_block_geometry.py" in deps, script
         assert "pinion_pivot_block_spec.py" not in deps, script
         assert "build_pinion_pivot_block.py" not in deps, script
+
+
+def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -> None:
+    # Fable review r4 (rule 7): the holes are standard drills and reams fully
+    # defined by their callouts, so every view is hidden-lines-removed.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible" not in source
+    assert "for view in (front, top, right, iso):" in source
+    assert 'process="DRILL"' in source
+    assert "symbol_xy=(0.208, 0.170)" in source
+    assert "char_height=0.0025" in source
+    # The Ra leader must leave the block through its top face, left of the
+    # corner where BlockHeight's extension line starts.
+    rim = (
+        drawing._front_x(0.0) + drawing.BORE_R_SHEET * 0.866,
+        drawing._front_y(0.0) + drawing.BORE_R_SHEET * 0.5,
+    )
+    top_y = drawing._front_y(
+        pinion_pivot_block_spec.BLOCK_HEIGHT - pinion_pivot_block_spec.BORE_UP
+    )
+    slope = (0.170 - rim[1]) / (0.208 - rim[0])
+    exit_x = rim[0] + (top_y - rim[1]) / slope
+    assert exit_x < drawing._front_x(pinion_pivot_block_spec.BLOCK_EAST) - 0.003

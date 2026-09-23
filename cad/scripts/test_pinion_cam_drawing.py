@@ -9,16 +9,18 @@ import pinion_cam_spec
 import draw_pinion_cam as drawing
 import build_pinion_cam as cam
 from _buildgraph import module_deps_of
-from _fit_limits import REAM_SLIDE
+import pinion_lift_rod_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    # Rule 5: the follower rides the cam OD; the set-screwed bore never moves
+    # on the rod, so the one roughness symbol sits on the OD.
     (control,) = pinion_cam_spec.SURFACE_FINISHES
-    assert control.key == "bore"
+    assert control.key == "cam_od"
     assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_cam_spec.BORE
+    assert control.face.diameter_mm == pinion_cam_spec.CAM_OD
 
 
 def test_required_drawing_paths() -> None:
@@ -34,9 +36,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert (drawing.CAM_OD, drawing.BORE, drawing.ECC) == (
+    assert (drawing.CAM_OD, drawing.ECC) == (
         pinion_cam_spec.CAM_OD,
-        pinion_cam_spec.BORE,
         pinion_cam_spec.ECC,
     )
     assert pinion_cam_spec.ECC == pinion_cam_geometry.ECC
@@ -62,10 +63,10 @@ def test_eccentricity_is_dimensioned_and_called_out() -> None:
     assert pinion_cam_geometry.THIN_SIDE_WALL >= 2.0
     worst = (
         (pinion_cam_geometry.CAM_OD - pinion_cam_spec.COLLAR_OD_TOLERANCE_MM) / 2.0
-        - (pinion_cam_geometry.BORE + pinion_cam_spec.BORE_BAND[1]) / 2.0
+        - (pinion_cam_geometry.BORE + pinion_cam_spec.BORE_BAND[0]) / 2.0
         - (pinion_cam_geometry.ECC + pinion_cam_spec.COLLAR_AXIS_TOLERANCE_MM)
     )
-    assert worst >= 1.5
+    assert worst >= 2.0  # 2.01 at the Ø6.43 bore limit
     assert pinion_cam_geometry.CAM_OD == 14.6
 
 
@@ -85,15 +86,21 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
     }
-    # The bore band is not a habit: it is the shared REAM_SLIDE fit class over
-    # the Ø6.35 lift rod, re-expressed about this part's as-cut nominal.
-    assert pinion_cam_spec.BORE_BAND == (
-        round(pinion_cam_spec.LIFT_ROD_DIA + REAM_SLIDE[0] - pinion_cam_spec.BORE, 6),
-        round(pinion_cam_spec.LIFT_ROD_DIA + REAM_SLIDE[1] - pinion_cam_spec.BORE, 6),
-    )
+    # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod.  A
+    # stock 6.4 reamer at +/-0.03 (the printed band is at least +/-0.025)
+    # against the MHA-060 rod's h band gives 0.02-0.10 diametral clearance.
+    assert pinion_cam_spec.BORE == 6.40
+    assert pinion_cam_spec.BORE_BAND == (0.03, -0.03)
+    assert min(abs(d) for d in pinion_cam_spec.BORE_BAND) >= 0.025
+    rod_max = pinion_lift_rod_spec.ROD_DIA + pinion_lift_rod_spec.ROD_DIA_BAND[0]
+    rod_min = pinion_lift_rod_spec.ROD_DIA + pinion_lift_rod_spec.ROD_DIA_BAND[1]
+    bore_min = pinion_cam_spec.BORE + pinion_cam_spec.BORE_BAND[1]
+    bore_max = pinion_cam_spec.BORE + pinion_cam_spec.BORE_BAND[0]
+    assert round(bore_min - rod_max, 6) == 0.02
+    assert round(bore_max - rod_min, 6) == 0.10
     assert pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "SLIDE FIT" in bore
+    assert "SLIP FIT" in bore
     assert "DIAMETRAL CLEARANCE" not in bore
     assert "LOCK AFTER POSITIONING" not in bore
     assert "LINEAR +/-" not in notes
@@ -181,3 +188,20 @@ def test_registry_retains_make_critical_properties() -> None:
     assert spec["finish"]
     assert "fit_class" not in spec
     assert int(spec["quantity"]) == 2
+
+
+def test_front_view_shows_which_side_the_set_screw_enters() -> None:
+    # Fable review r4 blocker: nothing tied the set-screw hole to the
+    # eccentricity.  The front view keeps hidden lines so the tap drill shows
+    # on the heavy side, opposite the bore offset; every other view is HLR.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible(adapter, front)" in source
+    assert "for view in (side, bottom, iso):" in source
+    assert "VIEW ALONG SET-SCREW AXIS" in source
+    import pinion_cam_geometry as geometry
+    import build_pinion_cam
+
+    # The tap plane sits on the heavy side: below the bore, where the collar
+    # centre (-ECC) also lies.
+    assert build_pinion_cam._TAP_PLANE_Y < 0.0
+    assert geometry.THICK_SIDE_WALL > geometry.THIN_SIDE_WALL

@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion lift cam.
 
-An eccentric steel collar: the Ø6.37 bore is offset 2.0 mm from the Ø14.6 OD
+An eccentric steel collar: the Ø6.40 bore is offset 2.0 mm from the Ø14.6 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
 on the Front plane (front view carries bore/eccentricity); the side profile
@@ -32,6 +32,7 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     view_name,
     stamp_drawing_summary,
 )
@@ -39,7 +40,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _named_views import octant_view_name
 from _surface_finish import surface_finish_by_key
 from pinion_cam_spec import (
-    BORE,
     CAM_OD,
     DRAWING_PRECISION_BY_NAME,
     ECC,
@@ -87,7 +87,7 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * SHEET_SCALE[0] / 1000.0
 
 
-BORE_R_SHEET = BORE * SHEET_SCALE[0] / 2000.0
+OD_R_SHEET = CAM_OD * SHEET_SCALE[0] / 2000.0
 _SQRT_HALF = 0.5**0.5
 
 # Diameters go on the view that shows them as a SOLID edge: the OD as the
@@ -110,7 +110,7 @@ BOTTOM_KEEP = {
     "TapCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"REAM THRU\nSLIDE FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
+    "BoreDia": f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
     "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
     "TapDrillDia": "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H",
 }
@@ -236,7 +236,12 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), octant_view_name(1, -1, 1), *ISO_CENTER, scale=(2, 1)
     )
-    for view in (front, side, bottom, iso):
+    # The front view keeps its hidden lines: they are the only place the tap
+    # drill shows WHICH side of the eccentric it enters -- the heavy side,
+    # opposite the bore offset (rule 7's cross-hole-through-a-wall case;
+    # Fable review r4 blocker).
+    set_hidden_lines_visible(adapter, front)
+    for view in (side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
     # Import the set-screw station from its authoring projection, then move it
@@ -285,26 +290,27 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to set-screw end view")
 
-    # Bore roughness: use the lower-left bore rim and a small, routine callout
-    # below the circular view so it cannot dominate or cross the dimensions.
-    bore_center = (FRONT_CENTER[0], _front_y(0.0))
-    bore_finish_edge = (
-        bore_center[0] - BORE_R_SHEET * _SQRT_HALF,
-        bore_center[1] - BORE_R_SHEET * _SQRT_HALF,
+    # Cam-OD roughness (the follower's running surface): the lower-right OD
+    # rim, clear of the bore callout's upper-left diagonal and of the tap
+    # drill's hidden lines at the bottom, with a small routine callout below.
+    od_center = (FRONT_CENTER[0], _front_y(-ECC))
+    od_finish_edge = (
+        od_center[0] + OD_R_SHEET * _SQRT_HALF,
+        od_center[1] - OD_R_SHEET * _SQRT_HALF,
     )
     add_surface_finish(
         adapter,
         front,
-        edge_xy=bore_finish_edge,
-        symbol_xy=(0.055, 0.105),
-        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
-        label="cam bore finish",
+        edge_xy=od_finish_edge,
+        symbol_xy=(0.150, 0.105),
+        control=surface_finish_by_key(SURFACE_FINISHES, "cam_od"),
+        label="cam OD finish",
         char_height=0.0025,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     if add_note(
-        adapter, "SET-SCREW END VIEW - ROTATED 90 DEG", 0.265, 0.075
+        adapter, "VIEW ALONG SET-SCREW AXIS - ROTATED 90 DEG", 0.255, 0.075
     ) is None:
         raise RuntimeError("failed to label rotated cam set-screw end view")
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)

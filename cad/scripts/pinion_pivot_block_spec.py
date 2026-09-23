@@ -86,9 +86,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # $PRPSHEET links, so the print cannot silently diverge from its source model.
 DRAWING_NOTES = "\n".join(
     (
-        "PIVOT AND LIFT BORES: 1/4 IN REAM THRU;",
-        "RUNNING FIT ON THE <MOD-DIAM>6.35 TORQUE SHAFT / LIFT ROD.",
-        "HOLD-DOWN HOLES: #8 NORMAL CLEARANCE Ø4.978 THRU, 2 PLACES;",
+        # Fable review r4 (rule 2): name each running bore's mate and state the
+        # functional acceptance; the REAM and hold-down callouts are not repeated.
+        "PIVOT BORE RUNS ON MHA-062 TORQUE SHAFT, LIFT BORE ON",
+        "  MHA-060 LIFT ROD; EACH SHAFT TURNS FREELY BY HAND.",
         "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY.",
     )
 )

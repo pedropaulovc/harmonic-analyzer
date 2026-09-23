@@ -33,7 +33,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -174,12 +173,10 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(3, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(3, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(2, 1))
-    for view in (front, iso):
+    # Every hole here is a standard drill or ream fully defined by its
+    # callout, so no view carries hidden lines (rule 7; Fable review r4).
+    for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
-    # The top view exposes the two vertical hold-down drills; the right view
-    # shows both Z-bores edge-on.  HLV keeps their hidden circles readable.
-    for view in (top, right):
-        set_hidden_lines_visible(adapter, view)
 
     front_annotations = curate_view_dimensions(
         adapter, front, keep=FRONT_KEEP, view_label="front"
@@ -243,13 +240,16 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=east_screw_edge,
         callout_xy=(0.245, 0.250),
         label="hold-down screw hole",
+        process="DRILL",
     )
     # Anchored on the bore rim at ~30 deg: the pivot centre's AnchorZ witness
     # leaves the rim at 0 deg and LiftBoreX's at 90 deg, and the diameter
-    # leader climbs at ~70 deg, so 30 deg is the clear sector.  The arm
-    # (x~0.199..0.215) sits above BlockHeight's upper extension line (y=0.154)
-    # and the text, which renders ABOVE and RIGHT of the arm, stays under the
-    # PivotBoreDia callout.
+    # leader climbs at ~70 deg, so 30 deg is the clear sector.  Fable review
+    # r4 read the full-size symbol, sitting on the top edge, as the top face's:
+    # at routine size and lifted 11 mm clear of that edge, its leader leaves
+    # the block through the top face (x ~0.193, inside the 0.200 corner, so
+    # it cannot cross BlockHeight's extension line) and the symbol stays
+    # under the PivotBoreDia callout.
     pivot_right_edge = (
         _front_x(0.0) + BORE_R_SHEET * 0.866,
         _front_y(0.0) + BORE_R_SHEET * 0.5,
@@ -258,9 +258,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=pivot_right_edge,
-        symbol_xy=(0.205, 0.161),
+        symbol_xy=(0.208, 0.170),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
+        char_height=0.0025,
     )
 
     # 0.020: a note is left-aligned on its anchor, so the ink starts here. The

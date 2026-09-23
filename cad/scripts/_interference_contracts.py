@@ -29,8 +29,6 @@ from crank_pin_spec import (
     SMALL_END_DIA as _PIN_D1,
 )
 from crankshaft_spec import SHAFT_DIA as _CS_DIA
-from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
-from pinion_cam_pin_geometry import PIN_DIA
 from pinion_arbor_spec import (
     CROSS_HOLE_DIA as _GRIP_CROSS_HOLE_DIA,
     HEAD_DIA as _GRIP_HEAD_DIA,
@@ -73,9 +71,6 @@ def _numbered_pairs(
         for number in numbers
     }
 
-
-_CAM_PIN_OVERLAP_MM3 = math.pi * (PIN_DIA**2 - PIN_BORE**2) * PIN_SEAT / 4.0
-_CAM_PIN_GATE_LIMIT_MM3 = 1.10 * _CAM_PIN_OVERLAP_MM3
 
 # MHA-058 is match-reamed into MHA-102's integral head for a light arbor
 # press fit.  In the nominal solids, the coaxial 6.0175 mm rod and 6.005 mm
@@ -137,8 +132,6 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    frozenset(("pinion-bracket-1", "pinion-cam-pin-1")): _CAM_PIN_GATE_LIMIT_MM3,
-    frozenset(("pinion-bracket-2", "pinion-cam-pin-2")): _CAM_PIN_GATE_LIMIT_MM3,
     frozenset(("pinion-handle-1", "pinion-arbor-1")): _GRIP_PRESS_OVERLAP_MM3,
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
         7.9502, 6.528, 6.0

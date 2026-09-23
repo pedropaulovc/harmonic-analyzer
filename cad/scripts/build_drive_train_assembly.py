@@ -1518,12 +1518,16 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-if not STRAP_PIN_BORE <= FPIN_DIA <= STRAP_PIN_BORE + 0.020:
-    raise AssertionError("follower pin nominal is outside the strap press-fit band")
+# U27: the drill-rod stud slips into the H7 seat line-to-line and is bonded
+# (LOCTITE 638), so the nominal solids touch without overlapping.
+if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
+    raise AssertionError("follower pin nominal is not line-to-line with its seat")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
-if not 6.36 <= CAM_BORE_DIA <= 6.375:
-    raise AssertionError("cam bore nominal is outside its O6.360-O6.375 fit limits")
+# U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
+# the Ø6.35 lift rod (pinion_cam_spec proves it at the printed limits).
+if not 0.02 <= CAM_BORE_DIA - 6.35 <= 0.10:
+    raise AssertionError("cam bore nominal is outside its 0.02-0.10 slip clearance")
 if CAM_THIN_SIDE_WALL < 1.5:
     raise AssertionError("cam thin-side wall is below the 1.5 mm U27 floor")
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
