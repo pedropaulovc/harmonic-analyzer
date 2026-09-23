@@ -67,6 +67,14 @@ SURFACE_FINISHES = (
 # supplier change can never leave the lever tapped for the wrong screw.
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
 HOLE_X = 39.85
+# The hook arm: the spring-hole row's distance normal to the knife line
+# (HoleSeedX, from the cylinder axis the knife ridge sits over).  It is a GAIN
+# term: error_budget.yaml summing_hook_arm holds it to +/-0.15 mm at every one
+# of the 20 holes.  The row is one straight line of holes along the knife, so
+# the band goes on HoleSeedX as a native model tolerance (drawing policy rule
+# 2) instead of the retired position frame.  The holes' stations ALONG the
+# knife line move no arm, so 142.50 / 8.43 stay at the routine .XX band.
+HOOK_ARM_TOLERANCE_MM = 0.15
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
@@ -136,7 +144,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SummationAnchor": {"AnchorHeight": 2},
     "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 1, "MidRibRightX": 1},
     "MiddleRib": {"MiddleRibThickness": 2},
-    "SpringHoleSeed": {"HoleSeedX": 1},
+    "SpringHoleSeed": {"HoleSeedX": 2},
     "SpringHolePattern": {"HolePitch": 2},
     "PatternReferences": {"HoleEndOffsetLast": 2, "HoleFirstFromEnd": 2},
     "BossAxialReference": {"BossAxialLocation": 1},
