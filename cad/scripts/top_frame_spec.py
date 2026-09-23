@@ -205,6 +205,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "right window clear width": 1,
     "central web width": 1,
     "central web section width": 1,
+    # B-B sheet 2: one web thickness controls all four rail webs ("4X RAIL WEB").
+    "rail web thickness": 1,
     "front rear flange width": 1,
     "top flange thickness": 1,
     "top rim chamfer": 1,

@@ -1208,8 +1208,10 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
         ),
     )[0]
+    # The socket bore opens at the cap-recess floor, not the boss top: the
+    # boss top carries the wider recess mouth (summing-integration-b1).
     upper_left_socket_axis = geometry_top_edges.circle_at(
-        (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
+        (-COLUMN_X, CAP_RECESS_FLOOR_Y, FRONT_COLUMN_Z),
         BORE_DIA / 2.0,
         axis=(0.0, 1.0, 0.0),
         label="geometry plan upper-left socket axis",
