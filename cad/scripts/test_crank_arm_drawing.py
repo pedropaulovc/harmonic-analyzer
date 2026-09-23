@@ -158,3 +158,13 @@ def test_notes_and_seat_callout_stay_inside_their_sheet_regions() -> None:
     seat_x = drawing.FRONT_KEEP["HubSeatDia"][0]
     half = max(len(line) for line in spec.HUB_SEAT_CALLOUT.splitlines()) * char_w / 2
     assert seat_x - half > 0.0128 + 0.003  # inner border plus air
+
+
+def test_top_view_crop_keeps_the_hub_end_and_drops_the_anchor_tap() -> None:
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    center = drawing._sheet_x(0.0)
+    groove_far = (spec.AXIAL_PIN_X + spec.AXIAL_PIN_DIA / 2.0) * scale
+    assert drawing.TOP_CROP_RADIUS > max(spec.HALF_WIDTH * scale, groove_far)
+    # The outline the drawing checks is the fence plus SolidWorks' padding.
+    outline_right = center + drawing.TOP_CROP_RADIUS + drawing.TOP_VIEW_OUTLINE_PAD
+    assert outline_right < drawing._sheet_x(spec.ANCHOR_SCREW_X) - 0.002
