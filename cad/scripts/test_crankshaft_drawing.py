@@ -175,11 +175,13 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
         assert not (x >= title_block[0] and y <= title_block[1])
-    # Both dragged diameters land on their own features: Ø9.525 on the
-    # far-end seat, Ø11.388 on the journal.
+    # Both dragged diameters land on the section their profile sketch starts,
+    # so their axis-parallel extension lines hide under the silhouette:
+    # Ø9.525 on the dome-side seat, Ø11.388 on the journal.
     shaft_x = drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0]
     journal_x = drawing.DIAMETER_POSITIONS["JournalDiaDim"][0]
-    assert drawing.JOURNAL_END_X < shaft_x < drawing.FAR_END_X
+    hole_radius = drawing._PIN_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert drawing.PIN_X + hole_radius < shaft_x < drawing.JOURNAL_START_X
     assert drawing.JOURNAL_START_X < journal_x < drawing.JOURNAL_END_X
     # The cross-hole callout sits right of the hole so its leader cannot run
     # near-parallel to the station extension line through the hole.

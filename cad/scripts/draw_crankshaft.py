@@ -144,11 +144,15 @@ SIDE_KEEP = {
     "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
 }
 # A dragged diameter prints its dimension line at the requested X with the
-# text running to its RIGHT (run 20260923T030252135Z-49e46990): Ø9.525 on
-# the far-end seat, Ø11.388 on the journal right of its finish symbol, which
-# leaves the dome-side seat above the cross-hole free for the hole callout.
+# text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
+# extension lines run parallel to the axis from the profile SKETCH that owns
+# it, so each must sit on the section that sketch starts: the Ø9.525 circle
+# lies at the dome root, and placed on the far-end seat its extension lines
+# drew solid through the journal (run 20260923T031747843Z-94724e44).
+# Ø9.525 on the dome-side seat right of the cross-hole; Ø11.388 on the
+# journal right of its finish symbol.
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (JOURNAL_END_X + 0.006, 0.200),
+    "ShaftDiaDim": (JOURNAL_START_X - 0.022, 0.200),
     "JournalDiaDim": (JOURNAL_END_X - 0.052, 0.200),
 }
 # One Ø9.525 dimension governs both 3/8-in seats.
@@ -156,11 +160,12 @@ CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
 FINISH_PICK = (JOURNAL_START_X + 0.040, JOURNAL_FLANK_Y)
 FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
-# Text centred up-right of the cross-hole: the callout's leader leaves the
-# text's left end and runs down-left at ~57 deg through the hole centre, a
-# clean crossing of the 118.0 station's extension line rather than a near
-# parallel one (run 20260923T030252135Z-49e46990), clear of the SR on the left.
-HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.235)
+# Text centred up-right of the cross-hole, above the Ø9.525 dimension: the
+# callout's leader leaves the text's left end and runs down-left at ~64 deg
+# through the hole centre, a clean crossing of the 118.0 station's extension
+# line rather than a near parallel one (run 20260923T030252135Z-49e46990),
+# left of the Ø9.525 text and clear of the SR on the left.
+HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
 
