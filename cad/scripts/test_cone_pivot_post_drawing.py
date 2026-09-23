@@ -256,6 +256,10 @@ def test_manufacturing_notes_do_not_restate_dimensions() -> None:
     # A note may state the axis relationship, but it may not restate a size, a
     # band or a finish: those remain dimensions and native symbols under
     # drawing-simplicity-policy.md rules 1 and 6.
+    # drawing-simplicity-policy.md rule 6: at most four short lines.
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len(lines) <= 4
+    assert max(len(line) for line in lines) <= 64
     stripped = re.sub(r"MHA-\d+", "", spec.DRAWING_NOTES)
     assert not any(character.isdigit() for character in stripped)
     for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra"):
@@ -452,7 +456,7 @@ def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> No
 
 def test_deep_mounting_holes_carry_a_drilling_note() -> None:
     """U37: the 2X mounting holes run the full post height in cast iron."""
-    assert "DRILL MOUNTING HOLES FROM THE TOP FACE" in spec.DRAWING_NOTES
+    assert "DRILL MOUNTING HOLES FROM TOP FACE" in spec.DRAWING_NOTES
     assert "CONE BORE AT BREAKOUT" in spec.DRAWING_NOTES
 
 
