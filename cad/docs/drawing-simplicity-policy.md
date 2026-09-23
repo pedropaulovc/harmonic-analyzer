@@ -277,8 +277,8 @@ is not precedent for anything else. Every sheet a row affects should state
 the exception itself; the table is the backstop. The blind reviewer sees only the sheets,
 so it reports a row's shortfall as a blocker unless the package itself states
 the exception. A blocker that matches a row (same parts, shortfall within the
-recorded range) is recorded against that row and does not gate. Any other
-finding on those parts still gates.
+recorded range) is recorded against that row by the person running the gate
+rather than fixed; any other finding on those parts still gates.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
@@ -306,8 +306,10 @@ all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
 A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. A `FIX` whose only gating findings are blockers matching a named
-exception counts as `SHIP`. Minor findings are recorded, not gating. Regression tests must defend
+finding. The runner passes `SHIP` only, so a `FIX` whose only gating findings
+are blockers matching a named exception still exits nonzero; it is accepted by
+hand, citing the row in the PR, and the durable cure is stating the exception
+on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
 line counts, or mocked API-call sequences. Native drawing generation must verify
 persisted dimension values, tolerances, reference state, and required view modes;
