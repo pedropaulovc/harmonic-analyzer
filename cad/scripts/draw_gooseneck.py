@@ -306,19 +306,14 @@ _HATCH_NONE = 1
 def _face_hatches(adapter: Any, view: Any, *, label: str) -> list[Any]:
     """Every face hatch in ``view``, or RAISE with the counts.
 
-    Farm r10 (swmaker000004) got ``None`` entries from ``GetFaceHatches``
-    straight after a rebuild. A view's display geometry is computed lazily (see
-    ``_drawing_common`` on the HLR flag), so each read is retried once after a
-    display-geometry update and once after a redraw. Every stage is recorded;
-    a ``None`` entry is never skipped.
+    A view's hatches exist only once its display geometry does: farm r11 read
+    6 of 6 as ``None`` after the rebuild and after UpdateViewDisplayGeometry,
+    and 6 real hatches after GraphicsRedraw2. So the read redraws first when
+    needed. A ``None`` entry is never skipped.
     """
     bound = _early_bound(view, "IView")
-    stages = (
-        ("after rebuild", None),
-        ("after UpdateViewDisplayGeometry", bound.UpdateViewDisplayGeometry),
-        ("after GraphicsRedraw2", adapter.currentModel.GraphicsRedraw2),
-    )
     readings = []
+    stages = (("as is", None), ("after GraphicsRedraw2", adapter.currentModel.GraphicsRedraw2))
     for stage, refresh in stages:
         if refresh is not None:
             refresh()
@@ -334,26 +329,40 @@ def _face_hatches(adapter: Any, view: Any, *, label: str) -> list[Any]:
             returned=len(raw),
             missing=missing,
         )
-        _telemetry.info(f"{label}: face hatches {readings[-1]}")
         if raw and not missing and len(raw) == count:
             return [_early_bound(item, "IFaceHatch") for item in raw]
     raise RuntimeError(f"{label}: face hatches unreadable ({'; '.join(readings)})")
 
 
-def _screw_hatches(adapter: Any, view: Any, *, label: str) -> tuple[list[Any], int]:
-    """The view's face hatches on the screw's cut faces, and the total count.
+def _hatch_rows(hatches: list[Any]) -> list[tuple[int, float, float, int, bool, int]]:
+    """Index -> (face x-min, x-max in mm, fill type, material hatch, scope)."""
+    rows = []
+    for index, hatch in enumerate(hatches):
+        box = _early_bound(hatch.Face, "IFace2").GetBox()
+        rows.append(
+            (
+                index,
+                round(float(box[0]) * 1000.0, 3),
+                round(float(box[3]) * 1000.0, 3),
+                int(hatch.HatchType),
+                bool(hatch.UseMaterialHatch),
+                int(hatch.HatchScope),
+            )
+        )
+    return rows
 
-    Only the screw reaches beyond the arm end (its head sits a clamped gap
-    outboard); tube and plug cut faces both stop at ``ARM_END_X``.
-    """
+
+def _screw_rows(
+    adapter: Any, view: Any, *, label: str, stage: str
+) -> tuple[list[Any], list[tuple[int, float, float, int, bool, int]]]:
+    """The screw's hatches (the only faces reaching beyond the arm end, whose
+    head sits a clamped gap outboard), logging every hatch's row."""
     hatches = _face_hatches(adapter, view, label=label)
-    beyond_arm_end = (ARM_END_X - 1.0) / 1000.0
-    screw = [
-        hatch
-        for hatch in hatches
-        if float(_early_bound(hatch.Face, "IFace2").GetBox()[0]) < beyond_arm_end
-    ]
-    return screw, len(hatches)
+    rows = _hatch_rows(hatches)
+    _telemetry.event("drawing.hatch_rows", label=label, stage=stage, rows=repr(rows))
+    _telemetry.info(f"{label} {stage}: (index, x-min, x-max, type, material, scope) {rows}")
+    beyond_arm_end = ARM_END_X - 1.0
+    return [hatches[row[0]] for row in rows if row[1] < beyond_arm_end], rows
 
 
 def _leave_screw_unsectioned(adapter: Any, view: Any) -> None:
@@ -362,25 +371,33 @@ def _leave_screw_unsectioned(adapter: Any, view: Any) -> None:
     A part drawing cannot exclude one body from a section: the IDrSection and
     CreateSectionViewAt5 exclusions take assembly components, and
     ISectionViewData's selective sectioning is for model views. So instead the
-    screw's cut-face hatch fill is cleared. Its cut outline is the same as its
+    screw's cut-face fill is cleared. Its cut outline is the same as its
     unsectioned side-view outline, because the cut runs along the axis.
+
+    Farm r11 set ``HatchType`` alone and read the fill back as a pattern after
+    the rebuild. The material crosshatch flag goes off first (a material hatch
+    owns the fill), and the fill is read back at three points: on the same
+    handle, on a fresh read, and after a rebuild.
     """
     label = "section A-A screw hatch"
-    screw, total = _screw_hatches(adapter, view, label=label)
-    if not screw or len(screw) == total:
-        raise RuntimeError(f"{label}: {len(screw)} of {total} hatches are the screw's")
+    screw, rows = _screw_rows(adapter, view, label=label, stage="before")
+    if not screw or len(screw) == len(rows):
+        raise RuntimeError(f"{label}: {len(screw)} of {len(rows)} hatches are the screw's")
     for hatch in screw:
+        hatch.UseMaterialHatch = False
         hatch.HatchType = _HATCH_NONE
+    same_handle = [(int(h.HatchType), bool(h.UseMaterialHatch)) for h in screw]
+    _telemetry.info(f"{label} same handle after write: (type, material) {same_handle}")
+    fresh, _ = _screw_rows(adapter, view, label=label, stage="fresh, before rebuild")
     rebuild_drawing(adapter, label=label)
-    screw, total = _screw_hatches(adapter, view, label=label)
-    kept = [int(hatch.HatchType) for hatch in screw]
-    if not screw or any(kind != _HATCH_NONE for kind in kept):
-        raise RuntimeError(f"{label}: screw hatch fill did not clear: {kept}")
-    _telemetry.info(
-        f"{label}: cleared {len(screw)} screw hatch(es), kept {total - len(screw)}",
-        screw_hatches=len(screw),
-        kept_hatches=total - len(screw),
-    )
+    rebuilt, _ = _screw_rows(adapter, view, label=label, stage="after rebuild")
+    kept = [int(hatch.HatchType) for hatch in rebuilt]
+    if not rebuilt or any(kind != _HATCH_NONE for kind in kept):
+        raise RuntimeError(
+            f"{label}: screw hatch fill did not clear: same handle {same_handle}, "
+            f"fresh {[int(h.HatchType) for h in fresh]}, after rebuild {kept}"
+        )
+    _telemetry.info(f"{label}: cleared {len(rebuilt)} screw hatch(es) of {len(rows)}")
 
 
 def _show_only_screw(adapter: Any, view: Any) -> None:
