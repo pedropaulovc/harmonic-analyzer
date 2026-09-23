@@ -277,3 +277,35 @@ def test_balloons_on_one_ray_swap_slots_until_their_leaders_clear() -> None:
     segments = [draw_summing_assembly._balloon_leader(b.annotation, b.name) for b in balloons]
     assert draw_summing_assembly.find_leader_leader_crossings(segments) == []
     assert four.position[:2] == (0.0909, 0.0457)
+
+
+def test_balloon_attachment_gate_names_every_mismatch() -> None:
+    expected = {"knife-mount": "1", "knife-hanger-washer": "2", "knife-hanger-stud": "3"}
+    clean = [
+        ("DetailItem1", "1", ("knife-mount",)),
+        ("DetailItem2", "2", ("knife-hanger-washer",)),
+        ("DetailItem3", "3", ("knife-hanger-stud",)),
+    ]
+    assert draw_summing_assembly.balloon_attachment_violations(clean, expected) == []
+    # Main's r14 reading: item 2's leader ends on the knife block, not a washer.
+    misread = [
+        ("DetailItem1", "1", ("knife-mount",)),
+        ("DetailItem2", "2", ("knife-mount",)),
+        ("DetailItem3", "3", ("knife-hanger-stud", "knife-mount")),
+    ]
+    findings = draw_summing_assembly.balloon_attachment_violations(misread, expected)
+    assert findings == [
+        "DetailItem2 shows item 2 but attaches to knife-mount (item 1)",
+        "DetailItem3 (item 3) attaches to ['knife-hanger-stud', 'knife-mount']",
+        "knife-hanger-stud (item 3) carries 0 balloons, expected 1",
+        "knife-hanger-washer (item 2) carries 0 balloons, expected 1",
+        "knife-mount (item 1) carries 2 balloons, expected 1",
+    ]
+
+
+def test_hanger_section_crop_keeps_one_station_only() -> None:
+    # The crop spans one station in z and must stop short of the other one,
+    # which sits 2 x HEX_Z_MID away, with room for its own washer (~27 across).
+    half = draw_summing_assembly.HANGER_SECTION_CROP_HALF_Z_MM
+    assert half >= 27.0 / 2.0 + 5.0
+    assert half + 27.0 / 2.0 < 2.0 * build_summing_assembly.HEX_Z_MID
