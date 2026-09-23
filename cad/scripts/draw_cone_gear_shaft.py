@@ -75,14 +75,15 @@ ISO_SCALE = (1, 2)
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
 # y < ~0.066).  The 202.27 mm shaft at 1:1 spans 0.0503..0.2526, leaving the
-# right third for the pictorial; the group sits mid-height so the baseline
-# stack below and the diameters above share the field evenly, with the note
-# block in the lower left.  The view is placed by its large end: every
+# right third for the pictorial; the group sits just below mid-height so
+# the baseline stack below and the diameters above share the field with the
+# note block in the lower left (review 2026-09-23: at 0.170 rows A-B stood
+# empty but for the note).  The view is placed by its large end: every
 # dimension below is laid out from that datum face, so a change at the tip
 # (E1 shortened it 2.9 mm) moves only the tip.
 BIG_END_X = 0.2526
-SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.170)
-ISO_CENTER = (0.345, 0.185)
+SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
+ISO_CENTER = (0.345, 0.165)
 NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
@@ -96,12 +97,12 @@ DONOR_CENTER = (0.360, 0.090)
 # attaches to (the fillet feature's first edge), its leader dropping straight
 # to that corner, right of the Ø9.525 text and left of the pivot finish.
 SIDE_KEEP = {
-    "Sec0End": (0.2311, 0.1555),
-    "Sec1End": (0.1672, 0.1465),
-    "Sec2End": (0.1638, 0.1375),
-    "Sec3End": (0.1603, 0.1285),
-    "Sec4End": (0.1499, 0.1195),
-    "ShoulderR": (0.2000, 0.2120),
+    "Sec0End": (0.2311, 0.1355),
+    "Sec1End": (0.1672, 0.1265),
+    "Sec2End": (0.1638, 0.1175),
+    "Sec3End": (0.1603, 0.1085),
+    "Sec4End": (0.1499, 0.0995),
+    "ShoulderR": (0.2000, 0.1920),
 }
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
@@ -113,11 +114,11 @@ SIDE_KEEP = {
 # lines: the tip's text sits highest and each neighbour to the right steps
 # down, so no line rises through a text (codex, 18395f30).
 SIDE_DIAMETERS = {
-    "Sec0Dia": (0.2700, 0.1820),
-    "Sec1Dia": (0.1400, 0.1930),
-    "Sec2Dia": (0.0810, 0.1960),
-    "Sec3Dia": (0.0690, 0.2080),
-    "Sec4Dia": (0.0520, 0.2200),
+    "Sec0Dia": (0.2700, 0.1620),
+    "Sec1Dia": (0.1400, 0.1730),
+    "Sec2Dia": (0.0810, 0.1760),
+    "Sec3Dia": (0.0690, 0.1880),
+    "Sec4Dia": (0.0520, 0.2000),
 }
 # Sheet width of one diameter text with its stacked band, for the layout test.
 DIAMETER_TEXT_WIDTH = 0.032
@@ -236,15 +237,17 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
 
-    pivot_face = _cylindrical_face(adapter, side, JOURNAL_DIA)
-    tip_face = _cylindrical_face(adapter, side, SECTION_DIAS[-1])
-    add_view_centerline(
-        adapter,
-        side,
-        face_xy=(SIDE_CENTER[0] + 0.050, SIDE_CENTER[1]),
-        label="shaft longitudinal axis",
-        entity=pivot_face,
-    )
+    land_faces = [_cylindrical_face(adapter, side, dia) for dia in SECTION_DIAS]
+    pivot_face, tip_face = land_faces[0], land_faces[-1]
+    # One axis per land, so the centreline runs the shaft's full length rather
+    # than only under the journal (review 2026-09-23).
+    for index, face in enumerate(land_faces):
+        add_view_centerline(
+            adapter,
+            side,
+            label=f"shaft longitudinal axis, land {index}",
+            entity=face,
+        )
 
     # The donor is curated FIRST so the diameters cannot be claimed (and then
     # deleted) by a view that cannot show them.
@@ -286,7 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.2400, 0.2000),
+        symbol_xy=(0.2400, 0.1800),
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_journal"),
         label="pivot journal finish",
         entity_type="FACE",
@@ -296,7 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        symbol_xy=(0.0240, 0.2160),
+        symbol_xy=(0.0240, 0.1960),
         control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
         label="tip journal finish",
         entity_type="FACE",
