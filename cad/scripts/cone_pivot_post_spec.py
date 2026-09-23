@@ -64,6 +64,12 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the top face.
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
 # local east/west axes to the opposite platform names.
+#
+# The screw is MHA-142, a 1/4-20 x 3-1/2 slotted fillister (MSC 40923898, user
+# ruling U37c) cut to 86.0 at assembly.  Its ASME B18.6.3 head (dia 9.1-9.5 x
+# 5.5 overall) sits about 0.5 below the top face in the dia 11.509 x 6.02
+# counterbore.  Deepening the counterbore for a shorter screw is not an
+# option: at 16.15 it would pass the crank bore with a 1.20 worst-case web.
 ATTACHMENT_SPACING = 26.88704
 ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
 ATTACHMENT_THRU_DIA = 7.14248
