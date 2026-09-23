@@ -313,6 +313,10 @@ CHECKS = "\n".join(
         "   CONE SET 1/4 TURN (16T:64T).",
         "2. MHA-025/MHA-021 BACKLASH PER THE MHA-021 PRINT; EACH CONE GEAR",
         "   MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
+        # C:/src/dt-logs/handoffs/dt-crank-mesh-under-spec-20260923.md: the
+        # 16T:64T centre distance is the difference of two .XX heights on
+        # MHA-016 and nothing sets it at assembly (open user decision).
+        "   [PENDING: 16T:64T CENTRE-DISTANCE SETTING - OPEN RULING]",
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
         "4. CONE SWING (P1): LOOSEN MHA-093; THE CONE SET SWINGS ON MHA-094",
         "   CLEAR OF EVERY MHA-027. RETURN IT TO THE MHA-095 STOP AND",
