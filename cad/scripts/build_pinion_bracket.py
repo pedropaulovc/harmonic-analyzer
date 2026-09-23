@@ -110,8 +110,13 @@ def _flank_face(model: Any, point_mm: tuple[float, float, float]) -> Any:
 
 def _open_flank_sketch(
     adapter: Any, point_mm: tuple[float, float, float]
-) -> tuple[float, float]:
-    """Open a sketch ON the flank face; return ``point_mm`` in sketch coords.
+) -> tuple[float, float, bool]:
+    """Open a sketch ON the flank face; map ``point_mm`` into it.
+
+    Returns the sketch ``(u, v)`` of the point and whether the sketch normal
+    points OUT of the flank (-X). A cut runs opposite the sketch normal by
+    default (IFeatureManager.FeatureCut4 remarks), so the caller reverses the
+    cut only when the normal points into the strap.
 
     The seat depth must dimension from the face the drill enters. A sketch on a
     reference plane coincident with that face displays its blind depth from
@@ -142,16 +147,25 @@ def _open_flank_sketch(
     sketch = _early_bound(active, "ISketch")
     math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    point = math_util.CreatePoint(
-        VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [v / 1000.0 for v in point_mm])
-    )
-    mapped = _early_bound(
-        _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
-    )
-    u, v, w = (c * 1000.0 for c in mapped.ArrayData)
+
+    def to_sketch(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
+        point = math_util.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
+            )
+        )
+        mapped = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+        )
+        return tuple(c * 1000.0 for c in mapped.ArrayData)
+
+    u, v, w = to_sketch(point_mm)
     if abs(w) > 1e-4:
         raise RuntimeError(f"pin seat centre is {w:g} mm off the flank sketch")
-    return u, v
+    w_out = to_sketch((point_mm[0] - 1.0, point_mm[1], point_mm[2]))[2]
+    if abs(abs(w_out) - 1.0) > 1e-4:
+        raise RuntimeError(f"flank sketch normal is not along X (w {w_out:g})")
+    return u, v, w_out > 0.0
 
 
 PART_NAME = "pinion-bracket"
@@ -342,7 +356,9 @@ async def build(adapter) -> dict[str, str]:
     com_before = res.data.center_of_mass
     com_before_x = com_before[0] * 1000.0 if com_before is not None else None
     seat = SketchDims()
-    u, v = _open_flank_sketch(adapter, (-R_END, -PIN_DROP, THICKNESS / 2.0))
+    u, v, normal_out = _open_flank_sketch(
+        adapter, (-R_END, -PIN_DROP, THICKNESS / 2.0)
+    )
     # The face's sketch axes may carry model z or model y; name and drive each
     # unsigned centre offset by the model axis it measures.
     if abs(abs(u) - THICKNESS / 2.0) < 1e-4 and abs(abs(v) - abs(PIN_DROP)) < 1e-4:
@@ -372,7 +388,9 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch pin seat", await adapter.exit_sketch())
     name_last_feature(adapter, "PinSeatProfile")
     drive_jobs += seat.apply(adapter, "PinSeatProfile")
-    cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=PIN_SEAT))
+    cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=PIN_SEAT, reverse_direction=not normal_out)
+    )
     if not cut.is_success:
         raise RuntimeError(f"pin seat cut failed: {cut.error}")
     res = await adapter.get_mass_properties()
@@ -454,9 +472,11 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(
         adapter,
         (
+            # name_bore_axis's offset planes: the arbor's Top + C2C, then the
+            # pin seat's Front + mid-thickness and Top + seat height.
+            ("Plane1", "PLANE"),
             ("Plane2", "PLANE"),
             ("Plane3", "PLANE"),
-            ("Plane4", "PLANE"),
             (pivot_axis, "AXIS"),
             (arbor_axis, "AXIS"),
             (pin_seat_axis, "AXIS"),
