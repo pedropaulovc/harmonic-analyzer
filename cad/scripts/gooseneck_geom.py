@@ -41,7 +41,11 @@ SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The former Ø10 head left only 0.2502 mm nominal radial overlap. Ø12 gives
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
 # clearance against this head and the arm end.
-SCREW_HEAD_T = 2.0  # head thickness (low)
+# 2.8 leaves a 2.0 mm web under the 0.8 mm slot (user ruling: machined webs
+# 2 mm target, 1.5 floor; the 2.0 head left 1.2). The underside (HEAD_X, the
+# clamp face) is unchanged; only the slotted end face moves outboard, 1.69 mm
+# clear of the counter spring's raised half-turn (1.92 with the 2.0 head).
+SCREW_HEAD_T = 2.8
 # Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
 # radial gap). The drawing does not assume stock-ID accuracy: it match-turns
 # this identified plug to the actual assigned bore for the filler supplier's

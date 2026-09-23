@@ -44,14 +44,15 @@ for _partition in (
         DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
 
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
-# them and the drawing verifies readback. The calibration-critical 50.80 arm
-# reach prints to two places; routine formed length/radius print to one, and
-# so do the screw's under-head length (the through thread adjusts it) and
-# the plug length (thread engagement, not a fit).
+# them and the drawing verifies readback. Formed lengths and radii print to one
+# place: the arm run enters the counter moment about 1:1, so +/-0.8 on it is
+# about +/-1% of moment against the purchased spring's +/-10%, which setup
+# re-tensions anyway. So do the screw's under-head length (the through thread
+# adjusts it) and the plug length (thread engagement, not a fit).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
-    "BendPath": {"BendRadius": 1, "ArmRun": 2},
+    "BendPath": {"BendRadius": 1, "ArmRun": 1},
     "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 1},
     "ScrewProfile": {
         "ScrewShankDia": 3,
