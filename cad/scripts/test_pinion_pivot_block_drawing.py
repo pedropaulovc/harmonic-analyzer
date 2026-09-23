@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pinion_pivot_block_spec
@@ -73,7 +74,7 @@ def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> 
     assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
-    assert "BA" not in notes
+    assert not re.search(r"\bBA\b", notes)
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -132,3 +133,22 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2  # the book uses two blocks
+
+
+def test_notes_stay_within_policy_and_carry_the_assembly_transfer() -> None:
+    notes = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
+    assert len(notes) <= 4  # policy rule 6
+    assert "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY." in notes
+    assert not any("FINISH" in line for line in notes)  # the title block owns it
+
+
+def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
+    from _buildgraph import module_deps_of
+
+    for script in ("build_drive_train_assembly.py", "build_harmonic_base.py"):
+        deps = {
+            Path(path).name for path in module_deps_of(Path(__file__).with_name(script))
+        }
+        assert "pinion_pivot_block_geometry.py" in deps, script
+        assert "pinion_pivot_block_spec.py" not in deps, script
+        assert "build_pinion_pivot_block.py" not in deps, script

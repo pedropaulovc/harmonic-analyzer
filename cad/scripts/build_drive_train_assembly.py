@@ -768,7 +768,7 @@ from pinion_bracket_geometry import (  # noqa: E402
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
 )
-from build_pinion_pivot_block import (  # noqa: E402
+from pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
     BLOCK_EAST,
     BLOCK_HEIGHT,
@@ -778,7 +778,7 @@ from build_pinion_pivot_block import (  # noqa: E402
     LIFT_BORE_SPACING,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
 )
-from pinion_pivot_block_spec import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
+from pinion_pivot_block_geometry import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
     CAM_LEN,

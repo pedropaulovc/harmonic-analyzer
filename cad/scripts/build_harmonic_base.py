@@ -130,7 +130,7 @@ from build_lag_screw import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
-from pinion_pivot_block_spec import BLOCK_HEIGHT
+from pinion_pivot_block_geometry import BLOCK_HEIGHT
 from pinion_spring_geometry import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
