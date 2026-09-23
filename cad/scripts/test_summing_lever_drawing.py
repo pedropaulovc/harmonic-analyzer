@@ -246,3 +246,71 @@ def test_reference_gate_rejects_a_diameter_line_off_the_cylinder_face() -> None:
     problems, _worst = build._reference_misses(_cylinder_points(1e-5), *claims)
     assert sum("mm off pivot-cylinder face" in problem for problem in problems) == 2
     assert problems[-1] == "no point lands on the pivot-cylinder face"
+
+
+def _slab_sources(source: str) -> dict[str, tuple[str, str]]:
+    """Per plate-arm builder: (extrusion depth, equation driving that depth).
+
+    Read from the build script's AST, so the guard runs offline and keys no
+    part: the extrusion's ``depth=`` expression and the global its depth
+    dimension is driven by (the ``drive_jobs.append((name, expr))`` call).
+    """
+    import ast
+
+    found: dict[str, tuple[str, str]] = {}
+    for node in ast.walk(ast.parse(source)):
+        if not (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name in ("_coefficients_plate", "_summation_plate")
+        ):
+            continue
+        depth = drive = ""
+        for call in (n for n in ast.walk(node) if isinstance(n, ast.Call)):
+            if getattr(call.func, "id", "") == "ExtrusionParameters":
+                depth = next(
+                    ast.unparse(k.value) for k in call.keywords if k.arg == "depth"
+                )
+            if getattr(call.func, "attr", "") == "append" and call.args:
+                pair = call.args[0]
+                # The depth dimension's own drive: (<arm>_depth[0], "<global>").
+                if (
+                    isinstance(pair, ast.Tuple)
+                    and ast.unparse(pair.elts[0]).endswith("_depth[0]")
+                    and isinstance(pair.elts[1], ast.Constant)
+                ):
+                    drive = pair.elts[1].value
+        found[node.name] = (depth, drive)
+    return found
+
+
+def _is_one_slab(sources: dict[str, tuple[str, str]]) -> bool:
+    return set(sources.values()) == {("PLATE_T", '"PlateT"')} and len(sources) == 2
+
+
+def test_plate_and_web_are_one_slab_by_construction() -> None:
+    """The print's "PLATE AND WEB" 5.08 governs both arms.
+
+    Both are mid-plane Top-plane extrusions whose depth is PLATE_T and whose
+    depth dimension is driven by the one "PlateT" global; splitting either
+    would let the web's thickness drift away from the only 5.08 printed.
+    """
+    import inspect
+
+    import build_summing_lever as build
+
+    source = inspect.getsource(build)
+    assert _slab_sources(source) == {
+        "_coefficients_plate": ("PLATE_T", '"PlateT"'),
+        "_summation_plate": ("PLATE_T", '"PlateT"'),
+    }
+    assert _is_one_slab(_slab_sources(source))
+    # Negative controls: a split global, and a web built to its own depth.
+    split = source.replace(
+        """web_depth[0], '"PlateT"'""", """web_depth[0], '"WebT"'"""
+    )
+    assert split != source and not _is_one_slab(_slab_sources(split))
+    body = inspect.getsource(build._summation_plate)
+    own_depth = source.replace(
+        body, body.replace("depth=PLATE_T", "depth=WEB_T")
+    )
+    assert own_depth != source and not _is_one_slab(_slab_sources(own_depth))
