@@ -8,8 +8,10 @@ model.
 
 The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
-west-edge lock notch and four rounded plan corners.  The three plan views and
-pivot section run 1:2; the isometric runs 1:3.
+west-edge lock notch, four rounded plan corners and the counterbored slot
+for the tip block's hidden hold-down screw (U30).  The three plan views run
+1:2, pivot section A-A 2:1, slot detail B and slot section C-C 1:1, and the
+isometric 1:3.
 
 Run with SolidWorks open::
 
@@ -63,7 +65,9 @@ from cone_swing_platform_spec import (
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
+    TIP_CBORE_W,
     TIP_SCREW_LOCAL_Z,
+    TIP_SLOT_W,
 )
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
@@ -709,7 +713,11 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         detail_annotations,
-        {"TipSlotW": "SLOT THRU", "TipCboreW": "C'BORE SLOT\nFROM UNDERSIDE"},
+        # The +0.10/0 width band is the cutter's own size: name the cutter.
+        {
+            "TipSlotW": f"\u00d8{TIP_SLOT_W:g} END MILL\nSLOT THRU",
+            "TipCboreW": f"\u00d8{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\nFROM UNDERSIDE",
+        },
     )
     slot_section_annotations = curate_view_dimensions(
         adapter,
