@@ -126,6 +126,14 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "WHOLE DEPTH" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
         assert f"{part.BACKLASH_MM[0]:.2f} TO {part.BACKLASH_MM[1]:.2f}" in data
+        # The operating mesh is not a reference-centre-distance mesh; say so
+        # beside the mate, and say where the view's thickness is measured.
+        assert (
+            "OPERATING MESH:  PARTIAL DEPTH ON INCLINED AXES; "
+            "CENTRE DISTANCE FROM ASSEMBLY"
+        ) in data
+        assert "TOOTH THICKNESS IN VIEW:  ARC LENGTH AT PITCH DIAMETER" in data
+        assert len(data.splitlines()) * 0.00315 <= drawing.GEAR_DATA_HEIGHT
         # These values are native imported dimensions, never parallel typed rows.
         for duplicate in (
             "OUTSIDE DIAMETER",
@@ -205,10 +213,28 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_face
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
         assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
-        # The largest side view's face-width dimension must stay below the
-        # multi-line Gear Data note; the native layout audit missed this text
-        # collision on T084 and T108-T120.
-        assert right["FaceWidth"][1] < drawing.GEAR_DATA_POS[1] - 0.040
+        # Third-angle projection: the side view shares the front bore axis.
+        assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+        # The Gear Data block clears the largest side view, and the face-width
+        # dimension hangs BELOW the side view -- the native layout audit
+        # missed the text collision this replaced on T084 and T108-T120.
+        assert (
+            drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
+            > drawing.RIGHT_CENTER[1] + half_od + 0.008
+        )
+        assert right["FaceWidth"][1] < drawing.RIGHT_CENTER[1] - half_od - 0.008
+        # Thickness text (~65 mm callout centred on its x) sits below the gear,
+        # left of the side view and its face-width dimension.
+        ctt_x, ctt_y = front["ToothThickness"]
+        assert ctt_y < drawing.FRONT_CENTER[1] - half_od - 0.015
+        assert ctt_x + 0.0325 < drawing.RIGHT_CENTER[0] - half_face - 0.020
+        assert ctt_x - 0.0325 > front["BoreCutDia"][0] + 0.0165 + 0.010
+        # The bore finish sits above-left of the gear, inside the border and
+        # below the manufacturing notes.
+        (edge_x, edge_y), (symbol_x, symbol_y) = drawing.bore_finish_xy(teeth)
+        assert edge_x < drawing.FRONT_CENTER[0] and edge_y > drawing.FRONT_CENTER[1]
+        assert 0.015 < symbol_x < drawing.FRONT_CENTER[0] - half_od * 0.7
+        assert drawing.FRONT_CENTER[1] + half_od * 0.7 < symbol_y < 0.225
         assert front["BoreCutDia"][0] < drawing.FRONT_CENTER[0] - half_od
         assert front["BoreCutDia"][0] == pytest.approx(
             drawing.BORE_CALLOUT_LANE_X

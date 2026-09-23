@@ -103,9 +103,13 @@ def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
 
 
 # Part PMI is authored while the default T120 configuration is active.  Drawing
-# sheets call ``bore_surface_finish`` with their own tooth count so native face
-# validation follows each configured bore.
+# sheets select their own configuration's control from
+# ``BORE_SURFACE_FINISHES`` so native face validation follows each configured
+# bore, and the drawing-purity gate sees a part-spec-sourced control.
 SURFACE_FINISHES = (bore_surface_finish(TEETH),)
+BORE_SURFACE_FINISHES: dict[int, SurfaceFinishControl] = {
+    teeth: bore_surface_finish(teeth) for teeth in CONFIGURATION_TEETH
+}
 
 # The three blank sizes and the tooth-system acceptance size.  ToothThickness
 # is a DRIVING dimension in a construction-only authoring sketch: policy rule 2

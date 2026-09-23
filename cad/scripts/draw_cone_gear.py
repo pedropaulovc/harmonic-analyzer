@@ -10,7 +10,11 @@ and gear-mesh fits; this drawing only arranges and verifies them.
 There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these plain through-bored spur gears, so all
 three views remain hidden-lines-removed.  The one finish symbol belongs to the
-fitted bore.  The approved attachment note permits solder/silver-braze or
+fitted bore.  The side view stays in projection with the front view's bore
+axis; its face width hangs below it, clear of the Gear Data block.  The
+circular tooth thickness is dimensioned on the +X tooth's pitch chord (a tooth
+on every configuration), and the part's construction witness sketch is hidden
+in the side and isometric views, where it carries no dimension.  The approved attachment note permits solder/silver-braze or
 Loctite 638/648 and adds no key, pin, set screw, or hub.
 """
 
@@ -24,6 +28,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
+    _model_item_paths,
+    _select_model_feature,
     DrawingOutputs,
     add_note,
     add_property_linked_note,
@@ -47,13 +53,13 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_cone_gear import assert_saved_configuration_topology
 from cone_gear_spec import (
+    BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
     MODULE_MM,
     bore_dia_mm,
-    bore_surface_finish,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -102,10 +108,18 @@ SHEET_SCALES = {
 SHEET_SCALE = SHEET_SCALES[SHEET_NAMES[0]]
 
 FRONT_CENTER = (0.105, 0.150)
-RIGHT_CENTER = (0.245, 0.140)
+# Projection-aligned with the front view's bore axis (codex, 2026-09-23: the
+# 0.140 offset that cleared FaceWidth from Gear Data broke the alignment).
+RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 BORE_CALLOUT_LANE_X = 0.045
-GEAR_DATA_POS = (0.215, 0.247)
+# Top-aligned with the manufacturing notes: the 15-line block (header + 14
+# rows, ~3.15 mm pitch measured on the 13-line render) ends ~0.048 below its
+# top, above the largest side view (top 0.197) with FaceWidth below it.
+GEAR_DATA_POS = (0.215, 0.263)
+# Rendered height of the Gear Data block, for the layout test.
+GEAR_DATA_HEIGHT = 0.048
+TOOTH_REFERENCE_SKETCH = "ToothThicknessReference"
 MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
 
@@ -142,20 +156,71 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
             BORE_CALLOUT_LANE_X,
             FRONT_CENTER[1] - half_od - 0.012,
         ),
+        # Vertical dimension on the +X tooth: its line stands at the text x,
+        # just right of the tip circle, and runs down to the text below the
+        # gear's lowest point (the ~65 mm callout stays left of the side view).
         "ToothThickness": (
-            FRONT_CENTER[0] + half_od + 0.035,
+            FRONT_CENTER[0] + half_od + 0.012,
             FRONT_CENTER[1] - half_od - 0.025,
         ),
     }
+
+
+def bore_finish_xy(teeth: int) -> tuple[tuple[float, float], tuple[float, float]]:
+    """(bore edge pick, symbol anchor) for the upper-left bore finish.
+
+    The +X tooth carries the thickness witness and the bore callout's
+    diametric line runs lower-left to upper-right, so the finish leader lands
+    on the bore's 135 deg point from a symbol above-left of the gear.
+    """
+    numerator, denominator = _SCALE_BY_TEETH[teeth]
+    bore_radius = bore_dia_mm(teeth) * numerator / (denominator * 2000.0)
+    half_od = rendered_half_od(teeth)
+    diagonal = 0.5 ** 0.5
+    edge = (
+        FRONT_CENTER[0] - bore_radius * diagonal,
+        FRONT_CENTER[1] + bore_radius * diagonal,
+    )
+    symbol = (
+        FRONT_CENTER[0] - half_od * diagonal - 0.030,
+        FRONT_CENTER[1] + half_od * diagonal + 0.006,
+    )
+    return edge, symbol
 
 
 def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
     return {
         "FaceWidth": (
             RIGHT_CENTER[0],
-            RIGHT_CENTER[1] + rendered_half_od(teeth) + 0.012,
+            RIGHT_CENTER[1] - rendered_half_od(teeth) - 0.012,
         )
     }
+
+
+def _hide_reference_sketch(adapter: Any, view: Any, label: str) -> None:
+    """Hide the part's thickness-witness sketch in one drawing view only.
+
+    ``IModelDoc2::BlankSketch`` on a sketch selected through a view
+    (``"<sketch>@<component>@<view>"``) hides it in that view -- the SOLIDWORKS
+    "Reset Visibility of Sketches in Drawing View" example.  Blanking it in the
+    part instead would also hide it in the front view, whose thickness
+    dimension it owns.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"{label}: failed to activate {name!r}")
+    draw.ClearSelection2(True)
+    selected = _select_model_feature(
+        adapter, TOOTH_REFERENCE_SKETCH, paths=_model_item_paths(adapter, view)
+    )
+    if not selected.startswith("SKETCH"):
+        draw.ClearSelection2(True)
+        raise RuntimeError(f"{label}: witness resolved as {selected!r}, not a sketch")
+    draw.BlankSketch()
+    draw.ClearSelection2(True)
+    _telemetry.debug(f"{label}: hid {TOOTH_REFERENCE_SKETCH} ({selected})")
 
 
 def _configure_views(
@@ -324,6 +389,8 @@ async def build(adapter: Any) -> dict[str, str]:
         for view in views:
             set_hidden_lines_removed(adapter, view)
         _assert_tooth_geometry(front, configuration, teeth)
+        _hide_reference_sketch(adapter, right, f"{configuration} side witness")
+        _hide_reference_sketch(adapter, iso, f"{configuration} iso witness")
 
         front_annotations = _curate_repeated_dimensions(
             adapter,
@@ -343,18 +410,13 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, front, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center mark on {configuration}")
 
-        numerator, denominator = view_scale
-        bore_radius = bore_dia_mm(teeth) * numerator / (denominator * 2000.0)
-        half_od = rendered_half_od(teeth)
+        finish_edge, finish_symbol = bore_finish_xy(teeth)
         add_surface_finish(
             adapter,
             front,
-            edge_xy=(FRONT_CENTER[0] + bore_radius, FRONT_CENTER[1]),
-            symbol_xy=(
-                FRONT_CENTER[0] + half_od + 0.015,
-                FRONT_CENTER[1],
-            ),
-            control=bore_surface_finish(teeth),
+            edge_xy=finish_edge,
+            symbol_xy=finish_symbol,
+            control=BORE_SURFACE_FINISHES[teeth],
             label=f"{configuration} cone-gear bore finish",
             char_height=0.0025,
         )
