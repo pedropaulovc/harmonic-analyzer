@@ -132,6 +132,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_handle_pivot_screw",
+        part="crank_handle_pivot_screw",
+        artifact_stem="crank-handle-pivot-screw",
+        script_name="draw_crank_handle_pivot_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="rocker_arm_support",
         part="rocker_arm_support",
         artifact_stem="rocker-arm-support",

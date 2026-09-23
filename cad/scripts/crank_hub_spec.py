@@ -18,6 +18,8 @@ from crank_hub_geometry import (
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
+    seam_callout,
+    seat_callout,
 )
 
 
@@ -56,16 +58,15 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked crank-hub dimension needs authored places")
 
+# The printed band governs the bore; the shaft clearance it yields is a
+# reference restatement.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"{SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL CLEARANCE "
-    "ON MHA-026"
+    f"({SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL CLEARANCE "
+    "ON MHA-026)"
 )
-SEAT_CALLOUT = (
-    "MATCH-FIT TO ASSIGNED MHA-020 BORE\n"
-    "LIGHT ARBOR-PRESS TO SHOULDER;\n"
-    "NO TURN OR SLIDE BY HAND"
-)
+SEAT_CALLOUT = seat_callout("MHA-020 ARM")
+SEAM_CALLOUT = seam_callout("MHA-020")
 # The cross-hole is taper-reamed through hub and shaft together; the wording
 # matches the crankshaft MHA-026 callout for the same operation.
 CROSS_HOLE_CALLOUT = (
@@ -74,14 +75,7 @@ CROSS_HOLE_CALLOUT = (
     "TO TAPER PIN MHA-024:\n"
     "LIGHT DRIVE FIT"
 )
-# Policy rule 6: at most four short lines, each under ~70 characters so the
-# block stays left of the title block.  The cross-hole operation lives on its
-# callout, and MHA-138's own drawing says how the pin is driven.  The U29 hub
-# leaves a 2-mm seam web at the printed bands, so no matched wall check.
-DRAWING_NOTES = "\n".join(
-    (
-        "MATCHED ASSEMBLY WITH MHA-020 ARM: SHOULDER SEATED, FACES FLUSH.",
-        "AT SIX O'CLOCK MATCH-REAM SEAM WITH MHA-020 TO MHA-138: LIGHT DRIVE FIT.",
-    )
-)
+# No general notes (policy rule 6): the seat fit, the seam and the cross-hole
+# each carry their requirement on their own callout, and the U29 hub leaves a
+# 2-mm seam web at the printed bands, so no matched wall check.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

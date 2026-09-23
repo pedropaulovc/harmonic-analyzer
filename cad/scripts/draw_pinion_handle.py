@@ -20,7 +20,6 @@ import sys
 from typing import Any
 
 import _telemetry
-from _config import title_block
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -42,8 +41,6 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
-from pinion_arbor_spec import SHAFT_DIA as ARBOR_DIA
-from pinion_arbor_spec import SHAFT_DIA_BAND as ARBOR_DIA_BAND
 from pinion_handle_spec import (
     CAP_SAG,
     DRAWING_PRECISION_BY_NAME,
@@ -55,6 +52,7 @@ from pinion_handle_spec import (
     TUBE_LEN,
     TUBE_OD,
     WALL_T,
+    socket_clearance_callout,
 )
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
@@ -121,20 +119,8 @@ ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
-_HOLE_TOLERANCE = title_block("drilled_hole")
-_SOCKET_CLEARANCE_MIN = (
-    TUBE_ID + float(_HOLE_TOLERANCE["minus_mm"])
-) - (ARBOR_DIA + ARBOR_DIA_BAND[0])
-_SOCKET_CLEARANCE_MAX = (
-    TUBE_ID + float(_HOLE_TOLERANCE["plus_mm"])
-) - (ARBOR_DIA + ARBOR_DIA_BAND[1])
-if _SOCKET_CLEARANCE_MIN < 0.0:
-    raise AssertionError("title-block socket range interferes with the arbor")
 DIMENSION_CALLOUTS = {
-    "TubeId": (
-        f"REAM FOR {_SOCKET_CLEARANCE_MIN:.2f}-{_SOCKET_CLEARANCE_MAX:.2f}\n"
-        "DIAMETRAL CLEARANCE ON\nPINION ARBOR MHA-102"
-    ),
+    "TubeId": socket_clearance_callout(),
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
     "RetentionHoleDia": RETENTION_HOLE_CALLOUT,

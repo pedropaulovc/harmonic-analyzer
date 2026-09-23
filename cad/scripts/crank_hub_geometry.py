@@ -93,6 +93,29 @@ HUB_SEAT_DIA_MAX_GENERAL = HUB_SEAT_DIA + GENERAL_1PL_TOL_MM
 HUB_BORE_DIA_MAX = HUB_BORE_DIA + HUB_BORE_BAND[0]
 
 
+def seat_callout(mate: str) -> str:
+    """Matched hub-seat fit and its acceptance, for the seat on either part."""
+    return "\n".join(
+        (
+            f"MATCH-FIT TO {mate}",
+            "LIGHT ARBOR-PRESS TO SHOULDER",
+            "FACES FLUSH",
+            "NO TURN OR SLIDE BY HAND",
+        )
+    )
+
+
+def seam_callout(mate: str) -> str:
+    """MHA-138 seam, match-drilled with ``mate``: nominal pin size and depth."""
+    return "\n".join(
+        (
+            f"MATCH-DRILL/REAM WITH {mate}",
+            "FOR MHA-138: LIGHT DRIVE FIT",
+            f"<MOD-DIAM>{AXIAL_PIN_DIA:.1f} <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
+        )
+    )
+
+
 def wall_after_edge_break(outer_dia: float, inner_dia: float) -> float:
     """Return the finished radial wall between two diameters after edge breaks."""
     return (outer_dia - inner_dia) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM

@@ -10,6 +10,7 @@ drawing keeps in lockstep (``test_pinion_handle_drawing.py``).
 
 from __future__ import annotations
 
+import _config
 from pinion_handle_geometry import (
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
@@ -112,6 +113,31 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # The handle and arbor rotate together. This static socket is not a running
 # bearing, so it has no local roughness requirement under the simplicity policy.
 SURFACE_FINISHES = ()
+
+# The socket bore takes the title-block drilled-hole band; the arbor clearance
+# it yields is spec-owned callout text, so the sheet never formats places.
+def socket_clearance_callout() -> str:
+    """Socket-bore callout with its diametral clearance on the MHA-102 arbor.
+
+    A function because pinion_arbor_spec imports this module: the arbor's
+    band is read once both are initialised.
+    """
+    from pinion_arbor_spec import SHAFT_DIA as arbor_dia
+    from pinion_arbor_spec import SHAFT_DIA_BAND as arbor_band
+
+    hole = _config.title_block("drilled_hole")
+    clearance_min = (TUBE_ID + float(hole["minus_mm"])) - (arbor_dia + arbor_band[0])
+    clearance_max = (TUBE_ID + float(hole["plus_mm"])) - (arbor_dia + arbor_band[1])
+    if clearance_min < 0.0:
+        raise AssertionError("title-block socket range interferes with the arbor")
+    return "\n".join(
+        (
+            f"REAM FOR {clearance_min:.2f}-{clearance_max:.2f}",
+            "DIAMETRAL CLEARANCE ON",
+            "PINION ARBOR MHA-102",
+        )
+    )
+
 
 RETENTION_HOLE_CALLOUT = (
     "MATCH-DRILL WITH PINION ARBOR MHA-102\n"

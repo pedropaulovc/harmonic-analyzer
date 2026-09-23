@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import math
 
-from _hole_spec import HoleSpec
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
 from crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
@@ -38,14 +38,28 @@ from crank_hub_geometry import (
     AXIAL_PIN_RADIUS_FROM_AXIS,
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
+    GENERAL_1PL_TOL_MM,
     HUB_SEAT_DIA,
+    WALL_TARGET_MM,
+    seam_callout,
+    seat_callout,
 )
 
 
 # --- Nominal geometry -------------------------------------------------------
 ARM_C2C = 75.0
 SQUARE_END_OVERHANG = 10.0
-HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
+# U33: the MHA-139 slotted shoulder screw threads through the arm and carries
+# the handle.  Its tapped web to the square end is judged at the .X worst case
+# of both stations (U27).
+HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", "#10-24")
+_PIVOT_THREAD_R = THREAD_MAJOR_MM[HANDLE_PIVOT_HOLE_SPEC.size] / 2.0
+PIVOT_END_WEB_NOMINAL = SQUARE_END_OVERHANG - _PIVOT_THREAD_R
+PIVOT_END_WEB_WORST = PIVOT_END_WEB_NOMINAL - 2.0 * GENERAL_1PL_TOL_MM
+if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
+    raise AssertionError(
+        f"handle-pivot thread leaves {PIVOT_END_WEB_WORST:.2f} mm to the arm end"
+    )
 
 # The axial MHA-138 groove is match-drilled in the assembled arm/hub.  Its
 # centre rides the hub-seat interface at six o'clock (toward the hanging handle);
@@ -137,14 +151,16 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # dimension to import. Its places are still specification, so the sheet
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
+# Native hole-callout depth fields have no model dimension to carry places
+# either; the blind anchor tap's two depths print at .X like every length.
+HOLE_CALLOUT_PRECISION: dict[str, dict[str, int]] = {
+    "anchor tap": {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
+}
 
-# Three short lines: the callout is centred under the diameter, so its widest
-# line sets how close to the left border the hub-end dimension can stand.
-HUB_SEAT_CALLOUT = (
-    "MATCH-FIT TO ASSIGNED MHA-137 HUB\n"
-    "LIGHT ARBOR-PRESS TO SHOULDER;\n"
-    "NO TURN OR SLIDE BY HAND"
-)
+# Short lines: the callout is centred under the diameter, so its widest line
+# sets how close to the left border the hub-end dimension can stand.  The
+# matched fit's acceptance lives here, on the feature (policy rule 6).
+HUB_SEAT_CALLOUT = seat_callout("MHA-137 HUB")
 # Policy rule 6: at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
@@ -153,8 +169,9 @@ DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
         "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED.",
-        "MATCHED ASSEMBLY WITH MHA-137 HUB: SHOULDER SEATED, FACES FLUSH.",
-        "AT SIX O'CLOCK MATCH-REAM AXIAL SEAM WITH MHA-137 FOR MHA-138.",
     )
 )
+# The MHA-138 seam is match-drilled with the hub at assembly; its callout sits
+# on the seam itself (policy rule 6) with the pin's nominal size and depth.
+SEAM_CALLOUT = seam_callout("MHA-137")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

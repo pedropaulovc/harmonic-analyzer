@@ -11,6 +11,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_view_centerline,
@@ -26,6 +27,8 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm, drill_process
 from crank_hub_spec import (
+    AXIAL_PIN_DIA,
+    AXIAL_PIN_RADIUS_FROM_AXIS,
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -34,6 +37,7 @@ from crank_hub_spec import (
     HUB_LENGTH,
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
+    SEAM_CALLOUT,
     SEAT_CALLOUT,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
@@ -102,9 +106,18 @@ BARREL_FACE_PICK = (INBOARD_X + 0.008, SIDE_CENTER[1] + 0.015)
 #   profile and the end view, its value and matched-fit callout above.
 # - Cross-hole callout: above the barrel, its leader rising almost straight
 #   from the hole's top rim, clear of the barrel diameter's extension lines.
-# - Bore callout: below the end view.
+# - Bore callout: below and right of the end view; the MHA-138 seam callout
+#   below and left of it, its short leader rising to the six-o'clock seam.
 _ROW_Y = (0.120, 0.108, 0.096)
-END_KEEP = {"BoreDia": (END_CENTER[0], 0.105)}
+END_KEEP = {"BoreDia": (END_CENTER[0] + 0.055, 0.105)}
+# The hub's half of the seam is the arc bulging from the seat edge toward the
+# bore; the callout attaches 45 degrees up its right flank.
+SEAM_CENTER = (END_CENTER[0], END_CENTER[1] - AXIAL_PIN_RADIUS_FROM_AXIS * _S)
+SEAM_EDGE_PICK = (
+    SEAM_CENTER[0] + AXIAL_PIN_DIA / 2.0 * _S * math.cos(math.pi / 4.0),
+    SEAM_CENTER[1] + AXIAL_PIN_DIA / 2.0 * _S * math.sin(math.pi / 4.0),
+)
+SEAM_CALLOUT_XY = (0.228, 0.128)
 SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
     "ServicePinStation": ((OUTBOARD_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[1]),
@@ -134,7 +147,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -142,7 +154,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -212,7 +223,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-024 hub pilot",
         process=f"{CROSS_HOLE_CALLOUT}\n{drill_process(SERVICE_PIN_HOLE_SPEC)}",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.070)
+    add_attached_note(
+        adapter,
+        front,
+        text=SEAM_CALLOUT,
+        entity_xy=SEAM_EDGE_PICK,
+        note_xy=SEAM_CALLOUT_XY,
+        label="MHA-138 seam callout",
+    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
