@@ -177,21 +177,26 @@ def _attach_radial_leaders(
 # locate them: nothing told the reader those stations are the rib's own apexes
 # (on its mid-plane, inside the boss and the plate), so the visible ends -- the
 # flanks running out into web and plate -- looked unlocated.  Name them where
-# they print.  (dimension, callout part, text): 3 = swDimensionTextCalloutAbove,
-# 4 = swDimensionTextCalloutBelow.
-MID_RIB_CALLOUTS = (
+# they print.  Fable R14b then could not tell the two R15.2 callouts apart (the
+# mid rib's and the end ribs', one outline in the front view), and the plate's
+# 5.08 now governs the web as well.  (dimension, callout part, text):
+# 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow.
+DIMENSION_CALLOUTS = (
     ("MidRibRightX", 3, "RIB APEX"),
     ("MidRibLeftX", 3, "RIB APEX"),
     ("MiddleRibThickness", 4, "MID RIB"),
+    ("MidRibArcR", 4, "MID RIB"),
+    ("EdgeRibFrontArcR", 4, "END RIBS"),
+    ("PlateThickness", 4, "PLATE AND WEB"),
 )
 
 
-def _label_mid_rib(
+def _label_dimensions(
     adapter: Any, annotations: Any, names: tuple[str, ...], label: str
 ) -> None:
-    """Write and read back the mid-rib callouts on the named dimensions."""
+    """Write and read back the callouts on the named dimensions."""
     wanted = {
-        name: (part, text) for name, part, text in MID_RIB_CALLOUTS if name in names
+        name: (part, text) for name, part, text in DIMENSION_CALLOUTS if name in names
     }
     seen = set()
     for annotation in annotations:
@@ -208,7 +213,7 @@ def _label_mid_rib(
         seen.add(name)
     missing = sorted(set(wanted) - seen)
     if missing:
-        raise RuntimeError(f"{label}: no mid-rib dimension named {missing!r}")
+        raise RuntimeError(f"{label}: no callout dimension named {missing!r}")
 
 
 def _assert_arc_centre_text(
@@ -240,18 +245,17 @@ def _assert_arc_centre_text(
 
 
 FORM_FRONT_KEEP = {
-    # Upper left, so the diameter line crosses the collar clear of the R15.2 leader
-    # that drops onto the top of the same circle.
-    "CylDia": (0.1425, 0.2470),
     "AnchorHeight": (0.0980, 0.2300),
-    "WebThickness": (0.1080, 0.2130),
-    "MidRibArcR": (0.1700, 0.2420),
-    # Past its own arrows: between them the witness lines ruled through the text.
-    "PlateThickness": (0.2050, 0.2330),
-    # Both carry "RIB APEX" above the value (MID_RIB_CALLOUTS).  35.8 sits past
+    # "MID RIB" below: 2 mm right of R14b so the label clears its own leader.
+    "MidRibArcR": (0.1720, 0.2420),
+    # Past its own arrows (between them the witness lines ruled through the
+    # text), below the plate so "PLATE AND WEB" clears the note block.
+    "PlateThickness": (0.2050, 0.2120),
+    # Both carry "RIB APEX" above the value (DIMENSION_CALLOUTS).  35.8 sits past
     # its +X witness so that label clears the shared cylinder-axis witness.
-    "MidRibRightX": (0.1413, 0.1960),
-    "MidRibLeftX": (0.1943, 0.1960),
+    # 3 mm lower than R14b: room for "END RIBS" under the 2X R15.2 above.
+    "MidRibRightX": (0.1413, 0.1930),
+    "MidRibLeftX": (0.1943, 0.1930),
     # Lower left, onto the edge rib's own (-X) semicircle, above the 76.2 / 35.75
     # chain: from the lower right its leader crossed the 35.75 dimension line.
     "EdgeRibFrontArcR": (0.1350, 0.2080),
@@ -281,14 +285,17 @@ FORM_TOP_KEEP = {
     "SummationArcCentreX": (0.1295, 0.1833),
     "SummationArcCentreZ": (0.2029, 0.1591),
     "BossAxialLocation": (0.0900, 0.0860),
+    # In the clear web field left of the tube, level with its construction line
+    # (build_summing_lever.CYLINDER_REFERENCE_Z), so the dimension line spans
+    # the silhouette with no witness lines.
+    "CylRefDia": (0.1414, 0.1124),
 }
 DETAIL_KEEP = {
     "HexWidth": (0.330, 0.113),
     "HexHeight": (0.378, 0.155),
-    # 0.0634 from the drawn detail centre against a 0.0468 fence radius: the
-    # text box clears the fence entirely, so only its extension lines cross
-    # geometry and SolidWorks jogs the leader instead of ruling it through text.
-    "HexKnifeFrontSideFlat": (0.280, 0.1770),
+    # On the +X flat, inside the 10.27 and short of the R15.2 outline: from the
+    # -X flat its witness lines ran collinear with the 5.08 web edges (Fable R14b).
+    "HexKnifeFrontSideFlat": (0.3577, 0.1550),
 }
 PATTERN_KEEP = {
     "HoleSeedX": (0.190, 0.205),
@@ -726,10 +733,19 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, top_dimensions, ("SummationArcRadius",), "form top"
     )
-    _label_mid_rib(
-        adapter, front_dimensions, ("MidRibRightX", "MidRibLeftX"), "form front"
+    _label_dimensions(
+        adapter,
+        front_dimensions,
+        (
+            "MidRibRightX",
+            "MidRibLeftX",
+            "MidRibArcR",
+            "EdgeRibFrontArcR",
+            "PlateThickness",
+        ),
+        "form front",
     )
-    _label_mid_rib(adapter, top_dimensions, ("MiddleRibThickness",), "form top")
+    _label_dimensions(adapter, top_dimensions, ("MiddleRibThickness",), "form top")
     _assert_arc_centre_text(
         adapter,
         top_dimensions,
@@ -837,7 +853,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    for sketch in ("SummationArcReference", "BossAxialReference"):
+    for sketch in (
+        "SummationArcReference",
+        "BossAxialReference",
+        "CylinderReference",
+    ):
         _hide_view_sketch(adapter, front, sketch)
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
@@ -929,7 +949,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "spring-hole pattern",
     )
     for view in (pattern, iso):
-        for sketch in ("SummationArcReference", "BossAxialReference"):
+        for sketch in (
+            "SummationArcReference",
+            "BossAxialReference",
+            "CylinderReference",
+        ):
             _hide_view_sketch(adapter, view, sketch)
     _hide_view_sketch(adapter, iso, "PatternReferences")
 

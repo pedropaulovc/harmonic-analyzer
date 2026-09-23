@@ -41,11 +41,11 @@ def test_knife_profile_is_the_nonregular_hex_detail_a_states() -> None:
     # A regular hexagon locks A/F and A/C together; ours is 0.28 mm outside it.
     assert abs(across_corners - across_flats * 2.0 / math.sqrt(3.0)) > 0.2
     # _hex_collar's vertex-up hexagon puts its shoulders at +-HEX_H/4, so the
-    # vertical flat HexKnifeFrontSideFlat names is exactly HEX_H/2 -- and not
+    # +X vertical flat HexKnifeFrontSideFlat names is exactly HEX_H/2 -- and not
     # the regular hexagon's side HEX_W/sqrt(3). A flat is half the A/C measure,
     # so the second gap is half the bound above.
     half_width, quarter_height = across_flats / 2.0, across_corners / 4.0
-    flat = math.dist((-half_width, quarter_height), (-half_width, -quarter_height))
+    flat = math.dist((half_width, -quarter_height), (half_width, quarter_height))
     assert math.isclose(flat, across_corners / 2.0, rel_tol=0.0, abs_tol=1e-12)
     assert abs(flat - across_flats / math.sqrt(3.0)) > 0.1
     # ...and the flat must reach the print as a model dimension at its own
@@ -176,6 +176,14 @@ def _arc_points(centre):
     )
 
 
+def _cylinder_points(radius_error: float = 0.0):
+    import build_summing_lever as build
+
+    station = -build.CYLINDER_REFERENCE_Z
+    half = build.CYL_R + radius_error
+    return _top_plane([(-half, station), (half, station)])
+
+
 def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
     """Positive control: the R7 authoring (-HOLE_Z on the Top plane) passes."""
     import build_summing_lever as build
@@ -186,6 +194,7 @@ def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
         ("PatternReferences", _pattern_points(-1.0)),
         ("BossAxialReference", _boss_points()),
         ("SummationArcReference", _arc_points(centre)),
+        ("CylinderReference", _cylinder_points()),
     ):
         problems, worst = build._reference_misses(points, *claims[name])
         assert problems == [], (name, problems)
@@ -226,3 +235,14 @@ def test_reference_gate_refuses_a_brep_missing_a_spring_hole() -> None:
     cylinders, planes, _centre = _synthetic_lever_brep()
     with pytest.raises(RuntimeError, match="expected 20 spring-hole axes"):
         build._reference_claims(cylinders[1:], planes)
+
+
+def test_reference_gate_rejects_a_diameter_line_off_the_cylinder_face() -> None:
+    """Negative control: a CylRefDia line 1e-5 mm off the face at each end."""
+    import build_summing_lever as build
+
+    cylinders, planes, _centre = _synthetic_lever_brep()
+    claims = build._reference_claims(cylinders, planes)["CylinderReference"]
+    problems, _worst = build._reference_misses(_cylinder_points(1e-5), *claims)
+    assert sum("mm off pivot-cylinder face" in problem for problem in problems) == 2
+    assert problems[-1] == "no point lands on the pivot-cylinder face"

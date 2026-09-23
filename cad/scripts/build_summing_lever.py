@@ -193,6 +193,11 @@ REFERENCE_COINCIDENCE_TOL_MM = 1e-6
 # Each arm of the construction cross that marks the R138.8 centre (2.5 mm on
 # the 1:2 sheet).
 CENTRE_CROSS_ARM = 5.0
+# Model Z of the construction line that carries the pivot cylinder's diameter
+# across its top-view silhouette: between the mid rib and the -Z end rib, level
+# with the clear web field the dimension text sits in.  The front view cannot
+# carry it -- the R15.2 rib outline hides the cylinder there (Fable R14b B1).
+CYLINDER_REFERENCE_Z = -15.0
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -451,12 +456,16 @@ async def _hex_collar(
             f"{stem}TopY",
             f"{stem}S0dx",
             f"{stem}S0dy",
-            f"{stem}SideFlat",
+            f"{stem}S1dy",
             f"{stem}S2dx",
             f"{stem}S2dy",
             f"{stem}S3dx",
             f"{stem}S3dy",
-            f"{stem}S4dy",
+            # The +X flat carries the printed side flat: in Detail A the -X
+            # flat's witness lines ran collinear with the 5.08 web edges
+            # (5.13 vs 5.08, 0.025 mm a side), reading as a web thickness
+            # (Fable R14b clarity).
+            f"{stem}SideFlat",
         ],
         drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
@@ -1018,6 +1027,48 @@ async def _drawing_reference_sketches(
     name_last_feature(adapter, "BossAxialReference")
     drive_jobs += boss.apply(adapter, "BossAxialReference")
 
+    # The pivot cylinder's diameter, across its top-view silhouette.  Its own
+    # Front-plane profile dimension could only print in the front view, where
+    # the R15.2 rib outline hides the cylinder: R14b printed a leader onto an
+    # invisible circle, and the reviewer took the Detail A fence for the tube.
+    cylinder = SketchDims()
+    check("create cylinder reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    across = check(
+        "cylinder diameter reference",
+        await adapter.add_line(
+            -CYL_R, -CYLINDER_REFERENCE_Z, CYL_R, -CYLINDER_REFERENCE_Z
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, across)
+    check(
+        "cylinder diameter reference horizontal",
+        await adapter.add_sketch_constraint(across, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{across}.start",
+        f"{across}.end",
+        "horizontal_distance",
+        2.0 * CYL_R,
+        "cylinder diameter reference",
+    )
+    cylinder.record("CylRefDia", '"CylR" * 2')
+    await anchor_point_to_origin(
+        adapter,
+        f"{across}.start",
+        -CYL_R,
+        -CYLINDER_REFERENCE_Z,
+        "cylinder diameter reference start",
+    )
+    cylinder.record("CylRefX", '"CylR"')
+    cylinder.record("CylRefZ")
+    await ensure_fully_defined(adapter, "cylinder reference sketch")
+    check("exit cylinder reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CylinderReference")
+    drive_jobs += cylinder.apply(adapter, "CylinderReference")
+
 
 async def _summation_arc_reference(
     adapter, drive_jobs: list[tuple[str, str]]
@@ -1144,9 +1195,10 @@ async def _summation_arc_reference(
 
 
 Point = tuple[float, float, float]
-# A target is ("axis", (origin, unit direction)) or ("plane", (unit normal, root)),
+# A target is ("axis", (origin, unit direction)), ("plane", (unit normal, root))
+# or ("surface", (origin, unit direction, radius)) -- a cylinder's own face --
 # all lengths in mm.
-Target = tuple[str, tuple[Point, Point]]
+Target = tuple[str, tuple]
 
 
 def _axis_offset_mm(point: Point, axis: tuple[Point, Point]) -> float:
@@ -1166,6 +1218,9 @@ def _target_offset_mm(point: Point, target: Target) -> float:
     kind, geometry = target
     if kind == "axis":
         return _axis_offset_mm(point, geometry)
+    if kind == "surface":
+        origin, direction, radius = geometry
+        return abs(_axis_offset_mm(point, (origin, direction)) - radius)
     return _plane_offset_mm(point, geometry)
 
 
@@ -1254,6 +1309,7 @@ def _reference_claims(
     }
     boss_target = {"summation-anchor axis": ("axis", (boss[0], boss[1]))}
     pivot_target = {"pivot axis": ("axis", (pivot[0], pivot[1]))}
+    pivot_surface = {"pivot-cylinder face": ("surface", pivot)}
     return {
         "PatternReferences": (
             {**hole_targets, **plate_targets},
@@ -1282,6 +1338,13 @@ def _reference_claims(
             ],
             # The centre cross's four free arm ends.
             4,
+        ),
+        # Both ends on the cylinder face: a horizontal chord of CylRefDia = 2R
+        # in the plane through the axis is the diameter itself.
+        "CylinderReference": (
+            pivot_surface,
+            [("the pivot-cylinder face", set(pivot_surface))],
+            0,
         ),
     }
 
@@ -1594,6 +1657,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(
         adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
     )
+    # A silhouette width that is the cylinder's diameter prints as one.
+    set_dimension_prefix(adapter, "CylinderReference", "CylRefDia", "<MOD-DIAM>")
     # Both arc centres, one per side, mirror about the boss axis.  CONTROLLING:
     # the arc's other defining end sits on the cylinder axis, buried in the
     # cylinder, so the print lays the arc out from this centre and R138.8 (Codex
