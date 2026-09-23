@@ -364,6 +364,10 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
     draw.ClearSelection2(True)
 
 
+# swCenterMarkHandle_e: Up, Left, Down, Right.
+_ARMS = (0, 1, 2, 3)
+
+
 def _mark_summation_arc_centres(adapter: Any, view: Any, edges: Any) -> None:
     """Centre-mark both R138.8 web arcs in the top view.
 
@@ -400,10 +404,30 @@ def _mark_summation_arc_centres(adapter: Any, view: Any, edges: Any) -> None:
             raise RuntimeError(f"no centre mark on the R138.8 arc centred {centre}")
         mark = _early_bound(mark, "ICenterMark")
         mark.UseDocDisplaySettings = False
+        # The reference dimensions' extension lines start at the END of each
+        # arm, drawn or not: on R8 the arms ran out to R138.8, so the 2X 64.0
+        # witness started 70 mm short of the centre and the 2X 123.2 one ran up
+        # through the front view.  Cut every arm back to the mark itself.
+        size = float(mark.Size)
+        before = [float(mark.GetExtendedLength(0, handle)) for handle in _ARMS]
+        for handle in _ARMS:
+            if not mark.SetExtendedLength(0, handle, size):
+                raise RuntimeError(
+                    f"R138.8 centre mark {centre}: arm {handle} refused length {size}"
+                )
+        after = [float(mark.GetExtendedLength(0, handle)) for handle in _ARMS]
         mark.ShowLines = False
         if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
             raise RuntimeError(
                 f"R138.8 centre mark {centre} kept its extended lines"
+            )
+        _telemetry.info(
+            f"R138.8 centre mark {centre}: size {size:.5f} m, arms {before} -> {after}"
+        )
+        if any(abs(value - size) > 1e-9 for value in after):
+            # First use of the arm API here: record it and let the render judge.
+            _telemetry.warn(
+                f"R138.8 centre mark {centre}: arms read back {after}, wanted {size}"
             )
     _telemetry.success(f"centre-marked {len(arcs)} R138.8 web arcs")
 
