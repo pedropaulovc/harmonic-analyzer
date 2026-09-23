@@ -94,7 +94,7 @@ from cone_gear_shaft_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
-    SECTION_DIA_BAND,
+    SECTION_DIA_BANDS,
     SECTIONS,
     SURFACE_FINISHES,
 )
@@ -243,12 +243,12 @@ async def build(adapter) -> dict[str, str]:
     # The five turned diameters carry their fit on the MODEL dimension, so
     # SolidWorks renders the limits and re-renders them on a unit change. The
     # sheet used to append "+0.00/-0.02" as frozen callout text instead.
-    for section in range(5):
+    for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
-            *deviations(SECTION_DIA_BAND),
+            *deviations(band),
         )
     # Display precision is model-owned too (drawing-simplicity policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
