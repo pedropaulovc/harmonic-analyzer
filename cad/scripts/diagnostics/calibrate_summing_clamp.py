@@ -2,6 +2,9 @@
 
 Run only through verify:calibrate_summing_clamp on the throwaway branch. The
 parent owns the COM seat; this child never acquires it and never writes YAML.
+On the submitter, ``--apply-report`` merges the completed preset reports' counter
+seats into springs.yaml (no COM): with the eye bearing on the tube's OD corner,
+X and Y are coupled, and only this fixture solves them together.
 The saved counter lengths seed an outer native-pose/torque equilibrium refit.
 The provisional gooseneck gap is only the coordinate system of its copied
 native screw. Neither it nor the spring's axial bounding box is an acceptance
@@ -1191,11 +1194,68 @@ async def calibrate(adapter, preset, output):
             failure.add_note(f"failed to checkpoint calibration report: {checkpoint_failure!r}")
 
 
+COUNTER_EYE_TOLERANCE_MM = 1e-4  # presets vs committed gooseneck_geom (r5 spread 4e-5)
+
+
+def apply_reports(paths):
+    """Merge completed clamp reports' counter seats into springs.yaml.
+
+    The seat fixture lowers the gooseneck in Y alone, but the calibrated eye's X
+    is held by the tube's OD corner, which moves with Y (spring-seats-r4 found
+    the separating end of its bracket interfering). Each counter row here was
+    certified on the lower hook, shank, arm end, under-head face and zero
+    overlap on every clamp body, at a torque-refit length. Channel seats are
+    untouched: they do not depend on the gooseneck."""
+    import yaml
+
+    from diagnostics.calibrate_spring_seats import SPRINGS_YAML
+
+    rows = {}
+    for path in paths:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        if report.get("status") != "completed":
+            raise SystemExit(f"--apply-report merges completed reports only; {path} is {report.get('status')!r}")
+        for preset, row in report["counters"].items():
+            if preset in rows:
+                raise SystemExit(f"--apply-report: preset {preset!r} appears in more than one report")
+            error = row["pose"]["upper_eye_xy"][0] - mounts.COUNTER_UPPER_EYE_X
+            if abs(error) > COUNTER_EYE_TOLERANCE_MM:
+                raise SystemExit(
+                    f"--apply-report: {preset} upper eye is {error:+.6f} mm off the committed "
+                    "gooseneck_geom eye centre; calibrate against the committed geometry first"
+                )
+            rows[preset] = {
+                "pose": row["pose"],
+                "gooseneck_origin_y_mm": row["gooseneck_origin_y_mm"],
+                "final_distance_mm": {key: row["final_distance_mm"][key] for key in ("lower", "upper")},
+            }
+    missing = sorted(set(_config.machine("springs", "presets")) - set(rows))
+    if missing:
+        raise SystemExit(f"--apply-report must cover every configured preset; missing {missing}")
+    text = SPRINGS_YAML.read_text(encoding="utf-8")
+    document = yaml.safe_load(text)
+    for preset, row in rows.items():
+        document["springs"]["presets"][preset]["counter"] = row
+    header = "\n".join(line for line in text.splitlines() if line.startswith("#"))
+    body = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)
+    SPRINGS_YAML.write_text(header + "\n" + body, encoding="utf-8", newline="\n")
+    print(f"--apply-report wrote {SPRINGS_YAML} counters {sorted(rows)}")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--preset", required=True, choices=PRESETS)
+    parser.add_argument("--preset", choices=PRESETS)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--apply-report", type=Path, nargs="+",
+                        help="merge completed preset reports' counter seats into springs.yaml; no COM")
     args = parser.parse_args()
+    if args.apply_report:
+        if args.preset or args.output:
+            parser.error("--apply-report merges existing reports; --preset/--output are COM-run flags")
+        return apply_reports([path.resolve() for path in args.apply_report])
+    if args.preset is None:
+        parser.error("--preset is required for a calibration run")
     output = args.output or ROOT / f"cad/out/reports/summing-clamp-calibration-{args.preset}.json"
     # _cached_com_action is the sole seat owner. No --write mode exists.
     return run_build(lambda adapter: calibrate(adapter, args.preset, output.resolve()))

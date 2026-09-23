@@ -171,3 +171,68 @@ def test_refused_control_still_reports_what_it_measured() -> None:
     tube = fixture.evidence["positive_controls"]["tube"]
     assert [row["withdrawn_mm"] for row in tube["withdrawals"]] == [0.05, 0.10]
     assert fixture.evidence["positive_controls"]["head"]["withdrawals"][0]["withdrawn_mm"] == 0.05
+
+
+def _report(tmp_path, preset, *, status="completed", eye_error=0.0):
+    import json
+
+    row = {
+        "pose": {"length_mm": 350.0, "lower_eye_xy": [-91.24, 1006.5],
+                 "upper_eye_xy": [clamp.mounts.COUNTER_UPPER_EYE_X + eye_error, 1346.8],
+                 "axis_xy": [-0.005, 0.99999], "centre_xy": [-92.1, 1176.6], "clocking": "half_turn"},
+        "gooseneck_origin_y_mm": 1186.5,
+        "final_distance_mm": {"lower": 1e-6, "upper": 2e-8, "tube_face": 0.0, "under_head_face": 3e-6},
+        "clamp_gap_mm": 4.6,
+    }
+    path = tmp_path / f"{preset}.json"
+    path.write_text(json.dumps({"status": status, "counters": {preset: row}}), encoding="utf-8")
+    return path
+
+
+@pytest.fixture
+def springs_copy(tmp_path, monkeypatch):
+    from diagnostics import calibrate_spring_seats as seats
+
+    copy = tmp_path / "springs.yaml"
+    copy.write_text(seats.SPRINGS_YAML.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(seats, "SPRINGS_YAML", copy)
+    return copy
+
+
+def test_apply_report_replaces_only_the_counter_rows(tmp_path, springs_copy) -> None:
+    import yaml
+
+    before = yaml.safe_load(springs_copy.read_text(encoding="utf-8"))["springs"]
+    header = [line for line in springs_copy.read_text(encoding="utf-8").splitlines() if line.startswith("#")]
+
+    clamp.apply_reports([_report(tmp_path, preset) for preset in clamp.PRESETS])
+
+    text = springs_copy.read_text(encoding="utf-8")
+    after = yaml.safe_load(text)["springs"]
+    assert [line for line in text.splitlines() if line.startswith("#")] == header
+    assert after["channel_seats"] == before["channel_seats"]
+    assert after["source"] == before["source"]
+    for preset in clamp.PRESETS:
+        counter = after["presets"][preset]["counter"]
+        assert set(counter) == {"pose", "gooseneck_origin_y_mm", "final_distance_mm"}
+        assert set(counter["final_distance_mm"]) == {"lower", "upper"}
+        assert {k: v for k, v in after["presets"][preset].items() if k != "counter"} == {
+            k: v for k, v in before["presets"][preset].items() if k != "counter"
+        }
+
+
+@pytest.mark.parametrize(
+    ("make", "reason"),
+    [
+        (lambda tmp: [_report(tmp, "neutral", status="failed"), _report(tmp, "square")], "completed"),
+        (lambda tmp: [_report(tmp, "neutral")], "missing"),
+        (lambda tmp: [_report(tmp, "neutral", eye_error=2e-4), _report(tmp, "square")], "committed"),
+    ],
+)
+def test_apply_report_refuses_what_it_cannot_certify(tmp_path, springs_copy, make, reason) -> None:
+    original = springs_copy.read_text(encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=reason):
+        clamp.apply_reports(make(tmp_path))
+
+    assert springs_copy.read_text(encoding="utf-8") == original
