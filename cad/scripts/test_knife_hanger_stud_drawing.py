@@ -75,6 +75,8 @@ def test_runout_note_never_exceeds_the_interface_relief() -> None:
     assert printed <= joint.STUD_THREAD_RELIEF_MAX_MM
     assert joint.STUD_THREAD_RELIEF_MAX_MM - printed < 0.1
     line = f"INCOMPLETE THREAD {spec.THREAD_RUNOUT_MAX_TEXT} MAX."
+    # Codex (stud-20): the requirement, not the tool -- no "DIE-CUT".
+    assert "DIE" not in spec.DRAWING_NOTES
     assert line in spec.DRAWING_NOTES
     assert spec.DRAWING_NOTES.startswith("FIT SHOULDER TO STACK PER MHA-A07 SHEET 4")
 
