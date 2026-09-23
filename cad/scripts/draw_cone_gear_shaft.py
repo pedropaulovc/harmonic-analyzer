@@ -74,11 +74,14 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 202.27 mm shaft at 1:1 spans 0.0489..0.2511 about
-# SIDE_CENTER, leaving the right third for the pictorial; the group sits
-# mid-height so the baseline stack below and the diameters above share the
-# field evenly, with the note block in the lower left.
-SIDE_CENTER = (0.150, 0.170)
+# y < ~0.066).  The 202.27 mm shaft at 1:1 spans 0.0503..0.2526, leaving the
+# right third for the pictorial; the group sits mid-height so the baseline
+# stack below and the diameters above share the field evenly, with the note
+# block in the lower left.  The view is placed by its large end: every
+# dimension below is laid out from that datum face, so a change at the tip
+# (E1 shortened it 2.9 mm) moves only the tip.
+BIG_END_X = 0.2526
+SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.170)
 ISO_CENTER = (0.345, 0.185)
 NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
@@ -105,7 +108,7 @@ SIDE_KEEP = {
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
 # land it measures (the big end is at sheet x 0.2526; land 1 spans
 # 0.0819..0.2096, land 2 0.0750..0.0819, land 3 0.0681..0.0750, land 4
-# 0.0474..0.0681); Ø12.231 stands just off the faced end.  The three tip
+# 0.0503..0.0681); Ø12.231 stands just off the faced end.  The three tip
 # lands are only 6.9 mm apart, so a text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
 # down, so no line rises through a text (codex, 18395f30).
