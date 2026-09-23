@@ -3,9 +3,9 @@ cone-tip-pinch-screw:
   number: MHA-098
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A108]
+  supplier_skus: [90280A110]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A108
+  material_specification: Steel, McMaster-Carr 90280A110
   finish: zinc plated
   quantity: 1
   tolerance_class: machined_block

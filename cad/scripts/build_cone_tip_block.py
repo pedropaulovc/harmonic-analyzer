@@ -102,7 +102,7 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
 
 ADJUSTER_BORE_DEPTH = ADJUSTER_BORE_SPEC.depth_mm
-# McMaster 90280A108 is a #4-40 screw. The near jaw receives a normal-fit #4
+# McMaster 90280A110 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
 PINCH_BORE_Y = PINCH_HEIGHT
 
@@ -245,6 +245,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
     await set_global(adapter, "PassageCenter", '"BlockX" / 2')
     await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
+    await set_global(adapter, "FootTapX", '"BlockX" / 2')
+    await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
     await set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
@@ -339,7 +341,7 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
 
     # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
-    # cross-bore so the exact McMaster 90280A108 #4-40 screw can squeeze the
+    # cross-bore so the exact McMaster 90280A110 #4-40 screw can squeeze the
     # two jaws around the adjuster thread.
     check("create_plane BlockTop", await adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane",
@@ -443,7 +445,7 @@ async def build(adapter) -> dict[str, str]:
     await _author_reference_dimension(
         adapter,
         plane="Front",
-        start=(-BLOCK_X / 2.0, ADJUSTER_AXIS_HEIGHT),
+        start=(BLOCK_X / 2.0, ADJUSTER_AXIS_HEIGHT),
         end=(0.0, ADJUSTER_AXIS_HEIGHT),
         orientation="horizontal",
         dimension_type="horizontal_distance",
@@ -476,7 +478,33 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="PinchRise",
         drive_expression='"PinchRise"',
     )
-    # Model-owned places are applied only after PinchRiseReference exists.
+    # The foot tap sits at the foot centre (it is placed at the origin); these
+    # two construction-only dimensions locate it from the -X and -Z faces.
+    await _author_reference_dimension(
+        adapter,
+        plane="Top",
+        start=(-BLOCK_X / 2.0, 0.0),
+        end=(0.0, 0.0),
+        orientation="horizontal",
+        dimension_type="horizontal_distance",
+        value_mm=BLOCK_X / 2.0,
+        feature_name="FootTapXReference",
+        dimension_name="FootTapX",
+        drive_expression='"FootTapX"',
+    )
+    await _author_reference_dimension(
+        adapter,
+        plane="Top",
+        start=(0.0, -BLOCK_Z / 2.0),
+        end=(0.0, 0.0),
+        orientation="vertical",
+        dimension_type="vertical_distance",
+        value_mm=BLOCK_Z / 2.0,
+        feature_name="FootTapZReference",
+        dimension_name="FootTapZ",
+        drive_expression='"FootTapZ"',
+    )
+    # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)

@@ -42,20 +42,36 @@ ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
 # engagement), so the full thread runs 9.5 and the tap-drill shoulder 11.
 ADJUSTER_THREAD_DEPTH = 9.5  # full-form thread; leaves lead beyond usable thread
 ADJUSTER_DEPTH = 11.0  # tap-drill shoulder
-# U30 hold-down: one #6-32 x 1/2 socket head cap screw (McMaster 91251A148)
-# comes up through the platform's counterbored lateral slot into the foot
-# centre. Under the head the platform leaves a 1.64..2.66 ledge and the fit-up
-# shim pack is 0.05..2.20, so the 12.7 screw reaches 7.84..11.01 into the
-# block: at least 1.5D of engagement, and never onto the tap's lead threads.
+# U30 hold-down: one #6-32 x 1/2 button-head socket cap screw (McMaster
+# 91255A148, head 0.262 x 0.073; rule-12 W22 swapped it in for the taller
+# socket head) comes up through the platform's counterbored lateral slot into
+# the foot centre. Under the head the platform leaves a ledge of stock
+# thickness (6.35 +/-0.13, user ruling U41: "1/4 PLATE AS SUPPLIED") less the
+# 2.80 .XX counterbore depth, 2.91..4.19
+# (cone_swing_platform_spec.TIP_LEDGE_RANGE), and the fit-up shim pack is
+# 0.05..2.20, so the 12.7 screw reaches 6.31..9.74 into the block (1.80D at
+# the short end).  Judged at the printed worst case: engagement >= 1.5D, and
+# the deepest reach stays on full thread -- ThreadDepth .X, so 0.8 under
+# nominal.
 FOOT_THREAD = "#6-32"
 FOOT_SCREW_LENGTH = 12.7
-FOOT_SCREW_REACH_MM = (12.7 - 2.66 - 2.20, 12.7 - 1.64 - 0.05)
-FOOT_THREAD_DEPTH = 11.5
-FOOT_DEPTH = 14.0
+FOOT_LEDGE_RANGE_MM = (2.91, 4.19)
+FOOT_SHIM_RANGE_MM = (0.05, 2.20)
+FOOT_SCREW_REACH_MM = (
+    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[1] - FOOT_SHIM_RANGE_MM[1],
+    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[0] - FOOT_SHIM_RANGE_MM[0],
+)
+FOOT_THREAD_DEPTH = 12.5
+# The tap drill runs 1.5P past the deepest full thread at the printed limits
+# (both depths .X), so a plug tap's lead never eats the full-thread depth.
+FOOT_DEPTH = 15.5
+_FOOT_PITCH_MM = 25.4 / 32.0
 if FOOT_SCREW_REACH_MM[0] < 1.5 * THREAD_MAJOR_MM[FOOT_THREAD]:
     raise AssertionError("foot screw engagement falls below 1.5D")
-if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.25:
+if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.8 - 0.25:
     raise AssertionError("foot screw can reach the tap's incomplete lead threads")
+if (FOOT_DEPTH - 0.8) - (FOOT_THREAD_DEPTH + 0.8) < 1.5 * _FOOT_PITCH_MM:
+    raise AssertionError("foot tap drill leaves no lead room past the full thread")
 # Non-bearing clearance passage from the south face into the adjuster bore. Its
 # diameter matches the already-defined adjuster cup, so the shaft tip has one
 # continuous envelope without reviving the removed fictional journal fit.
@@ -154,6 +170,21 @@ for _name, _web in (
         raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
+# Rule-12 E1: the #4-40 x 1/2 pinch screw (McMaster 90280A110, 12.7 under the
+# head) seats on the +X face.  PassageCenter prints .XX from that same face,
+# so the near jaw is at most PassageCenter + band - (SlitW - band)/2 and the
+# far jaw keeps >= 1.5D of thread; the tip stays short of the -X face.
+PINCH_SCREW_LENGTH = 12.7
+WORST_PINCH_NEAR_JAW_MM = (
+    round(BLOCK_X / 2.0, 2) + _GENERAL_2PL_MM - _min_slit_half
+)
+WORST_PINCH_ENGAGEMENT_MM = PINCH_SCREW_LENGTH - WORST_PINCH_NEAR_JAW_MM
+if WORST_PINCH_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[PINCH_THREAD]:
+    raise AssertionError(
+        f"pinch screw far-jaw engagement {WORST_PINCH_ENGAGEMENT_MM:.2f} < 1.5D"
+    )
+if PINCH_SCREW_LENGTH > round(BLOCK_X, 1) - _GENERAL_1PL_MM:
+    raise AssertionError("pinch screw can stand proud of the far (-X) face")
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
@@ -170,6 +201,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinchRiseReference": {"PinchRise"},
     "SlitProfile": {"SlitW"},
     "TopSlit": {"SlitDepth"},
+    # The #6-32 foot tap, located from two finished faces (review
+    # 2026-09-23: centre marks alone are not a location).
+    "FootTapXReference": {"FootTapX"},
+    "FootTapZReference": {"FootTapZ"},
 }
 
 # Decimal places carry the general tolerance and therefore live on the model.
@@ -185,6 +220,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchRiseReference": {"PinchRise": 2},
     "SlitProfile": {"SlitW": 2},
     "TopSlit": {"SlitDepth": 1},
+    # A centred tap in a 15 x 12 foot: .X leaves 4.95 of wall to the edge.
+    "FootTapXReference": {"FootTapX": 1},
+    "FootTapZReference": {"FootTapZ": 1},
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places

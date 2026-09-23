@@ -634,9 +634,9 @@ sections:
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525.'
+        - 'McMaster-Carr 90280A110 steel narrow fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 12.7 (rule-12 E1: 1.77D far-jaw engagement at the printed worst case).'
         - 'across the tip block''s top slit (head on the east face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the 5/16-18 adjuster so its end-play setting cannot back off.'
-        - McMaster-Carr 90280A108 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
+        - McMaster-Carr 90280A110 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
         - high (stock dimensions exact; function photo-derived)
   - prose: |2
 

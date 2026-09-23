@@ -10,12 +10,14 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_leader_note,
     add_native_hole_callout,
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -98,6 +100,29 @@ RIGHT_KEEP = {
     )
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
+# The foot tap's two locations: FootTapX above the bottom view (between it and
+# the front view's 15.0), FootTapZ to its left; the view caption moves under it.
+BOTTOM_KEEP = {
+    "FootTapX": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.007),
+    "FootTapZ": (BOTTOM_CENTER[0] - BLOCK_X * _S / 2.0 - 0.009, BOTTOM_CENTER[1]),
+}
+# A centreline runs a short way past the part it marks.
+AXIS_OVERRUN = 0.002
+# Review C1: the left and rear views sit right of the right view, out of
+# third-angle order, so each is a removed view named by a letter arrow on the
+# view that shows the face it looks at.  VIEW B looks at the -X (pinch-thread)
+# face: the arrow meets the front view's left edge above the 46.83 and 32.27
+# extension lines.  VIEW C looks at the -Z (shaft-entry) face, which is the top
+# view's upper edge, left of the A-A cutting-plane stem.  Each pair is
+# (note upper-left, leader tip), sheet metres.
+VIEW_B_ARROW = (
+    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0 - 0.013, 0.1625),
+    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, 0.160),
+)
+VIEW_C_ARROW = (
+    (TOP_CENTER[0] - 0.0115, TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.015),
+    (TOP_CENTER[0] - 0.010, TOP_CENTER[1] + BLOCK_Z * _S / 2.0),
+)
 DIMENSION_CALLOUTS = {
     "PassageDiaDim": "DRILL THRU\nCLEARANCE\nCOAXIAL WITH\nADJUSTER BORE",
     "SlitDepth": "SLOT DEPTH",
@@ -125,6 +150,38 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     if span < min_span_mm:
         raise RuntimeError(f"locating-foot edge span is only {span:.3f} mm")
     return edge
+
+
+def _add_pinch_axis(adapter: Any, section: Any) -> None:
+    """Sketch the pinch bore's axis across section A-A.
+
+    The 8.85 rise runs from the adjuster centre to this axis; without the
+    centreline its extension line reads as rising from nothing (review
+    2026-09-23).  The cutting plane contains both bore axes, so the axis
+    projects from the model and is sketched sheet-owned, as the gear shaft's
+    and swing platform's axes are.
+    """
+    half = BLOCK_X / 2000.0 + AXIS_OVERRUN / SHEET_SCALE[0]
+    ends = [
+        model_point_in_view(
+            adapter,
+            section,
+            (x, PINCH_HEIGHT / 1000.0, 0.0),
+            label=f"pinch axis end {index}",
+        )
+        for index, x in enumerate((-half, half))
+    ]
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.EditSheet()
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = manager.CreateCenterLine(
+        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
+    )
+    if centerline is None:
+        raise RuntimeError("failed to sketch the pinch axis in section A-A")
+    adapter.currentModel.ClearSelection2(True)
+    adapter.currentModel.EditRebuild3()
+
 
 def _circle_entity(
     adapter: Any,
@@ -380,6 +437,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="adjuster and pinch-bore centre section",
     )
     set_hidden_lines_removed(adapter, section)
+    _add_pinch_axis(adapter, section)
 
     adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
         adapter,
@@ -428,13 +486,14 @@ async def build(adapter: Any) -> dict[str, str]:
             _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center) - 0.012,
         ),
     }
+    plus_x_side = 1.0 if adjuster_view is front else -1.0
     adjuster_axis_keep = {
         "PassageZ": (
             adjuster_center[0] - 0.045,
             _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
         ),
         "PassageCenter": (
-            adjuster_center[0],
+            adjuster_center[0] + plus_x_side * BLOCK_X * _S / 4.0,
             _elevation_y(BLOCK_HEIGHT, adjuster_center) + 0.030,
         ),
         "SlitDepth": (
@@ -493,7 +552,15 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="adjuster threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    bottom_annotations = curate_view_dimensions(
+        adapter,
+        bottom,
+        keep=BOTTOM_KEEP,
+        view_label="foot hold-down entry",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
     annotations = [
+        *bottom_annotations,
         *front_annotations,
         *top_annotations,
         *section_annotations,
@@ -535,7 +602,6 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=pinch_clearance_edge,
         callout_xy=(0.145, 0.185),
         label="pinch entry-jaw clearance",
-        process="DRILL TO SLOT",
     )
     set_hole_callout_precision(
         pinch_clearance_callout,
@@ -566,20 +632,42 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _hide_section_cosmetic_threads(adapter, section)
     for text, x, y in (
-        ("REAR VIEW\nSHAFT ENTRY", passage_center[0] - 0.021, 0.078),
+        ("VIEW C\nSHAFT ENTRY", passage_center[0] - 0.021, 0.078),
         ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
-        ("LEFT VIEW\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
-        ("ADJUSTER ENTRY", adjuster_center[0] - 0.054, 0.185),
-        ("BOTTOM VIEW", BOTTOM_CENTER[0] - 0.047, BOTTOM_CENTER[1] + 0.004),
+        ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
+        # Review: named beside the thread callout it describes (the callout
+        # text starts ~0.018 right of the adjuster axis, top at ~0.120).
+        ("ADJUSTER ENTRY", adjuster_center[0] + 0.023, 0.1285),
+        ("BOTTOM VIEW", BOTTOM_CENTER[0] - 0.012, BOTTOM_CENTER[1] - 0.016),
     ):
         if add_note(adapter, text, x, y) is None:
             raise RuntimeError(f"failed to add {text.lower()} view caption")
     if add_note(adapter, "ROTATED 90°", SECTION_CENTER[0] - 0.015, 0.195) is None:
         raise RuntimeError("failed to label the rotated section")
+    # C1 verdict (2026-09-23): the native projected-view arrow is not
+    # switchable through the documented API -- IProjectionArrow.Visible is
+    # get-only and no document preference or IView member sets it; only the
+    # PropertyManager "Arrow" box does.  Untested: an IProjectionArrow.SetLabel
+    # side effect, a PropertyManager RunCommand route.  So each removed view
+    # is named by a letter note whose straight leader is the viewing arrow.
+    for letter, view, (text_xy, tip_xy) in (
+        ("B", front, VIEW_B_ARROW),
+        ("C", top, VIEW_C_ARROW),
+    ):
+        add_leader_note(
+            adapter,
+            letter,
+            text_xy=text_xy,
+            attach_xy=tip_xy,
+            view=view,
+            label=f"view {letter} viewing arrow",
+        )
 
     foot_edge = _foot_edge(adapter, front)
     foot_y = _elevation_y(0.0, FRONT_CENTER)
-    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 2.0, foot_y)
+    # Onto the foot edge itself, 2 mm in from the corner, so the symbol reads
+    # as the seat face and not the side (review 2026-09-23).
+    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 2.0 - 0.002, foot_y)
     foot_finish = add_surface_finish(
         adapter,
         front,

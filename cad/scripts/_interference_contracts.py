@@ -109,10 +109,16 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 
 # Independent SolidWorks-kernel observations for the exact stock bodies in
 # their production receivers.  The 90280A108's modeled helical thread and
-# under-head runout overlap the native #4-40 far jaw by 6.47 mm3; the cup-tip
-# adjuster makes its intended thrust contact with the shaft end at 0.13 mm3.
-# Ten-percent bounded headroom still fails any materially deeper insertion.
-_TIP_PINCH_GATE_LIMIT_MM3 = 6.47 * 1.10
+# under-head runout overlapped the native #4-40 far jaw by 6.47 mm3 over its
+# 2.625 of far-jaw engagement; the cup-tip adjuster makes its intended thrust
+# contact with the shaft end at 0.13 mm3.  Rule-12 E1 lengthened the pinch
+# screw to the 12.7 90280A110 (5.80 in the far jaw), so its limit scales that
+# observation by engagement -- an over-estimate, since the runout share does
+# not grow -- until the next drive-train build re-observes it.  Ten-percent
+# bounded headroom still fails any materially deeper insertion.
+# 6.47 * 5.80 / 2.625 = 14.296, rounded up.
+_TIP_PINCH_OBSERVED_MM3 = 14.30
+_TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
 _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {

@@ -4,8 +4,9 @@ validated single-part original).
 
 Replicas use vendor model harvests from ``cad/references/mcmaster/`` and
 the corresponding ``cad/out/reports/mcmaster-<part>-dump.json``.
-90280A837 starts from the supplied catalog dimensions and the existing
-fillister family equations; its native comparison is required before release.
+90280A837 and 90280A110 start from the supplied catalog dimensions and the
+existing fillister family equations; their native comparison is required
+before release.
 Gates run against the vendor's own mass properties and face-area multiset
 (see ``diag_mcmaster_lib.gate_and_save``).
 
@@ -36,6 +37,7 @@ from diagnostics.diag_mcmaster_lib import run_replica  # noqa: E402
 from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
 from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
 from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
+from diagnostics.diag_build_90280A110 import build_90280A110  # noqa: E402
 from diagnostics.diag_build_90280A194 import build_90280A194  # noqa: E402
 from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
@@ -64,6 +66,7 @@ REGISTRY = {
     "91882A221": build_91882A221,
     "91882A425": build_91882A425,
     "90280A108": build_90280A108,
+    "90280A110": build_90280A110,
     "90280A194": build_90280A194,
     "90280A199": build_90280A199,
     "90280A201": build_90280A201,
