@@ -126,3 +126,51 @@ def test_disengaged_collar_margin_survives_general_bands() -> None:
     )
     assert worst >= 2.0
     assert set(spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
+
+
+def _boxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def test_detail_band_clears_border_title_block_and_captions() -> None:
+    """Detail B, its label and callouts, and the relief note share one band.
+
+    Extents are the ones the layout audit logged on the farm (runs 2b643c17
+    and e86bf319): the native label is 31.5 x 16.2 mm; the relief note
+    0.0947 x 0.0176 m from its upper-left anchor; a vertical dimension's
+    text hangs OUTWARD from its line -- the counterbore callout (value and
+    four lines) spans x..x+0.042 by y-0.016..y+0.015, the through-slot
+    callout x-0.035..x+0.003 by y-0.010..y+0.009.  e86bf319 failed on the
+    label alone (8.9 mm through the bottom border); its callouts also ran
+    under the title block and the plan caption, which the audit's nominal
+    dimension boxes cannot see.
+    """
+    border_bottom, title_block = 0.0127, (0.216, 0.0, 0.4318, 0.066)
+    captions = (
+        (0.0449, 0.0805, 0.1059, 0.0853),
+        (0.1497, 0.0805, 0.2185, 0.0853),
+    )
+    label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
+    label = (label_x, label_y, label_x + 0.0315, label_y + 0.0162)
+    note_x, note_y = drawing.RELIEF_NOTE_XY
+    relief = (note_x, note_y - 0.0176, note_x + 0.0947, note_y)
+    cbore_x, cbore_y = drawing.DETAIL_KEEP["TipCboreW"]
+    cbore = (cbore_x, cbore_y - 0.016, cbore_x + 0.042, cbore_y + 0.015)
+    slot_x, slot_y = drawing.DETAIL_KEEP["TipSlotW"]
+    slot = (slot_x - 0.035, slot_y - 0.010, slot_x + 0.003, slot_y + 0.009)
+    boxes = {"label": label, "relief": relief, "cbore": cbore, "slot": slot}
+    for name, box in boxes.items():
+        assert box[1] > border_bottom + 0.001, name
+        assert not _boxes_overlap(box, title_block), name
+        for caption in captions:
+            assert not _boxes_overlap(box, caption), (name, caption)
+    names = list(boxes)
+    for i, first in enumerate(names):
+        for second in names[i + 1 :]:
+            assert not _boxes_overlap(boxes[first], boxes[second]), (first, second)
+    # Positive control: e86bf319's layout fails this very check.
+    old_label = (0.1443, 0.0038, 0.1758, 0.0200)
+    old_cbore = (0.196, 0.072 - 0.016, 0.196 + 0.042, 0.072 + 0.015)
+    assert old_label[1] < border_bottom
+    assert _boxes_overlap(old_cbore, title_block)
+    assert _boxes_overlap(old_cbore, captions[1])
