@@ -22,6 +22,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_reference_dimensions,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -30,6 +31,7 @@ from crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DIA,
+    REFERENCE_DIMENSIONS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
@@ -111,6 +113,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to MHA-138 end view")
     add_view_centerline(

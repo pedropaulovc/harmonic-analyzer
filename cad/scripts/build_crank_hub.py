@@ -56,7 +56,6 @@ from crank_hub_geometry import (
 from crank_native_acceptance import assert_signed_circle_center
 from crank_hub_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     HUB_BARREL_DIA,
     HUB_BORE_BAND,
@@ -342,7 +341,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

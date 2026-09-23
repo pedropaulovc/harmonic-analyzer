@@ -63,24 +63,34 @@ def test_drawing_registry_and_marks_are_complete() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= marked
 
 
-def test_matched_fit_and_distinct_pins_are_unambiguous() -> None:
-    notes = crank_hub_spec.DRAWING_NOTES
-    cross_hole = crank_hub_spec.CROSS_HOLE_CALLOUT
-    assert "MATCHED ASSEMBLY" in notes
-    assert "MHA-138" in notes and "SIX O'CLOCK" in notes
-    assert "LIGHT DRIVE FIT" in notes
+def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
+    # Policy rule 6: no general notes; each matched fit sits on its feature.
+    assert not hasattr(crank_hub_spec, "DRAWING_NOTES")
+    seat = crank_hub_spec.SEAT_CALLOUT
+    assert seat.startswith("MATCH-FIT TO MHA-020 ARM")
+    assert "SHOULDER" in seat and "FACES FLUSH" in seat
+    seam = crank_hub_spec.SEAM_CALLOUT
+    assert "MHA-020" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
+    assert "<MOD-DIAM>4.0 <HOLE-DEPTH> 4.0" in seam
+    assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates and the fit on its callout.
+    cross_hole = crank_hub_spec.CROSS_HOLE_CALLOUT
     assert "MHA-024" in cross_hole and "MHA-026" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
-    assert "RADIAL" not in notes
-    assert "SHOULDER SEATED" in notes and "FACES FLUSH" in notes
-    assert "HUB WALL" not in notes
+    # The bore band governs; the clearance is a reference restatement.
+    assert crank_hub_spec.BORE_CALLOUT.splitlines()[1].startswith("(")
 
 
-def test_notes_obey_the_four_line_rule_and_clear_the_title_block() -> None:
-    lines = crank_hub_spec.DRAWING_NOTES.splitlines()
-    assert len(lines) <= 4
-    assert max(len(line) for line in lines) <= 72
+def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:
+    x, y = drawing.SEAM_EDGE_PICK
+    cx, cy = drawing.SEAM_CENTER
+    r = geometry.AXIAL_PIN_DIA / 2.0 * drawing._S
+    assert (x - cx) ** 2 + (y - cy) ** 2 == pytest.approx(r**2)
+    assert cy < drawing.END_CENTER[1] and y > cy  # six o'clock, hub-side arc
+    # The seam block sits left of the bore block's right-shifted text and
+    # right of the side view's outboard end.
+    assert drawing.SEAM_CALLOUT_XY[0] > drawing.OUTBOARD_X
+    assert drawing.END_KEEP["BoreDia"][0] > drawing.END_CENTER[0]
 
 
 def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:

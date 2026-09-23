@@ -12,6 +12,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"PinDia": 1, "PinLen": 1},
 }
+# The diameter is the as-supplied m6 dowel, so it prints as a reference: its
+# one place must not read as a .X band to machine to.
+REFERENCE_DIMENSIONS = frozenset({"PinDia"})
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()

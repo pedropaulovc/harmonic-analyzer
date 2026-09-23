@@ -29,8 +29,9 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.HUB_SEAT_DIA == geometry.HUB_SEAT_DIA == 19.5
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
-    assert spec.HUB_SEAT_CALLOUT.startswith("MATCH-FIT TO ASSIGNED MHA-137")
+    assert spec.HUB_SEAT_CALLOUT.startswith("MATCH-FIT TO MHA-137 HUB")
     assert "LIGHT ARBOR-PRESS" in spec.HUB_SEAT_CALLOUT
+    assert "FACES FLUSH" in spec.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 
@@ -49,11 +50,11 @@ def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia"}
     assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == spec.HUB_SEAT_CALLOUT
-    assert drawing.TOP_KEEP == {}
+    assert not hasattr(drawing, "TOP_KEEP")  # the seam callout replaced the view
 
 
 def test_reference_dimensions_remain_model_owned() -> None:
@@ -70,12 +71,14 @@ def test_reference_dimensions_remain_model_owned() -> None:
     assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
 
 
-def test_punch_and_seam_operations_are_notes_not_fake_dimensions() -> None:
+def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     notes = spec.DRAWING_NOTES
-    assert "AXIAL SEAM" in notes
-    assert "MHA-138" in notes
+    assert "MHA-138" not in notes and "O'CLOCK" not in notes
     assert "MHA-024" not in notes
     assert "DIMPLE" not in notes
+    seam = spec.SEAM_CALLOUT
+    assert "MHA-137" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
+    assert "<MOD-DIAM>4.0 <HOLE-DEPTH> 4.0" in seam
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
     assert all("AxialPin" not in name for name in marked)
@@ -160,11 +163,35 @@ def test_notes_and_seat_callout_stay_inside_their_sheet_regions() -> None:
     assert seat_x - half > 0.0128 + 0.003  # inner border plus air
 
 
-def test_top_view_crop_keeps_the_hub_end_and_drops_the_anchor_tap() -> None:
+def test_hub_end_callouts_stand_in_a_row_without_crossing_leaders() -> None:
+    char_w = 0.0026  # measured on the U29 render
     scale = drawing.SHEET_SCALE[0] / 1000.0
-    center = drawing._sheet_x(0.0)
-    groove_far = (spec.AXIAL_PIN_X + spec.AXIAL_PIN_DIA / 2.0) * scale
-    assert drawing.TOP_CROP_RADIUS > max(spec.HALF_WIDTH * scale, groove_far)
-    # The outline the drawing checks is the fence plus SolidWorks' padding.
-    outline_right = center + drawing.TOP_CROP_RADIUS + drawing.TOP_VIEW_OUTLINE_PAD
-    assert outline_right < drawing._sheet_x(spec.ANCHOR_SCREW_X) - 0.002
+    # The seam pick lies on the arm's half of the MHA-138 circle.
+    seam_x = drawing._sheet_x(spec.AXIAL_PIN_X)
+    x, y = drawing.SEAM_EDGE_PICK
+    r = spec.AXIAL_PIN_DIA / 2.0 * scale
+    assert (x - seam_x) ** 2 + (y - drawing.FRONT_CENTER[1]) ** 2 == pytest.approx(r**2)
+    assert x > seam_x
+    # Seat block (centred on its keep) ends left of the seam leader, which
+    # drops from the seam block's left end to the pick; the anchor offset
+    # dimension stands between that leader and the anchor tap.
+    seat_x = drawing.FRONT_KEEP["HubSeatDia"][0]
+    seat_right = seat_x + max(map(len, spec.HUB_SEAT_CALLOUT.splitlines())) * char_w / 2
+    leader_x = min(drawing.SEAM_CALLOUT_XY[0], x)
+    assert seat_right + 0.002 < leader_x
+    anchor_x = drawing._sheet_x(spec.ANCHOR_SCREW_X)
+    assert max(drawing.SEAM_CALLOUT_XY[0], x) < drawing.FRONT_KEEP["AnchorOffset"][0] < anchor_x
+    seam_right = drawing.SEAM_CALLOUT_XY[0] + max(
+        len(line) for line in spec.SEAM_CALLOUT.splitlines()
+    ) * char_w
+    assert seam_right < drawing.ANCHOR_CALLOUT_XY[0] or (
+        drawing.ANCHOR_CALLOUT_XY[1] < drawing.SEAM_CALLOUT_XY[1] - 0.020
+    )
+
+
+def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.kind == "tapped"
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == "#10-24"
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
+    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(7.587)
+    assert spec.PIVOT_END_WEB_WORST >= 2.0
