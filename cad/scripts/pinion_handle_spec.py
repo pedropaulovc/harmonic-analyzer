@@ -16,6 +16,11 @@ from pinion_handle_geometry import (
     CAP_SAG as CAP_SAG,
     GRIP_DIA as GRIP_DIA,
     GRIP_LEN as GRIP_LEN,
+    RETENTION_PIN_CENTER_Z as RETENTION_PIN_CENTER_Z,
+    RETENTION_PIN_DIA as RETENTION_PIN_DIA,
+    RETENTION_PIN_LEN as RETENTION_PIN_LEN,
+    RETENTION_PIN_STATION_FROM_FLOOR as RETENTION_PIN_STATION_FROM_FLOOR,
+    RETENTION_PIN_STATION_FROM_MOUTH as RETENTION_PIN_STATION_FROM_MOUTH,
     ROD_DIA as ROD_DIA,
     ROD_DOWN as ROD_DOWN,
     ROD_HOLE_DIA as ROD_HOLE_DIA,
@@ -26,20 +31,6 @@ from pinion_handle_geometry import (
     TUBE_OD as TUBE_OD,
     WALL_T as WALL_T,
 )
-
-# Photo-derived reconstruction of the separate handle-to-arbor retention joint.
-# The upper tee's OD10.5 socket shows a small flush pin distinct from the Ø6
-# grip cross rod.  Its diameter and mid-socket station are reconstruction
-# choices within the photographic evidence, not historical measurements.
-RETENTION_PIN_DIA = 2.0
-RETENTION_PIN_STATION_FROM_FLOOR = TUBE_LEN / 2.0
-RETENTION_PIN_STATION_FROM_MOUTH = TUBE_LEN - RETENTION_PIN_STATION_FROM_FLOOR
-RETENTION_PIN_CENTER_Z = (
-    GRIP_LEN / 2.0 + WALL_T + RETENTION_PIN_STATION_FROM_FLOOR
-)
-RETENTION_PIN_LEN = TUBE_OD
-if RETENTION_PIN_STATION_FROM_FLOOR != RETENTION_PIN_STATION_FROM_MOUTH:
-    raise AssertionError("handle retention pin must remain at socket mid-length")
 
 # No local size bands. The socket is a slip clearance over the arbor stub and
 # the seating depth is a turned shoulder: neither is a running fit, a gear
@@ -119,8 +110,9 @@ SURFACE_FINISHES = ()
 def socket_clearance_callout() -> str:
     """Socket-bore callout with its diametral clearance on the MHA-102 arbor.
 
-    A function because pinion_arbor_spec imports this module: the arbor's
-    band is read once both are initialised.
+    A function so the arbor spec loads only when the drawing formats this
+    callout; the arbor spec takes its retention geometry from
+    ``pinion_handle_geometry``, never from this module.
     """
     from pinion_arbor_spec import SHAFT_DIA as arbor_dia
     from pinion_arbor_spec import SHAFT_DIA_BAND as arbor_band

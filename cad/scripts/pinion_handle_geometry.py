@@ -22,3 +22,17 @@ TUBE_LEN = 10.0
 WALL_T = 2.0
 CAP_RADIUS = ((GRIP_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 ROD_SPAN = ROD_DOWN + ROD_UP
+
+# Photo-derived reconstruction of the separate handle-to-arbor retention joint.
+# The upper tee's OD10.5 socket shows a small flush pin distinct from the Ø6
+# grip cross rod.  Its diameter and mid-socket station are reconstruction
+# choices within the photographic evidence, not historical measurements.
+RETENTION_PIN_DIA = 2.0
+RETENTION_PIN_STATION_FROM_FLOOR = TUBE_LEN / 2.0
+RETENTION_PIN_STATION_FROM_MOUTH = TUBE_LEN - RETENTION_PIN_STATION_FROM_FLOOR
+RETENTION_PIN_CENTER_Z = (
+    GRIP_LEN / 2.0 + WALL_T + RETENTION_PIN_STATION_FROM_FLOOR
+)
+RETENTION_PIN_LEN = TUBE_OD
+if RETENTION_PIN_STATION_FROM_FLOOR != RETENTION_PIN_STATION_FROM_MOUTH:
+    raise AssertionError("handle retention pin must remain at socket mid-length")

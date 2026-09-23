@@ -10,7 +10,7 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _gtol_spec import CylinderFace
-from pinion_handle_spec import (
+from pinion_handle_geometry import (
     RETENTION_PIN_DIA,
     RETENTION_PIN_STATION_FROM_FLOOR,
 )
