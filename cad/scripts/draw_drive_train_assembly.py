@@ -124,6 +124,10 @@ BOM_COLUMN_WIDTHS = {
     "quantity": 0.012,
 }
 BOM_COLUMN_WIDTH = sum(BOM_COLUMN_WIDTHS.values())
+# Measured, not derived: in the 118 mm column, four 41-character descriptions
+# kept one line and the 47-character MHA-030 row wrapped to 10.195 mm
+# (farm leaf 20260923T044055Z-1-20b23f24, swmaker000005).
+BOM_DESCRIPTION_MAX_CHARS = 41
 BOM_ANCHOR = (0.018, 0.258)
 BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
@@ -157,6 +161,11 @@ HEADING_XY = (0.018, 0.268)
 ASSEMBLED_HEADING_XY = (0.222, 0.268)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
+# Sheet 6 needs the whole right column for steps 8-17, so its reference view
+# sits under the left column's cone steps and station table. Notes pitch
+# 4.525 mm a line (summing-assembly.pdf): 29 left lines end near y=0.118.
+SEQUENCE_REFERENCE_ISO_CENTER = (0.110, 0.068)
+SEQUENCE_LEFT_FIELD = (NOTE_FIELD_LEFT[0], NOTE_FIELD_LEFT[1], NOTE_FIELD_LEFT[2], 0.100)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
 # --- BOM identities: released part numbers and descriptions ------------------
@@ -234,7 +243,7 @@ BOM_DESCRIPTIONS = {
     "crank-pin": "CRANK TAPER PIN, 1:48",
     "crank-pin-ring": "TAPER PIN KEEPER RING",
     "crank-pin-eye": "KEEPER RING ANCHOR EYE",
-    "fillister-screw": "#4-40 BRASS FILLISTER SCREW, MCMASTER 90114A511",
+    "fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
     "crank-handle": "CRANK HANDLE",
     "crank-hub": "CRANK HUB",
     "crank-hub-pin": "CRANK HUB AXIAL PIN",
@@ -309,7 +318,23 @@ BANK_RIG_STEPS = "\n".join(
         "13. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK WITH ITS SET SCREW.",
         "    [PENDING: MHA-059 TO MHA-060 PIN MHA-135]",
-        "14. BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
+        # Main ruling 2026-09-23 (U28 corollary): the rig is located by its
+        # parked tip gap, and MHA-035 carries its hold-down and spring seats as
+        # TRANSFER FROM MHA-061. The level line of centres makes block travel
+        # equal gap change; 2.5 is the physical rest gap, not the CAD gap
+        # (pinioncluster, PR #837).
+        "14. LOCATE THE RIG ON MHA-035; ITS SEATS ARE TRANSFERRED, NOT",
+        "    PRE-DRILLED. SET BOTH MHA-061 LOOSE ON THE BASE, MHA-114 FITTED.",
+        "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
+        "15. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
+        "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
+        "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
+        "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
+        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL AND TAP #8-32",
+        "    UNC-2B, {slotted} PLACES. SET MHA-114 WITH ITS TERMINAL FLAT ON THE",
+        "    PARKED BACK MHA-056; SPOT THROUGH ITS FOOT HOLE; DRILL AND TAP",
+        "    #4-40 UNC-2B, 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
+        "17. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
     )
 )
 
@@ -334,6 +359,8 @@ CHECKS = "\n".join(
         "   (SINES). RETURN MHA-059 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "   [PENDING: PINION BRACKET PLACEMENT AND TOOTH-COUNT RULINGS]",
+        "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
+        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 6, STEP 15).",
     )
 )
 
@@ -1079,7 +1106,10 @@ def _split_bom(adapter: Any, table: Any, *, data_rows: int, header_count: int) -
         position = tuple(float(value) for value in piece_annotation.GetPosition())
         # Row indexes stay those of the original table (ITableAnnotation::Split
         # remarks), so a piece's rows come from its split range, not RowCount.
-        info = tuple(piece.GetSplitInformation())
+        # The early-bound wrapper types the four outs as in/out VT_I4 BYREF, so
+        # they must be passed; a bare call raises 'Type mismatch' (leaf
+        # 20260923T044055Z-1-20b23f24). Same form as the layout audit's read.
+        info = tuple(piece.GetSplitInformation(0, 0, 0, 0))
         if len(info) != 5:
             raise RuntimeError(f"{label} BOM column split information unreadable: {info!r}")
         _direction, _index, _count, start, end = (int(value) for value in info)
@@ -1141,11 +1171,15 @@ def _heading(
     _add_note_block(adapter, "\n".join(lines), xy, label=f"sheet {sheet_number} heading")
 
 
-def _reference_iso(adapter: Any, *, caption: str, label: str) -> Any:
+def _reference_iso(
+    adapter: Any,
+    *,
+    caption: str,
+    label: str,
+    center: tuple[float, float] = REFERENCE_ISO_CENTER,
+) -> Any:
     """A small collapsed isometric: every sheet needs a view for its title block."""
-    view = place_view(
-        adapter, str(SOURCE), "*Isometric", *REFERENCE_ISO_CENTER, scale=REFERENCE_ISO_SCALE
-    )
+    view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=REFERENCE_ISO_SCALE)
     _set_exploded_state(adapter, view, False, label=label)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _caption_under(adapter, view, caption, label=f"{label} caption")
@@ -1304,7 +1338,12 @@ def _place_cluster_sheet(
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[SEQUENCE_SHEET - 1])
     _heading(adapter, SEQUENCE_SHEET)
-    _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric")
+    _reference_iso(
+        adapter,
+        caption="FINISHED ASSEMBLY 1:8",
+        label="sequence reference isometric",
+        center=SEQUENCE_REFERENCE_ISO_CENTER,
+    )
     findings = _stack_note_field(
         adapter,
         (
@@ -1312,11 +1351,11 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                 "cone and crank sequence",
                 CONE_CRANK_STEPS.format(cone_gears=facts.count("cone-gear")),
             ),
+            ("cone station table", station_table_text(facts.cone_rows())),
         ),
-        NOTE_FIELD_LEFT,
+        SEQUENCE_LEFT_FIELD,
         label=f"sheet {SEQUENCE_SHEET} left note field",
     )
-    right_field = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
     findings += _stack_note_field(
         adapter,
         (
@@ -1327,11 +1366,11 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
                     cam_pins=facts.count("pinion-cam-pin"),
                     pivot_blocks=facts.count("pinion-pivot-block"),
                     cams=facts.count("pinion-cam"),
+                    slotted=facts.count("slotted-screw"),
                 ),
             ),
-            ("cone station table", station_table_text(facts.cone_rows())),
         ),
-        right_field,
+        NOTE_FIELD_RIGHT,
         label=f"sheet {SEQUENCE_SHEET} right note field",
     )
     return findings

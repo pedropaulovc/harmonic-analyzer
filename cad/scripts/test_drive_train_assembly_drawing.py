@@ -126,6 +126,20 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
     assert "SHEET 6" in drawing.BOM_REFERENCE_CAPTION
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
+
+
+def test_bom_descriptions_keep_one_line() -> None:
+    for stem, text in drawing.BOM_DESCRIPTIONS.items():
+        assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
+
+
+def test_rig_is_located_by_its_parked_tip_gap() -> None:
+    steps = drawing.BANK_RIG_STEPS
+    for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
+        assert phrase in steps, phrase
+    assert "ACCEPT 2.3-2.7 (SHEET 6, STEP 15)" in drawing.CHECKS
+    assert "15. FACE A MHA-002 TOOTH TIP" in steps
+    assert drawing.SEQUENCE_LEFT_FIELD[3] > drawing.SEQUENCE_REFERENCE_ISO_CENTER[1]
     assert "SEE SHEET 8" in drawing.ASSEMBLED_HEADING
     assert "SHEET 8" in drawing.BANK_RIG_STEPS
 
