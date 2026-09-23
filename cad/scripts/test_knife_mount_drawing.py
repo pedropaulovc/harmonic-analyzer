@@ -386,3 +386,12 @@ def test_sheet_dimension_readbacks_bind_the_annotation_before_calling_it(
         lower = _DisplayDimension(0.0, {}, rendered)
         with pytest.raises(RuntimeError, match="uppercase MIN"):
             drawing._assert_callout_text_uppercase(lower, "tap")
+
+
+def test_hole_callout_places_cover_exactly_the_native_depth_variables() -> None:
+    """The spec's callout places name the two depth variables the drawing reads."""
+    import draw_knife_mount as drawing
+
+    assert set(knife_mount_spec.HOLE_CALLOUT_PRECISION) == set(
+        drawing._TAP_DEPTH_TOLERANCE_TYPES
+    )

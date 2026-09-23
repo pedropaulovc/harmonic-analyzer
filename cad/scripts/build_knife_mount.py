@@ -92,6 +92,7 @@ from knife_mount_spec import (
     BORE_FROM_TOP,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    HOLE_CALLOUT_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     MATING_HEX_SIZE_PLUS_MM,
     REQUIRED_ROCK_SWEEP_DEG,
@@ -223,6 +224,7 @@ def _tolerance_hole_depth(
     feature_name: str,
     dimension_token: str,
     tolerance_type: int,
+    precision: int,
 ) -> None:
     """Apply and read back one native Hole Wizard depth tolerance in the part.
 
@@ -327,10 +329,10 @@ def _tolerance_hole_depth(
             f"{feature_name} {dimension_token}: tolerance type readback "
             f"{int(tolerance.Type)} != {tolerance_type}"
         )
-    display.SetPrecision3(2, -1, 2, -1)
+    display.SetPrecision3(precision, -1, precision, -1)
     if (
-        int(display.GetPrimaryPrecision2()) != 2
-        or int(display.GetPrimaryTolPrecision2()) != 2
+        int(display.GetPrimaryPrecision2()) != precision
+        or int(display.GetPrimaryTolPrecision2()) != precision
     ):
         raise RuntimeError(
             f"{feature_name} {dimension_token}: depth precision did not persist"
@@ -465,6 +467,8 @@ def _block_near_end_top_edge(model: Any) -> Any:
     SelectByID2, which mis-resolves on end faces (see _holes's header).
     """
     top_face = find_planar_face(model, (0.0, 1.0, 0.0), [[0.0, BLK_TOP, 0.0]])
+    if top_face is None:
+        raise RuntimeError("seat boss: block top face not found")
     for raw_edge in top_face.GetEdges() or ():
         edge = _early_bound(raw_edge, "IEdge")
         ends = [
@@ -870,12 +874,14 @@ async def build(adapter) -> dict[str, str]:
         "StudTap",
         "tapdrilldepth",
         STUD_TAP_DRILL_DEPTH_TOLERANCE_TYPE,
+        HOLE_CALLOUT_PRECISION["hw-tapdrldepth"],
     )
     _tolerance_hole_depth(
         adapter,
         "StudTap",
         "fullthreaddepth",
         STUD_TAP_THREAD_DEPTH_TOLERANCE_TYPE,
+        HOLE_CALLOUT_PRECISION["hw-threaddepth"],
     )
     expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH_MM)
     vol = await _volume(adapter)
