@@ -619,7 +619,7 @@ sections:
         - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
-        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw, shared with slotted-screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
+        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
         - 'base-threaded STATIC at (−137.064, +0.841), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 3.013° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 5.527 mm signed clearance (derived and asserted against the base hole).'
         - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)

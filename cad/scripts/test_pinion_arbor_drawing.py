@@ -35,25 +35,35 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_integral_arbor_preserves_the_released_absolute_envelope() -> None:
-    assert spec.HEAD_FRONT_Z == pytest.approx(-11.0)
-    assert spec.HEAD_REAR_Z == pytest.approx(-2.0)
+def test_integral_arbor_keeps_the_released_stations_around_a_longer_head() -> None:
+    # Rule 12 (audit W6): the head grows 9.0 -> 10.5 about the released
+    # crossrod station; the neck shoulder, shaft and back crown stay put.
     assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
+    assert spec.HEAD_FRONT_Z == pytest.approx(-11.75)
+    assert spec.HEAD_REAR_Z == pytest.approx(-1.25)
     assert spec.NECK_END_Z == pytest.approx(10.0)
     assert spec.SHAFT_LEN == pytest.approx(226.25)
-    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.0)
+    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.75)
     assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
-    assert spec.OVERALL_LEN == pytest.approx(241.45)
+    assert spec.OVERALL_LEN == pytest.approx(242.2)
     assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
-    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(228.25)
-    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(4.5)
+    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(227.5)
+
+
+def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
+    # Printed centred on the head length: only HeadLen's .X band reaches the
+    # web, never a separate station band.
+    assert "CrossHoleReference" not in spec.DRAWING_DIMENSIONS
+    assert "CENTRED ON HEAD LENGTH" in spec.CROSS_HOLE_CALLOUT
+    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(1.7975)
+    assert spec.CROSS_HOLE_WEB_WORST >= 1.5
 
 
 def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.HEAD_DIA == pytest.approx(15.0)
-    assert spec.HEAD_LEN == pytest.approx(9.0)
+    assert spec.HEAD_LEN == pytest.approx(10.5)
     assert spec.NECK_DIA == pytest.approx(10.5)
-    assert spec.NECK_LEN == pytest.approx(12.0)
+    assert spec.NECK_LEN == pytest.approx(11.25)
     assert spec.CROSS_HOLE_DIA == pytest.approx(6.005)
     assert crossrod.ROD_DIA == pytest.approx(6.0175)
     assert crossrod.ROD_DIA > spec.CROSS_HOLE_DIA
@@ -62,9 +72,6 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert "MHA-058" in callout and "MIDPLANE" not in callout
     assert "ARBOR-PRESS" in callout
     assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
-    assert spec.DRAWING_DIMENSIONS["CrossHoleReference"] == {
-        "CrossHoleFromHeadRear"
-    }
 
 
 def test_running_journal_keeps_only_its_functional_size_and_finish() -> None:

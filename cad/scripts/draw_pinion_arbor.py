@@ -80,7 +80,6 @@ DETAIL_KEEP = {
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
     "CrossHoleDia": (0.245, 0.245),
-    "CrossHoleFromHeadRear": (0.155, 0.258),
 }
 DIAMETER_POSITIONS = {
     "HeadDia": (0.165, 0.215),

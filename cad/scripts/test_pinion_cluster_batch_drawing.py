@@ -472,7 +472,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 4.1656,
                 3.454,
-                6.65,
+                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/foot-screw",

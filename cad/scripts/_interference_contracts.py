@@ -321,11 +321,13 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 15.525),
     ),
+    # Rule 12 (audit E10): the 31.75 #8-32 x 1-1/4 block screws pass the
+    # 20.5 pinion block and engage 11.25 of the base seat.
     **_numbered_pairs(
         "drive-train-1/slotted-screw",
         range(1, 5),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 6.65),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 31.75 - 20.5),
     ),
     **_numbered_pairs(
         "drive-train-1/foot-screw",

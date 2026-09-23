@@ -1792,8 +1792,9 @@ if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA - 0.0125) > 1e-9:
     raise AssertionError("grip crossrod/head nominal interference changed")
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
-# Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
-# #8 clearance holes and engage 6.65 mm in the base's #8-32 UNC-2B seats.
+# Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal
+# #8 clearance holes and engage 11.25 mm (2.7D; 2.58D worst case, rule 12
+# audit E10) in the base's #8-32 UNC-2B seats.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
 _require_tapped_thread(
