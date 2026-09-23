@@ -107,8 +107,11 @@ ASSEMBLED_ISO_SCALE = (1.0, 3.0)
 REFERENCE_ISO_SCALE = (1.0, 8.0)
 # At 1:3 the bank and rig explodes filled about a fifth of their sheets (Fable
 # review of baseline-5); the cone-crank ring already spans ~170 x 150 mm there.
+# The bank still filled a small fraction of its sheet at 1:2 (r9 Fable review);
+# at 2:3 its ~145 x 107 mm outline plus the balloon ring fits the 395 x 176 field.
+# The rig cannot grow: its ~116 mm-tall outline plus ring already nears 176.
 CLUSTER_SCALES: dict[Cluster, tuple[float, float]] = {
-    "cylinder-bank": (1.0, 2.0),
+    "cylinder-bank": (2.0, 3.0),
     "cone-crank": (1.0, 3.0),
     "pinion-rig": (1.0, 2.0),
 }
@@ -300,7 +303,7 @@ BOM_DESCRIPTIONS = {
     "pinion-lift-rod": "PINION LIFT ROD",
     "pinion-spring": "PINION SPRING",
     "pinion-cam-pin": "PINION CAM FOLLOWER PIN",
-    "pinion-cam": "PINION ECCENTRIC CAM",
+    "pinion-cam": "PINION ECCENTRIC CAM, WITH M2.5 SET SCREW",
     "pinion-lever": "PINION LEVER",
     "pinion-lever-pin": "PINION LEVER PIN, 1/16 X 13 STEEL",
     "pinion-handle": "PINION GRIP CROSSROD",
@@ -340,9 +343,10 @@ CONE_CRANK_STEPS = "\n".join(
         "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
         "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
         "   (0.93-1.0D): ACCEPTED EXCEPTION TO THE 1.5D RULE.",
-        # U30 (user, 2026-09-23, option (a)): one #6-32 SHCS up through the
-        # MHA-091 slot, height and side set by the shim pack at fit-up. Wording
-        # from swing (dt-tip-block-attachment-options-20260923.md section 2(a)).
+        # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
+        # up through the MHA-091 slot, height and side set by the shim pack at
+        # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
+        # section 2(a)).
         "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB AGAINST",
         "   T006. SET MHA-092 ON A 1.10 MHA-141 SHIM PACK OVER THE MHA-091",
         "   SLOT; MHA-140 UP THROUGH THE SLOT, FINGER-TIGHT. RUN MHA-097 IN",
@@ -350,9 +354,10 @@ CONE_CRANK_STEPS = "\n".join(
         "   SHIMS UNTIL MHA-014 SPINS FREE, NO TIGHT SPOT AT THE MHA-016",
         "   JOURNAL; SNUG MHA-140 AND RECHECK. RECORD THE SHIM STACK.",
         # U32 (user, 2026-09-23): option 1A turn-set, dt-pending-rulings
-        # packet section 1; 5/16-18 is 1.411 a turn, so 1/8 turn is ~0.18.
+        # packet section 1. Worded without the pitch so it survives E11
+        # (MHA-097 5/16-18 -> #10-32: 1/8 turn is ~0.18 -> ~0.10).
         "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
-        "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN (APPROX. 0.18); TIGHTEN",
+        "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-098 ACROSS THE SLIT. END PLAY 0.05-0.40, BY FEEL OR INDICATOR.",
         # U31 (user, 2026-09-23, option 3a): MHA-016 bores the crank-above-cone
         # spacing 39.33 +0.37/0 in one setup, so the mesh is checked, not
@@ -439,10 +444,15 @@ RIG_STEPS = "\n".join(
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
-        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL AND TAP #8-32,",
-        "    {slotted} PLACES. SET MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED",
-        "    BACK MHA-056; SPOT THROUGH ITS FOOT HOLE; DRILL AND TAP #4-40,",
-        "    1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
+        # Seat depths from the base's own seat specs (build_harmonic_base
+        # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
+        # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
+        # 8.975 prints as 9.0: .X +/-0.8 is the honest band for a tap depth.
+        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
+        "    #8-32 X 12.75 (PLUG, THEN BOTTOMING), {slotted} PLACES. SET",
+        "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
+        "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
+        "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
         "17. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
     )
 )
@@ -512,8 +522,8 @@ FIT_PLACEHOLDER = "\n".join(
         "BACKLASH (CHECK 2).",
         "MESH + FIT DETAILS - PENDING",
         "CONE/CYLINDER STATION MESH, ALIGNMENT PINION ENGAGEMENT AND",
-        "TAPER-PIN STATION DETAILS FOLLOW THE PINION BRACKET, TOOTH-COUNT,",
-        "CRANK-HUB AND MHA-135 RULINGS.",
+        "TAPER-PIN STATION DETAILS FOLLOW THE PINION BRACKET AND TOOTH-COUNT",
+        "RULINGS.",
     )
 )
 
