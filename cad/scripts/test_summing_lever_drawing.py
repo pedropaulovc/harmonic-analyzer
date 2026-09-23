@@ -41,11 +41,11 @@ def test_knife_profile_is_the_nonregular_hex_detail_a_states() -> None:
     # A regular hexagon locks A/F and A/C together; ours is 0.28 mm outside it.
     assert abs(across_corners - across_flats * 2.0 / math.sqrt(3.0)) > 0.2
     # _hex_collar's vertex-up hexagon puts its shoulders at +-HEX_H/4, so the
-    # vertical flat HexKnifeFrontSideFlat names is exactly HEX_H/2 -- and not
+    # +X vertical flat HexKnifeFrontSideFlat names is exactly HEX_H/2 -- and not
     # the regular hexagon's side HEX_W/sqrt(3). A flat is half the A/C measure,
     # so the second gap is half the bound above.
     half_width, quarter_height = across_flats / 2.0, across_corners / 4.0
-    flat = math.dist((-half_width, quarter_height), (-half_width, -quarter_height))
+    flat = math.dist((half_width, -quarter_height), (half_width, quarter_height))
     assert math.isclose(flat, across_corners / 2.0, rel_tol=0.0, abs_tol=1e-12)
     assert abs(flat - across_flats / math.sqrt(3.0)) > 0.1
     # ...and the flat must reach the print as a model dimension at its own
@@ -176,6 +176,14 @@ def _arc_points(centre):
     )
 
 
+def _cylinder_points(radius_error: float = 0.0):
+    import build_summing_lever as build
+
+    station = -build.CYLINDER_REFERENCE_Z
+    half = build.CYL_R + radius_error
+    return _top_plane([(-half, station), (half, station)])
+
+
 def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
     """Positive control: the R7 authoring (-HOLE_Z on the Top plane) passes."""
     import build_summing_lever as build
@@ -186,6 +194,7 @@ def test_reference_gate_accepts_sketches_on_the_real_features() -> None:
         ("PatternReferences", _pattern_points(-1.0)),
         ("BossAxialReference", _boss_points()),
         ("SummationArcReference", _arc_points(centre)),
+        ("CylinderReference", _cylinder_points()),
     ):
         problems, worst = build._reference_misses(points, *claims[name])
         assert problems == [], (name, problems)
@@ -226,3 +235,108 @@ def test_reference_gate_refuses_a_brep_missing_a_spring_hole() -> None:
     cylinders, planes, _centre = _synthetic_lever_brep()
     with pytest.raises(RuntimeError, match="expected 20 spring-hole axes"):
         build._reference_claims(cylinders[1:], planes)
+
+
+def test_reference_gate_rejects_a_diameter_line_off_the_cylinder_face() -> None:
+    """Negative control: a CylRefDia line 1e-5 mm off the face at each end."""
+    import build_summing_lever as build
+
+    cylinders, planes, _centre = _synthetic_lever_brep()
+    claims = build._reference_claims(cylinders, planes)["CylinderReference"]
+    problems, _worst = build._reference_misses(_cylinder_points(1e-5), *claims)
+    assert sum("mm off pivot-cylinder face" in problem for problem in problems) == 2
+    assert problems[-1] == "no point lands on the pivot-cylinder face"
+
+
+def _slab_sources(source: str) -> dict[str, tuple[str, str]]:
+    """Per plate-arm builder: (extrusion depth, equation driving that depth).
+
+    Read from the build script's AST, so the guard runs offline and keys no
+    part: the extrusion's ``depth=`` expression and the global its depth
+    dimension is driven by (the ``drive_jobs.append((name, expr))`` call).
+    """
+    import ast
+
+    found: dict[str, tuple[str, str]] = {}
+    for node in ast.walk(ast.parse(source)):
+        if not (
+            isinstance(node, ast.AsyncFunctionDef)
+            and node.name in ("_coefficients_plate", "_summation_plate")
+        ):
+            continue
+        depth = drive = ""
+        for call in (n for n in ast.walk(node) if isinstance(n, ast.Call)):
+            if getattr(call.func, "id", "") == "ExtrusionParameters":
+                depth = next(
+                    ast.unparse(k.value) for k in call.keywords if k.arg == "depth"
+                )
+            if getattr(call.func, "attr", "") == "append" and call.args:
+                pair = call.args[0]
+                # The depth dimension's own drive: (<arm>_depth[0], "<global>").
+                if (
+                    isinstance(pair, ast.Tuple)
+                    and ast.unparse(pair.elts[0]).endswith("_depth[0]")
+                    and isinstance(pair.elts[1], ast.Constant)
+                ):
+                    drive = pair.elts[1].value
+        found[node.name] = (depth, drive)
+    return found
+
+
+def _is_one_slab(sources: dict[str, tuple[str, str]]) -> bool:
+    return set(sources.values()) == {("PLATE_T", '"PlateT"')} and len(sources) == 2
+
+
+def test_plate_and_web_are_one_slab_by_construction() -> None:
+    """The print's "PLATE AND WEB" 5.08 governs both arms.
+
+    Both are mid-plane Top-plane extrusions whose depth is PLATE_T and whose
+    depth dimension is driven by the one "PlateT" global; splitting either
+    would let the web's thickness drift away from the only 5.08 printed.
+    """
+    import inspect
+
+    import build_summing_lever as build
+
+    source = inspect.getsource(build)
+    assert _slab_sources(source) == {
+        "_coefficients_plate": ("PLATE_T", '"PlateT"'),
+        "_summation_plate": ("PLATE_T", '"PlateT"'),
+    }
+    assert _is_one_slab(_slab_sources(source))
+    # Negative controls: a split global, and a web built to its own depth.
+    split = source.replace("""web_depth[0], '"PlateT"'""", """web_depth[0], '"WebT"'""")
+    assert split != source and not _is_one_slab(_slab_sources(split))
+    body = inspect.getsource(build._summation_plate)
+    own_depth = source.replace(body, body.replace("depth=PLATE_T", "depth=WEB_T"))
+    assert own_depth != source and not _is_one_slab(_slab_sources(own_depth))
+
+
+def _slab_faces(web_half: float):
+    """Y-normal faces of the two arms: (normal, root, box centre X)."""
+    import build_summing_lever as build
+
+    plate_half = build.PLATE_T / 2.0
+    return [
+        ((0.0, sign, 0.0), (x, sign * half, 7.0), x)
+        for x, half in ((-45.0, web_half), (28.0, plate_half))
+        for sign in (1.0, -1.0)
+    ]
+
+
+def test_web_and_plate_gate_accepts_one_slab() -> None:
+    """Positive control: both arms on the plate's +-2.54 planes."""
+    import build_summing_lever as build
+
+    assert build._slab_misses(_slab_faces(build.PLATE_T / 2.0)) == []
+
+
+def test_web_and_plate_gate_rejects_a_thicker_web() -> None:
+    """Negative control: a web 1e-5 mm proud of the plate on each face."""
+    import build_summing_lever as build
+
+    problems = build._slab_misses(_slab_faces(build.PLATE_T / 2.0 + 1e-5))
+    assert problems == [
+        "no summation web face on y=+2.54",
+        "no summation web face on y=-2.54",
+    ]

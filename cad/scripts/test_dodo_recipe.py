@@ -2471,3 +2471,49 @@ def test_export_cache_ships_every_file_it_certifies():
         f"{len(uncovered)} certified release file(s) are not in the export cache "
         f"payload: {uncovered[:5]}"
     )
+
+
+def test_check_gates_depend_on_everything_they_execute():
+    """Every ``check:*`` stamp must go stale when code or config it EXECUTES
+    changes, or the gate reports green without running.
+
+    For each gate, the entry points are the ``.py`` arguments of its command
+    (``verify.py`` for math/config, the pytest files otherwise). Their local
+    import closure (``module_deps_of``, which follows lazy function-local
+    imports too) and the config files that closure reads (``_config_deps``,
+    conservative whole-config on any unclassified use) must all be declared
+    ``file_dep``s. ``check:math`` missed ``build_summing_assembly.py`` and
+    ``gooseneck_geom.py``: a gooseneck edit left the stamp green (2026-09-23),
+    and only an unrelated config change later re-ran it -- red.
+
+    Not covered by this derivation, so still hand-listed where a gate needs
+    them: modules ``module_deps_of`` excludes by design (``_buildgraph``,
+    ``_telemetry``, ``_watchdog``, ``test_*`` helpers), ``dodo.py`` itself
+    (outside ``cad/scripts``, loaded via ``spec_from_file_location``), other
+    ``importlib``/``runpy`` loads, and data files read at run time.
+    """
+    dodo = _load_dodo()
+    gaps: dict[str, list[str]] = {}
+    for task in dodo.task_check():
+        declared = {str(Path(dep).resolve()) for dep in task["file_dep"]}
+        command = task["actions"][0][1][0]
+        entries = [Path(arg) for arg in command if str(arg).endswith(".py")]
+        assert entries, f"check:{task['name']} runs no .py entry point: {command}"
+        executed = {
+            path
+            for entry in entries
+            for path in (
+                str(entry.resolve()),
+                *dodo.module_deps_of(entry),
+                *dodo._config_deps(entry),
+            )
+        }
+        missing = sorted(executed - declared)
+        if missing:
+            gaps[task["name"]] = [
+                str(Path(path).relative_to(REPO_ROOT)) for path in missing
+            ]
+    assert not gaps, "check:* gates execute undeclared inputs (stale-green): " + "; ".join(
+        f"check:{name} misses {len(paths)}: {', '.join(paths)}"
+        for name, paths in sorted(gaps.items())
+    )

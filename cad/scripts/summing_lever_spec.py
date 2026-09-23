@@ -102,8 +102,12 @@ HOLE_PATTERN_SPAN = (HOLE_COUNT - 1) * CHANNEL_PITCH
 # verifies them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
+    # Prints for the summation web too ("PLATE AND WEB"): the one "PlateT"
+    # global drives both mid-plane extrusions, one continuous slab in the front
+    # view.  The web's own 5.08 could only be dimensioned from its end inside
+    # the boss, its witness lines ruling out through the boss like a bar
+    # (Fable R14b B2/B3).
     "CoefficientsPlate": {"PlateThickness"},
-    "CylinderProfile": {"CylDia"},
     "HexKnifeFront": {"HexKnifeFrontDepth"},
     "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat"},
     "EdgeRibFront": {"EdgeRibThickness"},
@@ -111,7 +115,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
     "SummationPlateProfile": {"SummationArcRadius"},
     "SummationArcReference": {"SummationArcCentreX", "SummationArcCentreZ"},
-    "SummationPlate": {"WebThickness"},
     "SummationAnchorProfile": {"AnchorOuterX", "AnchorOuterDia"},
     "SummationAnchor": {"AnchorHeight"},
     "MiddleRibProfile": {"MidRibArcR", "MidRibLeftX", "MidRibRightX"},
@@ -120,6 +123,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SpringHolePattern": {"HolePitch"},
     "PatternReferences": {"HoleEndOffsetLast", "HoleFirstFromEnd"},
     "BossAxialReference": {"BossAxialLocation"},
+    # The pivot cylinder's diameter, across its top-view silhouette: the
+    # front view, where its profile lives, hides it behind the R15.2 rib
+    # outline (Fable R14b B1).
+    "CylinderReference": {"CylRefDia"},
 }
 
 # Decimal places carry the title-block tolerance and therefore live on the
@@ -131,7 +138,6 @@ DRAWING_REFERENCE_PRECISION = 2
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {"PlateWidth": 1, "PlateLength": 1},
     "CoefficientsPlate": {"PlateThickness": 2},
-    "CylinderProfile": {"CylDia": 1},
     "HexKnifeFront": {"HexKnifeFrontDepth": 1},
     "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat": 2},
     "EdgeRibFront": {"EdgeRibThickness": 2},
@@ -139,7 +145,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "KnifeEnvelopeReference": {"HexWidth": 2, "HexHeight": 2},
     "SummationPlateProfile": {"SummationArcRadius": 1},
     "SummationArcReference": {"SummationArcCentreX": 1, "SummationArcCentreZ": 1},
-    "SummationPlate": {"WebThickness": 2},
     "SummationAnchorProfile": {"AnchorOuterX": 1, "AnchorOuterDia": 2},
     "SummationAnchor": {"AnchorHeight": 2},
     "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 1, "MidRibRightX": 1},
@@ -148,6 +153,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringHolePattern": {"HolePitch": 2},
     "PatternReferences": {"HoleEndOffsetLast": 2, "HoleFirstFromEnd": 2},
     "BossAxialReference": {"BossAxialLocation": 1},
+    "CylinderReference": {"CylRefDia": 1},
 }
 
 _PRECISION_NAMES = [

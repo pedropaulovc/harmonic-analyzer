@@ -130,6 +130,7 @@ def _top_xy(
         center[1] + mz * factor / 1000.0,
     )
 
+
 def _assert_uses_sheet_scale(view: Any, label: str) -> None:
     """Prove a view follows the native sheet scale printed in the title block."""
     bound = _early_bound(view, "IView")
@@ -156,9 +157,7 @@ def _attach_radial_leaders(
         name = dimension_name(adapter, annotation)
         if name not in wanted:
             continue
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         display.ArcExtensionLineOrOppositeSide = False
         if bool(display.ArcExtensionLineOrOppositeSide):
             raise RuntimeError(
@@ -177,21 +176,26 @@ def _attach_radial_leaders(
 # locate them: nothing told the reader those stations are the rib's own apexes
 # (on its mid-plane, inside the boss and the plate), so the visible ends -- the
 # flanks running out into web and plate -- looked unlocated.  Name them where
-# they print.  (dimension, callout part, text): 3 = swDimensionTextCalloutAbove,
-# 4 = swDimensionTextCalloutBelow.
-MID_RIB_CALLOUTS = (
+# they print.  Fable R14b then could not tell the two R15.2 callouts apart (the
+# mid rib's and the end ribs', one outline in the front view), and the plate's
+# 5.08 now governs the web as well.  (dimension, callout part, text):
+# 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow.
+DIMENSION_CALLOUTS = (
     ("MidRibRightX", 3, "RIB APEX"),
     ("MidRibLeftX", 3, "RIB APEX"),
     ("MiddleRibThickness", 4, "MID RIB"),
+    ("MidRibArcR", 4, "MID RIB"),
+    ("EdgeRibFrontArcR", 4, "END RIBS"),
+    ("PlateThickness", 4, "PLATE AND WEB"),
 )
 
 
-def _label_mid_rib(
+def _label_dimensions(
     adapter: Any, annotations: Any, names: tuple[str, ...], label: str
 ) -> None:
-    """Write and read back the mid-rib callouts on the named dimensions."""
+    """Write and read back the callouts on the named dimensions."""
     wanted = {
-        name: (part, text) for name, part, text in MID_RIB_CALLOUTS if name in names
+        name: (part, text) for name, part, text in DIMENSION_CALLOUTS if name in names
     }
     seen = set()
     for annotation in annotations:
@@ -199,16 +203,14 @@ def _label_mid_rib(
         if name not in wanted:
             continue
         part, text = wanted[name]
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         display.SetText(part, text)
         if str(display.GetText(part) or "") != text:
             raise RuntimeError(f"{label}: {name} callout {text!r} did not persist")
         seen.add(name)
     missing = sorted(set(wanted) - seen)
     if missing:
-        raise RuntimeError(f"{label}: no mid-rib dimension named {missing!r}")
+        raise RuntimeError(f"{label}: no callout dimension named {missing!r}")
 
 
 def _assert_arc_centre_text(
@@ -225,9 +227,7 @@ def _assert_arc_centre_text(
         name = dimension_name(adapter, annotation)
         if name not in names:
             continue
-        display = _early_bound(
-            annotation.GetSpecificAnnotation(), "IDisplayDimension"
-        )
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         texts = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         if texts != ("2X ", "") or bool(display.ShowParenthesis):
             raise RuntimeError(
@@ -240,18 +240,23 @@ def _assert_arc_centre_text(
 
 
 FORM_FRONT_KEEP = {
-    # Upper left, so the diameter line crosses the collar clear of the R15.2 leader
-    # that drops onto the top of the same circle.
-    "CylDia": (0.1425, 0.2470),
-    "AnchorHeight": (0.0980, 0.2300),
-    "WebThickness": (0.1080, 0.2130),
-    "MidRibArcR": (0.1700, 0.2420),
-    # Past its own arrows: between them the witness lines ruled through the text.
-    "PlateThickness": (0.2050, 0.2330),
-    # Both carry "RIB APEX" above the value (MID_RIB_CALLOUTS).  35.8 sits past
+    # Dimension line close to the boss: its long witness lines read as a bar
+    # beside the boss to two blind reviewers (Fable R14b B2, R15c B1).
+    "AnchorHeight": (0.1080, 0.2300),
+    # "MID RIB" below: 2 mm right of R14b so the label clears its own leader.
+    "MidRibArcR": (0.1720, 0.2420),
+    # Past its own arrows (between them the witness lines ruled through the
+    # text), below the plate so "PLATE AND WEB" clears the note block, and close
+    # to the plate end: longer witness lines read as the plate running on
+    # (Fable R15c B1).
+    "PlateThickness": (0.1950, 0.2120),
+    # Both carry "RIB APEX" above the value (DIMENSION_CALLOUTS).  35.8 sits past
     # its +X witness so that label clears the shared cylinder-axis witness.
-    "MidRibRightX": (0.1413, 0.1960),
-    "MidRibLeftX": (0.1943, 0.1960),
+    # 2.5 mm lower than R14b: room for "END RIBS" under the 2X R15.2 above,
+    # one text height clear of the top view's 2X 123.2 below (3 mm crowded it:
+    # R15b census).
+    "MidRibRightX": (0.1413, 0.1935),
+    "MidRibLeftX": (0.1943, 0.1935),
     # Lower left, onto the edge rib's own (-X) semicircle, above the 76.2 / 35.75
     # chain: from the lower right its leader crossed the 35.75 dimension line.
     "EdgeRibFrontArcR": (0.1350, 0.2080),
@@ -281,14 +286,19 @@ FORM_TOP_KEEP = {
     "SummationArcCentreX": (0.1295, 0.1833),
     "SummationArcCentreZ": (0.2029, 0.1591),
     "BossAxialLocation": (0.0900, 0.0860),
+    # In the clear web field left of the tube; its dimension line lands on the
+    # construction chord (build_summing_lever.CYLINDER_REFERENCE_Z).  The census sizes the text from its string, "<MOD-DIAM>"
+    # token included (27 mm estimated for "Ø25.4"), and R15b's seat put that
+    # box across the cylinder-axis witness of PlateWidth: this one keeps the
+    # estimate short of it while the real text stays clear of the web arc.
+    "CylRefDia": (0.1380, 0.1115),
 }
 DETAIL_KEEP = {
     "HexWidth": (0.330, 0.113),
     "HexHeight": (0.378, 0.155),
-    # 0.0634 from the drawn detail centre against a 0.0468 fence radius: the
-    # text box clears the fence entirely, so only its extension lines cross
-    # geometry and SolidWorks jogs the leader instead of ruling it through text.
-    "HexKnifeFrontSideFlat": (0.280, 0.1770),
+    # On the +X flat, inside the 10.27 and short of the R15.2 outline: from the
+    # -X flat its witness lines ran collinear with the 5.08 web edges (Fable R14b).
+    "HexKnifeFrontSideFlat": (0.3577, 0.1550),
 }
 PATTERN_KEEP = {
     "HoleSeedX": (0.190, 0.205),
@@ -309,7 +319,11 @@ MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
     ("KNIFE RIDGES SHARP; NO EDGE BREAK", 0.230, 0.237),
     # The Ra value lives on the model's finish control (Detail A's symbol); the
     # note only scopes it, so the sheet never restates a manufacturing value.
-    ("DETAIL A FINISH ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS", 0.230, 0.228),
+    (
+        "DETAIL A FINISH ON THE TWO FLATS AT THE KNIFE RIDGE, BOTH TRUNNIONS",
+        0.230,
+        0.228,
+    ),
 )
 
 
@@ -395,7 +409,9 @@ def _knife_detail(adapter: Any, front: Any) -> Any:
 
 def _place_detail_letter(adapter: Any, front: Any) -> None:
     """Seat the parent circle's letter in clear air, proved by read-back."""
-    circles = tuple(_read_member(_early_bound(front, "IView"), "GetDetailCircles") or ())
+    circles = tuple(
+        _read_member(_early_bound(front, "IView"), "GetDetailCircles") or ()
+    )
     if len(circles) != 1:
         raise RuntimeError(f"expected one knife-detail circle, found {len(circles)}")
     circle = _early_bound(circles[0], "IDetailCircle")
@@ -453,8 +469,7 @@ def _audit_lines_through_text(adapter: Any) -> None:
     blocking = [finding for finding in findings if finding.kind == "text-on-line"]
     if blocking:
         raise RuntimeError(
-            "a line runs through annotation text:\n"
-            + format_layout_findings(blocking)
+            "a line runs through annotation text:\n" + format_layout_findings(blocking)
         )
 
 
@@ -512,11 +527,10 @@ def _omit_default_thread_class(display: Any, expected_class: str, label: str) ->
             f"string {expected_class!r}"
         )
 
-    definitions = {
-        part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)
-    }
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     matches = [
-        part for part, definition in definitions.items()
+        part
+        for part, definition in definitions.items()
         if "<hw-threadclass>" in definition
     ]
     if len(matches) != 1:
@@ -572,10 +586,8 @@ def _assert_model_thread_class(
     actual = str(definition.ThreadClass or "")
     if actual != expected_class:
         raise RuntimeError(
-            f"{label}: model Hole Wizard thread class {actual!r} != "
-            f"{expected_class!r}"
+            f"{label}: model Hole Wizard thread class {actual!r} != {expected_class!r}"
         )
-
 
 
 # SolidWorks attaches one of its own automatic "Tapped Hole" notes to a view
@@ -723,13 +735,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _attach_radial_leaders(
         adapter, front_dimensions, ("MidRibArcR", "EdgeRibFrontArcR"), "form front"
     )
-    _attach_radial_leaders(
-        adapter, top_dimensions, ("SummationArcRadius",), "form top"
+    _attach_radial_leaders(adapter, top_dimensions, ("SummationArcRadius",), "form top")
+    _label_dimensions(
+        adapter,
+        front_dimensions,
+        (
+            "MidRibRightX",
+            "MidRibLeftX",
+            "MidRibArcR",
+            "EdgeRibFrontArcR",
+            "PlateThickness",
+        ),
+        "form front",
     )
-    _label_mid_rib(
-        adapter, front_dimensions, ("MidRibRightX", "MidRibLeftX"), "form front"
-    )
-    _label_mid_rib(adapter, top_dimensions, ("MiddleRibThickness",), "form top")
+    _label_dimensions(adapter, top_dimensions, ("MiddleRibThickness",), "form top")
     _assert_arc_centre_text(
         adapter,
         top_dimensions,
@@ -797,7 +816,9 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{measured_overall_mm:g}, expected {expected_overall_mm:g} mm"
         )
     if int(overall_dimension.GetToleranceType()) != 0:  # swTolNONE
-        raise RuntimeError("overall trunnion reference unexpectedly carries a tolerance")
+        raise RuntimeError(
+            "overall trunnion reference unexpectedly carries a tolerance"
+        )
     overall_text_xy = (0.045, 0.105)
     if not overall_annotation.SetPosition2(*overall_text_xy, 0.0):
         raise RuntimeError("failed to position overall trunnion reference text")
@@ -837,7 +858,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    for sketch in ("SummationArcReference", "BossAxialReference"):
+    for sketch in (
+        "SummationArcReference",
+        "BossAxialReference",
+        "CylinderReference",
+    ):
         _hide_view_sketch(adapter, front, sketch)
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
@@ -914,7 +939,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         pattern,
         edge_xy=seed_rim_right,
-        callout_xy=(0.245, 0.222),
+        # 10 mm right of R14b: the leader from the shelf's left end ran
+        # through the estimated "39.85 +-0.15" box (R15b census, 1.48 mm).
+        callout_xy=(0.255, 0.222),
         label="spring-hole pattern",
     )
     _omit_default_thread_class(
@@ -929,7 +956,11 @@ async def build(adapter: Any) -> dict[str, str]:
         "spring-hole pattern",
     )
     for view in (pattern, iso):
-        for sketch in ("SummationArcReference", "BossAxialReference"):
+        for sketch in (
+            "SummationArcReference",
+            "BossAxialReference",
+            "CylinderReference",
+        ):
             _hide_view_sketch(adapter, view, sketch)
     _hide_view_sketch(adapter, iso, "PatternReferences")
 

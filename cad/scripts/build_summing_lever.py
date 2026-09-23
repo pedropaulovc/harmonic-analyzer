@@ -193,6 +193,14 @@ REFERENCE_COINCIDENCE_TOL_MM = 1e-6
 # Each arm of the construction cross that marks the R138.8 centre (2.5 mm on
 # the 1:2 sheet).
 CENTRE_CROSS_ARM = 5.0
+# Model Z of the construction line that carries the pivot cylinder's diameter
+# across its top-view silhouette: between the mid rib and the -Z end rib, level
+# with the dimension line under the text in the clear web field.  The front
+# view cannot carry it -- the R15.2 rib outline hides the cylinder there (Fable
+# R14b B1).  At -15 the dimension line landed 4 mm below the dashed chord, and
+# chord + witness lines + dimension line boxed a phantom hidden feature (Fable
+# R15c clarity); here the chord lies under the dimension line.
+CYLINDER_REFERENCE_Z = -7.5
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -298,9 +306,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
         ),
     )
     name_last_feature(adapter, "CoefficientsPlate")
-    plate_depth = name_dimensions(
-        adapter, "CoefficientsPlate", ["PlateThickness"]
-    )
+    plate_depth = name_dimensions(adapter, "CoefficientsPlate", ["PlateThickness"])
     drive_jobs.append((plate_depth[0], '"PlateT"'))
     # The plate is a plain rectangular prism, so an exact analytic volume gate
     # anchors the hole-field tripwires below (the WHOLE part has no analytic
@@ -361,9 +367,7 @@ async def _coefficients_plate(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     # Native readback enumerates D3 (7.0565 mm spacing) before D1 (20
     # instances, displayed through the length-valued COM dimension wrapper).
     # Name and drive the measured spacing; leave the instance count untouched.
-    pitch_dimension = name_dimensions(
-        adapter, "SpringHolePattern", ["HolePitch", None]
-    )
+    pitch_dimension = name_dimensions(adapter, "SpringHolePattern", ["HolePitch", None])
     drive_jobs.append((pitch_dimension[0], '"ChannelPitch"'))
     await volume_check(
         adapter,
@@ -451,12 +455,16 @@ async def _hex_collar(
             f"{stem}TopY",
             f"{stem}S0dx",
             f"{stem}S0dy",
-            f"{stem}SideFlat",
+            f"{stem}S1dy",
             f"{stem}S2dx",
             f"{stem}S2dy",
             f"{stem}S3dx",
             f"{stem}S3dy",
-            f"{stem}S4dy",
+            # The +X flat carries the printed side flat: in Detail A the -X
+            # flat's witness lines ran collinear with the 5.08 web edges
+            # (5.13 vs 5.08, 0.025 mm a side), reading as a web thickness
+            # (Fable R14b clarity).
+            f"{stem}SideFlat",
         ],
         drives=[_hh2, _hw, _hh4, _hh2, _hw, _hh4, _hw, _hh4, _hh2],
     )
@@ -466,9 +474,7 @@ async def _hex_collar(
     drive_jobs += hexd.apply(adapter, f"{stem}Profile")
     extrude_at_offset(adapter, HEX_Z_OUTER - HEX_Z_INNER, HEX_Z_INNER, flip=flip)
     name_last_feature(adapter, stem)
-    depth_dimension = name_dimensions(
-        adapter, stem, [f"{stem}Depth"]
-    )
+    depth_dimension = name_dimensions(adapter, stem, [f"{stem}Depth"])
     drive_jobs.append((depth_dimension[0], '"HexDepth"'))
 
 
@@ -526,16 +532,13 @@ async def _edge_rib(
     thickness_name = (
         "EdgeRibThickness" if stem == "EdgeRibFront" else "EdgeRibBackThickness"
     )
-    rib_depths = name_dimensions(
-        adapter, stem, [thickness_name, f"{stem}Start"]
-    )
+    rib_depths = name_dimensions(adapter, stem, [thickness_name, f"{stem}Start"])
     drive_jobs.extend(
         (
             (rib_depths[0], '"RibT"'),
             (rib_depths[1], '"PlateL" / 2 - "RibT"'),
         )
     )
-
 
 
 def _summation_top_arc_points() -> tuple[
@@ -958,9 +961,7 @@ async def _drawing_reference_sketches(
         PLATE_L / 2.0 - HOLE_Z[0],
         "first spring-hole from the +Z plate end",
     )
-    pattern.record(
-        "HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")'
-    )
+    pattern.record("HoleFirstFromEnd", '"PlateL" / 2 - ("ChannelZ0" + "HoleZOffset")')
     await dimension_between(
         adapter,
         f"{end_offset}.start",
@@ -1018,10 +1019,50 @@ async def _drawing_reference_sketches(
     name_last_feature(adapter, "BossAxialReference")
     drive_jobs += boss.apply(adapter, "BossAxialReference")
 
+    # The pivot cylinder's diameter, across its top-view silhouette.  Its own
+    # Front-plane profile dimension could only print in the front view, where
+    # the R15.2 rib outline hides the cylinder: R14b printed a leader onto an
+    # invisible circle, and the reviewer took the Detail A fence for the tube.
+    cylinder = SketchDims()
+    check("create cylinder reference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    across = check(
+        "cylinder diameter reference",
+        await adapter.add_line(
+            -CYL_R, -CYLINDER_REFERENCE_Z, CYL_R, -CYLINDER_REFERENCE_Z
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, across)
+    check(
+        "cylinder diameter reference horizontal",
+        await adapter.add_sketch_constraint(across, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{across}.start",
+        f"{across}.end",
+        "horizontal_distance",
+        2.0 * CYL_R,
+        "cylinder diameter reference",
+    )
+    cylinder.record("CylRefDia", '"CylR" * 2')
+    await anchor_point_to_origin(
+        adapter,
+        f"{across}.start",
+        -CYL_R,
+        -CYLINDER_REFERENCE_Z,
+        "cylinder diameter reference start",
+    )
+    cylinder.record("CylRefX", '"CylR"')
+    cylinder.record("CylRefZ")
+    await ensure_fully_defined(adapter, "cylinder reference sketch")
+    check("exit cylinder reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CylinderReference")
+    drive_jobs += cylinder.apply(adapter, "CylinderReference")
 
-async def _summation_arc_reference(
-    adapter, drive_jobs: list[tuple[str, str]]
-) -> None:
+
+async def _summation_arc_reference(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Locate the R138.8 summation arc centre for the print (rule 11, R3 B2).
 
     The arc runs from the boss quadrant to the plate-end corner ON the cylinder
@@ -1144,9 +1185,10 @@ async def _summation_arc_reference(
 
 
 Point = tuple[float, float, float]
-# A target is ("axis", (origin, unit direction)) or ("plane", (unit normal, root)),
+# A target is ("axis", (origin, unit direction)), ("plane", (unit normal, root))
+# or ("surface", (origin, unit direction, radius)) -- a cylinder's own face --
 # all lengths in mm.
-Target = tuple[str, tuple[Point, Point]]
+Target = tuple[str, tuple]
 
 
 def _axis_offset_mm(point: Point, axis: tuple[Point, Point]) -> float:
@@ -1166,6 +1208,9 @@ def _target_offset_mm(point: Point, target: Target) -> float:
     kind, geometry = target
     if kind == "axis":
         return _axis_offset_mm(point, geometry)
+    if kind == "surface":
+        origin, direction, radius = geometry
+        return abs(_axis_offset_mm(point, (origin, direction)) - radius)
     return _plane_offset_mm(point, geometry)
 
 
@@ -1204,9 +1249,7 @@ def _reference_claims(
         ]
         # Axis position across the two coordinates the axis does not run along.
         others = [i for i in range(3) if i != index]
-        return _distinct(
-            rows, lambda row: tuple(round(row[0][i], 4) for i in others)
-        )
+        return _distinct(rows, lambda row: tuple(round(row[0][i], 4) for i in others))
 
     def z_planes_at(z: float) -> list[tuple[Point, Point]]:
         rows = [
@@ -1254,6 +1297,7 @@ def _reference_claims(
     }
     boss_target = {"summation-anchor axis": ("axis", (boss[0], boss[1]))}
     pivot_target = {"pivot axis": ("axis", (pivot[0], pivot[1]))}
+    pivot_surface = {"pivot-cylinder face": ("surface", pivot)}
     return {
         "PatternReferences": (
             {**hole_targets, **plate_targets},
@@ -1283,6 +1327,13 @@ def _reference_claims(
             # The centre cross's four free arm ends.
             4,
         ),
+        # Both ends on the cylinder face: a horizontal chord of CylRefDia = 2R
+        # in the plane through the axis is the diameter itself.
+        "CylinderReference": (
+            pivot_surface,
+            [("the pivot-cylinder face", set(pivot_surface))],
+            0,
+        ),
     }
 
 
@@ -1298,7 +1349,9 @@ def _reference_misses(
     worst = 0.0
     for point in points:
         offsets = {name: _target_offset_mm(point, t) for name, t in targets.items()}
-        on = {name for name, off in offsets.items() if off <= REFERENCE_COINCIDENCE_TOL_MM}
+        on = {
+            name for name, off in offsets.items() if off <= REFERENCE_COINCIDENCE_TOL_MM
+        }
         if on:
             hit |= on
             worst = max(worst, *(offsets[name] for name in on))
@@ -1315,22 +1368,69 @@ def _reference_misses(
     return problems, worst
 
 
+def _slab_misses(slab_faces: list[tuple[Point, Point, float]]) -> list[str]:
+    """Where the summation web and the coefficients plate are NOT one slab.
+
+    ``slab_faces`` are the Y-normal planar faces as (normal, root, face-box
+    centre X), in mm.  The print gives the web no thickness of its own -- the
+    plate's 5.08 carries "PLATE AND WEB" -- which is true only while both arms
+    have a face on each of the plate's two planes.  The cylinder parts them
+    (R12.7 > PLATE_T / 2), so the box centre's side of the axis tells them apart.
+    """
+    problems = []
+    for region, on_side in (
+        ("summation web", lambda x: x < 0.0),
+        ("coefficients plate", lambda x: x > 0.0),
+    ):
+        for sign in (1.0, -1.0):
+            level = (0.0, sign * PLATE_T / 2.0, 0.0)
+            if not any(
+                _parallel(normal, 1)
+                and on_side(centre_x)
+                and _plane_offset_mm(level, (normal, root))
+                <= REFERENCE_COINCIDENCE_TOL_MM
+                for normal, root, centre_x in slab_faces
+            ):
+                problems.append(f"no {region} face on y={level[1]:+.2f}")
+    return problems
+
+
+@_telemetry.traced("gate.web_and_plate_one_slab")
+def _assert_web_and_plate_one_slab(
+    slab_faces: list[tuple[Point, Point, float]],
+) -> None:
+    problems = _slab_misses(slab_faces)
+    if problems:
+        raise RuntimeError("PLATE AND WEB 5.08 is not one slab: " + "; ".join(problems))
+    _telemetry.success(
+        f"web and plate share the +-{PLATE_T / 2.0:g} planes "
+        f"({len(slab_faces)} Y-normal faces read)"
+    )
+
+
 def _brep_surfaces_mm(
     adapter,
-) -> tuple[list[tuple[Point, Point, float]], list[tuple[Point, Point]]]:
-    """Every cylinder (origin, axis, radius) and plane (normal, root) of the body."""
+) -> tuple[
+    list[tuple[Point, Point, float]],
+    list[tuple[Point, Point]],
+    list[tuple[Point, Point, float]],
+]:
+    """Every cylinder (origin, axis, radius) and plane (normal, root) of the body,
+    plus each Y-normal plane's face-box centre X (see ``_slab_misses``)."""
     bodies = list(
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or []
     )
     if len(bodies) != 1:
-        raise RuntimeError(f"reference gate: expected one solid body, found {len(bodies)}")
+        raise RuntimeError(
+            f"reference gate: expected one solid body, found {len(bodies)}"
+        )
     faces = list(_early_bound(bodies[0], "IBody2").GetFaces() or [])
     cylinders: list[tuple[Point, Point, float]] = []
     planes: list[tuple[Point, Point]] = []
+    slab_faces: list[tuple[Point, Point, float]] = []
     for index, raw_face in enumerate(faces, 1):
-        surface = _early_bound(
-            _early_bound(raw_face, "IFace2").GetSurface(), "ISurface"
-        )
+        face = _early_bound(raw_face, "IFace2")
+        surface = _early_bound(face.GetSurface(), "ISurface")
         if surface.IsCylinder():
             p = [float(value) for value in surface.CylinderParams]
             cylinders.append(
@@ -1338,10 +1438,14 @@ def _brep_surfaces_mm(
             )
         elif surface.IsPlane():
             p = [float(value) for value in surface.PlaneParams]
-            planes.append((tuple(p[0:3]), tuple(v * 1000.0 for v in p[3:6])))
+            plane = (tuple(p[0:3]), tuple(v * 1000.0 for v in p[3:6]))
+            planes.append(plane)
+            if _parallel(plane[0], 1):
+                box = [float(value) for value in face.GetBox()]
+                slab_faces.append((*plane, (box[0] + box[3]) * 500.0))
         if index % 25 == 0:
             _telemetry.debug(f"reference gate: read {index}/{len(faces)} faces")
-    return cylinders, planes
+    return cylinders, planes, slab_faces
 
 
 def _sketch_points_mm(adapter, part, sketch_name: str) -> list[Point]:
@@ -1397,7 +1501,8 @@ def _assert_reference_sketches_on_geometry(adapter) -> None:
     """
     from solidworks_mcp.adapters import sw_type_info
 
-    cylinders, planes = _brep_surfaces_mm(adapter)
+    cylinders, planes, slab_faces = _brep_surfaces_mm(adapter)
+    _assert_web_and_plate_one_slab(slab_faces)
     part = sw_type_info.early_bound_doc(adapter.currentModel)
     for sketch_name, (targets, required, exempt) in _reference_claims(
         cylinders, planes
@@ -1591,9 +1696,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_prefix(adapter, "HexKnifeFront", "HexKnifeFrontDepth", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFront", "EdgeRibThickness", "2X ")
     set_dimension_prefix(adapter, "EdgeRibFrontProfile", "EdgeRibFrontArcR", "2X R")
-    set_dimension_prefix(
-        adapter, "SummationPlateProfile", "SummationArcRadius", "2X R"
-    )
+    set_dimension_prefix(adapter, "SummationPlateProfile", "SummationArcRadius", "2X R")
+    # A silhouette width that is the cylinder's diameter prints as one.
+    set_dimension_prefix(adapter, "CylinderReference", "CylRefDia", "<MOD-DIAM>")
     # Both arc centres, one per side, mirror about the boss axis.  CONTROLLING:
     # the arc's other defining end sits on the cylinder axis, buried in the
     # cylinder, so the print lays the arc out from this centre and R138.8 (Codex
