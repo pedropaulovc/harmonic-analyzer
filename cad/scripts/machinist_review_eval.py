@@ -208,10 +208,17 @@ def validate_evidence(
     workdirs: set[Path] = set()
     for number, invocation in enumerate(attempts, start=1):
         if not isinstance(invocation, dict) or set(invocation) != {
-            "attempt", "cwd", "images", "command", "outcome", "error", "exit_code",
-            "stdout_file", "stderr_file", "artifacts",
+            "attempt", "reviewer", "cwd", "images", "command", "outcome", "error",
+            "exit_code", "session_id", "resume_command", "stdout_file", "stderr_file",
+            "artifacts",
         } or type(invocation["attempt"]) is not int or invocation["attempt"] != number:
             raise ValueError("invalid invocation record")
+        if (
+            invocation["reviewer"] != review.reviewer
+            or (invocation["session_id"] is not None and not isinstance(invocation["session_id"], str))
+            or invocation["resume_command"] != mr._resume_command(review.reviewer, invocation["session_id"])
+        ):
+            raise ValueError("invalid session provenance")
         if not isinstance(invocation["cwd"], str):
             raise ValueError("missing invocation workdir")
         cwd = Path(invocation["cwd"])
@@ -280,7 +287,8 @@ def validate_evidence(
         expected_command = (
             mr.build_claude_command(
                 workdir=cwd, images=images, schema=cwd / "schema.json",
-                model=review.model, effort=review.effort, claude=command[0],
+                model=review.model, effort=review.effort,
+                session_id=invocation["session_id"] or "", claude=command[0],
                 schema_content=evidence["schema"],
             )
             if review.reviewer == "claude"
