@@ -155,7 +155,8 @@ view or item for every finding, and say the fix):
   requirements, functionally essential precision with a substantiated setting
   or verification capability conflict as defined above, full-thread
   engagement under 1.5D or an adjustment range that does not cover the
-  worst-case stack, an ambiguous
+  worst-case stack (unless the package states it as an accepted
+  exception), an ambiguous
   parked/engaged state, inconsistent BOM rows or balloon mappings
   across sheets, a setup sequence that conflicts across sheets, or any
   contradiction between sheets or between a view and a note.

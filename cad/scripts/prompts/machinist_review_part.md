@@ -65,7 +65,8 @@ The builder is a first-time hobby machinist, so margins must be generous:
   hole. Not at nominal, and not by root-sum-square. That includes the thread
   major diameter to an edge or another bore, a counterbore or countersink to
   an outside surface, and the ligament over a cross-hole. Under 1.5 mm is a
-  blocker. 1.5 to 2.0 mm goes in minor, recommending a geometry change.
+  blocker unless the sheet states it as an accepted exception. 1.5 to
+  2.0 mm goes in minor, recommending a geometry change.
 - Check that each tapped receiver gives at least 1.5 x the nominal thread
   diameter of FULL thread at the worst case. A tap or die leaves about one
   to one and a half incomplete threads; do not count them. Less is a blocker
@@ -277,7 +278,8 @@ say the fix):
   sheets between dimensions, views, notes or title blocks, incompatible controlled fit ranges, a missing mating target or
   matched-fit acceptance criterion, essential interchangeable-fit limits,
   an unbuildable or geometrically impossible callout, a worst-case wall under
-  1.5 mm or full-thread engagement under 1.5D, functionally essential
+  1.5 mm or full-thread engagement under 1.5D that the sheet does not state
+  as an accepted exception, functionally essential
   precision with a substantiated
   machining or verification capability conflict as defined above, a callout
   you cannot tell the unit or the process of, a
