@@ -16,7 +16,6 @@ part X. Sliding the post sets spring tension, not the part's dimensions.
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
-from counter_spring_stock_geom import END_OCCUPIED_WIDTH_MM
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)
@@ -31,9 +30,13 @@ ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
 SCREW_SHANK_DIA = 3.6  # conservative external envelope used by assembly checks
 SCREW_THREAD_MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]
 SPRING_SCREW_OPEN_GAP_MM = 8.0
-SPRING_SCREW_CLAMPED_GAP_MM = END_OCCUPIED_WIDTH_MM
+# Native clamp calibration (verify:calibrate_summing_clamp, run
+# 20260923T001401277Z-691cdb38; neutral/square mean, spread 4e-5 mm). The
+# 1330K524 end loop is widest outside the tube OD, so it seats on the tube end's
+# OD corner, 0.231 mm past the full-band position, and the head closes onto it.
+SPRING_SCREW_CLAMPED_GAP_MM = 4.616832947108421
 SPRING_SCREW_TRAVEL_MM = SPRING_SCREW_OPEN_GAP_MM - SPRING_SCREW_CLAMPED_GAP_MM
-SPRING_EYE_CENTRE_FROM_ARM_END_MM = SPRING_SCREW_CLAMPED_GAP_MM / 2.0
+SPRING_EYE_CENTRE_FROM_ARM_END_MM = 2.2090440562497236
 SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The former Ø10 head left only 0.2502 mm nominal radial overlap. Ø12 gives
 # 1.2502 mm; the summing assembly also checks the loop's axial band and coil
