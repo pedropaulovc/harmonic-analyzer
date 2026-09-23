@@ -155,8 +155,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # sheet only proves they survived the import (drawing-simplicity-policy rule 2).
 # The as-cast collar diameter and the cast body/boss sizes take one place --
 # nothing mates on them.  The two bearing-axis heights, the two mounting-hole
-# stations and the machined spot-face station take two.  Only the two running
-# bores take three, and only because their size limits are what deliver the
+# stations and the machined spot-face station take two.  The plan angle takes
+# one: the title block holds angles to +/-1 deg, so a second place would only
+# suggest a precision nobody sets up for.  Only the two running bores take
+# three, and only because their size limits are what deliver the
 # `shaft_in_bushing` clearance band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 1},
@@ -170,7 +172,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
     "ConeShaftBoss": {"ConeBossLen": 1},
     "JournalBoreProfile": {"JournalBoreDia": 3},
-    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 2},
+    "JournalPlanReference": {"CrankBossStartZ": 2, "InclineAngle": 1},
 }
 
 _PRECISION_NAMES = [
@@ -195,7 +197,6 @@ DRAWING_NOTES = "\n".join(
         "CRANK BORE CARRIES CRANKSHAFT MHA-026.",
         "CONE BORE CARRIES CONE GEAR SHAFT MHA-014.",
         "CRANK AND CONE BORE AXES INTERSECT THE POST AXIS.",
-        "CONE BOSS AND BODY ARE INTEGRAL; SECTION A-A SHOWS COMBINED CUT MATERIAL.",
         "FOOT SEATS ON CONE SWING PLATFORM MHA-091.",
     )
 )

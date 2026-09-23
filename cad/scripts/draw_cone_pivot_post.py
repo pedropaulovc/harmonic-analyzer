@@ -65,6 +65,7 @@ from cone_pivot_post_spec import (
     BORE_DIA,
     BORE_HEIGHT,
     CONE_AXIS_VIEW,
+    CONE_BOSS_LENGTH,
     CRANK_BORE_DIA,
     CRANK_BORE_HEIGHT,
     CRANK_BOSS_END_Z,
@@ -155,11 +156,15 @@ FRONT_KEEP = {
     "MainBodyDia": (0.150, 0.080),
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
     "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
-    "HeadDia": (FRONT_CENTER[0], 0.160),
     "CrankBossDia": (0.132, 0.120),
     "CrankBoreDia": (0.155, 0.172),
 }
+# The Ø44 collar is dimensioned on its true-shape plan circle, not across the
+# elevation: there its dimension line sat directly under the crank-bore size
+# and finish leaders, which both had to cross it to reach the bore.  The text
+# sits in the free quadrant between the crank-boss length and the boss.
 TOP_KEEP = {
+    "HeadDia": (0.071, 0.188),
     "CrankBossLen": (0.056, TOP_CENTER[1]),
     "CrankBossStartZ": (0.1255, 0.2225),
     "MountEastX": (0.075, 0.2525),
@@ -179,13 +184,14 @@ JOURNAL_KEEP = {
 # station identify the real local crank spotface without inventing a uniform
 # depth against the curved collar.
 DIMENSION_CALLOUTS = {
+    "HeadDia": "AS CAST",
     "CrankBossDia": "SPOTFACE",
     "CrankBossLen": "CRANK BOSS LENGTH",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": "CONE BORE THRU",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
-    "CrankBossStartZ": "POST AXIS TO CRANK\nGEAR-CLEARANCE SPOTFACE",
+    "CrankBossStartZ": "SPOTFACE",
     "InclineAngle": "CONE/CRANK BORE AXES",
 }
 
@@ -523,6 +529,64 @@ def _prepare_cone_section(adapter: Any, view: Any) -> None:
         raise RuntimeError("cone boss section cutting line did not close")
 
 
+# ASME Y14.2 runs a centerline a short, uniform distance past the feature it
+# marks; 3 mm clears the boss end faces without reaching the 42.0 witness lines.
+_CENTERLINE_OVERSHOOT_MM = 3.0
+
+
+def _add_cone_section_centerline(adapter: Any, view: Any) -> None:
+    """Draw the cone-bore axis through Section A-A.
+
+    The section is a surface-only cut, so it has no bore face to hand
+    ``InsertCenterLine2``; without the axis a blind reader saw two unrelated
+    hatched islands.  The endpoints are the model axis projected through the
+    section's own transform into sheet space, so the line is the bore axis
+    itself, and it runs a centerline overshoot past each boss end face.
+    """
+    incline = math.radians(INCLINE_DEG)
+    reach = (CONE_BOSS_LENGTH / 2.0 + _CENTERLINE_OVERSHOOT_MM) / 1000.0
+    centre = (0.0, BORE_HEIGHT / 1000.0, 0.0)
+    ends = [
+        model_point_in_view(
+            adapter,
+            view,
+            (
+                sign * reach * math.sin(incline),
+                centre[1],
+                sign * reach * math.cos(incline),
+            ),
+            label=f"cone section axis end {sign:+d}",
+        )
+        for sign in (-1, 1)
+    ]
+    middle = model_point_in_view(adapter, view, centre, label="cone section axis")
+    outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+    if not (outline[0] < middle[0] < outline[2] and outline[1] < middle[1] < outline[3]):
+        raise RuntimeError(
+            f"cone section axis {middle!r} falls outside the section {outline!r}"
+        )
+    printed = math.dist(*ends) * 1000.0 / (SECTION_SCALE[0] / SECTION_SCALE[1])
+    if abs(printed - 2.0 * reach * 1000.0) > 0.01:
+        raise RuntimeError(
+            f"cone section axis projects foreshortened: {printed:.4f} mm"
+        )
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    # EditSheet makes the line sheet-owned; the endpoints are already in sheet
+    # space, so it stays coincident with the projected model axis.
+    drawing.EditSheet()
+    sketch_manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    centerline = sketch_manager.CreateCenterLine(
+        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
+    )
+    if centerline is None:
+        raise RuntimeError("failed to create the cone-bore centerline in Section A-A")
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="cone section bore axis")
+    _telemetry.info(
+        f"cone section bore axis drawn {ends[0]!r} -> {ends[1]!r} through {middle!r}"
+    )
+
+
 def _configure_section_caption(drawing_model: Any) -> None:
     """Make the native section caption print its view-specific scale."""
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
@@ -826,10 +890,14 @@ async def build(adapter: Any) -> dict[str, str]:
         journal_annotations,
         {"JournalAxisY": (0.190, 0.157)},
     )
+    # The station's dimension line has to stay left of the counterbore
+    # callout's shelf, which runs level with its upper extension line.  The
+    # short text sits just right of that line, below the shelf and above the
+    # angle, so it reads as the dimension it is rather than a distant note.
     offset_dimension_text(
         adapter,
         top_annotations,
-        {"CrankBossStartZ": (0.170, 0.2225)},
+        {"CrankBossStartZ": (0.148, 0.230)},
     )
     # The plan must retain JournalPlanReference: its two native centreline rays
     # and imported dimensions carry the spotface station and 12.52-degree bore
@@ -851,6 +919,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=(_top_x(0.0), _top_y(35.0)),
         label="crank boss axis",
     )
+    _add_cone_section_centerline(adapter, section)
     add_attached_note(
         adapter,
         front,

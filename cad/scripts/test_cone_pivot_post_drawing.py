@@ -335,3 +335,20 @@ def test_part_config_is_a_machined_casting() -> None:
     assert "OIL BARE FACES ISO VG 32" in finish
     assert config["process"] == "machined from solid stock or casting"
     assert int(config["quantity"]) == 1
+
+
+def test_collar_diameter_lives_on_its_plan_circle() -> None:
+    """The front-view crank-bore leaders must not cross a collar dimension line."""
+    assert "HeadDia" in drawing.TOP_KEEP
+    assert "HeadDia" not in drawing.FRONT_KEEP
+    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "AS CAST"
+
+
+def test_plan_angle_prints_one_place_under_the_one_degree_band() -> None:
+    assert spec.DRAWING_PRECISION_BY_NAME["InclineAngle"] == 1
+
+
+def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
+    assert "SECTION A-A" not in spec.DRAWING_NOTES
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "_add_cone_section_centerline(adapter, section)" in source
