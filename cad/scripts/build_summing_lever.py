@@ -74,6 +74,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     define_polygon_chain,
@@ -201,6 +202,19 @@ CENTRE_CROSS_ARM = 5.0
 # chord + witness lines + dimension line boxed a phantom hidden feature (Fable
 # R15c clarity); here the chord lies under the dimension line.
 CYLINDER_REFERENCE_Z = -7.5
+
+# Construction-only sketches that exist to carry print dimensions.  None is
+# absorbed by a feature, so each renders by default -- in the part's own images
+# and in every assembly the lever sits in (asm, 2026-09-24: the R138.8 centre
+# cross floated ~139 mm off the part in the summing isometric).  The part saves
+# them hidden; the drawing shows the ones it needs, per view.
+DRAWING_REFERENCE_SKETCHES = (
+    "KnifeEnvelopeReference",
+    "PatternReferences",
+    "BossAxialReference",
+    "CylinderReference",
+    "SummationArcReference",
+)
 
 # Assembly-facing exports (build_summing_assembly imports these).
 SPIN_REF_X = TIP_X  # local X of the summation-anchor tap = counter-spring ref
@@ -1486,6 +1500,29 @@ def _sketch_points_mm(adapter, part, sketch_name: str) -> list[Point]:
     return list(points.values())
 
 
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank every drawing-reference sketch and prove each one saved hidden."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    for name in DRAWING_REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = sw_type_info.early_bound_doc(adapter.currentModel)
+    shown = [
+        name
+        for name in DRAWING_REFERENCE_SKETCHES
+        # swVisibilityStateHide = 1
+        if int(_read_member(part.FeatureByName(name), "Visible")) != 1
+    ]
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(DRAWING_REFERENCE_SKETCHES),
+        count=len(DRAWING_REFERENCE_SKETCHES),
+    )
+
+
 @_telemetry.traced("gate.reference_sketches_on_geometry")
 def _assert_reference_sketches_on_geometry(adapter) -> None:
     """Every drawing-reference point must coincide with the feature it locates.
@@ -1712,6 +1749,7 @@ async def build(adapter) -> dict[str, str]:
         prefix=f"{HOLE_COUNT - 1} EQ SP ",
     )
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    _hide_reference_sketches(adapter)
     apply_drawing_properties(adapter, PART_NAME)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
