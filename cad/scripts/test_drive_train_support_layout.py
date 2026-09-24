@@ -187,7 +187,8 @@ def test_j19_keeps_two_thirds_face_at_the_worst_stack() -> None:
         assert drive.BLOCK_BACK_Z0 - t - face_min <= g0_front - 1.0
 
 
-def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
+def _follower_stations() -> tuple[list[float], list[float]]:
+    """Follower-pin stations from each collar's front face, at every vertex."""
     import itertools
 
     # c is the front collar's gap to the front block's inner face: 0 with the
@@ -208,6 +209,11 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         for c in (0.0, c_max):
             front.append(g_f + t / 2.0 - c)
             back.append(drive.CAM_PIN_STATION[1] + e - g_b - (c - c_set))
+    return front, back
+
+
+def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
+    front, back = _follower_stations()
     assert math.isclose(drive.CAM_PIN_STATION[0], drive.STRAP_T / 2.0)
     for stations in (front, back):
         assert min(stations) >= 1.0, stations
@@ -285,3 +291,64 @@ def test_short_lift_rod_keeps_its_back_collar_and_bearing() -> None:
     assert rod_end - collar_back >= 1.0
     # The rod still bears across most of the back block's bore.
     assert rod_end - drive.BLOCK_BACK_Z0 >= 2.0 / 3.0 * drive.BLOCK_DEPTH
+
+
+# The cam's M2.5 set screw is tapped radially on its heavy side, at the
+# collar's mid-length, and the follower pins sweep over that station
+# (front T/2 = 4.5).  The hole stays clear of the follower because it sits
+# round the far side of the cam, not because of the axial offset.  Sweep the
+# whole engage throw with the strap swing, plus over-travel.
+_CAM_OVERTRAVEL_DEG = 10.0
+_HOLE_CONTACT_MARGIN_DEG = 45.0
+
+
+def _hole_to_contact_deg(rotation_deg: float, swing: float) -> float:
+    """Angle at the cam centre between the tapped hole and the follower contact."""
+    import pinion_cam_geometry as cam
+
+    a = math.radians(rotation_deg)
+    hole = (math.sin(a), -math.cos(a))  # heavy side: along the eccentricity
+    centre = (drive.LIFT_X + cam.ECC * hole[0], drive.LIFT_Y + cam.ECC * hole[1])
+    cs, sn = math.cos(swing), math.sin(swing)
+    px, py = drive._FPIN_C[0] - drive.PIVOT_X, drive._FPIN_C[1] - drive.PIVOT_Y
+    pin = (drive.PIVOT_X + px * cs - py * sn, drive.PIVOT_Y + px * sn + py * cs)
+    nx, ny = drive._SPR_N
+    n = (nx * cs - ny * sn, nx * sn + ny * cs)
+    n_len = math.hypot(*n)
+    n = (n[0] / n_len, n[1] / n_len)
+    r = (pin[0] - centre[0], pin[1] - centre[1])
+    t = r[0] * n[0] + r[1] * n[1]
+    foot = (r[0] - t * n[0], r[1] - t * n[1])  # centre -> nearest pin-axis point
+    foot_len = math.hypot(*foot)
+    cos_gap = (hole[0] * foot[0] + hole[1] * foot[1]) / foot_len
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos_gap))))
+
+
+def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
+    import pinion_cam_geometry as cam
+
+    # The axial bands DO overlap, so the angular gap is what keeps them apart.
+    hole_band = (
+        cam.SET_SCREW_Z - cam.TAP_DRILL_DIA / 2.0,
+        cam.SET_SCREW_Z + cam.TAP_DRILL_DIA / 2.0,
+    )
+    for stations in _follower_stations():
+        pin_band = (
+            min(stations) - drive.FPIN_DIA / 2.0,
+            max(stations) + drive.FPIN_DIA / 2.0,
+        )
+        assert pin_band[0] < hole_band[1] and pin_band[1] > hole_band[0]
+    # Tap-drill half-angle seen from the cam centre at the OD.
+    half = math.degrees(math.asin(cam.TAP_DRILL_DIA / cam.CAM_OD))
+    assert math.isclose(half, 8.07, abs_tol=0.01)
+    end = drive.CAM_ENGAGE_ROTATION_DEG - _CAM_OVERTRAVEL_DEG
+    gaps = [
+        _hole_to_contact_deg(end * i / 120, drive._PHI_ENG * j / 20)
+        for i in range(121)
+        for j in range(21)
+    ]
+    assert min(gaps) - half >= _HOLE_CONTACT_MARGIN_DEG, min(gaps)
+    # At the photographed engage, with the strap fully swung: 83.5 deg.
+    engaged = _hole_to_contact_deg(drive.CAM_ENGAGE_ROTATION_DEG, drive._PHI_ENG)
+    assert math.isclose(engaged, 83.52, abs_tol=0.05)
+    assert math.isclose(engaged - half, 75.45, abs_tol=0.05)
