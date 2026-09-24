@@ -319,8 +319,9 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.land_margin_slack(spec.JOURNAL_LEN - 1.0) < 0.0
     # The drum never binds between the straps.
     assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
+    # The drum-end airs share the cluster's one end play with the block gaps.
     assert spec.drum_total_air() == (
-        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
+        0.0,
         pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
     )
     # The lands are centred on their straps (to the printed place) with the

@@ -60,9 +60,12 @@ DRUM_STATION_BAND = LINEAR_X_BAND
 # User ruling 2026-09-24 (option c): the pivot blocks locate the swing cluster.
 # It is pushed against the back block, and the front block's slotted base
 # holes are set at fit-up with an END_PLAY feeler, within END_PLAY_SET_ERROR.
-# That total play is the float between the drum ends and the strap inner
-# faces, split either way, whatever the drum's length.  The drum hard forward
-# and hard aft are the two stops.
+# That total play is shared by the cluster's four axial gaps (front block to
+# front strap, front strap to drum, drum to back strap, back strap to back
+# block), each >= 0 and split any way, so the two drum-end airs together run
+# from 0 (all the play at the blocks) up to the whole play.  The model's
+# STRAP_AIR is only a pose and never enters this stack (pinioncluster,
+# 2026-09-24).  The drum hard forward and hard aft are the two stops.
 STRAP_AXIAL_LOCATION = "block-stop-slot-set"
 END_PLAY = 0.25
 END_PLAY_SET_ERROR = 0.10
@@ -76,7 +79,7 @@ def drum_total_air() -> tuple[float, float]:
     """Total axial air between the drum ends and the strap inner faces."""
     if STRAP_AXIAL_LOCATION != "block-stop-slot-set":
         raise AssertionError(f"no float model for {STRAP_AXIAL_LOCATION!r}")
-    return (END_PLAY - END_PLAY_SET_ERROR, END_PLAY + END_PLAY_SET_ERROR)
+    return (0.0, END_PLAY + END_PLAY_SET_ERROR)
 
 
 def land_stations(journal_len: float) -> tuple[float, float]:
