@@ -59,6 +59,25 @@ def test_installation_note_carries_the_ruled_cut_to_fit_line() -> None:
     assert f"NOMINAL {part.SHANK_LEN:.1f}" in notes
 
 
+def test_installation_note_fits_the_purchased_note_box() -> None:
+    """The contract's reserved box (_purchased_fastener_drawing) is
+    (0.015, 0.169)-(0.225, 0.190), with the note anchored at (0.018, 0.189).
+
+    It is a literal inside the builder, so this pins it from the one
+    measurement we have: 857-parts-r1 (bb0c8b18) rendered the six-line
+    note at 17.6..128.6 x 165.2..189.4 mm: 4.04 mm per line.  One of its
+    lines of 45 to 50 characters set the width, so a character is at most
+    110.96 / 45 = 2.47 mm.  Four lines leave about 4 mm spare, as MHA-140's
+    four did.
+    """
+    lines = _config.parts(part.PART_NAME)["installation_notes"].splitlines()
+    top, bottom, left, right = 189.42, 169.0, 17.62, 225.0
+    line_pitch, char_width = 24.25 / 6, 110.96 / 45
+    assert top - len(lines) * line_pitch >= bottom + 2.0
+    widest = max(len(line) for line in lines)
+    assert left + widest * char_width <= right - 10.0
+
+
 def test_stock_build_uses_its_registered_recipe() -> None:
     metadata = STOCK_RECIPES["40923898"]
     assert metadata.module == recipe.__name__
