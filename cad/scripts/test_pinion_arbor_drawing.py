@@ -616,27 +616,10 @@ def test_drum_station_text_clears_the_station_stack() -> None:
 
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "pinioncluster's option-(c) re-lay moves BDT APINION_Z_FRONT 0.3 aft "
-        "(ARBOR_Z0 fixed); until then BDT carries the as-built 61.25. "
-        "Flip to a plain test in the re-lay PR."
-    ),
-)
 def test_drum_station_matches_the_assembled_drum_on_the_arbor() -> None:
+    """pinioncluster's option-(c) re-lay (#855) moved BDT APINION_Z_FRONT 0.3
+    aft with ARBOR_Z0 fixed, so the assembly now carries the printed station."""
     import build_drive_train_assembly as assembly
 
     shoulder_z = assembly.ARBOR_Z0 + spec.HEAD_REAR_Z
     assert assembly.APINION_Z_FRONT - shoulder_z == pytest.approx(spec.DRUM_STATION)
-
-
-def test_drum_station_as_built_matches_the_current_assembly() -> None:
-    """Until the re-lay lands, BDT still places the drum at the as-built
-    station the 0.3 aft shift is measured from."""
-    import build_drive_train_assembly as assembly
-
-    shoulder_z = assembly.ARBOR_Z0 + spec.HEAD_REAR_Z
-    assert assembly.APINION_Z_FRONT - shoulder_z == pytest.approx(
-        spec.DRUM_STATION_AS_BUILT
-    )
