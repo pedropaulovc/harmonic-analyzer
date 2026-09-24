@@ -51,6 +51,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91829A560",
         material="AISI 304",
     ),
+    "cone-tip-block-screw": _stock(
+        "cone-tip-block-screw",
+        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
+        "91255A148",
+        material="Alloy Steel",
+    ),
     "cone-tip-adjuster": _stock(
         "cone-tip-adjuster",
         "18-8 Stainless Steel Slotted Cup-Tip Set Screw",
