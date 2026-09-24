@@ -2182,10 +2182,15 @@ async def build(adapter) -> dict[str, str]:
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
     ptip = cone_station(TIP_BLOCK_STATION)
+    # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
+    # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
+    # already counts it).  The shim is the integrator's; until it is inserted
+    # the block floats that far above the plate.
+    tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
     tip_block = await place_component(
         adapter,
         "cone-tip-block",
-        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
+        [ptip[0], tip_foot_y, ptip[2]],
         [0.0, INCLINE_DEG, 0.0],
         ROT_Y_INCLINE,
         ground=False,
@@ -2220,7 +2225,7 @@ async def build(adapter) -> dict[str, str]:
         "cone-tip-pinch-screw",
         [
             ptip[0] - (TIP_BLOCK_X / 2.0) * COS_I,
-            Y_BASE_TOP + PLAT_T + TIP_PINCH_Y,
+            tip_foot_y + TIP_PINCH_Y,
             ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
         ],
         PINCH_WEST_EULER,
@@ -2847,9 +2852,10 @@ async def build(adapter) -> dict[str, str]:
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
     # already carry) + an axial seat + a
     # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
-    # height falls out of the coaxial (bore height + plate = drive height,
-    # asserted at import), so its foot lands ON PlateTop with no seat mate --
-    # contact, not constraint. It follows the p1 swing through the shaft.
+    # height falls out of the coaxial (plate + shim + axis height = drive
+    # height, asserted at import), so its foot sits the nominal shim pack
+    # above PlateTop with no seat mate; the shim (MHA-141) is the
+    # integrator's. It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
