@@ -62,6 +62,12 @@ SURFACE_FINISHES = (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    # Head and neck diameters are the same Front-plane circle pattern as
+    # ShaftDia: imported end-on on the donor view and moved onto the 1:1
+    # profile (5cc191fb's proven path; a detail silhouette screen pick is
+    # seat-dependent and failed on w6).
+    "HeadProfile": {"HeadDia"},
+    "NeckProfile": {"NeckDia"},
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "ShaftProfile": {"ShaftDia"},
@@ -73,6 +79,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "HeadProfile": {"HeadDia": 1},
+    "NeckProfile": {"NeckDia": 1},
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 1},
     "ShaftProfile": {"ShaftDia": 2},
@@ -89,11 +97,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
-# The head and neck diameters are drawn on the sheet across the detail view's
-# silhouettes: their model dimensions live in end-on profile sketches that the
-# side detail cannot import.  A sheet-derived dimension takes its places from
-# DRAWING_REFERENCE_PRECISION (_drawing_contract rule 2), never a literal.
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"HeadDia": 1, "NeckDia": 1}
 
 CROSS_HOLE_CALLOUT = (
     "MATCH-REAM THRU, CENTRED ON HEAD LENGTH,\n"
