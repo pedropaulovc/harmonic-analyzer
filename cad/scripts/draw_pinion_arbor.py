@@ -30,6 +30,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
+from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
@@ -217,6 +218,12 @@ PRINCIPAL_KEEP = {
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
     "BackCapR": (0.045, 0.140),
+    # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
+    # so both its dimensions stand ABOVE the shaft: the station from the head
+    # rear face in a row over the neck's Ø10.5, and the hole's leader rising
+    # left of that row's witness, above the 19.0's right arrow tail.
+    "PinStationFromHeadRear": (0.288, 0.207),
+    "PinHoleDia": (0.250, 0.222),
 }
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
@@ -248,6 +255,8 @@ DIMENSION_CALLOUTS = {
     "FrontJournalDia": "JOURNAL",
     "BackJournalDia": "JOURNAL",
     "BondZoneDia": "BOND ZONE",
+    "PinStationFromHeadRear": "COLLAR PIN",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0

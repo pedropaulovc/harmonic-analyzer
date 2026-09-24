@@ -97,7 +97,7 @@ _INSERTED_SOURCES = {
     "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
     "crank_arm crank_drive_gear crank_handle crank_pin crank_pin_eye crank_pin_ring "
     "crank_pinion crankshaft cylinder_end_disc cylinder_gear cylinder_gear_shaft "
-    "dome_cap_screw fillister_screw foot_screw pinion_arbor pinion_bracket pinion_cam "
+    "dome_cap_screw fillister_screw foot_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
     "pinion_pivot_block pinion_pivot_shaft pinion_spring slotted_screw swing_stop_screw",
     "channel": "amplitude_bar channel_lever channel_spring_installed connecting_rod "
