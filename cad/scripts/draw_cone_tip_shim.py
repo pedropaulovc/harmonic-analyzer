@@ -29,12 +29,14 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    offset_dimension_text,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_reference_dimensions,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -84,7 +86,14 @@ TOP_KEEP = {
     "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
 }
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
+# The 1.10 span is 4.4 mm on the sheet, so its value cannot sit between the
+# arrows: r1 printed it across its own dimension line.  Lead it out to the
+# right and a little below, clear of the line and of the notes above.
+THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.022, FRONT_CENTER[1] - 0.010)
 REFERENCE_DIMENSIONS = ("Thickness",)
+# The two radius-centre locations are routine lengths: one place, like the
+# 15.0 x 12.0 outline (the document default is two).
+LOCATION_PLACES = 1
 DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK", "SlotWidth": "SLOT, FULL R"}
 
 # Radius-centre location from the closed (right) edge and the lower edge.
@@ -129,6 +138,12 @@ def _checked_location(
         raise RuntimeError(
             f"{label} measured {measured * 1000.0:.4f} mm, expected {expected_mm:.4f}"
         )
+    # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting (-1) keeps
+    # the dual and tolerance precisions; the status return is undocumented,
+    # so read the primary back.
+    display.SetPrecision3(LOCATION_PLACES, -1, -1, -1)
+    if display.GetPrimaryPrecision2() != LOCATION_PLACES:
+        raise RuntimeError(f"{label}: {LOCATION_PLACES}-place precision did not take")
     return display
 
 
@@ -192,8 +207,13 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*top_annotations, *front_annotations]
-    set_reference_dimensions(adapter, annotations, REFERENCE_DIMENSIONS)
+    # The singular helper: the plural one adds a diameter glyph ("(Ø1.10)"
+    # in r1), since its only other callers mark diameters.
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) in REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label="nominal stack")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     _checked_location(
