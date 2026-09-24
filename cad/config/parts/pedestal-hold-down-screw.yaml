@@ -1,13 +1,13 @@
-foot-screw:
+pedestal-hold-down-screw:
   title: Steel Narrow Fillister Head Slotted Screw
-  number: MHA-103
+  number: MHA-143
   stock_name: Steel Narrow Fillister Head Slotted Screw
   supplier: McMaster-Carr
-  supplier_skus: [90280A108]
+  supplier_skus: [90280A197]
   material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 90280A108
+  material_specification: Steel, McMaster-Carr 90280A197
   finish: zinc plated
-  quantity: 1
+  quantity: 2
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

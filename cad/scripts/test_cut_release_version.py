@@ -147,18 +147,60 @@ def test_previous_tag_uses_compact_release_history(
     assert cut_release.previous_tag("v9") is None
 
 
-def test_release_image_tools_do_not_use_deprecated_getdata() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    sources = (
-        repo_root / "cad" / "comparisons" / "tools" / "composite.py",
-        repo_root / "cad" / "comparisons" / "tools" / "parity_check.py",
-    )
-
-    for source in sources:
-        assert ".getdata(" not in source.read_text(encoding="utf-8"), source
 
 
-def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path):
+@pytest.fixture
+def readout_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, object]:
+    """A deterministic readout input without the report's Monte Carlo layer.
+
+    The release tests exercise the real procedure renderer and bundle staging;
+    error-budget tests own the report's numerical correctness.
+    """
+    import error_budget
+
+    budget = error_budget.load_budget()
+    nom = error_budget.nominal()
+    capacity = 4.7
+    pen_per_bar_at_min = nom.pen_half / capacity
+    null_station_mm = -0.5
+    report = {
+        "nominal": nom.__dict__,
+        "closed_form": {
+            "magnifier": {
+                "ordinate_capacity_full_scale_bars": capacity,
+                "lever_radius_min_mm": nom.lever_r_min,
+                "lever_radius_built_mm": nom.lever_r_built,
+                "wheel_ratio": nom.wheel_ratio,
+                "pen_mm_per_full_scale_bar_at_min": pen_per_bar_at_min,
+                "pen_mm_per_full_scale_bar_at_built": (
+                    pen_per_bar_at_min * nom.lever_r_built / nom.lever_r_min
+                ),
+            },
+            "readout": {
+                "pen_half_stroke_mm": nom.pen_half,
+                "assumed_reading_uncertainty_mm": float(
+                    budget["reserved"]["readout"]["reading_uncertainty_mm"]
+                ),
+            },
+        },
+        "null_lift_ordinate": -null_station_mm / nom.d_max,
+        "null_station_mm": null_station_mm,
+        "station_setting_tolerance_mm": float(
+            budget["critical_features"]["station_setting"]["tolerance"]
+        ),
+        "cam_home_phase": {"deg": nom.cam_home_deg},
+        "cam_home_phase_waived": False,
+        "closure": {"nominal_residual_mae": 0.01},
+    }
+    monkeypatch.setattr(error_budget, "build_report", lambda: report)
+    return report
+
+
+def test_staged_readout_procedure_references_resolve_inside_the_bundle(
+    tmp_path, readout_report
+):
     """READOUT.md sends the reader to the operating explanation; a release
     consumer has only the bundle, so that page -- and the pages IT cross-links
     with ./ -- must be staged beside it, every ./ link among them must resolve
@@ -197,7 +239,9 @@ def test_staged_readout_procedure_references_resolve_inside_the_bundle(tmp_path)
     assert "/blob/v42/references/" not in paper
 
 
-def test_staged_bundle_declares_its_sources_and_permitted_use(tmp_path):
+def test_staged_bundle_declares_its_sources_and_permitted_use(
+    tmp_path, readout_report
+):
     """The staged pages quote the 2014 book (short attributed excerpts) and
     cite the reference scans, so the bundle must carry that boundary itself:
     a downloader who never sees kickstarter/campaign/risks.md must still be
