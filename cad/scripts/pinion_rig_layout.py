@@ -50,9 +50,9 @@ from pinion_pivot_block_geometry import (
     BLOCK_DEPTH_BAND as BLOCK_DEPTH_BAND,
     BLOCK_DEPTH_PLACES,
 )
-from pinion_spring_geometry import PAD_WIDTH as SPRING_PAD_WIDTH
-from pinion_spring_geometry import PAD_WIDTH_PLACES as SPRING_PAD_WIDTH_PLACES
-from pinion_spring_geometry import WIDTH as SPRING_W
+from pinion_spring_section import PAD_WIDTH as SPRING_PAD_WIDTH
+from pinion_spring_section import WIDTH as SPRING_W
+from pinion_spring_section import WIDTH_PLACES as SPRING_W_PLACES
 
 # The novice-margin rule (Main, restricted review of #858): every rig-scope
 # margin stands at least this much over its floor at the worst stack, and the
@@ -445,27 +445,38 @@ LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.60
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-114 return spring: the blade rides the back strap's flank, and its foot
-# pad lies on the base beside the back block.  Main (restricted review of
+# pad lies on the base east of the back block.  Main (restricted review of
 # #858): the pad is set SPRING_PAD_LEAF off the back block's inner face with a
 # gage leaf before its seat is transferred, so the spring is stationed from
-# the block, not from the strap.  The blade's inset from the strap's NOMINAL
-# inner face follows, and a thin strap (inner face 0.8 aft) or the leaf's
-# set error only moves the flank under it: 1.00 leaves the blade exactly
-# SPRING_BLADE_MIN_ON_FLANK + RIG_MARGIN_SPARE on the flank at the worst
-# setting, and the pad 0.645 off the block.
-SPRING_PAD_LEAF = 1.00
-SPRING_Z = BACK_BLOCK_Z0 - SPRING_PAD_LEAF - SPRING_PAD_WIDTH / 2.0
-SPRING_BLADE_INSET = SPRING_Z - SPRING_W / 2.0 - STRAP_Z_INNER[1]  # 1.25
+# the block, not from the strap.  #859 option (iv) (Main, 2026-09-26): the
+# pad is flush with the strip's AFT edge and widens forward only, so the edge
+# the leaf sets is the strip's own and neither width band moves it; centred on
+# the pad, the strip's front edge had stood off the flank at every leaf.  The
+# foot lies wholly east of the block's east end, so the leaf stands on edge
+# against the block's inner face and overhangs that end to meet the pad
+# (pinion_rig_fitup).  At the worst setting a thin strap (inner face 0.8
+# aft), the leaf's set error and the widest strip all move the blade's front
+# edge onto less flank.  F = 0.65 (Main's ruling, a stock leaf): one step
+# thicker than the thinnest leaf that keeps the pad SPRING_PAD_MIN_AIR +
+# RIG_MARGIN_SPARE off the block, so that row keeps 0.05 in hand.
+SPRING_PAD_MIN_AIR = 0.25
+SPRING_PAD_LEAF = 0.65
+if SPRING_PAD_LEAF < smallest_leaf_setting(
+    SPRING_PAD_MIN_AIR + RIG_MARGIN_SPARE + FEELER_SET_ERROR
+):
+    raise AssertionError("the spring pad leaf no longer covers its floor and spare")
+SPRING_PAD_AFT_Z = BACK_BLOCK_Z0 - SPRING_PAD_LEAF  # the pad's and the strip's
+SPRING_Z = SPRING_PAD_AFT_Z - SPRING_W / 2.0  # the strip's mid-plane
+SPRING_PAD_Z = SPRING_PAD_AFT_Z - SPRING_PAD_WIDTH / 2.0  # the pad's, its screw's
+SPRING_BLADE_INSET = SPRING_Z - SPRING_W / 2.0 - STRAP_Z_INNER[1]
 SPRING_BLADE_MIN_ON_FLANK = 0.1
 SPRING_BLADE_ON_FLANK_WORST = (
-    SPRING_BLADE_INSET + _STRAP_T_LOWER - FEELER_SET_ERROR
-)  # 0.35
-SPRING_PAD_MIN_AIR = 0.25
-SPRING_PAD_TO_BLOCK_WORST = (
-    SPRING_PAD_LEAF
+    SPRING_BLADE_INSET
+    + _STRAP_T_LOWER
     - FEELER_SET_ERROR
-    - printed_deviations(SPRING_PAD_WIDTH, SPRING_PAD_WIDTH_PLACES)[1] / 2.0
-)  # 0.645
+    - printed_deviations(SPRING_W, SPRING_W_PLACES)[1]
+)
+SPRING_PAD_TO_BLOCK_WORST = SPRING_PAD_LEAF - FEELER_SET_ERROR  # 0.55
 for _name, _worst, _floor in (
     (
         "spring blade on the back strap flank",
