@@ -61,6 +61,8 @@ allowed_free_stems:
   - pinion-handle
   - pinion-lever
   - pinion-lift-rod
+  # Option E-a: pinned to both straps, the torque shaft swings with them.
+  - pinion-pivot-shaft
 # One family per freed DOF that must ITSELF read under-constrained.
 required_free_stems:
   - crankshaft

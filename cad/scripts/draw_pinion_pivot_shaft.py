@@ -40,6 +40,7 @@ from _surface_finish import surface_finish_by_key
 from pinion_pivot_shaft_spec import (
     CAP_RADIUS,
     CAP_SAG,
+    PIN_HOLE_CALLOUT,
     SHAFT_DIA as SHAFT_DIA,
     SHAFT_LEN,
     SURFACE_FINISHES,
@@ -80,10 +81,14 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {
     "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    # Option E-a: the set-pin holes read as solid circles in the side view.
+    # Only the size is printed; the match-drill callout carries the location.
+    "PinHoleDia": (0.120, 0.178),
 }
 DIMENSION_CALLOUTS = {
     "ShaftDia": "FINAL SIZE",
     "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
 
