@@ -84,3 +84,46 @@ def test_base_holes_follow_the_rederived_support() -> None:
         assert math.dist(derived, base) < 1e-9
     for derived, base in zip(drive._FOOT_SCREW_XZ, drive.BASE_FOOT_XZ, strict=True):
         assert math.dist(derived, base) < 1e-9
+
+
+def _world(origin, rows, local):
+    return [origin[k] + sum(local[i] * rows[i][k] for i in range(3)) for k in range(3)]
+
+
+def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
+    # MHA-135 is match-drilled through the lever hub and the lift rod at
+    # assembly, so the model's two holes must be one line.  Each part cuts its
+    # hole along its own local X (build_pinion_lift_rod / build_pinion_lever
+    # "lever pin" axes); the rod is phased to the lever to make them coincide.
+    from pinion_lever_geometry import PIN_HOLE_Z, ROD_PIN_HOLE_FROM_END
+
+    rod_origin = [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0]
+    lever_origin = [drive.LIFT_X, drive.LIFT_Y, drive.LEVER_Z]
+    rod_point = _world(
+        rod_origin, drive.LIFT_ROD_ROWS, [0.0, 0.0, ROD_PIN_HOLE_FROM_END]
+    )
+    lever_point = _world(lever_origin, drive.LEVER_ROWS, [0.0, 0.0, PIN_HOLE_Z])
+    rod_dir = drive.LIFT_ROD_ROWS[0]
+    lever_dir = drive.LEVER_ROWS[0]
+
+    cross = [
+        rod_dir[1] * lever_dir[2] - rod_dir[2] * lever_dir[1],
+        rod_dir[2] * lever_dir[0] - rod_dir[0] * lever_dir[2],
+        rod_dir[0] * lever_dir[1] - rod_dir[1] * lever_dir[0],
+    ]
+    assert math.hypot(*cross) < 1e-9
+    assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(rod_point, lever_point))
+
+
+def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
+    # The rod carries LEVER_TILT_DEG of phase; the cams must not: their world
+    # rows stay the identity the park-gap and engage solves assume, tied back
+    # to the rod by the same angle, and the freed spin's rest dihedral moves
+    # by exactly that phase.
+    identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    assert drive.PINION_CAM_ROWS == identity
+    assert math.isclose(drive.CAM_ROD_PHASE_DEG, drive.LEVER_TILT_DEG, abs_tol=1e-9)
+    assert math.isclose(
+        drive.LIFT_ROD_PARK_DEG, 90.0 + drive.LEVER_TILT_DEG, abs_tol=1e-9
+    )
+    assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
