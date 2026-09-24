@@ -26,6 +26,7 @@ from pinion_spring_geometry import (
     HOLE_FROM_END as HOLE_FROM_END,
     KINK_DEG as KINK_DEG,
     PAD_LEN as PAD_LEN,
+    PAD_LEN_PLACES as PAD_LEN_PLACES,
     PAD_WIDTH as PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
     PAD_Z as PAD_Z,
@@ -42,20 +43,19 @@ from pinion_spring_geometry import (
 # length is formed too, and its screw seat is transferred to the base at
 # assembly, so it no longer sets preload and takes the same band.
 FORMED_TOLERANCE_MM = FORMED_BAND_MM
+# O2 (Main, 2026-09-24): the part is modelled INSTALLED; the maker forms the
+# FREE shape.  The hidden construction-only FreeForm sketch carries the free
+# profile, and the print locates the crest and the tip from it; the
+# shape-invariant length and radii print from the installed profile.
+FREE_FORM_SKETCH = "FreeForm"
+REFERENCE_SKETCHES = (FREE_FORM_SKETCH,)
 FORMED_DIMENSIONS: dict[str, set[str]] = {
-    "SpringProfile": {
-        "FootLen",
-        "BendR",
-        "KinkH",
-        "KinkV",
-        "KinkR",
-        "FlatLen",
-        "TipH",
-    },
+    "SpringProfile": {"FootLen", "BendR", "KinkR", "FlatLen"},
+    FREE_FORM_SKETCH: {"FreeKinkH", "FreeKinkV", "FreeTipH"},
 }
 
 # Everything the print carries.  The profile is baselined from the foot's free
-# end (policy rule 7): the kink start and the tip are located from it, never
+# end (policy rule 7): the FREE kink start and tip are located from it, never
 # from the model origin.  The pad, the strip width and the hole location are
 # cut with the flat blank, so they take the title-block .XX row.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -68,8 +68,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # them and the drawing reads them back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
+    FREE_FORM_SKETCH: {name: 1 for name in FORMED_DIMENSIONS[FREE_FORM_SKETCH]},
     "Spring": {"StripWidth": WIDTH_PLACES},
-    "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": 2},
+    "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": PAD_LEN_PLACES},
 }
 
 _PRECISION_NAMES = [
@@ -88,6 +89,7 @@ DRAWING_NOTES = "\n".join(
         "CUT BLANK TO TEMPLATE OF TOP-VIEW PAD, DRILL, LEAVE STRIP LONG;",
         "  FORM, THEN TRIM FREE TIP.",
         "RADII AND FORMED-PROFILE DIMENSIONS ARE TO THE INSIDE SURFACE.",
+        "PHANTOM PROFILE IS THE FREE FORM; SOLID IS AS INSTALLED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

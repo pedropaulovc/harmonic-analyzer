@@ -1681,7 +1681,8 @@ if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
 # The foot's screw pad widens the free end forward of the strip, flush with
 # its aft edge (pinion_rig_layout): booked with that edge at the pad leaf's
-# thinnest setting, no width band reaches it.
+# thinnest setting, no width band reaches it.  The leaf sets z, so z alone
+# is gated (Main, #859 restricted review).
 _SPR_PAD_Z_HI = RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR
 if _SPR_PAD_Z_HI > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring foot pad reaches the back pivot block")
@@ -1913,7 +1914,7 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
 # parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
 _SWING_GRAVITY_NMM = (10.9, 19.2)
-_PRELOAD_MARGIN = 1.45  # over gravity, at the formed band's low end
+_PRELOAD_MARGIN = 1.5  # over gravity, at the formed band's low end
 _STRESS_SF = 1.5  # on yield, at the nominal preset
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16
