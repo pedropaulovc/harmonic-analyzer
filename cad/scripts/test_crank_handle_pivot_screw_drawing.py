@@ -324,10 +324,28 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The Ø stands on the floor, clear of the lead.
     lead_foot_x = drawing.SEAT_X - spec.RELIEF_LEAD * drawing.SHEET_SCALE[0] / 1000.0
     assert drawing.RELIEF_END_X < drawing.SIDE_KEEP["ReliefDia"][0] < lead_foot_x
-    # Its offset text starts clear of the seat-face extension line (the
-    # thread length's right side), which ran through the LEAD line.
-    assert drawing.RELIEF_DIA_TEXT_XY[0] - drawing.SEAT_X >= 0.0025
-    assert drawing.RELIEF_DIA_TEXT_XY[1] == drawing.SIDE_KEEP["ReliefDia"][1]
+    # Its offset text is centred on the anchor, so judge the rendered extent
+    # (render-measured width), not the anchor: the left edge stands >= 3 mm
+    # right of the seat-face extension line, the right edge clear of the
+    # shoulder Ø's dimension line.
+    text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
+    half = drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
+    assert (text_x - half) - drawing.SEAT_X >= 0.003
+    assert (text_x + half) + 0.003 <= drawing.SIDE_KEEP["ShoulderDia"][0]
+    # Failing control: 0f50950a anchored at floor + 6 mm, which run 69a2f961
+    # rendered with the LEAD line starting ~10 mm LEFT of the seat face.
+    assert (drawing.RELIEF_FLOOR_MID_X + 0.006 - half) - drawing.SEAT_X < 0.003
+    # The leader runs down-right from the dimension line on the floor to the
+    # underline's left end, passing >= 2 mm under the seat-face corner.
+    left = text_x - half
+    end_y = text_y - drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
+    start_x, start_y = drawing.RELIEF_FLOOR_MID_X, drawing.SIDE_CENTER[1]
+    t = (drawing.SEAT_X - start_x) / (left - start_x)
+    leader_y_at_seat = start_y + t * (end_y - start_y)
+    shoulder_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.SHOULDER_TOP_Y
+    assert shoulder_bottom - leader_y_at_seat >= 0.002
+    # The block stays above the thread-length row's text.
+    assert end_y - drawing.SIDE_KEEP["ThreadLength"][1] >= 0.005
     # The 45-degree lead rides the Ø callout; only the width stands above.
     assert "ReliefLead" not in drawing.SIDE_KEEP
     assert spec.RELIEF_CALLOUT == "0.5 X 45 DEG LEAD"

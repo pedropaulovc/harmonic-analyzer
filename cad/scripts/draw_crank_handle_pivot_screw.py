@@ -150,12 +150,23 @@ SIDE_KEEP = {
     # The slot shows as a notch in the head face; its depth reads above it.
     "SlotDepth": (HEAD_FACE_X - 0.0015, SIDE_CENTER[1] + 0.026),
 }
-# The relief Ø's dimension line stands on the floor (SIDE_KEEP), but its
-# two-line text left-aligned there ran the seat-face extension line (the
-# thread length's right side) through "0.5 X 45 DEG LEAD".  OffsetText
-# parks the text 6 mm right on a leader, clear of that line, while the
-# dimension line stays on the floor; the Ø6.00 arrow is well right of it.
-RELIEF_DIA_TEXT_XY = (RELIEF_FLOOR_MID_X + 0.006, SIDE_CENTER[1] - 0.016)
+# The relief Ø's dimension line stands on the floor (SIDE_KEEP); its text
+# goes on an OffsetText leader so the seat-face extension line (the thread
+# length's right side) cannot run through "0.5 X 45 DEG LEAD".  With
+# OffsetText the anchor is the CENTRE of the Ø line's bottom edge and the
+# callout is centred under it (a dimension exposes no GetExtent), measured
+# on farm run 69a2f961's render: the LEAD line spans 40.8 mm and its
+# underline, where the leader lands, sits 5.6 mm below the anchor.  The
+# text's left edge stands 3.5 mm right of the seat face, and 21 mm below
+# the axis the leader drops steeply enough to pass under the seat-face
+# corner rather than through the shoulder.  The Ø6.00 arrow is right of it.
+RELIEF_DIA_TEXT_WIDTH = 0.041
+RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
+RELIEF_DIA_TEXT_CLEARANCE = 0.0035
+RELIEF_DIA_TEXT_XY = (
+    SEAT_X + RELIEF_DIA_TEXT_CLEARANCE + RELIEF_DIA_TEXT_WIDTH / 2.0,
+    SIDE_CENTER[1] - 0.021,
+)
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.
 END_KEEP = {
