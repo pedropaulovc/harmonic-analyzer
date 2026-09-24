@@ -330,9 +330,9 @@ sections:
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 170.6922184176; Ø6.35 (1/4") to 177.5922184176; Ø3.175 (1/8") to 184.4922184176; Ø1.5875 (1/16") to 200.8856869456'
+        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø9.525 (3/8") to 163.7922184176; Ø6.35 (1/4") to 170.6922184176; Ø3.175 (1/8") to 177.5922184176; Ø1.5875 (1/16") to 200.8856869456 (U40 S1: each small land one gear station toward the big end)'
         - 12.2308/9.525/6.35/3.175/1.5875
-        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All earlier section endpoints, gear seats, and world stations are unchanged; only the terminal 1/16" endpoint is shortened 7.29350 mm to machine station 138.9788259477, the McMaster 94025A164 conical cup apex at 9.5 mm thread engagement (rule-12 E11). The 16.393468528 mm tip land carries the T006 seat and the bushing; it was 1/32" until the T006 rim was recomputed against the as-cut (base-chord) root, which allows 1/16" and takes the land from L/D 21 to 10 — `build_cone_gear_shaft.py`.'
+        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. All earlier section endpoints, gear seats, and world stations are unchanged; only the terminal 1/16" endpoint is shortened 7.29350 mm to machine station 138.9788259477, the McMaster 94025A164 conical cup apex at 9.5 mm thread engagement (rule-12 E11). The 23.293468528 mm tip land carries the T012 and T006 seats and the bushing (U40), turned with tailstock support at L/D 14.7; it was 1/32" until the T006 rim was recomputed against the as-cut (base-chord) root, which allows 1/16" — `build_cone_gear_shaft.py`.'
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`)
