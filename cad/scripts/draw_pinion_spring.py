@@ -91,7 +91,7 @@ FRONT_CENTER = (0.110, 0.118)
 # Third-angle projection: the top view sits ABOVE the front and shares its X
 # station (both views span the same model x range), so the pad and hole read
 # straight up from the profile's free end.
-TOP_CENTER = (FRONT_CENTER[0], 0.205)
+TOP_CENTER = (FRONT_CENTER[0], 0.210)
 ISO_CENTER = (0.350, 0.150)
 DETAIL_CENTER = (0.240, 0.195)
 DETAIL_SCALE = (5, 1)
@@ -120,8 +120,11 @@ FRONT_KEEP = {
     "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
     # The free locations, on the FreeForm phantom.
     "FreeKinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(FREE_KINK_START[1] / 2.0)),
-    "FreeKinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.012),
-    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.026),
+    # Clear of the kink fence's native "A" label, which SolidWorks sets just
+    # above the fence (spring-r1 put the 15.0 text on it), with a text gap
+    # between the two and the top view lifted to make room.
+    "FreeKinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.020),
+    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.038),
 }
 _PAD_EAST = _front_x(FOOT_END[0])
 TOP_KEEP = {
@@ -142,11 +145,12 @@ DIMENSION_CALLOUTS = {
     "FreeKinkV": "FREE, TO KINK TANGENT",
     "FreeTipH": "FREE, TO TIP",
 }
-HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), 0.236)
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), TOP_CENTER[1] + 0.031)
 HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
 # Below the pad: above it the leader crossed the 4.50 and 9.50 pad
-# dimensions on its way down to the hole.
-HOLE_CALLOUT_XY = (_PAD_EAST + 0.010, 0.186)
+# dimensions on its way down to the hole.  The note centres on this point, so
+# it sits east of the pad, clear of the FREE, TO TIP text below the top view.
+HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:
