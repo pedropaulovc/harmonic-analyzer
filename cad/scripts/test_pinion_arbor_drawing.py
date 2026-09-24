@@ -71,7 +71,10 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
     assert callout == "REAM THRU,\nCENTRED ON HEAD LENGTH"
-    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
+    # Fable r-delta (Main ruling B): MHA-058's bond and acceptance are
+    # instructions for a part not on this print; MHA-058 carries both.
+    assert "MHA-058" not in spec.DRAWING_NOTES
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in crossrod.DRAWING_NOTES
 
 
 def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
@@ -95,7 +98,7 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
     assert tightest >= 0.0
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
-    assert "ON ASSEMBLY: BOND MHA-058 WITH LOCTITE 638." in spec.DRAWING_NOTES
+    assert "BOND INTO MHA-102 HEAD WITH LOCTITE 638." in crossrod.DRAWING_NOTES
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
         assert retired not in spec.CROSS_HOLE_CALLOUT
@@ -226,3 +229,61 @@ def test_every_printed_length_is_exact_at_its_authored_places() -> None:
     for name, value in nominal.items():
         places = spec.DRAWING_PRECISION_BY_NAME[name]
         assert value == pytest.approx(round(value, places), abs=1e-9), name
+
+
+def test_back_journal_text_sits_head_side_clear_of_the_crown_witnesses() -> None:
+    """The back-crown/overall witnesses (sheet x 0.079-0.081) ran through the
+    back journal's "8.00" and "JOURNAL" (Main, 30620a85): its text now sits on
+    the head side, right of its Ra symbol and short of the bond-zone text."""
+    text_x, text_y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
+    _station_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
+    assert text_x > symbol_x + 0.015  # past the Ra symbol's ~17 mm width
+    assert text_y < symbol_y  # its shelf runs under the symbol
+    assert text_x + 0.030 < drawing.DIAMETER_POSITIONS["ShaftDia"][0] - 0.020
+
+
+def test_detail_fence_audit_allows_only_the_downward_station_witnesses() -> None:
+    from _layout_geometry import AnnotationGeometry, Segment
+
+    center, radius = (0.3132, 0.171), 0.015
+
+    def dim(*segments: Segment) -> AnnotationGeometry:
+        return AnnotationGeometry(label="d", kind="dim", owner="p", segments=segments)
+
+    station = Segment(0.308, 0.165, 0.308, 0.100)  # drops to the stack below
+    inside = Segment(0.3190, 0.1785, 0.3250, 0.1785)  # Ø15 witness, in the fence
+    leader = Segment(0.3238, 0.165, 0.3238, 0.192, "leader")  # own line to text
+    drawing._assert_witnesses_clear_of_detail_fence(
+        [dim(station, inside, leader)], center=center, radius=radius
+    )
+    outward = Segment(0.3190, 0.1785, 0.3420, 0.1785)  # the old Ø15 witness
+    with pytest.raises(RuntimeError, match="detail-A fence"):
+        drawing._assert_witnesses_clear_of_detail_fence(
+            [dim(outward)], center=center, radius=radius
+        )
+    upward = Segment(0.308, 0.175, 0.308, 0.200)
+    with pytest.raises(RuntimeError, match="detail-A fence"):
+        drawing._assert_witnesses_clear_of_detail_fence(
+            [dim(upward)], center=center, radius=radius
+        )
+
+
+def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
+    x = drawing.DIAMETER_POSITIONS["HeadDia"][0]
+    to_x = lambda z: drawing.PRINCIPAL_CENTER[0] - (z - 106.725) / 1000.0  # noqa: E731
+    apex = to_x(spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG)
+    center = to_x(spec.HEAD_CENTER_Z)
+    half = spec.HEAD_DIA / 2000.0
+    fence = center + (drawing.DETAIL_RADIUS_MM**2 / 1e6 - half**2) ** 0.5
+    assert apex + 0.0015 < x < fence - 0.0020
+
+
+def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
+    from _layout_geometry import Finding
+
+    advisory = Finding(kind="leader-crosses-leader", sheet="Sheet1", detail="x")
+    drawing._assert_no_text_on_line([advisory])
+    blocking = Finding(kind="text-on-line", sheet="Sheet1", detail="journal")
+    with pytest.raises(RuntimeError, match="text-on-line"):
+        drawing._assert_no_text_on_line([advisory, blocking])
+
