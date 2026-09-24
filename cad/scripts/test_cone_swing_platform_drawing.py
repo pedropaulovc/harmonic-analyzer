@@ -215,6 +215,17 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_SHEET_RADIUS
     circle = (cx - r, cy - r, cx + r, cy + r)
+    # eaafbc73: the audit boxes the view by its native outline, the circle
+    # padded 10.4 mm a side, against the 9.7 mm zone border.
+    pad = drawing.DETAIL_OUTLINE_PAD
+    outline = (cx - r - pad, cy - r - pad, cx + r + pad, cy + r + pad)
+    assert outline[1] > 0.0097
+    for other in (label, relief):
+        assert not _boxes_overlap(outline, other)
+    for caption in captions:
+        assert not _boxes_overlap(outline, caption)
+    eaafbc73_outline = (0.0536, 0.0096, 0.1224, 0.0784)
+    assert _boxes_overlap(eaafbc73_outline, (0.1189, 0.0166, 0.2135, 0.0342))
     z_x, z_y = drawing.DETAIL_KEEP["TipSlotZ"]
     slot_z = (z_x + 0.001, z_y - 0.0025, z_x + 0.013, z_y + 0.0025)
     east_x, east_y = drawing.DETAIL_KEEP["TipSlotEastCx"]

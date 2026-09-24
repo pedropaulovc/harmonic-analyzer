@@ -166,7 +166,14 @@ DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
 DETAIL_RADIUS_MM = 12.0
 DETAIL_SCALE = (2, 1)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
-DETAIL_CENTER = (0.088, 0.044)
+# The layout audit boxes a detail view by its native outline, which run
+# eaafbc73 measured at the circle plus 10.4 mm a side ([53.6, 9.6]..
+# [122.4, 78.4] mm around a 48 mm circle): it crossed the 9.7 mm zone border
+# by 0.1 and ran 3.5 into the relief note.  Centred here, the outline sits
+# at [49.1, 10.6]..[117.9, 79.4]: right of the label, under the plan
+# captions (80.5) and 2.1 short of the note.
+DETAIL_CENTER = (0.0835, 0.045)
+DETAIL_OUTLINE_PAD = 0.0104
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
 _PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
@@ -195,7 +202,7 @@ DETAIL_KEEP = {
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
-RELIEF_NOTE_XY = (0.119, 0.034)
+RELIEF_NOTE_XY = (0.120, 0.034)
 # SECTION C-C cuts across the plate along the slot (sheet-horizontal through
 # its centre in detail B), so the counterbore's depth is an imported model
 # dimension (drawing-simplicity rule 2: a typed "4.20 DEEP" was not).  The
