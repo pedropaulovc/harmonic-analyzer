@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 
 import pytest
 
@@ -71,11 +72,13 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
 
 def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): three notes plus the generated MHA-102 bond-zone line (#814)
-    # as the fourth.  The drum is symmetric, so no orientation note; its axial
-    # station is stated once, on MHA-102, never re-derived here from j=19.
-    assert len(notes.splitlines()) == 4
-    assert "MHA-102 BOND ZONE: DIA 8.00 -0.01/-0.10 (REF)." in notes
+    # Rule 6 (R3): three notes.  The drum is symmetric, so no orientation
+    # note; its axial station is stated once, on MHA-102, never re-derived
+    # here from j=19.  The MHA-102 bond-zone band is MHA-102's own native
+    # dimension (Codex P1 on #814), so it is not restated here.
+    assert len(notes.splitlines()) == 3
+    assert "BOND ZONE" not in notes
+    assert "DRUM SHALL SLIDE ON MHA-102 BY HAND." in notes
     assert "ARBOR JOURNAL" not in notes
     assert (
         "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
@@ -193,3 +196,12 @@ def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
         smallest_tip_r = (spec.OUTSIDE_DIA - general) / 2.0
         assert c2c - largest_tip_r - gear_floor_r > 0.20
         assert contact_ratio(c2c, smallest_tip_r) > 1.1
+
+
+def test_no_note_line_carries_a_dimension() -> None:
+    """Rule 6: once part numbers and the named retaining compound are set
+    aside, no note line carries a digit (Codex P1 on #814)."""
+    for line in spec.DRAWING_NOTES.splitlines():
+        text = re.sub(r"MHA-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
+        assert not re.search(r"\d", text), line
+
