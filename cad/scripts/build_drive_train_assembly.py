@@ -833,6 +833,7 @@ from pinion_pivot_block_geometry import (  # noqa: E402
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
 )
 from pinion_pivot_block_geometry import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
+import pinion_rig_layout as RIG  # noqa: E402
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
     CAM_LEN,
@@ -1356,13 +1357,16 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
 APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
 # Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
-APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
-APINION_Z_FRONT = -75.0 + MECHANISM_Z_SHIFT
-APINION_Z_BACK = APINION_Z_FRONT + APINION_DRUM_LEN  # +103.615
+# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster and the
+# drum's bond station moved 0.3 aft -- every rig z station is
+# pinion_rig_layout's, shared with the base's transferred seats.
+APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
+APINION_Z_FRONT = RIG.DRUM_FRONT_Z
+APINION_Z_BACK = RIG.DRUM_BACK_Z
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 # Bracket thickness, end radius and pivot-to-arbor spacing come from the
 # geometry-only contract imported above.
-STRAP_AIR = 0.25  # axial air each side of each strap
+STRAP_AIR = RIG.STRAP_AIR  # MODEL-pose drum-end air; physical play is the feeler P
 PIVOT_X = APINION_X + math.sqrt(
     STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
 )  # the far side from the drum, so swinging the strap toward
@@ -1382,13 +1386,13 @@ LIFT_X = PIVOT_X + LIFT_BORE_SPACING  # lift rod in the blocks' WEST bores
 LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
-PIVOT_SHAFT_Z0 = -104.0 + MECHANISM_Z_SHIFT
-# Ø6.35 x 192 remains flush with the translated block outer faces.
-LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
-# front end proud 10 south of the translated front block -- lever hub seat
+PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
+# Ø6.35 torque shaft flush with both block outer faces.
+LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
+# front end ~10 proud south of the front block -- lever hub seat
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
-BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
-BLOCK_BACK_Z0 = 88.0 - BLOCK_DEPTH + MECHANISM_Z_SHIFT  # outer face fixed at 88;
+BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
+BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # outer face fixed at 88; the (c) back stop
 # U28 thinned the blocks (12 -> 10.25) so the 9-thick back strap keeps 0.30 air
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
@@ -1401,7 +1405,7 @@ LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # pose, and the cam-contact solve proves its full swing to about -72 degrees.
 LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 # PR7 -- the PR6 98 was img08's perspective-inflated read)
-LEVER_Z = -111.0 + MECHANISM_Z_SHIFT
+LEVER_Z = LIFT_ROD_Z0 + LEVER_HUB_LEN / 2.0 - LEVER_WALL_T
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
 ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
@@ -1503,12 +1507,11 @@ SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
 # keeps its authored z (and with it the base's foot-screw hole), and riding the
 # strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
-STRAP_Z_INNER = (
-    APINION_Z_FRONT - STRAP_AIR,  # -40.085
-    APINION_Z_BACK + STRAP_AIR,  # +103.865
-)
-SPRING_BLADE_INSET = 0.5  # blade inner edge, in from the strap's inner face
-SPRING_Z = STRAP_Z_INNER[1] + SPRING_BLADE_INSET + SPRING_W / 2.0  # 106.365
+STRAP_Z_INNER = RIG.STRAP_Z_INNER
+# Blade inner edge, in from the strap's inner face: 1.0 keeps the blade on
+# the flank at every split of the end play (pinion_rig_layout).
+SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
+SPRING_Z = RIG.SPRING_Z
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
 _SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
@@ -1618,22 +1621,28 @@ if _S_CAM - _FPIN_S0 < 2.0:
     raise AssertionError("cam contact lands inside the strap edge, not the pin")
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
-# Cam z stations: the follower pin rides near each collar's BACK face --
-# station CAM_PIN_STATION of the 9-long collar.  U28 (2026-09-23) deleted the
-# set-pin boss for a sub-flush M2.5 set screw at SET_SCREW_Z = 4.5, so the
-# collar is a bare cylinder at every azimuth of the free cam spin; the station
-# is kept where the boss-era band analysis left it.
+# Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
+# U28 (2026-09-23) deleted the set-pin boss for a sub-flush M2.5 set screw at
+# SET_SCREW_Z = 4.5, so the collar is a bare cylinder at every azimuth of the
+# free cam spin.  Ruling (c): the FRONT collar is set against the front
+# block's inner face (0.25 feeler) -- flush with the strap's outer face, so
+# the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
+# rod on the block.  The back collar moves from the boss-era 7.5 to 6.0: with
+# the end play, the rod play and a by-eye set it then keeps >= 2 of collar on
+# both sides of the pin, and its back face stays >= 1.1 off the back block at
+# the thinnest strap (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
 )  # -44.085, +107.865
-# 7.5: CAM_LEN - 1 = 8.0 still leaves the pin on the collar.
-CAM_PIN_STATION = 7.5  # pin plane, from the collar front face
-CAM_Z0 = tuple(z - CAM_PIN_STATION for z in _STRAP_MID_Z)
+CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
+CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
-    if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
+    if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN - 1.0:
         raise AssertionError("cam collar overhangs the lift rod")
-if CAM_PIN_STATION > CAM_LEN - 1.0:
-    raise AssertionError("follower pin rides off the collar's back face")
+if max(CAM_PIN_STATION) > CAM_LEN - 1.0 or min(CAM_PIN_STATION) < 1.0:
+    raise AssertionError("follower pin rides off a collar face")
+if CAM_Z0[0] < BLOCK_FRONT_Z0 + BLOCK_DEPTH + RIG.FRONT_BLOCK_FEELER - 1e-9:
+    raise AssertionError("front cam collar crowds the front pivot block")
 
 
 # PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
@@ -1790,8 +1799,8 @@ for _lo, _hi, _what in (
         "lever hub",
     ),
     (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH, "front pivot block"),
-    (LIFT_ROD_Z0, LIFT_ROD_Z0 + 202.0, "lift rod"),
-    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + 192.0, "pivot shaft"),
+    (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, "lift rod"),
+    (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
     (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),

@@ -302,20 +302,22 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     # foot with the pinion rig while the arbor-pedestal seats stay on the
     # unchanged cylinder-drum axis.  U28 (2026-09-23): 2.2425 park-out, screws
     # +-8.5 about the pivot bore, block mid-depth 5.125 in from each outer face.
-    former_blocks = (
-        (-17.226441649810653, -98.875),
-        (-0.22644164981065273, -98.875),
-        (-17.226441649810653, 82.875),
-        (-0.22644164981065273, 82.875),
-    )
+    # Ruling (c) (user, 2026-09-24): the block and spring-foot z stations come
+    # from pinion_rig_layout -- the back block keeps its released seat, the
+    # front block stands one feeler off the front strap, the spring rides with
+    # the back strap.
+    import pinion_rig_layout as rig
+
+    former_block_x = (-17.226441649810653, -0.22644164981065273)
     former_feet = (
-        (16.87259321646788, 70.95),
+        (16.87259321646788, rig.SPRING_Z - MECHANISM_Z_SHIFT),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )
     assert part.BLOCK_SCREW_XZ == tuple(
-        (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_blocks
+        (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )
+    assert rig.BLOCK_SEAT_Z[1] == pytest.approx(82.875 + MECHANISM_Z_SHIFT)
     assert part.FOOT_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in former_feet
     )
