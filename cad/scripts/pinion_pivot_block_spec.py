@@ -94,10 +94,10 @@ DRAWING_NOTES = "\n".join(
         # functional acceptance; the REAM and hold-down callouts are not repeated.
         "PIVOT BORE RUNS ON MHA-062 TORQUE SHAFT, LIFT BORE ON",
         "  MHA-060 LIFT ROD; EACH SHAFT TURNS FREELY BY HAND.",
-        # User ruling (c), 2026-09-24: the blocks locate the swing cluster
-        # axially; the front block is set by feeler before the U28 transfer.
-        "AT ASSEMBLY: SET FRONT BLOCK 0.25 FEELER OFF STRAP WITH",
-        "  CLUSTER ON BACK BLOCK; SPOT BASE SEATS THRU BLOCK HOLES.",
+        # Ruling (c): the front block's feeler setting is an ASSEMBLY step
+        # (0.25 +/- 0.10 end play), so it lives on the drive-train assembly
+        # drawing's step list, not in this part's notes (rule 6, Codex #854).
+        "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
