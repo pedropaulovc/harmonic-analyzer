@@ -440,3 +440,15 @@ def test_interface_title_block_bands_match_the_printed_sheet() -> None:
         row = _config.title_block(f"linear_{places}pl")
         assert band == float(str(row["display"]).lstrip("±"))
         assert band >= float(row["value_in"]) * 25.4
+
+
+def test_knife_mount_prints_the_o1_grade_and_its_hardness() -> None:
+    # #818 Codex P1 + user ruling 2026-09-24 ("O1 or equivalent"): the heat
+    # treatment depends on the grade, so the print names O1 and its 58-60 HRC.
+    import _config
+
+    row = _config.parts("knife-mount")
+    assert "O1" in row["material"]
+    assert "OR EQUIVALENT" in row["material"]
+    assert "O1" in row["material_specification"]
+    assert "58-60 HRC" in row["material_specification"]

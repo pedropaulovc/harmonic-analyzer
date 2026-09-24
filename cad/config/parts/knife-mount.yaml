@@ -1,7 +1,9 @@
 knife-mount:
   number: MHA-037
-  material: HARDENED STEEL, 58-60 HRC
-  material_specification: HARDENED STEEL, HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING
+  # User ruling 2026-09-24 (#818 Codex P1): the grade is AISI O1 per the
+  # 2026-09-02 ch18 p.42 re-read (dimensions.yaml), "O1 or equivalent".
+  material: AISI O1 TOOL STEEL (OR EQUIVALENT)
+  material_specification: AISI O1 OR EQUIVALENT OIL-HARDENING TOOL STEEL, HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING
   finish: harden and temper after machining; unpainted
   quantity: 2
   tolerance_class: machined_block
