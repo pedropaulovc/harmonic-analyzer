@@ -52,6 +52,9 @@ from _drawing_common import (
     view_name,
 )
 
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
@@ -765,14 +768,17 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    top_dimensions = curate_view_dimensions(
+    # RimWidth and FlangeToRim are owned by construction sketches the part
+    # saves blanked (build_harmonic_base REFERENCE_SKETCHES); the hidden-owner
+    # curate shows each in the one view that dimensions it.
+    top_dimensions = curate_hidden_owner_dimensions(
         adapter,
         top,
         keep=GEOMETRY_TOP_KEEP,
         view_label="geometry top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    side_dimensions = curate_view_dimensions(
+    side_dimensions = curate_hidden_owner_dimensions(
         adapter,
         side,
         keep=SIDE_KEEP,
