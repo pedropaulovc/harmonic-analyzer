@@ -105,3 +105,14 @@ def test_gooseneck_consumers_import_against_this_geometry() -> None:
     assert build_motion_study_springs.GOOSENECK_EYE[0] == (
         geom.ARM_END_X - geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
     )
+
+
+def test_stock_tube_wall_holds_the_floor_through_the_bend() -> None:
+    """The purchased tube's worst-case wall (A519 Table 9, +/-10%) stays >= the
+    1.5 mm floor straight and at the outer fibre of the R51 bend."""
+    import gooseneck_spec
+
+    straight = geom.WALL_T * (1.0 - gooseneck_spec.TUBE_STOCK_WALL_TOL)
+    bend = straight * 2.0 * geom.BEND_R / (2.0 * geom.BEND_R + geom.TUBE_DIA)
+    assert round(straight, 9) >= 1.8
+    assert bend >= 1.5

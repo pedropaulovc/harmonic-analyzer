@@ -1,7 +1,10 @@
 gooseneck:
   number: MHA-032
-  material: AISI 1010 TUBE; AISI 1018 PLUG/SCREW
-  material_specification: AISI 1010 SEAMLESS TUBE; AISI 1018 PLUG/SCREW
+  # The tube is purchased stock, printed as reference (gooseneck_spec
+  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block cell holds one
+  # line, so material abbreviates; material_specification spells it out.
+  material: A519 1010 CD SMLS TUBE 16 OD X 2 WALL; 1018 PLUG/SCREW
+  material_specification: ASTM A519 1010 COLD-DRAWN SEAMLESS TUBE 16 OD X 2 WALL; AISI 1018 PLUG/SCREW
   finish: ASTM B456 SC2 NI-CR PLATE AFTER BRAZE; NO MASKING; DIMENSIONS PRE-PLATE
   quantity: 1
   tolerance_class: machined_block

@@ -484,6 +484,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "TubeBoreDia": _offset(post_center, 0.0, -POST_DIAMETER_ROW_MM),
         },
     )
+    # Purchased tube: the stock sizes are reference, the wall is the mill's.
+    set_reference_dimensions(adapter, post_dimensions, ("TubeDia", "TubeBoreDia"))
     _place_view_label(
         adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),
         label="section B-B label",

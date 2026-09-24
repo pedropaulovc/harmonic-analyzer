@@ -43,6 +43,17 @@ for _partition in (
     for _feature, _names in _partition.items():
         DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
 
+# The tube is purchased stock that nobody cuts, so its Ø16 and Ø12 print as
+# REFERENCE and Material names the stock (Main ruling on Codex machinist r19 B1;
+# the U41 swing-plate precedent). The wall is then the mill's, not a machining
+# band: ASTM A519-03 Table 8 footnote B sends an ID under 1/2 in (ours is
+# 0.472 in) to Table 9, which holds a wall <= 25% of OD with an ID up to
+# 1.499 in to +/-10.0%. So 2.0 * 0.9 = 1.80 min straight. Outer-fibre thinning
+# at the R51 bend is about 2R/(2R + OD) = 0.864, so 1.56 at the bend: at or
+# above rule 12's 1.5 floor, which covers MACHINED walls anyway. A519/A519M-24a
+# was not checked (paywalled).
+TUBE_STOCK_WALL_TOL = 0.10
+
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. Formed lengths and radii print to one
 # place: the arm run enters the counter moment about 1:1, so +/-0.8 on it is
@@ -53,7 +64,7 @@ for _partition in (
 # the head diameter (eye retention, not a fit; Codex machinist r19). At
 # Ø12.8 the head still clears the counter spring's raised half-turn by 1.26 mm.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
+    "LegProfile": {"TubeDia": 1, "TubeBoreDia": 1},
     "Leg": {"LegLength": 1},
     "BendPath": {"BendRadius": 1, "ArmRun": 1},
     "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 1},
