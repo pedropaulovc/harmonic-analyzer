@@ -29,8 +29,8 @@ gear faces (stations below quoted from the legacy pivot end):
 * 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
 * 1/4 in x 148.8 -- T018 seat
 * 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 143.2599 -- T006 tip journal contacts the exact McMaster
-  94025A150 conical cup apex at 6 mm thread engagement.  Its 20.675 mm
+* 1/32 in x 138.9788 -- T006 tip journal contacts the exact McMaster
+  94025A164 conical cup apex at 9.5 mm thread engagement.  Its 16.393 mm
   terminal stub still spans the 4 mm tip bushing.  WARNING: the 0.79 mm
   steel tip journal is mechanically marginal (it follows from the 62.2 OD
   anchor, low confidence) -- flagged for Phase 3 rebuild validation; a real

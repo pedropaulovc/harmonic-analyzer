@@ -11,7 +11,7 @@ _EXPECTED = {
     "clamp-screw": (("90280A201",), "MHA-107", 6),
     "cone-lock-knob": (("91882A425",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
-    "cone-tip-adjuster": (("94025A150",), "MHA-097", 1),
+    "cone-tip-adjuster": (("94025A164",), "MHA-097", 1),
     "cone-tip-pinch-screw": (("90280A110",), "MHA-098", 1),
     "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 3),

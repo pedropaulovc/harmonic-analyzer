@@ -27,11 +27,14 @@ JOURNAL_END = 43.011
 FRONT_STUB = 61.9068609979
 
 # T006's north face starts the 4 mm bushing, followed by 2 mm clearance and
-# the 12 mm tip block.  McMaster 94025A150 is threaded 6 mm into the block's
-# north face, placing its stock cup rim at station 141.27232594770454.  The
-# vendor Sketch2 profile puts the conical cup apex 1.98755 mm beyond that rim
-# (6.35 - 4.36245), so the terminal shaft endpoint contacts that apex rather
-# than extending through it as the former nominal 5 mm insertion did.
+# the 12 mm tip block.  Rule-12 E11 replaced the 5/16-18 94025A150 with the
+# #10-32 McMaster 94025A164, threaded ADJUSTER_EMBED (9.5, the block spec's
+# fit-up setting) into the block's north face, which places its cup rim at
+# station 137.77232594770454.  The vendor Sketch2 profile (Line7, harvested
+# 2026-09-24) puts the 45 deg conical cup apex 1.2065 mm beyond that rim
+# (4.7625 - 3.556), so the terminal shaft endpoint contacts that apex.
+# Both constants duplicate the block spec and the replica so this spec
+# imports no build module; the drive-train assembly asserts tip == apex.
 T006_CENTER_STATION = 126.02232594770454
 T006_FACE_WIDTH = 6.5
 TIP_BUSHING_LENGTH = 4.0
@@ -43,10 +46,10 @@ TIP_BUSHING_END_STATION = TIP_BUSHING_START_STATION + TIP_BUSHING_LENGTH
 TIP_BLOCK_NORTH_FACE_STATION = (
     TIP_BUSHING_END_STATION + TIP_BLOCK_CLEARANCE + TIP_BLOCK_LENGTH
 )
-ADJUSTER_EMBED = 6.0
+ADJUSTER_EMBED = 9.5
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
-MCM_94025A150_CUP_DEPTH = 1.98755
-T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A150_CUP_DEPTH
+MCM_94025A164_CUP_DEPTH = 1.2065
+T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A164_CUP_DEPTH
 TIP_STUB_START_STATION = 155.7 + GEAR_AXIS_SHIFT
 TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 

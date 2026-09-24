@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -186,3 +187,15 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     assert not drawing._pinch_thread_callout_resolved(
         {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
     )
+
+
+def test_isometric_hides_every_model_reference_sketch() -> None:
+    """f76387f5's iso printed reference-sketch strokes; the list must stay whole.
+
+    Every construction-only reference sketch the build authors is hidden in the
+    isometric, so a new one cannot print there unlisted.
+    """
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    authored = re.findall(r'feature_name="([A-Za-z]+Reference)"', source)
+    assert authored and tuple(authored) == drawing.REFERENCE_SKETCHES

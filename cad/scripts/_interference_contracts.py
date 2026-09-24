@@ -111,7 +111,10 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 # their production receivers.  The 90280A108's modeled helical thread and
 # under-head runout overlapped the native #4-40 far jaw by 6.47 mm3 over its
 # 2.625 of far-jaw engagement; the cup-tip adjuster makes its intended thrust
-# contact with the shaft end at 0.13 mm3.  Rule-12 E1 lengthened the pinch
+# contact with the shaft end at 0.13 mm3.  That is the 45 deg cup's analytic
+# (2/3)*pi*r^3 for the 0.79 stub (0.131); rule-12 E11's 94025A164 cup is also
+# 45 deg (vendor Sketch2), so the observation carries over until the next
+# drive-train build re-observes it.  Rule-12 E1 lengthened the pinch
 # screw to the 12.7 90280A110 (5.80 in the far jaw), so its limit scales that
 # observation by engagement -- an over-estimate, since the runout share does
 # not grow -- until the next drive-train build re-observes it.  Ten-percent
@@ -130,8 +133,10 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     ),
     frozenset(("pinion-bracket-1", "pinion-cam-pin-1")): _CAM_PIN_GATE_LIMIT_MM3,
     frozenset(("pinion-bracket-2", "pinion-cam-pin-2")): _CAM_PIN_GATE_LIMIT_MM3,
+    # Rule-12 E11: #10-32 94025A164 (major 4.826) in the #21 (4.0386) tap
+    # drill, ADJUSTER_EMBED 9.5 deep.
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
-        7.9502, 6.528, 6.0
+        4.826, 4.0386, 9.5
     ),
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
