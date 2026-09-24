@@ -188,8 +188,17 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 
 
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
-    assert "ACCEPTED EXCEPTION TO THE 1.5D RULE" in spec.DRAWING_NOTES
-    assert spec.DRAWING_NOTES.startswith("THREAD ENGAGEMENT 1.15D MIN")
+    # The sheet states the worst case its named-exception row records.
+    assert "NAMED EXCEPTION TO RULE 12" in spec.DRAWING_NOTES
+    worst = f"{spec.FULL_THREAD_WORST_DIAMETERS:.2f}D"
+    assert spec.DRAWING_NOTES.startswith(f"THREAD ENGAGEMENT {worst} MIN")
+    policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
+    row = next(
+        line
+        for line in policy.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| MHA-139")
+    )
+    assert f"{worst} at the printed worst case" in row
     # The ruling ID stays in the spec source; the sheet reader never sees it.
     assert "U33b" not in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) == 1

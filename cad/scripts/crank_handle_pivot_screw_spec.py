@@ -189,11 +189,13 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
 )
 # The tip may stand proud of the arm's inboard face by up to this much.
 PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
-# The one manufacturing note: the accepted exception, rendered from the floor.
-# The ruling ID (U33b) stays here; it means nothing to the book's reader.
+# The one manufacturing note: the named exception, stated with the worst-case
+# engagement its policy row records (the stock arm, after the exit break) and
+# worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
+# stays here; it means nothing to the book's reader.
 DRAWING_NOTES = (
-    f"THREAD ENGAGEMENT {ENGAGEMENT_EXCEPTION_FLOOR_D:.2f}D MIN, "
-    "ACCEPTED EXCEPTION TO THE 1.5D RULE."
+    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS:.2f}D MIN: "
+    "NAMED EXCEPTION TO RULE 12."
 )
 
 # Flat seat annulus that bears on the arm face, outside the 45-degree lead:
