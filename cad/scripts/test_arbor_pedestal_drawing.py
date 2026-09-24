@@ -315,3 +315,15 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     assert plan_top < drawing.HOLE_LATERAL_XY[1] < drawing.TOP_KEEP["Width"][1]
     # The bore lane sits below the seat.
     assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)
+
+
+def test_crown_callout_says_where_the_tapered_flanks_start() -> None:
+    """Round-2 review: the flanks run from the foot corners (the strap root is
+    the full foot width) up to tangency with the crown."""
+    import build_arbor_pedestal
+
+    source = Path(build_arbor_pedestal.__file__).read_text(encoding="utf-8")
+    assert "half_root = FOOT_WIDTH / 2.0" in source
+    assert "FOOT CORNERS" in drawing.CROWN_CALLOUT
+    assert "TANGENT" in drawing.CROWN_CALLOUT
+    assert not re.search(r"\d", drawing.CROWN_CALLOUT)

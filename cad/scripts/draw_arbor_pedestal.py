@@ -123,6 +123,7 @@ TOP_KEEP = {
 DIMENSION_CALLOUTS = {
     "BoreDia": "REAM THRU",
 }
+CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
 # Lanes for the two lateral locations: below the seat in the elevation (the
 # bore's centreline extends down through the part, crossing no other
 # dimension's extension line), and between the plan and the foot-width lane.
@@ -481,16 +482,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crown radius",
     )
     radius_display = _early_bound(radius_dimension, "IDisplayDimension")
-    # The crown is what places the tapered flanks, and both statements are
-    # geometric relations rather than sizes: concentric with the bore the
-    # height chain already locates, tangent to the sides that rise from the
-    # foot corners. Words only -- every digit on this sheet is a dimension.
-    radius_display.SetText(4, "CONC W/ BORE; SIDES TANGENT")
+    # The crown is what places the tapered flanks: each side runs from a
+    # 24.0 foot corner up to tangency with this radius, whose centre is the
+    # bore's (the shared centre mark says so). The Fable round-2 review could
+    # not tell where the flanks start, so the words name both ends. Words
+    # only -- every digit on this sheet is a dimension.
+    radius_display.SetText(4, CROWN_CALLOUT)
     # The leader runs from the text toward the crown centre; with the default
     # "extend to the opposite side" it kept going through the bore and crossed
     # the Ø9.55 dimension at the centre. Stop it at the crown arc.
     radius_display.ArcExtensionLineOrOppositeSide = False
-    if str(radius_display.GetText(4) or "") != "CONC W/ BORE; SIDES TANGENT" or bool(
+    if str(radius_display.GetText(4) or "") != CROWN_CALLOUT or bool(
         radius_display.ArcExtensionLineOrOppositeSide
     ):
         raise RuntimeError("crown radius annotation did not persist")
