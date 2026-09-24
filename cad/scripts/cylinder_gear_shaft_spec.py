@@ -74,13 +74,14 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # stock buy rather than a grind between centres, and a 162:9.5 slender bar is
 # turned between centres -- saying the centre holes may stay saves a phone
 # call (both ends finish up inside a pedestal bore, where they do no harm).
-# The length is cut at assembly, so the shop supplies the bar long (170 covers
-# the nominal span plus facing stock).
+# The length is cut at assembly, so the shop supplies the bar long (190 covers
+# the nominal span plus facing stock and leaves about 11 protruding past each
+# MHA-004 for the step 9 edge-find that sets the drum x on the mill DRO).
 DRAWING_NOTES = "\n".join(
     (
         "3/8 IN GROUND STOCK OK.",
         "CENTRES OK.",
-        "SUPPLY 170 LONG, UNCUT.",
+        "SUPPLY 190 LONG, UNCUT.",
     )
 )
 # The title block declares 1:1, so the off-scale pictorial must say so

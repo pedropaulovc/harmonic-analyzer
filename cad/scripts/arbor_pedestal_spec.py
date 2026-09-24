@@ -96,7 +96,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BoreProfile": {"BoreDia": 2, "BoreHeight": 2},
 }
 
-# Places for the four dimensions the SHEET derives, keyed by the recipe's own
+# Places for the six dimensions the SHEET derives, keyed by the recipe's own
 # label.  Each is a distance no single model dimension expresses (the strap
 # band between two faces, the hold-down hole off the foot's far face), the
 # crown radius a full-circle boss carries as a diameter, or the parenthesised
@@ -112,6 +112,12 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # assembly, so its location only has to keep the webs, and the U27 worst
     # case at ±0.8 still leaves 5.0 to the strap root and to the ledge end.
     "hold-down hole location": 1,
+    # Both lateral locations run off the foot's west side face (policy rule 7:
+    # an origin is a feature, not the symmetry axis). One place: the drum x is
+    # set with the arbor itself at assembly (DRO edge-find), so neither hole's
+    # side offset feeds a fit, and the crown is concentric with the bore.
+    "bore lateral location": 1,
+    "hold-down hole lateral location": 1,
 }
 
 _PRECISION_NAMES = [

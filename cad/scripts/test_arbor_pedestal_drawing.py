@@ -86,6 +86,8 @@ def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
         "crown radius",
         "strap depth",
         "hold-down hole location",
+        "bore lateral location",
+        "hold-down hole lateral location",
     }
 
 
@@ -93,7 +95,7 @@ def test_arbor_bore_closes_the_configured_running_fit() -> None:
     import _config
 
     assert round(arbor_pedestal_spec.BORE_DIA, 2) == 9.55
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU; ON PART C/L"}
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "REAM THRU"}
     shaft_limits = (9.505, 9.525)
     bore_limits = (9.550, 9.580)
     clearances = (
@@ -271,6 +273,8 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "front view": drawing.FRONT_CENTER,
         "plan view": drawing.TOP_CENTER,
         "isometric view": drawing.ISO_CENTER,
+        "bore lateral lane": drawing.BORE_LATERAL_XY,
+        "hole lateral lane": drawing.HOLE_LATERAL_XY,
     }
     for label, (x, y) in anchors.items():
         assert margin < x < template.width_m - margin, label
@@ -297,3 +301,17 @@ def test_part_stamps_make_flexible_material_and_protective_finish() -> None:
     # Two identical pedestals: the south support plus the north one rotated
     # 180 about Y (build_drive_train_assembly places both).
     assert int(config["quantity"]) == 2
+
+
+def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
+    """Policy rule 7: X is dimensioned from the foot's west side face in both
+    views, and no callout falls back on the part centreline."""
+    source = _drawing_source()
+    assert "PART C/L" not in source
+    assert source.count("_side_face_edge(adapter, front, -FOOT_WIDTH / 2.0") == 1
+    assert source.count("_side_face_edge(adapter, top, -FOOT_WIDTH / 2.0") == 1
+    # The hole lane sits between the plan's near edge and the foot-width lane.
+    plan_top = drawing._top_y(arbor_pedestal_spec.FOOT_NEAR_Z)
+    assert plan_top < drawing.HOLE_LATERAL_XY[1] < drawing.TOP_KEEP["Width"][1]
+    # The bore lane sits below the seat.
+    assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)

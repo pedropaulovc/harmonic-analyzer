@@ -72,8 +72,9 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # above the elevation; the isometric balances the aligned group from the
 # right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
 # the crown callout and still leaves a dimension lane above itself under the
-# sheet border: elevation 0.065..0.165, crown text ~0.173, plan 0.182..0.238,
-# foot-width lane 0.250.
+# sheet border: lateral-location lane 0.055, elevation 0.065..0.165, crown
+# text ~0.173, plan 0.182..0.238, hole lateral lane 0.246, foot-width lane
+# 0.256.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
@@ -110,17 +111,23 @@ FRONT_KEEP = {
     "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
 }
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.012),
+    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
     # Outer left lane; its text sits above the hold-down lane's text so the
     # two nested dimensions never read side by side.
     "Depth": (TOP_CENTER[0] - 0.048, _top_y(FOOT_NEAR_Z) - 0.012),
 }
-# X on this part is stated once, in words, by the two features that sit on the
-# symmetry axis: a digit-free callout beats a pair of half-width dimensions
-# that would only repeat the 24.0 foot width.
+# X on this part starts on a FEATURE, never the symmetry axis (policy rule 7):
+# the bore in the elevation and the hold-down hole in the plan are both
+# dimensioned from the foot's west side face, so the two views share one
+# origin the shop can touch off.
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU; ON PART C/L",
+    "BoreDia": "REAM THRU",
 }
+# Lanes for the two lateral locations: below the seat in the elevation (the
+# bore's centreline extends down through the part, crossing no other
+# dimension's extension line), and between the plan and the foot-width lane.
+BORE_LATERAL_XY = (FRONT_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _front_y(0.0) - 0.010)
+HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 0.008)
 
 
 def _set_reference_precision(display: Any, label: str) -> None:
@@ -211,6 +218,27 @@ def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
             candidates.append((abs(p1[0] - p0[0]), edge))
     if not candidates:
         raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def _side_face_edge(adapter: Any, view: Any, x_mm: float, *, label: str) -> Any:
+    """Return the longest straight view edge lying on the plane x = ``x_mm``."""
+    candidates: list[tuple[float, Any]] = []
+    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
+        edge = _early_bound(raw_edge, "IEdge")
+        start = edge.GetStartVertex()
+        end = edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        start = _early_bound(start, "IVertex")
+        end = _early_bound(end, "IVertex")
+        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
+        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
+        if abs(p0[0] - x_mm) <= 0.01 and abs(p1[0] - x_mm) <= 0.01:
+            span = max(abs(p1[1] - p0[1]), abs(p1[2] - p0[2]))
+            candidates.append((span, edge))
+    if not candidates:
+        raise RuntimeError(f"{label}: no view edge on the plane x={x_mm:.3f} mm")
     return max(candidates, key=lambda item: item[0])[1]
 
 
@@ -506,6 +534,30 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(hold_down_dimension, "hold-down hole location")
     _set_reference_precision(strap_dimension, "strap depth")
+    # Lateral locations off the foot's west side face (x = -FOOT_WIDTH/2), the
+    # same face in both views.
+    bore_lateral = _add_entity_dimension(
+        adapter,
+        front,
+        _side_face_edge(adapter, front, -FOOT_WIDTH / 2.0, label="elevation west side"),
+        bore_entity,
+        orientation="horizontal",
+        position=BORE_LATERAL_XY,
+        label="bore lateral location",
+        arc_endpoint="center",
+    )
+    hole_lateral = _add_entity_dimension(
+        adapter,
+        top,
+        _side_face_edge(adapter, top, -FOOT_WIDTH / 2.0, label="plan west side"),
+        screw_entity,
+        orientation="horizontal",
+        position=HOLE_LATERAL_XY,
+        label="hold-down hole lateral location",
+        arc_endpoint="center",
+    )
+    _set_reference_precision(bore_lateral, "bore lateral location")
+    _set_reference_precision(hole_lateral, "hold-down hole lateral location")
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
     # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
     # wide at 2:1, so anchoring it near the view buried its left half in the
@@ -518,7 +570,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(TOP_CENTER[0] + _screw_r, _top_y(SCREW_Z)),
         callout_xy=(TOP_CENTER[0] + 0.120, _top_y(SCREW_Z) + 0.012),
         label="flange hold-down hole",
-        process="FLANGE HOLE ON PART C/L: DRILL",
+        process="DRILL",
     )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
