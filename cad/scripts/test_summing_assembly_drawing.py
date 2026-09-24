@@ -625,3 +625,63 @@ def test_visible_reference_census_names_only_shown_sketches_and_reference_geomet
         [("", "PatternAxisX", "RefAxis", 2), ("", "Mates", "MateGroup", 2),
          ("", "Plane1", "RefPlane", 3)]
     ) == ["PatternAxisX"]
+
+
+class _AxisFeature:
+    def __init__(self, visible_after: int):
+        self.Visible = 2
+        self._after = visible_after
+        self.selected_with = None
+
+    def Select2(self, append: bool, mark: int) -> bool:
+        self.selected_with = (append, mark)
+        return True
+
+
+class _AxisModel:
+    def __init__(self, features: dict):
+        self._features = features
+        self.blanked = 0
+
+    def ClearSelection2(self, _all: bool) -> None:
+        pass
+
+    def FeatureByName(self, name: str):
+        return self._features.get(name)
+
+    def BlankRefGeom(self) -> None:
+        self.blanked += 1
+        for feature in self._features.values():
+            feature.Visible = feature._after
+
+
+class _AxisAdapter:
+    def __init__(self, model):
+        self.currentModel = model
+
+
+def test_explode_axes_are_blanked_together_and_read_back_hidden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Census e7143094 listed PatternAxisX/Y/Z as shown; summing owns them, so
+    # it hides them by name (Main, 2026-09-24) and proves the hide stuck.
+    monkeypatch.setattr(build_summing_assembly, "_early_bound", lambda obj, _iface: obj)
+    names = build_summing_assembly.EXPLODE_AXIS_NAMES
+    features = {name: _AxisFeature(visible_after=1) for name in names}
+    model = _AxisModel(features)
+    build_summing_assembly._hide_explode_axes(_AxisAdapter(model))
+    assert model.blanked == 1
+    assert [features[name].selected_with for name in names] == [
+        (False, 0),
+        (True, 0),
+        (True, 0),
+    ]
+
+    stuck = {name: _AxisFeature(visible_after=1) for name in names}
+    stuck["PatternAxisY"] = _AxisFeature(visible_after=2)
+    with pytest.raises(RuntimeError, match=r"still shown after BlankRefGeom: \['PatternAxisY'\]"):
+        build_summing_assembly._hide_explode_axes(_AxisAdapter(_AxisModel(stuck)))
+
+    missing = {name: _AxisFeature(visible_after=1) for name in names[:2]}
+    with pytest.raises(RuntimeError, match="PatternAxisZ is missing"):
+        build_summing_assembly._hide_explode_axes(_AxisAdapter(_AxisModel(missing)))

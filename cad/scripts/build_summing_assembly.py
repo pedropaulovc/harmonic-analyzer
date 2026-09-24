@@ -472,6 +472,46 @@ REFERENCE_FEATURE_TYPES = frozenset(
     {"ProfileFeature", "3DProfileFeature", "RefAxis", "RefPlane", "RefPoint"}
 )
 VISIBILITY_SHOWN = 2  # swVisibilityState_e.swVisibilityStateShown
+VISIBILITY_HIDDEN = 1  # swVisibilityState_e.swVisibilityStateHide
+# The explode's world-direction axes (ensure_global_pattern_axis). They are
+# this assembly's own construction references: hidden, not suppressed, so the
+# explode steps keep selecting them by name.
+EXPLODE_AXIS_NAMES = ("PatternAxisX", "PatternAxisY", "PatternAxisZ")
+
+
+@_telemetry.traced("assembly.hide_reference")
+def _hide_explode_axes(adapter: Any) -> None:
+    """BlankRefGeom the explode axes by name and prove each reads hidden.
+
+    The first census (run e7143094) listed them as shown; each part hides its
+    own references (Main ruling 2026-09-24), and these belong to summing.
+    """
+    model = adapter.currentModel
+    assembly = _early_bound(model, "IAssemblyDoc")
+    features = {}
+    model.ClearSelection2(True)
+    for index, name in enumerate(EXPLODE_AXIS_NAMES):
+        feature = assembly.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"{ASM_NAME}: explode axis {name} is missing")
+        feature = _early_bound(feature, "IFeature")
+        if not feature.Select2(index > 0, 0):
+            raise RuntimeError(f"{ASM_NAME}: cannot select explode axis {name}")
+        features[name] = feature
+    model.BlankRefGeom()
+    model.ClearSelection2(True)
+    shown = [
+        name
+        for name, feature in features.items()
+        if int(feature.Visible) != VISIBILITY_HIDDEN
+    ]
+    if shown:
+        raise RuntimeError(
+            f"{ASM_NAME}: explode axes still shown after BlankRefGeom: {shown}"
+        )
+    _telemetry.event(
+        "assembly.hide_reference", assembly=ASM_NAME, names=EXPLODE_AXIS_NAMES
+    )
 
 
 def visible_reference_names(
@@ -1292,6 +1332,7 @@ async def build(adapter) -> dict[str, str]:
     # (not the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=ASSEMBLY_TITLE)
     _create_summing_explode(adapter)
+    _hide_explode_axes(adapter)
     _visible_reference_census(adapter)
     return await save_assembly_and_images(
         adapter,
