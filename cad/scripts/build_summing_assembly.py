@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import math
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -463,6 +464,82 @@ def measure_hanger_joint(
         raise RuntimeError(f"{summary}: " + "; ".join(violations))
     log(summary)
     return reading
+
+
+# Feature types that draw in a shaded render when left shown: unconsumed
+# sketches and reference geometry (IFeature.GetTypeName2 values).
+REFERENCE_FEATURE_TYPES = frozenset(
+    {"ProfileFeature", "3DProfileFeature", "RefAxis", "RefPlane", "RefPoint"}
+)
+VISIBILITY_SHOWN = 2  # swVisibilityState_e.swVisibilityStateShown
+
+
+def visible_reference_names(
+    rows: Iterable[tuple[str, str, str, int]],
+) -> list[str]:
+    """``name@owner`` of every shown sketch/reference row ``(owner, name, type, visible)``.
+
+    A top-level sketch is by construction unconsumed (a consumed profile is a
+    subfeature of the feature that absorbed it), so any shown one draws.
+    """
+    return [
+        f"{name}@{owner}" if owner else name
+        for owner, name, type_name, visible in rows
+        if type_name in REFERENCE_FEATURE_TYPES and visible == VISIBILITY_SHOWN
+    ]
+
+
+def _feature_rows(
+    adapter: Any, owner: str, first: Any
+) -> list[tuple[str, str, str, int]]:
+    """One row per top-level feature; visibility read only where it matters."""
+    rows = []
+    feature = first
+    while feature is not None:
+        feature = _early_bound(feature, "IFeature")
+        type_name = str(feature.GetTypeName2())
+        visible = 0
+        if type_name in REFERENCE_FEATURE_TYPES:
+            visible = int(adapter._attempt(lambda f=feature: f.Visible, default=0))
+        rows.append((owner, str(feature.Name), type_name, visible))
+        feature = feature.GetNextFeature()
+    return rows
+
+
+def _visible_reference_census(adapter: Any) -> list[str]:
+    """Name every sketch/reference feature that will draw in the saved PNGs.
+
+    Read-only (Main ruling 2026-09-24): the lever's SummationArcReference point
+    and BossAxialReference line shipped into the summing isometric. Each part
+    owns hiding its own construction sketches; this census makes the build say
+    which ones still show instead of leaving it to an eye pass.
+    """
+    model = adapter.currentModel
+    assembly = _early_bound(model, "IAssemblyDoc")
+    with _telemetry.span("assembly.visible_reference_census") as span:
+        rows = _feature_rows(adapter, "", model.FirstFeature())
+        components = tuple(assembly.GetComponents(False) or ())
+        for raw_component in components:
+            component = _early_bound(raw_component, "IComponent2")
+            rows += _feature_rows(
+                adapter, str(component.Name2 or ""), component.FirstFeature()
+            )
+        names = visible_reference_names(rows)
+        span.set_attribute("features_scanned", len(rows))
+        span.set_attribute("components_scanned", len(components))
+        span.set_attribute("visible_count", len(names))
+        _telemetry.event(
+            "assembly.visible_reference",
+            assembly=ASM_NAME,
+            count=len(names),
+            names=tuple(names),
+        )
+    if names:
+        _telemetry.warn(
+            f"{ASM_NAME}: {len(names)} shown sketch/reference feature(s) draw in "
+            f"the saved PNGs: {', '.join(names)}"
+        )
+    return names
 
 
 def _assert_built_hanger_engagements(adapter: Any) -> None:
@@ -1215,6 +1292,7 @@ async def build(adapter) -> dict[str, str]:
     # (not the bare stem) so the sheet identifies itself as an assembly drawing.
     apply_summary_info(adapter, title=ASSEMBLY_TITLE)
     _create_summing_explode(adapter)
+    _visible_reference_census(adapter)
     return await save_assembly_and_images(
         adapter,
         ASM_NAME,

@@ -568,3 +568,60 @@ def test_hanger_engagement_is_measured_from_the_boss_top_seat_not_the_block() ->
     assert violations(_joint()) == []
     block_datum = violations(_joint(mount_top=hanger.MOUNT_BLOCK_TOP_Y))
     assert any("is not the seat plane" in item for item in block_datum)
+
+
+class _CensusFeature:
+    def __init__(self, name: str, type_name: str, visible: int, following=None):
+        self.Name = name
+        self._type = type_name
+        self.Visible = visible
+        self._next = following
+
+    def GetTypeName2(self) -> str:
+        return self._type
+
+    def GetNextFeature(self):
+        return self._next
+
+
+class _CensusAdapter:
+    @staticmethod
+    def _attempt(fn, default=None):
+        try:
+            return fn()
+        except Exception:
+            return default
+
+
+def test_visible_reference_census_names_only_shown_sketches_and_reference_geometry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Main ruling 2026-09-24: the lever's SummationArcReference point and
+    # BossAxialReference line drew in the summing isometric. The census must
+    # name exactly the shown sketch/reference rows, owner-qualified.
+    monkeypatch.setattr(build_summing_assembly, "_early_bound", lambda obj, _iface: obj)
+    chain = None
+    for name, type_name, visible in reversed(
+        (
+            ("Front Plane", "RefPlane", 1),
+            ("Boss", "Extrusion", 2),
+            ("SummationArcReference", "ProfileFeature", 2),
+            ("BossAxialReference", "ProfileFeature", 2),
+            ("KnifeEnvelopeReference", "ProfileFeature", 1),
+            ("knife axis", "RefAxis", 2),
+        )
+    ):
+        chain = _CensusFeature(name, type_name, visible, chain)
+    rows = build_summing_assembly._feature_rows(_CensusAdapter(), "summing-lever-1", chain)
+    assert len(rows) == 6
+    assert build_summing_assembly.visible_reference_names(rows) == [
+        "SummationArcReference@summing-lever-1",
+        "BossAxialReference@summing-lever-1",
+        "knife axis@summing-lever-1",
+    ]
+    # Assembly-level rows carry no owner; a shown non-reference feature and an
+    # unknown visibility state never count.
+    assert build_summing_assembly.visible_reference_names(
+        [("", "PatternAxisX", "RefAxis", 2), ("", "Mates", "MateGroup", 2),
+         ("", "Plane1", "RefPlane", 3)]
+    ) == ["PatternAxisX"]
