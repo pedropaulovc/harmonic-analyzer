@@ -11,11 +11,8 @@ import math
 
 import _config
 
-from _fit_limits import band_text
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from pinion_arbor_spec import SHAFT_DIA as ARBOR_DIA
-from pinion_arbor_spec import SHAFT_DIA_BAND as ARBOR_BOND_ZONE_BAND
 
 
 MM_PER_IN = 25.4
@@ -124,10 +121,10 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
+# Rule 6: notes never carry a dimension.  MHA-102 owns its bond-zone band
+# natively (BondZoneDia); the hand slide is this part's functional acceptance.
 DRAWING_NOTES = "\n".join(
     (
-        f"MHA-102 BOND ZONE: DIA {ARBOR_DIA:.2f} "
-        f"{band_text(ARBOR_BOND_ZONE_BAND)} (REF).",
         "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
         f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND} AT THE "
         "DRUM STATION ON MHA-102.",

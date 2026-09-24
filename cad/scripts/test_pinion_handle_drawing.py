@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -178,3 +179,14 @@ def test_part_metadata_names_the_grip_crossrod_work() -> None:
     assert "cold-finished steel rod" in str(config["material_specification"])
     assert "crossrod" in str(config["process"])
     assert int(config["quantity"]) == 1
+
+
+def test_no_note_line_carries_a_dimension() -> None:
+    """Rule 6 (Codex P1 on #814): the Ø6 bar size lives in the registry's
+    material specification and the imported RodDia, never in a note."""
+    for line in spec.DRAWING_NOTES.splitlines():
+        text = re.sub(r"MHA-\d+", "", line).replace(arbor.RETAINING_COMPOUND, "")
+        assert not re.search(r"\d", text), line
+    assert "USE COLD-FINISHED BAR AS RECEIVED." in spec.DRAWING_NOTES
+    assert "6 mm" in _config.parts("pinion-handle")["material_specification"]
+
