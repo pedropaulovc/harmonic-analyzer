@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import math
 
 import _config
@@ -235,20 +236,75 @@ def test_material_fits_one_title_block_line() -> None:
     assert "1018" in str(row["material_specification"])
 
 
+# Detail B text extents (sheet metres), from the renders: outside its span a
+# vertical dimension's text hangs outward from its line, centred on the keep
+# y -- "4.0 +0.1/0.0" 17 x 8 mm, "7.94 +0.1/0.0" 21 x 8 mm and "11.00"
+# 12 x 5 mm (81788ce9); the 2.00s ~12 x 5 centred on theirs.  Notes are
+# 2.5 mm text anchored upper-left, ~1.894 mm a character and 3.52 mm a line
+# (the relief note, 0.0947 x 0.0176 for 50 characters on five lines).
+_NOTE_CHAR_W, _NOTE_LINE_H = 0.001894, 0.00352
+_DETAIL_SPANS = {  # each vertical dimension's extension-line span, sheet y
+    "TipSlotZ": (0.033, 0.055),
+    "TipSlotW": (0.051, 0.059),
+    "TipCboreW": (0.04706, 0.06294),
+}
+
+
+def _detail_text_boxes(keep: dict[str, tuple[float, float]]) -> dict[str, tuple]:
+    z_x, z_y = keep["TipSlotZ"]
+    slot_x, slot_y = keep["TipSlotW"]
+    cbore_x, cbore_y = keep["TipCboreW"]
+    east_x, east_y = keep["TipSlotEastCx"]
+    west_x, west_y = keep["TipSlotWestCx"]
+    return {
+        "TipSlotZ": (z_x, z_y - 0.0025, z_x + 0.013, z_y + 0.0025),
+        "TipSlotW": (slot_x - 0.018, slot_y - 0.0045, slot_x, slot_y + 0.0045),
+        "TipCboreW": (cbore_x - 0.022, cbore_y - 0.0045, cbore_x, cbore_y + 0.0045),
+        "TipSlotEastCx": (east_x - 0.006, east_y - 0.0025, east_x + 0.006, east_y + 0.0025),
+        "TipSlotWestCx": (west_x - 0.006, west_y - 0.0025, west_x + 0.006, west_y + 0.0025),
+    }
+
+
+def _note_box(note: drawing.CutterNote) -> tuple[float, float, float, float]:
+    lines = note.text.replace("<MOD-DIAM>", "D").split("\n")
+    x, y = note.text_xy
+    width = max(len(line) for line in lines) * _NOTE_CHAR_W
+    return (x, y - len(lines) * _NOTE_LINE_H, x + width, y)
+
+
+def _segments_cross(a, b) -> bool:
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    d1, d2 = orient(b[0], b[1], a[0]), orient(b[0], b[1], a[1])
+    d3, d4 = orient(a[0], a[1], b[0]), orient(a[0], a[1], b[1])
+    return d1 * d2 < 0 and d3 * d4 < 0
+
+
+def _segment_hits_box(segment, box) -> bool:
+    if any(box[0] <= x <= box[2] and box[1] <= y <= box[3] for x, y in segment):
+        return True
+    corners = ((box[0], box[1]), (box[2], box[1]), (box[2], box[3]), (box[0], box[3]))
+    edges = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+    return any(_segments_cross(segment, edge) for edge in edges)
+
+
+def _leader_fan(note: drawing.CutterNote):
+    """The leader from its arc tip to each end of the note's left edge."""
+    tip = drawing.cutter_note_tip(note)
+    box = _note_box(note)
+    return [(tip, (box[0], box[1])), (tip, (box[0], box[3]))]
+
+
 def test_detail_band_clears_border_title_block_and_captions() -> None:
-    """Detail B, its label and callouts, and the relief note share one band.
+    """Detail B, its label, dimension texts, cutter notes and the relief note.
 
     Extents are the ones the layout audit logged on the farm (runs 2b643c17
-    and e86bf319): the native label is 31.5 x 16.2 mm; the relief note
-    0.0947 x 0.0176 m from its upper-left anchor; a vertical dimension's
-    text hangs OUTWARD from its line -- the counterbore callout (value and
-    four lines) spans x..x+0.042 by y-0.016..y+0.015, the through-slot
-    callout x-0.035..x+0.003 by y-0.010..y+0.009.  e86bf319 failed on the
-    label alone (8.9 mm through the bottom border); its callouts also ran
-    under the title block and the plan caption, which the audit's nominal
-    dimension boxes cannot see.  At 1:1 (7959e994) the texts also crossed
-    the detail circle, so the circle and the 11.00 / 2.00 texts (~12 x 5 mm,
-    right of / centred on their anchors) are boxed too.
+    and e86bf319) -- the native label 31.5 x 16.2 mm, the relief note
+    0.0947 x 0.0176 m from its upper-left anchor -- and the rendered text
+    blocks above.  e86bf319 failed on the label alone (8.9 mm through the
+    bottom border); its callouts also ran under the title block and the plan
+    caption, which the audit's nominal dimension boxes cannot see (#852).
     """
     border_bottom, title_block = 0.0127, (0.216, 0.0, 0.4318, 0.066)
     captions = (
@@ -259,10 +315,6 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     label = (label_x, label_y, label_x + 0.0315, label_y + 0.0162)
     note_x, note_y = drawing.RELIEF_NOTE_XY
     relief = (note_x, note_y - 0.0176, note_x + 0.0947, note_y)
-    cbore_x, cbore_y = drawing.DETAIL_KEEP["TipCboreW"]
-    cbore = (cbore_x, cbore_y - 0.016, cbore_x + 0.042, cbore_y + 0.015)
-    slot_x, slot_y = drawing.DETAIL_KEEP["TipSlotW"]
-    slot = (slot_x - 0.035, slot_y - 0.010, slot_x + 0.003, slot_y + 0.009)
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_SHEET_RADIUS
     circle = (cx - r, cy - r, cx + r, cy + r)
@@ -271,27 +323,19 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     pad = drawing.DETAIL_OUTLINE_PAD
     outline = (cx - r - pad, cy - r - pad, cx + r + pad, cy + r + pad)
     assert outline[1] > 0.0097
-    for other in (label, relief):
+    notes = {f"{note.key} note": _note_box(note) for note in drawing.CUTTER_NOTES}
+    for other in (label, relief, *notes.values()):
         assert not _boxes_overlap(outline, other)
     for caption in captions:
         assert not _boxes_overlap(outline, caption)
     eaafbc73_outline = (0.0536, 0.0096, 0.1224, 0.0784)
     assert _boxes_overlap(eaafbc73_outline, (0.1189, 0.0166, 0.2135, 0.0342))
-    z_x, z_y = drawing.DETAIL_KEEP["TipSlotZ"]
-    slot_z = (z_x + 0.001, z_y - 0.0025, z_x + 0.013, z_y + 0.0025)
-    east_x, east_y = drawing.DETAIL_KEEP["TipSlotEastCx"]
-    west_x, west_y = drawing.DETAIL_KEEP["TipSlotWestCx"]
-    east = (east_x - 0.006, east_y - 0.0025, east_x + 0.006, east_y + 0.0025)
-    west = (west_x - 0.006, west_y - 0.0025, west_x + 0.006, west_y + 0.0025)
     boxes = {
         "label": label,
         "relief": relief,
-        "cbore": cbore,
-        "slot": slot,
         "circle": circle,
-        "slot z": slot_z,
-        "east 2.00": east,
-        "west 2.00": west,
+        **_detail_text_boxes(drawing.DETAIL_KEEP),
+        **notes,
     }
     for name, box in boxes.items():
         assert box[1] > border_bottom + 0.001, name
@@ -309,6 +353,170 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     assert old_label[1] < border_bottom
     assert _boxes_overlap(old_cbore, title_block)
     assert _boxes_overlap(old_cbore, captions[1])
+
+
+def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
+    """No vertical dimension's line runs through its text (81788ce9).
+
+    Each text sits outside its extension-line span, on one side of its own
+    dimension line, and clear of every other vertical dimension's extension
+    lines.  The slot sits nearest the part so the counterbore's extension
+    lines, further out, never cross the slot's line inside the slot's span.
+    """
+    keep = drawing.DETAIL_KEEP
+    boxes = _detail_text_boxes(keep)
+    east_arc_x = drawing.DETAIL_CENTER[0] - 0.004  # where the width lines start
+    extension_runs = {
+        # The widths run left from the slot's straight edges to their lines.
+        "TipSlotW": [((keep["TipSlotW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipSlotW"]],
+        "TipCboreW": [((keep["TipCboreW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipCboreW"]],
+        # Pivot-to-slot runs right from the pivot and the east arc centre.
+        "TipSlotZ": [
+            ((drawing.DETAIL_CENTER[0], 0.033), (keep["TipSlotZ"][0], 0.033)),
+            ((east_arc_x, 0.055), (keep["TipSlotZ"][0], 0.055)),
+        ],
+    }
+    for name, (low, high) in _DETAIL_SPANS.items():
+        x, _y = keep[name]
+        box = boxes[name]
+        assert box[3] <= low or box[1] >= high, name  # text outside its span
+        assert box[0] >= x or box[2] <= x, name  # not straddling its line
+        for other, runs in extension_runs.items():
+            for run in runs:
+                assert not _segment_hits_box(run, box), (name, other, run)
+    slot_x, cbore_x = keep["TipSlotW"][0], keep["TipCboreW"][0]
+    assert cbore_x < slot_x < east_arc_x  # counterbore outboard of the slot
+    assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW", "TipCboreW"}
+    # Positive control: 81788ce9's keeps put the 11.00 and both widths
+    # inside their spans, where the text is centred on its own line.
+    old = {
+        "TipSlotZ": (0.1135, 0.0435),
+        "TipSlotW": (0.0515, 0.055),
+        "TipCboreW": (0.1315, 0.055),
+    }
+    for name, (_x, y) in old.items():
+        low, high = _DETAIL_SPANS[name]
+        assert low < y < high
+
+
+def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
+    """Each cutter note's leader tip is on its slot's west end arc.
+
+    The build proves the tip against the physical edge (``_add_cutter_note``,
+    0.01 mm); here the tip's sheet image, the arc radius and the leader paths
+    are pinned: both leaders rise to the right and cross neither each other,
+    the other note, pivot-to-slot's text or the 2.00s.
+    """
+    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
+    assert set(by_key) == {"slot", "cbore"}
+    assert by_key["slot"].feature == "TipScrewSlot"
+    assert by_key["cbore"].feature == "TipScrewCbore"
+    assert by_key["slot"].radius_mm == spec.TIP_SLOT_W / 2.0
+    assert by_key["cbore"].radius_mm == spec.TIP_CBORE_W / 2.0
+    assert by_key["slot"].model_y_mm == spec.PLATE_THICKNESS  # the visible arc
+    assert "SLOT THRU" in by_key["slot"].text
+    assert "FROM UNDERSIDE" in by_key["cbore"].text
+    assert drawing.LEADER_TIP_BOUND_M == 0.00001
+    centre = (drawing.DETAIL_CENTER[0] + 0.004, drawing._SLOT_Y)
+    for note in drawing.CUTTER_NOTES:
+        tip = drawing.cutter_note_tip(note)
+        assert math.dist(tip, centre) == pytest.approx(note.radius_mm * 0.002)
+        assert -90.0 < note.tip_deg < 90.0  # the west (sheet-right) end arc
+        model = drawing.cutter_note_model_tip(note)
+        assert math.hypot(
+            model[0] - spec.TIP_SCREW_HALF_TRAVEL / 1000.0,
+            model[2] - spec.TIP_SCREW_LOCAL_Z / 1000.0,
+        ) == pytest.approx(note.radius_mm / 1000.0)
+        assert tip[1] > 0.055  # above pivot-to-slot's upper extension line
+    boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
+    obstacles = {
+        name: boxes[name] for name in ("TipSlotZ", "TipSlotEastCx", "TipSlotWestCx")
+    }
+    fans = {note.key: _leader_fan(note) for note in drawing.CUTTER_NOTES}
+    for key, fan in fans.items():
+        other = "cbore" if key == "slot" else "slot"
+        for segment in fan:
+            for name, box in obstacles.items():
+                assert not _segment_hits_box(segment, box), (key, name)
+            assert not _segment_hits_box(segment, _note_box(by_key[other])), key
+            for other_segment in fans[other]:
+                assert not _segments_cross(segment, other_segment)
+    # Positive control: stacked the other way (inner slot's note below the
+    # counterbore's), the two leaders cross.
+    swapped = [
+        dataclasses.replace(by_key["slot"], text_xy=by_key["cbore"].text_xy),
+        dataclasses.replace(by_key["cbore"], text_xy=by_key["slot"].text_xy),
+    ]
+    assert any(
+        _segments_cross(a, b)
+        for a in _leader_fan(swapped[0])
+        for b in _leader_fan(swapped[1])
+    )
+
+
+def test_slot_section_cut_keeps_its_plane_and_span() -> None:
+    """Section C-C moved parents but not planes: +-9 mm at the slot station.
+
+    Looking south mirrors the strip; it prints the same only because the
+    partial span is symmetric -- slot ends +-2, plate edges beyond +-9 on
+    both sides of this station -- so that symmetry is pinned too.
+    """
+    ends = drawing.slot_section_line_model_points()
+    assert ends == (
+        (-0.009, spec.PLATE_THICKNESS / 1000.0, spec.TIP_SCREW_LOCAL_Z / 1000.0),
+        (0.009, spec.PLATE_THICKNESS / 1000.0, spec.TIP_SCREW_LOCAL_Z / 1000.0),
+    )
+    assert drawing.SLOT_SECTION_HALF_SPAN_MM == 9.0
+    east_half = -_profile_edge_mm(spec.TIP_SCREW_LOCAL_Z, -1)
+    west_half = _profile_edge_mm(spec.TIP_SCREW_LOCAL_Z, +1)
+    assert min(east_half, west_half) > drawing.SLOT_SECTION_HALF_SPAN_MM
+    assert spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0 < 9.0
+    # Positive control: an 11 mm half span would run off the west edge.
+    assert west_half < 11.0
+
+
+def _profile_edge_mm(z_mm: float, side: int) -> float:
+    """Model x of the plate's straight east (-1) / west (+1) edge at ``z_mm``."""
+    run = (part.NORTH_OVERHANG - z_mm) / part.PLATE_LEN
+    if side < 0:
+        return -(part.HALF_WIDTH_N + (part.EAST_HALF_S - part.HALF_WIDTH_N) * run)
+    return part.WEST_HALF_N + (part.WEST_HALF_S - part.WEST_HALF_N) * run
+
+
+def test_slot_section_arrows_clear_the_profile_plan() -> None:
+    """C-C's arrows, looking south, stay inside the plate on the 1:2 plan.
+
+    Arrows are 12.6 mm with 3 mm heads (the detail B render).  Looking north
+    (the default), the west arrow ran 0.5 mm beside the 8.0 extension line
+    and through the R8 leader; sheet-up they stay between the plate's edges,
+    clear of the corner radii's leaders and the north-edge witness.
+    """
+    px, py = drawing.PROFILE_PIVOT_XY
+    line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
+    half = drawing.SLOT_SECTION_HALF_SPAN_MM * 0.0005
+    length, head = 0.0126, 0.0015
+    arrows = [
+        (px + s * half - head, line_y, px + s * half + head, line_y + length)
+        for s in (-1, 1)
+    ]
+    tip_z = spec.TIP_SCREW_LOCAL_Z - length / 0.0005
+    for arrow in arrows:
+        assert arrow[0] > px + _profile_edge_mm(tip_z, -1) * 0.0005
+        assert arrow[2] < px + _profile_edge_mm(tip_z, +1) * 0.0005
+    r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
+    r8_leader = ((0.135, 0.118), (0.0723 + 0.00283, 0.1382 - 0.00283))
+    north_edge_y = py - part.NORTH_OVERHANG * 0.0005
+    nw_x = px + part.WEST_HALF_N * 0.0005
+    nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))
+    for arrow in arrows:
+        for line in (r10_leader, r8_leader, nw_extension):
+            assert not _segment_hits_box(line, arrow)
+        assert arrow[1] > north_edge_y
+    # Positive control: the default north-looking arrows hit the R8 leader
+    # and the 8.0 extension line.
+    down = (px + half - head, line_y - length, px + half + head, line_y)
+    assert _segment_hits_box(nw_extension, down)
+    assert _segment_hits_box(r8_leader, down)
 
 
 def test_slot_section_pocket_clears_its_neighbours() -> None:
@@ -339,7 +547,17 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     label = (lx, ly, lx + 0.0465, ly + 0.0162)
     dx, dy = drawing.SLOT_SECTION_KEEP["TipCboreDepth"]
     depth = (dx - 0.012, dy - 0.004, dx, dy + 0.004)
-    ours = {"C-C strip": strip, "C-C label": label, "depth text": depth}
+    # Looking south mirrors the strip, so the build may park the depth on the
+    # right-hand end instead (text hanging right): both must fit.
+    rx, ry = drawing.SLOT_SECTION_DEPTH_RIGHT
+    depth_right = (rx, ry - 0.004, rx + 0.012, ry + 0.004)
+    assert rx - cx == pytest.approx(cx - dx)
+    ours = {
+        "C-C strip": strip,
+        "C-C label": label,
+        "depth text": depth,
+        "depth text right": depth_right,
+    }
     for name, box in ours.items():
         for other, neighbour in neighbours.items():
             assert not _boxes_overlap(box, neighbour), (name, other)

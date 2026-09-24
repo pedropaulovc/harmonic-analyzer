@@ -12,7 +12,8 @@ west-edge lock notch, four rounded plan corners and the counterbored slot
 for the tip block's hidden hold-down screw (U30).  The three plan views run
 1:2 and pivot section A-A 2:1.  Slot detail B enlarges a 12 mm radius
 around the pivot-to-slot region at 2:1, hidden lines dashed, at sheet
-(88, 44) mm; section C-C (1:1) cuts along the slot for the counterbore
+(88, 44) mm, its cutters named by leadered notes; section C-C (1:1),
+cut on the plate-profile plan, runs along the slot for the counterbore
 depth.  The isometric runs 1:3.
 
 Run with SolidWorks open::
@@ -25,12 +26,14 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -181,43 +184,147 @@ DETAIL_OUTLINE_PAD = 0.0104
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
 _PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
+# Between its extension lines a vertical dimension's text is CENTRED on its
+# dimension line, which then runs through it (81788ce9: "SLOT|THRU",
+# "11.|00"); outside them the text hangs outward, one edge on the line,
+# centred on the keep y.  So every vertical dimension here parks its text
+# OUTSIDE its span.  The three spans all overlap (pivot-to-slot 33..55,
+# counterbore 47..63, slot 51..59), so no layout of them is crossing-free:
+# the one left is the slot's dimension line running down past the
+# counterbore's lower extension line to its text.  The slot sits nearest
+# the part, the counterbore outboard (its extension lines then never cross
+# the slot's dimension line inside the slot's span), and pivot-to-slot alone
+# on the right.  The cutters are named by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, nearest the circle: pivot to slot, its text between the relief
-    # note's top (0.034) and the counterbore's lower extension line (0.046).
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, 0.0435),
+    # Right, alone: text above the slot-centre extension line (0.055),
+    # hanging right, under the cutter notes' leaders (>= 0.063 here).
+    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
-    # the plan caption row (y >= 0.0805).
+    # the plan caption row (y >= 0.0805).  The west one sits in toward the
+    # circle, left of the through-slot leader's path.
     "TipSlotEastCx": (
         DETAIL_CENTER[0] - 0.020,
         DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
     ),
     "TipSlotWestCx": (
-        DETAIL_CENTER[0] + 0.020,
+        DETAIL_CENTER[0] + 0.0135,
         DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
     ),
-    # Left: the through slot and its cutter, text hanging left to the border.
-    "TipSlotW": (DETAIL_CENTER[0] - 0.032, _SLOT_Y),
-    # Right, outboard of TipSlotZ: the counterbored slot and its cutter,
-    # text hanging right above the relief note.
-    "TipCboreW": (DETAIL_CENTER[0] + 0.048, _SLOT_Y),
+    # Left, nearest the circle: the through slot, text below its span
+    # (under the counterbore's lower extension line at 0.047).
+    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y - 0.014),
+    # Left, outboard: the counterbored slot, text above its span (0.063).
+    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0135),
 }
+# Arrowheads inside the extension lines: outside, the slot's 8 mm span put
+# an arrow tail across the counterbore's upper extension line (81788ce9).
+DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
+# The cutter that sets each +0.10/0 width band, named by a leadered note
+# (2.5 mm text, anchored upper-left) in the open field right of the circle.
+# Each leader tip lands on the WEST (sheet-right) end arc of its slot, at a
+# sheet angle from that arc's centre, so both leaders rise to the right
+# without crossing each other, the 2.00s or pivot-to-slot's text.
+_WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
+
+
+@dataclass(frozen=True)
+class CutterNote:
+    """One leadered cutter note: ``text`` at ``text_xy`` pointing at an arc."""
+
+    key: str
+    text: str
+    text_xy: tuple[float, float]
+    feature: str  # the native cut whose end arc the leader names
+    radius_mm: float
+    tip_deg: float  # sheet angle of the tip on the west end arc
+    model_y_mm: float | None  # the arc's face; None = either coincident arc
+
+
+CUTTER_NOTES = (
+    CutterNote(
+        "slot",
+        f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL SLOT THRU",
+        (0.121, 0.0785),
+        "TipScrewSlot",
+        TIP_SLOT_W / 2.0,
+        60.0,
+        PLATE_THICKNESS,  # the visible top-face arc, not the hidden floor one
+    ),
+    CutterNote(
+        "cbore",
+        f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL C'BORE SLOT\nFROM UNDERSIDE",
+        (0.121, 0.0715),
+        "TipScrewCbore",
+        TIP_CBORE_W / 2.0,
+        35.0,
+        None,  # the dashed arc: underside outline and floor edge project as one
+    ),
+)
+CUTTER_NOTE_CHAR_HEIGHT = 0.0025
+# Physical-edge bound on a leader tip, model metres (the R8 proof's bound).
+LEADER_TIP_BOUND_M = 0.00001
+
+
+def cutter_note_tip(note: CutterNote) -> tuple[float, float]:
+    """The sheet point on ``note``'s west end arc its leader must touch."""
+    angle = math.radians(note.tip_deg)
+    r = note.radius_mm * _DETAIL_S
+    return (
+        _WEST_ARC_CENTER[0] + r * math.cos(angle),
+        _WEST_ARC_CENTER[1] + r * math.sin(angle),
+    )
+
+
+def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
+    """``cutter_note_tip`` in part metres (sheet +x = +x, sheet +y = -z)."""
+    angle = math.radians(note.tip_deg)
+    return (
+        (2.0 + note.radius_mm * math.cos(angle)) / 1000.0,
+        (note.model_y_mm if note.model_y_mm is not None else PLATE_THICKNESS) / 1000.0,
+        (TIP_SCREW_LOCAL_Z - note.radius_mm * math.sin(angle)) / 1000.0,
+    )
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner under the slot text.
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
 RELIEF_NOTE_XY = (0.120, 0.034)
-# SECTION C-C cuts across the plate along the slot (sheet-horizontal through
-# its centre in detail B), so the counterbore's depth is an imported model
-# dimension (drawing-simplicity rule 2: a typed "4.20 DEEP" was not).  The
-# 1:1 strip, plate edge-on, sits in the free pocket between the notch plan
-# (x <= 0.2806, y >= 0.1286), its caption row (y <= 0.0853), the relief
-# dimension RD1 (x <= 0.246) and section A-A's finish symbol (x >= 0.316).
+# SECTION C-C cuts across the plate along the slot, so the counterbore's
+# depth is an imported model dimension (drawing-simplicity rule 2: a typed
+# "4.20 DEEP" was not).  The 1:1 strip, plate edge-on, sits in the free
+# pocket between the notch plan (x <= 0.2806, y >= 0.1286), its caption row
+# (y <= 0.0853), the relief dimension RD1 (x <= 0.246) and section A-A's
+# finish symbol (x >= 0.316).
+#
+# Its cutting line lives on the 1:2 plate-profile plan, not in detail B: in
+# the detail it lay ON the slot centreline, so pivot-to-slot's extension line
+# ran along it and its arrows sat in every width extension's path.  The
+# plane is unchanged -- the same partial +-9 mm span at the slot station --
+# so the strip's geometry and 1:1 scale are too.  On the plan the default
+# arrows (looking north, sheet-down) ran 0.5 mm beside the 8.0 extension
+# line and through the R8 leader, so the cut looks SOUTH (arrows sheet-up,
+# inside the plate).  That mirrors the strip, which is symmetric about the
+# slot centre at this station (plate edges beyond +-9 both sides), so it
+# prints the same; the depth dimension follows whichever end it attaches to.
 SLOT_SECTION_HALF_SPAN_MM = 9.0
 SLOT_SECTION_CENTER = (0.296, 0.096)
 SLOT_SECTION_KEEP = {
     "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.015, SLOT_SECTION_CENTER[1]),
 }
+# Mirror of the depth keep, used when the dimension attaches to the strip's
+# right-hand end: its text then hangs right, under section A-A's finish.
+SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.015, SLOT_SECTION_CENTER[1])
+# The pivot on the profile plan, from the NE/NW corner-radius stations below
+# (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
+PROFILE_PIVOT_XY = (0.0718, 0.1377)
+
+
+def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
+    """The C-C cutting line's ends, part metres: +-9 mm at the slot station."""
+    return tuple(
+        (x / 1000.0, PLATE_THICKNESS / 1000.0, TIP_SCREW_LOCAL_Z / 1000.0)
+        for x in (-SLOT_SECTION_HALF_SPAN_MM, SLOT_SECTION_HALF_SPAN_MM)
+    )
 # Its native label, left of the strip's 2.80 (x >= 0.2691): above the strip
 # it held the pocket section A-A's thickness text now needs.  Between the
 # plan caption row (y <= 0.0853) and the drill callout RD1 (y >= 0.1042).
@@ -441,6 +548,256 @@ def _create_detail_view(
             f"detail {detail_label} centre landed at {landed}, requested {view_xy}"
         )
     return detail
+
+
+def _look_slot_section_south(
+    adapter: Any, parent: Any, section: Any, cut: Any
+) -> None:
+    """Point section C-C's arrows sheet-up (looking south) and prove the strip.
+
+    The view direction is read from the section's own projection, not from
+    arrow-array layouts: with screen-right r and screen-up u, the sight line
+    is u x r, so it runs along -z (south) exactly when model +x's sheet-x sign
+    times model +y's sheet-y sign is positive.  The strip must still be the
+    18 mm partial span of the 6.35 plate at 1:1 -- the geometry section C-C
+    had in detail B.
+    """
+    z = TIP_SCREW_LOCAL_Z / 1000.0
+
+    def x_direction() -> float:
+        base = model_point_in_view(adapter, section, (0.0, 0.003, z), label="C-C origin")
+        east = model_point_in_view(adapter, section, (0.001, 0.003, z), label="C-C +x")
+        up = model_point_in_view(adapter, section, (0.0, 0.004, z), label="C-C +y")
+        return (east[0] - base[0]) * (up[1] - base[1])
+
+    if x_direction() < 0.0:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section C-C looks south")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section C-C cut direction did not persist")
+    direction = x_direction()
+    if not direction > 0.0:
+        raise RuntimeError(f"section C-C still looks north (x/y sign product {direction})")
+    ends = slot_section_line_model_points()
+    low = model_point_in_view(
+        adapter, section, (ends[0][0], 0.0, z), label="C-C strip east underside"
+    )
+    high = model_point_in_view(
+        adapter, section, (ends[1][0], ends[1][1], z), label="C-C strip west top"
+    )
+    span = (high[0] - low[0], high[1] - low[1])
+    print(
+        f"section C-C: reversed={bool(cut.GetReversedCutDirection())} "
+        f"x_dir={direction} strip_span_m={span} "
+        f"arrows={tuple(float(v) for v in (cut.GetArrowInfo() or ()))} "
+        f"texts={tuple(float(v) for v in (cut.GetTextInfo() or ()))} "
+        f"parent_line_info="
+        f"{tuple(float(v) for v in (_early_bound(parent, 'IView').GetSectionLineInfo2() or ()))}"
+    )
+    expected = (2.0 * SLOT_SECTION_HALF_SPAN_MM / 1000.0, PLATE_THICKNESS / 1000.0)
+    if any(abs(abs(span[i]) - expected[i]) > 1e-6 for i in (0, 1)):
+        raise RuntimeError(
+            f"section C-C strip is {span}, expected the 1:1 {expected} partial span"
+        )
+
+
+def _ink_segments(annotation: Any) -> list[tuple[float, float, float, float]]:
+    """An annotation's straight ink runs, sheet metres (x0, y0, x1, y1).
+
+    ``IDisplayData::GetLineAtIndex3`` ends with startPt[3], endPt[3]; the
+    start index is read from the array length, as the layout audit does.
+    """
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    runs = []
+    for index in range(int(data.GetLineCount())):
+        values = [float(v) for v in (data.GetLineAtIndex3(index) or ())]
+        if len(values) < 10:
+            continue
+        start = len(values) - 6
+        runs.append(
+            (values[start], values[start + 1], values[start + 3], values[start + 4])
+        )
+    return runs
+
+
+def _set_arrows_inside(
+    adapter: Any, annotations: list[Any], names: tuple[str, ...]
+) -> None:
+    """Pin the named dimensions' arrowheads between their extension lines."""
+    found = set()
+    for item in annotations:
+        name = dimension_name(adapter, item)
+        if name not in names:
+            continue
+        display = _early_bound(item.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+        if int(display.ArrowSide) != 0:
+            raise RuntimeError(f"{name} did not keep its arrows inside")
+        found.add(name)
+    if found != set(names):
+        raise RuntimeError(f"arrows-inside dimensions missing: {set(names) - found}")
+    rebuild_drawing(adapter, label="detail B arrows inside")
+
+
+def _keep_depth_on_its_attached_end(adapter: Any, annotations: list[Any]) -> None:
+    """Park the C-C depth text beside the strip end its extension lines leave.
+
+    Looking south mirrors the strip; SolidWorks attaches the imported depth to
+    whichever end it picks.  Text on the far side would stretch both extension
+    lines across the strip, so if the ink reaches past the strip centre the
+    text moves to the mirrored keep.
+    """
+    matches = [
+        item for item in annotations if dimension_name(adapter, item) == "TipCboreDepth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("expected one native counterbore depth in section C-C")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    runs = _ink_segments(annotation)
+    reach = max((max(run[0], run[2]) for run in runs), default=float("-inf"))
+    print(f"TipCboreDepth ink: runs={runs} max_x={reach}")
+    if reach <= SLOT_SECTION_CENTER[0]:
+        return
+    target = (*SLOT_SECTION_DEPTH_RIGHT, 0.0)
+    if not annotation.SetPosition2(*target):
+        raise RuntimeError("failed to move the C-C depth text to the strip's right end")
+    rebuild_drawing(adapter, label="section C-C depth on its attached end")
+    runs = _ink_segments(annotation)
+    low = min((min(run[0], run[2]) for run in runs), default=float("inf"))
+    print(f"TipCboreDepth ink after move: runs={runs} min_x={low}")
+    if low < SLOT_SECTION_CENTER[0]:
+        raise RuntimeError("C-C depth ink still crosses the strip after the move")
+
+
+def _plan_basis_to_model(
+    adapter: Any,
+    view: Any,
+    sheet_xy: tuple[float, float],
+    origin: tuple[float, float, float],
+    *,
+    label: str,
+) -> tuple[float, float, float]:
+    """Invert a plan view's measured X/Z basis at ``origin``'s model Y.
+
+    The R8 proof's inversion, shared by the cutter-note leader proof.
+    """
+    center = model_point_in_view(adapter, view, origin, label=f"{label} origin")
+    px = model_point_in_view(
+        adapter, view, (origin[0] + 0.001, origin[1], origin[2]), label=f"{label} X basis"
+    )
+    pz = model_point_in_view(
+        adapter, view, (origin[0], origin[1], origin[2] + 0.001), label=f"{label} Z basis"
+    )
+    xx, xy = px[0] - center[0], px[1] - center[1]
+    zx, zy = pz[0] - center[0], pz[1] - center[1]
+    det = xx * zy - zx * xy
+    if abs(det) < 1e-12:
+        raise RuntimeError(f"{label} plan projection is singular")
+    dx, dy = sheet_xy[0] - center[0], sheet_xy[1] - center[1]
+    return (
+        origin[0] + 0.001 * (dx * zy - zx * dy) / det,
+        origin[1],
+        origin[2] + 0.001 * (xx * dy - dx * xy) / det,
+    )
+
+
+def _add_cutter_note(adapter: Any, view: Any, note: CutterNote) -> Any:
+    """Place one leadered cutter note, then prove its tip is on its arc.
+
+    Same proof as the R8 radius: the leader tip read back off the sheet is
+    inverted through the view's measured plan basis at each candidate edge's
+    model Y, and the trimmed physical edge (``IEdge::GetClosestPointOn``) must
+    lie within ``LEADER_TIP_BOUND_M`` of it.  Candidates are the named cut's
+    own edges on the west end circle (radius and centre to 1e-6 m), limited
+    to ``note.model_y_mm`` when the note names one face.
+    """
+    tip_xy = model_point_in_view(
+        adapter, view, cutter_note_model_tip(note), label=f"{note.key} note tip"
+    )
+    drift = math.dist(tip_xy[:2], cutter_note_tip(note))
+    # The detail's centre lands within 0.5 mm of DETAIL_CENTER (asserted by
+    # _create_detail_view); the layout was checked against that point.
+    if drift > 0.0006:
+        raise RuntimeError(
+            f"{note.key} note tip projects to {tip_xy[:2]}, layout expects "
+            f"{cutter_note_tip(note)} ({drift * 1000:.3f} mm off)"
+        )
+    created = add_leader_note(
+        adapter,
+        note.text,
+        text_xy=note.text_xy,
+        attach_xy=(tip_xy[0], tip_xy[1]),
+        label=f"{note.key} cutter note",
+        view=view,
+    )
+    annotation = _early_bound(_early_bound(created, "INote").GetAnnotation(), "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{note.key} cutter note has no text format")
+    text_format.CharHeight = CUTTER_NOTE_CHAR_HEIGHT
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"failed to size the {note.key} cutter note")
+    rebuild_drawing(adapter, label=f"{note.key} cutter note text height")
+
+    points = [float(v) for v in (annotation.GetLeaderPointsAtIndex(0) or ())]
+    if len(points) < 6:
+        raise RuntimeError(f"{note.key} cutter note leader is unreadable")
+    tip = (points[-3], points[-2])
+    document = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    feature = _early_bound(
+        _early_bound(document, "IPartDoc").FeatureByName(note.feature), "IFeature"
+    )
+    radius_m = note.radius_mm / 1000.0
+    center_x = 0.002  # the west end arc's centre, +TIP_SCREW_HALF_TRAVEL
+    center_z = TIP_SCREW_LOCAL_Z / 1000.0
+    candidates: list[tuple[Any, tuple[float, ...]]] = []
+    for raw_face in feature.GetFaces() or ():
+        for raw_edge in _early_bound(raw_face, "IFace2").GetEdges() or ():
+            edge = _early_bound(raw_edge, "IEdge")
+            if any(int(adapter.swApp.IsSame(edge, item[0])) == 1 for item in candidates):
+                continue
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            circle = tuple(float(value) for value in curve.CircleParams)
+            if (
+                abs(circle[6] - radius_m) > 1e-6
+                or abs(circle[0] - center_x) > 1e-6
+                or abs(circle[2] - center_z) > 1e-6
+            ):
+                continue
+            if (
+                note.model_y_mm is not None
+                and abs(circle[1] - note.model_y_mm / 1000.0) > 1e-6
+            ):
+                continue
+            candidates.append((edge, circle))
+    if not candidates:
+        raise RuntimeError(f"{note.feature} has no west end arc for the {note.key} note")
+    distances = []
+    for edge, circle in candidates:
+        model_tip = _plan_basis_to_model(
+            adapter, view, tip, circle[:3], label=f"{note.key} note arc"
+        )
+        closest = tuple(float(value) for value in edge.GetClosestPointOn(*model_tip))
+        distance = math.dist(model_tip, closest[:3])
+        distances.append(distance)
+        print(
+            f"{note.key} cutter note: tip_sheet_m={tip} arc_center_m={circle[:3]} "
+            f"radius_m={circle[6]} tip_model_m={model_tip} "
+            f"closest_model_m={closest[:3]} distance_m={distance}"
+        )
+    if not min(distances) <= LEADER_TIP_BOUND_M:
+        raise RuntimeError(
+            f"{note.key} cutter note leader misses its {note.feature} end arc "
+            f"by {min(distances) * 1000:.4f} mm"
+        )
+    _telemetry.info(
+        f"{note.key} cutter note leader lands on {note.feature}'s west end arc "
+        f"({len(candidates)} candidate edge(s), {min(distances) * 1e6:.2f} um)"
+    )
+    return created
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -778,20 +1135,22 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Hidden edges dashed, so the underside counterbored slot reads.
     set_hidden_lines_visible(adapter, detail)
+    profile_pivot = model_point_in_view(
+        adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
+    )
+    print(f"profile pivot: sheet_xy={profile_pivot[:2]} expected={PROFILE_PIVOT_XY}")
+    if math.dist(profile_pivot[:2], PROFILE_PIVOT_XY) > 0.0005:
+        # The C-C arrow clearances in the tests are laid out from it.
+        _telemetry.warn(
+            f"profile pivot landed at {profile_pivot[:2]}, layout assumes {PROFILE_PIVOT_XY}"
+        )
     slot_ends = [
-        model_point_in_view(
-            adapter,
-            detail,
-            (x / 1000.0, PLATE_THICKNESS / 1000.0, TIP_SCREW_LOCAL_Z / 1000.0),
-            label=f"slot section end {index}",
-        )
-        for index, x in enumerate(
-            (-SLOT_SECTION_HALF_SPAN_MM, SLOT_SECTION_HALF_SPAN_MM)
-        )
+        model_point_in_view(adapter, profile, point, label=f"slot section end {index}")
+        for index, point in enumerate(slot_section_line_model_points())
     ]
     slot_section = create_section_view(
         adapter,
-        detail,
+        profile,
         line_start=slot_ends[0],
         line_end=slot_ends[1],
         view_xy=SLOT_SECTION_CENTER,
@@ -803,6 +1162,7 @@ async def build(adapter: Any) -> dict[str, str]:
     slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
     slot_cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="slot section cut faces only")
+    _look_slot_section_south(adapter, profile, slot_section, slot_cut)
     set_hidden_lines_removed(adapter, slot_section)
 
     profile_annotations = curate_view_dimensions(
@@ -866,17 +1226,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="tip screw slot detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(
-        adapter,
-        detail_annotations,
-        # The +0.10/0 width band is the cutter's own size: name the cutter.
-        {
-            "TipSlotW": f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL\nSLOT THRU",
-            "TipCboreW": (
-                f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\nFROM UNDERSIDE"
-            ),
-        },
-    )
+    _set_arrows_inside(adapter, detail_annotations, DETAIL_ARROWS_INSIDE)
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -897,6 +1247,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="tip screw slot section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _keep_depth_on_its_attached_end(adapter, slot_section_annotations)
     relief_annotations = [
         item for item in section_annotations
         if dimension_name(adapter, item) == "PivotBearingReliefDepth"
@@ -970,6 +1321,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )
+    for cutter_note in CUTTER_NOTES:
+        _add_cutter_note(adapter, detail, cutter_note)
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, slot_section, iso):
