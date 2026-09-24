@@ -29,7 +29,6 @@ ARM_END_X = -101.8  # flat arm-end face; exposed screw runs toward negative X
 ARM_RUN = -ARM_END_X - BEND_R  # 50.8 (2"): straight run after the bend exit
 SCREW_SHANK_DIA = 3.6  # conservative external envelope used by assembly checks
 SCREW_THREAD_MAJOR_DIA = THREAD_MAJOR_MM["#6-32"]
-SCREW_THREAD_PITCH = 25.4 / 32.0
 SPRING_SCREW_OPEN_GAP_MM = 8.0
 # Native clamp calibration (verify:calibrate_summing_clamp, run
 # 20260923T001401277Z-691cdb38; neutral/square mean, spread 4e-5 mm). The
@@ -59,11 +58,16 @@ SCREW_HEAD_T = 4.2
 # plug are similar-expansion steels, so their centered cold-fit gap is retained
 # to first order through brazing rather than translated into a diametral band.
 PLUG_DIA = 11.85
-# Policy rule 12 (U27): >= 1.5D of FULL thread at the printed worst case, a
-# tap or die leaving about 1.5 incomplete threads. The plug prints at .X
-# (+/-0.8), so 8.0 leaves 7.2 - 1.5P = 6.01 = 1.72D of #6-32 (7.0 gave 5.01 =
-# 1.43D, Codex machinist r19). The under-head length grows with it.
-PLUG_T = 8.0
+# Policy rule 12 (U27): full-thread engagement >= 1.5D at the printed worst
+# case. The plug prints at .X (+/-0.8), so 7.0 leaves 6.2 = 1.77D of #6-32
+# (the former 6.0 gave 5.2 = 1.48D). The under-head length grows with it.
+# All 6.2 is FULL thread: the plug is tapped through (TAP_CALLOUT "#6-32
+# UNC-2B THRU"), so it has no tap-lead loss, and in the installed, clamped
+# state the screw passes fully through it (9.58 reach at worst case), so its
+# tip threads sit past the plug. The 8.0 open gap is assembly access only: the
+# eye hangs loose and the screw carries no clamp load, so it is not a load case
+# for engagement (Main ruling on Codex machinist r19 B2).
+PLUG_T = 7.0
 PLUG_BRAZE_RADIAL_CLEARANCE = 0.075
 SPRING_SCREW_PLUG_ENGAGEMENT_MM = PLUG_T
 SPRING_SCREW_UNDERHEAD_LENGTH_MM = (
