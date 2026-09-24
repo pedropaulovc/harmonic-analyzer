@@ -2,10 +2,10 @@ r"""Pure-data dimensional contract shared by the pinion return leaf spring and
 its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  The pinion return spring is NOT a coil
-spring: it is a bent BRASS LEAF -- a 0.8 thick strip formed as a flat screw-down
-foot with a square screw pad at its free end, an R2 bend up to a blade leaning
-BLADE_TILT_DEG off vertical, then a subtle R1.5 kink (~20 deg back) to a short
-free flat.  The nominals drive the part's named equation globals AND the
+spring: it is a bent PHOSPHOR-BRONZE LEAF -- a 0.5 thick strip formed as a flat
+screw-down foot with a square screw pad at its free end, an R2 bend up to a
+blade leaning BLADE_LEAN_DEG west of vertical (in toward the strap), then an
+R1.5 crest turning 25 deg back east to a short free flat.  The nominals drive the part's named equation globals AND the
 drawing's coordinate math; the marked-dimension map keeps the part marks and
 drawing keeps in lockstep (``test_pinion_spring_drawing.py``).
 
@@ -17,8 +17,9 @@ read one source of truth.
 from __future__ import annotations
 
 from pinion_spring_geometry import (
+    FORMED_BAND_MM,
     BLADE_STRAIGHT_LEN as BLADE_STRAIGHT_LEN,
-    BLADE_TILT_DEG as BLADE_TILT_DEG,
+    BLADE_LEAN_DEG as BLADE_LEAN_DEG,
     FLAT_LEN as FLAT_LEN,
     FOOT_LEN as FOOT_LEN,
     HOLE_DIA as HOLE_DIA,
@@ -27,10 +28,12 @@ from pinion_spring_geometry import (
     PAD_LEN as PAD_LEN,
     PAD_WIDTH as PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
+    PAD_Z as PAD_Z,
     R_BEND as R_BEND,
     R_KINK as R_KINK,
     THICK as THICK,
     WIDTH as WIDTH,
+    WIDTH_PLACES as WIDTH_PLACES,
 )
 
 # U27 + Main's r6 ruling (c): the profile is hand-formed, so every formed
@@ -38,7 +41,7 @@ from pinion_spring_geometry import (
 # could ever be held to +/-0.10, tighter than the .X row's +/-0.8.  The foot
 # length is formed too, and its screw seat is transferred to the base at
 # assembly, so it no longer sets preload and takes the same band.
-FORMED_TOLERANCE_MM = 0.5
+FORMED_TOLERANCE_MM = FORMED_BAND_MM
 FORMED_DIMENSIONS: dict[str, set[str]] = {
     "SpringProfile": {
         "FootLen",
@@ -65,7 +68,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # them and the drawing reads them back.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpringProfile": {name: 1 for name in FORMED_DIMENSIONS["SpringProfile"]},
-    "Spring": {"StripWidth": 2},
+    "Spring": {"StripWidth": WIDTH_PLACES},
     "PadProfile": {"PadWidth": PAD_WIDTH_PLACES, "PadLen": 2},
 }
 
