@@ -147,16 +147,12 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
 
 def test_notes_stay_within_policy_and_carry_the_assembly_transfer() -> None:
-    lines = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
-    # A note's continuation lines are indented; rule 6 counts notes.
-    notes = [line for line in lines if not line.startswith(" ")]
+    notes = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
     assert len(notes) <= 4  # policy rule 6
-    text = " ".join(line.strip() for line in lines)
-    assert (
-        "SET FRONT BLOCK WITH 0.25 FEELER TO FRONT STRAP, CLUSTER HARD ON BACK "
-        "BLOCK; THEN SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY." in text
-    )
-    assert not any("FINISH" in line for line in lines)  # the title block owns it
+    # Ruling (c): the transfer now sets the front block by feeler first.
+    assert "  CLUSTER ON BACK BLOCK; SPOT BASE SEATS THRU BLOCK HOLES." in notes
+    assert "0.25 FEELER" in notes[-2]
+    assert not any("FINISH" in line for line in notes)  # the title block owns it
 
 
 def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
