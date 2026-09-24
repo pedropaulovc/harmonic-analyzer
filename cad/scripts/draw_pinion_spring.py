@@ -3,9 +3,11 @@ r"""Create the curated machinist drawing for the pinion return leaf spring.
 NOT a coil spring: a bent phosphor-bronze leaf.  A 0.5 blank -- a 5.0 strip
 with a square screw pad at its free end -- formed as a flat screw-down foot, an
 R2 bend up to a blade leaning back over the foot's bend, then an R1.5 crest
-turning 25 deg out to a short free flat.  The formed profile is baselined from
-the foot's free end in the front view; the projected top view carries the
-blank's pad, strip width and hole; a 5:1 detail carries the crest.
+turning 25 deg out to a short free flat.  The solid is the installed shape;
+the front view also shows the part's hidden FreeForm reference sketch as the
+phantom free form, and the free crest and tip are baselined from the foot's
+free end on it.  The projected top view carries the blank's pad, strip width
+and hole; a 5:1 detail carries the crest.
 
 Run with SolidWorks open::
 
@@ -19,6 +21,7 @@ import math
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
@@ -43,10 +46,11 @@ from pinion_spring_geometry import (
     FLAT_TIP,
     FOOT_END,
     FOOT_TAN,
+    FREE_FLAT_TIP,
+    FREE_KINK_START,
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
-    KINK_START,
     PAD_LEN,
     PAD_WIDTH,
     PAD_Z,
@@ -109,14 +113,15 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-_FOOT_MID_X = (FOOT_END[0] + KINK_START[0]) / 2.0
-_PROFILE_TOP = _front_y(FLAT_TIP[1])
+_FOOT_MID_X = (FOOT_END[0] + FREE_KINK_START[0]) / 2.0
+_PROFILE_TOP = _front_y(max(FLAT_TIP[1], FREE_FLAT_TIP[1]))
 FRONT_KEEP = {
     "FootLen": (_front_x((FOOT_TAN[0] + FOOT_END[0]) / 2.0), _front_y(0.0) - 0.010),
     "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
-    "KinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(KINK_START[1] / 2.0)),
-    "KinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.012),
-    "TipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.026),
+    # The free locations, on the FreeForm phantom.
+    "FreeKinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(FREE_KINK_START[1] / 2.0)),
+    "FreeKinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.012),
+    "FreeTipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.026),
 }
 _PAD_EAST = _front_x(FOOT_END[0])
 TOP_KEEP = {
@@ -133,9 +138,9 @@ DETAIL_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "FootLen": "TO BEND TANGENT",
-    "KinkH": "TO KINK TANGENT",
-    "KinkV": "TO KINK TANGENT",
-    "TipH": "TO FREE TIP",
+    "FreeKinkH": "FREE, TO KINK TANGENT",
+    "FreeKinkV": "FREE, TO KINK TANGENT",
+    "FreeTipH": "FREE, TO TIP",
 }
 HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), 0.236)
 HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
@@ -164,7 +169,9 @@ def _kink_detail(adapter: Any, front: Any) -> Any:
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
     for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
@@ -338,7 +345,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
-    front_annotations = curate_view_dimensions(
+    # The front view imports the part-hidden FreeForm reference sketch, so it
+    # takes the opt-in curation that shows it (the phantom) in this view only.
+    # The kink detail is derived from it and is created while the part still
+    # hides the sketch, so it shows the installed crest alone.
+    front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
         keep=FRONT_KEEP,

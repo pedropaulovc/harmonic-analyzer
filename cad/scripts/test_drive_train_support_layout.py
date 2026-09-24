@@ -1057,6 +1057,7 @@ def test_spring_pad_books_its_printed_bands() -> None:
     import re
 
     assert not re.search(r"\b0\.51\b", inspect.getsource(drive))
+    assert not hasattr(drive, "_SPR_PAD_WEST_X")  # z only: the leaf sets z
     assert math.isclose(
         drive._SPR_PAD_Z_HI,
         RIG.SPRING_PAD_AFT_Z + RIG.FEELER_SET_ERROR,

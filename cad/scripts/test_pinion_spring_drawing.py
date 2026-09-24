@@ -60,8 +60,8 @@ def test_profile_is_baselined_from_the_foots_free_end() -> None:
     # feature the maker can put a rule on, never from the model origin.
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "KinkStartX" not in source and "FlatTipX" not in source
-    kink = pinion_spring_spec.FORMED_DIMENSIONS["SpringProfile"]
-    assert {"KinkH", "KinkV", "TipH"} <= kink
+    free = pinion_spring_spec.FORMED_DIMENSIONS[pinion_spring_spec.FREE_FORM_SKETCH]
+    assert free == {"FreeKinkH", "FreeKinkV", "FreeTipH"}
     assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
     assert drawing.DETAIL_SCALE == (5, 1)
 
@@ -108,6 +108,20 @@ def test_free_form_presets_the_crest_into_the_flank() -> None:
     assert geometry.PRESET - geometry.FORMED_BAND_MM > 1.0
     assert geometry.FREE_KINK_START[0] < geometry.KINK_START[0]
     assert pinion_spring_spec.FORMED_TOLERANCE_MM == geometry.FORMED_BAND_MM
+
+
+def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
+    # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
+    # tip print from the hidden sketch, which the part blanks and the front
+    # view shows through the opt-in hidden-sketch curation.
+    assert pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
+    build_source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "blank_sketch(adapter, FREE_FORM_SKETCH)" in build_source
+    assert 'prefix="Free", construction=True' in build_source
+    draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "hidden_sketches.curate_view_dimensions(" in draw_source
+    assert {"FreeKinkH", "FreeKinkV", "FreeTipH"} <= set(drawing.FRONT_KEEP)
+    assert "FREE FORM" in pinion_spring_spec.DRAWING_NOTES
 
 
 def test_views_are_projected_and_hidden_lines_removed() -> None:
