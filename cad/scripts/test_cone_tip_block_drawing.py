@@ -205,3 +205,46 @@ def test_part_hides_every_model_reference_sketch() -> None:
     assert build_body.index("_blank_reference_sketches(") < build_body.index(
         "save_part_and_images("
     )
+
+
+def test_section_a_shows_every_hidden_sketch_it_dimensions() -> None:
+    """A derived view keeps the part's sketch visibility from its creation.
+
+    995a7c94 hides every reference sketch in the part; section A is made off
+    the plan and dimensions PinchRise, so it is created and curated while the
+    part shows exactly the hidden sketches that own its kept dimensions.
+    """
+    owners = {
+        feature
+        for feature, names in cone_tip_block_spec.DRAWING_DIMENSIONS.items()
+        if set(names) & set(drawing.SECTION_KEEP)
+    }
+    hidden = owners & set(part.REFERENCE_SKETCHES)
+    assert hidden == {"PinchRiseReference"}
+    assert tuple(sorted(hidden)) == tuple(sorted(drawing.SECTION_SKETCHES))
+
+
+def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
+    """The opt-in import goes where a kept dimension lives on a hidden sketch.
+
+    Right (PinchDepthCenter) and bottom (FootTapX/Z) always do; the adjuster
+    elevation (AxisHeight/PassageCenter) opts in at build time; plan, left
+    and the base front keep only solid-feature dimensions and stay on
+    _drawing_common's import.
+    """
+
+    def hidden_owners(keep) -> set[str]:
+        return {
+            feature
+            for feature, names in cone_tip_block_spec.DRAWING_DIMENSIONS.items()
+            if set(names) & set(keep)
+        } & set(part.REFERENCE_SKETCHES)
+
+    assert hidden_owners(drawing.RIGHT_KEEP) == {"PinchDepthReference"}
+    assert hidden_owners(drawing.BOTTOM_KEEP) == {"FootTapXReference", "FootTapZReference"}
+    assert hidden_owners({"AxisHeight": 0, "PassageCenter": 0}) == {
+        "AxisHeightReference",
+        "PassageCenterReference",
+    }
+    for keep in (drawing.TOP_KEEP, drawing.LEFT_KEEP, drawing.FRONT_KEEP):
+        assert hidden_owners(keep) == set()

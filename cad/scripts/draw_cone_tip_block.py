@@ -7,6 +7,7 @@ import math
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
@@ -91,6 +92,8 @@ FRONT_KEEP = {
     "SlitW": (FRONT_CENTER[0], _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.014),
 }
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
+# The part-hidden reference sketch section A dimensions (PinchRise).
+SECTION_SKETCHES = ("PinchRiseReference",)
 SECTION_KEEP = {
     "PinchRise": (
         SECTION_CENTER[0] + 0.060,
@@ -479,6 +482,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open cone-tip-block source", await adapter.open_model(str(SOURCE)))
+    source_model = adapter.currentModel
     read_required_properties(
         adapter.currentModel,
         (
@@ -525,17 +529,33 @@ async def build(adapter: Any) -> dict[str, str]:
     # resulting solid-line section shows the through adjuster thread, its
     # countersinks, split jaws and pinch bore relationship without dashed
     # inference.
-    section = create_section_view(
-        adapter,
-        top,
-        line_start=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.004),
-        line_end=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.004),
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=SHEET_SCALE,
-        label="adjuster and pinch-bore centre section",
-    )
-    set_hidden_lines_removed(adapter, section)
+    #
+    # PinchRise lives on the part-hidden PinchRiseReference sketch (995a7c94).
+    # A derived view takes a hidden sketch's visibility from the part when it
+    # is created and refuses the per-view override the targeted import uses
+    # (lever's probe c0514e35, measured on a detail), so the section is made
+    # and dimensioned while the part shows that sketch in memory.
+    with hidden_sketches.part_sketches_shown(
+        adapter, source_model, SECTION_SKETCHES, label="section A pinch rise"
+    ):
+        section = create_section_view(
+            adapter,
+            top,
+            line_start=(TOP_CENTER[0], TOP_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.004),
+            line_end=(TOP_CENTER[0], TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.004),
+            view_xy=SECTION_CENTER,
+            section_label="A",
+            scale=SHEET_SCALE,
+            label="adjuster and pinch-bore centre section",
+        )
+        set_hidden_lines_removed(adapter, section)
+        section_annotations = hidden_sketches.curate_view_dimensions(
+            adapter,
+            section,
+            keep=SECTION_KEEP,
+            view_label="bore centre section",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     _add_adjuster_axis(adapter, section)
 
     adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
@@ -591,7 +611,14 @@ async def build(adapter: Any) -> dict[str, str]:
     else:
         back_keep.update(adjuster_axis_keep)
 
-    front_annotations = curate_view_dimensions(
+    # Views that dimension part-hidden reference sketches (995a7c94) import
+    # through the opt-in helper, which shows each owner sketch in that view
+    # only.  AxisHeight/PassageCenter go to whichever elevation shows the
+    # adjuster entry, so only that one opts in; the other shows no sketch.
+    adjuster_curate = hidden_sketches.curate_view_dimensions
+    front_curate = adjuster_curate if adjuster_view is front else curate_view_dimensions
+    back_curate = curate_view_dimensions if adjuster_view is front else adjuster_curate
+    front_annotations = front_curate(
         adapter,
         front,
         keep=front_keep,
@@ -605,14 +632,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="bore centre section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    right_annotations = curate_view_dimensions(
+    right_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         right,
         keep=RIGHT_KEEP,
@@ -626,14 +646,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="pinch threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    back_annotations = curate_view_dimensions(
+    back_annotations = back_curate(
         adapter,
         back,
         keep=back_keep,
         view_label="adjuster threaded entry",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    bottom_annotations = curate_view_dimensions(
+    bottom_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         bottom,
         keep=BOTTOM_KEEP,
