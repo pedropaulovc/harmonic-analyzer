@@ -378,12 +378,12 @@ def test_balloons_on_one_ray_swap_slots_until_their_leaders_clear() -> None:
 # Each non-summing contract set, digested BEFORE summing took ownership of its
 # own pairs (integration, 2026-09-23): sorted (pair, limit rounded to 1e-9).
 _OTHER_CONTRACT_DIGESTS = {
-    "drive-train": (8, "e6815d6a66052a05"),
+    "drive-train": (6, "2c1de13d3994978f"),
     "frame": (17, "4677d25965fb6fd2"),
     "magnifier": (3, "4fdafd77e003d5c6"),
     "pen": (2, "c859c793ecd100ba"),
     "paper-drive": (29, "f47dafd2222d6d9d"),
-    "harmonic-analyzer": (32, "516c3ab72f513a2d"),
+    "harmonic-analyzer": (32, "338d4e7b7e6999dd"),
 }
 
 

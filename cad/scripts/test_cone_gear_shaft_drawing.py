@@ -58,9 +58,10 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     assert not _lands_ride_named_bands(tuple(forked))
     # The running tip land still clears the bushing bore it turns in.
     import cone_tip_bushing_spec as bushing
+    import build_cone_tip_bushing as bushing_part
 
     tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
-    assert bushing.BORE_DIA + bushing.BORE_DIA_BAND[1] - tip_max >= 0.0
+    assert bushing.BORE_DIA + bushing_part.BORE_DIA_BAND[1] - tip_max >= 0.0
     # Applied in ONE loop over the named bands, so the AST reports the
     # f-string source rather than five literal keys.
     assert model_toleranced_dimensions(part) == {

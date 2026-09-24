@@ -162,7 +162,7 @@ def test_running_bores_close_the_configured_fit_class() -> None:
         (
             spec.BORE_DIA,
             cone_gear_shaft_spec.JOURNAL_DIA,
-            cone_gear_shaft_spec.SECTION_DIA_BAND,
+            cone_gear_shaft_spec.RUNNING_DIA_BAND,
         ),
     ):
         shaft_max = shaft_nominal + shaft_band[0]
