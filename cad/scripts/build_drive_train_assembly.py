@@ -808,7 +808,6 @@ from pinion_spring_geometry import (  # noqa: E402
     HOLE_FROM_END as SPR_HOLE_FROM_END,
     HOLE_SPEC as SPR_HOLE_SPEC,
     KINK_START as SPR_CREST_L,
-    PAD_LEN as SPR_PAD_LEN,
     PAD_WIDTH as SPR_PAD_WIDTH,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
