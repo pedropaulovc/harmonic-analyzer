@@ -11,9 +11,9 @@ hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
 west-edge lock notch, four rounded plan corners and the counterbored slot
 for the tip block's hidden hold-down screw (U30).  The three plan views run
 1:2 and pivot section A-A 2:1.  Slot detail B enlarges a 12 mm radius
-around the pivot-to-slot region at 1:1, hidden lines dashed, at sheet
-(110, 57) mm; the counterbore depth rides its width callout (no section
-C-C).  The isometric runs 1:3.
+around the pivot-to-slot region at 2:1, hidden lines dashed, at sheet
+(88, 44) mm; section C-C (1:1) cuts along the slot for the counterbore
+depth.  The isometric runs 1:3.
 
 Run with SolidWorks open::
 
@@ -65,10 +65,10 @@ from cone_swing_platform_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIVOT_HOLE_DIA,
+    PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
-    TIP_CBORE_DEPTH,
     TIP_CBORE_W,
     TIP_SCREW_LOCAL_Z,
     TIP_SLOT_W,
@@ -146,11 +146,11 @@ SECTION_KEEP = {
 }
 
 # U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
-# enlarges the pivot-to-slot region of the hole-location plan to 1:1, with
-# hidden lines shown so the underside counterbored slot reads dashed.  The
-# counterbore depth rides the width callout, formatted from the same spec
-# constant the model cuts, the way a Hole Wizard callout carries its depth:
-# a separate section view has no room here.
+# enlarges the pivot-to-slot region of the hole-location plan to 2:1, with
+# hidden lines shown so the underside counterbored slot reads dashed.  At
+# 1:1 (run 7959e994) five dimensions and two cutter callouts crowded a 24 mm
+# circle, texts over the outline and each other; 2:1 gives them the room.
+# The counterbore depth is section C-C's imported dimension.
 #
 # The free band is x 0.0127..0.216 under the plan captions (y <= 0.0805)
 # and above the bottom border (y >= 0.0127).  Run e86bf319 put the detail in
@@ -163,29 +163,51 @@ SECTION_KEEP = {
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
 DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
 DETAIL_RADIUS_MM = 12.0
-DETAIL_CENTER = (0.110, 0.057)
-_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z / 1000.0
-_SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) / 1000.0
+DETAIL_SCALE = (2, 1)
+_DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+DETAIL_CENTER = (0.088, 0.044)
+DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
+_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
+_SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 DETAIL_KEEP = {
-    # Right, nearest the circle: pivot to slot, its text low enough that the
-    # counterbore's lower extension line passes above it.
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.018, _PIVOT_Y + 0.003),
-    # Above the circle, each 2.00 outside its own extension lines.
-    "TipSlotEastCx": (DETAIL_CENTER[0] - 0.014, DETAIL_CENTER[1] + 0.017),
-    "TipSlotWestCx": (DETAIL_CENTER[0] + 0.014, DETAIL_CENTER[1] + 0.017),
-    # Left: the through slot and its cutter, text hanging left into the
-    # field the relief note vacated (x ~0.060..0.095).
-    "TipSlotW": (DETAIL_CENTER[0] - 0.018, _SLOT_Y),
-    # Right, outboard of TipSlotZ: the counterbored slot, its cutter and
-    # depth, text hanging right (x ~0.150..0.192), under the caption row.
-    "TipCboreW": (DETAIL_CENTER[0] + 0.040, _SLOT_Y),
+    # Right, nearest the circle: pivot to slot, its text between the relief
+    # note's top (0.034) and the counterbore's lower extension line (0.046).
+    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, 0.0435),
+    # Above the circle, each 2.00 outside its own extension lines and under
+    # the plan caption row (y >= 0.0805).
+    "TipSlotEastCx": (
+        DETAIL_CENTER[0] - 0.020,
+        DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
+    ),
+    "TipSlotWestCx": (
+        DETAIL_CENTER[0] + 0.020,
+        DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
+    ),
+    # Left: the through slot and its cutter, text hanging left to the border.
+    "TipSlotW": (DETAIL_CENTER[0] - 0.032, _SLOT_Y),
+    # Right, outboard of TipSlotZ: the counterbored slot and its cutter,
+    # text hanging right above the relief note.
+    "TipCboreW": (DETAIL_CENTER[0] + 0.048, _SLOT_Y),
 }
-# The native "DETAIL B / SCALE 1:1" label, moved by its measured extent:
-# lower left of its box, left of the relief note and under the detail.
-DETAIL_LABEL_LOWER_LEFT = (0.058, 0.015)
+# The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
+# lower left of its box, in the band's lower-left corner under the slot text.
+DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
 RELIEF_NOTE_XY = (0.119, 0.034)
+# SECTION C-C cuts across the plate along the slot (sheet-horizontal through
+# its centre in detail B), so the counterbore's depth is an imported model
+# dimension (drawing-simplicity rule 2: a typed "4.20 DEEP" was not).  The
+# 1:1 strip, plate edge-on, sits in the free pocket between the notch plan
+# (x <= 0.2806, y >= 0.1286), its caption row (y <= 0.0853), the relief
+# dimension RD1 (x <= 0.246) and section A-A's finish symbol (x >= 0.316).
+SLOT_SECTION_HALF_SPAN_MM = 9.0
+SLOT_SECTION_CENTER = (0.296, 0.096)
+SLOT_SECTION_KEEP = {
+    "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.015, SLOT_SECTION_CENTER[1]),
+}
+# Its native label, above the strip and left of the finish symbol.
+SLOT_SECTION_LABEL_LOWER_LEFT = (0.258, 0.106)
 
 
 
@@ -265,10 +287,10 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         )
 
 
-def _position_detail_label(
-    adapter: Any, detail: Any, lower_left: tuple[float, float]
+def _position_view_label(
+    adapter: Any, view: Any, lower_left: tuple[float, float], *, label: str
 ) -> None:
-    """Move the native detail label so its box's lower-left lands at ``lower_left``.
+    """Move a view's native label so its box's lower-left lands at ``lower_left``.
 
     The label's anchor is not its box corner, so the move is measured: read
     ``INote.GetExtent``, shift the anchor by the corner's error, read back.
@@ -278,10 +300,10 @@ def _position_detail_label(
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
-        raise RuntimeError("cannot pin sheet scale before detail label placement")
-    notes = tuple(_read_member(detail, "GetNotes") or ())
+        raise RuntimeError(f"cannot pin sheet scale before {label} placement")
+    notes = tuple(_read_member(view, "GetNotes") or ())
     if len(notes) != 1:
-        raise RuntimeError(f"expected one native detail label, found {len(notes)}")
+        raise RuntimeError(f"expected one native {label}, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
     for _attempt in range(2):
@@ -292,13 +314,13 @@ def _position_detail_label(
         anchor = tuple(float(v) for v in _read_member(annotation, "GetPosition"))
         moved = (anchor[0] + error[0], anchor[1] + error[1], 0.0)
         if not annotation.SetPosition2(*moved):
-            raise RuntimeError("failed to position native detail label")
+            raise RuntimeError(f"failed to position native {label}")
         adapter.currentModel.EditRebuild3()
     extent = tuple(float(v) for v in note.GetExtent())
-    print(f"detail label: requested lower-left={lower_left} extent={extent}")
+    print(f"{label}: requested lower-left={lower_left} extent={extent}")
     if max(abs(lower_left[0] - extent[0]), abs(lower_left[1] - extent[1])) > 0.0005:
         raise RuntimeError(
-            f"native detail label landed at {extent[:2]}, requested {lower_left}"
+            f"native {label} landed at {extent[:2]}, requested {lower_left}"
         )
 
 
@@ -699,11 +721,37 @@ async def build(adapter: Any) -> dict[str, str]:
         radius_mm=DETAIL_RADIUS_MM,
         view_xy=DETAIL_CENTER,
         detail_label="B",
-        scale=(1, 1),
+        scale=DETAIL_SCALE,
         label="tip screw slot detail",
     )
     # Hidden edges dashed, so the underside counterbored slot reads.
     set_hidden_lines_visible(adapter, detail)
+    slot_ends = [
+        model_point_in_view(
+            adapter,
+            detail,
+            (x / 1000.0, PLATE_THICKNESS / 1000.0, TIP_SCREW_LOCAL_Z / 1000.0),
+            label=f"slot section end {index}",
+        )
+        for index, x in enumerate(
+            (-SLOT_SECTION_HALF_SPAN_MM, SLOT_SECTION_HALF_SPAN_MM)
+        )
+    ]
+    slot_section = create_section_view(
+        adapter,
+        detail,
+        line_start=slot_ends[0],
+        line_end=slot_ends[1],
+        view_xy=SLOT_SECTION_CENTER,
+        section_label="C",
+        scale=(1, 1),
+        partial=True,
+        label="tip screw slot section",
+    )
+    slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
+    slot_cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="slot section cut faces only")
+    set_hidden_lines_removed(adapter, slot_section)
 
     profile_annotations = curate_view_dimensions(
         adapter,
@@ -720,9 +768,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="feature plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Name the relief so the reader ties the diameter to the fit note.
+    # Name the relief so the reader ties the width to the fit note; it is
+    # open through the north edge (rule-12 W18), round-ended at the pivot.
     set_dimension_callouts(
-        adapter, feature_annotations, {"PivotBearingReliefDia": "SPOTFACE"}
+        adapter,
+        feature_annotations,
+        {"PivotBearingReliefDia": "TOP RELIEF\nOPEN TO NORTH EDGE"},
     )
     notch_annotations = curate_view_dimensions(
         adapter,
@@ -770,10 +821,29 @@ async def build(adapter: Any) -> dict[str, str]:
         {
             "TipSlotW": f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL\nSLOT THRU",
             "TipCboreW": (
-                f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\n"
-                f"{TIP_CBORE_DEPTH:.2f} DEEP\nFROM UNDERSIDE"
+                f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL\nC'BORE SLOT\nFROM UNDERSIDE"
             ),
         },
+    )
+    # U41: the thickness is the stock's, a reference with no band.
+    thickness_annotations = [
+        item for item in section_annotations
+        if dimension_name(adapter, item) == "PlateThk"
+    ]
+    if len(thickness_annotations) != 1:
+        raise RuntimeError("expected one native plate thickness")
+    thickness_reference = set_reference_dimension(
+        adapter, thickness_annotations[0], label="stock plate thickness reference"
+    )
+    set_dimension_callouts(
+        adapter, thickness_annotations, {"PlateThk": PLATE_STOCK_CALLOUT}
+    )
+    slot_section_annotations = curate_view_dimensions(
+        adapter,
+        slot_section,
+        keep=SLOT_SECTION_KEEP,
+        view_label="tip screw slot section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     relief_annotations = [
         item for item in section_annotations
@@ -790,6 +860,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *notch_annotations,
         *section_annotations,
         *detail_annotations,
+        *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
@@ -849,16 +920,29 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, iso):
+    for view in (profile, feature, notch, section, slot_section, iso):
         set_hidden_lines_removed(adapter, view)
     # Re-assert after the dimensions attach: the shared helper passes through
     # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
     set_hidden_lines_visible(adapter, detail)
     # Last, after every annotation and display-mode regen could re-lay it.
-    _position_detail_label(adapter, detail, DETAIL_LABEL_LOWER_LEFT)
+    _position_view_label(
+        adapter, detail, DETAIL_LABEL_LOWER_LEFT, label="detail B label"
+    )
+    _position_view_label(
+        adapter,
+        slot_section,
+        SLOT_SECTION_LABEL_LOWER_LEFT,
+        label="section C-C label",
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if (str(relief_reference.GetText(1)), str(relief_reference.GetText(2))) != ("(", ")"):
         raise RuntimeError("pivot relief reference state did not persist")
+    if (
+        str(thickness_reference.GetText(1)),
+        str(thickness_reference.GetText(2)),
+    ) != ("(", ")"):
+        raise RuntimeError("stock plate thickness reference state did not persist")
     for name, feature_name, radius_m, station_xy in (
         ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
         ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
