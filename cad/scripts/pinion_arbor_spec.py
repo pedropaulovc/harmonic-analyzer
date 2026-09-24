@@ -233,6 +233,24 @@ if (
 ):
     raise AssertionError("back journal land runs into the back-crown root")
 
+# The bond zone's Ø8 -0.01/-0.10 is dimensioned on its own flank, from a
+# Top-plane reference sketch like the lands', not off the end-on shaft circle:
+# that circle sits in the neck face on the Front plane, so its witnesses ran
+# along the neck and out through the detail-A fence (run 492a7be5).  The
+# witness station lies inside the drum's bond zone, clear of both lands, so
+# the diameter reads as the bond zone's.
+BOND_ZONE_DIA_FROM_HEAD_REAR = 113.0
+BOND_ZONE_DIA_Z = HEAD_REAR_Z + BOND_ZONE_DIA_FROM_HEAD_REAR
+BOND_ZONE_LAND_CLEARANCE = 10.0
+if not (
+    max(FRONT_JOURNAL_FROM_HEAD_REAR + JOURNAL_LEN, DRUM_STATION)
+    + BOND_ZONE_LAND_CLEARANCE
+    <= BOND_ZONE_DIA_FROM_HEAD_REAR
+    <= min(BACK_JOURNAL_FROM_HEAD_REAR, DRUM_STATION + DRUM_LEN)
+    - BOND_ZONE_LAND_CLEARANCE
+):
+    raise AssertionError("the bond-zone diameter must sit on the drum, clear of both lands")
+
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         key,
@@ -246,15 +264,16 @@ SURFACE_FINISHES = tuple(
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    # Head and neck diameters are the same Front-plane circle pattern as
-    # ShaftDia: imported end-on on the donor view and moved onto the 1:1
-    # profile (5cc191fb's proven path; a detail silhouette screen pick is
-    # seat-dependent and failed on w6).
+    # Head and neck diameters are Front-plane circles: imported end-on on the
+    # donor view and moved onto the 1:1 profile (5cc191fb's proven path; a
+    # detail silhouette screen pick is seat-dependent and failed on w6).  The
+    # Ø8 is not: its circle's witnesses crossed the neck face, so the bond
+    # zone carries its own flank diameter (BondZoneReference).
     "HeadProfile": {"HeadDia"},
     "NeckProfile": {"NeckDia"},
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
-    "ShaftProfile": {"ShaftDia"},
+    "BondZoneReference": {"BondZoneDia"},
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
@@ -277,7 +296,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NeckProfile": {"NeckDia": 1},
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 2},
-    "ShaftProfile": {"ShaftDia": 2},
+    "BondZoneReference": {"BondZoneDia": 2},
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},

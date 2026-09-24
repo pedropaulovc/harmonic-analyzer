@@ -57,6 +57,8 @@ from pinion_arbor_spec import (
     BACK_CAP_SAG,
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
+    BOND_ZONE_DIA_FROM_HEAD_REAR,
+    BOND_ZONE_DIA_Z,
     CROSS_HOLE_DIA,
     CROSS_HOLE_DIA_BAND,
     DRAWING_DIMENSIONS,
@@ -109,6 +111,8 @@ V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
 # the whole Ø8 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
 JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
+# The bond-zone diameter's construction witness: a short run of the flank.
+BOND_ZONE_WITNESS_LEN = 4.0
 
 
 def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float) -> float:
@@ -348,6 +352,77 @@ async def _add_journal_land(
         land_area_mm2=area_mm2,
     )
     return drive_jobs
+
+
+async def _add_bond_zone_reference(adapter) -> list[tuple[str, str]]:
+    """Dimension the Ø8 bond zone on its own flank, like a journal land.
+
+    A Top-plane sketch with no model geometry: the turning axis from the head
+    shoulder to the bond-zone station, a construction witness on the flank
+    there, and the diameter between them.  The profile view prints it as a
+    local diameter whose witnesses stay on the bond zone, where the end-on
+    shaft circle's ran along the neck face and out through the detail fence.
+    """
+    feature_name = "BondZoneReference"
+    start_v = -HEAD_REAR_Z
+    end_v = -BOND_ZONE_DIA_Z
+    dims = SketchDims()
+    check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        f"{feature_name} axis",
+        await adapter.add_centerline(0.0, start_v, 0.0, end_v),
+    )
+    witness = check(
+        f"{feature_name} flank witness",
+        await adapter.add_line(SHAFT_R, end_v, SHAFT_R, end_v - BOND_ZONE_WITNESS_LEN),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{witness}: failed to become construction geometry")
+    for line in (axis, witness):
+        check(
+            f"{feature_name} {line} vertical",
+            await adapter.add_sketch_constraint(line, None, "vertical"),
+        )
+    check(
+        f"{feature_name} witness level with the axis end",
+        await adapter.add_sketch_constraint(
+            f"{witness}.start", f"{axis}.end", "horizontal_points"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{axis}.start", 0.0, start_v, f"{feature_name} shoulder"
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} station",
+        await adapter.add_sketch_dimension(
+            f"{axis}.start", f"{axis}.end", "vertical_distance", BOND_ZONE_DIA_FROM_HEAD_REAR
+        ),
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} witness length",
+        await adapter.add_sketch_dimension(
+            f"{witness}.start", f"{witness}.end", "vertical_distance", BOND_ZONE_WITNESS_LEN
+        ),
+    )
+    dims.record(None, None)
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        f"{witness}.start",
+        (SHAFT_R + 5.0, end_v),
+        "BondZoneDia",
+    )
+    dims.record("BondZoneDia", '"ShaftDia"')
+    await ensure_fully_defined(adapter, feature_name)
+    check(f"exit sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    return dims.apply(adapter, feature_name)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -652,6 +727,7 @@ async def build(adapter) -> dict[str, str]:
     )
     if len(_shaft_faces(adapter)) != 5:
         raise RuntimeError("the Ø8 shaft must read as two journal lands and three plain zones")
+    drive_jobs += await _add_bond_zone_reference(adapter)
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
@@ -663,7 +739,7 @@ async def build(adapter) -> dict[str, str]:
     _require_one_solid_body(adapter, label="driven integral pinion arbor")
 
     set_dimension_bilateral_tolerance(
-        adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+        adapter, "BondZoneReference", "BondZoneDia", *deviations(SHAFT_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_DIA_BAND)
@@ -675,7 +751,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BackJournalReference", "BackJournalDia", *deviations(JOURNAL_DIA_BAND)
     )
     # A diametric linear dimension on a side-view sketch prints no Ø by itself.
-    for prefix in ("FrontJournal", "BackJournal"):
+    for prefix in ("FrontJournal", "BackJournal", "BondZone"):
         set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")

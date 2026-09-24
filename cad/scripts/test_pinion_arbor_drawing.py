@@ -35,7 +35,7 @@ def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
     assert kept == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
-    assert {"HeadDia", "NeckDia", "ShaftDia"} == set(drawing.DONOR_KEEP)
+    assert {"HeadDia", "NeckDia"} == set(drawing.DONOR_KEEP)
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
@@ -112,7 +112,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert _fit_limits.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
-        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
@@ -235,33 +235,107 @@ def test_back_journal_text_sits_head_side_clear_of_the_crown_witnesses() -> None
     _station_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
     assert text_x > symbol_x + 0.015  # past the Ra symbol's ~17 mm width
     assert text_y < symbol_y  # its shelf runs under the symbol
-    assert text_x + 0.030 < drawing.DIAMETER_POSITIONS["ShaftDia"][0] - 0.020
+    assert text_x + 0.030 < drawing.PRINCIPAL_KEEP["BondZoneDia"][0] - 0.020
 
 
-def test_detail_fence_audit_allows_only_the_downward_station_witnesses() -> None:
-    from _layout_geometry import AnnotationGeometry, Segment
+FENCE = {"center": (0.3132, 0.171), "radius": 0.015, "axis": (-1.0, 0.0)}
 
-    center, radius = (0.3132, 0.171), 0.015
 
-    def dim(*segments: Segment) -> AnnotationGeometry:
-        return AnnotationGeometry(label="d", kind="dim", owner="p", segments=segments)
+def _fence_dim(label: str, *segments):
+    from _layout_geometry import AnnotationGeometry
 
-    station = Segment(0.308, 0.165, 0.308, 0.100)  # drops to the stack below
-    inside = Segment(0.3190, 0.1785, 0.3250, 0.1785)  # Ø15 witness, in the fence
-    leader = Segment(0.3238, 0.165, 0.3238, 0.192, "leader")  # own line to text
-    drawing._assert_witnesses_clear_of_detail_fence(
-        [dim(station, inside, leader)], center=center, radius=radius
-    )
+    return AnnotationGeometry(label=label, kind="dim", owner="p", segments=segments)
+
+
+def test_fence_lets_a_vertical_diameter_line_out_but_not_its_extension_lines() -> None:
+    """Run 492a7be5: HeadDia's own vertical line runs up out of the fence to
+    its text (allowed, a line crossing a line); a horizontal run off a
+    vertical diameter is an extension line and may not leave (Main ruling)."""
+    from _layout_geometry import Segment
+
+    to_text = Segment(0.3238, 0.1775, 0.3238, 0.1892)  # the flagged run
+    tail = Segment(0.3238, 0.1625, 0.3238, 0.1562)  # the outside-arrow tail
+    inside = Segment(0.3190, 0.1785, 0.3250, 0.1785)  # extension, in the fence
+    arrows = {"HeadDia": ((0.3238, 0.1775), (0.0, -1.0))}
+    head = _fence_dim("HeadDia", to_text, tail, inside)
+    drawing._assert_witnesses_clear_of_detail_fence([head], arrows=arrows, **FENCE)
+    assert drawing._segment_kind(to_text, arrows["HeadDia"][1]) == "dimension-line"
+    assert drawing._segment_kind(inside, arrows["HeadDia"][1]) == "extension-line"
+
     outward = Segment(0.3190, 0.1785, 0.3420, 0.1785)  # the old Ø15 witness
-    with pytest.raises(RuntimeError, match="detail-A fence"):
+    with pytest.raises(RuntimeError, match="HeadDia' extension-line"):
         drawing._assert_witnesses_clear_of_detail_fence(
-            [dim(outward)], center=center, radius=radius
+            [_fence_dim("HeadDia", to_text, outward)], arrows=arrows, **FENCE
         )
-    upward = Segment(0.308, 0.175, 0.308, 0.200)
-    with pytest.raises(RuntimeError, match="detail-A fence"):
+
+
+def test_fence_lets_a_horizontal_station_out_on_its_witnesses_and_line() -> None:
+    """A station from the head shoulder measures along the turning axis: its
+    vertical extension lines drop to the stack and its horizontal dimension
+    line may cross, while a run oblique to it may not."""
+    from _layout_geometry import Segment
+
+    witness = Segment(0.3080, 0.1650, 0.3080, 0.1280)  # drops to the stack
+    upward = Segment(0.3080, 0.1750, 0.3080, 0.2000)  # still a station witness
+    line = Segment(0.2600, 0.1600, 0.3100, 0.1600)  # its own dimension line
+    arrows = {"FrontJournalFromHeadRear": ((0.3080, 0.1600), (1.0, 0.0))}
+    station = _fence_dim("FrontJournalFromHeadRear", witness, upward, line)
+    drawing._assert_witnesses_clear_of_detail_fence([station], arrows=arrows, **FENCE)
+    assert drawing._segment_kind(witness, (1.0, 0.0)) == "extension-line"
+    assert drawing._segment_kind(line, (1.0, 0.0)) == "dimension-line"
+
+    oblique = Segment(0.3080, 0.1650, 0.3300, 0.1400)
+    with pytest.raises(RuntimeError, match="oblique"):
         drawing._assert_witnesses_clear_of_detail_fence(
-            [dim(upward)], center=center, radius=radius
+            [_fence_dim("FrontJournalFromHeadRear", line, oblique)],
+            arrows=arrows,
+            **FENCE,
         )
+
+
+def test_fence_judges_an_unread_or_misread_dimension_as_all_extension_lines() -> None:
+    from _layout_geometry import Segment
+
+    run = Segment(0.3080, 0.1650, 0.3080, 0.1280)
+    with pytest.raises(RuntimeError, match="extension-line"):
+        drawing._assert_witnesses_clear_of_detail_fence(
+            [_fence_dim("NoArrow", run)], arrows={}, **FENCE
+        )
+    # A run that stops at the arrow's base still carries the arrow's tip.
+    short = Segment(0.3238, 0.1805, 0.3238, 0.1892)
+    base = {"Base": ((0.3238, 0.1775), (0.0, -1.0))}
+    drawing._assert_witnesses_clear_of_detail_fence(
+        [_fence_dim("Base", short)], arrows=base, **FENCE
+    )
+    # An arrowhead off every one of its own parallel runs is a misread.
+    stray = {"Stray": ((0.2000, 0.2000), (0.0, 1.0))}
+    with pytest.raises(RuntimeError, match="unreadable"):
+        drawing._assert_witnesses_clear_of_detail_fence(
+            [_fence_dim("Stray", run)], arrows=stray, **FENCE
+        )
+    # Leaders are the audit's, not the fence's.
+    leader = Segment(0.3238, 0.1650, 0.3238, 0.1920, "leader")
+    drawing._assert_witnesses_clear_of_detail_fence(
+        [_fence_dim("Led", leader)], arrows={}, **FENCE
+    )
+
+
+def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
+    """The end-on Ø8 circle sat in the neck face, so its witnesses crossed the
+    neck and the detail fence (run 492a7be5).  The bond zone now carries its
+    own Top-plane diameter, printed over its witness, clear of the fence."""
+    assert "ShaftProfile" not in spec.DRAWING_DIMENSIONS
+    assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
+    assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] == "BOND ZONE"
+    station = spec.BOND_ZONE_DIA_FROM_HEAD_REAR
+    clear = spec.BOND_ZONE_LAND_CLEARANCE
+    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN + clear <= station
+    assert station <= spec.BACK_JOURNAL_FROM_HEAD_REAR - clear
+    assert spec.DRUM_STATION < station < spec.DRUM_STATION + spec.DRUM_LEN
+    text_x, _ = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    assert text_x == pytest.approx(drawing._sheet_x(spec.BOND_ZONE_DIA_Z))
+    fence_x = drawing._sheet_x(spec.HEAD_CENTER_Z)
+    assert fence_x - text_x > drawing.DETAIL_RADIUS_MM / 1000.0 + 0.050
 
 
 def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:

@@ -32,6 +32,7 @@ from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
+    BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
     FRONT_JOURNAL_Z,
@@ -67,8 +68,7 @@ DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
 # The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
 # circle, this far below it (the label's anchor is its top edge): clear of the
-# HeadLen text that rides the circle's lower edge.  The bond-zone ShaftDia
-# line then moves right of the label so its upper arrow misses "SCALE 2:1".
+# HeadLen text that rides the circle's lower edge.
 DETAIL_LABEL_DROP = 0.012
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
@@ -76,10 +76,10 @@ DETAIL_LABEL_XY = (
     - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
     - DETAIL_LABEL_DROP,
 )
-# Every turned diameter lives in an end-on Front-plane profile sketch, so the
-# end-on donor imports all three and each moves onto the 1:1 profile.
+# The head and neck diameters live in end-on Front-plane profile sketches, so
+# the end-on donor imports them and each moves onto the 1:1 profile.  The Ø8
+# is dimensioned on the profile itself, from the bond zone's flank.
 DONOR_KEEP = {
-    "ShaftDia": (0.030, 0.145),
     "NeckDia": (0.055, 0.145),
     "HeadDia": (0.030, 0.215),
 }
@@ -105,12 +105,14 @@ BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
 # and below it: on the crown side the back-crown and overall-length witnesses
 # (x 0.079-0.081) ran through "8" and "JOURNAL", and the SR7.3 leader fills the
 # space left of them.  Its shelf passes under the Ra symbol and across the
-# back station witness, stopping short of the bond-zone text (x ~0.168).
+# back station witness, stopping short of the bond-zone text.
 BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     "BackJournalLen": (0.099, 0.188),
     "FrontJournalDia": (0.250, 0.150),
+    # Below the bond zone, between the two land diameters, over its own witness.
+    "BondZoneDia": (_sheet_x(BOND_ZONE_DIA_Z), 0.150),
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     "BackJournalFromHeadRear": (0.207, 0.115),
@@ -140,8 +142,6 @@ DETAIL_KEEP = {
 DIAMETER_POSITIONS = {
     "HeadDia": (0.3238, 0.192),
     "NeckDia": (0.300, 0.194),
-    # Below the bond zone, between the two land diameters.
-    "ShaftDia": (0.195, 0.150),
 }
 DIMENSION_CALLOUTS = {
     "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
@@ -150,6 +150,7 @@ DIMENSION_CALLOUTS = {
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
     "FrontJournalDia": "JOURNAL",
     "BackJournalDia": "JOURNAL",
+    "BondZoneDia": "BOND ZONE",
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
@@ -485,6 +486,21 @@ async def build(adapter: Any) -> dict[str, str]:
         (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
         label="integral-arbor detail fence centre",
     )
+    far_on_axis = model_point_in_view(
+        adapter,
+        principal,
+        (0.0, 0.0, (HEAD_CENTER_Z + OVERALL_LEN) / 1000.0),
+        label="integral-arbor axis direction",
+    )
+    arrows = _dimension_arrows(adapter, principal)
+    _telemetry.info(
+        f"pinion-arbor: {len(arrows)} profile dimensions carry a readable arrowhead",
+        arrows=len(arrows),
+        directions=",".join(
+            f"{name}@{tx * 1000:.1f},{ty * 1000:.1f}mm:{dx:+.3f}/{dy:+.3f}"
+            for name, ((tx, ty), (dx, dy)) in sorted(arrows.items())
+        ),
+    )
     _assert_witnesses_clear_of_detail_fence(
         [
             annotation
@@ -495,6 +511,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ],
         center=fence_center,
         radius=DETAIL_RADIUS_MM / 1000.0,
+        arrows=arrows,
+        axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
 
     return await finalize_drawing(
@@ -539,45 +557,155 @@ def _assert_no_text_on_line(findings: list[Any]) -> None:
 
 
 FENCE_TOL_M = 0.0002
+# A run within this angle of its dimension's measured direction is that
+# dimension's line; within this angle of the perpendicular, an extension line.
+# Anything between is neither and is judged like an extension line.
+DIRECTION_TOL_RAD = math.radians(5.0)
+# An arrowhead's tip lies on its own dimension line, or on its extension past
+# a run that stops at the arrow's base.
+ARROW_ON_LINE_TOL_M = 0.0005
+ARROW_REACH_M = 0.005
+# swAnnotationType_e.swDisplayDimension
+_SW_DISPLAY_DIMENSION = 4
+
+Arrow = tuple[tuple[float, float], tuple[float, float]]
+
+
+def _unit(dx: float, dy: float) -> tuple[float, float]:
+    length = math.hypot(dx, dy)
+    if length == 0.0:
+        raise ValueError("a direction needs a non-zero vector")
+    return dx / length, dy / length
+
+
+def _dimension_arrows(adapter: Any, view: Any) -> dict[str, Arrow]:
+    """Each dimension's first arrowhead on ``view``: its tip and unit direction.
+
+    ``IDisplayData`` labels no run as extension or dimension line, and
+    ``IDimension::DimensionLineDirection`` answers feature dimensions only,
+    while this sheet mixes feature and sketch dimensions.  An arrowhead, the
+    one signal every dimension carries, points along its own
+    dimension line (``IDisplayData::GetArrowHeadAtIndex2``: tip[3], dir[3],
+    ...), so it names the dimension's measured direction on the sheet.
+    """
+    arrows = {}
+    for item in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(item, "IAnnotation")
+        if int(annotation.GetType()) != _SW_DISPLAY_DIMENSION:
+            continue
+        data = annotation.GetDisplayData()
+        if data is None:
+            continue
+        data = _early_bound(data, "IDisplayData")
+        for index in range(int(data.GetArrowHeadCount() or 0)):
+            values = [float(value) for value in (data.GetArrowHeadAtIndex2(index) or ())]
+            if len(values) < 6 or math.hypot(values[3], values[4]) < 1e-9:
+                continue
+            arrows[str(annotation.GetName())] = (
+                (values[0], values[1]),
+                _unit(values[3], values[4]),
+            )
+            break
+    return arrows
+
+
+def _segment_kind(segment: Any, measured: tuple[float, float]) -> str:
+    """Classify one straight run against its own dimension's measured direction."""
+    direction = _unit(segment.x1 - segment.x0, segment.y1 - segment.y0)
+    along = abs(direction[0] * measured[0] + direction[1] * measured[1])
+    if along >= math.cos(DIRECTION_TOL_RAD):
+        return "dimension-line"
+    if along <= math.sin(DIRECTION_TOL_RAD):
+        return "extension-line"
+    return "oblique"
+
+
+def _on_line_through(point: tuple[float, float], segment: Any) -> bool:
+    """``point`` lies on ``segment``'s line, within an arrow's reach of its ends."""
+    direction = _unit(segment.x1 - segment.x0, segment.y1 - segment.y0)
+    dx, dy = point[0] - segment.x0, point[1] - segment.y0
+    along = dx * direction[0] + dy * direction[1]
+    across = abs(dx * direction[1] - dy * direction[0])
+    return (
+        across <= ARROW_ON_LINE_TOL_M
+        and -ARROW_REACH_M <= along <= segment.length + ARROW_REACH_M
+    )
+
+
+def _measured_direction(annotation: Any, arrow: Arrow | None) -> tuple[float, float] | None:
+    """The arrowhead's direction, once its tip is proven to sit on its own line."""
+    if arrow is None:
+        return None
+    tip, measured = arrow
+    on_own_line = any(
+        _segment_kind(segment, measured) == "dimension-line"
+        and _on_line_through(tip, segment)
+        for segment in annotation.segments
+        if segment.length > 0.0
+    )
+    if not on_own_line:
+        raise RuntimeError(
+            f"{annotation.label!r}: arrowhead at ({tip[0] * 1000:.1f},"
+            f"{tip[1] * 1000:.1f})mm lies on none of its own parallel runs; "
+            "its measured direction is unreadable"
+        )
+    return measured
 
 
 def _assert_witnesses_clear_of_detail_fence(
-    annotations: list[Any], *, center: tuple[float, float], radius: float
+    annotations: list[Any],
+    *,
+    center: tuple[float, float],
+    radius: float,
+    arrows: dict[str, Arrow],
+    axis: tuple[float, float],
 ) -> None:
-    """No witness line may run out through the detail-A fence on the profile.
+    """No extension line may run out through the detail-A fence on the profile.
 
     The head sits inside the fence, so every head dimension starts inside it.
-    The axial stations drop their witnesses straight down to the stack below
-    the shaft, which is the one sanctioned exit.  Anything else leaving the
-    circle (the Ø15.0 witnesses did, with the "A" label between them) reads as
-    part of the detail callout.  A dimension's own line up to its text is
-    classified as its leader by the audit and is exempt, like the neck's.
+    Each crossing run is judged against ITS OWN dimension (Main's ruling on
+    run 492a7be5).  The dimension line, parallel to the measured direction,
+    may cross the fence to reach its text, as any line may cross a line.  An
+    extension line, perpendicular to it, may leave only as a station witness,
+    belonging to a dimension measured along the turning axis, which drops to
+    the station stack.  Anything else leaving the circle (the Ø15.0 witnesses
+    did, with the "A" label between them) reads as part of the detail callout.
+    A dimension with no readable arrowhead is judged as all extension lines.
     """
     offenders = []
     for annotation in annotations:
+        crossing = []
         for segment in annotation.segments:
             if segment.role != "line":
                 continue
             ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
             far = max(math.dist(end, center) for end in ends)
             near = _segment_distance(center, ends)
-            if not (near < radius - FENCE_TOL_M and far > radius + FENCE_TOL_M):
+            if near < radius - FENCE_TOL_M and far > radius + FENCE_TOL_M:
+                crossing.append(segment)
+        if not crossing:
+            continue
+        measured = _measured_direction(annotation, arrows.get(annotation.label))
+        axial = measured is not None and abs(
+            measured[0] * axis[0] + measured[1] * axis[1]
+        ) >= math.cos(DIRECTION_TOL_RAD)
+        for segment in crossing:
+            kind = "extension-line" if measured is None else _segment_kind(segment, measured)
+            if kind == "dimension-line":
                 continue
-            vertical = abs(segment.x1 - segment.x0) <= FENCE_TOL_M
-            low = min(segment.y0, segment.y1)
-            if vertical and low < center[1] - radius:
+            if kind == "extension-line" and axial:
                 continue
             offenders.append(
-                f"{annotation.label!r} {segment.role} "
+                f"{annotation.label!r} {kind} "
                 f"({segment.x0 * 1000:.1f},{segment.y0 * 1000:.1f})-"
                 f"({segment.x1 * 1000:.1f},{segment.y1 * 1000:.1f})mm"
             )
     if offenders:
         raise RuntimeError(
-            f"pinion-arbor: {len(offenders)} witness line(s) cross the detail-A "
+            f"pinion-arbor: {len(offenders)} extension line(s) cross the detail-A "
             "fence:\n  " + "\n  ".join(offenders)
         )
-    _telemetry.success("pinion-arbor: no witness line crosses the detail-A fence")
+    _telemetry.success("pinion-arbor: no extension line crosses the detail-A fence")
 
 
 def _segment_distance(
