@@ -119,13 +119,17 @@ def test_stock_tube_wall_holds_the_floor_through_the_bend() -> None:
 
 
 def test_material_fits_one_title_block_line() -> None:
-    """Farm r20: a 51-character material wrapped into the DRAWN PER row; the
-    former 36-character string printed on one line. The printed field keeps
-    CDS: the 1.80 wall minimum is A519's cold-worked (Table 9) band."""
+    """The title-block material note wraps into the DRAWN PER row past about
+    56 mm of text. Measured at 200 dpi: "AISI 1010 TUBE; AISI 1018 PLUG/SCREW"
+    (r19, 36 characters) fit at 435 px, and "A519 1010 CDS 16x2; 1018
+    PLUG/SCREW" (r23, 35 characters, about 459 px) wrapped. Glyph widths vary,
+    so the cap is 30 characters, which leaves about 8% of width in hand. The
+    printed field keeps CDS: the 1.80 wall minimum is A519's cold-worked
+    (Table 9) band."""
     import _config
 
     material = str(_config.parts("gooseneck")["material"])
-    assert len(material) <= 36
+    assert len(material) <= 30
     assert "CDS" in material
 
 

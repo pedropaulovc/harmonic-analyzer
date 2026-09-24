@@ -1,11 +1,12 @@
 gooseneck:
   number: MHA-032
   # The tube is purchased stock, printed as reference (gooseneck_spec
-  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block cell wraps
-  # past about 36 characters into the row below (farm r20), so material names
-  # the tube as CDS (cold-drawn seamless: the A519 Table 9 wall band depends on
-  # it) and OD x wall; material_specification spells it out.
-  material: A519 1010 CDS 16x2; 1018 PLUG/SCREW
+  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block note wraps
+  # at about 56 mm of text into the row below (farm r23: 35 characters
+  # wrapped), so material names the tube only as CDS (cold-drawn seamless: the
+  # A519 Table 9 wall band depends on it); the size is on the reference
+  # diameters and material_specification spells it all out.
+  material: A519 1010 CDS; 1018 PLUG/SCREW
   material_specification: ASTM A519 1010 COLD-DRAWN SEAMLESS TUBE 16 OD X 2 WALL; AISI 1018 PLUG/SCREW
   # Plating builds about 4x its thickness onto a 60-degree thread's pitch
   # diameter, past the 2A/2B bands, so the screw comes out before plating (it
