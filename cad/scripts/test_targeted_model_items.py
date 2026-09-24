@@ -420,3 +420,46 @@ def test_the_sketch_is_blanked_again_when_the_import_fails() -> None:
         ("ArcReference@summing-lever-2@Drawing View2",),
     )
     assert not drawing.view_shows_sketch
+
+
+def test_a_missing_dimensions_undetected_owner_is_named_in_a_warning(
+    monkeypatch,
+) -> None:
+    """r18 went silent: dimensions missing, no hidden sketch detected, no log."""
+    warnings: list[str] = []
+    monkeypatch.setattr(drawing_common._telemetry, "warn", warnings.append)
+    _adapter, drawing, view = _hidden_seat(visible=2)
+    undetected = drawing_common._warn_undetected_owners(
+        view, ("ArcReference", "Column"), view_label="form top"
+    )
+    assert undetected == ["ArcReference", "Column"]
+    assert len(warnings) == 1
+    assert "owners ['ArcReference', 'Column'] were not detected" in warnings[0]
+    assert "'ArcReference': 'ProfileFeature Visible=2'" in warnings[0]
+    assert "'Column': 'Extrusion'" in warnings[0]
+
+
+def test_a_detected_hidden_owner_does_not_warn(monkeypatch) -> None:
+    warnings: list[str] = []
+    monkeypatch.setattr(drawing_common._telemetry, "warn", warnings.append)
+    _adapter, drawing, view = _hidden_seat()
+    assert (
+        drawing_common._warn_undetected_owners(
+            view, ("ArcReference",), view_label="form top"
+        )
+        == []
+    )
+    assert warnings == []
+
+
+def test_the_detection_report_is_logged_at_info(monkeypatch) -> None:
+    infos: list[str] = []
+    monkeypatch.setattr(drawing_common._telemetry, "info", infos.append)
+    adapter, drawing, view = _hidden_seat()
+    drawing_common.insert_feature_dimensions(adapter, view, ("ArcReference", "Column"))
+    assert infos[0] == (
+        "hidden-sketch check Drawing View2: {'ArcReference': "
+        "'ProfileFeature Visible=1', 'Column': 'Extrusion'}; "
+        "showing ['ArcReference']"
+    )
+    assert "dimension Visible states {'ArcCentreX': 1, 'Length': 1}" in infos[1]

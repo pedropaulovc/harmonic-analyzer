@@ -2754,8 +2754,12 @@ _ANNOTATION_NOT_SHOWN = (2, 3)
 _SKETCH_FEATURE_TYPES = ("ProfileFeature", "3DProfileFeature")
 
 
-def _model_hidden_sketches(view: Any, features: Sequence[str]) -> list[str]:
-    """Those of ``features`` that are sketches the view's part saves hidden.
+def _model_hidden_sketches(
+    view: Any, features: Sequence[str]
+) -> tuple[list[str], dict[str, str]]:
+    """Those of ``features`` that are sketches the view's part saves hidden,
+    plus what was read for every requested feature (the INFO record: r18 found
+    none and said nothing, which cost a farm round).
 
     A construction-only reference sketch renders in every assembly unless its
     part blanks it, and the selected-feature import then delivers none of its
@@ -2764,20 +2768,28 @@ def _model_hidden_sketches(view: Any, features: Sequence[str]) -> list[str]:
     part's own sketches are considered; anything else is left to the import.
     """
     referenced = getattr(_early_bound(view, "IView"), "ReferencedDocument", None)
-    lookup = getattr(referenced, "FeatureByName", None)
-    if lookup is None:
-        return []
-    hidden = []
+    if referenced is None:
+        return [], {"*": "no referenced document"}
+    # Bound as IModelDoc2 (draw_harmonic_base / draw_cylinder_gear do the same):
+    # the raw ReferencedDocument dispatch exposes no FeatureByName to getattr.
+    model = _early_bound(referenced, "IModelDoc2")
+    hidden: list[str] = []
+    report: dict[str, str] = {}
     for name in features:
-        raw = lookup(name)
+        raw = model.FeatureByName(name)
         if raw is None:
+            report[name] = "not found"
             continue
         feature = _early_bound(raw, "IFeature")
-        if str(feature.GetTypeName2()) not in _SKETCH_FEATURE_TYPES:
+        type_name = str(feature.GetTypeName2())
+        if type_name not in _SKETCH_FEATURE_TYPES:
+            report[name] = type_name
             continue
-        if int(_read_member(feature, "Visible")) == _VISIBILITY_HIDDEN:
+        visible = int(_read_member(feature, "Visible"))
+        report[name] = f"{type_name} Visible={visible}"
+        if visible == _VISIBILITY_HIDDEN:
             hidden.append(name)
-    return hidden
+    return hidden, report
 
 
 def _set_view_sketches(
@@ -2860,7 +2872,8 @@ def insert_feature_dimensions(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
     paths = _model_item_paths(adapter, view)
-    hidden = _model_hidden_sketches(view, features)
+    hidden, report = _model_hidden_sketches(view, features)
+    _telemetry.info(f"hidden-sketch check {name}: {report}; showing {hidden}")
     if hidden:
         _set_view_sketches(draw, hidden, paths=paths, shown=True, label=name)
     try:
@@ -2906,6 +2919,10 @@ def insert_feature_dimensions(
             sketches=", ".join(hidden),
             dimension_visibility=repr(states),
         )
+        _telemetry.info(
+            f"{name}: showed {hidden} for the import and blanked them again; "
+            f"dimension Visible states {states}"
+        )
         dropped = sorted(i for i, v in states.items() if v in _ANNOTATION_NOT_SHOWN)
         if dropped:
             raise RuntimeError(
@@ -2944,6 +2961,21 @@ def _curate_entire_model_import(
             f"available={sorted(present)}"
         )
     return curate_dimensions(adapter, curated, reposition=dict(keep))
+
+
+def _warn_undetected_owners(
+    view: Any, owners: Sequence[str], *, view_label: str
+) -> list[str]:
+    """WARN naming the owners of missing dimensions that were NOT detected as
+    part-hidden sketches -- a detection miss must read in the log (r18)."""
+    hidden, report = _model_hidden_sketches(view, owners)
+    undetected = [owner for owner in owners if owner not in hidden]
+    if undetected:
+        _telemetry.warn(
+            f"{view_label} view: missing dimensions' owners {undetected} were "
+            f"not detected as part-hidden sketches: {report}"
+        )
+    return undetected
 
 
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
@@ -3003,6 +3035,11 @@ def curate_view_dimensions(
     present = {dimension_name(adapter, annotation) for annotation in curated}
     missing = sorted(set(keep) - present)
     if missing:
+        _warn_undetected_owners(
+            view,
+            _features_owning(dimensions_by_feature, missing, view_label=view_label),
+            view_label=view_label,
+        )
         raise RuntimeError(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)} from features={list(features)}"
