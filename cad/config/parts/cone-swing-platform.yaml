@@ -8,7 +8,7 @@ cone-swing-platform:
   # +/-0.13 the rule-12 stacks use (cone_swing_platform_spec.PLATE_STOCK_BAND).
   # Printed in the title block's MATERIAL row: 81788ce9 wrapped the long
   # form onto a second line, so the full wording lives in the spec below.
-  material: 1018 CF FLAT BAR 1/4 x 2-1/2 in
+  material: 1018 CF FLAT 1/4 x 2-1/2 in
   material_specification: ASTM A108 1018 cold-finished flat bar, 1/4 x 2-1/2 in; thickness as supplied
   finish: MIL-DTL-13924 Class 1 black oxide with oil seal; all surfaces
   quantity: 1

@@ -313,10 +313,42 @@ def test_material_fits_one_title_block_line() -> None:
     """81788ce9 wrapped the long material form onto a second title-block line.
 
     The printed row is short; the full wording lives in material_specification.
+    30 characters is the fleet's one-line budget (Main, 2026-09-24).
     """
     row = _config.parts("cone-swing-platform")
-    assert len(str(row["material"])) <= 36
+    assert len(str(row["material"])) <= 30
     assert "1018" in str(row["material_specification"])
+    assert "flat bar" in str(row["material_specification"])
+
+
+def test_post_screw_engagement_note_states_the_computed_exception() -> None:
+    """Codex review of 68565ace (B1): the sheet must state MHA-142's exception.
+
+    U37 accepts short engagement for the 1/4-20 post screws; the printed
+    worst case is the thinnest stock plate (U41 band) less the 0.3 cut-to-fit
+    allowance, floored -- 5.92 mm = 0.93D -- and never under the rule-12
+    audit's E7 floor of 0.87D.
+    """
+    worst = spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT
+    assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
+    diameters = worst / (0.25 * 25.4)
+    printed = math.floor(diameters * 100.0) / 100.0
+    assert printed <= diameters and printed >= 0.87
+    assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
+        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142):\n"
+        "NAMED EXCEPTION TO RULE 12."
+    )
+    assert f"{printed:.2f}" == "0.93"
+    # The note sits in the empty band right of C-C's label, under A-A's
+    # label and over the title block (2.5 mm text, ~1.93 mm a character).
+    x, y = drawing.ENGAGEMENT_NOTE_XY
+    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
+    note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
+    lx, _ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
+    assert note[0] > lx + 0.0465 + 0.003
+    assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
+    assert note[1] >= 0.066 + 0.004  # title block top
+    assert note[2] <= 0.4189 - 0.010  # border
 
 
 # Detail B text extents (sheet metres), from the renders: outside its span a

@@ -100,6 +100,7 @@ from cone_swing_platform_spec import (
     PIVOT_HOLE_SPEC,
     PIVOT_HEAD_RADIAL_CLEARANCE,  # noqa: F401 -- public verify contract
     PIVOT_RELIEF_FIT_REQUIREMENT,
+    POST_MOUNT_ENGAGEMENT_NOTE,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
@@ -1125,6 +1126,7 @@ async def build(adapter) -> dict[str, str]:
             "Notch View Note": NOTCH_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Pivot Relief Fit": PIVOT_RELIEF_FIT_REQUIREMENT,
+            "Post Mount Engagement": POST_MOUNT_ENGAGEMENT_NOTE,
         },
     )
     blank_reference_geometry(

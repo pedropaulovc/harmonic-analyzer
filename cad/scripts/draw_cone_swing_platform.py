@@ -309,6 +309,12 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
 RELIEF_NOTE_XY = (0.120, 0.034)
+# The MHA-142 named-exception note (2.5 mm text, two lines, ~87 x 8.8 mm),
+# anchored upper-left in the empty band above the title block: right of the
+# C-C label (x <= 0.3022), under the A-A label (y >= 0.0853), over the title
+# block (0.066).  A sheet must state a named exception (codex review of
+# 68565ace, blocker B1).
+ENGAGEMENT_NOTE_XY = (0.307, 0.080)
 # SECTION C-C cuts across the plate along the slot, so the counterbore's
 # depth is an imported model dimension (drawing-simplicity rule 2: a typed
 # "4.20 DEEP" was not).  Its cutting line lives on the 1:2 plate-profile
@@ -1122,6 +1128,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
+            "Post Mount Engagement",
         ),
         required=(
             "Number",
@@ -1133,6 +1140,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Notch View Note",
             "Isometric View Note",
             "Pivot Relief Fit",
+            "Post Mount Engagement",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -1377,6 +1385,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
     add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
+    add_property_linked_note(
+        adapter, "Post Mount Engagement", *ENGAGEMENT_NOTE_XY, char_height=0.0025
+    )
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )

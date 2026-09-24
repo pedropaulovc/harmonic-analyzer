@@ -9,6 +9,8 @@ view math.
 
 from __future__ import annotations
 
+import math
+
 from _gtol_spec import PlanarFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
@@ -67,6 +69,32 @@ if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
 # counterpart required by that purchased screw family.
 POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
+# The MHA-142 post screws (MSC 40923898, 1/4-20 fillister, cut to fit, U37c)
+# thread through the plate, flush to this much short of its underside.
+POST_SCREW_CUT_TO_FIT_SHORT = 0.3
+POST_MOUNT_THREAD_DIA = 0.25 * 25.4
+# U37 (2026-09-23): the user accepted short engagement for MHA-142 as a named
+# exception to rule 12's 1.5D; the plate slides on the deck, so no boss can
+# add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
+# allowance.  A MIN never rounds up, so the print floors to two places.
+POST_MOUNT_ENGAGEMENT_WORST = round(
+    PLATE_THICKNESS - PLATE_STOCK_BAND - POST_SCREW_CUT_TO_FIT_SHORT, 6
+)
+POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
+    POST_MOUNT_ENGAGEMENT_WORST / POST_MOUNT_THREAD_DIA
+)
+POST_MOUNT_ENGAGEMENT_PRINTED = (
+    math.floor(POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS * 100.0) / 100.0
+)
+# The rule-12 audit's E7 floor (0.87D, at the old .XX plate band): the stock
+# band must not print below it without a new ruling.
+if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
+    raise AssertionError("MHA-142 engagement fell below the audited 0.87D floor")
+# The sheet states the named exception, worded like MHA-139's.
+POST_MOUNT_ENGAGEMENT_NOTE = (
+    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142):\n"
+    "NAMED EXCEPTION TO RULE 12."
+)
 
 
 # U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
