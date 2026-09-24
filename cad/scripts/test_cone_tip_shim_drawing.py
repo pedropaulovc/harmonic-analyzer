@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import itertools
-import math
 from pathlib import Path
 
 import pytest
@@ -13,6 +12,7 @@ import build_cone_tip_shim as part
 import cone_tip_block_spec as block
 import cone_tip_shim_spec as spec
 import draw_cone_tip_shim as drawing
+from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 
@@ -92,30 +92,18 @@ def test_slot_width_reads_past_the_open_mouth() -> None:
 
 
 def test_depth_stands_outside_the_radius_centre_location() -> None:
-    assert drawing.TOP_KEEP["Depth"][0] > drawing.SLOT_Z_TEXT[0] + 0.008
+    assert drawing.TOP_KEEP["Depth"][0] > drawing.TOP_KEEP["SlotCentreZ"][0] + 0.008
 
 
 def test_slot_location_values_sit_between_their_witnesses() -> None:
     """Each value is mid-span, at least 2 mm off both witness lines."""
     half_w = 0.0065 / 2.0  # three-character value, measured on the tip block
     right = drawing.TOP_CENTER[0] + drawing.HALF_X
-    x = drawing.SLOT_X_TEXT[0]
+    x = drawing.TOP_KEEP["SlotCentreX"][0]
     assert drawing.TOP_CENTER[0] + 0.002 <= x - half_w and x + half_w <= right - 0.002
     lower = drawing.TOP_CENTER[1] - drawing.HALF_Z
-    y = drawing.SLOT_Z_TEXT[1]
+    y = drawing.TOP_KEEP["SlotCentreZ"][1]
     assert lower + 0.002 <= y - 0.0019 and y + 0.0019 <= drawing.TOP_CENTER[1] - 0.002
-
-
-def test_slot_picks_land_on_the_closed_radius() -> None:
-    r = spec.SLOT_R * drawing._S
-    for angle in (45.0, -45.0):
-        x, y = drawing._slot_end_xy(angle)
-        assert x > drawing.TOP_CENTER[0]  # the closed end looks right
-        assert math.hypot(x - drawing.TOP_CENTER[0], y - drawing.TOP_CENTER[1]) == (
-            pytest.approx(r)
-        )
-    with pytest.raises(ValueError):
-        drawing._slot_end_xy(135.0)
 
 
 def test_drawing_registry_row() -> None:
@@ -141,6 +129,25 @@ def test_reference_mark_carries_no_diameter_glyph() -> None:
     assert "set_reference_dimension(" in source
 
 
-def test_radius_centre_locations_print_one_place() -> None:
-    assert drawing.LOCATION_PLACES == 1
-    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == drawing.LOCATION_PLACES
+def test_radius_centre_locations_are_model_owned_one_place() -> None:
+    """Codex P1 on #857: .X locations the machinist works to take the
+    part's places, imported, never a render-time SetPrecision3."""
+    assert spec.DRAWING_DIMENSIONS["SlotCentreXReference"] == {"SlotCentreX"}
+    assert spec.DRAWING_DIMENSIONS["SlotCentreZReference"] == {"SlotCentreZ"}
+    assert spec.DRAWING_PRECISION_BY_NAME["SlotCentreX"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["SlotCentreZ"] == 1
+    assert set(spec.REFERENCE_SKETCHES) == {
+        "SlotCentreXReference",
+        "SlotCentreZReference",
+    }
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "SetPrecision3" not in source
+    assert "hidden_sketches.curate_view_dimensions" in source
+
+
+def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
+    violations = drawing_specification_violations(
+        Path(drawing.__file__).read_text(encoding="utf-8"),
+        filename=Path(drawing.__file__).name,
+    )
+    assert violations == ()

@@ -26,13 +26,17 @@ import sys
 from _common import (
     PANEL_BLACK,
     SketchDims,
+    _early_bound,
     add_line_chain,
+    anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_centered_rectangle,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -42,6 +46,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -54,6 +59,7 @@ from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     MANUFACTURING_NOTES,
+    REFERENCE_SKETCHES,
     SHIM_T,
     SHIM_X,
     SHIM_Z,
@@ -70,6 +76,66 @@ SLOT_OVERRUN = 2.0
 CUT_DEPTH = 4.0 * SHIM_T
 
 
+def _as_construction(adapter, entity_id: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _author_reference_dimension(
+    adapter,
+    *,
+    start: tuple[float, float],
+    orientation: str,
+    value_mm: float,
+    feature_name: str,
+    dimension_name: str,
+    drive_expression: str,
+) -> None:
+    """One construction-only Top-plane line from a part edge to the slot's
+    radius centre (the origin), carrying a model-owned drawing location.
+
+    build_cone_tip_block's FootTapX/FootTapZ pattern; the sketch is saved
+    hidden and the drawing imports it through _drawing_hidden_sketches.
+    """
+    check(f"create_sketch {feature_name}", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    reference = check(f"{feature_name} line", await adapter.add_line(*start, 0.0, 0.0))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, reference)
+    check(
+        f"{feature_name} {orientation}",
+        await adapter.add_sketch_constraint(reference, None, orientation),
+    )
+    await dimension_between(
+        adapter,
+        f"{reference}.start",
+        f"{reference}.end",
+        f"{orientation}_distance",
+        value_mm,
+        feature_name,
+    )
+    await anchor_point_to_origin(adapter, f"{reference}.start", *start, feature_name)
+    await ensure_fully_defined(adapter, f"{feature_name} sketch")
+    check(f"exit_sketch {feature_name}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature_name)
+    full_name = name_dimensions(adapter, feature_name, [dimension_name])[0]
+    await drive_dimension(adapter, full_name, drive_expression)
+    await force_rebuild(adapter)
+
+
+def _blank_reference_sketches(adapter) -> None:
+    """Hide the reference sketches so no assembly instance renders them."""
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in REFERENCE_SKETCHES:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{sketch} still visible after BlankSketch ({state})")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -81,6 +147,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShimZ", f"{SHIM_Z}mm")
     await set_global(adapter, "ShimT", f"{SHIM_T}mm")
     await set_global(adapter, "SlotW", f"{SLOT_W}mm")
+    await set_global(adapter, "SlotCentreX", '"ShimX" / 2')
+    await set_global(adapter, "SlotCentreZ", '"ShimZ" / 2')
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -181,6 +249,28 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven shim (equations neutral)", volume, 0.005 * v_shim
     )
 
+    # The slot radius centre's two print locations.  The closed edge is +X
+    # (the slot opens to SLOT_OPEN_SIDE); the *Top view's lower edge is +Z,
+    # which a Top-plane sketch reads as -y.
+    await _author_reference_dimension(
+        adapter,
+        start=(-SLOT_OPEN_SIDE * SHIM_X / 2.0, 0.0),
+        orientation="horizontal",
+        value_mm=SHIM_X / 2.0,
+        feature_name="SlotCentreXReference",
+        dimension_name="SlotCentreX",
+        drive_expression='"SlotCentreX"',
+    )
+    await _author_reference_dimension(
+        adapter,
+        start=(0.0, -SHIM_Z / 2.0),
+        orientation="vertical",
+        value_mm=SHIM_Z / 2.0,
+        feature_name="SlotCentreZReference",
+        dimension_name="SlotCentreZ",
+        drive_expression='"SlotCentreZ"',
+    )
+    # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
@@ -188,6 +278,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    _blank_reference_sketches(adapter)
     apply_drawing_properties(
         adapter, PART_NAME, extra={"Manufacturing Notes": MANUFACTURING_NOTES}
     )
