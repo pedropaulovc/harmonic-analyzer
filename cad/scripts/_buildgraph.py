@@ -1037,7 +1037,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    current_module = _module_by_path().get(path.resolve())
+    current_module = _module_by_path().get(_resolved(path))
     syntax = _module_syntax(path.read_text(encoding="utf-8"))
     for name, _asname in syntax.imports:
         add(name)
@@ -1082,16 +1082,57 @@ def module_deps_of(script: Path) -> list[str]:
     script imports what it uses, which Python enforces at run time.  The BFS is
     cycle-safe (``build_motion_study`` <-> ``build_motion_study_springs``).
     """
+    return list(_module_closure(_resolved(script)))
+
+
+@functools.lru_cache(maxsize=None)
+def _resolved(path: Path) -> Path:
+    """``path.resolve()``, once per path per process.
+
+    A doit graph load resolves the same few hundred module and config paths
+    ~56k times (every closure re-resolves every member); on Windows each is a
+    ``GetFinalPathNameByHandle`` round trip, which measured ~5 s of a ~21 s
+    load. Cleared with the module map (``_local_modules.cache_clear``), so a
+    test that rebuilds its fixture tree re-resolves.
+    """
+    return path.resolve()
+
+
+@functools.lru_cache(maxsize=None)
+def _module_closure(script: Path) -> tuple[str, ...]:
+    """:func:`module_deps_of` for one RESOLVED script, computed once.
+
+    The graph asks for the same closure from several task generators (helper
+    deps, config deps, data deps, the check gates). Every input is already
+    memoized per process (``_direct_local_imports``), so the closure is too;
+    it is dropped with them (``_direct_local_imports.cache_clear``).
+    """
     mods = _local_modules()
     result: set[str] = set()
-    frontier = set(_direct_local_imports(script.resolve()))
+    frontier = set(_direct_local_imports(script))
     while frontier:
         mod = frontier.pop()
         if mod in result:
             continue
         result.add(mod)
-        frontier |= set(_direct_local_imports(mods[mod].resolve())) - result
-    return sorted(str(mods[m].resolve()) for m in result)
+        frontier |= set(_direct_local_imports(_resolved(mods[mod]))) - result
+    return tuple(sorted(str(_resolved(mods[m])) for m in result))
+
+
+def _clear_import_caches(
+    _imports=_direct_local_imports.cache_clear,
+    _closure=_module_closure.cache_clear,
+    _paths=_resolved.cache_clear,
+) -> None:
+    """Clearing the import facts also drops the closures and resolved paths
+    derived from them, so the existing single entry point keeps meaning
+    "re-read the tree"."""
+    _imports()
+    _closure()
+    _paths()
+
+
+_direct_local_imports.cache_clear = _clear_import_caches
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
@@ -1555,20 +1596,20 @@ def config_files_of(script: Path) -> frozenset[str]:
 # narrowing of the "parts/*" token).
 def all_config_files() -> list[str]:
     """Every config file (recursive) -- the ``"**"`` whole-config expansion."""
-    return sorted(str(p.resolve()) for p in CONFIG_DIR.rglob("*.yaml"))
+    return sorted(str(_resolved(p)) for p in CONFIG_DIR.rglob("*.yaml"))
 
 
 def machine_family_files() -> list[str]:
     """Every machine/*.yaml (incl _base) -- the ``"machine/*"`` expansion."""
     d = CONFIG_DIR / "machine"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def parts_registry_files() -> list[str]:
     """Every parts/*.yaml (incl _defaults) -- the conservative ``"parts/*"``
     expansion (dodo.py narrows this per task)."""
     d = CONFIG_DIR / "parts"
-    return sorted(str(p.resolve()) for p in d.glob("*.yaml")) if d.is_dir() else []
+    return sorted(str(_resolved(p)) for p in d.glob("*.yaml")) if d.is_dir() else []
 
 
 def part_row_files(dashed_name: str) -> list[str]:
@@ -1579,7 +1620,7 @@ def part_row_files(dashed_name: str) -> list[str]:
     if not row.exists():
         return []
     defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
-    return sorted({str(row.resolve()), str(defaults.resolve())})
+    return sorted({str(_resolved(row)), str(_resolved(defaults))})
 
 
 # A generic custom-property write says nothing about registry ownership.  Part
