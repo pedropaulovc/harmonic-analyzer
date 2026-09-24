@@ -73,12 +73,24 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 # thread through the plate, flush to this much short of its underside.
 POST_SCREW_CUT_TO_FIT_SHORT = 0.3
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
+# The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
+# each end of the through tap (0.85D worst case, under the audit floor), so the
+# two tapped holes carry a local override: deburr only (Main, 2026-09-24).
+POST_MOUNT_TAP_EDGE_BREAK = 0.1
+POST_MOUNT_TAP_BREAK_NOTE = (
+    f"1/4-20 TAPPED HOLES: DEBURR ONLY, {POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END."
+)
 # U37 (2026-09-23): the user accepted short engagement for MHA-142 as a named
 # exception to rule 12's 1.5D; the plate slides on the deck, so no boss can
 # add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
-# allowance.  A MIN never rounds up, so the print floors to two places.
+# allowance and the break at both ends of the tap, counted as MHA-139 counts
+# its exit break.  A MIN never rounds up, so the print floors to two places.
 POST_MOUNT_ENGAGEMENT_WORST = round(
-    PLATE_THICKNESS - PLATE_STOCK_BAND - POST_SCREW_CUT_TO_FIT_SHORT, 6
+    PLATE_THICKNESS
+    - PLATE_STOCK_BAND
+    - POST_SCREW_CUT_TO_FIT_SHORT
+    - 2.0 * POST_MOUNT_TAP_EDGE_BREAK,
+    6,
 )
 POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS = (
     POST_MOUNT_ENGAGEMENT_WORST / POST_MOUNT_THREAD_DIA
@@ -90,10 +102,12 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 # band must not print below it without a new ruling.
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-142 engagement fell below the audited 0.87D floor")
-# The sheet states the named exception, worded like MHA-139's.
+# The sheet states the named exception, worded like MHA-139's, over the
+# break override it depends on: one line each.
 POST_MOUNT_ENGAGEMENT_NOTE = (
-    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142):\n"
-    "NAMED EXCEPTION TO RULE 12."
+    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-142): "
+    "NAMED EXCEPTION TO RULE 12.\n"
+    f"{POST_MOUNT_TAP_BREAK_NOTE}"
 )
 
 

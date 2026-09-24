@@ -324,28 +324,45 @@ def test_material_fits_one_title_block_line() -> None:
 def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     """Codex review of 68565ace (B1): the sheet must state MHA-142's exception.
 
-    U37 accepts short engagement for the 1/4-20 post screws; the printed
-    worst case is the thinnest stock plate (U41 band) less the 0.3 cut-to-fit
-    allowance, floored -- 5.92 mm = 0.93D -- and never under the rule-12
-    audit's E7 floor of 0.87D.
+    U37 accepts short engagement for the 1/4-20 post screws. The printed worst
+    case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
+    allowance and the local 0.1 break at each end of the tap, floored:
+    5.72 mm = 0.90D, never under the rule-12 audit's E7 floor of 0.87D.
     """
-    worst = spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT
+    worst = (
+        spec.PLATE_THICKNESS
+        - spec.PLATE_STOCK_BAND
+        - spec.POST_SCREW_CUT_TO_FIT_SHORT
+        - 2.0 * spec.POST_MOUNT_TAP_EDGE_BREAK
+    )
     assert spec.POST_MOUNT_ENGAGEMENT_WORST == pytest.approx(worst)
     diameters = worst / (0.25 * 25.4)
     printed = math.floor(diameters * 100.0) / 100.0
     assert printed <= diameters and printed >= 0.87
-    assert spec.POST_MOUNT_ENGAGEMENT_NOTE == (
-        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142):\n"
+    assert f"{printed:.2f}" == "0.90"
+    engagement, override = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
+    assert engagement == (
+        f"1/4-20 THREAD ENGAGEMENT {printed:.2f}D MIN (MHA-142): "
         "NAMED EXCEPTION TO RULE 12."
     )
-    assert f"{printed:.2f}" == "0.93"
-    # The note sits in the empty band right of C-C's label, under A-A's
-    # label and over the title block (2.5 mm text, ~1.93 mm a character).
+    # The break the derivation counts is the break the note allows.
+    assert spec.POST_MOUNT_TAP_EDGE_BREAK == 0.1
+    assert override == "1/4-20 TAPPED HOLES: DEBURR ONLY, 0.1 MAX BREAK EACH END."
+    assert f"{spec.POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK" in override
+    # Positive control: the title block's 0.25 break at both ends would print
+    # under the audit floor, which is why the override exists.
+    title_block = (
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - spec.POST_SCREW_CUT_TO_FIT_SHORT - 0.5
+    ) / (0.25 * 25.4)
+    assert title_block < 0.87
+    # The note sits in the empty band above the title block (2.5 mm text,
+    # ~1.93 mm a character, 4.4 mm a line).
     x, y = drawing.ENGAGEMENT_NOTE_XY
     lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
     note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
-    lx, _ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    assert note[0] > lx + 0.0465 + 0.003
+    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
+    assert note[0] > 0.2185 + 0.002  # plan caption row
+    assert note[3] <= ly - 0.0015  # C-C label
     assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
     assert note[1] >= 0.066 + 0.004  # title block top
     assert note[2] <= 0.4189 - 0.010  # border
