@@ -138,22 +138,26 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # The lift rod floats axially.  Southward, the front cam collar stops on the
 # front block's inner face; it is set there with the same 0.25 feeler, so up
 # to 0.35 of play.  Northward, the lever hub does NOT bear on the front block
-# (its bore takes 8 of the rod's 10 proud, leaving it about 1.95 off the block
-# face), so the rod runs about 1.5 north, until the back cam collar lands on the
-# back block, and only then does the hub stop it.  Main 2026-09-24: keep that
-# float, since every follower gate below holds at its true extremes.
+# (its bore takes 8 of the rod's >= 10 proud, leaving it about 2.05 off the
+# PHYSICAL block face), so the rod runs about 1.5 north, until the back cam
+# collar lands on the back block, and only then does the hub stop it.  Main
+# 2026-09-24: keep that float, since every follower gate below holds at its
+# true extremes.  The rod is set back-flush, so its travel is measured from
+# there against the PHYSICAL front block (pinion_rig_layout; the model's sits
+# 2 x STRAP_AIR further south, Codex #854).
 _P_MAX = 0.25 + 0.10
 _FEELER_BAND = (0.25 - 0.10, 0.25 + 0.10)  # front collar set gap to the block
 _BACK_CAM_SET_ERR = 0.5  # the back collar is set to its pin by eye
 
 
-def _hub_stop_c() -> float:
-    """Front-collar gap c at which the lever hub lands on the front block."""
+def _hub_gap() -> float:
+    """Lever hub to the physical front block, with the rod set back-flush."""
     import pinion_rig_layout as rig
 
-    hub_gap = drive.BLOCK_FRONT_Z0 - (drive.LEVER_Z + drive.LEVER_HUB_LEN / 2.0)
+    hub_north = drive.LEVER_Z + drive.LEVER_HUB_LEN / 2.0
+    hub_gap = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - hub_north
     assert hub_gap >= 0.25, hub_gap
-    return rig.FRONT_BLOCK_FEELER + hub_gap
+    return hub_gap
 
 
 def _back_collar_gap(t: float, e: float) -> float:
@@ -205,7 +209,7 @@ def _follower_stations() -> tuple[list[float], list[float]]:
         (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR),
     ):
         assert _back_collar_gap(t, e) >= 0.5, (t, e)
-        c_max = min(_hub_stop_c(), c_set + _back_collar_gap(t, e))
+        c_max = c_set + min(_hub_gap(), _back_collar_gap(t, e))
         for c in (0.0, c_max):
             front.append(g_f + t / 2.0 - c)
             back.append(drive.CAM_PIN_STATION[1] + e - g_b - (c - c_set))
@@ -222,7 +226,7 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     assert math.isclose(min(back), 3.10, abs_tol=5e-3)
     # North float at the nominal set: the back collar lands first.
     assert math.isclose(_back_collar_gap(drive.STRAP_T, 0.0), 1.5, abs_tol=5e-3)
-    assert _back_collar_gap(drive.STRAP_T, 0.0) < _hub_stop_c() - 0.25
+    assert _back_collar_gap(drive.STRAP_T, 0.0) < _hub_gap() - 0.25
     # A perfectly set back collar sits >= 1.0 off the back block; it lands
     # there only as the rod's north stop.
     for t in _strap_t_band():
@@ -253,12 +257,8 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
 
     rod_r = ROD_DIA / 2.0
     # Longest rod, hard north (hub on the front block): the back end's reach.
-    reach = (
-        rig.BACK_BLOCK_OUTER_Z
-        + _ROD_LEN_BAND
-        + (_hub_stop_c() - rig.FRONT_BLOCK_FEELER)
-    )
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.75, abs_tol=5e-3)
+    reach = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + _hub_gap()
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.85, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
