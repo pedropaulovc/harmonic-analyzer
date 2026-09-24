@@ -67,7 +67,7 @@ DETAIL_RADIUS_MM = 15.0
 # circle, this far below it (the label's anchor is its top edge): clear of the
 # HeadLen text that rides the circle's lower edge.  The bond-zone ShaftDia
 # line then moves right of the label so its upper arrow misses "SCALE 2:1".
-DETAIL_LABEL_DROP = 0.010
+DETAIL_LABEL_DROP = 0.012
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
     DETAIL_CENTER[1]
@@ -102,7 +102,7 @@ PRINCIPAL_KEEP = {
     "BackCapR": (0.045, 0.140),
 }
 DETAIL_KEEP = {
-    "HeadLen": (0.165, 0.205),
+    "HeadLen": (0.165, 0.201),
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
     "CrossHoleDia": (0.245, 0.245),
