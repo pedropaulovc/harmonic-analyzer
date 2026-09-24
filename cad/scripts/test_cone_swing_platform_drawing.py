@@ -479,64 +479,78 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
     )
 
 
-def test_slot_section_cut_keeps_its_plane_and_span() -> None:
-    """Section C-C moved parents but not planes: +-9 mm at the slot station.
+def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
+    """Section C-C cuts at the slot station, edge to edge (8783776d eye-pass).
 
-    Looking south mirrors the strip; it prints the same only because the
-    partial span is symmetric -- slot ends +-2, plate edges beyond +-9 on
-    both sides of this station -- so that symmetry is pinned too.
+    The plane is the one detail B carried; the line now runs past both plate
+    edges, so the strip is the full 26.98 mm width and needs no symmetry.
     """
+    z = spec.TIP_SCREW_LOCAL_Z
     ends = drawing.slot_section_line_model_points()
-    assert ends == (
-        (-0.009, spec.PLATE_THICKNESS / 1000.0, spec.TIP_SCREW_LOCAL_Z / 1000.0),
-        (0.009, spec.PLATE_THICKNESS / 1000.0, spec.TIP_SCREW_LOCAL_Z / 1000.0),
-    )
-    assert drawing.SLOT_SECTION_HALF_SPAN_MM == 9.0
-    east_half = -_profile_edge_mm(spec.TIP_SCREW_LOCAL_Z, -1)
-    west_half = _profile_edge_mm(spec.TIP_SCREW_LOCAL_Z, +1)
-    assert min(east_half, west_half) > drawing.SLOT_SECTION_HALF_SPAN_MM
-    assert spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0 < 9.0
-    # Positive control: an 11 mm half span would run off the west edge.
-    assert west_half < 11.0
+    assert all(end[1:] == (spec.PLATE_THICKNESS / 1000.0, z / 1000.0) for end in ends)
+    east, west = drawing.plate_edge_mm(z, -1), drawing.plate_edge_mm(z, +1)
+    assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
+    assert west - east == pytest.approx(26.98, abs=0.01)
+    # The slot and its counterbore lie inside the cut.
+    assert east < -(spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0)
+    assert west > spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0
 
 
-def _profile_edge_mm(z_mm: float, side: int) -> float:
-    """Model x of the plate's straight east (-1) / west (+1) edge at ``z_mm``."""
-    run = (part.NORTH_OVERHANG - z_mm) / part.PLATE_LEN
-    if side < 0:
-        return -(part.HALF_WIDTH_N + (part.EAST_HALF_S - part.HALF_WIDTH_N) * run)
-    return part.WEST_HALF_N + (part.WEST_HALF_S - part.WEST_HALF_N) * run
+_profile_edge_mm = drawing.plate_edge_mm
 
 
-def test_slot_section_arrows_clear_the_profile_plan() -> None:
-    """C-C's arrows, looking south, stay inside the plate on the 1:2 plan.
+def _cc_arrows_and_letters(line_x_mm):
+    """Sheet boxes of C-C's sheet-up arrows and letters on the 1:2 plan.
 
-    Arrows are 12.6 mm with 3 mm heads (the detail B render).  Looking north
-    (the default), the west arrow ran 0.5 mm beside the 8.0 extension line
-    and through the R8 leader; sheet-up they stay between the plate's edges,
-    clear of the corner radii's leaders and the north-edge witness.
+    Arrows are 12.6 mm with 3 mm heads; each letter sat 15.5..22 mm above
+    the line and 5.5 mm wide (the 8783776d render, full-res crop).
     """
     px, py = drawing.PROFILE_PIVOT_XY
     line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
-    half = drawing.SLOT_SECTION_HALF_SPAN_MM * 0.0005
-    length, head = 0.0126, 0.0015
-    arrows = [
-        (px + s * half - head, line_y, px + s * half + head, line_y + length)
-        for s in (-1, 1)
-    ]
-    tip_z = spec.TIP_SCREW_LOCAL_Z - length / 0.0005
-    for arrow in arrows:
-        assert arrow[0] > px + _profile_edge_mm(tip_z, -1) * 0.0005
-        assert arrow[2] < px + _profile_edge_mm(tip_z, +1) * 0.0005
+    length, head, half_letter = 0.0126, 0.0015, 0.00275
+    arrows, letters = [], []
+    for x_mm in line_x_mm:
+        x = px + x_mm * 0.0005
+        arrows.append((x - head, line_y, x + head, line_y + length))
+        letters.append((x - half_letter, line_y + 0.0155, x + half_letter, line_y + 0.022))
+    return arrows, letters
+
+
+def _clears_plate(box, side: int) -> bool:
+    """``box`` lies outside the plate's ``side`` edge over its whole height."""
+    px, py = drawing.PROFILE_PIVOT_XY
+    far_z = -(box[3] - py) / 0.0005  # sheet-up is model -z (south)
+    edge = px + drawing.plate_edge_mm(far_z, side) * 0.0005
+    return box[2] < edge if side < 0 else box[0] > edge
+
+
+def test_slot_section_arrows_clear_the_profile_plan() -> None:
+    """C-C's arrows and letters, looking south, stand outside the plate.
+
+    As a +-9 mm partial cut the west letter landed on the plate's sloped west
+    edge (8783776d).  Looking north (the default), the west arrow ran 0.5 mm
+    beside the 8.0 extension line and through the R8 leader; sheet-up they
+    stay clear of the corner radii's leaders and the north-edge witness.
+    """
+    px, py = drawing.PROFILE_PIVOT_XY
+    arrows, letters = _cc_arrows_and_letters(drawing.SLOT_SECTION_LINE_X_MM)
+    for side, arrow, letter in zip((-1, 1), arrows, letters):
+        assert _clears_plate(arrow, side) and _clears_plate(letter, side)
     r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
     r8_leader = ((0.135, 0.118), (0.0723 + 0.00283, 0.1382 - 0.00283))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
     nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))
-    for arrow in arrows:
+    for box in (*arrows, *letters):
         for line in (r10_leader, r8_leader, nw_extension):
-            assert not _segment_hits_box(line, arrow)
-        assert arrow[1] > north_edge_y
+            assert not _segment_hits_box(line, box)
+        assert box[1] > north_edge_y
+    # Positive control: 8783776d's +-9 mm ends put the west letter on the edge.
+    _old_arrows, old_letters = _cc_arrows_and_letters((-9.0, 9.0))
+    assert not _clears_plate(old_letters[1], 1)
+    half = 9.0 * 0.0005
+    length, head = 0.0126, 0.0015
+    line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
     # Positive control: the default north-looking arrows hit the R8 leader
     # and the 8.0 extension line.
     down = (px + half - head, line_y - length, px + half + head, line_y)
@@ -565,11 +579,20 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
         "A-A thickness": _plate_thickness_text_box(),
         "title block": (0.216, 0.0, 0.4318, 0.066),
     }
-    half = drawing.SLOT_SECTION_HALF_SPAN_MM / 1000.0 + 0.004
+    z = spec.TIP_SCREW_LOCAL_Z
+    width = drawing.plate_edge_mm(z, 1) - drawing.plate_edge_mm(z, -1)
+    half = width / 2000.0 + 0.004
     cx, cy = drawing.SLOT_SECTION_CENTER
     strip = (cx - half, cy - 0.0072, cx + half, cy + 0.0072)
     lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
     label = (lx, ly, lx + 0.0465, ly + 0.0162)
+    # The label sits directly under its own strip, centred (8783776d printed
+    # it 50 mm to the left, closer to nothing of its own).
+    assert lx + 0.0465 / 2.0 == pytest.approx(cx)
+    assert label[3] < strip[1]
+    # The depth text hangs beyond the strip's ends, not over it.
+    assert drawing.SLOT_SECTION_KEEP["TipCboreDepth"][0] < cx - width / 2000.0
+    assert drawing.SLOT_SECTION_DEPTH_RIGHT[0] > cx + width / 2000.0
     dx, dy = drawing.SLOT_SECTION_KEEP["TipCboreDepth"]
     depth = (dx - 0.012, dy - 0.004, dx, dy + 0.004)
     # Looking south mirrors the strip, so the build may park the depth on the
@@ -591,3 +614,25 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     # notch caption row is caught.
     moved = (strip[0], 0.078, strip[2], 0.092)
     assert _boxes_overlap(moved, neighbours["notch caption"])
+
+
+def test_relief_width_text_sits_between_its_neighbours() -> None:
+    """The 10.50 relief text clears the 195.09 line and the plate's west edge.
+
+    8783776d: centred at x 0.150, "OPEN TO NORTH EDGE" (50.4 mm, 2.8 mm a
+    character) ran through the 195.09 line (x 0.1300) and the plate's west
+    edge (x 0.1679 at that height).  Four lines keep the block ~28 mm wide.
+    """
+    lines = ("10.50", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
+    line_195, west_edge, char_w = 0.1300, 0.1679, 0.0028
+
+    def block(x: float, texts) -> tuple[float, float]:
+        width = max(len(text) for text in texts) * char_w
+        return (x - width / 2.0, x + width / 2.0)
+
+    x = drawing.FEATURE_KEEP["PivotBearingReliefDia"][0]
+    left, right = block(x, lines)
+    assert line_195 + 0.002 < left and right < west_edge - 0.002
+    # Positive control: 8783776d's three lines at x 0.150 hit both.
+    old_left, old_right = block(0.150, ("10.50", "TOP RELIEF", "OPEN TO NORTH EDGE"))
+    assert old_left < line_195 and old_right > west_edge

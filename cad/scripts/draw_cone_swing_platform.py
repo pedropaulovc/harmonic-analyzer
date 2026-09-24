@@ -130,12 +130,16 @@ PROFILE_KEEP = {
     "CornerSER": (0.040, 0.2435),
 }
 FEATURE_KEEP = {
-    "PivotBearingReliefDia": (0.150, 0.155),
+    # Four lines (~28 mm wide) between the 195.09 line (x 0.130) and the
+    # plate's west edge (x 0.1679): on three the 50 mm "OPEN TO NORTH EDGE"
+    # ran through both (8783776d).
+    "PivotBearingReliefDia": (0.1490, 0.155),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.225, 0.175),
     "PostMountEastX": (0.205, 0.185),
     "PostMountEastZ": (0.130, 0.175),
 }
+RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nOPEN TO\nNORTH EDGE"
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.
@@ -297,44 +301,54 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 RELIEF_NOTE_XY = (0.120, 0.034)
 # SECTION C-C cuts across the plate along the slot, so the counterbore's
 # depth is an imported model dimension (drawing-simplicity rule 2: a typed
-# "4.20 DEEP" was not).  The 1:1 strip, plate edge-on, sits in the free
-# pocket between the notch plan (x <= 0.2806, y >= 0.1286), its caption row
-# (y <= 0.0853), the relief dimension RD1 (x <= 0.246) and section A-A's
-# finish symbol (x >= 0.316).
+# "4.20 DEEP" was not).  Its cutting line lives on the 1:2 plate-profile
+# plan, not in detail B: in the detail it lay ON the slot centreline, so
+# pivot-to-slot's extension line ran along it and its arrows sat in every
+# width extension's path.  On the plan the default arrows (looking north,
+# sheet-down) ran beside the 8.0 extension line and through the R8 leader,
+# so the cut looks SOUTH (arrows sheet-up).
 #
-# Its cutting line lives on the 1:2 plate-profile plan, not in detail B: in
-# the detail it lay ON the slot centreline, so pivot-to-slot's extension line
-# ran along it and its arrows sat in every width extension's path.  The
-# plane is unchanged -- the same partial +-9 mm span at the slot station --
-# so the strip's geometry and 1:1 scale are too.  On the plan the default
-# arrows (looking north, sheet-down) ran 0.5 mm beside the 8.0 extension
-# line and through the R8 leader, so the cut looks SOUTH (arrows sheet-up,
-# inside the plate).  That mirrors the strip, which is symmetric about the
-# slot centre at this station (plate edges beyond +-9 both sides), so it
-# prints the same; the depth dimension follows whichever end it attaches to.
-SLOT_SECTION_HALF_SPAN_MM = 9.0
-SLOT_SECTION_CENTER = (0.296, 0.096)
+# The line runs PAST both plate edges (a full section, 26.98 mm across at
+# the slot station): as a +-9 mm partial cut its sheet-up arrows sat inside
+# the plate, and the west letter, 42..55 mm south of the cut where the plate
+# flares, landed on the sloped west edge (Main's eye-pass of 8783776d).
+# Each end clears its edge at the letter's far station by the letter's half
+# width (5.5 model mm at 1:2) plus 1.5.
+SLOT_SECTION_LINE_X_MM = (-26.0, 24.0)
+# 1:1, full width: the strip is the plate edge-on, 26.98 x 6.35, in the
+# pocket right of the drill callout RD1 (x <= 0.246), under the notch plan
+# (y >= 0.1286) and the (6.35) stock text (x >= 0.294, y >= 0.121), with its
+# native label centred directly under it, above the plan caption row
+# (y <= 0.0853): 8783776d printed the label 50 mm left of its strip.
+SLOT_SECTION_CENTER = (0.279, 0.1109)
+# Where the depth text hangs: beyond the strip's left end, or mirrored past
+# its right end when SolidWorks attaches the depth at the right-hand
+# counterbore edge (looking south mirrors the strip).
 SLOT_SECTION_KEEP = {
-    "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.015, SLOT_SECTION_CENTER[1]),
+    "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.0205, SLOT_SECTION_CENTER[1]),
 }
-# Mirror of the depth keep, used when the dimension attaches to the strip's
-# right-hand end: its text then hangs right, under section A-A's finish.
-SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.015, SLOT_SECTION_CENTER[1])
+SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.0205, SLOT_SECTION_CENTER[1])
+# The native label box measured 46.5 x 16.2 mm; centred under the strip.
+SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0865)
 # The pivot on the profile plan, from the NE/NW corner-radius stations below
 # (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
 PROFILE_PIVOT_XY = (0.0718, 0.1377)
 
 
+def plate_edge_mm(z_mm: float, side: int) -> float:
+    """Model x of the plate's straight east (-1) / west (+1) edge at ``z_mm``."""
+    run = (_part.NORTH_OVERHANG - z_mm) / _part.PLATE_LEN
+    if side < 0:
+        return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
+    return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
+
+
 def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
-    """The C-C cutting line's ends, part metres: +-9 mm at the slot station."""
+    """The C-C cutting line's ends, part metres, past both edges at the slot."""
     return tuple(
         (x / 1000.0, PLATE_THICKNESS / 1000.0, TIP_SCREW_LOCAL_Z / 1000.0)
-        for x in (-SLOT_SECTION_HALF_SPAN_MM, SLOT_SECTION_HALF_SPAN_MM)
+        for x in SLOT_SECTION_LINE_X_MM
     )
-# Its native label, left of the strip's 2.80 (x >= 0.2691): above the strip
-# it held the pocket section A-A's thickness text now needs.  Between the
-# plan caption row (y <= 0.0853) and the drill callout RD1 (y >= 0.1042).
-SLOT_SECTION_LABEL_LOWER_LEFT = (0.2140, 0.0868)
 
 
 
@@ -586,8 +600,8 @@ def _look_slot_section_south(
     The view direction is read from the section's own projection, not from
     arrow-array layouts: with screen-right r and screen-up u, the sight line
     is u x r, so it runs along -z (south) exactly when model +x's sheet-x sign
-    times model +y's sheet-y sign is positive.  The strip must still be the
-    18 mm partial span of the 6.35 plate at 1:1 -- the geometry section C-C
+    times model +y's sheet-y sign is positive.  The strip must be the full
+    width of the 6.35 plate at the slot station, at 1:1 -- the geometry section C-C
     had in detail B.
     """
     z = TIP_SCREW_LOCAL_Z / 1000.0
@@ -607,12 +621,13 @@ def _look_slot_section_south(
     direction = x_direction()
     if not direction > 0.0:
         raise RuntimeError(f"section C-C still looks north (x/y sign product {direction})")
-    ends = slot_section_line_model_points()
+    east = plate_edge_mm(TIP_SCREW_LOCAL_Z, -1) / 1000.0
+    west = plate_edge_mm(TIP_SCREW_LOCAL_Z, +1) / 1000.0
     low = model_point_in_view(
-        adapter, section, (ends[0][0], 0.0, z), label="C-C strip east underside"
+        adapter, section, (east, 0.0, z), label="C-C strip east underside"
     )
     high = model_point_in_view(
-        adapter, section, (ends[1][0], ends[1][1], z), label="C-C strip west top"
+        adapter, section, (west, PLATE_THICKNESS / 1000.0, z), label="C-C strip west top"
     )
     span = (high[0] - low[0], high[1] - low[1])
     print(
@@ -623,10 +638,10 @@ def _look_slot_section_south(
         f"parent_line_info="
         f"{tuple(float(v) for v in (_early_bound(parent, 'IView').GetSectionLineInfo2() or ()))}"
     )
-    expected = (2.0 * SLOT_SECTION_HALF_SPAN_MM / 1000.0, PLATE_THICKNESS / 1000.0)
+    expected = (west - east, PLATE_THICKNESS / 1000.0)
     if any(abs(abs(span[i]) - expected[i]) > 1e-6 for i in (0, 1)):
         raise RuntimeError(
-            f"section C-C strip is {span}, expected the 1:1 {expected} partial span"
+            f"section C-C strip is {span}, expected the 1:1 {expected} full width"
         )
 
 
@@ -1184,7 +1199,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_xy=SLOT_SECTION_CENTER,
         section_label="C",
         scale=(1, 1),
-        partial=True,
+        partial=False,
         label="tip screw slot section",
     )
     slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
@@ -1213,7 +1228,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         feature_annotations,
-        {"PivotBearingReliefDia": "TOP RELIEF\nOPEN TO NORTH EDGE"},
+        {"PivotBearingReliefDia": RELIEF_WIDTH_CALLOUT},
     )
     notch_annotations = curate_view_dimensions(
         adapter,
