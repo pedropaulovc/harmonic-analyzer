@@ -146,3 +146,20 @@ def test_block_drops_by_the_shim_and_keeps_every_axis_relation() -> None:
     assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
     assert spec.ADJUSTER_THREAD_DEPTH == 9.5
     assert spec.ADJUSTER_DEPTH == 11.0
+
+
+def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None:
+    """c6981bac (run 244bc8bb) resolved exactly this and was wrongly refused."""
+    resolved = {
+        1: "4-40 UNC - 2B TO SLOT\nCOAXIAL WITH CLEARANCE",
+        2: "",
+        3: "<MOD-DIAM> 2.26 TO SLOT",
+        4: "",
+    }
+    assert drawing._pinch_thread_callout_resolved(resolved)
+    assert not drawing._pinch_thread_callout_resolved(
+        {**resolved, 1: "COAXIAL WITH CLEARANCE\n4-40 UNC - 2B TO SLOT"}
+    )
+    assert not drawing._pinch_thread_callout_resolved(
+        {**resolved, 3: "<MOD-DIAM> 2.26 THRU ALL"}
+    )

@@ -331,6 +331,24 @@ def _pinch_thread_callout_definitions(
     return updated
 
 
+def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
+    """Whether the resolved callout keeps both extents and qualifies the thread.
+
+    GetText(1..4) resolves definition parts 5..8 in part order, which is not
+    the sheet's line order: af561fa7 printed part 7 (the tap drill) above
+    part 5 (the thread).  So the check is per part -- the qualifier ends the
+    thread's own part, which then prints last -- not by string position.
+    """
+    joined = "\n".join(resolved_parts.values())
+    thread = [text for text in resolved_parts.values() if "UNC" in text]
+    return (
+        "THRU ALL" not in joined
+        and joined.count("TO SLOT") == 2
+        and len(thread) == 1
+        and thread[0].rstrip().endswith(f"TO SLOT\n{_PINCH_THREAD_QUALIFIER}")
+    )
+
+
 def _set_pinch_thread_callout_text(display: Any) -> None:
     """State the final two-jaw extent without severing Hole Wizard variables."""
     definitions = {
@@ -345,14 +363,11 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
         part: str(display.GetText(part) or "")
         for part in (5, 6, 7, 8)
     }
-    resolved = "\n".join(str(display.GetText(part) or "") for part in (1, 2, 3, 4))
-    if (
-        persisted != updated
-        or "THRU ALL" in resolved
-        or resolved.count("TO SLOT") != 2
-        or _PINCH_THREAD_QUALIFIER not in resolved
-        or resolved.index(_PINCH_THREAD_QUALIFIER) < resolved.rindex("TO SLOT")
-    ):
+    resolved_parts = {
+        part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)
+    }
+    resolved = "\n".join(resolved_parts.values())
+    if persisted != updated or not _pinch_thread_callout_resolved(resolved_parts):
         raise RuntimeError(
             "pinch-thread native extent override did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
