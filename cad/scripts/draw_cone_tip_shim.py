@@ -1,11 +1,13 @@
 r"""Create the machinist drawing for the MHA-141 cone tip shim pack.
 
 One plan view carries the whole blank at 4:1: the 15.0 x 12.0 outline, the
-#6 clearance hole callout and its location from two finished edges (policy
-rule 7: a location starts on a face the shop can pick up, never the model
-origin).  An edge view below it shows the nominal stack as a reference
-dimension; the leaf stock and the stack-to-fit range ride the manufacturing
-notes, because the fitted thickness is set at assembly, not machined.
+horseshoe slot's width with its full-radius callout, and the radius centre
+located from the closed edge and the lower edge (policy rule 7: a location
+starts on a face the shop can pick up, never the model origin).  An edge
+view below it shows the nominal stack as a reference dimension; the
+stack-to-fit range rides the manufacturing notes and the leaf stock the
+material specification, because the fitted thickness is set at assembly,
+not machined.
 
 Run with SolidWorks open::
 
@@ -24,7 +26,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
-    add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
@@ -40,11 +41,12 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    HOLE_DIA,
     SHIM_X,
     SHIM_Z,
+    SLOT_OPEN_SIDE,
+    SLOT_R,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
 SPEC = DRAWINGS_BY_NAME["cone_tip_shim"]
@@ -68,26 +70,36 @@ ISO_CENTER = (0.320, 0.180)
 HALF_X = SHIM_X * _S / 2.0  # 0.030 on the sheet
 HALF_Z = SHIM_Z * _S / 2.0  # 0.024 on the sheet
 
+# The *Top view keeps model +X to the right, so the slot opens to the LEFT
+# edge and the closed (radius) end looks right.
+if SLOT_OPEN_SIDE != -1:
+    raise ValueError("the plan layout assumes the slot opens to model -X")
+
+# Larger dimensions stand outside smaller ones: the 12.0 depth outboard of
+# the 6.0 radius-centre location on the right.
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], TOP_CENTER[1] + HALF_Z + 0.014),
-    "Depth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
+    "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),
+    # Past the open mouth, level with the slot's centreline.
+    "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
 }
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 REFERENCE_DIMENSIONS = ("Thickness",)
-DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK"}
+DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK", "SlotWidth": "SLOT, FULL R"}
 
-# Hole location from the left edge and the lower edge (the blank is symmetric,
-# so either pair reads the same).  Each value sits midway along its span, off
-# both witnesses (the tip block's 5637ac42 lesson).
-HOLE_X_TEXT = (TOP_CENTER[0] - HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012)
-HOLE_Z_TEXT = (TOP_CENTER[0] + HALF_X + 0.014, TOP_CENTER[1] - HALF_Z / 2.0)
-HOLE_CALLOUT_XY = (TOP_CENTER[0] + HALF_X + 0.020, TOP_CENTER[1] + HALF_Z + 0.006)
+# Radius-centre location from the closed (right) edge and the lower edge.
+# Each value sits midway along its span, off both witnesses (the tip block's
+# 5637ac42 lesson).
+SLOT_X_TEXT = (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012)
+SLOT_Z_TEXT = (TOP_CENTER[0] + HALF_X + 0.010, TOP_CENTER[1] - HALF_Z / 2.0)
 NOTES_XY = (0.190, 0.120)
 
 
-def _hole_edge_xy(angle_deg: float = 45.0) -> tuple[float, float]:
-    """A point on the plan view's hole circle, off the centre mark's arms."""
-    r = HOLE_DIA * _S / 2.0
+def _slot_end_xy(angle_deg: float) -> tuple[float, float]:
+    """A point on the plan view's full-radius end, which spans -90..+90 deg."""
+    if abs(angle_deg) >= 90.0:
+        raise ValueError(f"{angle_deg} deg is off the slot's closed end")
+    r = SLOT_R * _S
     a = math.radians(angle_deg)
     return (TOP_CENTER[0] + r * math.cos(a), TOP_CENTER[1] + r * math.sin(a))
 
@@ -106,7 +118,7 @@ def _checked_location(
         adapter,
         view,
         p0=edge_xy,
-        p1=_hole_edge_xy(-45.0),
+        p1=_slot_end_xy(-45.0),
         text_xy=text_xy,
         label=label,
         orientation=orientation,
@@ -187,30 +199,20 @@ async def build(adapter: Any) -> dict[str, str]:
     _checked_location(
         adapter,
         top,
-        edge_xy=(TOP_CENTER[0] - HALF_X, TOP_CENTER[1] + HALF_Z / 2.0),
-        text_xy=HOLE_X_TEXT,
+        edge_xy=(TOP_CENTER[0] + HALF_X, TOP_CENTER[1] + HALF_Z / 2.0),
+        text_xy=SLOT_X_TEXT,
         orientation="horizontal",
         expected_mm=SHIM_X / 2.0,
-        label="screw hole from the left edge",
+        label="slot radius centre from the closed edge",
     )
     _checked_location(
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z),
-        text_xy=HOLE_Z_TEXT,
+        text_xy=SLOT_Z_TEXT,
         orientation="vertical",
         expected_mm=SHIM_Z / 2.0,
-        label="screw hole from the lower edge",
-    )
-    if not auto_center_marks(adapter, top, holes=True, size=0.0025):
-        raise RuntimeError("failed to add the plan view's centre mark")
-    add_native_hole_callout(
-        adapter,
-        top,
-        edge_xy=_hole_edge_xy(45.0),
-        callout_xy=HOLE_CALLOUT_XY,
-        label="shim screw clearance",
-        process="DRILL",
+        label="slot radius centre from the lower edge",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
