@@ -426,20 +426,22 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
         raise RuntimeError(f"knife-detail letter position did not persist: {actual}")
 
 
-def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Hide one model reference sketch in one drawing view that prints none of
-    its dimensions.
+def _show_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
+    """Show one model reference sketch in one drawing view that needs it.
 
-    ``BossAxialReference`` carries the construction line that locates the boss
-    axially, and the isometric and the spring-pattern view printed it as a stray
-    dash-dot stroke from the boss to the plate end; ``SummationArcReference``
-    would print its centre stub edge-on beside the boss in the front view.  ``BlankSketch`` is VT_VOID and there is no per-view
-    read-back, so the selection is the gate and the render the proof.
+    The part saves every drawing-reference sketch hidden
+    (``build_summing_lever.DRAWING_REFERENCE_SKETCHES``), so they stay out of
+    its renders and every assembly.  A view shows only what it prints from:
+    the R138.8 centre cross, the boss axis line and the spring-row line in the
+    top view, the knife envelope in the front view (and so Detail A), and the
+    spring-row line in the pattern view.  ``UnblankSketch`` is VT_VOID and
+    there is no per-view read-back, so the selection is the gate and the render
+    the proof.
     """
     draw = adapter.currentModel
     name = view_name(adapter, view)
     if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate {name} to hide {sketch}")
+        raise RuntimeError(f"failed to activate {name} to show {sketch}")
     draw.ClearSelection2(True)
     # The middle qualifier is the view's own model instance ("summing-lever-N",
     # numbered per view), not the file stem: the stem refused on R4.
@@ -448,7 +450,7 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
         qualified, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"cannot select {qualified}")
-    draw.BlankSketch()
+    draw.UnblankSketch()
     draw.ClearSelection2(True)
 
 
@@ -861,9 +863,11 @@ async def build(adapter: Any) -> dict[str, str]:
     for sketch in (
         "SummationArcReference",
         "BossAxialReference",
-        "CylinderReference",
+        "PatternReferences",
     ):
-        _hide_view_sketch(adapter, front, sketch)
+        _show_view_sketch(adapter, top, sketch)
+    # Before the detail, which takes its sketch display from its parent.
+    _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
@@ -955,14 +959,7 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
-    for view in (pattern, iso):
-        for sketch in (
-            "SummationArcReference",
-            "BossAxialReference",
-            "CylinderReference",
-        ):
-            _hide_view_sketch(adapter, view, sketch)
-    _hide_view_sketch(adapter, iso, "PatternReferences")
+    _show_view_sketch(adapter, pattern, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
