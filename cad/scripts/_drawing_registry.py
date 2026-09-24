@@ -539,6 +539,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="cone_tip_shim",
+        part="cone_tip_shim",
+        artifact_stem="cone-tip-shim",
+        script_name="draw_cone_tip_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="arbor_pedestal",
         part="arbor_pedestal",
         artifact_stem="arbor-pedestal",
