@@ -39,11 +39,13 @@ from _common import (
     PANEL_BLACK,
     SketchDims,
     _early_bound,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
     bbox_extent_check,
+    blank_sketch,
     check,
     define_circle,
     define_rectilinear_chain,
@@ -817,6 +819,30 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
+REFERENCE_SKETCHES = ("RimWidthReference", "HeightReference")
+
+
+@_telemetry.traced("appearance.hide_reference_sketches")
+def _hide_reference_sketches(adapter) -> None:
+    """Blank the drawing-reference sketches and prove each one reads hidden."""
+    for name in REFERENCE_SKETCHES:
+        blank_sketch(adapter, name)
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {
+        name: visible
+        for name in REFERENCE_SKETCHES
+        # swVisibilityState_e: 1 hidden
+        if (visible := int(_read_member(part.FeatureByName(name), "Visible"))) != 1
+    }
+    if shown:
+        raise RuntimeError(f"reference sketches still visible after blanking: {shown}")
+    _telemetry.event(
+        "part.reference_sketches_hidden",
+        sketches=", ".join(REFERENCE_SKETCHES),
+        count=len(REFERENCE_SKETCHES),
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
@@ -1412,10 +1438,14 @@ async def build(adapter) -> dict[str, str]:
     # width is the gap between two loops of one profile, and the 40.6 spans
     # three features. Each therefore gets a hidden one-line sketch whose
     # single driving dimension IS the value, marked for drawing like any
-    # other. Construction, not hidden: a BLANKED sketch's dimensions never reach
-    # InsertModelAnnotations3 (first build failed with "geometry top view is
-    # missing model dimensions: ['RimWidth']"), while construction geometry
-    # imports normally and is never drawn in a view.
+    # other. Both are construction lines, and both are BLANKED once built:
+    # shown, the height line stood as a tick with two endpoint dots on the
+    # base's end face in every assembly render (top iso, asm round d60107b3).
+    # A blanked sketch's dimensions never reach a plain InsertModelAnnotations3
+    # (the first build failed with "geometry top view is missing model
+    # dimensions: ['RimWidth']"), so draw_harmonic_base imports them through
+    # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
+    # sketch in its own view only.
     check("create_sketch rim-width reference", await adapter.create_sketch("Top"))
     # Direct-to-DB for the geometry: this line lies ON the sketch X axis and
     # runs horizontally, so creation-time inference would snap in exactly the
@@ -1486,6 +1516,7 @@ async def build(adapter) -> dict[str, str]:
     _verify_named_dimension(
         adapter, "FlangeToRim@HeightReference", deck_top - BOTTOM_THICKNESS
     )
+    _hide_reference_sketches(adapter)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, CASTING_GREEN)
