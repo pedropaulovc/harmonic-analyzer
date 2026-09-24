@@ -15,9 +15,17 @@ not occurrences of part names in prose. Unknown source expressions fail loudly.
 from __future__ import annotations
 
 import ast
+import atexit
+import contextlib
 import functools
+import hashlib
+import io
 import json
+import os
+import pickle
 import re
+import sys
+import tempfile
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
@@ -922,6 +930,141 @@ def _module_by_path() -> dict[Path, str]:
     return {path.resolve(): name for name, path in _local_modules().items()}
 
 
+# --- Machine-wide store of pure syntax facts -------------------------------------
+# Every doit graph load parses and walks each local module up to three times
+# (imports, config reads, drawing-registry reads): ~1400 parses, measured as most
+# of the load once path resolution was memoized. A farm leaf loads the graph twice
+# (prepare's export and execute's ``build.py run``) and the submitter once per
+# command, and between loads almost no source changes. These facts are pure
+# functions of a file's TEXT, so they are kept across processes keyed by the
+# SHA-256 of that text -- plus the SHA-256 of this analyzer, which names the
+# store file, so any change to the analysis starts an empty store. A stale answer
+# is therefore impossible by construction: a different text is a different key.
+# The store lives OUTSIDE the checkout (a farm root is ``clean -ffdx``-ed on every
+# leaf) and is best-effort: an unreadable, foreign or corrupt store is an empty
+# one, and a failed write only costs the next process a parse.
+# ``HARMONIC_BUILDGRAPH_CACHE`` overrides the directory; ``off`` disables it.
+_FACTS_ENV = "HARMONIC_BUILDGRAPH_CACHE"
+# Beyond this many entries a save keeps only what this process used, so a
+# long-lived store sheds the facts of source versions nothing reads any more.
+_FACTS_MAX_ENTRIES = 20_000
+
+
+class _BuiltinsOnly(pickle.Unpickler):
+    """The store holds builtin containers of strings only; refuse anything else."""
+
+    _ALLOWED = frozenset({"frozenset", "set", "tuple", "list", "dict", "str"})
+
+    def find_class(self, module: str, name: str):
+        if module == "builtins" and name in self._ALLOWED:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"refused {module}.{name}")
+
+
+class _FactStore:
+    def __init__(self) -> None:
+        self._entries: dict[bytes, object] | None = None
+        self._used: dict[bytes, object] = {}
+        self._dirty = False
+        self._path: Path | None = None
+
+    def _location(self) -> Path | None:
+        setting = os.environ.get(_FACTS_ENV, "")
+        if setting.lower() in {"off", "0", "false", "no"}:
+            return None
+        base = (
+            Path(setting)
+            if setting
+            else Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
+            / "harmonic-analyzer"
+            / "buildgraph"
+        )
+        analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+        version = f"py{sys.version_info[0]}{sys.version_info[1]}"
+        return base / f"syntax-facts-{analyzer}-{version}.pickle"
+
+    def _read(self, path: Path) -> dict[bytes, object]:
+        try:
+            with path.open("rb") as handle:
+                entries = _BuiltinsOnly(io.BytesIO(handle.read())).load()
+        except (OSError, pickle.UnpicklingError, EOFError, ValueError, TypeError):
+            return {}
+        return entries if isinstance(entries, dict) else {}
+
+    def _load(self) -> dict[bytes, object]:
+        if self._entries is None:
+            self._path = self._location()
+            self._entries = {} if self._path is None else self._read(self._path)
+        return self._entries
+
+    def get(self, key: bytes) -> tuple[bool, object]:
+        entries = self._load()
+        if key not in entries:
+            return False, None
+        self._used[key] = entries[key]
+        return True, entries[key]
+
+    def put(self, key: bytes, value: object) -> None:
+        self._load()[key] = value
+        self._used[key] = value
+        if self._path is not None and not self._dirty:
+            self._dirty = True
+            atexit.register(self.save)
+
+    def save(self) -> None:
+        if not self._dirty or self._path is None:
+            return
+        self._dirty = False
+        # Merge with whatever a concurrent process saved since we loaded: every
+        # entry is content-addressed, so any union of them is still correct.
+        merged = {**self._read(self._path), **(self._entries or {})}
+        if len(merged) > _FACTS_MAX_ENTRIES:
+            merged = dict(self._used)
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(
+                dir=self._path.parent, prefix=".facts-", suffix=".tmp"
+            )
+            with os.fdopen(fd, "wb") as handle:
+                pickle.dump(merged, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(temporary, self._path)
+        except OSError:
+            with contextlib.suppress(OSError, UnboundLocalError):
+                os.unlink(temporary)
+
+
+_FACTS = _FactStore()
+
+
+def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: raw):
+    """Keep a pure ``text -> facts`` function's results in :data:`_FACTS`.
+
+    ``encode`` must reduce the result to builtin containers of strings (the
+    store refuses to unpickle anything else) and ``decode`` must rebuild it.
+    Exceptions (a ``SyntaxError``) are never stored: the next process re-raises
+    them by parsing again.
+    """
+
+    def wrap(function):
+        @functools.wraps(function)
+        def facts(text: str, *extra):
+            digest = hashlib.sha256()
+            for part in (name, text, *(repr(sorted(e)) for e in extra)):
+                digest.update(part.encode("utf-8", "surrogatepass"))
+                digest.update(b"\0")
+            key = digest.digest()
+            found, raw = _FACTS.get(key)
+            if found:
+                return decode(raw)
+            value = function(text, *extra)
+            _FACTS.put(key, encode(value))
+            return value
+
+        return facts
+
+    return wrap
+
+
 class _ModuleSyntax(NamedTuple):
     """Syntax facts of ONE source text: what it imports, and what each top-level
     function calls.
@@ -957,6 +1100,7 @@ def _function_call_names(
 
 
 @functools.lru_cache(maxsize=1024)
+@_persisted_facts("module_syntax", encode=tuple, decode=lambda raw: _ModuleSyntax(*raw))
 def _module_syntax(text: str) -> _ModuleSyntax:
     """Parse one source CONTENT once, for every syntax consumer of it.
 
@@ -1230,6 +1374,7 @@ def drawing_registry_recipe(text: str, spec: object) -> str:
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts("drawing_registry_reads")
 def _drawing_registry_reads(text: str) -> frozenset[str] | None:
     """Cache a source's literal row read set; None denotes an unclassified use."""
     nodes = tuple(ast.walk(ast.parse(text)))
@@ -1495,6 +1640,15 @@ class _ConfigUse(Enum):
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts(
+    "config_references",
+    encode=lambda refs: None
+    if refs is None
+    else tuple((attr, use.value, argument) for attr, use, argument in refs),
+    decode=lambda raw: None
+    if raw is None
+    else tuple((attr, _ConfigUse(use), argument) for attr, use, argument in raw),
+)
 def _config_references_in_text(
     text: str, config_modules: frozenset[str]
 ) -> tuple[tuple[str, _ConfigUse, str | None], ...] | None:

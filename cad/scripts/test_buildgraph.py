@@ -38,6 +38,14 @@ from _assembly import assembly_title_properties  # noqa: E402
 from _common import part_properties  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _isolated_syntax_facts(tmp_path_factory, monkeypatch):
+    """Each test starts from an EMPTY machine-wide facts store of its own, so a
+    parse-count assertion never depends on what an earlier run left behind."""
+    monkeypatch.setenv(bg._FACTS_ENV, str(tmp_path_factory.mktemp("facts")))
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+
+
 @pytest.mark.parametrize(
     "declaration",
     [
@@ -1931,3 +1939,124 @@ def _run() -> int:
 
 if __name__ == "__main__":
     sys.exit(_run())
+
+
+# --- Machine-wide syntax facts store (_FactStore / _persisted_facts) ---------------
+
+
+def _fresh_store(monkeypatch, directory: Path) -> bg._FactStore:
+    """A store as a NEW process would see it, rooted in ``directory``."""
+    monkeypatch.setenv(bg._FACTS_ENV, str(directory))
+    store = bg._FactStore()
+    monkeypatch.setattr(bg, "_FACTS", store)
+    return store
+
+
+def test_syntax_facts_are_reused_by_the_next_process(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> frozenset[str]:
+        calls.append(text)
+        return frozenset(text.split())
+
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("a b") == frozenset({"a", "b"})
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("a b") == frozenset({"a", "b"})
+    assert calls == ["a b"]
+
+
+def test_syntax_facts_are_keyed_by_content_not_by_file(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> frozenset[str]:
+        calls.append(text)
+        return frozenset(text.split())
+
+    _fresh_store(monkeypatch, tmp_path)
+    probe("import a")
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    assert probe("import b") == frozenset({"import", "b"})
+    assert calls == ["import a", "import b"]
+
+
+def test_module_syntax_round_trips_through_the_store(tmp_path, monkeypatch):
+    source = "import os\nfrom . import x\n\ndef f():\n    g()\n    m.h()\n"
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    expected = bg._module_syntax(source)
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
+        assert bg._module_syntax(source) == expected
+    bg._module_syntax.cache_clear()
+
+
+def test_config_references_round_trip_through_the_store(tmp_path, monkeypatch):
+    source = "import _config\n\ndef f():\n    return _config.tolerances()\n"
+    modules = frozenset({"_config"})
+    _fresh_store(monkeypatch, tmp_path)
+    bg._config_references_in_text.cache_clear()
+    expected = bg._config_references_in_text(source, modules)
+    assert expected and isinstance(expected[0][1], bg._ConfigUse)
+    bg._FACTS.save()
+    _fresh_store(monkeypatch, tmp_path)
+    bg._config_references_in_text.cache_clear()
+    with patch.object(bg.ast, "parse", side_effect=AssertionError("re-parsed")):
+        assert bg._config_references_in_text(source, modules) == expected
+    bg._config_references_in_text.cache_clear()
+
+
+def test_syntax_errors_are_never_stored(tmp_path, monkeypatch):
+    _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    with pytest.raises(SyntaxError):
+        bg._module_syntax("def (:\n")
+    bg._FACTS.save()
+    assert not list(tmp_path.glob("*.pickle"))
+
+
+def test_a_corrupt_or_foreign_store_reads_as_empty(tmp_path, monkeypatch):
+    import pickle
+
+    store = _fresh_store(monkeypatch, tmp_path)
+    path = store._location()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"not a pickle")
+    assert store.get(b"k") == (False, None)
+
+    # A pathlib object is picklable but not a builtin container of strings.
+    path.write_bytes(pickle.dumps({b"k": Path("foreign")}))
+    assert _fresh_store(monkeypatch, tmp_path).get(b"k") == (False, None)
+
+
+def test_the_store_can_be_switched_off(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    @bg._persisted_facts("probe")
+    def probe(text: str) -> str:
+        calls.append(text)
+        return text
+
+    monkeypatch.setenv(bg._FACTS_ENV, "off")
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    probe("x")
+    bg._FACTS.save()
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    probe("x")
+    assert calls == ["x", "x"]
+    assert not list(tmp_path.rglob("*.pickle"))
+
+
+def test_the_store_file_is_named_for_this_analyzer(tmp_path, monkeypatch):
+    import hashlib
+
+    location = _fresh_store(monkeypatch, tmp_path)._location()
+    analyzer = hashlib.sha256(Path(bg.__file__).read_bytes()).hexdigest()[:16]
+    assert location.parent == tmp_path
+    assert analyzer in location.name
