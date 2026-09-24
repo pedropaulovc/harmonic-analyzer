@@ -131,6 +131,7 @@ from build_lag_screw import (
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
 from pinion_pivot_block_geometry import BLOCK_HEIGHT
+from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
 from pinion_spring_geometry import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
@@ -350,15 +351,12 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 # tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
 # the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
 # about the pivot bore, block mid-depth 5.125 in from each outer face; the
-# drum-axis pedestal seats remain unchanged.
-_FORMER_BLOCK_SCREW_XZ = (
-    (-17.226441649810653, -98.875),  # front block, east screw
-    (-0.22644164981065273, -98.875),  # front block, west screw
-    (-17.226441649810653, 82.875),  # back block, east screw
-    (-0.22644164981065273, 82.875),  # back block, west screw
-)
+# drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
+# the block and spring-foot z stations are pinion_rig_layout's -- the front
+# block stands one feeler off the front strap, the spring rides 0.8 aft.
+_FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
 BLOCK_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
+    (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
 )
 # Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
 # 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
@@ -368,8 +366,9 @@ BLOCK_SCREW_HOLE_DEPTH = 12.75
 BLOCK_SCREW_DRILL_DEPTH = 15.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    (16.87259321646788, 70.95),  # spring foot follows the shifted 32T swing rig
-    # clear of the unchanged rocker-arm-support casting after the rig recenter
+    # spring foot follows the shifted 32T swing rig, clear of the unchanged
+    # rocker-arm-support casting after the rig recenter (z: pinion_rig_layout)
+    (16.87259321646788, SPRING_Z - MECHANISM_Z_SHIFT),
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
@@ -791,10 +790,7 @@ async def _paint_machined_faces_black(adapter) -> None:
     # through it (~1.3% of the cylinder), well inside the 5% band below.
     expected_areas.update(
         {
-            control.key: math.pi
-            * COLUMN_SOCKET_DIAMETER
-            * COLUMN_SOCKET_DEPTH
-            * 1e-6
+            control.key: math.pi * COLUMN_SOCKET_DIAMETER * COLUMN_SOCKET_DEPTH * 1e-6
             for control in SOCKET_BORE_FINISHES
         }
     )
@@ -808,7 +804,9 @@ async def _paint_machined_faces_black(adapter) -> None:
                 f"{expected * 1e6:.0f} (minus openings/edge breaks)"
             )
         if key not in BLACK_FINISH_KEYS:
-            _telemetry.info(f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour")
+            _telemetry.info(
+                f"{key} face qualified ({area * 1e6:.0f} mm^2), body colour"
+            )
             continue
         face.MaterialPropertyValues = values
         back = tuple(float(value) for value in (face.MaterialPropertyValues or ())[:3])
