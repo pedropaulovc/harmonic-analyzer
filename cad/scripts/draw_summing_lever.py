@@ -427,16 +427,16 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
 
 
 def _show_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Show one model reference sketch in one drawing view that needs it.
+    """Show one model reference sketch in one drawing view, as a print mark.
 
     The part saves every drawing-reference sketch hidden
     (``build_summing_lever.DRAWING_REFERENCE_SKETCHES``), so they stay out of
-    its renders and every assembly.  A view shows only what it prints from:
-    the R138.8 centre cross, the boss axis line and the spring-row line in the
-    top view, the knife envelope in the front view (and so Detail A), and the
-    spring-row line in the pattern view.  ``UnblankSketch`` is VT_VOID and
-    there is no per-view read-back, so the selection is the gate and the render
-    the proof.
+    its renders and every assembly, and the targeted import shows each one only
+    for its own call (``_drawing_common.insert_feature_dimensions``).  Two are
+    print marks and are shown for good: the R138.8 centre cross in the top view
+    (Main's R7 "unmarked centres") and the knife envelope's centre "+" in the
+    front view and Detail A.  ``UnblankSketch`` is VT_VOID and there is no
+    per-view read-back, so the selection is the gate and the render the proof.
     """
     draw = adapter.currentModel
     name = view_name(adapter, view)
@@ -860,12 +860,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    for sketch in (
-        "SummationArcReference",
-        "BossAxialReference",
-        "PatternReferences",
-    ):
-        _show_view_sketch(adapter, top, sketch)
+    _show_view_sketch(adapter, top, "SummationArcReference")
     # Before the detail, which takes its sketch display from its parent.
     _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
     detail = _knife_detail(adapter, front)
@@ -878,6 +873,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="knife-end detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Again: the detail's import shows and re-blanks the knife envelope through
+    # its parent's model-item path, which undoes the parent's mark.
+    _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
     knife_surface_mm = (HEX_W / 4.0, 3.0 * HEX_H / 8.0, HEX_Z_OUTER)
     detail_edges = scan_view_edges(detail, label="knife-end detail finish")
     knife_surface_edge = detail_edges.exact_line_through(
@@ -959,7 +957,6 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
-    _show_view_sketch(adapter, pattern, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
