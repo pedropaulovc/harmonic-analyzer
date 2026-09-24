@@ -48,6 +48,16 @@ def _mm(value: float, places: int = 3) -> str:
     return f"{value:.{places}f}".replace("-", "−")
 
 
+def _section_mm(value: float) -> str:
+    """A strip dimension as the record prints it: 5.0, 6.35."""
+    text = f"{value:.3f}".rstrip("0")
+    return text + "0" if text.endswith(".") else text
+
+
+def test_the_spring_pad_the_record_calls_square_is_square() -> None:
+    assert spring.PAD_LEN == spring.PAD_WIDTH
+
+
 def _expected_fragments() -> list[str]:
     authority = (dt.FPIN_DIA + dt.CAM_OD) / 2.0 - dt._D_ENG
     follower_reserve = dt._FPIN_TIP_S - dt._S_CAM_ENG
@@ -82,8 +92,12 @@ def _expected_fragments() -> list[str]:
         f"{_mm(dt.LEVER_ENGAGED_TILT_DEG)}° engaged lever",
         # Return-spring row: the numbers only.  The strip material is prose
         # the spring owner may change, not a dimension this record derives.
-        f"{spring.THICK:g} × {spring.WIDTH:.1f} ",
-        f"{spring.FOOT_LEN:.1f} foot",
+        # #859 re-derived the leaf: its foot is a square screw pad east of
+        # the pivot, and the row prints the section at the width's own places.
+        f"{spring.THICK:g} × {_section_mm(spring.WIDTH)} ",
+        f"{spring.SCREW_EAST_OF_PIVOT:.1f} EAST of the pivot bore",
+        f"on a {spring.PAD_LEN:g} square pad",
+        f"{spring.CONTACT_T:.1f} up the strap",
     ]
 
 
