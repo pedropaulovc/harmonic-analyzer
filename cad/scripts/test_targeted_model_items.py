@@ -286,3 +286,137 @@ def test_the_component_qualifier_is_read_back_per_view() -> None:
         "SKETCH",
         True,
     ) in drawing.calls
+
+
+class FakeSketchFeature:
+    """An ``IFeature`` double: a profile sketch and its saved visibility."""
+
+    def __init__(self, type_name: str, visible: int) -> None:
+        self._type_name = type_name
+        self.Visible = visible
+
+    def GetTypeName2(self) -> str:
+        return self._type_name
+
+
+class FakePart:
+    """The view's referenced part; the import helper must only READ it."""
+
+    def __init__(self, features: dict[str, tuple[str, int]]) -> None:
+        self.features = {
+            name: FakeSketchFeature(type_name, visible)
+            for name, (type_name, visible) in features.items()
+        }
+
+    def FeatureByName(self, name: str):
+        return self.features.get(name)
+
+
+class VisibleAnnotation(FakeAnnotation):
+    def __init__(self, name: str, visible: int) -> None:
+        super().__init__(name)
+        self.Visible = visible
+
+
+class HiddenSketchDrawing(FakeDrawing):
+    """Imports a part-hidden sketch's dimensions only while the VIEW shows it
+    -- the behaviour measured by probe run 20260924T160303083Z-67cebdcd."""
+
+    def __init__(self, part: FakePart, view: str, component: str) -> None:
+        self.sketch = f"ArcReference@{component}@{view}"
+        kinds = {
+            view: "DRAWINGVIEW",
+            self.sketch: "SKETCH",
+            f"Column@{component}@{view}": "BODYFEATURE",
+        }
+        dimensions = {
+            self.sketch: ["ArcCentreX"],
+            f"Column@{component}@{view}": ["Length"],
+        }
+        super().__init__(kinds, dimensions)
+        self.part = part
+        self.log: list[tuple] = []
+        self.view_shows_sketch = part.features["ArcReference"].Visible == 2
+        self.dimension_visibility = 1
+
+    def UnblankSketch(self) -> None:
+        self.log.append(("unblank", tuple(self.selection)))
+        self.view_shows_sketch = True
+
+    def BlankSketch(self) -> None:
+        self.log.append(("blank", tuple(self.selection)))
+        self.view_shows_sketch = False
+
+    def InsertModelAnnotations3(
+        self, option, types, all_views, duplicate_dims, hidden, placement
+    ):
+        self.log.append(("import", self.view_shows_sketch))
+        annotations = super().InsertModelAnnotations3(
+            option, types, all_views, duplicate_dims, hidden, placement
+        )
+        return [
+            VisibleAnnotation(a._display._dimension.Name, self.dimension_visibility)
+            for a in annotations
+            if self.view_shows_sketch or a._display._dimension.Name != "ArcCentreX"
+        ]
+
+
+class ReferencingView(FakeView):
+    def __init__(self, name: str, component: str, part: FakePart) -> None:
+        super().__init__(name, component)
+        self.ReferencedDocument = part
+
+
+def _hidden_seat(visible: int = 1):
+    part = FakePart(
+        {"ArcReference": ("ProfileFeature", visible), "Column": ("Extrusion", 2)}
+    )
+    drawing = HiddenSketchDrawing(part, "Drawing View2", "summing-lever-2")
+    view = ReferencingView("Drawing View2", "summing-lever-2", part)
+    return FakeAdapter(drawing), drawing, view
+
+
+def test_a_part_hidden_sketch_is_shown_in_the_view_for_its_import_only() -> None:
+    """Order: per-view unblank -> import (shown) -> per-view blank again."""
+    adapter, drawing, view = _hidden_seat()
+    named = drawing_common.insert_feature_dimensions(
+        adapter, view, ("ArcReference", "Column")
+    )
+    assert [name for name, _ in named] == ["ArcCentreX", "Length"]
+    sketch = ("ArcReference@summing-lever-2@Drawing View2",)
+    assert drawing.log == [
+        ("unblank", sketch),
+        ("import", True),
+        ("blank", sketch),
+    ]
+    assert not drawing.view_shows_sketch
+    # The part is only read: its saved hidden state stands.
+    assert drawing.part.features["ArcReference"].Visible == 1
+
+
+def test_a_visible_sketch_imports_untouched() -> None:
+    """No-op when nothing is hidden: no per-view toggles at all."""
+    adapter, drawing, view = _hidden_seat(visible=2)
+    named = drawing_common.insert_feature_dimensions(adapter, view, ("ArcReference",))
+    assert [name for name, _ in named] == ["ArcCentreX"]
+    assert drawing.log == [("import", True)]
+
+
+def test_a_dimension_hidden_with_its_reblanked_sketch_fails_loudly() -> None:
+    adapter, drawing, view = _hidden_seat()
+    drawing.dimension_visibility = 3  # swAnnotationHidden
+    with pytest.raises(RuntimeError, match=r"re-blanked sketches: \['ArcCentreX'"):
+        drawing_common.insert_feature_dimensions(adapter, view, ("ArcReference",))
+
+
+def test_the_sketch_is_blanked_again_when_the_import_fails() -> None:
+    adapter, drawing, view = _hidden_seat()
+    with pytest.raises(RuntimeError, match="as a SKETCH or a BODYFEATURE"):
+        drawing_common.insert_feature_dimensions(
+            adapter, view, ("ArcReference", "Missing")
+        )
+    assert drawing.log[-1] == (
+        "blank",
+        ("ArcReference@summing-lever-2@Drawing View2",),
+    )
+    assert not drawing.view_shows_sketch

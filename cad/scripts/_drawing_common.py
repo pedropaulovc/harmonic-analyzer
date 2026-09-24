@@ -25,6 +25,7 @@ import _telemetry
 from _common import (
     _build_id,
     _early_bound,
+    _read_member,
     _visible_document_paths,
     apply_custom_properties,
     capture_com_failure,
@@ -2746,6 +2747,82 @@ def _select_model_feature(
     )
 
 
+# swVisibilityState_e.swVisibilityStateHide
+_VISIBILITY_HIDDEN = 1
+# swAnnotationVisibilityState_e: HalfHidden, Hidden
+_ANNOTATION_NOT_SHOWN = (2, 3)
+_SKETCH_FEATURE_TYPES = ("ProfileFeature", "3DProfileFeature")
+
+
+def _model_hidden_sketches(view: Any, features: Sequence[str]) -> list[str]:
+    """Those of ``features`` that are sketches the view's part saves hidden.
+
+    A construction-only reference sketch renders in every assembly unless its
+    part blanks it, and the selected-feature import then delivers none of its
+    marked dimensions, HiddenFeatureDims notwithstanding (summing lever r17:
+    BossAxialLocation, CylRefDia and SummationArcCentreX/Z missing).  Only a
+    part's own sketches are considered; anything else is left to the import.
+    """
+    referenced = getattr(_early_bound(view, "IView"), "ReferencedDocument", None)
+    lookup = getattr(referenced, "FeatureByName", None)
+    if lookup is None:
+        return []
+    hidden = []
+    for name in features:
+        raw = lookup(name)
+        if raw is None:
+            continue
+        feature = _early_bound(raw, "IFeature")
+        if str(feature.GetTypeName2()) not in _SKETCH_FEATURE_TYPES:
+            continue
+        if int(_read_member(feature, "Visible")) == _VISIBILITY_HIDDEN:
+            hidden.append(name)
+    return hidden
+
+
+def _set_view_sketches(
+    draw: Any,
+    sketches: Sequence[str],
+    *,
+    paths: Sequence[tuple[str, str]],
+    shown: bool,
+    label: str,
+) -> None:
+    """Show or blank ``sketches`` in ONE drawing view (per-view override).
+
+    Measured on the summing lever (probe run 20260924T160303083Z-67cebdcd):
+    with the sketch blanked in the part, the import delivers nothing; after a
+    per-view ``UnblankSketch`` it delivers the sketch's dimensions; after
+    ``UnblankSketch`` on the drawing's open PART (Visible read back as shown,
+    drawing rebuilt) it still delivers nothing.  So the toggle is per view, and
+    the part is never touched.  ``paths`` are :func:`_model_item_paths`'
+    qualifiers; the first that selects wins.
+    """
+    verb = "show" if shown else "blank"
+    for sketch in sketches:
+        draw.ClearSelection2(True)
+        if not any(
+            draw.Extension.SelectByID2(
+                f"{sketch}@{component}@{in_view}",
+                "SKETCH",
+                0.0,
+                0.0,
+                0.0,
+                False,
+                0,
+                null_callout(),
+                0,
+            )
+            for component, in_view in paths
+        ):
+            raise RuntimeError(f"{label}: cannot select sketch {sketch!r} to {verb} it")
+        if shown:
+            draw.UnblankSketch()
+        else:
+            draw.BlankSketch()
+        draw.ClearSelection2(True)
+
+
 @_telemetry.traced("drawing.targeted_model_items")
 def insert_feature_dimensions(
     adapter: Any, view: Any, features: Sequence[str]
@@ -2782,27 +2859,34 @@ def insert_feature_dimensions(
     name = view_name(adapter, view)
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate drawing view {name!r}")
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select drawing view {name!r}")
     paths = _model_item_paths(adapter, view)
-    types = [
-        _select_model_feature(adapter, feature, paths=paths)
-        for feature in features
-    ]
-    result = adapter._attempt(
-        lambda: ddoc.InsertModelAnnotations3(
-            1,  # swImportModelItemsFromSelectedFeature
-            _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
-            False,
-            True,
-            True,
-            False,
+    hidden = _model_hidden_sketches(view, features)
+    if hidden:
+        _set_view_sketches(draw, hidden, paths=paths, shown=True, label=name)
+    try:
+        draw.ClearSelection2(True)
+        if not draw.Extension.SelectByID2(
+            name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select drawing view {name!r}")
+        types = [
+            _select_model_feature(adapter, feature, paths=paths)
+            for feature in features
+        ]
+        result = adapter._attempt(
+            lambda: ddoc.InsertModelAnnotations3(
+                1,  # swImportModelItemsFromSelectedFeature
+                _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
+                False,
+                True,
+                True,  # HiddenFeatureDims: does NOT reach a blanked sketch
+                False,
+            )
         )
-    )
-    draw.ClearSelection2(True)
+        draw.ClearSelection2(True)
+    finally:
+        if hidden:
+            _set_view_sketches(draw, hidden, paths=paths, shown=False, label=name)
     if not result or isinstance(result, str):
         return []
     named = [
@@ -2814,6 +2898,19 @@ def insert_feature_dimensions(
             for annotation in result
         )
     ]
+    if hidden:
+        states = {item: int(_read_member(a, "Visible")) for item, a in named if item}
+        _telemetry.event(
+            "drawing.hidden_sketches_imported",
+            view=name,
+            sketches=", ".join(hidden),
+            dimension_visibility=repr(states),
+        )
+        dropped = sorted(i for i, v in states.items() if v in _ANNOTATION_NOT_SHOWN)
+        if dropped:
+            raise RuntimeError(
+                f"{name}: dimensions hidden with their re-blanked sketches: {dropped}"
+            )
     _telemetry.info(
         f"targeted model-item import {name}: "
         f"features={[f'{f}[{t}]' for f, t in zip(features, types, strict=True)]}, "
