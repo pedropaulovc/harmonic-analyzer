@@ -99,3 +99,14 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
         encoding="utf-8"
     )
+
+
+def test_standalone_recipe_run_is_catalog_only() -> None:
+    # Codex #857 P2: MSC publishes no CAD, so the standalone command must not
+    # enter the McMaster replica path (vendor SLDPRT + harvest).  It builds the
+    # recipe and saves it; the documented command is that entry point.
+    source = Path(recipe.__file__).read_text(encoding="utf-8")
+    assert "replica_main(" not in source and "import replica_main" not in source
+    assert "run_build(build_catalog)" in source
+    assert "diag_build_40923898.py" in (recipe.__doc__ or "")
+    assert "catalog-only" in (recipe.__doc__ or "")
