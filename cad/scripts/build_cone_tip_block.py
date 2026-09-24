@@ -37,7 +37,6 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
-    define_circle,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -61,6 +60,7 @@ from _drawing_marks import (
 from cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
     ADJUSTER_BORE_DIA,
+    ADJUSTER_CSK,
     ADJUSTER_AXIS_HEIGHT,
     BLOCK_HEIGHT,
     BLOCK_X,
@@ -76,7 +76,6 @@ from cone_tip_block_spec import (
     PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT,
     PINCH_RISE,
-    SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SLIT_W,
     SURFACE_FINISHES,
@@ -84,7 +83,6 @@ from cone_tip_block_spec import (
     WORST_SLIT_MOUTH_WEB_MM,
     WORST_TOP_LIGAMENT_MM,
 )
-from _hole_spec import DRILL_POINT_H
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_pmi import author_part_pmi
 
@@ -96,12 +94,10 @@ MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it ri
 # from the same values the print annotates (BLOCK_X/BLOCK_Z/BLOCK_HEIGHT,
 # threads, pinch height, slit width).
 # --- adjuster + pinch lock (item 5, v4_t00471 / 7:49) ------------------------
-# Native 5/16-18 blind tapped adjuster receiver from the north face. Its
+# Native #10-32 adjuster thread tapped THROUGH the block (rule-12 E11/W1). Its
 # tap-drill diameter is manufacturing geometry, distinct from the purchased
-# screw's true major-diameter solid.
-SHAFT_PASSAGE_RADIUS = SHAFT_PASSAGE_DIA / 2.0
-
-ADJUSTER_BORE_DEPTH = ADJUSTER_BORE_SPEC.depth_mm
+# screw's true major-diameter solid.  The shaft tip enters through the same
+# thread from the south face.
 # McMaster 90280A110 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
 PINCH_BORE_Y = PINCH_HEIGHT
@@ -121,12 +117,9 @@ if BLOCK_HEIGHT - SLIT_DEPTH > PINCH_BORE_Y - PINCH_BORE_DIA / 2.0:
 
 
 def _slit_removed() -> float:
-    """Slit volume net of the already-void bores it crosses: the adjuster
-    counterbore band, its blind-tap 118-degree DRILL-POINT cone, and the shaft
-    clearance passage. The cone and passage are concentric, so each south-side
-    slice subtracts their union, never both. This is a clearance passage, not
-    the removed fictional journal fit. The drill-point term is load-bearing;
-    omitting it caused the first wizard build to miss volume by 4.1 mm^3."""
+    """Slit volume net of the already-void through tap drill and the two
+    countersinks where they rise into the slit (each a 45-degree triangle of
+    side ADJUSTER_CSK across the slit width at the top of the bore)."""
     r_cb = ADJUSTER_BORE_DIA / 2.0
     y_cb, y_bot = ADJUSTER_AXIS_HEIGHT, BLOCK_HEIGHT - SLIT_DEPTH
     x_half = SLIT_W / 2.0
@@ -149,20 +142,9 @@ def _slit_removed() -> float:
             + 2.0 * sum(f(x) for x in xs[2:-1:2])
         return simpson * h / 3.0
 
-    point_h = r_cb * DRILL_POINT_H  # 118-degree point height past the shoulder
     v = SLIT_W * BLOCK_Z * SLIT_DEPTH
-    v -= a_void(r_cb) * ADJUSTER_BORE_DEPTH  # counterbore band already void
-    # Past the shoulder the void is the union of the tapered drill point and
-    # the through passage.
-    n_z = 400
-    dz = (BLOCK_Z - ADJUSTER_BORE_DEPTH) / n_z
-    acc = 0.0
-    for k in range(n_z + 1):
-        z = k * dz  # 0 at the shoulder
-        r_cone = r_cb * max(1.0 - z / point_h, 0.0)
-        a = a_void(max(r_cone, SHAFT_PASSAGE_RADIUS))
-        acc += a * (0.5 if k in (0, n_z) else 1.0)
-    v -= acc * dz
+    v -= a_void(r_cb) * BLOCK_Z  # the through tap drill is already void
+    v -= 2.0 * SLIT_W * ADJUSTER_CSK**2 / 2.0
     return v
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -236,7 +218,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlockZ", f"{BLOCK_Z}mm")
     await set_global(adapter, "BlockHeight", f"{BLOCK_HEIGHT}mm")
     await set_global(adapter, "AdjusterAxisHeight", f"{ADJUSTER_AXIS_HEIGHT}mm")
-    await set_global(adapter, "ShaftPassageDia", f"{SHAFT_PASSAGE_DIA}mm")
     # (The old AdjusterBoreDia/PinchBoreDia knobs are gone: both are now native
     # Hole Wizard TAPPED features whose diameters come from the ANSI-inch tap
     # tables, not driven dims.)
@@ -276,69 +257,42 @@ async def build(adapter) -> dict[str, str]:
     v_block = BLOCK_X * BLOCK_Z * BLOCK_HEIGHT
     volume = await volume_check(adapter, "block", v_block, 0.005 * v_block)
 
-    # Non-bearing shaft-tip passage, coaxial with the adjuster. The external
-    # brass bushing supports the Ø0.794 tip; this opening only admits the tip
-    # to the exact 94025A150 conical cup apex. It is cut first so the later
-    # blind-tap volume subtracts only material not already removed here.
-    passage = SketchDims()
-    check("create_sketch shaft passage", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        ADJUSTER_AXIS_HEIGHT,
-        SHAFT_PASSAGE_RADIUS,
-        "shaft passage",
-        dims=passage,
-        names=("PassageX", "PassageZ", "PassageDiaDim"),
-        drives=(None, '"AdjusterAxisHeight"', '"ShaftPassageDia"'),
-    )
-    await ensure_fully_defined(adapter, "shaft-passage sketch")
-    check("exit_sketch shaft passage", await adapter.exit_sketch())
-    name_last_feature(adapter, "PassageProfile")
-    drive_jobs += passage.apply(adapter, "PassageProfile")
-    check(
-        "cut shaft passage",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BLOCK_Z + 4.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "ShaftPassage")
-    v_passage = math.pi * SHAFT_PASSAGE_RADIUS**2 * BLOCK_Z
-    volume = await volume_check(
-        adapter, "shaft clearance passage", volume - v_passage, 0.02 * v_passage
-    )
-
-    # Adjuster interface (v4_t00471 / 7:49): ONE native Hole Wizard blind
-    # 5/16-18 TAPPED hole from the NORTH face (z = +BLOCK_Z/2), concentric with
-    # the cone shaft, ADJUSTER_BORE_DEPTH deep -- the partially hollow slotted
-    # adjuster screw threads in here and the shaft tip rests in its (own) cup
-    # (axial end-play takeup). Drilled while the body is still simple (block +
-    # cup-ended screw supports the shaft tip. Removed volume is the blind
-    # tap-drill cylinder plus its standard drill point.
+    # Adjuster interface (v4_t00471 / 7:49; rule-12 E11/W1): ONE native Hole
+    # Wizard #10-32 TAPPED hole THROUGH the block on the cone axis.  The
+    # slotted cup-point adjuster threads in from the north face and the shaft
+    # tip enters from the south face into its cup (axial end-play takeup).
+    # Drilled while the body is still simple (block only), so the removed
+    # volume is the plain tap-drill cylinder.
     adjuster_cut = wizard_holes(
         adapter, ADJUSTER_BORE_SPEC,
         [[0.0, ADJUSTER_AXIS_HEIGHT, BLOCK_Z / 2.0]],
         (0.0, 0.0, 1.0),
-        f"adjuster tapped hole ({ADJUSTER_BORE_SPEC.size} blind)",
+        f"adjuster tapped hole ({ADJUSTER_BORE_SPEC.size} through)",
         name="AdjusterBore",
         placement_dims=[((None, None), ("CbZ", '"AdjusterAxisHeight"'))],
     )
     drive_jobs += adjuster_cut.placement_drive_jobs
-    point_h = (ADJUSTER_BORE_DIA / 2.0) * DRILL_POINT_H
-    radius_ratio = SHAFT_PASSAGE_RADIUS / (ADJUSTER_BORE_DIA / 2.0)
-    passage_point_overlap = math.pi * (
-        SHAFT_PASSAGE_RADIUS**2 * point_h * (1.0 - radius_ratio)
-        + point_h * SHAFT_PASSAGE_RADIUS**3 / (3.0 * (ADJUSTER_BORE_DIA / 2.0))
-    )
-    passage_overlap = (
-        math.pi * SHAFT_PASSAGE_RADIUS**2 * ADJUSTER_BORE_DEPTH
-        + passage_point_overlap
-    )
-    v_cb = (
-        blind_hole_volume_mm3(ADJUSTER_BORE_DIA, ADJUSTER_BORE_DEPTH)
-        - passage_overlap
-    )
+    r_cb = ADJUSTER_BORE_DIA / 2.0
+    v_cb = math.pi * r_cb**2 * BLOCK_Z
     volume = await volume_check(adapter, "adjuster bore", volume - v_cb, 0.03 * v_cb)
+
+    # 90-degree countersink on both mouths: a 45-degree break of ADJUSTER_CSK
+    # on each tap-drill edge, so the first full thread starts under it.
+    check(
+        "countersink adjuster mouths",
+        await adapter.add_chamfer(
+            ADJUSTER_CSK,
+            [
+                [r_cb, ADJUSTER_AXIS_HEIGHT, z_face]
+                for z_face in (-BLOCK_Z / 2.0, BLOCK_Z / 2.0)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "AdjusterCountersinks")
+    v_csk = 2.0 * math.pi * ADJUSTER_CSK**2 * (r_cb + ADJUSTER_CSK / 3.0)
+    volume = await volume_check(
+        adapter, "adjuster countersinks", volume - v_csk, 0.03 * v_csk + 0.05
+    )
 
     # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
     # cross-bore so the exact McMaster 90280A110 #4-40 screw can squeeze the
@@ -453,6 +407,20 @@ async def build(adapter) -> dict[str, str]:
         feature_name="PassageCenterReference",
         dimension_name="PassageCenter",
         drive_expression='"PassageCenter"',
+    )
+    # E11/W1: the axis height, from the foot, once the passage sketch that
+    # carried it was gone.
+    await _author_reference_dimension(
+        adapter,
+        plane="Front",
+        start=(-BLOCK_X / 2.0, 0.0),
+        end=(-BLOCK_X / 2.0, ADJUSTER_AXIS_HEIGHT),
+        orientation="vertical",
+        dimension_type="vertical_distance",
+        value_mm=ADJUSTER_AXIS_HEIGHT,
+        feature_name="AxisHeightReference",
+        dimension_name="AxisHeight",
+        drive_expression='"AdjusterAxisHeight"',
     )
     await _author_reference_dimension(
         adapter,

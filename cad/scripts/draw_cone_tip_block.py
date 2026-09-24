@@ -33,6 +33,7 @@ from _surface_finish import surface_finish_by_key
 from cone_tip_block_spec import (
     ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_BORE_DIA,
+    ADJUSTER_CSK,
     BLOCK_HEIGHT,
     BLOCK_X,
     BLOCK_Z,
@@ -42,7 +43,6 @@ from cone_tip_block_spec import (
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
-    SHAFT_PASSAGE_DIA,
     SLIT_DEPTH,
     SURFACE_FINISHES,
 )
@@ -135,7 +135,6 @@ VIEW_C_ARROW = (
     (TOP_CENTER[0] - 0.010, TOP_CENTER[1] + BLOCK_Z * _S / 2.0),
 )
 DIMENSION_CALLOUTS = {
-    "PassageDiaDim": "DRILL THRU\nCLEARANCE\nCOAXIAL WITH\nADJUSTER BORE",
     "SlitDepth": "SLOT DEPTH",
 }
 
@@ -284,7 +283,7 @@ def _preferred_entry_circle(
         matches.append((view, center, edge))
     if not matches:
         raise RuntimeError(f"{label} is absent from both opposed views")
-    # A through passage can expose the blind tap's entry rim from both sides.
+    # The through thread exposes the same tap-drill rim from both sides.
     # Both selections still belong to the same native Hole Wizard feature; the
     # caller's candidate order supplies a stable sheet-side preference.
     return matches[0]
@@ -347,6 +346,47 @@ def _pinch_thread_callout_resolved(resolved_parts: dict[int, str]) -> bool:
         and len(thread) == 1
         and thread[0].rstrip().endswith(f"TO SLOT\n{_PINCH_THREAD_QUALIFIER}")
     )
+
+
+# E11/W1: the through thread's two countersinks are one chamfer feature; the
+# callout names them under the thread line, so the hole reads in one place.
+ADJUSTER_CSK_QUALIFIER = (
+    f"90\u00b0 CSK \u00d8{ADJUSTER_BORE_DIA + 2.0 * ADJUSTER_CSK:.1f} BOTH ENDS"
+)
+
+
+def _adjuster_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Append the countersink line to the one compartment holding the thread."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected adjuster callout parts: {definitions!r}")
+    thread_parts = [part for part, text in definitions.items() if "<hw-threadclass>" in text]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"adjuster thread line is not in one callout part: {definitions!r}")
+    updated = dict(definitions)
+    part = thread_parts[0]
+    updated[part] = f"{updated[part].rstrip()}\n{ADJUSTER_CSK_QUALIFIER}"
+    return updated
+
+
+def _set_adjuster_callout_text(display: Any) -> None:
+    """Name both countersinks under the native through-thread line."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = _adjuster_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    thread = [text for text in resolved.values() if "UNF" in text]
+    if (
+        persisted != updated
+        or len(thread) != 1
+        or not thread[0].rstrip().endswith(ADJUSTER_CSK_QUALIFIER)
+    ):
+        raise RuntimeError(
+            "adjuster countersink line did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
 
 
 def _set_pinch_thread_callout_text(display: Any) -> None:
@@ -482,8 +522,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     # The top-view cutting plane passes through both orthogonal bore axes.  The
-    # resulting solid-line section shows the blind adjuster thread, clearance
-    # passage, split jaws and pinch bore relationship without dashed inference.
+    # resulting solid-line section shows the through adjuster thread, its
+    # countersinks, split jaws and pinch bore relationship without dashed
+    # inference.
     section = create_section_view(
         adapter,
         top,
@@ -502,19 +543,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ((front, FRONT_CENTER), (back, BACK_CENTER)),
         radius_mm=ADJUSTER_BORE_DIA / 2.0,
         center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="blind adjuster thread",
+        label="through adjuster thread",
     )
-    if adjuster_view is front:
-        passage_view, passage_center = back, BACK_CENTER
-    else:
-        passage_view, passage_center = front, FRONT_CENTER
-    passage_edge = _circle_entity(
-        adapter,
-        passage_view,
-        radius_mm=SHAFT_PASSAGE_DIA / 2.0,
-        center_y_mm=ADJUSTER_AXIS_HEIGHT,
-        label="shaft clearance passage",
-    )
+    # The through thread shows the same rim from both ends; VIEW C (the
+    # opposite elevation) is the shaft's entry.
+    shaft_entry_center = BACK_CENTER if adjuster_view is front else FRONT_CENTER
     pinch_clearance_edge = _circle_entity(
         adapter,
         right,
@@ -538,15 +571,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front_keep = dict(FRONT_KEEP)
     back_keep: dict[str, tuple[float, float]] = {}
-    passage_keep = {
-        "PassageDiaDim": (
-            passage_center[0] + 0.055,
-            _elevation_y(ADJUSTER_AXIS_HEIGHT, passage_center) - 0.012,
-        ),
-    }
     plus_x_side = 1.0 if adjuster_view is front else -1.0
     adjuster_axis_keep = {
-        "PassageZ": (
+        "AxisHeight": (
             adjuster_center[0] - 0.045,
             _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
         ),
@@ -559,10 +586,6 @@ async def build(adapter: Any) -> dict[str, str]:
             _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
         ),
     }
-    if passage_view is front:
-        front_keep.update(passage_keep)
-    else:
-        back_keep.update(passage_keep)
     if adjuster_view is front:
         front_keep.update(adjuster_axis_keep)
     else:
@@ -572,7 +595,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         keep=front_keep,
-        view_label="passage entry elevation",
+        view_label="adjuster entry elevation",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
@@ -630,7 +653,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (
-        (front, "shaft-passage entry"),
+        (front, "adjuster entry elevation"),
         (right, "pinch clearance entry"),
         (left, "pinch threaded entry"),
         (back, "adjuster threaded entry"),
@@ -647,13 +670,9 @@ async def build(adapter: Any) -> dict[str, str]:
             adjuster_center[0] + 0.043,
             0.115,
         ),
-        label="blind adjuster thread",
+        label="through adjuster thread",
     )
-    set_hole_callout_precision(
-        adjuster_callout,
-        {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
-        label="adjuster tap depths",
-    )
+    _set_adjuster_callout_text(adjuster_callout)
     pinch_clearance_callout = add_native_hole_callout(
         adapter,
         right,
@@ -696,7 +715,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _hide_cosmetic_threads(adapter, section, label="section")
     for text, x, y in (
-        ("VIEW C\nSHAFT ENTRY", passage_center[0] - 0.021, 0.078),
+        ("VIEW C\nSHAFT ENTRY", shaft_entry_center[0] - 0.021, 0.078),
         ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
         ("VIEW B\nPINCH THREAD ENTRY", LEFT_CENTER[0] - 0.023, 0.078),
         # Review: named beside the thread callout it describes (the callout
