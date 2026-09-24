@@ -261,6 +261,7 @@ class TogglePart(FakePart):
         self.log: list[str] = []
         self.selected = None
         self.stuck = False
+        self.on_blank = lambda: None
         feature = self.features[sketch]
         feature.Select2 = lambda append, mark: self._select(feature)
 
@@ -282,6 +283,7 @@ class TogglePart(FakePart):
     def BlankSketch(self) -> None:
         self.log.append("part blank")
         self.selected.Visible = 1
+        self.on_blank()
 
 
 class RebuildingDrawing:
@@ -377,3 +379,40 @@ def test_a_part_saved_while_its_sketches_were_shown_fails_loudly(tmp_path) -> No
             _dimension_knife(part)
             part.path.write_bytes(b"saved again")
     assert part.features["KnifeReference"].Visible == 1
+
+
+def test_a_dimension_the_part_reblank_hides_fails_loudly(tmp_path) -> None:
+    """Codex on #819: the curate's gate runs before the re-blank, so the block
+    re-reads its kept dimensions afterwards (a derived view other than the
+    measured detail might lose them)."""
+    part = TogglePart(tmp_path / "lever.SLDPRT", "ArcReference")
+    adapter, _drawing, view = _hidden_seat(visible=2)
+    part_adapter = FakeAdapter(RebuildingDrawing(part.log))
+    with pytest.raises(
+        RuntimeError, match=r"hidden by the part re-blank.*form top:ArcCentreX"
+    ):
+        with hidden_sketches.part_sketches_shown(
+            part_adapter, part, ["ArcReference"], label="section A"
+        ):
+            curated = _curate(adapter, view, ("ArcCentreX",))
+
+            def hide() -> None:
+                for annotation in curated:
+                    annotation.Visible = 3
+
+            part.on_blank = hide
+
+
+def test_dimensions_that_survive_the_part_reblank_pass(tmp_path, monkeypatch) -> None:
+    infos: list[str] = []
+    monkeypatch.setattr(hidden_sketches._telemetry, "info", infos.append)
+    part = TogglePart(tmp_path / "lever.SLDPRT", "ArcReference")
+    adapter, _drawing, view = _hidden_seat(visible=2)
+    part_adapter = FakeAdapter(RebuildingDrawing(part.log))
+    with hidden_sketches.part_sketches_shown(
+        part_adapter, part, ["ArcReference"], label="Detail A"
+    ):
+        _curate(adapter, view, ("ArcCentreX", "Length"))
+    assert infos[-1] == (
+        "Detail A: after the part re-blank, dimension Visible {'form top:ArcCentreX': 1}"
+    )
