@@ -969,17 +969,26 @@ class _FactStore:
         self._path: Path | None = None
 
     def _location(self) -> Path | None:
-        setting = os.environ.get(_FACTS_ENV, "")
-        if setting.lower() in {"off", "0", "false", "no"}:
+        """The store file, or None when disabled or when no home can be named.
+
+        A farm leaf runs under a filtered environment; a missing
+        ``LOCALAPPDATA`` and home (``Path.home()`` raises ``RuntimeError``)
+        disables the store rather than failing the graph load.
+        """
+        try:
+            setting = os.environ.get(_FACTS_ENV, "")
+            if setting.lower() in {"off", "0", "false", "no"}:
+                return None
+            base = (
+                Path(setting)
+                if setting
+                else Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
+                / "harmonic-analyzer"
+                / "buildgraph"
+            )
+            analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+        except Exception:  # noqa: BLE001 - the store is an optimisation only
             return None
-        base = (
-            Path(setting)
-            if setting
-            else Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache")
-            / "harmonic-analyzer"
-            / "buildgraph"
-        )
-        analyzer = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
         version = f"py{sys.version_info[0]}{sys.version_info[1]}"
         return base / f"syntax-facts-{analyzer}-{version}.pickle"
 
@@ -987,7 +996,7 @@ class _FactStore:
         try:
             with path.open("rb") as handle:
                 entries = _BuiltinsOnly(io.BytesIO(handle.read())).load()
-        except (OSError, pickle.UnpicklingError, EOFError, ValueError, TypeError):
+        except Exception:  # noqa: BLE001 - unreadable, corrupt or foreign: empty
             return {}
         return entries if isinstance(entries, dict) else {}
 
@@ -1028,7 +1037,7 @@ class _FactStore:
             with os.fdopen(fd, "wb") as handle:
                 pickle.dump(merged, handle, protocol=pickle.HIGHEST_PROTOCOL)
             os.replace(temporary, self._path)
-        except OSError:
+        except Exception:  # noqa: BLE001 - a failed save only costs a re-parse
             with contextlib.suppress(OSError, UnboundLocalError):
                 os.unlink(temporary)
 
@@ -1055,7 +1064,10 @@ def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: r
             key = digest.digest()
             found, raw = _FACTS.get(key)
             if found:
-                return decode(raw)
+                try:
+                    return decode(raw)
+                except Exception:  # noqa: BLE001 - a malformed entry is a miss
+                    pass
             value = function(text, *extra)
             _FACTS.put(key, encode(value))
             return value

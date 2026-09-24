@@ -2060,3 +2060,39 @@ def test_the_store_file_is_named_for_this_analyzer(tmp_path, monkeypatch):
     analyzer = hashlib.sha256(Path(bg.__file__).read_bytes()).hexdigest()[:16]
     assert location.parent == tmp_path
     assert analyzer in location.name
+
+
+def test_no_nameable_home_disables_the_store_instead_of_failing(monkeypatch):
+    # A farm leaf runs under a filtered environment: with no LOCALAPPDATA and
+    # no home, Path.home() raises RuntimeError; the graph load must go on.
+    for name in (
+        "HARMONIC_BUILDGRAPH_CACHE",
+        "LOCALAPPDATA",
+        "USERPROFILE",
+        "HOMEPATH",
+        "HOMEDRIVE",
+        "HOME",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def no_home(cls):
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(bg, "_FACTS", bg._FactStore())
+    monkeypatch.setattr(bg.Path, "home", classmethod(no_home))
+    bg._module_syntax.cache_clear()
+    assert bg._module_syntax("import os\n").imports == (("os", None),)
+    assert bg._FACTS._path is None
+    bg._module_syntax.cache_clear()
+
+
+def test_a_malformed_stored_entry_is_recomputed(tmp_path, monkeypatch):
+    store = _fresh_store(monkeypatch, tmp_path)
+    bg._module_syntax.cache_clear()
+    source = "import os\n"
+    expected = bg._module_syntax(source)
+    for key in list(store._entries):
+        store._entries[key] = ("not", "a", "module", "syntax")
+    bg._module_syntax.cache_clear()
+    assert bg._module_syntax(source) == expected
+    bg._module_syntax.cache_clear()
