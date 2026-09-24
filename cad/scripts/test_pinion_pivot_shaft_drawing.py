@@ -65,8 +65,9 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "FINAL SIZE"
     assert model_toleranced_dimensions(shaft) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
-        ("Shaft", "Depth"): "SHAFT_LENGTH_TOLERANCE_MM",
     }
+    # U27: the length reads the title-block .X band, not a tight tolerance.
+    assert pinion_pivot_shaft_spec.DRAWING_PRECISION == {"Shaft": {"Depth": 1}}
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "
