@@ -7,4 +7,4 @@ pinion-arbor:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "turn integral arbor, neck, and head from one blank; match-ream head to actual MHA-058 grip crossrod"
+  process: "turn integral arbor, neck, and head from one blank; ream head cross-hole 6.00 +0.10/0 for MHA-058 grip crossrod; bond crossrod with Loctite 638"

@@ -2,7 +2,7 @@ r"""Build the separate MHA-058 pinion grip crossrod.
 
 The registry slug remains ``pinion-handle`` for the operator-grip component.
 The part is now exactly one cold-finished rod body; MHA-102 owns the integral
-turned head, neck, arbor shaft, and match-reamed cross-hole.
+turned head, neck, arbor shaft, and reamed cross-hole.
 """
 
 from __future__ import annotations

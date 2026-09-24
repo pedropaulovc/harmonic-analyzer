@@ -3,7 +3,7 @@ r"""Build the integral MHA-102 pinion arbor and turned grip head.
 The head, neck, and long shaft are one turned steel part.  Their absolute
 released envelope and assembly origin are unchanged; only the unsupported
 socket/retention-pin construction is removed.  MHA-058 is the separate grip
-crossrod installed through the head's match-reamed hole.
+crossrod bonded into the head's reamed hole.
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ from pinion_arbor_spec import (
     BACK_JOURNAL_FROM_HEAD_REAR,
     BACK_JOURNAL_Z,
     CROSS_HOLE_DIA,
+    CROSS_HOLE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -663,6 +664,9 @@ async def build(adapter) -> dict[str, str]:
 
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "FrontJournalReference", "FrontJournalDia", *deviations(JOURNAL_DIA_BAND)

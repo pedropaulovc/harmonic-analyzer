@@ -749,7 +749,10 @@ from build_alignment_pinion import (  # noqa: E402
     BORE_DIA as DRUM_BORE_DIA,
 )
 from pinion_arbor_spec import (  # noqa: E402
+    CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
+    CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
@@ -1778,17 +1781,26 @@ if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
 # bounds the collar sweep against the base, spring foot and shaft.)
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
-# The steel Ø8 arbor presses through the drum and journals in both straps'
-# top bores.  Its turned head/neck are integral; MHA-058 is only the separate
-# crossrod, placed at the unchanged head/cross-hole station.
+# The steel Ø8 arbor slips through the drum (bonded) and journals in both
+# straps' top bores.  Its turned head/neck are integral; MHA-058 is only the
+# separate crossrod, bonded into the head's reamed hole at the unchanged
+# head/cross-hole station.
 if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
     raise AssertionError("grip crossrod is not centred in the integral head")
 if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
     raise AssertionError("arbor back end off the translated p2 station")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
-if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA - 0.0125) > 1e-9:
-    raise AssertionError("grip crossrod/head nominal interference changed")
+# R1: the crossrod is a bonded slip fit, modelled line to line; at the printed
+# limits it must still enter the hole and stay inside the Loctite 638 gap.
+if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA) > 1e-9:
+    raise AssertionError("grip crossrod and head hole no longer share a nominal")
+if not 0.0 <= ARBOR_CROSSROD_MIN_CLEARANCE <= ARBOR_CROSSROD_MAX_CLEARANCE <= ARBOR_BOND_MAX_GAP:
+    raise AssertionError(
+        "grip crossrod bond clearance "
+        f"{ARBOR_CROSSROD_MIN_CLEARANCE:.3f}-{ARBOR_CROSSROD_MAX_CLEARANCE:.3f} "
+        f"is outside 0-{ARBOR_BOND_MAX_GAP}"
+    )
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal
@@ -3799,14 +3811,14 @@ async def build(adapter) -> dict[str, str]:
         verify=(pinion_arbor, arb_o),
         witness_local=[0.0, ARBOR_HEAD_DIA / 2.0, ARBOR_HEAD_CENTER_Z],
     )
-    # The separate grip crossrod is press-fitted in MHA-102's match-reamed
-    # integral head.  A LOCK records that authored relative pose with no
+    # The separate grip crossrod is bonded in MHA-102's reamed integral head
+    # (R1).  A LOCK records that authored relative pose with no
     # branches or added DOF, so the engage swing carries the complete crank.
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{grip_crossrod}", "PLANE"),
         named_ref(f"Front Plane@{pinion_arbor}", "PLANE"),
-        label="grip crossrod press-fitted in the integral arbor head",
+        label="grip crossrod bonded in the integral arbor head",
     )
 
     # DRIVER #1 (the single machine input): the crank angle. The arm hangs at
