@@ -69,18 +69,19 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
 
 
-def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
+def test_notes_bond_the_drum_at_the_station_mha102_owns() -> None:
     notes = spec.DRAWING_NOTES
-    # Rule 6 (R3): three notes -- the bond and its axial location merged, the
-    # MHA-102 journal size left to MHA-102's own sheet -- plus the generated
-    # MHA-102 bond-zone line (#814) as the fourth.
-    assert sum(not line.startswith("  ") for line in notes.splitlines()) == 4
+    # Rule 6 (R3): three notes plus the generated MHA-102 bond-zone line (#814)
+    # as the fourth.  The drum is symmetric, so no orientation note; its axial
+    # station is stated once, on MHA-102, never re-derived here from j=19.
+    assert len(notes.splitlines()) == 4
     assert "MHA-102 BOND ZONE: DIA 8.00 -0.01/-0.10 (REF)." in notes
     assert "ARBOR JOURNAL" not in notes
     assert (
-        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638, LOCATED FROM\n"
-        "  THE END AT THE LAST MHA-027 GEAR (j=19)." in notes
+        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638 AT THE "
+        "DRUM STATION ON MHA-102." in notes
     )
+    assert "j=19" not in notes and "LOCATED FROM" not in notes
     assert "MATES WITH CYLINDER-GEAR BANK" not in notes
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
         assert retired not in notes, retired

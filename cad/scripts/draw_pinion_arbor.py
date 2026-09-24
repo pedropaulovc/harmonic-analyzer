@@ -20,6 +20,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
@@ -27,6 +28,7 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
@@ -48,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     iter_views,
     place_view,
 )
+from diagnostics.drawing_layout_audit import collect_document
 
 SPEC = DRAWINGS_BY_NAME["pinion_arbor"]
 PART_STEM = SPEC.artifact_stem
@@ -85,11 +88,16 @@ DONOR_KEEP = {
 # 0.246-0.258 and the back land (z 202-214) x 0.093-0.105.  Land lengths ride
 # just above the shaft, each land's diameter hangs below it with its Ra symbol
 # beside it, and the two stations from the head shoulder stack under those.
+# The back land's diameter text sits on the HEAD side, right of its Ra symbol
+# and below it: on the crown side the back-crown and overall-length witnesses
+# (x 0.079-0.081) ran through "8" and "JOURNAL", and the SR7.3 leader fills the
+# space left of them.  Its shelf passes under the Ra symbol and across the
+# 203.2 witness (x 0.105), stopping short of the bond-zone text (x ~0.168).
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     "BackJournalLen": (0.099, 0.188),
     "FrontJournalDia": (0.250, 0.150),
-    "BackJournalDia": (0.099, 0.150),
+    "BackJournalDia": (0.130, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     "BackJournalFromHeadRear": (0.207, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
@@ -109,11 +117,14 @@ DETAIL_KEEP = {
     "CrossHoleDia": (0.245, 0.256),
 }
 # The head and neck sit inside detail A's fence at the right end of the
-# profile (x 0.296-0.320, axis y 0.171): the neck's text rides above its own
-# station, and the head's is pushed right of the crown so the two stay apart
-# and clear of the isometric's lower end and the NeckLen/OverallLen witnesses.
+# profile (x 0.296-0.320, axis y 0.171): each diameter's dimension line stands
+# inside the fence and runs up to its text above it.  The head's line sits
+# between the crown apex (x 0.3215) and the fence (x 0.3262 at the head's
+# top and bottom edges), so its witnesses stay inside the circle: they used
+# to run out through it to x 0.340, reading as part of the detail callout
+# with the "A" label between them (Fable r-delta).
 DIAMETER_POSITIONS = {
-    "HeadDia": (0.340, 0.192),
+    "HeadDia": (0.3238, 0.192),
     "NeckDia": (0.300, 0.194),
     # Below the bond zone, between the two land diameters.
     "ShaftDia": (0.195, 0.150),
@@ -451,6 +462,26 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _position_detail_label(adapter, detail)
+    rebuild_drawing(adapter, label="pinion arbor layout audit")
+    sheets = collect_document(adapter)
+    _assert_no_text_on_line([f for sheet in sheets for f in audit_sheet(sheet)])
+    fence_center = model_point_in_view(
+        adapter,
+        principal,
+        (0.0, 0.0, HEAD_CENTER_Z / 1000.0),
+        label="integral-arbor detail fence centre",
+    )
+    _assert_witnesses_clear_of_detail_fence(
+        [
+            annotation
+            for sheet in sheets
+            for annotation in sheet.annotations
+            if annotation.owner == view_name(adapter, principal)
+            and annotation.kind == "dim"
+        ],
+        center=fence_center,
+        radius=DETAIL_RADIUS_MM / 1000.0,
+    )
 
     return await finalize_drawing(
         adapter,
@@ -459,6 +490,93 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+
+
+BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line"})
+
+
+def _assert_no_text_on_line(findings: list[Any]) -> None:
+    """Fail the sheet when any annotation's text sits on another's line.
+
+    Main's eye-pass of 30620a85 found the back-crown and overall witnesses
+    running through the back journal's "8.00" and "JOURNAL".  The native audit
+    reads every dimension's rendered witness, dimension and leader segments, so
+    that defect is now a build failure with sheet-millimetre fix coordinates.
+    The audit's other finding kinds are logged, not gated: the diametric Ø6
+    leader crossing the SR10.9 leader inside detail A is conventional ink.
+    """
+    blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
+    advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
+    if advisory:
+        _telemetry.warn(
+            f"pinion-arbor layout audit: {len(advisory)} advisory finding(s)\n"
+            + format_findings(advisory),
+            advisory=len(advisory),
+        )
+    if blocking:
+        raise RuntimeError(
+            f"pinion-arbor layout audit: {len(blocking)} text-on-line finding(s)\n"
+            + format_findings(blocking)
+        )
+    _telemetry.success(
+        f"pinion-arbor layout audit: no text on a foreign line "
+        f"({len(advisory)} advisory)"
+    )
+
+
+FENCE_TOL_M = 0.0002
+
+
+def _assert_witnesses_clear_of_detail_fence(
+    annotations: list[Any], *, center: tuple[float, float], radius: float
+) -> None:
+    """No witness line may run out through the detail-A fence on the profile.
+
+    The head sits inside the fence, so every head dimension starts inside it.
+    The axial stations drop their witnesses straight down to the stack below
+    the shaft, which is the one sanctioned exit.  Anything else leaving the
+    circle (the Ø15.0 witnesses did, with the "A" label between them) reads as
+    part of the detail callout.  A dimension's own line up to its text is
+    classified as its leader by the audit and is exempt, like the neck's.
+    """
+    offenders = []
+    for annotation in annotations:
+        for segment in annotation.segments:
+            if segment.role != "line":
+                continue
+            ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            far = max(math.dist(end, center) for end in ends)
+            near = _segment_distance(center, ends)
+            if not (near < radius - FENCE_TOL_M and far > radius + FENCE_TOL_M):
+                continue
+            vertical = abs(segment.x1 - segment.x0) <= FENCE_TOL_M
+            low = min(segment.y0, segment.y1)
+            if vertical and low < center[1] - radius:
+                continue
+            offenders.append(
+                f"{annotation.label!r} {segment.role} "
+                f"({segment.x0 * 1000:.1f},{segment.y0 * 1000:.1f})-"
+                f"({segment.x1 * 1000:.1f},{segment.y1 * 1000:.1f})mm"
+            )
+    if offenders:
+        raise RuntimeError(
+            f"pinion-arbor: {len(offenders)} witness line(s) cross the detail-A "
+            "fence:\n  " + "\n  ".join(offenders)
+        )
+    _telemetry.success("pinion-arbor: no witness line crosses the detail-A fence")
+
+
+def _segment_distance(
+    point: tuple[float, float],
+    ends: tuple[tuple[float, float], tuple[float, float]],
+) -> float:
+    (x0, y0), (x1, y1) = ends
+    dx, dy = x1 - x0, y1 - y0
+    span = dx * dx + dy * dy
+    if span == 0.0:
+        return math.dist(point, (x0, y0))
+    t = max(0.0, min(1.0, ((point[0] - x0) * dx + (point[1] - y0) * dy) / span))
+    return math.dist(point, (x0 + t * dx, y0 + t * dy))
 
 
 def _parse_args() -> argparse.Namespace:
