@@ -24,6 +24,8 @@ instead (``test_drive_train_support_layout``).
 
 from __future__ import annotations
 
+import math
+
 from cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_pivot_block_geometry import BLOCK_DEPTH
@@ -55,14 +57,28 @@ BLOCK_Z0 = (FRONT_BLOCK_Z0, BACK_BLOCK_Z0)
 # them through the block holes at assembly).
 BLOCK_SEAT_Z = tuple(z0 + BLOCK_DEPTH / 2.0 for z0 in BLOCK_Z0)
 
-# Torque shaft and lift rod: back ends flush with the back block's outer face,
-# lengths printed at one decimal place.  The shaft's front end sits flush with
-# the front block's outer face to within that rounding; the rod stands ~10
-# proud of it as the MHA-059 lever hub's seat.
-TORQUE_SHAFT_LEN = round(BACK_BLOCK_OUTER_Z - FRONT_BLOCK_Z0, 1)
+# MANUFACTURED spacing (Codex #854 P1): the solid stack plus ONE end play,
+# the feeler setting.  The model pose's STRAP_AIR never enters it -- the pose
+# carries 2 x STRAP_AIR = 0.5 more between the blocks than the hardware does,
+# so the model's front block stands that far south of its physical station.
+PHYSICAL_INNER_SPAN = 2.0 * STRAP_T + DRUM_LEN + FRONT_BLOCK_FEELER  # 161.45
+PHYSICAL_FRONT_BLOCK_OUTER_Z = BACK_BLOCK_Z0 - PHYSICAL_INNER_SPAN - BLOCK_DEPTH
+
+# Torque shaft and lift rod: back ends flush with the back block's outer face.
+# The shaft (printed .XX) is flush with the PHYSICAL front block's outer face;
+# the rod (printed .X, rounded up) stands >= LEVER_SEAT_PROUD proud of it as the
+# MHA-059 lever hub's seat.  In the model pose the shaft's front end therefore
+# reads 2 x STRAP_AIR inside the model front block.
+TORQUE_SHAFT_LEN = round(BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z, 2)
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
 LEVER_SEAT_PROUD = 10.0
-LIFT_ROD_LEN = round(BACK_BLOCK_OUTER_Z - FRONT_BLOCK_Z0 + LEVER_SEAT_PROUD, 1)
+LIFT_ROD_LEN = (
+    math.ceil(
+        (BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z + LEVER_SEAT_PROUD) * 10.0
+        - 1e-6
+    )
+    / 10.0
+)
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-114 return spring: the blade rides the back strap's flank.  The inset
