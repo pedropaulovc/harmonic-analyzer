@@ -137,16 +137,21 @@ PROFILE_KEEP = {
     "CornerSER": (0.040, 0.2435),
 }
 FEATURE_KEEP = {
-    # Four lines (~28 mm wide) between the 195.09 line (x 0.130) and the
-    # plate's west edge (x 0.1679): on three the 50 mm "OPEN TO NORTH EDGE"
-    # ran through both (8783776d).
+    # Short lines (12 characters, ~34 mm at most) between the 195.09 line
+    # (x 0.130) and the plate's west edge (x 0.1679): on three the 50 mm
+    # "OPEN TO NORTH EDGE" ran through both (8783776d).  The block stands on
+    # its shelf (y 0.1438) and grows up, 5.6 mm a line, under the 13.12 row.
     "PivotBearingReliefDia": (0.1490, 0.155),
     "PostMountWestX": (0.150, 0.185),
     "PostMountWestZ": (0.225, 0.175),
     "PostMountEastX": (0.205, 0.185),
     "PostMountEastZ": (0.130, 0.175),
 }
-RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nOPEN TO\nNORTH EDGE"
+# Named by features on the sheet, not a compass: to a blind reader of
+# 68565ace "OPEN TO NORTH EDGE" contradicted a relief opening toward the
+# sheet's lower edge, since sheet-down is model north (codex blocker B2; B3's
+# phantom 0.695 lip followed from it).
+RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
 NOTCH_KEEP = {
     # Pivot-to-north-edge lives here, sharing the 205.81 pivot witness: in the
     # profile the R8 corner ray has no path that clears this dimension.

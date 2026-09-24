@@ -739,7 +739,8 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
 
     8783776d: centred at x 0.150, "OPEN TO NORTH EDGE" (50.4 mm, 2.8 mm a
     character) ran through the 195.09 line (x 0.1300) and the plate's west
-    edge (x 0.1679 at that height).  Four lines keep the block ~28 mm wide.
+    edge (x 0.1679 at that height).  Short lines keep the block ~34 mm wide
+    at most; five of them still clear the 13.12 row above.
     """
     lines = ("10.50", *drawing.RELIEF_WIDTH_CALLOUT.split("\n"))
     line_195, west_edge, char_w = 0.1300, 0.1679, 0.0028
@@ -754,3 +755,12 @@ def test_relief_width_text_sits_between_its_neighbours() -> None:
     # Positive control: 8783776d's three lines at x 0.150 hit both.
     old_left, old_right = block(0.150, ("10.50", "TOP RELIEF", "OPEN TO NORTH EDGE"))
     assert old_left < line_195 and old_right > west_edge
+    # The block stands on its shelf and grows up (aa9766da render: shelf
+    # 0.1438, 5.6 mm a line); the five lines top out under the 13.12 row's
+    # dimension line (0.1821) with 5 mm to spare.
+    shelf, pitch, row_13_12 = 0.1438, 0.0056, 0.1821
+    top = shelf + len(lines) * pitch
+    assert len(lines) == 5 and top <= row_13_12 - 0.005
+    # No compass word: sheet-down is model north (codex B2 on 68565ace).
+    assert not any(word in drawing.RELIEF_WIDTH_CALLOUT for word in ("NORTH", "SOUTH"))
+    assert "PIVOT" in drawing.RELIEF_WIDTH_CALLOUT.split("\n")[-1]
