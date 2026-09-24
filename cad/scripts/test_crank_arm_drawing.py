@@ -64,7 +64,8 @@ def test_hole_callouts_state_size_process_and_fit() -> None:
     assert "3/8 IN" in callouts["ShaftBoreDia"]
     assert "0.00-0.12 DIAMETRAL" in callouts["ShaftBoreDia"]
     assert "CLEARANCE ON MHA-026" in callouts["ShaftBoreDia"]
-    assert callouts["DimpleDia"] == "FIDUCIAL FLAT-BOTTOM\n0.3 MIN, 1.0 MAX DEEP"
+    # U13: the fiducial is a punched alignment mark with no manufacturing depth.
+    assert "DimpleDia" not in callouts
     assert blind_cut_dia_mm(crank_arm_spec.PIN_HOLE_SPEC) == 4.623
     assert blind_cut_dia_mm(crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 5.953
     assert drawing.PIN_HOLE_CALLOUT_PREFIX == "#14 DRILL\nON SHAFT-BORE CL"
