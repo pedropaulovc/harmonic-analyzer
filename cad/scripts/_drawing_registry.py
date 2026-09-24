@@ -721,6 +721,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="post_mount_screw",
+        part="post_mount_screw",
+        artifact_stem="post-mount-screw",
+        script_name="draw_post_mount_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="slotted_screw",
         part="slotted_screw",
         artifact_stem="slotted-screw",

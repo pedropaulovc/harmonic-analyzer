@@ -1,0 +1,20 @@
+post-mount-screw:
+  title: Cone Pivot Post Mount Screw
+  number: MHA-142
+  stock_name: Zinc-Plated Steel Slotted Fillister Head Machine Screw
+  supplier: MSC Industrial Supply
+  supplier_skus: ["40923898"]
+  material: Plain Carbon Steel
+  material_specification: Steel, SAE J82, MSC 40923898 (mfr 1456MSL)
+  finish: zinc plated
+  installation_notes: |-
+    INSTALLATION - CONE PIVOT POST MOUNT
+    FROM THE TOP THROUGH THE MHA-016 C'BORE, HEAD
+    ON ITS FLOOR, INTO THE MHA-091 TAP. CUT EACH
+    TO FIT, SHORT OF MHA-091 UNDERSIDE, NEVER PROUD
+    (NOMINAL 86.0). CHAMFER THE CUT END.
+    ENGAGEMENT 0.90D MIN: NAMED EXCEPTION TO RULE 12.
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased
