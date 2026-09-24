@@ -1,10 +1,12 @@
 r"""McMaster 91255A148 -- black-oxide alloy steel button head SHCS, #6-32 x 1/2".
 
-Modelled from the catalog dimensions only; no vendor SLDPRT is harvested and
-none may be committed (cad/references/mcmaster/README.md).  Source: the U30
-cone-tip attachment handoff, which read the product page on 2026-09-23 (rule-12
-W22): head Ø0.262 in (6.65) x 0.073 in (1.85), 5/64 hex drive, fully threaded,
-1/2 in (12.7) under the head.  A re-read on 2026-09-24 was refused (HTTP 403).
+Modelled from the catalog dimensions.  Source: the McMaster product page,
+supplied by the user on 2026-09-24 (an agent fetch that day got HTTP 403):
+#6-32 UNC-3A, flat tip, head Ø0.262 in (6.65) x 0.073 in (1.85), 5/64 hex
+drive, 1/2 in (12.7) under the head, fully threaded; it matches the U30
+handoff's 2026-09-23 reading.  Class 3A is not modelled (nominal UN cutter).
+The vendor file is local-only (© McMaster, gitignored; never committed, see
+cad/references/mcmaster/README.md); the replica gate against it is pending.
 
 Laws (assumptions, flagged where the catalog is silent):
 
