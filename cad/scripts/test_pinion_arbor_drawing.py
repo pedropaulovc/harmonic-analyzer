@@ -102,7 +102,7 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
 
 def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.JOURNAL_DIA_BAND is _fit_limits.SHAFT_H
-    assert spec.SHAFT_DIA_BAND == (0.0, -0.10)
+    assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
@@ -156,11 +156,14 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
     assert strap_lower - journal_upper == pytest.approx(0.010)
     assert strap_upper - journal_lower == pytest.approx(0.045)
-    # Every bore slides on from the back crown, so no zone may exceed 8.00,
-    # and the worst drum-bore/shaft gap stays inside Loctite 638's 0.25.
+    # Every bore slides on from the back crown, so no zone may exceed 8.00.
+    # The drum keeps its stock-H7 bore, so the bond zone sits 0.01 under it
+    # for a guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
     shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
-    assert shaft_upper == journal_upper == 0.0
-    drum_upper, _drum_lower = drum.ARBOR_BORE_BAND
+    assert journal_upper == 0.0
+    assert shaft_upper == pytest.approx(-0.010)
+    drum_upper, drum_lower = drum.ARBOR_BORE_BAND
+    assert drum_lower - shaft_upper == pytest.approx(0.010)
     assert drum_upper - shaft_lower <= 0.20 + 1e-9
 
 

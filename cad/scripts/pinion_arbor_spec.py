@@ -17,10 +17,11 @@ SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
 # Only the two short lands that run in the MHA-056 strap bores (REAM_SLIDE)
 # carry the ground-shaft band and the Ra 1.6 finish (U39).  Everything else,
-# the MHA-002 drum bond zone included, is Ø8 0/-0.10: every bore slides on
-# from the back crown, so the upper limit stays 8.00, and the drum's
-# +0.10/0 bore then leaves at most a 0.20 Loctite 638 gap.
-SHAFT_DIA_BAND = (0.000, -0.100)
+# the MHA-002 drum bond zone included, is Ø8 -0.01/-0.10: the drum keeps its
+# stock-H7-reamer bore (8.000-8.100), so the guaranteed slide-on clearance
+# comes from this side (min 0.010 at 7.99), and the loosest pair (8.10 on
+# 7.90) stays a 0.20 diametral gap, inside Loctite 638's 0.25.
+SHAFT_DIA_BAND = (-0.010, -0.100)
 JOURNAL_DIA_BAND = SHAFT_H
 JOURNAL_LEN = 12.0
 # Land stations are printed from the head shoulder at one place, so they are

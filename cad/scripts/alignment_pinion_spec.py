@@ -11,6 +11,7 @@ import math
 
 import _config
 
+from _fit_limits import band_text
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_arbor_spec import SHAFT_DIA as ARBOR_DIA
@@ -58,9 +59,10 @@ BORE_DIA = 8.0  # Ø8 arbor through-bore (build_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
 # bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
 # stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-102's bond zone,
-# not its journal lands (U39: Ø8 0/-0.10), so the diametral clearance runs
-# from 0.000 up to the drum's upper deviation minus the arbor's lower one
-# (0.200), inside the 0.25 mm bond gap the 638 technical data sheet allows.
+# not its journal lands (U39: Ø8 -0.01/-0.10), so the diametral clearance
+# runs from 0.010 (the drum slides on by hand) up to the drum's upper
+# deviation minus the arbor's lower one (0.200), inside the 0.25 mm bond gap
+# the 638 technical data sheet allows.
 ARBOR_BORE_BAND = (0.100, 0.000)  # (upper, lower) deviations
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
@@ -125,7 +127,7 @@ GEAR_DATA = gear_data_note(
 DRAWING_NOTES = "\n".join(
     (
         f"MHA-102 BOND ZONE: DIA {ARBOR_DIA:.2f} "
-        f"+{ARBOR_BOND_ZONE_BAND[0]:.2f}/{ARBOR_BOND_ZONE_BAND[1]:.2f} (REF).",
+        f"{band_text(ARBOR_BOND_ZONE_BAND)} (REF).",
         "DRUM SHALL SLIDE ON MHA-102 BY HAND.",
         f"ON ASSEMBLY: BOND TO MHA-102 WITH {RETAINING_COMPOUND}, LOCATED FROM\n"
         "  THE END AT THE LAST MHA-027 GEAR (j=19).",

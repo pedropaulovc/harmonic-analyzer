@@ -58,10 +58,13 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
     assert minimum_clearance == pytest.approx(
         spec.ARBOR_BORE_BAND[1] - arbor.SHAFT_DIA_BAND[0]
     )
-    assert minimum_clearance >= 0.0  # the drum still slides on by hand
+    # The drum slides on by hand: the arbor's bond zone sits 0.01 under 8.00.
+    assert minimum_clearance == pytest.approx(0.010)
+    assert minimum_clearance >= 0.010 - 1e-9
     assert maximum_clearance == pytest.approx(
         spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]
     )
+    assert maximum_clearance == pytest.approx(0.200)
     assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
     assert spec.BORE_DIA == arbor.SHAFT_DIA  # the CAD models line-to-line
 
@@ -72,7 +75,7 @@ def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
     # MHA-102 journal size left to MHA-102's own sheet -- plus the generated
     # MHA-102 bond-zone line (#814) as the fourth.
     assert sum(not line.startswith("  ") for line in notes.splitlines()) == 4
-    assert "MHA-102 BOND ZONE: DIA 8.00 +0.00/-0.10 (REF)." in notes
+    assert "MHA-102 BOND ZONE: DIA 8.00 -0.01/-0.10 (REF)." in notes
     assert "ARBOR JOURNAL" not in notes
     assert (
         "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638, LOCATED FROM\n"
