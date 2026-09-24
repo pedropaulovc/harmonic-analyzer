@@ -62,11 +62,16 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
 
 def test_notes_bond_the_drum_and_locate_it_from_the_back_end() -> None:
     notes = spec.DRAWING_NOTES
-    assert "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638." in notes
+    # Rule 6 (R3): three notes -- the bond and its axial location merged, the
+    # MHA-102 journal size left to MHA-102's own sheet -- so the generated
+    # MHA-102 bond-zone line (#814) makes the fourth.
+    assert sum(not line.startswith("  ") for line in notes.splitlines()) == 3
+    assert "ARBOR JOURNAL" not in notes
     assert (
-        "ON ASSEMBLY: LOCATE DRUM ON ARBOR FROM THE END AT THE LAST "
-        "MHA-027 GEAR (j=19)." in notes
+        "ON ASSEMBLY: BOND TO MHA-102 WITH LOCTITE 638, LOCATED FROM\n"
+        "  THE END AT THE LAST MHA-027 GEAR (j=19)." in notes
     )
+    assert "MATES WITH CYLINDER-GEAR BANK" not in notes
     for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
         assert retired not in notes, retired
 

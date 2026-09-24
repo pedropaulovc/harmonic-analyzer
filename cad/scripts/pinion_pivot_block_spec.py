@@ -23,6 +23,7 @@ part marks and the drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+from _fit_limits import REAM_SLIDE
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -48,7 +49,10 @@ from pinion_pivot_block_geometry import (
     SCREW_SPACING as SCREW_SPACING,
 )
 
-BORE_DIA_BAND = (0.05, 0.00)
+# One fit per shaft (Main R2, converged-r7 review): the same REAM_SLIDE band
+# MHA-056 holds on the same Ø6.35 h shafts, never a line-to-line limit on a
+# bore that must turn or slide by hand.
+BORE_DIA_BAND = REAM_SLIDE
 
 # The two reamed bores share a diameter.  The harvested pivot-bore cylinder
 # spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach

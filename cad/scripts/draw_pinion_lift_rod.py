@@ -104,8 +104,9 @@ DETAIL_KEEP = {
     # r7 eye-pass: above the detail the callout ran over the DETAIL A label
     # and past the right border; the open field left of the detail fits it.
     "PinHoleDia": (DETAIL_CENTER[0] - 0.090, DETAIL_CENTER[1] + 0.028),
-    # Below the fence circle (bottom y 0.0975): at -0.034 the text sat on it.
-    "PinHoleZ": (DETAIL_CENTER[0] + 0.004, DETAIL_CENTER[1] - 0.045),
+    # Below the fence (bottom y 0.0975) and OUTSIDE the witness lines (hole
+    # axis 0.335, front end 0.355): between them the text was struck by both.
+    "PinHoleZ": (DETAIL_CENTER[0] + 0.047, DETAIL_CENTER[1] - 0.045),
 }
 DIMENSION_CALLOUTS = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
@@ -199,6 +200,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -207,6 +209,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "End View Note",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -279,6 +282,8 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     add_property_linked_note(adapter, "End View Note", 0.020, 0.170)
+    # Under the 1:2 isometric (x 0.098-0.172, bottom y ~0.104).
+    add_property_linked_note(adapter, "Isometric View Note", 0.105, 0.097)
 
     return await finalize_drawing(
         adapter,

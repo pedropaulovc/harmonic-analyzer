@@ -63,6 +63,7 @@ from pinion_lift_rod_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     END_VIEW_NOTE,
+    ISOMETRIC_VIEW_NOTE,
     ROD_DIA,
     ROD_DIA_BAND,
     ROD_LEN,
@@ -311,6 +312,7 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
     return await save_part_and_images(adapter, PART_NAME)

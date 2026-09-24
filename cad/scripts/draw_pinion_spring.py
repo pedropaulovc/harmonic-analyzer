@@ -109,7 +109,8 @@ FRONT_KEEP = {
     "BendR": (0.172, 0.080),
     "KinkV": (0.176, 0.120),
     "KinkH": (_front_x(_FOOT_MID_X), 0.160),
-    "TipH": (_front_x(_FOOT_MID_X), 0.174),
+    # 18 mm above KinkH: 10 put TipH's dimension line through 41.1.
+    "TipH": (_front_x(_FOOT_MID_X), 0.178),
 }
 TOP_KEEP = {
     "PadLen": (_front_x(FOOT_END[0] + 4.75), 0.226),

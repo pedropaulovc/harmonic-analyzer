@@ -267,7 +267,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         screw_station[0],
         side,
-        (SIDE_CENTER[0], SIDE_CENTER[1] + 0.030),
+        # Outside the right face (x 0.273): on the hole axis its centreline
+        # ran through the 4.5.
+        (SIDE_CENTER[0] + 0.021, SIDE_CENTER[1] + 0.030),
         source_view=bottom,
     )
     bottom_annotations = [

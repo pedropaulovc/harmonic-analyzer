@@ -30,6 +30,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -140,7 +141,9 @@ LEFT_KEEP = {
     "PinSeatDia": (0.050, 0.245),
 }
 SECTION_CENTER = (0.350, 0.115)
-SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
+# Right of the seat's witness lines (x <= 0.3394), callout below the value:
+# the above-lane callout never rendered and left a bare 66 mm dimension line.
+SECTION_KEEP = {"PinSeatDepth": (0.361, 0.160)}
 # The flank's top and bottom edges are the strap's two extreme lines. Put the
 # overall on its clear right, between the third-angle left and front views.
 OVERALL_XY = (0.112, 0.168)
@@ -148,7 +151,13 @@ OVERALL_XY = (0.112, 0.168)
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
 PIVOT_FINISH_EDGE = (_front_x(-PIVOT_BORE / 2.0), _front_y(0.0))
-PIVOT_FINISH_XY = (0.155, 0.095)
+# Low and far left, with the leader to the bore's lower-left quadrant: a
+# shallow rise keeps it under the symbol's own Ra text and the B label.
+PIVOT_FINISH_XY = (0.136, 0.106)
+PIVOT_FINISH_LEADER = (
+    _front_x(-PIVOT_BORE / 2.0 * math.cos(math.radians(45.0))),
+    _front_y(-PIVOT_BORE / 2.0 * math.sin(math.radians(45.0))),
+)
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.  Naming both follower-seat annotations ties the native
@@ -217,7 +226,6 @@ def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
         adapter,
         [annotation],
         {"PinSeatDepth": PIN_SEAT_DEPTH_CALLOUT},
-        location="above",
     )
     return annotation
 
@@ -316,6 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         edge_xy=PIVOT_FINISH_EDGE,
         symbol_xy=PIVOT_FINISH_XY,
+        leader_attach_xy=PIVOT_FINISH_LEADER,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
         char_height=0.0025,

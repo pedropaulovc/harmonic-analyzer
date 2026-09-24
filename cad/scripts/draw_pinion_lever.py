@@ -79,8 +79,10 @@ ISO_CENTER = (0.184, 0.142)
 DETAIL_CENTER = (0.245, 0.170)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
-# r7 eye-pass: at (0.228, 0.128) the label sat on the 8.0 FLAT BOTTOM text.
-DETAIL_LABEL_XY = (0.300, 0.128)
+# r7 eye-pass: at (0.228, 0.128) the label sat on the 8.0 FLAT BOTTOM text;
+# FLAT BOTTOM now sits right of the detail at y 0.122, so the label rides
+# above it, clear of the fence (x <= 0.263 at this height).
+DETAIL_LABEL_XY = (0.300, 0.150)
 _DS = DETAIL_SCALE[0] / 1000.0
 
 
@@ -111,7 +113,9 @@ DETAIL_KEEP = {
     "GripFromB": (DETAIL_CENTER[0] - 0.020, DETAIL_CENTER[1] + 0.032),
     "EndWall": (DETAIL_CENTER[0] + 0.045, DETAIL_CENTER[1] + 0.032),
     "PinHoleFromB": (DETAIL_CENTER[0] - 3.0 * _DS, DETAIL_CENTER[1] - 0.031),
-    "BoreDepth": (DETAIL_CENTER[0] - 1.0 * _DS, DETAIL_CENTER[1] - 0.041),
+    # Right of the witness lines (bore wall 0.2245, crown root 0.260): between
+    # them FLAT BOTTOM was struck by both.
+    "BoreDepth": (DETAIL_CENTER[0] + 0.037, DETAIL_CENTER[1] - 0.048),
     "PinHoleDia": (DETAIL_CENTER[0] + 0.085, DETAIL_CENTER[1] + 0.008),
 }
 DIMENSION_CALLOUTS = {
@@ -273,7 +277,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.105)
+    # Top-left anchored under the relocated isometric (bottom y ~0.102).
+    add_property_linked_note(adapter, "Isometric View Note", 0.1545, 0.097)
 
     return await finalize_drawing(
         adapter,

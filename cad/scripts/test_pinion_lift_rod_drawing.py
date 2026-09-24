@@ -82,3 +82,4 @@ def test_view_scales_are_explicit() -> None:
     assert "scale=(2, 1)" in source  # end view 2:1
     assert "scale=(1, 1)" in source  # side view true scale
     assert pinion_lift_rod_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
+    assert pinion_lift_rod_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
