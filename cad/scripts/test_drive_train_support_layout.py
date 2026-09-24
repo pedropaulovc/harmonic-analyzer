@@ -286,6 +286,39 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     )
 
 
+def test_torque_shaft_length_band_clears_both_ends() -> None:
+    # MHA-062 at the title-block .X band (U27): set back-flush, the shaft end
+    # stands up to 0.8 + rounding proud of the physical front block.
+    import arbor_pedestal_spec as ped
+    import pinion_rig_layout as rig
+    from pinion_pivot_shaft_spec import SHAFT_DIA
+    from rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
+
+    front_end = rig.BACK_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
+    proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - front_end
+    assert math.isclose(proud, 0.85, abs_tol=5e-3)
+    # South of the front block the lever's throw plane is the only occupant;
+    # it is highest with the rod hard north, the hub on the physical block.
+    lever_top = (
+        rig.PHYSICAL_FRONT_BLOCK_OUTER_Z
+        - drive.LEVER_HUB_LEN / 2.0
+        + (drive._LEV_Z[1] - drive.LEVER_Z)
+    )
+    assert front_end - lever_top >= 1.0, front_end - lever_top
+    assert math.isclose(front_end - lever_top, 1.15, abs_tol=5e-3)
+    # Shortest shaft: still bears most of the front block.
+    recess = rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
+    bearing = recess - (rig.BACK_BLOCK_OUTER_Z - rig.PHYSICAL_FRONT_BLOCK_OUTER_Z)
+    assert drive.BLOCK_DEPTH + bearing >= 9.5 - 1e-9
+    # Past the back block (the same band pushed north) nothing stands on the
+    # shaft's axis: the north pedestal is well west, the rocker support ends
+    # short of the block face, and the base deck lies under the shaft.
+    shaft_r = SHAFT_DIA / 2.0
+    assert (drive.PIVOT_X - shaft_r) - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 25.0
+    assert SUPPORT_WORLD_Z + SUPPORT_HALF_MACHINE_Z < rig.BACK_BLOCK_OUTER_Z
+    assert drive.PIVOT_Y - shaft_r - drive.Y_BASE_TOP >= 5.0
+
+
 def test_short_lift_rod_keeps_its_back_collar_and_bearing() -> None:
     import pinion_rig_layout as rig
 
