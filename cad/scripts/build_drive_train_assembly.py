@@ -513,6 +513,7 @@ ARBOR_PEDESTAL_NORTH_Z = 97.5 + MECHANISM_Z_SHIFT
 # about Y so its strap looks SOUTH at the drum.  After the fixed-post recenter
 # its foot spans z 92.588..108.588, still north of the unchanged rocker support.
 from build_arbor_pedestal import FOOT_DEPTH as ARBOR_PED_DEPTH  # noqa: E402
+from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
 # Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
@@ -811,19 +812,31 @@ from pinion_lever_geometry import (  # noqa: E402
 )
 from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
-    AXIS_OFFSET as SPRING_AXIS_OFF,
-    BLADE_TILT_DEG as SPR_BLADE_TILT_DEG,
+    BEND_EXIT as SPR_BEND_EXIT_L,
+    CONTACT_T as SPR_CONTACT_T,
+    CREST as SPR_CREST_L,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
-    HOLE_FROM_END as SPR_HOLE_FROM_END,
+    FOOT_TAN as SPR_FOOT_TAN_L,
+    FORMED_BAND_MM as SPR_FORMED_BAND,
     HOLE_SPEC as SPR_HOLE_SPEC,
-    KINK_START as SPR_CREST_L,
+    HOLE_X as SPR_HOLE_X_L,
+    KINK_C as SPR_KINK_C_L,
+    KINK_DEG as SPR_KINK_DEG,
+    KINK_START as SPR_KINK_START_L,
     PAD_WIDTH as SPR_PAD_WIDTH,
+    PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
-    THICK as SPRING_T,
-    WIDTH as SPRING_W,
+    PRESET as SPR_PRESET,
+    R_KINK as SPR_R_KINK,
+    STRAP_HALF_WIDTH as SPR_STRAP_HALF_WIDTH,
+    STRAP_LEAN_DEG as SPR_STRAP_LEAN_DEG,
+    YIELD_MPA as SPR_YIELD_MPA,
+    contact_force as spr_contact_force,
+    root_stress as spr_root_stress,
 )
+from pinion_spring_section import THICK as SPRING_T, WIDTH as SPRING_W  # noqa: E402
 from build_slotted_screw import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
@@ -1436,107 +1449,114 @@ if _LEV_STUB_D < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
     raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
-# Brass leaf east of the BACK strap only (t00393 shows the front strap clean):
-# foot flat on the base pointing WEST (crossing under the lift rod so its
-# black hold-down screw lands west of the whole moving rig -- img01's
-# far-left dark head), blade rising parallel to the parked strap's east
-# flank; near the top a SUBTLE BEND BACK (PR7 item 10): the kink's convex
-# crest is the parked contact edge, the flat above it the engaged contact
-# face. Engaging the drum swings the strap east INTO the blade -- in the
-# real machine the leaf flexes and pushes the swing back west (the default-
-# disengaged behaviour); in rigid CAD the engaged pose overlaps the unflexed
-# blade, a documented simplification: only the PARKED pose is interference-
-# gated. The cam engage path (PR5, below) defines the engaged pose; flexed
-# spring geometry for it stays deferred -- issue #158 (the channel springs'
-# stretchNN precedent is the eventual shape of the fix).
-# Geometry is imported from pinion_spring_geometry (machine = part local +
-# (SPRING_X, Y_BASE_TOP)). The thin wall is ONE-sided; the part's 1%-tol
-# volume gate pins the probed side (right-of-travel: under the foot, EAST
-# of the blade/flat centreline), but every clearance that can afford it
-# still books the full 0.8 on whichever side hurts. The flat-tip-vs-cap
-# check below is the one exception -- it relies on the gated east side.
-SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
-# (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
+# Phosphor-bronze leaf EAST of the BACK strap only (t00393 shows the front
+# strap clean).  Re-derived 2026-09-24 (handoff dt-pinion-spring-rederive-
+# 20260924): the foot is screwed to the base OUTBOARD, east of the strap --
+# img01's far-left black head; that side of img01 is the drum side (cylinder
+# gear top-left, lift rod and follower bottom-right), not west as the old
+# block read it.  The blade rises leaning IN toward the strap and its crest
+# bears on the straight east flank CONTACT_T up from the pivot, about 5 below
+# the arbor (img04); a short flick turns back east above the crest.
+# Gravity swings the cluster east into mesh; the leaf pushes the strap top
+# back WEST onto the parked cam collar, and the lever engages against it.
+# In rigid CAD the engaged pose overlaps the unflexed blade, a documented
+# simplification (issue #158): only the PARKED pose is interference-gated;
+# the swing's contact locus, preload and root stress are proven analytically
+# below the cam block (they need _PHI_ENG).
+# Geometry is imported from pinion_spring_geometry: machine = (SPRING_X -
+# local x, Y_BASE_TOP + local y) -- the part is placed Ry(180), its local +x
+# running machine -x (east).  The part's inside-surface path puts the wall
+# west of the blade and under the foot (the build's west-extreme and pad-merge
+# gates prove it), so SPR_CREST_L is already the contact face.
+SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor
 # The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
-# the 2026-10 thickness re-derive (5.0 -> 8.0) grows the strap OUTBOARD from
-# there.  The 4.0-wide leaf therefore stays referenced to that inner face --
-# SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
-# keeps its authored z (and with it the base's foot-screw hole), and riding the
-# strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
+# the strap thickness grows OUTBOARD from there, so the blade is referenced to
+# that inner face -- SPRING_BLADE_INSET in from it -- not to the strap
+# mid-plane.
 STRAP_Z_INNER = RIG.STRAP_Z_INNER
 # Blade inner edge, in from the strap's inner face: 1.0 keeps the blade on
 # the flank at every split of the end play (pinion_rig_layout).
 SPRING_BLADE_INSET = RIG.SPRING_BLADE_INSET
 SPRING_Z = RIG.SPRING_Z
-_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
-_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
+_SPR_TH = math.radians(-STRAP_LEAN_DEG)  # the strap leans east of vertical
+_SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the strap axis
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
 # (east = machine -x)
-_SPR_PIVOT = (SPRING_X - SPR_PIVOT_LX, Y_BASE_TOP + SPR_PIVOT_LY)
-SPRING_CREST = (SPRING_X - SPR_CREST_L[0], Y_BASE_TOP + SPR_CREST_L[1])
-# the parked contact edge (kink start, tangent parallel to the strap axis)
-SPRING_FLAT_TIP = (SPRING_X - SPR_FLAT_TIP_L[0], Y_BASE_TOP + SPR_FLAT_TIP_L[1])
-SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T  # wall under the foot centreline
-SPRING_HOLE_X = SPRING_X - SPR_FOOT_END_L[0] - SPR_HOLE_FROM_END
+
+
+def _spring_machine(local: tuple[float, float]) -> tuple[float, float]:
+    return (SPRING_X - local[0], Y_BASE_TOP + local[1])
+
+
+def _strap_frame(p: tuple[float, float], phi: float = 0.0) -> tuple[float, float]:
+    """(station up the strap axis, offset east of it) of ``p`` for the strap
+    swung ``phi`` CCW (toward mesh) about the pivot."""
+    c, s = math.cos(phi), math.sin(phi)
+    u = (_SPR_U[0] * c - _SPR_U[1] * s, _SPR_U[0] * s + _SPR_U[1] * c)
+    n = (_SPR_N[0] * c - _SPR_N[1] * s, _SPR_N[0] * s + _SPR_N[1] * c)
+    d = (p[0] - PIVOT_X, p[1] - PIVOT_Y)
+    return (d[0] * u[0] + d[1] * u[1], d[0] * n[0] + d[1] * n[1])
+
+
+_SPR_PIVOT = _spring_machine((SPR_PIVOT_LX, SPR_PIVOT_LY))
+SPRING_CREST = _spring_machine(SPR_CREST_L)  # parked contact, crest west face
+SPRING_KINK_C = _spring_machine(SPR_KINK_C_L)  # crest centre
+SPRING_KINK_START = _spring_machine(SPR_KINK_START_L)  # path = the blade's east face
+SPRING_FLAT_TIP = _spring_machine(SPR_FLAT_TIP_L)  # path = the flick's east face
+SPRING_BEND_EXIT = _spring_machine(SPR_BEND_EXIT_L)  # path = the blade's east face
+SPRING_FOOT_TOP = Y_BASE_TOP + SPRING_T
+SPRING_HOLE_X = SPRING_X - SPR_HOLE_X_L
+SPRING_FOOT_END_X = SPRING_X - SPR_FOOT_END_L[0]  # the free end, east
+SPRING_FOOT_TAN_X = SPRING_X - SPR_FOOT_TAN_L[0]  # the bend tangent
 
 if math.hypot(_SPR_PIVOT[0] - PIVOT_X, _SPR_PIVOT[1] - PIVOT_Y) > 0.01:
     raise AssertionError("spring part frame disagrees with the strap pivot")
-if abs(SPR_BLADE_TILT_DEG - STRAP_LEAN_DEG) > 0.01:
-    raise AssertionError("spring blade is not parallel to the parked strap")
-if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
-    raise AssertionError("spring blade touches the parked strap flank")
+if abs(SPR_STRAP_LEAN_DEG - STRAP_LEAN_DEG) > 0.01:
+    raise AssertionError("spring geometry assumes another parked strap lean")
+if abs(SPR_STRAP_HALF_WIDTH - STRAP_R_END) > 1e-9:
+    raise AssertionError("spring geometry assumes another strap width")
+# Crest station and air, parked: on the straight flank at CONTACT_T, clear of
+# the arbor end cap (the flank is straight from the pivot to STRAP_C2C).
+_CREST_T, _CREST_N = _strap_frame(SPRING_CREST)
+if abs(_CREST_T - SPR_CONTACT_T) > 0.01:
+    raise AssertionError("spring crest is off its contact station")
+if abs(_CREST_N - STRAP_R_END - SPR_PARKED_AIR) > 0.01 or SPR_PARKED_AIR < 0.1:
+    raise AssertionError("spring crest does not hover its parked air off the flank")
+if _CREST_T > STRAP_C2C - 1.0:
+    raise AssertionError("spring crest bears on the arbor end cap, not the flank")
 if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
-if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
-    raise AssertionError("spring blade fouls the lift rod")  # perpendicular
-    # foot of the rod axis lands mid-blade, so the segment bound is the line's
-    # (west rod: the blade sits 10.1 EAST of the strap axis, the rod ~14.7 WEST)
-if (
-    math.hypot(X_DRUM - SPRING_CREST[0], Y_DRIVE - SPRING_CREST[1]) - SPRING_T
-    < TIP_DRUM120 + 0.25
-):
-    raise AssertionError("spring contact crest crowds the cylinder-gear tips")
-if (
-    math.hypot(X_DRUM - SPRING_FLAT_TIP[0], Y_DRIVE - SPRING_FLAT_TIP[1]) - SPRING_T
-    < TIP_DRUM120 + 0.25
-):
-    raise AssertionError("spring flat tip crowds the cylinder-gear tips")
-if (
-    math.hypot(SPRING_CREST[0] - APINION_X, SPRING_CREST[1] - APINION_Y)
-    < STRAP_R_END + SPRING_T + 0.25
-):
-    raise AssertionError("spring contact crest reaches the strap's arbor end cap")
-# The flat tips back WEST toward the strap; its wall is on the gated EAST
-# side, so the governing surface is the centreline itself. Two constraints,
-# tip-governed (n falls monotonically along kink + flat): the parked FLANK
-# line (n = R_END, the 6.28 mm^3 interference the first PR7 build hit at
-# FLAT_LEN 6) and the arbor-end cap circle.
-_FLAT_TIP_N = (SPRING_FLAT_TIP[0] - PIVOT_X) * _SPR_N[0] + (
-    SPRING_FLAT_TIP[1] - PIVOT_Y
-) * _SPR_N[1]
-if _FLAT_TIP_N < STRAP_R_END + 0.25:
-    raise AssertionError("spring flat tip re-enters the parked strap flank")
+# The cylinder drum: the leaf rides axially PAST its last (j = 19) gear, so
+# the flexed blade can never meet the 120T tips; only the north end disc
+# (Ø55, END_DISC_AIR outboard of that gear) shares its z band.  Parked, the
+# crest and the flick tip also clear the tip circle itself in 2D; the engaged
+# blade is gated against the disc with the swing gates below.  Each books the
+# strip's full thickness on the east side.
+if (SPRING_Z - SPRING_W / 2.0) - (Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0) < 0.25:
+    raise AssertionError("spring reaches the cylinder drum's last gear axially")
+for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
+    if math.hypot(X_DRUM - _p[0], Y_DRIVE - _p[1]) - SPRING_T < TIP_DRUM120 + 0.25:
+        raise AssertionError(f"spring {_label} crowds the cylinder-gear tips")
+# The flick turns back east: its tip stays off the parked flank and the cap.
+if _strap_frame(SPRING_FLAT_TIP)[1] - SPRING_T < STRAP_R_END + 0.25:
+    raise AssertionError("spring flick tip re-enters the parked strap flank")
 if (
     math.hypot(SPRING_FLAT_TIP[0] - APINION_X, SPRING_FLAT_TIP[1] - APINION_Y)
+    - SPRING_T
     < STRAP_R_END + 0.25
 ):
-    raise AssertionError("spring flat tip reaches the strap's arbor end cap")
+    raise AssertionError("spring flick tip reaches the strap's arbor end cap")
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
-# The foot's screw pad (r7) widens the free end symmetrically about the strip.
-# Booked at the printed .XX worst case (+0.51 on the width): the pad lies on the
-# base top beside the back block, west of the lift rod.
+# The foot's screw pad widens the free end symmetrically about the strip.
+# Booked at the printed .XX worst case (+0.51 on the width).
 if SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring foot pad reaches the back pivot block")
-# West foot corridor (PR7 item 11): the strip crosses UNDER the lift rod and
-# the back cam collar; its screw head must clear the rod flank. (The rod now
-# rides at LIFT_Y, PR8; the collar sweep is bounded in the cam block below.)
-if (LIFT_Y - 3.175) - SPRING_FOOT_TOP < 0.25:
-    raise AssertionError("spring foot reaches the lift rod above it")
-if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - (LIFT_X + 3.175) < 0.25:
-    raise AssertionError("spring foot screw head crowds the lift rod")
-if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
+# The screw head sits on the pad: clear of the free end and of the bend.
+if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - SPRING_FOOT_END_X < 0.25:
     raise AssertionError("spring foot screw head overhangs the foot's free end")
+if SPRING_FOOT_TAN_X - (SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0) < 0.25:
+    raise AssertionError("spring foot screw head crowds the bend")
 
 # --- cam engage path (ch. 25 + page001_img01; PR8) ---------------------------
 # Each strap carries a Ø4 follower STUD in a blind edge seat FPIN_DROP
@@ -1715,16 +1735,91 @@ if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
     )
 
 # Full-rotation sweep of the bare collar about the rod axis (U28: no boss, so
-# the eccentric OD's far point is the whole sweep) against the base, the
-# spring foot and the pivot shaft.
+# the eccentric OD's far point is the whole sweep) against the base and the
+# pivot shaft.  (The return spring's foot no longer runs under the rod: it is
+# screwed down east of the strap, 2026-09-24.)
 _CAM_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 9.3: U28 boss deleted, bare collar
-_COLLAR_SWEEP_R = _CAM_SWEEP_R
 if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
     raise AssertionError("cam collar sweep reaches the base top")
-if LIFT_Y - _COLLAR_SWEEP_R - SPRING_FOOT_TOP < 0.25:
-    raise AssertionError("cam collar sweep dips into the spring foot below")
 if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
+
+# --- return spring across the engage swing (analytic; issue #158) ------------
+# The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf deflects by the
+# crest's penetration into the swung flank on top of its PRESET (the free form
+# stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
+# Gravity moments about the pivot (handoff estimate from the part volumes:
+# drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
+# parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
+_SWING_GRAVITY_NMM = (10.9, 19.2)
+_PRELOAD_MARGIN = 1.45  # over gravity, at the formed band's low end
+_STRESS_SF = 1.5  # on yield, at the nominal preset
+_SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
+_SPR_BLADE_SAMPLES = 16
+_SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
+_spr_blade = (
+    SPRING_KINK_START[0] - SPRING_BEND_EXIT[0],
+    SPRING_KINK_START[1] - SPRING_BEND_EXIT[1],
+)
+_spr_len = math.hypot(*_spr_blade)
+_SPR_WEST = (_spr_blade[1] / _spr_len, -_spr_blade[0] / _spr_len)  # blade normal
+_spr_deflection: list[float] = []
+_spr_station: list[float] = []
+for _i in range(_SPR_STEPS):
+    _phi = _PHI_ENG * _i / (_SPR_STEPS - 1)
+    # The flank touches the crest where the crest's outward normal faces it:
+    # that direction must stay on the crest arc (blade side -> flick side).
+    _t, _n = _strap_frame(SPRING_KINK_C, _phi)
+    _n -= _SPR_CREST_OUTER_R
+    _toward = math.atan2(
+        -(_SPR_N[0] * math.sin(_phi) + _SPR_N[1] * math.cos(_phi)),
+        -(_SPR_N[0] * math.cos(_phi) - _SPR_N[1] * math.sin(_phi)),
+    )
+    _from = math.atan2(_SPR_WEST[1], _SPR_WEST[0])
+    _sweep = (_toward - _from + math.pi) % (2.0 * math.pi) - math.pi
+    if not -1e-9 <= _sweep <= math.radians(SPR_KINK_DEG) + 1e-9:
+        raise AssertionError(f"spring contact runs off the crest arc at {_phi:.4f}")
+    # The contact stays on the STRAIGHT flank, clear of the arbor end cap.
+    if not 1.0 <= _t <= STRAP_C2C - 1.0:
+        raise AssertionError(f"spring contact leaves the straight flank at {_phi:.4f}")
+    # The crest is the first contact: no point of the blade's west face below
+    # it nor the flick tip comes nearer the swung flank.
+    for _k in range(_SPR_BLADE_SAMPLES + 1):
+        _f = _k / _SPR_BLADE_SAMPLES
+        _p = (
+            SPRING_BEND_EXIT[0] + _f * _spr_blade[0] + SPRING_T * _SPR_WEST[0],
+            SPRING_BEND_EXIT[1] + _f * _spr_blade[1] + SPRING_T * _SPR_WEST[1],
+        )
+        if _strap_frame(_p, _phi)[1] < _n - 1e-6:
+            raise AssertionError("spring blade crosses the flank below the crest")
+    if _strap_frame(SPRING_FLAT_TIP, _phi)[1] - SPRING_T < _n - 1e-6:
+        raise AssertionError("spring flick tip crosses the flank above the crest")
+    _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
+    _spr_station.append(_t)
+SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
+for _label, _d, _t, _m in zip(
+    ("parked", "engaged"),
+    SPRING_DEFLECTION,
+    (_spr_station[0], _spr_station[-1]),
+    _SWING_GRAVITY_NMM,
+):
+    if spr_contact_force(_d - SPR_FORMED_BAND) * _t < _PRELOAD_MARGIN * _m:
+        raise AssertionError(
+            f"spring preload loses to gravity {_label} at the formed band's low end"
+        )
+if SPR_YIELD_MPA / spr_root_stress(SPRING_DEFLECTION[1]) < _STRESS_SF:
+    raise AssertionError("spring root stress over yield / SF at the engaged pose")
+# The engaged blade flexes east toward the cylinder drum: the crest and the
+# flick tip, carried east by the extra deflection, keep 0.25 to the north end
+# disc beside them (the gears themselves end axially short of the leaf).
+_spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
+for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
+    _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
+    if (
+        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - SPRING_T
+        < END_DISC_DIA / 2.0 + 0.25
+    ):
+        raise AssertionError(f"engaged spring {_label} reaches the drum end disc")
 
 # --- full-rotation clearance proofs (PR6) -------------------------------------
 # The interference gate sees only the PARKED pose; the grip crossrod spins full
@@ -1805,7 +1900,7 @@ if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the integral grip head")
 
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
-# bounds the collar sweep against the base, spring foot and shaft.)
+# bounds the collar sweep against the base and shaft.)
 
 # The MHA-144 collar rides the arbor outboard of the front strap.  It must
 # stand clear of the strap's outer face (the printed-band stack lives in

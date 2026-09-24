@@ -1,11 +1,11 @@
 r"""Create the curated machinist drawing for the pinion return leaf spring.
 
-NOT a coil spring: a bent brass leaf.  A 0.8 brass blank -- a 4.0 strip with a
-square screw pad at its free end -- formed as a flat screw-down foot, an R2 bend
-up to a blade following the parked strap lean, then a subtle R1.5 kink (~20 deg
-back) to a short free flat.  The formed profile is baselined from the foot's
-free end in the front view; the projected top view carries the blank's pad,
-strip width and hole; a 5:1 detail carries the kink.
+NOT a coil spring: a bent phosphor-bronze leaf.  A 0.5 blank -- a 5.0 strip
+with a square screw pad at its free end -- formed as a flat screw-down foot, an
+R2 bend up to a blade leaning back over the foot's bend, then an R1.5 crest
+turning 25 deg out to a short free flat.  The formed profile is baselined from
+the foot's free end in the front view; the projected top view carries the
+blank's pad, strip width and hole; a 5:1 detail carries the crest.
 
 Run with SolidWorks open::
 
@@ -39,13 +39,17 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_spring_geometry import (
+    BEND_CX,
     FLAT_TIP,
     FOOT_END,
+    FOOT_TAN,
     HOLE_DIA,
     HOLE_FROM_END,
     KINK_C,
     KINK_START,
+    PAD_LEN,
     PAD_WIDTH,
+    R_KINK,
     THICK,
 )
 from pinion_spring_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION_BY_NAME
@@ -71,11 +75,12 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
 
-# Front view (XY): the checkmark profile -- the foot along the bottom, the
-# blade rising to the upper right.  Views centre on their bounding boxes; the
-# profile spans the foot's free end to the blade's east face and the foot's
-# underside to the free tip.
-FRONT_BBOX_CX = (FOOT_END[0] + KINK_START[0] + THICK) / 2.0
+# Front view (XY): the profile -- the foot along the bottom running right to
+# its free end, the blade rising at the left and leaning back over the bend.
+# Views centre on their bounding boxes; the profile spans the crest's outer
+# face to the foot's free end and the foot's underside to the free tip.
+_PROFILE_MIN_X = KINK_C[0] - (R_KINK + THICK)
+FRONT_BBOX_CX = (_PROFILE_MIN_X + FOOT_END[0]) / 2.0
 FRONT_BBOX_CY = (FLAT_TIP[1] + THICK) / 2.0
 FRONT_CENTER = (0.110, 0.118)
 # Third-angle projection: the top view sits ABOVE the front and shares its X
@@ -104,25 +109,26 @@ def _front_y(model_y_mm: float) -> float:
 
 
 _FOOT_MID_X = (FOOT_END[0] + KINK_START[0]) / 2.0
+_PROFILE_TOP = _front_y(FLAT_TIP[1])
 FRONT_KEEP = {
-    "FootLen": (_front_x(_FOOT_MID_X), 0.074),
-    "BendR": (0.172, 0.080),
-    "KinkV": (0.176, 0.120),
-    "KinkH": (_front_x(_FOOT_MID_X), 0.160),
-    # 18 mm above KinkH: 10 put TipH's dimension line through 41.1.
-    "TipH": (_front_x(_FOOT_MID_X), 0.178),
+    "FootLen": (_front_x((FOOT_TAN[0] + FOOT_END[0]) / 2.0), _front_y(0.0) - 0.010),
+    "BendR": (_front_x(BEND_CX) - 0.032, _front_y(0.0) - 0.004),
+    "KinkV": (_front_x(FOOT_END[0]) + 0.016, _front_y(KINK_START[1] / 2.0)),
+    "KinkH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.012),
+    "TipH": (_front_x(_FOOT_MID_X), _PROFILE_TOP + 0.026),
 }
+_PAD_EAST = _front_x(FOOT_END[0])
 TOP_KEEP = {
-    "PadLen": (_front_x(FOOT_END[0] + 4.75), 0.226),
-    # Outboard of the hole-edge 4.75 (text at x 0.056) so the two stack apart.
-    "PadWidth": (0.028, TOP_CENTER[1]),
-    "StripWidth": (0.172, TOP_CENTER[1]),
+    "PadLen": (_front_x(FOOT_END[0] - PAD_LEN / 2.0), TOP_CENTER[1] + 0.021),
+    # Outboard of the hole-edge 4.75 (HOLE_EDGE_TEXT_XY) so the two stack apart.
+    "PadWidth": (_PAD_EAST + 0.030, TOP_CENTER[1]),
+    "StripWidth": (_front_x(_PROFILE_MIN_X) - 0.018, TOP_CENTER[1]),
 }
 DETAIL_KEEP = {
-    # Upper-left of the fence: right of it the leader crossed the 2.0 flat
-    # dimension's extension lines and its arrowhead met the text.
-    "KinkR": (0.195, 0.232),
-    "FlatLen": (0.278, 0.182),
+    # The flick turns right (east) in this view: the radius leader goes
+    # upper-left of the fence, the flat's length to its right.
+    "KinkR": (0.205, 0.232),
+    "FlatLen": (0.282, 0.200),
 }
 DIMENSION_CALLOUTS = {
     "FootLen": "TO BEND TANGENT",
@@ -130,11 +136,11 @@ DIMENSION_CALLOUTS = {
     "KinkV": "TO KINK TANGENT",
     "TipH": "TO FREE TIP",
 }
-HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] + 2.25), 0.236)
-HOLE_EDGE_TEXT_XY = (0.056, TOP_CENTER[1] + 0.004)
-# Below the pad (bottom edge y 0.196): above it the leader crossed the 4.50
-# and 9.50 pad dimensions on its way down to the hole.
-HOLE_CALLOUT_XY = (0.045, 0.188)
+HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), 0.236)
+HOLE_EDGE_TEXT_XY = (_PAD_EAST + 0.012, TOP_CENTER[1] + 0.004)
+# Below the pad: above it the leader crossed the 4.50 and 9.50 pad
+# dimensions on its way down to the hole.
+HOLE_CALLOUT_XY = (_PAD_EAST + 0.010, 0.186)
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:
@@ -214,7 +220,7 @@ def _hole_locations(adapter: Any, top: Any) -> None:
     print dimensions the hole from the blank's own edges with driven sheet
     dimensions picked on both features; they print at the .XX row.
     """
-    hole_x = (FOOT_END[0] + HOLE_FROM_END) / 1000.0
+    hole_x = (FOOT_END[0] - HOLE_FROM_END) / 1000.0
     hole_r = HOLE_DIA / 2000.0
     top_y = THICK / 1000.0
     edge_picks = {
@@ -237,7 +243,7 @@ def _hole_locations(adapter: Any, top: Any) -> None:
                 label="pad free end",
             ),
             model_point_in_view(
-                adapter, top, (hole_x - hole_r, top_y, 0.0), label="hole west edge"
+                adapter, top, (hole_x + hole_r, top_y, 0.0), label="hole east edge"
             ),
             HOLE_END_TEXT_XY,
             "horizontal",
@@ -358,7 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         (
-            (FOOT_END[0] + HOLE_FROM_END) / 1000.0,
+            (FOOT_END[0] - HOLE_FROM_END) / 1000.0,
             THICK / 1000.0,
             HOLE_DIA / 2000.0,
         ),
