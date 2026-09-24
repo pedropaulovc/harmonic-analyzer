@@ -291,7 +291,7 @@ table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-| MHA-139 crank handle pivot screw (#10-24 slotted, Ø3.4 thread relief) in the tapped 5/16 in steel crank arm | full-thread engagement about 1.35D nominal, 1.18D at the printed worst case | the arm is 5/16 flat bar as photographed, and a steel screw in a steel tap reaches full strength at about 1D | 2026-09-23 |
+| MHA-139 crank handle pivot screw (#10-24 slotted, Ø3.4 thread relief) in the tapped 5/16 in steel crank arm | full-thread engagement about 1.35D nominal, 1.17D at the printed worst case | the arm is 5/16 flat bar as photographed, and a steel screw in a steel tap reaches full strength at about 1D | 2026-09-23 |
 
 Pending: cone gears T006–T024 webs (#846 / U38 study).
 

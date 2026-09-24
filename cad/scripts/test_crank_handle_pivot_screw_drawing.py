@@ -190,7 +190,10 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
     # The sheet states the worst case its named-exception row records.
     assert "NAMED EXCEPTION TO RULE 12" in spec.DRAWING_NOTES
-    worst = f"{spec.FULL_THREAD_WORST_DIAMETERS:.2f}D"
+    # A MIN is floored, never rounded up: 1.176 prints 1.17.
+    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.17
+    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED <= spec.FULL_THREAD_WORST_DIAMETERS
+    worst = f"{spec.FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D"
     assert spec.DRAWING_NOTES.startswith(f"THREAD ENGAGEMENT {worst} MIN")
     policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
     row = next(

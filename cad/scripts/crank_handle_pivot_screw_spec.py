@@ -193,8 +193,10 @@ PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
 # engagement its policy row records (the stock arm, after the exit break) and
 # worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
 # stays here; it means nothing to the book's reader.
+# A MIN never rounds up: 1.176 prints 1.17, floored to two places.
+FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
 DRAWING_NOTES = (
-    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS:.2f}D MIN: "
+    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN: "
     "NAMED EXCEPTION TO RULE 12."
 )
 
