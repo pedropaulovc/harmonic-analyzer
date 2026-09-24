@@ -109,6 +109,11 @@ def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> No
     assert drawing.SEAM_CALLOUT_XY[0] > drawing.OUTBOARD_X
     end_bottom = drawing.END_CENTER[1] - geometry.HUB_BARREL_DIA / 2.0 * drawing._S
     assert drawing.SEAM_CALLOUT_XY[1] < end_bottom
+    # Its near (left) end sits just right of the seam, so the leader drops
+    # short and clear of the bore leader instead of crossing its own text.
+    assert 0.0 < drawing.SEAM_CALLOUT_XY[0] - cx < 0.010
+    bore_block_bottom = drawing.END_KEEP["BoreDia"][1] - 3 * 0.006
+    assert drawing.SEAM_CALLOUT_XY[1] < bore_block_bottom
     assert drawing.END_KEEP["BoreDia"][0] > drawing.END_CENTER[0]
 
 

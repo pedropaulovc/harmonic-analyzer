@@ -124,7 +124,10 @@ SEAM_EDGE_PICK = (
     SEAM_CENTER[0] + AXIAL_PIN_DIA / 2.0 * _S * math.cos(math.pi / 4.0),
     SEAM_CENTER[1] + AXIAL_PIN_DIA / 2.0 * _S * math.sin(math.pi / 4.0),
 )
-SEAM_CALLOUT_XY = (0.255, 0.120)
+# Below the end view with its LEFT end just right of the seam, so the leader
+# drops almost straight to it; a block centred under the view attached at its
+# far end and crossed both its own text and the bore leader (run a2e1cd67).
+SEAM_CALLOUT_XY = (0.303, 0.105)
 # The overall is picked on the two end-face edges seen edge-on, above the axis
 # where the seat and barrel circles -- not the bore -- project.
 OVERALL_PICK_Y = SIDE_CENTER[1] + 0.8 * HUB_SEAT_DIA / 2.0 * _S
