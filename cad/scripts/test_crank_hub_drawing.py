@@ -8,6 +8,7 @@ import pytest
 
 import _config
 import crank_hub_geometry as geometry
+import crank_hub_notes
 import crank_hub_spec
 import draw_crank_hub as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -79,23 +80,24 @@ def test_drawing_registry_and_marks_are_complete() -> None:
 def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None:
     # Policy rule 6: no general notes; each matched fit sits on its feature.
     assert not hasattr(crank_hub_spec, "DRAWING_NOTES")
-    seat = crank_hub_spec.SEAT_CALLOUT
+    seat = crank_hub_notes.SEAT_CALLOUT
     assert seat.startswith("MATCH-FIT TO MHA-020 ARM BORE")
     assert "SHOULDER" in seat and "FACES FLUSH" in seat
     # The arm bore is made first and carries the band; the hub seat is fitted
     # to it, so its nominal prints as a reference.
     assert crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
-    seam = crank_hub_spec.SEAM_CALLOUT
+    seam = crank_hub_notes.SEAM_CALLOUT
     assert "MHA-020" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
-    assert "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0" in seam
+    # Size first, then the process, in the order the work is done.
+    assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates and the fit on its callout.
-    cross_hole = crank_hub_spec.CROSS_HOLE_CALLOUT
+    cross_hole = crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-024" in cross_hole and "MHA-026" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
     # The bore band governs; the clearance is a reference restatement.
-    assert crank_hub_spec.BORE_CALLOUT.splitlines()[1].startswith("(")
+    assert crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
 
 
 def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:
@@ -143,10 +145,10 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
         return max(len(line) for line in text.splitlines()) * char_w / 2.0
 
     seat_x, seat_y = drawing.SIDE_KEEP["SeatDia"]
-    seat_half = half(crank_hub_spec.SEAT_CALLOUT)
+    seat_half = half(crank_hub_notes.SEAT_CALLOUT)
     seat_block = (seat_x - seat_half, seat_x + seat_half)
     hole_x, hole_y = drawing.HOLE_CALLOUT_XY
-    hole_text = f"{crank_hub_spec.CROSS_HOLE_CALLOUT}\n#14 DRILL 0 4.62 THRU ALL"
+    hole_text = f"{crank_hub_notes.CROSS_HOLE_CALLOUT}\n#14 DRILL 0 4.62 THRU ALL"
     hole_block = (hole_x - half(hole_text), hole_x + half(hole_text))
     # The cross-hole leader rises from the hole's top rim to the block's
     # right end; the seat callout must start right of that leader.
@@ -158,7 +160,7 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     bore_x, bore_y = drawing.END_KEEP["BoreDia"]
     # Right of the end view, so its leader enters the bore from the right,
     # clear of the six-o'clock seam and its callout.
-    assert bore_x - half(crank_hub_spec.BORE_CALLOUT) > end_right
+    assert bore_x - half(crank_hub_notes.BORE_CALLOUT) > end_right
     assert bore_y < drawing.END_CENTER[1]
     assert seat_block[1] < drawing.ISO_NOTE_XY[0] and end_left > drawing.OUTBOARD_X
     assert drawing.SIDE_KEEP["BarrelDia"][0] < drawing.INBOARD_X
@@ -185,3 +187,29 @@ def test_centerline_pick_hits_barrel_face_not_the_cross_hole() -> None:
     hole_x, hole_y = drawing.SERVICE_PIN_CENTER
     hole_r = drawing.SERVICE_PIN_DIA / 2.0 * drawing._S
     assert (x - hole_x) ** 2 + (y - hole_y) ** 2 > hole_r**2
+
+
+def test_callout_prose_stays_out_of_every_part_recipe() -> None:
+    # Codex #361: callout wording lives in drawing-only *_notes modules, so a
+    # prose edit re-keys drawings, never a crank part or an assembly.
+    from _buildgraph import module_deps_of
+
+    scripts = Path(drawing.__file__).parent
+    notes = {"crank_hub_notes", "crank_arm_notes", "crankshaft_notes"}
+
+    def reached(stem: str) -> set[str]:
+        return {Path(str(dep)).stem for dep in module_deps_of(scripts / f"{stem}.py")}
+
+    for stem in (
+        "build_crank_hub",
+        "build_crank_arm",
+        "build_crank_hub_pin",
+        "build_crankshaft",
+        "build_crank_handle_pivot_screw",
+        "build_drive_train_assembly",
+        "_interference_contracts",
+    ):
+        assert not reached(stem) & notes, stem
+    assert "crank_hub_notes" in reached("draw_crank_hub")
+    assert "crank_arm_notes" in reached("draw_crank_arm")
+    assert "crankshaft_notes" in reached("draw_crankshaft")

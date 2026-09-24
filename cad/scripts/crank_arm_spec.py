@@ -41,8 +41,6 @@ from crank_hub_geometry import (
     GENERAL_1PL_TOL_MM,
     HUB_SEAT_DIA,
     WALL_TARGET_MM,
-    seam_callout,
-    seat_bore_callout,
 )
 
 
@@ -147,10 +145,6 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
-# Short lines: the callout is centred under the diameter, so its widest line
-# sets how close to the left border the hub-end dimension can stand.  The
-# matched fit's acceptance lives here, on the feature (policy rule 6).
-HUB_SEAT_CALLOUT = seat_bore_callout("MHA-137 HUB")
 # Policy rule 6: at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
@@ -161,7 +155,4 @@ DRAWING_NOTES = "\n".join(
         "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED.",
     )
 )
-# The MHA-138 seam is match-drilled with the hub at assembly; its callout sits
-# on the seam itself (policy rule 6) with the pin's nominal size and depth.
-SEAM_CALLOUT = seam_callout("MHA-137")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

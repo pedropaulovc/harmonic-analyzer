@@ -58,10 +58,9 @@ from crank_arm_spec import (
     DRAWING_REFERENCE_PRECISION,
     HALF_WIDTH,
     HANDLE_PIVOT_HOLE_SPEC,
-    HUB_SEAT_CALLOUT,
-    SEAM_CALLOUT,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from crank_arm_notes import HUB_SEAT_CALLOUT, SEAM_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 

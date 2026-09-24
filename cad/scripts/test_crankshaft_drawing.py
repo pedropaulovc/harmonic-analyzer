@@ -9,6 +9,7 @@ import pytest
 
 import build_crankshaft as part
 import crank_hub_geometry as geometry
+import crankshaft_notes as notes
 import crankshaft_spec as spec
 import draw_crankshaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
@@ -112,14 +113,15 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     assert drawing.PIN_HOLE_SPEC is spec.PIN_HOLE_SPEC
     assert drawing._PIN_HOLE_DIA == blind_cut_dia_mm(spec.PIN_HOLE_SPEC)
     assert spec.PIN_HOLE_HEIGHT == geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
-    # The matched fit identifies both mating parts on the feature callout.
-    process = spec.CROSS_HOLE_PROCESS
-    assert "TAPER-REAM" in process
-    assert "LIGHT DRIVE FIT" in process
-    assert "MHA-137" in process
-    assert "MHA-024" in process
-    assert process.splitlines()[-1] == "#9 DRILL"
-    assert "MHA-020" not in process
+    # The drill size reads first (the prefix of the native callout); the
+    # matched fit, naming both mating parts, reads under it.
+    assert spec.CROSS_HOLE_PROCESS == "#9 DRILL"
+    callout = notes.CROSS_HOLE_CALLOUT
+    assert "TAPER-REAM" in callout
+    assert "LIGHT DRIVE FIT" in callout
+    assert "MHA-137" in callout
+    assert "MHA-024" in callout
+    assert "MHA-020" not in callout
 
 
 def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:

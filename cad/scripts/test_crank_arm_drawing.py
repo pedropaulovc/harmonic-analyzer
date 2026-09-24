@@ -8,6 +8,7 @@ import pytest
 
 import build_crank_arm as arm
 import build_drive_train_assembly as drive
+import crank_arm_notes as notes
 import crank_arm_spec as spec
 import crank_hub_geometry as geometry
 import draw_crank_arm as drawing
@@ -30,9 +31,9 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     assert spec.HALF_WIDTH == pytest.approx(12.7)
     assert "1 x 5/16 IN CF FLAT BAR AS SUPPLIED" in spec.DRAWING_NOTES
     # The arm bore is made first and keeps its band; the hub is fitted to it.
-    assert spec.HUB_SEAT_CALLOUT.startswith("MHA-137 HUB IS MATCH-FIT")
-    assert "TO THIS BORE" in spec.HUB_SEAT_CALLOUT
-    assert "FACES FLUSH" in spec.HUB_SEAT_CALLOUT
+    assert notes.HUB_SEAT_CALLOUT.startswith("MHA-137 HUB IS MATCH-FIT")
+    assert "TO THIS BORE" in notes.HUB_SEAT_CALLOUT
+    assert "FACES FLUSH" in notes.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
     assert not hasattr(spec, "PIN_HOLE_SPEC")
 
@@ -54,7 +55,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia"}
-    assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == spec.HUB_SEAT_CALLOUT
+    assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == notes.HUB_SEAT_CALLOUT
     assert not hasattr(drawing, "TOP_KEEP")  # the seam callout replaced the view
 
 
@@ -73,14 +74,14 @@ def test_reference_dimensions_remain_model_owned() -> None:
 
 
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
-    notes = spec.DRAWING_NOTES
-    assert "MHA-138" not in notes and "O'CLOCK" not in notes
-    assert "MHA-024" not in notes
-    assert "DIMPLE" not in notes
-    seam = spec.SEAM_CALLOUT
+    general = spec.DRAWING_NOTES
+    assert "MHA-138" not in general and "O'CLOCK" not in general
+    assert "MHA-024" not in general
+    assert "DIMPLE" not in general
+    seam = notes.SEAM_CALLOUT
     assert "MHA-137" in seam and "MHA-138" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam
-    assert "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0" in seam
+    assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert all("Fiducial" not in name for name in marked)
     assert all("AxialPin" not in name for name in marked)
@@ -164,7 +165,7 @@ def test_notes_and_seat_callout_stay_inside_their_sheet_regions() -> None:
     assert len(lines) <= 4
     assert 0.016 + max(len(line) for line in lines) * char_w < 0.218  # title block
     seat_x = drawing.FRONT_KEEP["HubSeatDia"][0]
-    half = max(len(line) for line in spec.HUB_SEAT_CALLOUT.splitlines()) * char_w / 2
+    half = max(len(line) for line in notes.HUB_SEAT_CALLOUT.splitlines()) * char_w / 2
     assert seat_x - half > 0.0128 + 0.003  # inner border plus air
 
 
@@ -181,13 +182,13 @@ def test_hub_end_callouts_stand_in_a_row_without_crossing_leaders() -> None:
     # drops from the seam block's left end to the pick; the anchor offset
     # dimension stands between that leader and the anchor tap.
     seat_x = drawing.FRONT_KEEP["HubSeatDia"][0]
-    seat_right = seat_x + max(map(len, spec.HUB_SEAT_CALLOUT.splitlines())) * char_w / 2
+    seat_right = seat_x + max(map(len, notes.HUB_SEAT_CALLOUT.splitlines())) * char_w / 2
     leader_x = min(drawing.SEAM_CALLOUT_XY[0], x)
     assert seat_right + 0.002 < leader_x
     anchor_x = drawing._sheet_x(spec.ANCHOR_SCREW_X)
     assert max(drawing.SEAM_CALLOUT_XY[0], x) < drawing.FRONT_KEEP["AnchorOffset"][0] < anchor_x
     seam_right = drawing.SEAM_CALLOUT_XY[0] + max(
-        len(line) for line in spec.SEAM_CALLOUT.splitlines()
+        len(line) for line in notes.SEAM_CALLOUT.splitlines()
     ) * char_w
     assert seam_right < drawing.ANCHOR_CALLOUT_XY[0] or (
         drawing.ANCHOR_CALLOUT_XY[1] < drawing.SEAM_CALLOUT_XY[1] - 0.020

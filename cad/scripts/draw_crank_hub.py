@@ -32,8 +32,6 @@ from _hole_spec import blind_cut_dia_mm, drill_process
 from crank_hub_spec import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_RADIUS_FROM_AXIS,
-    BORE_CALLOUT,
-    CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
@@ -43,10 +41,14 @@ from crank_hub_spec import (
     HUB_SEAT_LENGTH,
     ISOMETRIC_VIEW_NOTE,
     REFERENCE_DIMENSIONS,
-    SEAM_CALLOUT,
-    SEAT_CALLOUT,
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
+)
+from crank_hub_notes import (
+    BORE_CALLOUT,
+    CROSS_HOLE_CALLOUT,
+    SEAM_CALLOUT,
+    SEAT_CALLOUT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
@@ -144,6 +146,20 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
 }
+
+
+def _set_callout_below(display: Any, text: str, label: str) -> None:
+    """Put the matched-operation prose UNDER a native hole callout.
+
+    The drill size reads first, in the order the work is done; the fit and
+    mate prose follows in the callout-below compartment (the Ø9.550 bore
+    callout's order).  ``SetText`` reports nothing, so it is read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(4, text)  # swDimensionTextCalloutBelow
+    applied = str(display.GetText(4) or "")
+    if applied.replace("\r", "") != text:
+        raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
 def _add_overall_reference(adapter: Any, view: Any) -> None:
@@ -269,14 +285,15 @@ async def build(adapter: Any) -> dict[str, str]:
         face_xy=BARREL_FACE_PICK,
         label="crank hub axis centerline",
     )
-    add_native_hole_callout(
+    cross_hole = add_native_hole_callout(
         adapter,
         right,
         edge_xy=SERVICE_PIN_TOP_RIM,
         callout_xy=HOLE_CALLOUT_XY,
         label="MHA-024 hub pilot",
-        process=f"{CROSS_HOLE_CALLOUT}\n{drill_process(SERVICE_PIN_HOLE_SPEC)}",
+        process=drill_process(SERVICE_PIN_HOLE_SPEC),
     )
+    _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "MHA-024 hub pilot")
     add_attached_note(
         adapter,
         front,

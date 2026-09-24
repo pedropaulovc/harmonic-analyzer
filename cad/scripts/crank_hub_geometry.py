@@ -114,35 +114,6 @@ SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
 )
 
 
-def seat_callout(mate: str) -> str:
-    """Hub-seat fit on MHA-137, the part turned second to fit ``mate``'s bore."""
-    return "\n".join(
-        (
-            f"MATCH-FIT TO {mate}",
-            "LIGHT ARBOR-PRESS TO SHOULDER",
-            "FACES FLUSH",
-            "NO TURN OR SLIDE BY HAND",
-        )
-    )
-
-
-def seat_bore_callout(mate: str) -> str:
-    """The arm's seat bore, made first: its printed size governs, ``mate`` fits it."""
-    return "\n".join((f"{mate} IS MATCH-FIT", "TO THIS BORE; FACES FLUSH"))
-
-
-def seam_callout(mate: str) -> str:
-    """MHA-138 seam, match-drilled with ``mate``: the pin sets the size."""
-    return "\n".join(
-        (
-            f"MATCH-DRILL/REAM WITH {mate}",
-            "AT ASSEMBLY, CENTRED ON THE SEAM",
-            "FOR MHA-138: LIGHT DRIVE FIT",
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
-        )
-    )
-
-
 def wall_after_edge_break(outer_dia: float, inner_dia: float) -> float:
     """Return the finished radial wall between two diameters after edge breaks."""
     return (outer_dia - inner_dia) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM

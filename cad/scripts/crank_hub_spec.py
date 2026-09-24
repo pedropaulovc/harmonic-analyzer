@@ -20,8 +20,6 @@ from crank_hub_geometry import (
     SERVICE_PIN_STATION,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
-    seam_callout,
-    seat_callout,
 )
 
 
@@ -62,26 +60,10 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 ):
     raise AssertionError("every marked crank-hub dimension needs authored places")
 
-# The printed band governs the bore; the shaft clearance it yields is a
-# reference restatement.
-BORE_CALLOUT = (
-    "REAM THRU\n"
-    f"({SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL\n"
-    "CLEARANCE ON MHA-026)"
-)
 # The arm bore is made first and carries the band; this seat is turned to fit
-# it, so its nominal prints as a reference under the match-fit callout.
-SEAT_CALLOUT = seat_callout("MHA-020 ARM BORE")
+# it, so its nominal prints as a reference under the match-fit callout
+# (crank_hub_notes owns the callout prose).
 REFERENCE_DIMENSIONS = frozenset({"SeatDia"})
-SEAM_CALLOUT = seam_callout("MHA-020")
-# The cross-hole is taper-reamed through hub and shaft together; the wording
-# matches the crankshaft MHA-026 callout for the same operation.
-CROSS_HOLE_CALLOUT = (
-    "MATCH TAPER-REAM 1:48\n"
-    "WITH CRANKSHAFT MHA-026\n"
-    "TO TAPER PIN MHA-024:\n"
-    "LIGHT DRIVE FIT"
-)
 # No general notes (policy rule 6): the seat fit, the seam and the cross-hole
 # each carry their requirement on their own callout, and the U29 hub leaves a
 # 2-mm seam web at the printed bands, so no matched wall check.

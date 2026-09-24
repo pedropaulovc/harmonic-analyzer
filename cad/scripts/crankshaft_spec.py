@@ -101,19 +101,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "DomeSphereRadius"})
 SPHERICAL_DIMENSIONS = frozenset({"DomeSphereRadius"})
 
-# Matched-fit requirement on the feature callout (rule 6), above the native
-# drill size, naming both mates and the acceptance of the custom 1:48 taper
-# pin (crank_pin_spec).  Short lines keep the callout narrow enough to sit
-# beside the cross-hole.
-CROSS_HOLE_PROCESS = "\n".join(
-    (
-        "MATCH TAPER-REAM 1:48",
-        "WITH CRANK HUB MHA-137",
-        "TO TAPER PIN MHA-024:",
-        "LIGHT DRIVE FIT",
-        drill_process(PIN_HOLE_SPEC),
-    )
-)
+# The native cross-hole callout's process prefix: the drill reads first; the
+# taper-ream prose under it lives in crankshaft_notes (drawing-only).
+CROSS_HOLE_PROCESS = drill_process(PIN_HOLE_SPEC)
 # The punch mark is a visual witness: its clocking to the cross-hole shows in
 # the end view's hidden lines, and its exact spot is deliberately free.
 DRAWING_NOTES = "PUNCH FIDUCIAL MARK ON DOME WHERE SHOWN; LOCATE BY EYE."

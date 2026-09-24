@@ -64,6 +64,7 @@ from crankshaft_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
+from crankshaft_notes import CROSS_HOLE_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -168,6 +169,20 @@ FINISH_SYMBOL = (JOURNAL_START_X + 0.050, 0.203)
 HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.368, 0.108)
+
+
+def _set_callout_below(display: Any, text: str, label: str) -> None:
+    """Put the matched-operation prose UNDER a native hole callout.
+
+    The drill size reads first, in the order the work is done; the fit and
+    mate prose follows in the callout-below compartment (the Ø9.550 bore
+    callout's order).  ``SetText`` reports nothing, so it is read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(4, text)  # swDimensionTextCalloutBelow
+    applied = str(display.GetText(4) or "")
+    if applied.replace("\r", "") != text:
+        raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
 def _visible_cross_hole_edge(adapter: Any, view: Any) -> Any:
@@ -402,7 +417,7 @@ async def build(adapter: Any) -> dict[str, str]:
         face=_visible_cylindrical_face(adapter, side, JOURNAL_DIA),
     )
 
-    add_native_hole_callout(
+    cross_hole = add_native_hole_callout(
         adapter,
         side,
         callout_xy=HOLE_CALLOUT_XY,
@@ -410,6 +425,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge=_visible_cross_hole_edge(adapter, side),
         process=CROSS_HOLE_PROCESS,
     )
+    _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
     add_surface_finish(
         adapter,
         side,
