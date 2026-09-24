@@ -33,6 +33,8 @@ def test_registry_paths_and_part_name() -> None:
 def test_part_registry_row_is_the_made_screw() -> None:
     row = _config.parts("crank-handle-pivot-screw")
     assert row["number"] == "MHA-139"
+    # The title block prints the registry title, not the slug.
+    assert row["title"] == "Crank Handle Pivot Screw"
     for grade in ("1018", "12L14", "3/8 in"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
@@ -322,6 +324,10 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The Ø stands on the floor, clear of the lead.
     lead_foot_x = drawing.SEAT_X - spec.RELIEF_LEAD * drawing.SHEET_SCALE[0] / 1000.0
     assert drawing.RELIEF_END_X < drawing.SIDE_KEEP["ReliefDia"][0] < lead_foot_x
+    # Its offset text starts clear of the seat-face extension line (the
+    # thread length's right side), which ran through the LEAD line.
+    assert drawing.RELIEF_DIA_TEXT_XY[0] - drawing.SEAT_X >= 0.0025
+    assert drawing.RELIEF_DIA_TEXT_XY[1] == drawing.SIDE_KEEP["ReliefDia"][1]
     # The 45-degree lead rides the Ø callout; only the width stands above.
     assert "ReliefLead" not in drawing.SIDE_KEEP
     assert spec.RELIEF_CALLOUT == "0.5 X 45 DEG LEAD"

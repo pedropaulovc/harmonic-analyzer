@@ -37,6 +37,7 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_hidden_lines_removed,
     set_dimension_callouts,
@@ -149,6 +150,12 @@ SIDE_KEEP = {
     # The slot shows as a notch in the head face; its depth reads above it.
     "SlotDepth": (HEAD_FACE_X - 0.0015, SIDE_CENTER[1] + 0.026),
 }
+# The relief Ø's dimension line stands on the floor (SIDE_KEEP), but its
+# two-line text left-aligned there ran the seat-face extension line (the
+# thread length's right side) through "0.5 X 45 DEG LEAD".  OffsetText
+# parks the text 6 mm right on a leader, clear of that line, while the
+# dimension line stays on the floor; the Ø6.00 arrow is well right of it.
+RELIEF_DIA_TEXT_XY = (RELIEF_FLOOR_MID_X + 0.006, SIDE_CENTER[1] - 0.016)
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.
 END_KEEP = {
@@ -239,6 +246,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"
     )
+    offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [
