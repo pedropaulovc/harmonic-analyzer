@@ -23,7 +23,6 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
-    set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
 )
@@ -106,7 +105,8 @@ DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
     "HeadCapR": (0.195, 0.262),
     "HeadCapSagDim": (0.205, 0.210),
-    "CrossHoleDia": (0.245, 0.245),
+    # Above the hole's centre line, so the leader drops onto the hole edge.
+    "CrossHoleDia": (0.245, 0.256),
 }
 # The head and neck sit inside detail A's fence at the right end of the
 # profile (x 0.296-0.320, axis y 0.171): the neck's text rides above its own
@@ -341,13 +341,13 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Integral Pinion Arbor Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "integral arbor and grip head; match-reamed crossrod hole",
+            3: "integral arbor and grip head; reamed, bonded crossrod hole",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     donor = place_view(adapter, str(SOURCE), "*Front", 0.030, 0.180, scale=(2, 1))
-    # Looking along model Y presents the match-reamed cross-hole as a true
+    # Looking along model Y presents the reamed cross-hole as a true
     # circle while retaining the entire turned profile in one horizontal view.
     principal = place_view(
         adapter, str(SOURCE), "*Top", *PRINCIPAL_CENTER, scale=SHEET_SCALE
@@ -414,7 +414,6 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_reference_dimensions(adapter, annotations, {"CrossHoleDia"})
     for name, label in {
         "HeadCapSagDim": "front-crown height reference",
         "BackCapSagDim": "back-crown descriptive reference",

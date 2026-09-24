@@ -277,12 +277,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
-            # MHA-058's nominal Ø6.0175 rod is match-reamed into the MHA-102
-            # Ø6.005 cross-hole through the integral Ø15 head.  The allowance
-            # is only the resulting annular shell within that host envelope.
-            frozenset(("pinion-handle-1", "pinion-arbor-1")): (
-                _press_fit_shell_limit(6.0175, 6.005, 15.0)
-            ),
+            # R1: MHA-058 is a bonded slip fit modelled line to line in the
+            # MHA-102 cross-hole, so the pair needs no interference allowance.
         },
         "frame": {
             **_expected_numbered_pairs(

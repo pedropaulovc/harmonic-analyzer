@@ -10,6 +10,7 @@ import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
 import pinion_arbor_spec as spec
+import pinion_handle_geometry as rod_geometry
 import pinion_handle_spec as crossrod
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -57,7 +58,7 @@ def test_crossrod_hole_is_centred_with_a_rule_12_web() -> None:
     # web, never a separate station band.
     assert "CrossHoleReference" not in spec.DRAWING_DIMENSIONS
     assert "CENTRED ON HEAD LENGTH" in spec.CROSS_HOLE_CALLOUT
-    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(1.7975)
+    assert spec.CROSS_HOLE_WEB_WORST == pytest.approx(1.80)
     assert spec.CROSS_HOLE_WEB_WORST >= 1.5
 
 
@@ -66,14 +67,37 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.HEAD_LEN == pytest.approx(10.5)
     assert spec.NECK_DIA == pytest.approx(10.5)
     assert spec.NECK_LEN == pytest.approx(11.25)
-    assert spec.CROSS_HOLE_DIA == pytest.approx(6.005)
-    assert crossrod.ROD_DIA == pytest.approx(6.0175)
-    assert crossrod.ROD_DIA > spec.CROSS_HOLE_DIA
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert "MHA-058" in callout and "MIDPLANE" not in callout
-    assert "ARBOR-PRESS" in callout
+    assert callout == "REAM THRU,\nCENTRED ON HEAD LENGTH"
     assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
+
+
+def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
+    """R1 (U27 precedent): a novice's stock reamer and as-received bar give
+    clearance, so the hole is banded Ø6.00 +0.10/0 and the rod is bonded."""
+    assert spec.CROSS_HOLE_DIA == pytest.approx(6.0)
+    assert spec.CROSS_HOLE_DIA_BAND == (0.10, 0.0)
+    assert crossrod.ROD_DIA == pytest.approx(spec.CROSS_HOLE_DIA)  # line to line
+    assert (
+        model_toleranced_dimensions(part)[("CrossHoleProfile", "CrossHoleDia")]
+        == "*deviations(CROSS_HOLE_DIA_BAND)"
+    )
+    assert spec.DRAWING_PRECISION_BY_NAME["CrossHoleDia"] == 2
+    tightest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[1]) - (
+        crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[0]
+    )
+    loosest = (spec.CROSS_HOLE_DIA + spec.CROSS_HOLE_DIA_BAND[0]) - (
+        crossrod.ROD_DIA + rod_geometry.ROD_DIA_BAND[1]
+    )
+    assert spec.CROSSROD_MIN_CLEARANCE == pytest.approx(tightest)
+    assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
+    assert tightest >= 0.0
+    assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
+    assert "ON ASSEMBLY: BOND MHA-058 WITH LOCTITE 638." in spec.DRAWING_NOTES
+    for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
+        assert retired not in spec.DRAWING_NOTES
+        assert retired not in spec.CROSS_HOLE_CALLOUT
 
 
 def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
@@ -81,6 +105,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.SHAFT_DIA_BAND == (0.0, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
     }
@@ -101,7 +126,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(50.5)
     assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(203.2)
     assert "MHA-056" in spec.DRAWING_NOTES
-    assert "BOND INTO MHA-002 WITH LOCTITE 638." in spec.DRAWING_NOTES
+    assert "SHAFT SLIPS INTO MHA-002 AND BONDS WITH LOCTITE 638." in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")

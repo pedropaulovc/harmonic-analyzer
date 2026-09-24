@@ -29,11 +29,6 @@ from crank_pin_spec import (
     SMALL_END_DIA as _PIN_D1,
 )
 from crankshaft_spec import SHAFT_DIA as _CS_DIA
-from pinion_arbor_spec import (
-    CROSS_HOLE_DIA as _GRIP_CROSS_HOLE_DIA,
-    HEAD_DIA as _GRIP_HEAD_DIA,
-)
-from pinion_handle_geometry import ROD_DIA as _GRIP_ROD_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
@@ -72,16 +67,6 @@ def _numbered_pairs(
     }
 
 
-# MHA-058 is match-reamed into MHA-102's integral head for a light arbor
-# press fit.  In the nominal solids, the coaxial 6.0175 mm rod and 6.005 mm
-# bore cross the head on its full 15 mm diameter.  Bound only that annular
-# shell inside the actual host envelope, with no blanket pair exemption.
-_GRIP_PRESS_OVERLAP_MM3 = (
-    math.pi
-    * (_GRIP_ROD_DIA**2 - _GRIP_CROSS_HOLE_DIA**2)
-    * _GRIP_HEAD_DIA
-    / 4.0
-)
 # Crank taper pin in its PILOT holes (ch11 p.14, 2026-09-02): the released
 # drawings drill the arm #14 (4.623) and the shaft #9 (4.978) and taper-ream
 # them together at assembly, so the nominal 1:48 pin overlaps both pilots.
@@ -132,7 +117,6 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    frozenset(("pinion-handle-1", "pinion-arbor-1")): _GRIP_PRESS_OVERLAP_MM3,
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
         7.9502, 6.528, 6.0
     ),
