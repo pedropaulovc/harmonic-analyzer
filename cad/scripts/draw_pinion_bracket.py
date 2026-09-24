@@ -62,7 +62,6 @@ from pinion_bracket_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DROP,
-    PIN_SEAT,
     DRAWING_REFERENCE_PRECISION,
     OVERALL_LENGTH,
     PIVOT_BORE,
@@ -125,7 +124,9 @@ def _flank_y(model_y_mm: float) -> float:
 FRONT_KEEP = {
     "ArborBoreDia": (0.256, 0.214),
     "ArborBoreCz": (0.240, 0.151),
-    "BottomCapRadius": (0.250, 0.080),
+    # r6 eye-pass: at (0.250, 0.080) it overprinted the pivot bore's REAM
+    # THRU; the lower-left field is clear of the pivot Ra and the title block.
+    "BottomCapRadius": (0.170, 0.072),
     "TopCapRadius": (0.188, 0.245),
     "PivotBoreDia": (0.256, 0.086),
 }
@@ -133,9 +134,10 @@ FRONT_KEEP = {
 # station through the bar are dimensioned on real geometry.
 LEFT_KEEP = {
     "Depth": (0.080, 0.212),
-    "PinSeatCz": (0.060, 0.090),
     "PinSeatCy": (0.130, 0.125),
-    "PinSeatDia": (0.040, 0.160),
+    # r6 eye-pass: beside the view its widest callout line ran across the
+    # flank; above the view the leader crosses only the outline.
+    "PinSeatDia": (0.050, 0.245),
 }
 SECTION_CENTER = (0.350, 0.115)
 SECTION_KEEP = {"PinSeatDepth": (SECTION_CENTER[0], 0.145)}
@@ -155,7 +157,7 @@ PIVOT_FINISH_XY = (0.155, 0.095)
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nBLIND FLAT-BOTTOM\nREAM",
+    "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nCENTRED ON THICKNESS\nBLIND FLAT-BOTTOM\nREAM",
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
 
@@ -197,31 +199,27 @@ def _overall_reference(adapter: Any, left: Any) -> None:
         raise RuntimeError("overall length reference precision did not persist")
 
 def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
-    """Dimension the visible entry face to blind floor in Section B-B."""
-    entry_x = SECTION_CENTER[0] - R_END * 3.0 / 1000.0
-    floor_x = entry_x + PIN_SEAT * 3.0 / 1000.0
-    display = add_edge_dimension(
+    """Import the part's marked seat depth into Section B-B.
+
+    The section plane runs through the seat axis, so the blind cut's own depth
+    dimension lies in the view plane and imports as a native model dimension
+    with the part-authored places (policy rule 2) -- the sheet never writes a
+    precision for a controlling dimension.
+    """
+    (annotation,) = curate_view_dimensions(
         adapter,
         section,
-        p0=(entry_x, SECTION_CENTER[1] + 0.009),
-        p1=(floor_x, SECTION_CENTER[1]),
-        text_xy=SECTION_KEEP["PinSeatDepth"],
-        label="follower seat depth",
-        orientation="horizontal",
+        keep=SECTION_KEEP,
+        view_label="follower seat section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
-    if abs(measured_mm - PIN_SEAT) > 1e-5:
-        raise RuntimeError(
-            f"follower seat depth measured {measured_mm:g}, expected {PIN_SEAT:g} mm"
-        )
-    digits = DRAWING_PRECISION_BY_NAME["PinSeatDepth"]
-    display.SetPrecision3(digits, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != digits:
-        raise RuntimeError("follower seat depth precision did not persist")
-    display.SetText(3, PIN_SEAT_DEPTH_CALLOUT)
-    return display.GetAnnotation()
+    set_dimension_callouts(
+        adapter,
+        [annotation],
+        {"PinSeatDepth": PIN_SEAT_DEPTH_CALLOUT},
+        location="above",
+    )
+    return annotation
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -311,6 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=ARBOR_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "arbor_bore"),
         label="arbor bore finish",
+        char_height=0.0025,  # the pivot-block size; the default read oversized
     )
     add_surface_finish(
         adapter,
@@ -319,18 +318,16 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=PIVOT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_bore"),
         label="pivot bore finish",
+        char_height=0.0025,
     )
-    _seat_depth_dimension(adapter, seat_section)
+    seat_depth = _seat_depth_dimension(adapter, seat_section)
 
 
     annotations = [*front_annotations, *left_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    imported_precision = {
-        name: digits
-        for name, digits in DRAWING_PRECISION_BY_NAME.items()
-        if name != "PinSeatDepth"
-    }
-    assert_imported_precision(adapter, annotations, imported_precision)
+    assert_imported_precision(
+        adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
+    )
 
     for index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
