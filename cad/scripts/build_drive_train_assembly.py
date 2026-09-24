@@ -843,7 +843,7 @@ from build_cone_pivot_post import (  # noqa: E402
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_DEPTH as TIP_ADJ_BORE_DEPTH,
+    ADJUSTER_CSK as TIP_ADJ_CSK,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
@@ -942,11 +942,12 @@ for _lbl, _s0, _hx, _hz in (
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
-# The shaft's tip reaches through the block to the adjuster cup (>= 5 inside
-# the block envelope, end short of the north face).
+# The shaft's tip reaches through the block to the adjuster cup: past the
+# south countersink by 2.0 (E11/W1: the #10-32 cup rim sits 9.5 in from the
+# north face, so the tip lands ~3.7 inside), end short of the north face.
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
 if not (
-    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + 5.0
+    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + TIP_ADJ_CSK + 2.0
     <= _TIP_END_STATION
     <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5
 ):
@@ -962,9 +963,10 @@ if SHAFT_FRONT_STATION > _POST_SOUTH_STATION - 1.0 + 1e-9:
     )
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
 # Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A150 adjuster's conical cup. The adjusted 1/32-in shaft terminal
-# meets the vendor cup apex while the full 6 mm of 5/16-18 thread remains in
-# the block; the top slit and 90280A108 pinch screw lock that setting.
+# | the adjuster's conical cup. The shaft terminal meets the vendor cup apex
+# with the cup rim ADJ_EMBED inside the #10-32 thread tapped through the
+# block (rule-12 E11/W1); the top slit and 90280A110 pinch screw lock that
+# setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
 BUSH_STATION = T006_NORTH_FACE
 ADJ_HEAD_STATION = TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 + (ADJ_LEN - ADJ_EMBED)
@@ -977,8 +979,8 @@ if BUSH_STATION < _STUB_START + 1.0:
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-if ADJ_EMBED > TIP_ADJ_BORE_DEPTH - 0.5:
-    raise AssertionError("adjuster bottoms out in the block tapped hole")
+if ADJ_EMBED > TIP_BLOCK_Z - TIP_ADJ_CSK - 0.5:
+    raise AssertionError("adjuster cup rim leaves the through thread's south end")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:

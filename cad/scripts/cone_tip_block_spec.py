@@ -6,7 +6,6 @@ import _config
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from build_cone_tip_adjuster import CUP_DIA as SHAFT_PASSAGE_DIA
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -37,11 +36,26 @@ PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.2
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
-ADJUSTER_THREAD = "5/16-18"  # blind tapped hole from the far (north) face
-# U30 / E1: the adjuster threads 8.9 mm into the block (>= 8 mm of 5/16-18
-# engagement), so the full thread runs 9.5 and the tap-drill shoulder 11.
-ADJUSTER_THREAD_DEPTH = 9.5  # full-form thread; leaves lead beyond usable thread
-ADJUSTER_DEPTH = 11.0  # tap-drill shoulder
+# Rule-12 E11/W1 (Main, 2026-09-24): a #10-32 x 3/8 cup set screw (McMaster
+# 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
+# both mouths, and no block growth.  A through tap has no floor to break out
+# and no tap lead to deduct; the shaft tip enters through the same thread.
+# The cup rim sits ADJUSTER_EMBED in from the north face (the 3/8 screw stands
+# 0.03 proud).  Worst case at the printed bands: the tip station can come
+# 0.8 north (the shaft's .X overall length), and the north countersink eats
+# its depth, so engagement is min(L, embed - 0.8) - countersink >= 1.5D.  The
+# block's own axial location is set at fit-up (integration item "tip-block
+# axial fit-up slot"), not stacked.
+ADJUSTER_THREAD = "#10-32"
+ADJUSTER_SCREW_LENGTH = 9.525
+ADJUSTER_EMBED = 9.5
+# 45-degree break on each tap-drill mouth: a 90-degree countersink to about the
+# thread major, so the first full thread starts under it.
+ADJUSTER_CSK = 0.4
+# ASME B1.1 #10-32 UNF-2B minimum minor diameter (0.1560 in): the tightest
+# envelope the shaft tip passes through.
+ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
+SHAFT_PASSAGE_DIA = ADJUSTER_MINOR_MIN_DIA
 # U30 hold-down: one #6-32 x 1/2 button-head socket cap screw (McMaster
 # 91255A148, head 0.262 x 0.073; rule-12 W22 swapped it in for the taller
 # socket head) comes up through the platform's counterbored lateral slot into
@@ -72,17 +86,8 @@ if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.8 - 0.25:
     raise AssertionError("foot screw can reach the tap's incomplete lead threads")
 if (FOOT_DEPTH - 0.8) - (FOOT_THREAD_DEPTH + 0.8) < 1.5 * _FOOT_PITCH_MM:
     raise AssertionError("foot tap drill leaves no lead room past the full thread")
-# Non-bearing clearance passage from the south face into the adjuster bore. Its
-# diameter matches the already-defined adjuster cup, so the shaft tip has one
-# continuous envelope without reviving the removed fictional journal fit.
 PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
-ADJUSTER_BORE_SPEC = HoleSpec(
-    "tapped",
-    ADJUSTER_THREAD,
-    end="blind",
-    depth_mm=ADJUSTER_DEPTH,
-    overrides_mm={"ThreadDepth": ADJUSTER_THREAD_DEPTH},
-)
+ADJUSTER_BORE_SPEC = HoleSpec("tapped", ADJUSTER_THREAD)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
 PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
 FOOT_BORE_SPEC = HoleSpec(
@@ -116,11 +121,14 @@ _DRILLED_HOLE_PLUS_MM = float(
 # under the top face) both breaks come off the same web.
 EDGE_BREAK_MAX_MM = 0.25
 MIN_WEB_MM = 2.0
-# ASME B1.1 5/16-18 UNC-2B has no specified maximum major diameter; its
+# ASME B1.1 #10-32 UNF-2B has no specified maximum major diameter; its
 # section 5.8.2(a) reference envelope (basic major + 0.14433757P + the 2B
-# pitch-diameter tolerance) stands in for the finished thread root.
-_ADJ_PITCH_MM = 25.4 / 18.0
-ADJUSTER_ROOT_REF_DIA = 7.9375 + 0.14433757 * _ADJ_PITCH_MM + 0.0053 * 25.4
+# pitch-diameter tolerance, 0.1736 - 0.1697 in) stands in for the finished
+# thread root.
+_ADJ_PITCH_MM = 25.4 / 32.0
+ADJUSTER_ROOT_REF_DIA = (
+    THREAD_MAJOR_MM[ADJUSTER_THREAD] + 0.14433757 * _ADJ_PITCH_MM + 0.0039 * 25.4
+)
 _root_r = ADJUSTER_ROOT_REF_DIA / 2.0
 _worst_clearance_radius = (
     round(PINCH_CLEARANCE_DIA, 2) + _DRILLED_HOLE_PLUS_MM
@@ -185,6 +193,19 @@ if WORST_PINCH_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[PINCH_THREAD]:
     )
 if PINCH_SCREW_LENGTH > round(BLOCK_X, 1) - _GENERAL_1PL_MM:
     raise AssertionError("pinch screw can stand proud of the far (-X) face")
+# E11/W1: the through thread is the whole block, so the screw is the limit.
+WORST_ADJUSTER_ENGAGEMENT_MM = (
+    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - _GENERAL_1PL_MM) - ADJUSTER_CSK
+)
+if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
+    raise AssertionError(
+        f"adjuster engagement {WORST_ADJUSTER_ENGAGEMENT_MM:.2f} < 1.5D at the "
+        "printed worst case"
+    )
+# The cup rim stays inside the block with a full thread past the south
+# countersink at the far end of the embed band.
+if ADJUSTER_EMBED + _GENERAL_1PL_MM > round(BLOCK_Z, 1) - _GENERAL_1PL_MM - ADJUSTER_CSK:
+    raise AssertionError("adjuster cup can leave the south thread at the printed limits")
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
@@ -195,7 +216,9 @@ SURFACE_FINISHES = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},
     "Block": {"BlockHt"},
-    "PassageProfile": {"PassageDiaDim", "PassageZ"},
+    # E11/W1: the through thread replaced the passage sketch that used to
+    # carry the axis height; a construction reference owns it now.
+    "AxisHeightReference": {"AxisHeight"},
     "PassageCenterReference": {"PassageCenter"},
     "PinchDepthReference": {"PinchDepthCenter"},
     "PinchRiseReference": {"PinchRise"},
@@ -209,12 +232,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places carry the general tolerance and therefore live on the model.
 # U24b: the webs close at the title-block bands, so no dimension carries its
-# own band. The height stack (axis, rise, overall height) and the passage
+# own band. The height stack (axis, rise, overall height) and the axis
 # centre print .XX; plain envelope dimensions keep .X.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": 1, "Depth": 1},
     "Block": {"BlockHt": 2},
-    "PassageProfile": {"PassageDiaDim": 2, "PassageZ": 2},
+    "AxisHeightReference": {"AxisHeight": 2},
     "PassageCenterReference": {"PassageCenter": 2},
     "PinchDepthReference": {"PinchDepthCenter": 1},
     "PinchRiseReference": {"PinchRise": 2},

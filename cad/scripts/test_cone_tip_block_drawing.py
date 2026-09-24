@@ -21,23 +21,42 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["cone_tip_block"].script == Path(drawing.__file__).resolve()
 
 
-def test_tip_passage_is_the_adjuster_cup_clearance_envelope() -> None:
-    """The block admits the tip; it must not become a second bearing journal."""
-    assert part.SHAFT_PASSAGE_DIA == cone_tip_block_spec.SHAFT_PASSAGE_DIA
-    assert part.SHAFT_PASSAGE_DIA == 2.0 * part.SHAFT_PASSAGE_RADIUS
-    assert part.SHAFT_PASSAGE_DIA < part.ADJUSTER_BORE_DIA
-    callout = drawing.DIMENSION_CALLOUTS["PassageDiaDim"].upper()
-    assert "THRU" in callout
-    assert "CLEARANCE" in callout
-    assert "COAXIAL WITH" in callout
-    assert "ADJUSTER BORE" in callout
+def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
+    """E11/W1: no floor to break out and no tap lead to deduct (Main, 2026-09-24)."""
+    spec = cone_tip_block_spec
+    assert spec.ADJUSTER_THREAD == "#10-32"
+    assert spec.ADJUSTER_BORE_SPEC.end == "through_all"
+    assert spec.ADJUSTER_BORE_SPEC.depth_mm == 0.0
+    assert "ThreadDepth" not in spec.ADJUSTER_BORE_SPEC.overrides_mm
+    assert "PassageProfile" not in spec.DRAWING_DIMENSIONS
+    # The tip passes the thread's minimum minor diameter, not a separate hole.
+    assert spec.SHAFT_PASSAGE_DIA == pytest.approx(3.9624)
+    assert spec.SHAFT_PASSAGE_DIA < spec.ADJUSTER_BORE_DIA
 
-def test_adjuster_tap_has_lead_beyond_the_required_full_thread() -> None:
-    """A blind tap cannot deliver full threads to its drill shoulder."""
-    spec = part.ADJUSTER_BORE_SPEC
-    thread_depth = spec.overrides_mm["ThreadDepth"]
-    assert 0.0 < thread_depth < spec.depth_mm
-    assert thread_depth == cone_tip_block_spec.ADJUSTER_THREAD_DEPTH
+
+def test_adjuster_engagement_closes_at_the_printed_worst_case() -> None:
+    """min(L, embed - .X) - countersink >= 1.5D; the cup stays on full thread."""
+    spec = cone_tip_block_spec
+    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(8.30)
+    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM >= 1.5 * 4.826
+    assert spec.ADJUSTER_EMBED + 0.8 <= spec.BLOCK_Z - 0.8 - spec.ADJUSTER_CSK
+    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø4.8 BOTH ENDS"
+
+
+def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
+    native = {
+        5: "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>",
+        6: "",
+        7: "<hw-threaddesc> <hw-threadclass> <hw-thru>",
+        8: "",
+    }
+    rewritten = drawing._adjuster_callout_definitions(native)
+    assert rewritten[5] == native[5]
+    assert rewritten[7] == (
+        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø4.8 BOTH ENDS"
+    )
+    with pytest.raises(RuntimeError):
+        drawing._adjuster_callout_definitions({**native, 5: native[7]})
 
 
 def test_pinch_joint_uses_entry_clearance_and_opposite_jaw_thread() -> None:
@@ -92,9 +111,10 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     spec = cone_tip_block_spec
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.0365, abs=1e-3)
+    # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.664, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.00, abs=1e-6)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(2.052, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(3.670, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -144,8 +164,8 @@ def test_block_drops_by_the_shim_and_keeps_every_axis_relation() -> None:
     assert spec.ADJUSTER_AXIS_HEIGHT + spec.SHIM_NOMINAL == 33.368
     assert abs(spec.SLIT_FLOOR - (spec.ADJUSTER_AXIS_HEIGHT - 0.65)) < 1e-12
     assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
-    assert spec.ADJUSTER_THREAD_DEPTH == 9.5
-    assert spec.ADJUSTER_DEPTH == 11.0
+    assert spec.ADJUSTER_EMBED == 9.5
+    assert spec.DRAWING_DIMENSIONS["AxisHeightReference"] == {"AxisHeight"}
 
 
 def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None:
