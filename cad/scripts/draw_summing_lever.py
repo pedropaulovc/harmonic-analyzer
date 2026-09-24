@@ -35,7 +35,6 @@ from _drawing_common import (
     add_surface_finish,
     assert_imported_precision,
     create_blank_drawing_sheets,
-    curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     model_point_in_view,
@@ -47,6 +46,7 @@ from _drawing_common import (
     set_reference_dimension,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import format_findings as format_layout_findings
 from diagnostics.drawing_layout_audit import audit_document
@@ -294,7 +294,11 @@ FORM_TOP_KEEP = {
     "CylRefDia": (0.1380, 0.1115),
 }
 DETAIL_KEEP = {
-    "HexWidth": (0.330, 0.113),
+    # 6 mm below R16's seat: there the detail boundary's lower arc (y 114.2 mm)
+    # ran through "8.65" (Main's r23 eye pass; R15c had it too).  Centred
+    # between its witness lines (x 330.0 / 347.3 mm): at x 0.330 the -X witness
+    # ran through the text (r24).
+    "HexWidth": (0.3387, 0.107),
     "HexHeight": (0.378, 0.155),
     # On the +X flat, inside the 10.27 and short of the R15.2 outline: from the
     # -X flat its witness lines ran collinear with the 5.08 web edges (Fable R14b).
@@ -313,6 +317,25 @@ PATTERN_KEEP = {
 # The whole general-note block: four lines, sheet 1 upper right beside Detail A.
 # Pinned to four on purpose -- the drawing simplicity policy treats a growing
 # note block as the disease the migration cures, not as the cure.
+# The reference sketches each orthographic view shows: the accepted R16 sheet's
+# set.  The part then saved them all visible and the drawing hid the rest per
+# view; now it saves them hidden and the drawing shows these.  Among them are
+# the print marks the reviews asked for: the R138.8 centre cross (Main's R7
+# "unmarked centres"), the boss-axis line, the spring-row line and the knife
+# envelope's centre "+" in the front view (Detail A takes it from the part:
+# see part_sketches_shown below).  The pictorial shows none.
+VIEW_SKETCHES: dict[str, tuple[str, ...]] = {
+    "form front": ("KnifeEnvelopeReference", "PatternReferences"),
+    "form top": (
+        "KnifeEnvelopeReference",
+        "PatternReferences",
+        "BossAxialReference",
+        "CylinderReference",
+        "SummationArcReference",
+    ),
+    "spring-pattern plan": ("KnifeEnvelopeReference", "PatternReferences"),
+}
+
 MANUFACTURING_NOTES: tuple[tuple[str, float, float], ...] = (
     ("CLOCK KNIFE RIDGE TO BOSS AXIS", 0.230, 0.255),
     ("NONREGULAR 6-SIDED PROFILE; SYMMETRIC ABOUT BOTH CENTERLINES", 0.230, 0.246),
@@ -427,16 +450,15 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
 
 
 def _show_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Show one model reference sketch in one drawing view that needs it.
+    """Show one model reference sketch in one drawing view (VIEW_SKETCHES).
 
     The part saves every drawing-reference sketch hidden
     (``build_summing_lever.DRAWING_REFERENCE_SKETCHES``), so they stay out of
-    its renders and every assembly.  A view shows only what it prints from:
-    the R138.8 centre cross, the boss axis line and the spring-row line in the
-    top view, the knife envelope in the front view (and so Detail A), and the
-    spring-row line in the pattern view.  ``UnblankSketch`` is VT_VOID and
-    there is no per-view read-back, so the selection is the gate and the render
-    the proof.
+    its renders and every assembly.  The targeted import leaves a view that
+    imports a sketch's dimensions showing it
+    (``_drawing_hidden_sketches.curate_view_dimensions``); this shows the rest of
+    the accepted sheet's marks.  ``UnblankSketch`` is VT_VOID and there is no
+    per-view read-back, so the selection is the gate and the render the proof.
     """
     draw = adapter.currentModel
     name = view_name(adapter, view)
@@ -661,7 +683,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
-    source_part = _early_bound(adapter.currentModel, "IPartDoc")
+    source_model = adapter.currentModel
+    source_part = _early_bound(source_model, "IPartDoc")
     read_required_properties(
         adapter.currentModel,
         (
@@ -860,24 +883,25 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    for sketch in (
-        "SummationArcReference",
-        "BossAxialReference",
-        "PatternReferences",
+    for label, view in (("form front", front), ("form top", top)):
+        for sketch in VIEW_SKETCHES[label]:
+            _show_view_sketch(adapter, view, sketch)
+    # Detail A takes the knife envelope (HexWidth / HexHeight and the centre
+    # "+") from the part as it stands when the detail is created, not from its
+    # parent's per-view setting (probe run 20260924T170431016Z-c0514e35).
+    with part_sketches_shown(
+        adapter, source_model, ("KnifeEnvelopeReference",), label="knife-end detail"
     ):
-        _show_view_sketch(adapter, top, sketch)
-    # Before the detail, which takes its sketch display from its parent.
-    _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
-    detail = _knife_detail(adapter, front)
-    _place_detail_letter(adapter, front)
-    set_hidden_lines_removed(adapter, detail)
-    detail_dimensions = curate_view_dimensions(
-        adapter,
-        detail,
-        keep=DETAIL_KEEP,
-        view_label="knife-end detail",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
+        detail = _knife_detail(adapter, front)
+        _place_detail_letter(adapter, front)
+        set_hidden_lines_removed(adapter, detail)
+        detail_dimensions = curate_view_dimensions(
+            adapter,
+            detail,
+            keep=DETAIL_KEEP,
+            view_label="knife-end detail",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
     knife_surface_mm = (HEX_W / 4.0, 3.0 * HEX_H / 8.0, HEX_Z_OUTER)
     detail_edges = scan_view_edges(detail, label="knife-end detail finish")
     knife_surface_edge = detail_edges.exact_line_through(
@@ -932,6 +956,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="spring-pattern plan",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    for sketch in VIEW_SKETCHES["spring-pattern plan"]:
+        _show_view_sketch(adapter, pattern, sketch)
     seed_rim_right = _top_xy(
         HOLE_X + HOLE_DIA / 2.0,
         HOLE_Z_LAST,
@@ -959,7 +985,6 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
-    _show_view_sketch(adapter, pattern, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):

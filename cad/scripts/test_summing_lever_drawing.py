@@ -355,3 +355,17 @@ def test_every_reference_sketch_is_saved_hidden() -> None:
         if feature.endswith(("Reference", "References"))
     }
     assert marked == set(build.DRAWING_REFERENCE_SKETCHES)
+
+
+def test_only_orthographic_views_show_reference_sketches() -> None:
+    """Main's bar: the orthographic views keep the accepted sheet's marks and
+    the pictorial shows no reference-sketch geometry at all."""
+    import build_summing_lever as build
+
+    assert set(draw_summing_lever.VIEW_SKETCHES) == {
+        "form front",
+        "form top",
+        "spring-pattern plan",
+    }
+    for sketches in draw_summing_lever.VIEW_SKETCHES.values():
+        assert set(sketches) <= set(build.DRAWING_REFERENCE_SKETCHES)
