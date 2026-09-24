@@ -67,6 +67,14 @@ SURFACE_FINISHES = (
 # supplier change can never leave the lever tapped for the wrong screw.
 HOLE_SPEC = HoleSpec("tapped", ANCHOR_9489T111.thread_size)
 HOLE_X = 39.85
+# The hook arm: the spring-hole row's distance normal to the knife line
+# (HoleSeedX, from the cylinder axis the knife ridge sits over).  It is a GAIN
+# term: error_budget.yaml summing_hook_arm holds it to +/-0.15 mm at every one
+# of the 20 holes.  The row is one straight line of holes along the knife, so
+# the band goes on HoleSeedX as a native model tolerance (drawing policy rule
+# 2) instead of the retired position frame.  The holes' stations ALONG the
+# knife line move no arm, so 142.50 / 8.43 stay at the routine .XX band.
+HOOK_ARM_TOLERANCE_MM = 0.15
 HOLE_COUNT = 20
 CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
@@ -87,16 +95,80 @@ HOLE_END_OFFSET_FIRST = HOLE_Z_FIRST + PLATE_L / 2.0  # 9.90 from -Z end
 HOLE_END_OFFSET_LAST = PLATE_L / 2.0 - HOLE_Z_LAST  # 8.43 from +Z end
 HEX_Z_INNER = PLATE_L / 2.0  # trunnion inboard face flush with the body end (76.20)
 HEX_Z_OUTER = HEX_Z_INNER + HEX_DEPTH  # outboard face overhangs the body (97.92)
+HOLE_PATTERN_SPAN = (HOLE_COUNT - 1) * CHANNEL_PITCH
 
-# Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
-# DRAWING_NOTES / ISOMETRIC_VIEW_NOTE) live in ``summing_lever_notes`` --
-# ``build_summing_assembly`` / ``build_knife_mount`` import this module, so
-# drawing-only data here would put every notes edit in their rebuild
-# closures (codex #354).
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "summation anchor position": "0.30",
-    "spring-hole pattern position": "0.30",
+# Manufacturing-dimension and precision contracts live with the geometry: the
+# part build authors them on the SLDPRT and the drawing only imports and
+# verifies them.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateProfile": {"PlateWidth", "PlateLength"},
+    # Prints for the summation web too ("PLATE AND WEB"): the one "PlateT"
+    # global drives both mid-plane extrusions, one continuous slab in the front
+    # view.  The web's own 5.08 could only be dimensioned from its end inside
+    # the boss, its witness lines ruling out through the boss like a bar
+    # (Fable R14b B2/B3).
+    "CoefficientsPlate": {"PlateThickness"},
+    "HexKnifeFront": {"HexKnifeFrontDepth"},
+    "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat"},
+    "EdgeRibFront": {"EdgeRibThickness"},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR"},
+    "KnifeEnvelopeReference": {"HexWidth", "HexHeight"},
+    "SummationPlateProfile": {"SummationArcRadius"},
+    "SummationArcReference": {"SummationArcCentreX", "SummationArcCentreZ"},
+    "SummationAnchorProfile": {"AnchorOuterX", "AnchorOuterDia"},
+    "SummationAnchor": {"AnchorHeight"},
+    "MiddleRibProfile": {"MidRibArcR", "MidRibLeftX", "MidRibRightX"},
+    "MiddleRib": {"MiddleRibThickness"},
+    "SpringHoleSeed": {"HoleSeedX"},
+    "SpringHolePattern": {"HolePitch"},
+    "PatternReferences": {"HoleEndOffsetLast", "HoleFirstFromEnd"},
+    "BossAxialReference": {"BossAxialLocation"},
+    # The pivot cylinder's diameter, across its top-view silhouette: the
+    # front view, where its profile lives, hides it behind the R15.2 rib
+    # outline (Fable R14b B1).
+    "CylinderReference": {"CylRefDia"},
 }
+
+# Decimal places carry the title-block tolerance and therefore live on the
+# model.  The ordinary spring-pattern locations and total span avoid a chained
+# 19-pitch tolerance stack; HolePitch prints parenthetically as the equal-space
+# reference.
+DRAWING_REFERENCE_PRECISION = 2
+
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {"PlateWidth": 1, "PlateLength": 1},
+    "CoefficientsPlate": {"PlateThickness": 2},
+    "HexKnifeFront": {"HexKnifeFrontDepth": 1},
+    "HexKnifeFrontProfile": {"HexKnifeFrontSideFlat": 2},
+    "EdgeRibFront": {"EdgeRibThickness": 2},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR": 1},
+    "KnifeEnvelopeReference": {"HexWidth": 2, "HexHeight": 2},
+    "SummationPlateProfile": {"SummationArcRadius": 1},
+    "SummationArcReference": {"SummationArcCentreX": 1, "SummationArcCentreZ": 1},
+    "SummationAnchorProfile": {"AnchorOuterX": 1, "AnchorOuterDia": 2},
+    "SummationAnchor": {"AnchorHeight": 2},
+    "MiddleRibProfile": {"MidRibArcR": 1, "MidRibLeftX": 1, "MidRibRightX": 1},
+    "MiddleRib": {"MiddleRibThickness": 2},
+    "SpringHoleSeed": {"HoleSeedX": 2},
+    "SpringHolePattern": {"HolePitch": 2},
+    "PatternReferences": {"HoleEndOffsetLast": 2, "HoleFirstFromEnd": 2},
+    "BossAxialReference": {"BossAxialLocation": 1},
+    "CylinderReference": {"CylRefDia": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name)
+    for feature, dimensions in DRAWING_PRECISION.items()
+    for name in dimensions
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
