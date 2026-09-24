@@ -161,16 +161,16 @@ def chord_floor_radius_mm(
 #   MIN.  These two also print a MAX (Main, 2026-09-23): the drum tip clears
 #   them by as little as 0.05, so a shallow plunge would rub.  MAX is the
 #   shallowest floor that keeps 0.02 of drum-tip clearance with every runout
-#   closing.  MIN is the web limit: T006 stays at the standard tooth's base
-#   chord (the named 0.614 web exception); T012 trades its web from 2.12 down
-#   to 2.05, still over the 2.0 target, for a 0.25 window instead of 0.11.
+#   closing.  MIN is the web limit: T006 keeps the 0.621 web the user ruled
+#   on as its named exception (U40); T012 trades its web from 2.12 down to
+#   2.05, still over the 2.0 target, for a 0.25 window instead of 0.11.
 # * T018-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
 #   cutter at least 0.43 wide fits every gear.
 FLOOR_LIMITS_MM: dict[int, tuple[float, float]] = {
-    6: (2.865, 2.929),
+    6: (2.880, 2.929),
     12: (5.738, 5.988),
 }
 GAP_FLOOR_TMIN: dict[int, float] = {
@@ -243,7 +243,7 @@ FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 # r 1.43) and its web is the one named exception (book fidelity).
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.614}
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
 
 
 def bore_surface_finish(teeth: int) -> SurfaceFinishControl:

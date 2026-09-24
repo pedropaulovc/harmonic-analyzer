@@ -291,7 +291,7 @@ table; a stated exception with no matching row gates like a blocker.
 
 | parts | shortfall | why accepted | ruled |
 |---|---|---|---|
-| MHA-013 cone gear T006 | Root-to-bore web 0.614 mm (printed MIN floor Ø2.865 to the Ø1.6375 maximum bore), under the 1.5 floor. | Book fidelity: the 6-tooth gear's floor sits at r 1.43, and no usable bore meets 1.5 under it. The 1/16 in bore is the shaft's smallest land, and an integral pinion is blocked by the tip-first assembly. T012–T024 meet the 2.0 target on smaller lands. | User, U40, 2026-09-23 |
+| MHA-013 cone gear T006 | Root-to-bore web 0.621 mm (printed MIN floor Ø2.880 to the Ø1.6375 maximum bore), under the 1.5 floor. | Book fidelity: the 6-tooth gear's floor sits at r 1.43, and no usable bore meets 1.5 under it. The 1/16 in bore is the shaft's smallest land, and an integral pinion is blocked by the tip-first assembly. T012–T024 meet the 2.0 target on smaller lands. | User, U40, 2026-09-23 |
 | MHA-013 cone gears T006–T042, in mesh with MHA-027 | Worst-case transverse contact ratio with the 120T drum below 1.1: 0.18 / 0.43 / 0.61 / 0.75 / 0.86 / 0.97 / 1.06 (T006 → T042), every printed band at its worst case. | Book fidelity: the tooth counts and taper are the book's (ch12 p.16 shows the wear). The mesh is deepened to the limit, where the tooth comes to a point first. Below CR 1 the drive rides on a tooth-tip corner. Rigid transmission error is ≤ 0.023 mm at the drum pitch line on T006 and ≤ 0.004 elsewhere, so the cost is tip-corner wear, not position error. | User, U42, 2026-09-23 |
 
 ## The gate
