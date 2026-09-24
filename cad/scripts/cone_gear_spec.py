@@ -156,15 +156,23 @@ def chord_floor_radius_mm(
 # the cutter, so the floor does not move with the tooth band.  Three
 # constructions, all one six-entity gap sketch:
 #
-# * T006, T012: the floor stays at the standard tooth's base chord (today's
-#   floor).  The thicker tooth would raise the chord into the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to that radius.
+# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
+#   (+0.030 at T006), so the floor bows below the feet chord to the printed
+#   MIN.  These two also print a MAX (Main, 2026-09-23): the drum tip clears
+#   them by as little as 0.05, so a shallow plunge would rub.  MAX is the
+#   shallowest floor that keeps 0.02 of drum-tip clearance with every runout
+#   closing.  MIN is the web limit: T006 stays at the standard tooth's base
+#   chord (the named 0.614 web exception); T012 trades its web from 2.12 down
+#   to 2.05, still over the 2.0 target, for a 0.25 window instead of 0.11.
 # * T018-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
 #   cutter at least 0.43 wide fits every gear.
-STANDARD_FLOOR_TEETH = (6, 12)
+FLOOR_LIMITS_MM: dict[int, tuple[float, float]] = {
+    6: (2.865, 2.929),
+    12: (5.738, 5.988),
+}
 GAP_FLOOR_TMIN: dict[int, float] = {
     48: 0.0900,
     54: 0.1200,
@@ -190,8 +198,8 @@ def floor_tmin(teeth: int) -> float:
 
 def floor_radius_mm(teeth: int) -> float:
     """Return the modelled gap-floor radius, printed as the MIN diameter."""
-    if teeth in STANDARD_FLOOR_TEETH:
-        return chord_floor_radius_mm(teeth, thickness_mm=STANDARD_TOOTH_THICKNESS)
+    if teeth in FLOOR_LIMITS_MM:
+        return FLOOR_LIMITS_MM[teeth][0] / 2.0
     return chord_floor_radius_mm(
         teeth, thickness_mm=tooth_thickness_mm(teeth), tmin=floor_tmin(teeth)
     )

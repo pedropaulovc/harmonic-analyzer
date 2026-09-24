@@ -234,10 +234,17 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
     clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
     # Main: one fly cutter at least 0.43 wide fits every gap.
     assert _floor_width(teeth, thickest) >= 0.43
-    if teeth in spec.STANDARD_FLOOR_TEETH:
-        # The standard floor keeps the drum tip off it: +0.052 / +0.076 with
-        # every runout closing.
+    if teeth in spec.FLOOR_LIMITS_MM:
+        # Two-sided floor: MAX is the shallowest floor keeping 0.02 of
+        # drum-tip clearance with every runout closing (a shallow plunge would
+        # rub); MIN is the web limit.
+        minimum, maximum = spec.FLOOR_LIMITS_MM[teeth]
+        drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
         assert clearance > 0.05
+        assert drum_path - maximum / 2.0 >= 0.02
+        assert drum_path - (maximum + 0.001) / 2.0 < 0.02
+        # Main: T006's window must be at least 0.04 on diameter.
+        assert maximum - minimum >= 0.04
         return
     if spec.floor_tmin(teeth) == 0.0:
         assert clearance >= 0.10
