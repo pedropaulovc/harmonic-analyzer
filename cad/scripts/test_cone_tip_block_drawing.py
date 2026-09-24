@@ -189,13 +189,19 @@ def test_pinch_thread_readback_checks_the_thread_part_not_string_order() -> None
     )
 
 
-def test_isometric_hides_every_model_reference_sketch() -> None:
-    """f76387f5's iso printed reference-sketch strokes; the list must stay whole.
+def test_part_hides_every_model_reference_sketch() -> None:
+    """f76387f5's iso and 8929d954's drive-train iso printed reference sketches.
 
-    Every construction-only reference sketch the build authors is hidden in the
-    isometric, so a new one cannot print there unlisted.
+    The part blanks every construction-only reference sketch it authors before
+    save, so no drawing view or assembly instance renders one, and a new one
+    cannot be authored unlisted.
     """
 
     source = Path(part.__file__).read_text(encoding="utf-8")
     authored = re.findall(r'feature_name="([A-Za-z]+Reference)"', source)
-    assert authored and tuple(authored) == drawing.REFERENCE_SKETCHES
+    assert authored and tuple(authored) == part.REFERENCE_SKETCHES
+    build_body = source[source.index("async def build(") :]
+    assert "_blank_reference_sketches(adapter, REFERENCE_SKETCHES)" in build_body
+    assert build_body.index("_blank_reference_sketches(") < build_body.index(
+        "save_part_and_images("
+    )

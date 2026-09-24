@@ -11,7 +11,6 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    _drawing_component_name,
     add_leader_note,
     add_native_hole_callout,
     add_surface_finish,
@@ -48,7 +47,6 @@ from cone_tip_block_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
@@ -418,41 +416,6 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
 
 
 
-# The model's construction-only reference sketches (build_cone_tip_block's
-# _author_reference_dimension calls).  Unabsorbed, each prints its dash-dot
-# construction lines in every view; the isometric prints none of their
-# dimensions, so f76387f5's pictorial carried two stray L-shaped strokes.
-REFERENCE_SKETCHES = (
-    "PassageCenterReference",
-    "AxisHeightReference",
-    "PinchDepthReference",
-    "PinchRiseReference",
-    "FootTapXReference",
-    "FootTapZReference",
-)
-
-
-def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Hide one model reference sketch in one drawing view (per-view BlankSketch).
-
-    ``BlankSketch`` is VT_VOID with no per-view read-back, so the selection is
-    the gate and the render the proof (the summing lever's pattern).
-    """
-    draw = adapter.currentModel
-    name = view_name(adapter, view)
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate {name} to hide {sketch}")
-    draw.ClearSelection2(True)
-    # The middle qualifier is the view's own model instance, numbered per view.
-    qualified = f"{sketch}@{_drawing_component_name(adapter, view)}@{name}"
-    if not draw.Extension.SelectByID2(
-        qualified, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"cannot select {qualified}")
-    draw.BlankSketch()
-    draw.ClearSelection2(True)
-
-
 def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
     """Prove every isometric annotation is native cosmetic-thread ink (to hide)."""
     annotation_types = [
@@ -749,8 +712,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _audit_isometric_annotation_provenance(adapter, iso)
     # Main eye-pass af561fa7: the shaded pictorial carries no thread ink.
     _hide_cosmetic_threads(adapter, iso, label="isometric")
-    for sketch in REFERENCE_SKETCHES:
-        _hide_view_sketch(adapter, iso, sketch)
 
     _hide_cosmetic_threads(adapter, section, label="section")
     for text, x, y in (

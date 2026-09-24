@@ -35,6 +35,7 @@ from _common import (
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    blank_sketch,
     check,
     define_centered_rectangle,
     dimension_between,
@@ -88,6 +89,17 @@ from _part_pmi import author_part_pmi
 
 PART_NAME = "cone-tip-block"
 MATERIAL = "Plain Carbon Steel"  # black-finished steel, like the platform it rides
+
+# The construction-only sketches that carry the drawing's location dimensions
+# (_author_reference_dimension); hidden in the part before save.
+REFERENCE_SKETCHES = (
+    "PassageCenterReference",
+    "AxisHeightReference",
+    "PinchDepthReference",
+    "PinchRiseReference",
+    "FootTapXReference",
+    "FootTapZReference",
+)
 
 # Geometry envelope comes from cone_tip_block_spec — the drawing's single
 # source of the marked dimensions — so a spec correction rebuilds the SLDPRT
@@ -205,6 +217,22 @@ async def _author_reference_dimension(
     )[0]
     await drive_dimension(adapter, full_name, drive_expression)
     await force_rebuild(adapter)
+
+
+def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
+    """Hide the reference sketches in the part so no instance renders them.
+
+    Unabsorbed sketches default to SHOWN: 8929d954's drive-train isometric
+    printed these points and dash-dot lines on the slit block.  The drawing
+    still imports their dimensions (hidden-feature dims are included).
+    """
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    for sketch in sketches:
+        blank_sketch(adapter, sketch)
+        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
+        state = int(feature.Visible)
+        if state != 1:  # swVisibilityStateHide
+            raise RuntimeError(f"{sketch} still visible after BlankSketch (state {state})")
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
@@ -482,6 +510,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    _blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
