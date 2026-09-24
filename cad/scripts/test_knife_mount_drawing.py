@@ -445,10 +445,13 @@ def test_interface_title_block_bands_match_the_printed_sheet() -> None:
 def test_knife_mount_prints_the_o1_grade_and_its_hardness() -> None:
     # #818 Codex P1 + user ruling 2026-09-24 ("O1 or equivalent"): the heat
     # treatment depends on the grade, so the print names O1 and its 58-60 HRC.
+    # Pin the PRINTED cells: the title block shows MATERIAL and FINISH, while
+    # material_specification is a custom property no cell on MHA-037 shows.
     import _config
 
     row = _config.parts("knife-mount")
     assert "O1" in row["material"]
     assert "OR EQUIVALENT" in row["material"]
+    assert "58-60 HRC" in row["finish"]
     assert "O1" in row["material_specification"]
     assert "58-60 HRC" in row["material_specification"]
