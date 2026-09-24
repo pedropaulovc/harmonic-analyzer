@@ -12,6 +12,7 @@ _EXPECTED = {
     "cone-lock-knob": (("91882A425",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A164",), "MHA-097", 1),
+    "cone-tip-block-screw": (("91255A148",), "MHA-140", 1),
     "cone-tip-pinch-screw": (("91794A112",), "MHA-098", 1),
     "fillister-screw": (("90114A511",), "MHA-030", 27),
     "foot-screw": (("90280A108",), "MHA-103", 3),
@@ -40,7 +41,7 @@ def test_catalog_carries_only_purchased_mcmaster_identities() -> None:
         assert spec.supplier == "McMaster-Carr"
         assert spec.skus == skus
         assert spec.stock_name.strip()
-        assert spec.material in {"Plain Carbon Steel", "AISI 304", "Brass"}
+        assert spec.material in {"Plain Carbon Steel", "AISI 304", "Brass", "Alloy Steel"}
 
 
 def test_purchased_config_preserves_bom_identity_and_quantity() -> None:

@@ -23,6 +23,7 @@ recipes:
 | 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91255A148 | `cone-tip-block-screw` | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
@@ -73,6 +74,13 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
+- [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
+  black-oxide alloy steel button head hex drive screw that holds the cone tip
+  block (U30, rule-12 W22). It was read on September 23, 2026: head Ø0.262 in
+  x 0.073 in, 5/64 hex drive, fully threaded. A re-read on September 24 was
+  refused (HTTP 403). No vendor SLDPRT is harvested:
+  `diag_build_91255A148.py` models it from those catalog dimensions, with its
+  assumed edge band and socket depth stated in its docstring.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them

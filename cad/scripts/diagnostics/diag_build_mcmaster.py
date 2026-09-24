@@ -42,6 +42,7 @@ from diagnostics.diag_build_90280A199 import build_90280A199  # noqa: E402
 from diagnostics.diag_build_90280A201 import build_90280A201  # noqa: E402
 from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
+from diagnostics.diag_build_91255A148 import build_91255A148  # noqa: E402
 from diagnostics.diag_build_91410A538 import build_91410A538  # noqa: E402
 from diagnostics.diag_build_91794A112 import build_91794A112  # noqa: E402
 from diagnostics.diag_build_92240A539 import build_92240A539  # noqa: E402
@@ -64,6 +65,7 @@ REGISTRY = {
     "93075A194": build_93075A194,
     "92865A585": build_92865A585,
     "91247A720": build_91247A720,
+    "91255A148": build_91255A148,
     "99607A213": build_99607A213,
     "91882A221": build_91882A221,
     "91882A425": build_91882A425,
