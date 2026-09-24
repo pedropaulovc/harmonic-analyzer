@@ -221,12 +221,11 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     # the PHYSICAL front block, the rod >= LEVER_SEAT_PROUD proud of it.
     assert rig.TORQUE_SHAFT_Z0 + SHAFT_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
     assert rig.LIFT_ROD_Z0 + ROD_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
-    assert rig.TORQUE_SHAFT_Z0 == pytest.approx(
-        rig.PHYSICAL_FRONT_BLOCK_OUTER_Z, abs=0.005
-    )
+    shaft_proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_Z0
+    assert -1e-9 <= shaft_proud <= 0.1
     proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - rig.LIFT_ROD_Z0
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
-    assert (SHAFT_LEN, ROD_LEN) == (181.95, 192.0)
+    assert (SHAFT_LEN, ROD_LEN) == (182.0, 192.0)
 
 
 def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
@@ -238,10 +237,10 @@ def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
 
     solid = 2.0 * THICKNESS + rig.DRUM_LEN
     assert rig.PHYSICAL_INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
-    assert rig.TORQUE_SHAFT_LEN == pytest.approx(
-        2.0 * pinion_pivot_block_spec.BLOCK_DEPTH + solid + rig.FRONT_BLOCK_FEELER,
-        abs=0.005,
+    physical = (
+        2.0 * pinion_pivot_block_spec.BLOCK_DEPTH + solid + rig.FRONT_BLOCK_FEELER
     )
+    assert 0.0 <= rig.TORQUE_SHAFT_LEN - physical < 0.1  # rounded up to .X
     # The model's block span carries the pose air on top, and only it.
     model_span = rig.BACK_BLOCK_Z0 - (
         rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
