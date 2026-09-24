@@ -111,8 +111,11 @@ PLUG_FIT_CALLOUT = (
 # open gap is assembly access only: the eye hangs loose and the screw carries
 # no clamp load, so it is not a load case for engagement (Main ruling on Codex
 # machinist r19 B2). This lives here, not in gooseneck_geom, which the channel,
-# magnifier and summing recipes read.
-TAP_CALLOUT = "#6-32 UNC-2B THRU"
+# magnifier and summing recipes read. The sheet says FULL THREAD, so the tap
+# runs fully through the plug and a blind review does not charge a lead loss
+# (Codex machinist r19/r24 B2; Main ruling). It is a second line, because one
+# line would run into the screw view's Ø12 dimension line.
+TAP_CALLOUT = "#6-32 UNC-2B THRU\nFULL THREAD"
 # The bend radius is the tube-bender's centreline radius; its imported
 # dimension rides the (unshown) sweep path, so the sheet says so.
 BEND_RADIUS_CALLOUT = "AT TUBE CENTERLINE"

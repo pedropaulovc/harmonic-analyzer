@@ -156,6 +156,9 @@ def test_sheets_name_the_part_and_its_tube_stock() -> None:
     assert _config.parts("gooseneck")["title"] == "Gooseneck"
     assert "16 OD X 2.0 WALL" in gooseneck_spec.TUBE_STOCK_CALLOUT
     assert "+/-10%" in gooseneck_spec.TUBE_STOCK_CALLOUT
+    # The engagement rebuttal rests on a through, full-thread plug.
+    assert gooseneck_spec.TAP_CALLOUT.startswith("#6-32 UNC-2B THRU")
+    assert "FULL THREAD" in gooseneck_spec.TAP_CALLOUT
 
 
 def test_plan_view_is_captioned() -> None:
