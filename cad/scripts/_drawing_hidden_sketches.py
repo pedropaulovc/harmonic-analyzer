@@ -172,13 +172,15 @@ def _warn_undetected_owners(
 
 
 class _PartShown:
-    """One ``part_sketches_shown`` block: the sketches it shows, and those a
-    curate inside it has dimensioned."""
+    """One ``part_sketches_shown`` block: the sketches it shows, those a
+    curate inside it has dimensioned, and the kept annotations they own
+    (re-read after the re-blank)."""
 
     def __init__(self, sketches: Sequence[str], label: str) -> None:
         self.sketches = tuple(sketches)
         self.label = label
         self.dimensioned: set[str] = set()
+        self.annotations: list[tuple[str, str, Any]] = []
 
 
 _PART_SHOWN: list[_PartShown] = []
@@ -262,6 +264,16 @@ def curate_view_dimensions(
     for block in _PART_SHOWN:
         block.dimensioned |= _owners_dimensioned(
             block.sketches, present, dimensions_by_feature
+        )
+        owned = {
+            item
+            for sketch in block.sketches
+            for item in dimensions_by_feature.get(sketch, ())
+        }
+        block.annotations.extend(
+            (view_label, item, annotation)
+            for annotation in curated
+            if (item := _dc.dimension_name(adapter, annotation)) in owned
         )
     return curated
 
@@ -364,9 +376,28 @@ def part_sketches_shown(
                 f"{label}: {path} changed on disk while its sketches were shown "
                 f"({before[:12]} -> {after[:12]}); the drawing must never save the part"
             )
+    if not completed:
+        return
     undimensioned = sorted(set(block.sketches) - block.dimensioned)
-    if completed and undimensioned:
+    if undimensioned:
         raise RuntimeError(
             f"{label}: part sketches {undimensioned} were shown but no view "
             "curated inside the block keeps a dimension they own"
+        )
+    # The curate's visibility gate ran while the part still showed the
+    # sketches; the re-blank and rebuild come after it.  Measured harmless for
+    # a detail (probe 20260924T170431016Z-c0514e35), but re-read here so any
+    # other derived view that does lose them fails before the save (Codex).
+    states = {
+        f"{view}:{item}": int(
+            _read_member(_early_bound(annotation, "IAnnotation"), "Visible")
+        )
+        for view, item, annotation in block.annotations
+    }
+    _telemetry.info(f"{label}: after the part re-blank, dimension Visible {states}")
+    dropped = sorted(key for key, v in states.items() if v in _ANNOTATION_NOT_SHOWN)
+    if dropped:
+        raise RuntimeError(
+            f"{label}: dimensions hidden by the part re-blank of "
+            f"{list(block.sketches)}: {dropped}"
         )
