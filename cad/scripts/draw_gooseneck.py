@@ -102,7 +102,10 @@ SCREW_TIP_X = HEAD_X - SCREW_HEAD_T
 SHANK_END_X = HEAD_X + SPRING_SCREW_UNDERHEAD_LENGTH_MM
 PLUG_END_X = ARM_END_X + PLUG_T
 POST_CUT_Y = 20.0  # above the Top-plane LegProfile sketch, below the bend
-JOINT_CUT_END_X = SHANK_END_X + 8.0  # past the screw tip, still in the arm
+# Past the screw tip, still in the arm. Kept short: the section grows right
+# with the under-head length, and at 8.0 the 15.0 shank (farm r18) pushed its
+# outline into the screw view's head-diameter leader.
+JOINT_CUT_END_X = SHANK_END_X + 4.0
 
 # Sheet 1 (sheet metres). The 1:3 elevation stays left; the post section and
 # its two diameters sit between it and the isometric, all above the title
