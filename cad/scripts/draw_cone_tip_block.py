@@ -46,7 +46,13 @@ from cone_tip_block_spec import (
     SLIT_DEPTH,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+    view_name,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["cone_tip_block"]
@@ -116,12 +122,16 @@ AXIS_OVERRUN = 0.002
 # extension lines.  VIEW C looks at the -Z (shaft-entry) face, which is the top
 # view's upper edge, left of the A-A cutting-plane stem.  Each pair is
 # (note upper-left, leader tip), sheet metres.
+# The letters match the A-A cutting-plane letters (~5 mm, run 6cab17f6), and
+# each note sits square to its face so the leader reads as a viewing arrow:
+# B level with its tip, C centred above its tip.
+VIEW_LETTER_HEIGHT = 0.005
 VIEW_B_ARROW = (
-    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0 - 0.013, 0.1625),
+    (FRONT_CENTER[0] - BLOCK_X * _S / 2.0 - 0.013, 0.160 + VIEW_LETTER_HEIGHT / 2.0),
     (FRONT_CENTER[0] - BLOCK_X * _S / 2.0, 0.160),
 )
 VIEW_C_ARROW = (
-    (TOP_CENTER[0] - 0.0115, TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.015),
+    (TOP_CENTER[0] - 0.010 - 0.0018, TOP_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.013),
     (TOP_CENTER[0] - 0.010, TOP_CENTER[1] + BLOCK_Z * _S / 2.0),
 )
 DIMENSION_CALLOUTS = {
@@ -154,15 +164,19 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
 
 
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
-    """Sketch the adjuster bore's axis across section A-A.
+    """Sketch the adjuster bore's axis across section A-A, owned by the view.
 
     The 8.85 pinch rise is measured from this axis to the pinch-bore centre;
     without the centreline its extension line reads as rising from nothing
     (review 2026-09-23).  The cutting plane is X = 0, so the adjuster axis
     (along Z) lies in it and projects as a line, while the pinch axis (along
     X) projects to a point -- run 71f5acc5 sketched that zero-length line and
-    CreateCenterLine returned None.  Sketched sheet-owned, as the gear shaft's
-    and swing platform's axes are.
+    CreateCenterLine returned None.  Run 6cab17f6 then sketched it with sheet
+    coordinates while the section was the active view, so it landed in the
+    view's own sketch frame, off the sheet.  This is draw_top_frame's proven
+    owned-centreline recipe: activate the view, map each sheet point through
+    the view sketch's ModelToSketchTransform, and colour the segment black
+    (a sketch line otherwise prints in the under-defined blue).
     """
     half = BLOCK_Z / 2000.0 + AXIS_OVERRUN / SHEET_SCALE[0]
     ends = [
@@ -181,16 +195,32 @@ def _add_adjuster_axis(adapter: Any, section: Any) -> None:
             f"adjuster axis projects {length:.4f} m long in section A-A, "
             f"expected {expected:.4f}"
         )
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    drawing.EditSheet()
-    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
-    centerline = manager.CreateCenterLine(
-        ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
-    )
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section A-A for the adjuster axis")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(section.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in ends:
+        point = _early_bound(
+            utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        points.append(
+            tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData)
+        )
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    centerline = manager.CreateCenterLine(*points[0], *points[1])
     if centerline is None:
         raise RuntimeError("failed to sketch the adjuster axis in section A-A")
-    adapter.currentModel.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
+    segment = _early_bound(centerline, "ISketchSegment")
+    segment.Color = 0
+    if int(segment.Color) != 0:
+        raise RuntimeError("adjuster axis colour did not persist")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="section A-A adjuster axis")
 
 
 def _circle_entity(
@@ -259,7 +289,9 @@ def _preferred_entry_circle(
     # caller's candidate order supplies a stable sheet-side preference.
     return matches[0]
 
-_PINCH_THREAD_QUALIFIER = "LEFT-JAW THREAD\nCOAXIAL WITH CLEARANCE"
+# Hole-callout order: drill line, thread line, then the prose (Main eye-pass
+# af561fa7); the caption already names the pinch-thread jaw.
+_PINCH_THREAD_QUALIFIER = "COAXIAL WITH CLEARANCE"
 _PINCH_THREAD_NATIVE_TOKENS = frozenset(
     {"<hw-thrutapdrldia>", "<hw-threaddesc>", "<hw-threadclass>"}
 )
@@ -284,11 +316,11 @@ def _pinch_thread_callout_definitions(
         part: text.replace("<hw-thru>", "TO SLOT")
         for part, text in definitions.items()
     }
-    updated[5] = (
-        f"{_PINCH_THREAD_QUALIFIER}\n{updated[5].lstrip()}"
-        if updated[5].strip()
-        else _PINCH_THREAD_QUALIFIER
-    )
+    thread_parts = [part for part, text in updated.items() if "<hw-threadclass>" in text]
+    if len(thread_parts) != 1:
+        raise RuntimeError(f"pinch thread line is not in one callout part: {updated!r}")
+    thread_part = thread_parts[0]
+    updated[thread_part] = f"{updated[thread_part].rstrip()}\n{_PINCH_THREAD_QUALIFIER}"
     rewritten = "\n".join(updated.values())
     if (
         "THRU ALL" in rewritten
@@ -319,6 +351,7 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
         or "THRU ALL" in resolved
         or resolved.count("TO SLOT") != 2
         or _PINCH_THREAD_QUALIFIER not in resolved
+        or resolved.index(_PINCH_THREAD_QUALIFIER) < resolved.rindex("TO SLOT")
     ):
         raise RuntimeError(
             "pinch-thread native extent override did not persist: "
@@ -329,7 +362,7 @@ def _set_pinch_thread_callout_text(display: Any) -> None:
 
 
 def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
-    """Prove every dashed isometric annotation is native cosmetic-thread ink."""
+    """Prove every isometric annotation is native cosmetic-thread ink (to hide)."""
     annotation_types = [
         int(_early_bound(raw, "IAnnotation").GetType())
         for raw in (_early_bound(view, "IView").GetAnnotations() or ())
@@ -348,8 +381,8 @@ def _audit_isometric_annotation_provenance(adapter: Any, view: Any) -> int:
 _COSMETIC_THREAD_LAYER = "CONE-TIP-SECTION-THREADS-HIDDEN"
 
 
-def _hide_section_cosmetic_threads(adapter: Any, view: Any) -> int:
-    """Keep cosmetic-thread annotation ink out of the solid-line section."""
+def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
+    """Keep cosmetic-thread annotation ink out of a view (section, pictorial)."""
     draw = adapter.currentModel
     manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
     layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
@@ -376,11 +409,11 @@ def _hide_section_cosmetic_threads(adapter: Any, view: Any) -> int:
             continue
         annotation.Layer = _COSMETIC_THREAD_LAYER
         if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
-            raise RuntimeError("cone-tip section cosmetic thread refused hidden layer")
+            raise RuntimeError(f"cone-tip {label} cosmetic thread refused hidden layer")
         hidden += 1
     if not hidden:
-        raise RuntimeError("cone-tip section has no cosmetic thread to hide")
-    rebuild_drawing(adapter, label="_hide_section_cosmetic_threads")
+        raise RuntimeError(f"cone-tip {label} has no cosmetic thread to hide")
+    rebuild_drawing(adapter, label=f"hide {label} cosmetic threads")
     return hidden
 
 
@@ -610,7 +643,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge=pinch_clearance_edge,
-        callout_xy=(0.145, 0.185),
+        # Fable review af561fa7: at (0.145, 0.185) the leader ran through the
+        # 6.0 text.  Measured on that render the text spans x-0.015..x+0.007,
+        # centred on y; here it sits under the 6.0 dimension, right of the
+        # SLOT DEPTH line (x 0.115) and left of the view (x 0.154).
+        callout_xy=(0.133, 0.1735),
         label="pinch entry-jaw clearance",
     )
     set_hole_callout_precision(
@@ -639,8 +676,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot tap depths",
     )
     _audit_isometric_annotation_provenance(adapter, iso)
+    # Main eye-pass af561fa7: the shaded pictorial carries no thread ink.
+    _hide_cosmetic_threads(adapter, iso, label="isometric")
 
-    _hide_section_cosmetic_threads(adapter, section)
+    _hide_cosmetic_threads(adapter, section, label="section")
     for text, x, y in (
         ("VIEW C\nSHAFT ENTRY", passage_center[0] - 0.021, 0.078),
         ("RIGHT VIEW\nPINCH CLEARANCE ENTRY", RIGHT_CENTER[0] - 0.026, 0.078),
@@ -664,7 +703,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ("B", front, VIEW_B_ARROW),
         ("C", top, VIEW_C_ARROW),
     ):
-        add_leader_note(
+        note = add_leader_note(
             adapter,
             letter,
             text_xy=text_xy,
@@ -672,12 +711,26 @@ async def build(adapter: Any) -> dict[str, str]:
             view=view,
             label=f"view {letter} viewing arrow",
         )
+        # add_note leaves text at the document height; size the letter here
+        # (the add_surface_finish char_height recipe) and prove the leader
+        # tip did not move with it.
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        text_format = annotation.GetTextFormat(0)
+        if text_format is None:
+            raise RuntimeError(f"view {letter} arrow note has no text format")
+        text_format.CharHeight = VIEW_LETTER_HEIGHT
+        if not annotation.SetTextFormat(0, False, text_format):
+            raise RuntimeError(f"failed to size the view {letter} arrow letter")
+        rebuild_drawing(adapter, label=f"view {letter} arrow letter")
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+        if len(points) < 6 or math.dist((points[-3], points[-2]), tip_xy) > 0.001:
+            raise RuntimeError(f"view {letter} arrow tip moved when its letter was sized")
 
     foot_edge = _foot_edge(adapter, front)
     foot_y = _elevation_y(0.0, FRONT_CENTER)
-    # Onto the foot edge itself, 2 mm in from the corner, so the symbol reads
-    # as the seat face and not the side (review 2026-09-23).
-    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 2.0 - 0.002, foot_y)
+    # Onto the foot edge itself, midway along its right half: at the corner
+    # vertex (run 6cab17f6) it could name the side face as well as the seat.
+    foot_right = (FRONT_CENTER[0] + BLOCK_X * _S / 4.0, foot_y)
     foot_finish = add_surface_finish(
         adapter,
         front,

@@ -73,6 +73,12 @@ def test_pinch_thread_callout_keeps_native_variables_but_limits_both_extents() -
     assert text.count("TO SLOT") == 2
     assert drawing._PINCH_THREAD_QUALIFIER in text
     assert all(token in text for token in drawing._PINCH_THREAD_NATIVE_TOKENS)
+    # Drill line, thread line, then the prose (Main eye-pass af561fa7).
+    assert rewritten[5] == (
+        "<hw-threaddesc> <hw-threadclass> TO SLOT\nCOAXIAL WITH CLEARANCE"
+    )
+    assert rewritten[7] == "<MOD-DIAM> <hw-thrutapdrldia> TO SLOT"
+    assert "LEFT-JAW" not in text
 
 
 def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
