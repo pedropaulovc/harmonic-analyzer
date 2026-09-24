@@ -23,7 +23,7 @@ from typing import Any
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -31,6 +31,7 @@ from _drawing_common import (
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     insert_hole_table,
     new_project_drawing,
@@ -41,6 +42,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
     view_name,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -226,11 +228,7 @@ def _create_view_centerline(
     if not ddoc.ActivateView(name):
         raise RuntimeError(f"failed to activate centerline view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
-    sketch_manager.DisplayWhenAdded = True
-    try:
+    with direct_sketch(sketch_manager):
         centerline = sketch_manager.CreateCenterLine(
             start_xy[0],
             start_xy[1],
@@ -239,9 +237,6 @@ def _create_view_centerline(
             end_xy[1],
             0.0,
         )
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-        sketch_manager.DisplayWhenAdded = previous_display
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if centerline is None:
@@ -472,4 +467,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

@@ -2762,6 +2762,12 @@ def task_check():
         SCRIPTS_DIR / "test_logo_profile_closure.py",
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
+        # The drawing half of the same contract: no drawing recipe creates
+        # sketch geometry outside ``_drawing_common.direct_sketch`` (the
+        # 2026-09-22 detail fence that snapped onto a thread root on one seat).
+        # It scans draw_*.py and the drawing-only helpers, all already in
+        # ``scanned_by_binding_gate`` below.
+        SCRIPTS_DIR / "test_drawing_direct_sketch.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun

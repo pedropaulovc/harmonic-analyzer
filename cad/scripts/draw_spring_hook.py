@@ -21,7 +21,7 @@ from typing import Any
 
 import _stock_trim_drawing as trim_drawing
 import _telemetry
-from _common import _early_bound, check, run_build
+from _common import _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -32,6 +32,7 @@ from _drawing_common import (
     set_dimension_precision,
     set_hidden_lines_visible,
     stamp_drawing_summary,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
@@ -171,4 +172,4 @@ if __name__ == "__main__":
     parser.add_argument("part", choices=[SPEC.artifact_stem])
     parser.parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

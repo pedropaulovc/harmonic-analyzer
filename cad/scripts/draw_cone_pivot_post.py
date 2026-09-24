@@ -9,7 +9,7 @@ from typing import Any
 from cone_pivot_post_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -28,6 +28,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
     visible_view_entities,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_pivot_post_spec import (
@@ -462,4 +463,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

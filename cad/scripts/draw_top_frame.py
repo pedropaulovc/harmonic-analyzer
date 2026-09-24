@@ -26,7 +26,7 @@ from typing import Any
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from solidworks_mcp.adapters.com_variant import double_array
 from _drawing_common import (
     DrawingOutputs,
@@ -44,6 +44,8 @@ from _drawing_common import (
     add_property_linked_note,
     create_section_view,
     create_blank_drawing_sheets,
+    create_detail_view,
+    direct_sketch,
     curate_view_dimensions,
     finalize_drawing,
     model_point_in_view,
@@ -60,6 +62,7 @@ from _drawing_common import (
     rebuild_drawing,
     scan_view_edges,
     stamp_drawing_summary,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_pmi import _resolve_faces
@@ -424,7 +427,8 @@ def _add_view_centerlines(
             )
             point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
             points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-        segment = manager.CreateCenterLine(*points[0], *points[1])
+        with direct_sketch(manager):
+            segment = manager.CreateCenterLine(*points[0], *points[1])
         if segment is None:
             raise RuntimeError("failed to create owned drawing centreline")
         segment = _early_bound(segment, "ISketchSegment")
@@ -834,33 +838,17 @@ def _hub_pocket_section(adapter: Any, parent_view: Any) -> Any:
 def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     """Enlarge the native underside; the circular fence is presentation only."""
     draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(parent_view, "IView")
-    if not drawing.ActivateView(view_name(adapter, parent_view)):
-        raise RuntimeError("failed to activate underside detail parent")
-    draw.ClearSelection2(True)
     center = model_point_in_view(
         adapter, parent_view,
         (GOOSENECK_X/1000.0, (-HALF_H-HUB_BOSS_DROP)/1000.0, GOOSENECK_Z/1000.0),
         label="underside detail centre",
     )
     radius = (HUB_GUSSET_HALF_OUT+HUB_BOSS_DROP)*HUB_BOTTOM_SCALE[0]/HUB_BOTTOM_SCALE[1]/1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0]+radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create native underside detail fence")
-    detail = drawing.CreateDetailViewAt4(
-        *HUB_DETAIL_CENTER, 0.0, 0, *HUB_DETAIL_SCALE, "C", 1, True, False, False, 5,
+    detail = create_detail_view(
+        adapter, parent_view,
+        center=center, radius=radius, view_xy=HUB_DETAIL_CENTER,
+        scale=HUB_DETAIL_SCALE, letter="C", label="underside detail",
     )
-    if detail is None:
-        raise RuntimeError("failed to create native underside detail")
-    detail = _early_bound(detail, "IView")
     detail.ScaleRatio = double_array([float(value) for value in HUB_DETAIL_SCALE])
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="_hub_underside_detail")
@@ -2087,4 +2075,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

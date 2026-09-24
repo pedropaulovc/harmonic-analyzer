@@ -14,12 +14,13 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    create_detail_view,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -33,6 +34,7 @@ from _drawing_common import (
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
@@ -129,11 +131,6 @@ def _project_mm(
 def _notch_detail(adapter: Any, front: Any) -> Any:
     """Enlarge the actual kerf and its neighbouring teeth, without redrawing them."""
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(front, "IView")
-    if not ddoc.ActivateView(view_name(adapter, front)):
-        raise RuntimeError("failed to activate notch-detail parent")
-    draw.ClearSelection2(True)
     center = _project_mm(
         adapter,
         front,
@@ -141,34 +138,16 @@ def _notch_detail(adapter: Any, front: Any) -> Any:
         label="notch detail center",
     )
     radius = NOTCH_DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (center, (center[0] + radius, center[1])):
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        points.append(tuple(float(value) for value in projected.ArrayData))
-    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if sketch_manager.CreateCircle(*points[0], *points[1]) is None:
-        raise RuntimeError("failed to create notch-detail fence")
-    detail = ddoc.CreateDetailViewAt4(
-        *NOTCH_DETAIL_CENTER,
-        0.0,
-        0,  # swDetViewSTANDARD
-        *NOTCH_DETAIL_SCALE,
-        "A",
-        1,  # swDetCircleCIRCLE
-        True,
-        False,
-        False,
-        5,
+    detail = create_detail_view(
+        adapter,
+        front,
+        center=center,
+        radius=radius,
+        view_xy=NOTCH_DETAIL_CENTER,
+        scale=NOTCH_DETAIL_SCALE,
+        letter="A",
+        label="notch detail",
     )
-    if detail is None:
-        raise RuntimeError("failed to create native notch detail")
-    detail = _early_bound(detail, "IView")
     detail.ScaleRatio = double_array([float(value) for value in NOTCH_DETAIL_SCALE])
     draw.ClearSelection2(True)
     draw.EditRebuild3()
@@ -518,4 +497,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

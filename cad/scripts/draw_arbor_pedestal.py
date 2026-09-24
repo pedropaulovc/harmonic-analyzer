@@ -8,13 +8,14 @@ from typing import Any, Literal
 
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
     add_surface_finish,
     add_native_hole_callout,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -27,6 +28,7 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
+    run_drawing_build,
 )
 from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -279,7 +281,8 @@ def _add_bore_hidden_lines(adapter: Any, view: Any) -> None:
     for x in (-bore_radius, bore_radius):
         for start_z, end_z in ((z0, midpoint), (z1, midpoint)):
             draw.ClearSelection2(True)
-            segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
+            with direct_sketch(sketch_manager):
+                segment = sketch_manager.CreateLine(x, start_z, 0.0, x, end_z, 0.0)
             if segment is None:
                 raise RuntimeError("failed to create an arbor bore hidden line")
             segment = _early_bound(segment, "ISketchSegment")
@@ -566,4 +569,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

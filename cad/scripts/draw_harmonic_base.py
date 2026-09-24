@@ -24,7 +24,7 @@ from typing import Any
 from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
@@ -49,6 +49,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     visible_view_entities,
     view_name,
+    run_drawing_build,
 )
 
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -1151,4 +1152,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

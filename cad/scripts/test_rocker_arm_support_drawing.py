@@ -215,6 +215,9 @@ class _FakeSketchManager:
         raises: Exception | None = None,
     ) -> None:
         self.AddToDB = add_to_db
+        # ISketchManager's other creation mode, which direct_sketch also
+        # forces and hands back; the seat default is True.
+        self.DisplayWhenAdded = True
         self.add_to_db_when_created: bool | None = None
         self.calls: list[tuple[float, ...]] = []
         self._snap = snap

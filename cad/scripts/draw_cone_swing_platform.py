@@ -22,17 +22,19 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, check
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
+    direct_sketch,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    run_drawing_build,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.com_variant import double_array
@@ -150,9 +152,10 @@ def _add_cone_axis_centerline(adapter: Any, view: Any) -> tuple[float, float]:
     # this keeps the centerline coincident with the projected model axis.
     drawing.EditSheet()
     sketch_manager = _early_bound(model.SketchManager, "ISketchManager")
-    centerline = sketch_manager.CreateCenterLine(
-        north[0], north[1], 0.0, south[0], south[1], 0.0
-    )
+    with direct_sketch(sketch_manager):
+        centerline = sketch_manager.CreateCenterLine(
+            north[0], north[1], 0.0, south[0], south[1], 0.0
+        )
     if centerline is None:
         raise RuntimeError("failed to create cone-axis centerline in plan view")
     adapter.currentModel.ClearSelection2(True)
@@ -304,4 +307,4 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    sys.exit(run_drawing_build(build))

@@ -14,20 +14,24 @@ import math
 import os
 import sys
 from collections import Counter
+from datetime import UTC, datetime
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import Any, Awaitable, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
 
 import _config
 import _telemetry
 from _common import (
+    OUT_FAILURES,
     _build_id,
     _early_bound,
+    _slug,
     _visible_document_paths,
     apply_custom_properties,
     capture_com_failure,
+    run_build,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
@@ -1185,6 +1189,206 @@ def add_view_centerline(
     return centerline
 
 
+# Every sketch entity a drawing recipe authors goes in through ``direct_sketch``.
+# ``ISketchManager.Create*`` otherwise runs the new entity through the sketch
+# INFERENCE engine, which snaps its input points onto nearby view geometry with
+# a tolerance in SCREEN pixels -- so the result depends on the seat's window
+# and zoom, not on the recipe. The detail fence of the knife-hanger stud landed
+# centred on a thread-root vertex on swmaker000005 (parent radius 6.35 mm, a
+# 103.1 mm detail outline) and 0.02 mm off on swmaker000006 (5.02 mm) from the
+# same code (2026-09-22, stud-4/5/6). Direct-to-DB creation has no inference
+# stage (ISketchManager::AddToDB: "avoid grid and entity snapping").
+# ``test_drawing_direct_sketch`` fails any drawing recipe that creates sketch
+# geometry outside this block.
+
+
+@contextlib.contextmanager
+def direct_sketch(manager: Any) -> Iterator[Any]:
+    """``manager`` in direct-to-DB mode for the block: entities land exactly at
+    the coordinates given, displayed as they are added.
+
+    The mode is read back, because a sketch manager that declines the write
+    does so SILENTLY and every entity would go through inference anyway. The
+    manager's mode is session-global, so the exit -- in a ``finally``, even
+    when creation raises -- hands back exactly what it found rather than
+    writing a default over a mode an earlier caller chose
+    (``test_rocker_arm_support_drawing`` pins both). A direct-to-DB entity is
+    NOT left selected the way an inferred one is: a caller whose next command
+    consumes the selection must select it (:func:`_select_sketch_segment`).
+    """
+    previous_add_to_db = bool(manager.AddToDB)
+    previous_display = bool(manager.DisplayWhenAdded)
+    try:
+        # Inside the try: a write that raises part-way must still be undone.
+        manager.AddToDB = True
+        manager.DisplayWhenAdded = True
+        if not bool(manager.AddToDB):
+            raise RuntimeError(
+                "the sketch manager refused AddToDB = True; its entities would "
+                "be snapped by sketch inference"
+            )
+        yield manager
+    finally:
+        manager.AddToDB = previous_add_to_db
+        manager.DisplayWhenAdded = previous_display
+
+
+def _select_sketch_segment(
+    draw: Any, view: Any, segment: Any, *, label: str
+) -> None:
+    """Make ``segment`` of ``view``'s sketch the one selected entity -- the
+    precondition of ``CreateSectionViewAt5``/``CreateDetailViewAt4``, which a
+    direct-to-DB segment does not meet on its own."""
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = view
+    selectable = _sw_type_info.early_bound_or_flag(
+        segment, "ISketchSegment", "Select4"
+    )
+    if not selectable.Select4(False, selection_data):
+        raise RuntimeError(f"failed to select the sketch segment ({label})")
+    selected = int(selection_manager.GetSelectedObjectCount2(-1))
+    if selected != 1:
+        raise RuntimeError(
+            f"selecting the sketch segment produced {selected} entities ({label})"
+        )
+
+
+# Exact, as for the section line: nothing legitimately moves a fence authored
+# in sketch coordinates, and the smallest snap on record (0.02 mm) is four
+# orders of magnitude above this, so a snap cannot hide under it.
+_DETAIL_CIRCLE_TOLERANCE_M = 1e-6
+
+
+def _detail_circles(view: Any) -> list[tuple[tuple[float, float], float]]:
+    """``(centre, radius)`` in sheet metres of every detail circle on ``view``.
+
+    ``IView::GetDetailCircleInfo2`` is ``[count, (layer, centre[3], start[3],
+    end[3], lineType, textPt[3], textHeight, numArrows, numArrows x (tip[3],
+    component[3], width, height, style)) x count]``; the radius is the centre
+    to start-point distance.
+    """
+    info = [float(value) for value in (view.GetDetailCircleInfo2() or ())]
+    if not info:
+        return []
+    circles = []
+    at = 1
+    for _ in range(int(info[0])):
+        centre = (info[at + 1], info[at + 2])
+        start = (info[at + 4], info[at + 5])
+        circles.append((centre, math.dist(centre, start)))
+        arrows = int(info[at + 15])
+        at += 16 + 9 * arrows
+    return circles
+
+
+def _assert_detail_circle(
+    view: Any,
+    center: tuple[float, float],
+    radius: float,
+    *,
+    label: str,
+) -> None:
+    """The parent view's detail circle is exactly the fence that was asked for.
+
+    Nonzero-radius-and-fits was the old bar, and a fence snapped onto a thread
+    root passed it with a detail 24% too large.
+    """
+    circles = _detail_circles(view)
+    if not circles:
+        raise RuntimeError(f"{label}: the parent view reports no detail circle")
+    actual_center, actual_radius = min(
+        circles, key=lambda circle: math.dist(circle[0], center)
+    )
+    drift = max(math.dist(actual_center, center), abs(actual_radius - radius))
+    _telemetry.info(
+        f"detail circle {label}: "
+        + json.dumps(
+            {
+                "requested_center_mm": [round(v * 1000.0, 4) for v in center],
+                "requested_radius_mm": round(radius * 1000.0, 4),
+                "parent_center_mm": [round(v * 1000.0, 4) for v in actual_center],
+                "parent_radius_mm": round(actual_radius * 1000.0, 4),
+                "drift_mm": round(drift * 1000.0, 6),
+            },
+            sort_keys=True,
+        )
+    )
+    if drift > _DETAIL_CIRCLE_TOLERANCE_M:
+        raise RuntimeError(
+            f"{label}: the detail circle sits {drift * 1000.0:.4g} mm from the "
+            f"fence that was authored (centre {actual_center} r {actual_radius} "
+            f"instead of {center} r {radius}) -- sketch inference snapped it"
+        )
+
+
+@_telemetry.traced("drawing.detail_view", label_param="label")
+def create_detail_view(
+    adapter: Any,
+    parent_view: Any,
+    *,
+    center: tuple[float, float],
+    radius: float,
+    view_xy: tuple[float, float],
+    scale: tuple[float, float],
+    letter: str,
+    label: str,
+) -> Any:
+    """Fence a circle on ``parent_view`` and create its native detail view.
+
+    ``center``/``radius`` are drawing-sheet metres; the fence is converted
+    through the parent sketch's transform, drawn direct-to-DB, selected, and
+    read back off the parent view once the detail exists
+    (:func:`_assert_detail_circle`). Returns the detail's ``IView``, created as
+    a standard, circular, full-outline detail at ``view_xy``; placing and
+    rescaling it stays with the caller.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(parent_view, "IView")
+    if not ddoc.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError(f"failed to activate the detail parent view ({label})")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    with direct_sketch(manager):
+        fence = manager.CreateCircle(*points[0], *points[1])
+    if fence is None:
+        raise RuntimeError(f"failed to create the detail fence ({label})")
+    _select_sketch_segment(draw, parent_view, fence, label=label)
+    detail = ddoc.CreateDetailViewAt4(
+        float(view_xy[0]),
+        float(view_xy[1]),
+        0.0,
+        0,  # swDetViewSTANDARD
+        float(scale[0]),
+        float(scale[1]),
+        letter,
+        1,  # swDetCircleCIRCLE
+        True,  # full outline
+        False,  # jagged
+        False,  # no outline
+        5,
+    )
+    if detail is None:
+        raise RuntimeError(f"failed to create the native detail view ({label})")
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="create_detail_view")
+    _assert_detail_circle(parent, center, radius, label=label)
+    return _early_bound(detail, "IView")
+
+
 # The section cutting line is a GEOMETRIC DATUM, not annotation: the plane it
 # defines is where every dimension taken off the section is measured, and a
 # cut-face line carries that plane's own coordinate (which is what the part
@@ -1300,28 +1504,12 @@ def create_section_view(
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    sketch_manager.AddToDB = True
-    try:
+    with direct_sketch(sketch_manager):
         segment = sketch_manager.CreateLine(*points[0], *points[1])
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
     if segment is None:
         raise RuntimeError(f"failed to create section line ({label})")
     _assert_section_line_placed(adapter, segment, points, label=label)
-    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    selection_data = selection_manager.CreateSelectData()
-    selection_data.View = parent_view
-    selectable = _sw_type_info.early_bound_or_flag(
-        segment, "ISketchSegment", "Select4"
-    )
-    if not selectable.Select4(False, selection_data):
-        raise RuntimeError(f"failed to select the section line ({label})")
-    selected = int(selection_manager.GetSelectedObjectCount2(-1))
-    if selected != 1:
-        raise RuntimeError(
-            f"selecting the section line produced {selected} entities ({label})"
-        )
+    _select_sketch_segment(draw, parent_view, segment, label=label)
     # swCreateSectionView_NotAligned | swCreateSectionView_ScaleWithModel
     # (| swCreateSectionView_Partial for a removed section).
     options = 0x1 | 0x8 | (0x10 if partial else 0)
@@ -3800,15 +3988,8 @@ def create_view_theoretical_datum(
     if not drawing.ActivateView(name):
         raise RuntimeError(f"failed to activate theoretical-datum view {name!r}")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(sketch_manager.AddToDB)
-    previous_display = bool(sketch_manager.DisplayWhenAdded)
-    sketch_manager.AddToDB = True
-    sketch_manager.DisplayWhenAdded = True
-    try:
+    with direct_sketch(sketch_manager):
         point = sketch_manager.CreatePoint(point_xy[0], point_xy[1], 0.0)
-    finally:
-        sketch_manager.AddToDB = previous_add_to_db
-        sketch_manager.DisplayWhenAdded = previous_display
     if point is None:
         raise RuntimeError(f"failed to create {label} theoretical datum point")
     point = _early_bound(point, "ISketchPoint")
@@ -6220,3 +6401,81 @@ def draw_note_table(
         for x, text in zip(column_x, row, strict=True):
             if add_note(adapter, text, x, y) is None:
                 raise RuntimeError(f"failed to add schedule cell {text!r}")
+
+
+# swDocumentTypes_e.swDocDRAWING
+_DOC_DRAWING = 3
+
+
+def export_failure_pdf(adapter: Any, target: str) -> Path | None:
+    """Export the drawing a failed recipe left open, as forensic evidence.
+
+    A recipe failure -- a layout-audit abort, a BOM row that did not persist --
+    never reaches ``capture_com_failure``, so it used to leave nothing to look
+    at: the farm worker's workspace is disposable and the sheets died with it.
+    The PDF lands under ``cad/out/reports/failures/drawing-<target>/<UTC>/``,
+    which the doit parent lists in the leaf log and the farm worker uploads
+    beside ``task.log``.
+
+    The export is the same ``SaveAs3`` every finished drawing ships through,
+    and ``finalize_drawing`` already holds that call to one page per sheet
+    (:func:`sanitize_pdf_metadata`) on every multi-sheet drawing the fleet
+    builds. The page count is still read back against ``GetSheetNames``: a
+    short PDF is kept (partial evidence beats none) but reported as
+    ``partial``. Returns the path when a PDF exists, else ``None`` (no drawing
+    open yet, or the export failed). Never raises: the evidence must not
+    replace the failure it documents.
+    """
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    path = OUT_FAILURES / _slug(f"drawing-{target}") / stamp / f"{target.replace('_', '-')}.pdf"
+    outcome = "exported"
+    counts: dict[str, int] = {}
+    try:
+        model = adapter.currentModel
+        if model is None or int(_early_bound(model, "IModelDoc2").GetType()) != _DOC_DRAWING:
+            outcome = "no_drawing"
+        else:
+            sheets = tuple(_early_bound(model, "IDrawingDoc").GetSheetNames() or ())
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _early_bound(model, "IModelDoc2").SaveAs3(str(path), 0, 0)
+            if not path.is_file():
+                outcome = "no_file"
+            else:
+                from pypdf import PdfReader
+
+                counts = {"pages": len(PdfReader(str(path)).pages), "sheets": len(sheets)}
+                if counts["pages"] != counts["sheets"]:
+                    outcome = "partial"
+    except Exception as exc:  # noqa: BLE001 -- evidence must not mask the failure
+        outcome = f"error: {exc!r}"
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "drawing.failure_pdf", target=target, path=str(path), outcome=outcome, **counts
+        )
+        if outcome == "exported":
+            _telemetry.info(f"drawing failure evidence PDF: {path}", path=str(path), **counts)
+        else:
+            _telemetry.warn(
+                f"drawing failure evidence PDF {outcome} {counts}: {path}",
+                path=str(path),
+                outcome=outcome,
+                **counts,
+            )
+    return path if outcome in ("exported", "partial") else None
+
+
+def run_drawing_build(build: Callable[[Any], Awaitable[dict[str, str]]]) -> int:
+    """``run_build`` for a drawing recipe: a build that raises first exports the
+    sheets it got to (:func:`export_failure_pdf`), while the drawing is still
+    open -- ``run_build``'s teardown closes every document right after."""
+    script = Path(sys.argv[0]).stem if sys.argv and sys.argv[0] else "draw_drawing"
+    target = script.removeprefix("draw_")
+
+    async def build_or_capture(adapter: Any) -> dict[str, str]:
+        try:
+            return await build(adapter)
+        except Exception:
+            export_failure_pdf(adapter, target)
+            raise
+
+    return run_build(build_or_capture)
