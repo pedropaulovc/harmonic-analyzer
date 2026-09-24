@@ -51,6 +51,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+import build_cone_swing_platform as _part
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -550,6 +551,31 @@ def _section_edge_midpoint(
     return (sheet[0], sheet[1])
 
 
+def expected_corner_arcs(feature_name: str) -> int:
+    """Visible plan arcs a corner fillet leaves: 2 where the W18 relief crosses it.
+
+    Derived from the same overlap the part build credits in its fillet volume
+    gate (``_north_fillet_relief_overlap``), so the drawing and the model agree
+    on where the open relief splits a fillet's top edge.
+    """
+    label = feature_name.removeprefix("Corner")
+    radius = {corner[0]: corner[3] for corner in _part._CORNERS}[label]
+    return 2 if _part._north_fillet_relief_overlap(label, radius) > 0.0 else 1
+
+
+def check_corner_arc_plan(
+    name: str, plan: list[tuple[float, float, float]], expected: int
+) -> None:
+    """Exactly the expected owned arcs, all on one plan circle (x, z, radius)."""
+    if len(plan) != expected:
+        raise RuntimeError(
+            f"expected {expected} owned visible {name} arc(s) at corner station, "
+            f"found {len(plan)}"
+        )
+    if any(math.dist(item, plan[0]) > 1e-8 for item in plan[1:]):
+        raise RuntimeError(f"{name} owned arcs do not share one plan circle: {plan!r}")
+
+
 def _assert_corner_radius_attachment(
     adapter: Any, view: Any, annotations: list[Any], *,
     name: str, feature_name: str, radius_m: float, station_xy: tuple[float, float],
@@ -607,11 +633,8 @@ def _assert_corner_radius_attachment(
     # fillet, so its plan arc is two physical edges on one circle -- one on
     # the 6.35 top, one on the 6.10 relief floor.  Every owned visible arc
     # must share the plan centre and radius; the arrow must land on one.
-    if not candidates:
-        raise RuntimeError(f"no {feature_name}-owned visible {name} edge at corner station")
     plan = [(circle[0], circle[2], circle[6]) for _edge, circle, _center in candidates]
-    if any(math.dist(item, plan[0]) > 1e-8 for item in plan[1:]):
-        raise RuntimeError(f"{name} owned arcs do not share one plan circle: {plan!r}")
+    check_corner_arc_plan(name, plan, expected_corner_arcs(feature_name))
     distances = []
     for edge, circle, center in candidates:
         # Invert the measured plan-view X/Z basis at this owned edge's model Y.
@@ -641,6 +664,13 @@ def _assert_corner_radius_attachment(
         )
     if not min(distances) <= 0.00002:  # 0.01 mm on this 1:2 sheet; unchanged physical-edge bound.
         raise RuntimeError(f"{name} arrow does not land on its owned physical corner arc")
+    # Which face's arc the arrow names: a reader should see the radius on the
+    # 6.35 top outline, not the 6.10 relief floor (Main, 2026-09-24).
+    hit = candidates[distances.index(min(distances))][1]
+    _telemetry.info(
+        f"{name} arrow lands on the arc at model y={hit[1] * 1000.0:.3f} mm "
+        f"({len(candidates)} owned arc(s); plate top {PLATE_THICKNESS:.2f})"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:

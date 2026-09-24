@@ -136,6 +136,29 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     assert 0.0 < overlaps["NW"] < part._corner_fillet_area("NW", 8.0)
 
 
+def test_corner_arc_count_follows_the_relief_overlap() -> None:
+    """The NW fillet's plan arc splits in two where W18's relief crosses it.
+
+    Run d9711228 found two CornerNW arcs.  The count is pinned from the build's
+    own overlap check, so a third arc from an unintended cut still fails, and
+    arcs that do not share one plan circle fail too.
+    """
+    assert {
+        name: drawing.expected_corner_arcs(name)
+        for name in ("CornerNE", "CornerNW", "CornerSW", "CornerSE")
+    } == {"CornerNE": 1, "CornerNW": 2, "CornerSW": 1, "CornerSE": 1}
+    split = [(0.0065, 0.007, 0.008), (0.0065, 0.007, 0.008)]
+    drawing.check_corner_arc_plan("CornerNWR", split, 2)
+    with pytest.raises(RuntimeError, match="found 3"):
+        drawing.check_corner_arc_plan("CornerNWR", [*split, split[0]], 2)
+    with pytest.raises(RuntimeError, match="found 2"):
+        drawing.check_corner_arc_plan("CornerNER", split, 1)
+    with pytest.raises(RuntimeError, match="one plan circle"):
+        drawing.check_corner_arc_plan(
+            "CornerNWR", [split[0], (0.0070, 0.007, 0.008)], 2
+        )
+
+
 def test_disengaged_collar_margin_survives_general_bands() -> None:
     """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
     general, base_axis = 0.8, 0.51
