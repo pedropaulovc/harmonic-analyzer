@@ -17,9 +17,10 @@ protrusion); the open LOCK NOTCH cuts straight into the west edge. The
 four plan corners are rounded, echoing the hardware each sits beside
 (pivot screw head at the north end, the green column at the south-east,
 the lock-knob head at the south-west). A native close-clearance Ø6.756 pivot
-hole clears the stock Ø6.35 shoulder. A Ø10.50 x 0.25-deep top relief reduces
-only the local bearing thickness to 6.10, preserving 0.25 running axial
-clearance without lowering the plate or its mounted hardware.
+hole clears the stock Ø6.35 shoulder. A 10.50-wide x 0.25-deep top relief,
+round-ended about the pivot and open through the north edge (rule-12 W18),
+reduces only the local bearing thickness to 6.10, preserving 0.25 running
+axial clearance without lowering the plate or its mounted hardware.
 
 The shortened envelope and paired 1/4-20 post mounts are the direct platform
 cascade from ``cone-pivot-post-v2.SLDPRT``.  Its 42.011 mm casting foot is
@@ -390,6 +391,90 @@ async def _sketch_tip_screw_slot(
     return dims
 
 
+# The top relief's sketch runs this far past the north edge, so its cut
+# opens the edge cleanly (the plate stops at NORTH_OVERHANG).
+PIVOT_RELIEF_RUNOUT = 3.0
+if PIVOT_BEARING_RELIEF_DIAMETER / 2.0 >= NORTH_OVERHANG:
+    raise AssertionError("pivot relief no longer runs out through the north edge")
+
+
+async def _sketch_pivot_relief(adapter, dims: SketchDims) -> None:
+    """Top relief: a south half-circle about the pivot plus two lines north.
+
+    Sketched on the plate top.  The arc's centre is the pivot, the two lines
+    are vertical and tangent to it, and the closing line lies
+    PIVOT_RELIEF_RUNOUT past the north edge, so the cut is one round-ended
+    slot open to that edge.  The width between the lines is the relief
+    diameter (the end-mill size).
+    """
+    r = PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    far = -(NORTH_OVERHANG + PIVOT_RELIEF_RUNOUT)  # sketch y -> part -Z
+    set_sketch_direct_db(adapter, True)
+    arc = check(
+        "pivot relief south arc", await adapter.add_arc(0.0, 0.0, r, 0.0, -r, 0.0)
+    )
+    line_w = check("pivot relief line a", await adapter.add_line(-r, 0.0, -r, far))
+    line_n = check("pivot relief runout", await adapter.add_line(-r, far, r, far))
+    line_e = check("pivot relief line b", await adapter.add_line(r, far, r, 0.0))
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{arc}.center", 0.0, 0.0, "pivot relief")
+    for line, relation in (
+        (line_w, "vertical"),
+        (line_e, "vertical"),
+        (line_n, "horizontal"),
+    ):
+        check(
+            f"pivot relief {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    for junction, e1, e2 in (("a", arc, line_w), ("b", line_e, arc)):
+        check(
+            f"pivot relief tangent {junction}",
+            await adapter.add_sketch_constraint(e1, e2, "tangent"),
+        )
+    await dimension_between(
+        adapter,
+        f"{line_w}.end",
+        f"{line_e}.start",
+        "horizontal_distance",
+        2.0 * r,
+        "pivot relief width",
+    )
+    dims.record("PivotBearingReliefDia", '"PivotBearingReliefDia"')
+    await dimension_between(
+        adapter,
+        f"{line_n}.start",
+        "origin",
+        "vertical_distance",
+        -far,
+        "pivot relief runout",
+    )
+    dims.record("PivotReliefRunout")
+
+
+def _north_fillet_relief_overlap(label: str, r: float) -> float:
+    """Plan area of a north corner fillet that lies over the open relief.
+
+    The fillet is cut after the relief, so where its removed wedge overlaps
+    the 10.50 slot it takes 0.25 less thickness.  A north corner's first edge
+    is the north edge (horizontal), so the fillet circle is tangent to it at
+    ``x_t`` and the removed wedge above the arc spans ``x_t`` to the corner.
+    """
+    idx = [c[0] for c in _CORNERS].index(label)
+    x, z = _CORNERS[idx][1], _CORNERS[idx][2]
+    if abs(z - NORTH_OVERHANG) > 1e-9:
+        return 0.0
+    tangent = r / math.tan(_corner_theta(label) / 2.0)
+    half = PIVOT_BEARING_RELIEF_DIAMETER / 2.0
+    run = half - (abs(x) - tangent)  # slot edge past the tangent point
+    if run <= 0.0:
+        return 0.0
+    run = min(run, r)
+    return r * run - (
+        0.5 * run * math.sqrt(r * r - run * run) + 0.5 * r * r * math.asin(run / r)
+    )
+
+
 def _slot_area(width: float) -> float:
     return math.pi * (width / 2.0) ** 2 + width * 2.0 * TIP_SCREW_HALF_TRAVEL
 
@@ -497,8 +582,8 @@ _CORNERS = (
 )
 
 
-def _corner_fillet_area(label: str, r: float) -> float:
-    """Plan area a radius-r fillet removes at the named sharp corner."""
+def _corner_theta(label: str) -> float:
+    """Interior angle of the named sharp plan corner, radians."""
     idx = [c[0] for c in _CORNERS].index(label)
     x, z = _CORNERS[idx][1], _CORNERS[idx][2]
     xp, zp = _CORNERS[idx - 1][1], _CORNERS[idx - 1][2]
@@ -506,7 +591,12 @@ def _corner_fillet_area(label: str, r: float) -> float:
     v1 = (xp - x, zp - z)
     v2 = (xn - x, zn - z)
     dot = v1[0] * v2[0] + v1[1] * v2[1]
-    theta = math.acos(dot / (math.hypot(*v1) * math.hypot(*v2)))
+    return math.acos(dot / (math.hypot(*v1) * math.hypot(*v2)))
+
+
+def _corner_fillet_area(label: str, r: float) -> float:
+    """Plan area a radius-r fillet removes at the named sharp corner."""
+    theta = _corner_theta(label)
     return r * r * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
 
 
@@ -698,16 +788,7 @@ async def build(adapter) -> dict[str, str]:
         "create_sketch pivot bearing relief",
         await adapter.create_sketch("PivotBearingTop"),
     )
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        PIVOT_BEARING_RELIEF_DIAMETER / 2.0,
-        "pivot bearing relief",
-        dims=bearing_relief,
-        names=("PivotBearingReliefCx", "PivotBearingReliefCz", "PivotBearingReliefDia"),
-        drives=(None, None, '"PivotBearingReliefDia"'),
-    )
+    await _sketch_pivot_relief(adapter, bearing_relief)
     await ensure_fully_defined(adapter, "pivot bearing relief sketch")
     check("exit_sketch pivot bearing relief", await adapter.exit_sketch())
     name_last_feature(adapter, "PivotBearingReliefProfile")
@@ -723,9 +804,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PivotBearingRelief", ["PivotBearingReliefDepth"]
     )
     drive_jobs += [(relief_depth_dim[0], '"PivotBearingReliefDepth"')]
+    # The plan corners are still sharp here, so the relief is exactly a
+    # half disc plus a 10.50 x NORTH_OVERHANG strip, less the pivot hole.
+    relief_r = PIVOT_BEARING_RELIEF_DIAMETER / 2.0
     v_relief = (
-        math.pi
-        * ((PIVOT_BEARING_RELIEF_DIAMETER / 2.0) ** 2 - (pivot_dia / 2.0) ** 2)
+        (
+            math.pi * relief_r**2 / 2.0
+            + 2.0 * relief_r * NORTH_OVERHANG
+            - math.pi * (pivot_dia / 2.0) ** 2
+        )
         * PIVOT_BEARING_RELIEF_DEPTH
     )
     volume = await volume_check(
@@ -985,6 +1072,7 @@ async def build(adapter) -> dict[str, str]:
         name_last_feature(adapter, f"Corner{lbl}")
         name_dimensions(adapter, f"Corner{lbl}", [f"Corner{lbl}R"])
         v_fillets += _corner_fillet_area(lbl, r) * PLATE_T
+        v_fillets -= _north_fillet_relief_overlap(lbl, r) * PIVOT_BEARING_RELIEF_DEPTH
     volume = await volume_check(
         adapter, "rounded corners", volume - v_fillets, 0.01 * v_fillets
     )

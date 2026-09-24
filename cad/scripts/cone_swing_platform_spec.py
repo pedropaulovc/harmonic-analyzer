@@ -22,6 +22,15 @@ POST_CONE_BORE_HEIGHT = cone_pivot_post_spec.BORE_HEIGHT
 
 
 PLATE_THICKNESS = 6.35
+# User ruling U41 (2026-09-23): the thickness is the stock's, printed as a
+# reference "(6.35)" with "1/4 PLATE AS SUPPLIED" -- no machined thickness
+# band.  Rule-12 stacks through the plate use the stock's mill tolerance.
+PLATE_STOCK_BAND = 0.13
+PLATE_STOCK_CALLOUT = "1/4 PLATE AS SUPPLIED"
+# The top relief is 10.50 wide, round-ended about the pivot and OPEN through
+# the north edge (rule-12 W18, Main 2026-09-23, option (d)): as a closed
+# Ø10.50 spotface 7.0 from that edge it left a 1.75 web.  The width keeps the
+# stock 3/8 head's radial clearance (BDT reads it as the relief diameter).
 PIVOT_BEARING_RELIEF_DIAMETER = 10.50
 PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit governs.
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
@@ -29,7 +38,7 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # User decision relayed by Main, 2026-09-22: fit the actual purchased shoulder
 # and finished plate; do not invent a numerical axial-clearance band.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
-    "TOP PIVOT SPOTFACE: MATCH DEPTH TO FINISHED PLATE\n"
+    "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
     "AND ACTUAL CONE-PIVOT-SCREW (McMASTER 91829A560).\n"
     "WITH SCREW SHOULDER FULLY SEATED ON BASE AND LOCK\n"
     "KNOB RELEASED, PLATFORM SHALL SWING FREELY WITHOUT\n"
@@ -58,7 +67,9 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 
 
 # U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
-# socket head cap screw (McMaster 91251A148) coming up from under the plate
+# BUTTON-head socket cap screw (McMaster 91255A148, black-oxide alloy steel;
+# rule-12 audit W22, Main 2026-09-23: the low head leaves a 2.9 ledge where a
+# socket head's 4.2 counterbore left 1.51) coming up from under the plate
 # through a lateral slot; a counterbored slot sinks the head below the slide
 # face. The slot runs across the cone axis so the block can be shifted +/-2.25
 # at fit-up; a shim pack under the foot sets its height. Both slots share the
@@ -68,15 +79,17 @@ POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
 TIP_SCREW_LOCAL_Z = -11.0
 TIP_SCREW_HALF_TRAVEL = 2.0
 TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
-TIP_SCREW_HEAD_DIA = (5.54, 5.74)  # ASME B18.3 #6 SHCS head min/max
-TIP_SCREW_HEAD_H_MAX = 3.505
+# McMaster 91255A148 lists one head size, 0.262 dia x 0.073 high, taken as the
+# max; the B18.3 #6 button-head minimum diameter, 0.250, bounds the bearing.
+TIP_SCREW_HEAD_DIA = (0.250 * 25.4, 0.262 * 25.4)
+TIP_SCREW_HEAD_H_MAX = 0.073 * 25.4
 # The slot widths are cut in one pass by an end mill of that size, so they
 # carry the same one-sided +0.10/0 band as the title block's DRILLED HOLES
 # row: the cutter makes the size, the machinist holds nothing tight.
 TIP_SLOT_W = 4.0
-TIP_CBORE_W = 6.5
+TIP_CBORE_W = 7.94  # a 5/16 end mill
 TIP_SLOT_W_BAND = (0.0, 0.10)
-TIP_CBORE_DEPTH = 4.2  # .XX
+TIP_CBORE_DEPTH = 2.8  # .XX
 _XX = 0.51
 TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W - TIP_SCREW_MAJOR
 TIP_SLOT_HEAD_BEARING = (
@@ -84,9 +97,11 @@ TIP_SLOT_HEAD_BEARING = (
 ) / 2.0
 TIP_CBORE_HEAD_CLEARANCE = TIP_CBORE_W - TIP_SCREW_HEAD_DIA[1]
 TIP_HEAD_RECESS = TIP_CBORE_DEPTH - _XX - TIP_SCREW_HEAD_H_MAX
+# Ledge under the head: the stock plate less the .XX counterbore depth, both
+# bands (rule-12 audit W22: the first cut left out the plate's band).
 TIP_LEDGE_RANGE = (
-    PLATE_THICKNESS - TIP_CBORE_DEPTH - _XX,
-    PLATE_THICKNESS - TIP_CBORE_DEPTH + _XX,
+    PLATE_THICKNESS - PLATE_STOCK_BAND - TIP_CBORE_DEPTH - _XX,
+    PLATE_THICKNESS + PLATE_STOCK_BAND - TIP_CBORE_DEPTH + _XX,
 )
 if TIP_SLOT_SCREW_CLEARANCE < 0.25:
     raise AssertionError("tip-block screw slot does not clear the #6-32 major")
@@ -96,8 +111,8 @@ if TIP_CBORE_HEAD_CLEARANCE < 0.25:
     raise AssertionError("tip-block counterbore slot does not clear the screw head")
 if TIP_HEAD_RECESS < 0.1:
     raise AssertionError("tip-block screw head can stand proud of the slide face")
-if TIP_LEDGE_RANGE[0] < 1.5:
-    raise AssertionError("tip-block counterbore ledge is below the U27 1.5 floor")
+if TIP_LEDGE_RANGE[0] < 2.0:
+    raise AssertionError("tip-block counterbore ledge is below the U27 2.0 target")
 
 
 # Only functional sliding/locating surfaces carry roughness.  The existing
@@ -138,6 +153,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
     "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
     "TipScrewCboreProfile": {"TipCboreW"},
+    "TipScrewCbore": {"TipCboreDepth"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -180,7 +196,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TipSlotZ": 2,
         "TipSlotW": 1,
     },
-    "TipScrewCboreProfile": {"TipCboreW": 1},
+    "TipScrewCboreProfile": {"TipCboreW": 2},
+    "TipScrewCbore": {"TipCboreDepth": 2},
     "CornerNE": {"CornerNER": 1},
     "CornerNW": {"CornerNWR": 1},
     "CornerSW": {"CornerSWR": 1},
