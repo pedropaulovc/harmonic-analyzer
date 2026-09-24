@@ -99,6 +99,7 @@ from build_knife_hanger_washer import (
 from build_knife_mount import STUD_TAP_THREAD_DEPTH_MM
 from build_top_frame import RING_HEIGHT as CROSSBAR_HEIGHT, STUD_HOLE_DIA
 from summing_assembly_spec import (
+    ASSEMBLY_TITLE,
     BOM_QUANTITIES,
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
@@ -1210,9 +1211,9 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The PART cell resolves the document summary Title; "summing assembly" (not
-    # the bare stem) so the sheet identifies itself as an assembly drawing.
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    # The PART cell resolves the document summary Title; "Summing Assembly"
+    # (not the bare stem) so the sheet identifies itself as an assembly drawing.
+    apply_summary_info(adapter, title=ASSEMBLY_TITLE)
     _create_summing_explode(adapter)
     return await save_assembly_and_images(
         adapter,

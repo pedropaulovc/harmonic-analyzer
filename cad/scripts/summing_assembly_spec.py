@@ -5,6 +5,8 @@ from __future__ import annotations
 import knife_hanger_interface as hanger
 
 
+# The title block's PART cell prints the document summary Title.
+ASSEMBLY_TITLE = "Summing Assembly"
 EXPLODED_VIEW_NAME = "SUMMING_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 

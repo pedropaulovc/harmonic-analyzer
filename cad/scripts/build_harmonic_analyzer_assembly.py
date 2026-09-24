@@ -67,6 +67,8 @@ from _interference_contracts import allowed_interference_pairs
 import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
+# The title block's PART cell prints the document summary Title.
+ASSEMBLY_TITLE = "Harmonic Analyzer Assembly"
 
 SUBASSEMBLIES = (
     "frame",
@@ -230,7 +232,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    apply_summary_info(adapter, title=ASSEMBLY_TITLE)
 
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the
