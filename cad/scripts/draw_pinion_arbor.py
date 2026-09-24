@@ -101,11 +101,27 @@ def _sheet_x(model_z: float) -> float:
     return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
 
 
-# Each land's Ra symbol sits just head side of the land's head-side end, so
-# its left edge clears that end's station witness.
+# Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
+# head-side end, and its symbol hangs RA_SHOULDER further head side on a short
+# bent-leader shoulder.  The front symbol hangs below the shaft, its left edge
+# clear of that end's station witness.  At c6eb7f6f the back symbol did the
+# same and its shoulder ran through the 199.9 / 19.0 witness below the shaft
+# (Main).  Nothing rises from the back land above the shaft, so its symbol
+# hangs there, over the land's head-side end and under the raised back
+# JOURNAL diameter (BACK_JOURNAL_DIA_Y).
+RA_ARROW_FROM_HEAD_END = 2.0
 RA_SYMBOL_OFFSET = 0.0033
+RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
 FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
-BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
+BACK_RA_XY = (
+    _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
+    0.179,
+)
+# Rendered extent of an Ra 1.6 symbol about its insertion point (left, right,
+# top; the point is the shoulder's end under the triangle's vertex), measured
+# on the c6eb7f6f sheet.
+RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
+FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
 # Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
 # CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
 # test), and its line stands 1 mm from that point, so its extensions are ~1 mm
@@ -124,8 +140,10 @@ BACK_JOURNAL_DIA_POINT_X = _sheet_x(
 # witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
 # leader on its head side), so its diameter hangs ABOVE the shaft, its text
 # right of the line over the land and clear of the back-crown sag witnesses,
-# and its 19.0 length moves below, under the Ra symbol.
+# and its 19.0 length moves below.  The block rides high enough that the
+# back Ra symbol fits under it, over the land.
 BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
+BACK_JOURNAL_DIA_Y = 0.1945
 # The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
 # of its drum-end witness: between that witness and the head face, the
 # neck-end witness drops through.
@@ -184,7 +202,7 @@ PRINCIPAL_KEEP = {
     "BackJournalLen": (0.097, 0.143),
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
-    "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.185),
+    "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     # The drum station stacks between the two land stations, its text left of
     # its own drum-end witness.  The back station's text moves left to clear
@@ -233,11 +251,15 @@ DIMENSION_CALLOUTS = {
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0
-# Each land's Ra symbol hangs off the lower flank on the land's head side of
-# its diameter line, clear of the split-line rings at the land ends.
+# Each land's Ra symbol hangs off one flank on the land's head side of its
+# diameter line, clear of the split-line rings at the land ends.
 JOURNAL_FINISHES = {
-    "front_journal": (FRONT_JOURNAL_Z + 2.0, (FRONT_RA_X, 0.150)),
-    "back_journal": (BACK_JOURNAL_Z + 2.0, (BACK_RA_X, 0.150)),
+    "front_journal": (
+        FRONT_JOURNAL_Z + RA_ARROW_FROM_HEAD_END,
+        (FRONT_RA_X, 0.150),
+        "lower",
+    ),
+    "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),
 }
 
 
@@ -638,7 +660,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
-    for key, (station_z, symbol_xy) in JOURNAL_FINISHES.items():
+    for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
         land_x, axis_y = model_point_in_view(
             adapter,
             principal,
@@ -648,7 +670,7 @@ async def build(adapter: Any) -> dict[str, str]:
         add_surface_finish(
             adapter,
             principal,
-            edge_xy=(land_x, axis_y - SHAFT_DIA / 2000.0),
+            edge_xy=(land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0),
             symbol_xy=symbol_xy,
             control=surface_finish_by_key(SURFACE_FINISHES, key),
             label=f"arbor {key} finish",
@@ -718,7 +740,11 @@ async def build(adapter: Any) -> dict[str, str]:
 
 # Text on text joined the gate with the bond-zone callout's move above the
 # shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
-BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
+# Leader on leader joined with the back Ra symbol's move above the shaft: at
+# c6eb7f6f its shoulder crossed the back land's 19.0 witness (Main).
+BLOCKING_LAYOUT_FINDINGS = frozenset(
+    {"text-on-line", "text-on-text", "leader-crosses-leader"}
+)
 
 
 def _assert_no_text_on_line(findings: list[Any]) -> None:

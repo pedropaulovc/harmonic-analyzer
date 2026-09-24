@@ -129,7 +129,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
         station = lands[finish.key]
         assert station < finish.face.contains_z_mm < station + spec.JOURNAL_LEN
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
-    for key, (station_z, _symbol_xy) in drawing.JOURNAL_FINISHES.items():
+    for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
     assert "MHA-056" in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
@@ -255,18 +255,43 @@ def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> Non
     width, height = drawing.DIAMETER_BLOCK_SIZE
     x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
-    assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.012
+    # 12 -> 15 mm: the back Ra symbol now sits between block and shaft.
+    assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.015
     assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
     detail_left = drawing.DETAIL_LABEL_XY[0] - 0.017
     assert detail_left - (x + width) >= 0.010
-    # The 19.0 sits below, under the Ra symbol and clear of its leader.
-    len_x, len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
-    edge_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
-    leader_x = drawing._sheet_x(edge_z)
-    assert len_y < symbol_y - 0.005
-    assert leader_x - (len_x + 0.0055) >= 0.003
+    # The 19.0 sits below, clear of the land's crown-side end.
+    len_x, _len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
     crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
     assert len_x - 0.0055 > crown_end
+
+
+def test_back_ra_symbol_hangs_above_the_shaft_clear_of_every_witness() -> None:
+    """c6eb7f6f: the back Ra leader's shoulder crossed the 199.9 / 19.0
+    witness below the shaft, a line through the symbol (Main).  Above the
+    shaft nothing rises from the back land, so the symbol hangs there."""
+    edge_z, (symbol_x, symbol_y), flank = drawing.JOURNAL_FINISHES["back_journal"]
+    assert flank == "upper"
+    assert drawing.JOURNAL_FINISHES["front_journal"][2] == "lower"
+    head_end = drawing._sheet_x(spec.BACK_JOURNAL_Z)
+    crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
+    arrow_x = drawing._sheet_x(edge_z)
+    assert crown_end < arrow_x < head_end  # the arrow lands on the land
+    left, right, top = drawing.RA_SYMBOL_EXTENT
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    # A leader rise long enough to carry its arrowhead.
+    assert symbol_y - shaft_top >= 0.004
+    # The shoulder runs head side from the arrow, right of the diameter line.
+    dia_line_x = drawing.BACK_JOURNAL_DIA_POINT_X
+    assert dia_line_x + 0.010 < arrow_x < symbol_x
+    assert symbol_x + left - dia_line_x >= 0.010
+    # Under the back JOURNAL block, with a gap.
+    _width, height = drawing.DIAMETER_BLOCK_SIZE
+    dia_bottom = drawing.PRINCIPAL_KEEP["BackJournalDia"][1] - height / 2.0
+    assert dia_bottom - (symbol_y + top) >= 0.002
+    # Clear of the DETAIL A label to its right.
+    assert (drawing.DETAIL_LABEL_XY[0] - 0.017) - (symbol_x + right) >= 0.005
+    assert "leader-crosses-leader" in drawing.BLOCKING_LAYOUT_FINDINGS
 
 
 def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> None:
@@ -407,9 +432,9 @@ def test_head_diameter_line_stands_between_crown_apex_and_fence() -> None:
 def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
     from _layout_geometry import Finding
 
-    advisory = Finding(kind="leader-crosses-leader", sheet="Sheet1", detail="x")
+    advisory = Finding(kind="leader-crosses-view", sheet="Sheet1", detail="x")
     drawing._assert_no_text_on_line([advisory])
-    for kind in ("text-on-line", "text-on-text"):
+    for kind in ("text-on-line", "text-on-text", "leader-crosses-leader"):
         blocking = Finding(kind=kind, sheet="Sheet1", detail="journal")
         with pytest.raises(RuntimeError, match="blocking finding"):
             drawing._assert_no_text_on_line([advisory, blocking])
