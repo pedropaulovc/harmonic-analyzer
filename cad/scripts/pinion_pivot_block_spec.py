@@ -96,9 +96,8 @@ DRAWING_NOTES = "\n".join(
         "  MHA-060 LIFT ROD; EACH SHAFT TURNS FREELY BY HAND.",
         # User ruling (c), 2026-09-24: the blocks locate the swing cluster
         # axially; the front block is set by feeler before the U28 transfer.
-        "SET FRONT BLOCK WITH 0.25 FEELER TO FRONT STRAP, CLUSTER",
-        "  HARD ON BACK BLOCK; THEN SPOT BASE SEATS THROUGH BLOCK",
-        "  HOLES AT ASSEMBLY.",
+        "AT ASSEMBLY: SET FRONT BLOCK 0.25 FEELER OFF STRAP WITH",
+        "  CLUSTER ON BACK BLOCK; SPOT BASE SEATS THRU BLOCK HOLES.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
