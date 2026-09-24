@@ -43,11 +43,11 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
@@ -56,12 +56,12 @@ from pinion_pivot_shaft_spec import (
     CAP_SAG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     END_VIEW_NOTE,
     ISO_VIEW_NOTE,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
-    SHAFT_LENGTH_TOLERANCE_MM,
     SURFACE_FINISHES,
 )
 
@@ -250,9 +250,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ShaftProfile", "ShaftDia", *deviations(SHAFT_DIA_BAND)
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "Shaft", "Depth", SHAFT_LENGTH_TOLERANCE_MM
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)  # length at .X (U27)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -64,20 +64,22 @@ BLOCK_SEAT_Z = tuple(z0 + BLOCK_DEPTH / 2.0 for z0 in BLOCK_Z0)
 PHYSICAL_INNER_SPAN = 2.0 * STRAP_T + DRUM_LEN + FRONT_BLOCK_FEELER  # 161.45
 PHYSICAL_FRONT_BLOCK_OUTER_Z = BACK_BLOCK_Z0 - PHYSICAL_INNER_SPAN - BLOCK_DEPTH
 
-# Torque shaft and lift rod: back ends flush with the back block's outer face.
-# The shaft (printed .XX) is flush with the PHYSICAL front block's outer face;
-# the rod (printed .X, rounded up) stands >= LEVER_SEAT_PROUD proud of it as the
-# MHA-059 lever hub's seat.  In the model pose the shaft's front end therefore
-# reads 2 x STRAP_AIR inside the model front block.
-TORQUE_SHAFT_LEN = round(BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z, 2)
+
+# Torque shaft and lift rod: back ends flush with the back block's outer face,
+# both printed at .X (title-block +/-0.8, U27) and rounded UP.  The shaft is
+# flush with the PHYSICAL front block's outer face to within that rounding; the
+# rod stands >= LEVER_SEAT_PROUD proud of it as the MHA-059 lever hub's seat.
+# In the model pose the shaft's front end therefore reads about 2 x STRAP_AIR
+# inside the model front block.
+def _up_to_tenth(length: float) -> float:
+    return math.ceil(length * 10.0 - 1e-6) / 10.0
+
+
+TORQUE_SHAFT_LEN = _up_to_tenth(BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z)
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
 LEVER_SEAT_PROUD = 10.0
-LIFT_ROD_LEN = (
-    math.ceil(
-        (BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z + LEVER_SEAT_PROUD) * 10.0
-        - 1e-6
-    )
-    / 10.0
+LIFT_ROD_LEN = _up_to_tenth(
+    BACK_BLOCK_OUTER_Z - PHYSICAL_FRONT_BLOCK_OUTER_Z + LEVER_SEAT_PROUD
 )
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 

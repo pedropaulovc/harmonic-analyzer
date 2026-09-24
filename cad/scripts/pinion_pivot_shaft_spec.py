@@ -17,13 +17,19 @@ from pinion_rig_layout import TORQUE_SHAFT_LEN
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # Ends flush with the pivot blocks' outer faces; ruling (c) moved the front
-# block inboard to the front strap (pinion_rig_layout), 192 -> 181.95
+# block inboard to the front strap (pinion_rig_layout), 192 -> 182.0
 # (the physical stack, never the model pose's air: Codex #854).
 SHAFT_LEN = TORQUE_SHAFT_LEN
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
-SHAFT_LENGTH_TOLERANCE_MM = 0.25
+# U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
+# not a tight one.  The only occupant outboard of either end on the shaft's
+# axis is the MHA-059 lever's throw plane south of the front block; with the
+# rod hard north (hub on the block) and the shaft 0.85 proud, it still clears
+# the shaft end by 1.15 (test_drive_train_support_layout).  Past the back block
+# nothing stands on the axis.  Each block still bears >= 9.5 of its 10.25.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
