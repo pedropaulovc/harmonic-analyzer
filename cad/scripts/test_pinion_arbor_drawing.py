@@ -130,11 +130,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
     for key, (station_z, _symbol_xy) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
-    assert spec.JOURNAL_LEN == pytest.approx(12.0)
-    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(50.5)
-    assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(203.2)
     assert "MHA-056" in spec.DRAWING_NOTES
-    assert "SHAFT SLIPS INTO MHA-002 AND BONDS WITH LOCTITE 638." in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
@@ -286,4 +282,62 @@ def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
     blocking = Finding(kind="text-on-line", sheet="Sheet1", detail="journal")
     with pytest.raises(RuntimeError, match="text-on-line"):
         drawing._assert_no_text_on_line([advisory, blocking])
+
+
+def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
+    """Ruling A on the user's located cluster (option c): the lands are the
+    smallest whole-mm length that keeps every land end over its strap by 0.5 at
+    the worst band corner, at BOTH stops of the fit-up end play, with a printed
+    drum-station band of at least 0.5; no .X band is tightened (U27)."""
+    import alignment_pinion_spec as drum
+    import build_drive_train_assembly as assembly
+    import pinion_bracket_geometry as strap
+    import pinion_bracket_spec
+
+    # The stack's inputs are the parts' and the assembly's own values.
+    assert spec.DRUM_LEN == drum.FACE_WIDTH == assembly.APINION_DRUM_LEN
+    assert spec.STRAP_T == strap.THICKNESS == assembly.STRAP_T
+    assert spec.STRAP_T_BAND == pinion_bracket_spec.THICKNESS_BAND
+    assert spec.STRAP_AXIAL_LOCATION == "block-stop-slot-set"
+    assert spec.DRUM_STATION == pytest.approx(
+        spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
+    )
+
+    assert spec.JOURNAL_LEN == pytest.approx(18.0)
+    assert spec.DRUM_STATION == pytest.approx(61.55)
+    assert spec.DRUM_STATION_BAND == pytest.approx(0.6)
+    assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
+        pytest.approx(47.9),
+        pytest.approx(200.4),
+    )
+    assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
+    for margins in spec.LAND_MARGINS_AT_STOPS.values():
+        assert set(margins) == set(spec.LAND_ENDS)
+        assert min(margins.values()) >= 0.5 - 1e-9
+    # One millimetre shorter fails: the derivation picked the smallest length.
+    assert spec.drum_station_band(spec.JOURNAL_LEN - 1.0) < 0.5
+    # The drum never binds between the straps.
+    assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
+    assert spec.drum_total_air() == (
+        pytest.approx(spec.END_PLAY - spec.END_PLAY_SET_ERROR),
+        pytest.approx(spec.END_PLAY + spec.END_PLAY_SET_ERROR),
+    )
+    # The lands are centred on their straps (to the printed place) with the
+    # drum mid-way through its play.
+    air = spec.END_PLAY / 2.0
+    front_mid = spec.FRONT_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
+    back_mid = spec.BACK_JOURNAL_FROM_HEAD_REAR + spec.JOURNAL_LEN / 2.0
+    front_strap_mid = spec.DRUM_STATION - air - spec.STRAP_T / 2.0
+    back_strap_mid = spec.DRUM_STATION + spec.DRUM_LEN + air + spec.STRAP_T / 2.0
+    assert abs(front_mid - front_strap_mid) <= 0.05 + 1e-9
+    assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
+
+
+def test_drum_bond_note_states_the_derived_station() -> None:
+    assert spec.DRAWING_NOTES.splitlines() == [
+        "JOURNALS RUN IN MHA-056 REAMED BORES.",
+        "SHAFT SLIPS INTO MHA-002; BOND WITH LOCTITE 638, DRUM FRONT END",
+        "  61.55 +/-0.6 FROM HEAD SHOULDER. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
+    ]
+    assert f"{spec.DRUM_STATION:.2f} +/-{spec.DRUM_STATION_BAND:.1f}" in spec.DRAWING_NOTES
 

@@ -84,20 +84,34 @@ DONOR_KEEP = {
     "HeadDia": (0.030, 0.215),
 }
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
-# x = 0.200 - (z - 106.725) / 1000: the front land (z 49-61) spans x
-# 0.246-0.258 and the back land (z 202-214) x 0.093-0.105.  Land lengths ride
-# just above the shaft, each land's diameter hangs below it with its Ra symbol
-# beside it, and the two stations from the head shoulder stack under those.
+# x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
+# their centres (x 0.252 front, 0.099 back) hold whatever the derived land
+# length; only their ends move.  Land lengths ride just above the shaft, each
+# land's diameter hangs below it with its Ra symbol beside it, and the two
+# stations from the head shoulder stack under those.
+MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
+
+
+def _sheet_x(model_z: float) -> float:
+    return PRINCIPAL_CENTER[0] - (model_z - MODEL_Z_AT_SHEET_ORIGIN_X) / 1000.0
+
+
+# Each land's Ra symbol sits just head side of the land's head-side end, so
+# its left edge clears that end's station witness.
+RA_SYMBOL_OFFSET = 0.0033
+FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
+BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
 # The back land's diameter text sits on the HEAD side, right of its Ra symbol
 # and below it: on the crown side the back-crown and overall-length witnesses
 # (x 0.079-0.081) ran through "8" and "JOURNAL", and the SR7.3 leader fills the
 # space left of them.  Its shelf passes under the Ra symbol and across the
-# 203.2 witness (x 0.105), stopping short of the bond-zone text (x ~0.168).
+# back station witness, stopping short of the bond-zone text (x ~0.168).
+BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     "BackJournalLen": (0.099, 0.188),
     "FrontJournalDia": (0.250, 0.150),
-    "BackJournalDia": (0.130, 0.138),
+    "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     "BackJournalFromHeadRear": (0.207, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
@@ -142,8 +156,8 @@ AXIS_OVERSHOOT_MM = 3.0
 # Each land's Ra symbol hangs off the lower flank on the land's head side of
 # its diameter line, clear of the split-line rings at the land ends.
 JOURNAL_FINISHES = {
-    "front_journal": (FRONT_JOURNAL_Z + 2.0, (0.262, 0.150)),
-    "back_journal": (BACK_JOURNAL_Z + 2.0, (0.108, 0.150)),
+    "front_journal": (FRONT_JOURNAL_Z + 2.0, (FRONT_RA_X, 0.150)),
+    "back_journal": (BACK_JOURNAL_Z + 2.0, (BACK_RA_X, 0.150)),
 }
 
 
