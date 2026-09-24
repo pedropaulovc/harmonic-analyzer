@@ -1,115 +1,173 @@
-"""Offline contracts for the pinion-arbor drawing."""
+"""Behavioral release contracts for the integral MHA-102 pinion arbor."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
-import pinion_arbor_spec
-import _fit_limits
-from _drawing_contract import model_toleranced_dimensions
+import pinion_arbor_spec as spec
+import pinion_handle_spec as crossrod
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    (control,) = pinion_arbor_spec.SURFACE_FINISHES
-    assert control.key == "bearing"
-    assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bearing")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
-
-
-def test_required_drawing_paths() -> None:
+def test_required_drawing_paths_and_registry() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-arbor.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-arbor.pdf")
     assert drawing.PNG.as_posix().endswith("/png/pinion-arbor_drawing.png")
     assert DRAWINGS_BY_NAME["pinion_arbor"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is pinion_arbor_spec.DRAWING_DIMENSIONS
-    marked = set().union(*pinion_arbor_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked
-    assert (drawing.SHAFT_DIA, drawing.SHAFT_LEN, drawing.CAP_SAG) == (
-        pinion_arbor_spec.SHAFT_DIA,
-        pinion_arbor_spec.SHAFT_LEN,
-        pinion_arbor_spec.CAP_SAG,
+def test_spec_is_the_single_source_of_every_printed_dimension() -> None:
+    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    kept = (
+        set(drawing.DONOR_KEEP)
+        | set(drawing.PRINCIPAL_KEEP)
+        | set(drawing.DETAIL_KEEP)
     )
+    assert kept == marked
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == (
+        marked | set(drawing.DIAMETER_POSITIONS)
+    )
+    assert {
+        name: spec.DRAWING_PRECISION_BY_NAME[name]
+        for name in ("HeadDia", "NeckDia")
+    } == {"HeadDia": 1, "NeckDia": 1}
+    # Every printed size is a native model import: nothing is sheet-derived.
+    assert not hasattr(spec, "DRAWING_REFERENCE_PRECISION")
+    assert set(drawing.DONOR_KEEP) == set(drawing.DIAMETER_POSITIONS)
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_crown_is_dimensioned_and_annotated() -> None:
-    # The crown radius derives from the marked sagitta: R = (r^2 + s^2) / 2s.
-    r, s = pinion_arbor_spec.SHAFT_DIA / 2.0, pinion_arbor_spec.CAP_SAG
-    assert abs(pinion_arbor_spec.CAP_R - (r * r + s * s) / (2.0 * s)) < 1e-9
-    assert "CapSagDim" in drawing.RIGHT_KEEP
-    assert drawing.CAP_CALLOUTS["CapSagDim"] == "SR7.27 CROWN"
-    assert "CROWN BACK END SR7.27" in pinion_arbor_spec.DRAWING_NOTES
+def test_integral_arbor_preserves_the_released_absolute_envelope() -> None:
+    assert spec.HEAD_FRONT_Z == pytest.approx(-11.0)
+    assert spec.HEAD_REAR_Z == pytest.approx(-2.0)
+    assert spec.HEAD_CENTER_Z == pytest.approx(-6.5)
+    assert spec.NECK_END_Z == pytest.approx(10.0)
+    assert spec.SHAFT_LEN == pytest.approx(226.25)
+    assert spec.HEAD_FRONT_Z - spec.HEAD_CAP_SAG == pytest.approx(-14.0)
+    assert spec.SHAFT_LEN + spec.BACK_CAP_SAG == pytest.approx(227.45)
+    assert spec.OVERALL_LEN == pytest.approx(241.45)
+    assert spec.EXPOSED_SHAFT_LEN == pytest.approx(216.25)
+    assert spec.BACK_RIM_FROM_HEAD_REAR == pytest.approx(228.25)
+    assert spec.CROSS_HOLE_FROM_HEAD_REAR == pytest.approx(4.5)
 
 
-def test_linked_notes_define_remaining_arbor_operations() -> None:
-    notes = pinion_arbor_spec.DRAWING_NOTES
-    assert drawing.DIMENSION_CALLOUTS == {}
-    assert pinion_arbor_spec.SHAFT_DIA_BAND is _fit_limits.SHAFT_H
-    assert model_toleranced_dimensions(part) == {
-        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)"
+def test_integral_head_owns_the_crossrod_interface() -> None:
+    assert spec.HEAD_DIA == pytest.approx(15.0)
+    assert spec.HEAD_LEN == pytest.approx(9.0)
+    assert spec.NECK_DIA == pytest.approx(10.5)
+    assert spec.NECK_LEN == pytest.approx(12.0)
+    assert spec.CROSS_HOLE_DIA == pytest.approx(6.005)
+    assert crossrod.ROD_DIA == pytest.approx(6.0175)
+    assert crossrod.ROD_DIA > spec.CROSS_HOLE_DIA
+    callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
+    assert callout is spec.CROSS_HOLE_CALLOUT
+    assert "MHA-058" in callout and "MIDPLANE" not in callout
+    assert "ARBOR-PRESS" in callout
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
+    assert spec.DRAWING_DIMENSIONS["CrossHoleReference"] == {
+        "CrossHoleFromHeadRear"
     }
-    assert "CENTRE MARKS" in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "def _manufacturing_notes" not in source
 
 
-def test_native_gdt_controls_arbor_form_orientation_and_finish() -> None:
-    """GD&T identity lives in the spec's PMI rows; the sheet only imports it."""
-    from pinion_arbor_spec import GEOMETRIC_CONTROLS, PART_DATUMS
-
-    by_key = {control.key: control for control in GEOMETRIC_CONTROLS}
-    assert set(by_key) == {"bearing_cylindricity", "flat_tip_perpendicularity"}
-    assert by_key["bearing_cylindricity"].characteristic == "cylindricity"
-    assert by_key["bearing_cylindricity"].tolerance == "0.01"
-    # Only the flat front tip is squared to the axis -- the back end is the crown.
-    assert by_key["flat_tip_perpendicularity"].characteristic == "perpendicularity"
-    assert by_key["flat_tip_perpendicularity"].tolerance == "0.05"
-    assert by_key["flat_tip_perpendicularity"].datums == ("A",)
-    assert by_key["flat_tip_perpendicularity"].face.normal == (0, 0, -1)
-    assert by_key["flat_tip_perpendicularity"].face.offset_mm == 0.0
-    assert tuple(datum.letter for datum in PART_DATUMS) == ("A",)
-    assert PART_DATUMS[0].face.diameter_mm == pinion_arbor_spec.SHAFT_DIA
-
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "project_part_pmi(" in source
-    assert "controls=GEOMETRIC_CONTROLS" in source
-    assert "add_feature_control_frame(" not in source
-    assert "add_datum_feature(" not in source
-    assert source.count("add_surface_finish(") == 1
-
-
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source
-    assert source.count("scale=(1, 1)") == 1
-    assert "scale=(1, 2)" in source  # 226-long arbor: half-scale isometric
-    assert pinion_arbor_spec.END_VIEW_NOTE == "END VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "End View Note"' in source
+def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
+    assert spec.JOURNAL_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.SHAFT_DIA_BAND == (0.0, -0.10)
+    assert model_toleranced_dimensions(part) == {
+        ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
+        ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
+    }
+    lands = {
+        "front_journal": spec.FRONT_JOURNAL_Z,
+        "back_journal": spec.BACK_JOURNAL_Z,
+    }
+    assert {finish.key for finish in spec.SURFACE_FINISHES} == set(lands)
+    for finish in spec.SURFACE_FINISHES:
+        assert finish.roughness_um == 1.6
+        assert finish.face.diameter_mm == spec.SHAFT_DIA
+        station = lands[finish.key]
+        assert station < finish.face.contains_z_mm < station + spec.JOURNAL_LEN
+    assert set(drawing.JOURNAL_FINISHES) == set(lands)
+    for key, (station_z, _symbol_xy) in drawing.JOURNAL_FINISHES.items():
+        assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
+    assert spec.JOURNAL_LEN == pytest.approx(12.0)
+    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(51.0)
+    assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(204.0)
+    assert "MHA-056" in spec.DRAWING_NOTES
+    assert "BOND INTO MHA-002 WITH LOCTITE 638." in spec.DRAWING_NOTES
+    assert "PRESSES INTO" not in spec.DRAWING_NOTES
+    assert not hasattr(spec, "PART_DATUMS")
+    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
 
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
+def test_each_journal_land_covers_its_strap_with_axial_margin() -> None:
+    """The lands must cover the MHA-056 straps where the assembly puts them."""
+    import build_drive_train_assembly as assembly
 
-    config = _config.parts("pinion-arbor")
-    assert "1018" in str(config["material_specification"])
-    assert config["finish"]
-    assert int(config["quantity"]) == 1
+    front_face = assembly.APINION_Z_FRONT - assembly.STRAP_AIR - assembly.ARBOR_Z0
+    back_face = assembly.APINION_Z_BACK + assembly.STRAP_AIR - assembly.ARBOR_Z0
+    # 9 mm is the thicker strap the pinion-cluster slice carries.
+    for strap_t in {assembly.STRAP_T, 9.0}:
+        for strap_lo, strap_hi, land_lo in (
+            (front_face - strap_t, front_face, spec.FRONT_JOURNAL_Z),
+            (back_face, back_face + strap_t, spec.BACK_JOURNAL_Z),
+        ):
+            assert strap_lo - land_lo >= 1.0
+            assert land_lo + spec.JOURNAL_LEN - strap_hi >= 1.0
+
+
+def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
+    import alignment_pinion_spec as drum
+    import pinion_bracket_spec as strap
+
+    journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
+    strap_upper, strap_lower = strap.ARBOR_BORE_BAND
+    assert strap_lower - journal_upper == pytest.approx(0.010)
+    assert strap_upper - journal_lower == pytest.approx(0.045)
+    # Every bore slides on from the back crown, so no zone may exceed 8.00,
+    # and the worst drum-bore/shaft gap stays inside Loctite 638's 0.25.
+    shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
+    assert shaft_upper == journal_upper == 0.0
+    drum_upper, _drum_lower = drum.ARBOR_BORE_BAND
+    assert drum_upper - shaft_lower <= 0.20 + 1e-9
+
+
+def test_retired_socket_and_retention_pin_are_not_exported() -> None:
+    retired = {
+        "RETENTION_HOLE_DIA",
+        "RETENTION_PIN_STATION",
+        "TUBE_ID",
+        "TUBE_OD",
+        "TUBE_LEN",
+        "WALL_T",
+    }
+    assert retired.isdisjoint(vars(spec))
+    assert "RETENTION PIN" not in spec.CROSS_HOLE_CALLOUT
+
+
+def test_every_post_import_name_is_carried_by_a_kept_or_moved_dimension() -> None:
+    """Offline audit of the names the sheet looks up after the model import."""
+    carried = (
+        set(drawing.DONOR_KEEP)
+        | set(drawing.PRINCIPAL_KEEP)
+        | set(drawing.DETAIL_KEEP)
+    )
+    assert set(drawing.DIMENSION_CALLOUTS) <= carried
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == carried
+    assert set(drawing.DIAMETER_POSITIONS) <= carried
+    assert {"CrossHoleDia", "HeadCapSagDim", "BackCapSagDim", "OverallLen"} <= carried
+
+
+def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
+    assert spec.DRAWING_DIMENSIONS["BackCapProfile"] == {"BackCapR", "BackCapSagDim"}
+    assert spec.DRAWING_PRECISION_BY_NAME["BackCapR"] == 1
+    assert "BackCapR" in drawing.PRINCIPAL_KEEP
+    assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
+    assert not any("SR" in text for text in drawing.DIMENSION_CALLOUTS.values())

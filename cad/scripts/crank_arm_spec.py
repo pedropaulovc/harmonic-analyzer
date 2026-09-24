@@ -49,8 +49,11 @@ ARM_WIDTH = 16.0  # arm width (low)
 ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
 SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
 SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
-SHAFT_BORE_BAND = (0.05, 0.00)  # (upper, lower) deviations
-# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
+# rounding left the bore 0.025 smaller than the shaft (caught in M6.2).  Three
+# DISPLAYED places because the nominal is an exact inch conversion the callout
+# cites, not because the bore is held tighter than the title block: the arm is
+# PINNED to its shaft, so this is no running fit and it carries no local band
+# (cad/docs/tolerance-policy.md -- the drilled-hole row, +0.10/0, governs).
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#14")
 HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
 DIMPLE_DIA = 8.0  # fiducial indentation (low)
@@ -88,26 +91,81 @@ HALF_WIDTH = ARM_WIDTH / 2.0  # 8.0
 # print shows. ``build_crank_arm`` marks exactly these; ``draw_crank_arm`` keeps
 # exactly their union across its per-view ``keep`` maps. The offline test enforces
 # ``union(marks) == union(keeps)`` so a rename in one script that isn't mirrored in
-# the other fails before any SolidWorks build. ---
+# the other fails before any SolidWorks build.
+#
+# ``StationReference`` and ``PinStationReference`` are hidden construction
+# sketches whose one job is to OWN the locations the sheet prints but no
+# feature dimension carries (policy rule 2): the pivot and anchor stations from
+# the shaft-bore axis, the anchor's offset from the top long edge, the stock
+# width, and the cross-hole's station from the broad face. A Hole Wizard
+# placement sketch measures from the origin and cannot start on the long edge,
+# so the print imports these instead of building them from view picks. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"ArmEndX", "BossRadius"},
     "Arm": {"Depth"},
     "ShaftBoreProfile": {"ShaftBoreDia"},
     "DimpleProfile": {"DimpleX", "DimpleDia"},
+    "StationReference": {
+        "PivotStation",
+        "AnchorStation",
+        "AnchorOffset",
+        "AxisOffset",
+        "Width",
+    },
+    "PinStationReference": {"PinStation"},
 }
 
-# Notes: part-specific process and exceptional feature-tolerance facts only,
-# never a duplicate of the title block (drawing-simplicity-policy.md rule 6).
-DRAWING_NOTES = "\n".join(
-    (
-        "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "CROSS-HOLE AXIS INTERSECTS SHAFT AXIS.",
-        "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
-        "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
-        f"ANCHOR TAP: {ANCHOR_HOLE_SPEC.size} UNC-{ANCHOR_HOLE_SPEC.thread_class}"
-        f" X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
-        f"ANCHOR DRILL: {ANCHOR_HOLE_SPEC.depth_mm:.1f} DEEP (DO NOT BREAK THROUGH).",
-    )
+# Decimal places ARE the tolerance statement (drawing-simplicity policy rule 2),
+# so the MODEL owns them: build_crank_arm applies this map to the .SLDPRT and
+# draw_crank_arm only reads it back. Three places on the bore alone, because
+# 9.525 is the exact 3/8 in conversion its callout cites -- not because the
+# bore is held tighter than the title block (the arm is pinned to its shaft).
+# Every other feature on a hand-crank lever is noncritical and prints one
+# place, so the title block's .X row governs it (cad/docs/tolerance-policy.md).
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
+    "Arm": {"Depth": 1},
+    "ShaftBoreProfile": {"ShaftBoreDia": 3},
+    "DimpleProfile": {"DimpleX": 1, "DimpleDia": 1},
+    "StationReference": {
+        "PivotStation": 1,
+        "AnchorStation": 1,
+        "AnchorOffset": 1,
+        "AxisOffset": 1,
+        "Width": 1,
+    },
+    "PinStationReference": {"PinStation": 1},
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# The one sheet-derived dimension: the parenthesised boss-extreme-to-arm-end
+# overall, a read-only sum of the boss radius and ArmEndX with no model
+# dimension to import. Its places are still specification, so the sheet
+# reads them here instead of typing a literal (policy rule 2).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
+
+# The two same-face features are called out individually; only their shared,
+# otherwise invisible face ownership belongs in the linked note.
+DRAWING_NOTES = (
+    "FIDUCIAL AND ANCHOR TAP ARE ON THE SAME FACE SHOWN IN THE FRONT VIEW."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

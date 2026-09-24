@@ -1836,10 +1836,10 @@ sections:
         - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — 36 × 18.75 × 12 blocks, lift bore 1.86 above the pivot bore)'
         - scaled
         - med
-      - - Tee handle (2026-09 re-derive)
-        - Ø15 × 9 grip (SR10.9 crown) on a Ø6 cross rod, 65 overall (32 down / 33 up)
+      - - Pinion grip head and crossrod (2026-09 re-derive)
+        - Integral MHA-102 turned head Ø15 × 9 (SR10.9 crown), neck Ø10.5 × 12, match-reamed for separate MHA-058 Ø6 crossrod, 65 overall (32 down / 33 up)
         - —
-        - 'ch25 p.68: a ~Ø15 ball on a ~65 rod — SUPERSEDES the Ø23 × 14 drum on an 85 rod (`pinion_handle_geometry.py`)'
+        - 'ch25 p.68: a ~Ø15 ball on a ~65 rod. The one-piece arbor/head and separate crossrod are an approved photo-derived reconstruction choice, not proof of the historical joint detail. SUPERSEDES the Ø23 × 14 drum on an 85 rod and the unsupported socket / radial-retention-pin reconstruction.'
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
@@ -1866,7 +1866,7 @@ sections:
       ### Alignment-pinion layout — RESTORED 2026-07-02 (ch30 GT), level-inboard
 
       The mechanism (42T zeroing drum + swing straps, pivot blocks, torque
-      shaft, lift rod, lever and tee handle) is BACK in
+      shaft, lift rod, lever, integral grip head and separate crossrod) is BACK in
       `build_drive_train_assembly.py`, re-solved against the ch30 GT
       triangulation, then re-closed vertically around the v2 post. The 2026-06-18 removal argued the Ø22.4 drum could not
       thread the 12.56 mm channel between the rocker-support frustum and the
@@ -1877,8 +1877,8 @@ sections:
       centreline), not in the frustum/64T channel at all. Modeled layout
       (`APINION_*` constants): axis at machine (−16.077, 90.518) =
       X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap);
-      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), steel
-      arbor z −131.912..+94.338, and tee-handle hub at z −138.412. Straps:
+      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), integral
+      steel arbor/head root z −131.912..+94.338, head/crossrod axis z −138.412, and separate MHA-058 crossrod at +65°. Straps:
       15 wide × 5 thick with R7.5 ends (`v4_pinion_018` — the teeth stand
       proud of both flanks), pivot (−12.113, 62.8), bore-to-bore c2c 28.0,
       parked at an 8.139° lean; the swing rides the torque shaft as the p2

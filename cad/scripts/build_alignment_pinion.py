@@ -11,8 +11,8 @@ every cylinder gear) -- and a drum long enough to span all 20 stations
 at once. PR7 (review item 14): ONLY the drum is brass -- the integral
 Ø6.35 stubs are retired for a separate thicker STEEL arbor
 (build_pinion_arbor.py, Ø8) pressed through the drum's new through-bore;
-the arbor rides the swing brackets' top bores and carries the turning
-handle (build_pinion_handle.py). The knurled end collars are simplified
+the arbor rides the swing brackets' top bores and carries its integral turned
+grip head plus the separate MHA-058 crossrod. The knurled end collars are simplified
 away.
 
 Layout: axis Z, drum z 0..143.2, Ø8 through-bore on the axis.

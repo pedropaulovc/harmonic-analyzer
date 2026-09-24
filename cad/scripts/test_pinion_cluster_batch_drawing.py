@@ -186,6 +186,14 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
     return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
 
 
+def _press_fit_shell_limit(
+    outer_d: float,
+    bore_d: float,
+    host_chord: float,
+) -> float:
+    return math.pi * (outer_d**2 - bore_d**2) * host_chord / 4.0
+
+
 def _expected_numbered_pairs(
     first_stem: str,
     numbers: Iterable[int],
@@ -266,6 +274,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
+            ),
+            # MHA-058's nominal Ø6.0175 rod is match-reamed into the MHA-102
+            # Ø6.005 cross-hole through the integral Ø15 head.  The allowance
+            # is only the resulting annular shell within that host envelope.
+            frozenset(("pinion-handle-1", "pinion-arbor-1")): (
+                _press_fit_shell_limit(6.0175, 6.005, 15.0)
             ),
         },
         "frame": {
