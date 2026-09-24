@@ -524,6 +524,52 @@ def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
     assert 'far_end = f"{line}.end" if flank is None else f"{flank}.start"' in helper
 
 
+def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
+    """5471a6ef: both standalone reference sketches' flank witnesses printed in
+    the default construction grey over the black Ø8 outline, a break a
+    machinist reads as a groove (Main)."""
+    import inspect
+
+    assert set(drawing.REFERENCE_WITNESSES) == {"DrumStationReference", "BondZoneReference"}
+    assert drawing.REFERENCE_WITNESS_COLOR == 0
+    assert drawing.DRUM_STATION_POINT_LEN == part.DRUM_STATION_POINT_LEN
+    assert drawing.BOND_ZONE_WITNESS_LEN == part.BOND_ZONE_WITNESS_LEN
+    drum = drawing.REFERENCE_WITNESSES["DrumStationReference"]
+    assert drum[1] == pytest.approx(spec.HEAD_REAR_Z + spec.DRUM_STATION)
+    assert drum[1] - drum[0] == pytest.approx(part.DRUM_STATION_POINT_LEN)
+    bond = drawing.REFERENCE_WITNESSES["BondZoneReference"]
+    assert bond[0] == pytest.approx(spec.BOND_ZONE_DIA_Z)
+    assert bond[1] - bond[0] == pytest.approx(part.BOND_ZONE_WITNESS_LEN)
+    helper = inspect.getsource(drawing._blacken_reference_witnesses)
+    assert "drawing.SetLineColor(REFERENCE_WITNESS_COLOR)" in helper
+    assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
+    source = inspect.getsource(drawing.build)
+    blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
+    finalize = source.index("await finalize_drawing(")
+    gate = source.index("_assert_outline_unbroken(PNG, witness_spans, sheet_size)")
+    assert blacken < finalize < gate
+
+
+def _outline_raster(core: int):
+    from PIL import Image, ImageDraw
+
+    # 1 px per mm on a 100 x 50 mm sheet; the outline runs along sheet y = 20.
+    raster = Image.new("L", (100, 50), 255)
+    pen = ImageDraw.Draw(raster)
+    pen.line([(0, 29), (99, 29)], fill=0)
+    pen.line([(0, 30), (99, 30)], fill=0)
+    pen.line([(40, 29), (44, 29)], fill=core)
+    pen.line([(40, 30), (44, 30)], fill=core)
+    return raster
+
+
+def test_outline_raster_check_flags_a_grey_witness_and_passes_black() -> None:
+    spans = {"DrumStationReference": ((0.039, 0.020), (0.045, 0.020))}
+    grey = drawing._broken_outline_columns(_outline_raster(128), spans, (0.100, 0.050))
+    assert grey == {"DrumStationReference": [40, 41, 42, 43, 44]}
+    assert drawing._broken_outline_columns(_outline_raster(0), spans, (0.100, 0.050)) == {}
+
+
 def test_drum_station_text_clears_the_station_stack() -> None:
     """The drum station's text sits left of its drum-end witness: between
     that witness and the head face, the neck-end witness drops through."""

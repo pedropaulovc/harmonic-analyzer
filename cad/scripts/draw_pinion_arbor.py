@@ -148,6 +148,32 @@ FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # rises a few mm off the silhouette to the shelf, right of the DETAIL A label
 # and under detail A's "(3.0)", and short of the front land's 19.0 witnesses.
 BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
+# The drum-station and bond-zone reference sketches stand alone, so the
+# profile shows them, and each ends on a short construction witness lying ON
+# the lower Ø8 outline.  The view paints that witness construction grey over
+# the black silhouette, which at 1:1 read as a break in the outline, i.e. a
+# groove or relief to a machinist (Main, 5471a6ef).  Each is re-coloured in
+# the view to the outline's black; the model sketch and its dimension are
+# untouched.  The spans (model z, mm) mirror build_pinion_arbor's
+# DRUM_STATION_POINT_LEN / BOND_ZONE_WITNESS_LEN, pinned by test.
+REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
+DRUM_STATION_POINT_LEN = 1.0
+BOND_ZONE_WITNESS_LEN = 4.0
+REFERENCE_WITNESSES = {
+    "DrumStationReference": (
+        HEAD_REAR_Z + DRUM_STATION - DRUM_STATION_POINT_LEN,
+        HEAD_REAR_Z + DRUM_STATION,
+    ),
+    "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
+}
+SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+# Exported-raster proof that the outline stays unbroken over each witness:
+# the grey witness core measured 107-128 and the black outline 0 (5471a6ef
+# PNG), so every raster column over a span needs at least two dark pixels
+# within a few rows of the flank.
+OUTLINE_DARK_MAX = 60
+OUTLINE_CORE_ROWS = 2
+OUTLINE_SEARCH_ROWS = 6
 # Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
 # measured on the 63468ee9 sheet.
 DIAMETER_BLOCK_SIZE = (0.027, 0.014)
@@ -363,6 +389,99 @@ def _add_turning_axis(adapter: Any, view: Any) -> None:
     draw.EditRebuild3()
 
 
+def _blacken_reference_witnesses(
+    adapter: Any, view: Any
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Draw each reference sketch's flank witness in the outline's black.
+
+    Returns each witness's sheet endpoints for the exported-raster check.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate the integral-arbor profile for its witnesses")
+    flank_x = SHAFT_DIA / 2000.0
+    spans = {}
+    for sketch_name, (z0, z1) in REFERENCE_WITNESSES.items():
+        ends = tuple(
+            model_point_in_view(
+                adapter, view, (flank_x, 0.0, z / 1000.0), label=f"{sketch_name} witness end"
+            )
+            for z in (z0, z1)
+        )
+        mid = ((ends[0][0] + ends[1][0]) / 2.0, (ends[0][1] + ends[1][1]) / 2.0)
+        draw.ClearSelection2(True)
+        _early_bound(view, "IView").UpdateViewDisplayGeometry()
+        if not draw.Extension.SelectByID2(
+            "", "EXTSKETCHSEGMENT", mid[0], mid[1], 0.0, False, 0, null_callout(), 0
+        ):
+            raise RuntimeError(f"failed to select the {sketch_name} flank witness")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        kind = int(selection.GetSelectedObjectType3(1, -1))
+        if kind != SW_SEL_EXT_SKETCH_SEGS:
+            raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
+        segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
+        owner = _early_bound(_early_bound(segment.GetSketch(), "ISketch"), "IFeature").Name
+        if owner != sketch_name or not bool(segment.ConstructionGeometry):
+            raise RuntimeError(
+                f"{sketch_name} witness pick resolved to {owner!r} "
+                f"(construction={bool(segment.ConstructionGeometry)})"
+            )
+        drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
+        draw.ClearSelection2(True)
+        spans[sketch_name] = ends
+        _telemetry.info(
+            f"pinion-arbor: {sketch_name} flank witness drawn black at sheet "
+            f"({mid[0] * 1000:.1f}, {mid[1] * 1000:.1f}) mm",
+            sketch=sketch_name,
+        )
+    draw.EditRebuild3()
+    return spans
+
+
+def _broken_outline_columns(
+    raster: Any,
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    sheet_size: tuple[float, float],
+) -> dict[str, list[int]]:
+    """Return, per witness, the raster columns where the outline is not dark."""
+    gray = raster.convert("L")
+    scale = gray.width / sheet_size[0]
+    broken = {}
+    for name, ((x0, y), (x1, _)) in spans.items():
+        row = round((sheet_size[1] - y) * scale)
+        rows = range(row - OUTLINE_SEARCH_ROWS, row + OUTLINE_SEARCH_ROWS + 1)
+        columns = range(round(min(x0, x1) * scale), round(max(x0, x1) * scale) + 1)
+        broken[name] = [
+            column
+            for column in columns
+            if sum(gray.getpixel((column, r)) <= OUTLINE_DARK_MAX for r in rows)
+            < OUTLINE_CORE_ROWS
+        ]
+    return {name: columns for name, columns in broken.items() if columns}
+
+
+def _assert_outline_unbroken(
+    png: Any,
+    spans: dict[str, tuple[tuple[float, float], tuple[float, float]]],
+    sheet_size: tuple[float, float],
+) -> None:
+    from PIL import Image
+
+    with Image.open(png) as raster:
+        broken = _broken_outline_columns(raster, spans, sheet_size)
+    if broken:
+        detail = "; ".join(
+            f"{name}: {len(columns)} column(s) from x={columns[0]} px"
+            for name, columns in broken.items()
+        )
+        raise RuntimeError(f"pinion-arbor: Ø8 outline broken over reference witness: {detail}")
+    _telemetry.info(
+        f"pinion-arbor: Ø8 outline unbroken over {len(spans)} reference witnesses",
+        witnesses=len(spans),
+    )
+
+
 def _position_detail_label(adapter: Any, detail: Any) -> None:
     """Centre the native detail label under its own detail circle."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
@@ -509,6 +628,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add center mark to the detailed grip cross-hole")
     _add_turning_axis(adapter, principal)
+    witness_spans = _blacken_reference_witnesses(adapter, principal)
     for key, (station_z, symbol_xy) in JOURNAL_FINISHES.items():
         land_x, axis_y = model_point_in_view(
             adapter,
@@ -571,13 +691,20 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=_unit(far_on_axis[0] - fence_center[0], far_on_axis[1] - fence_center[1]),
     )
 
-    return await finalize_drawing(
+    sheet = _early_bound(
+        _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
+    )
+    properties = tuple(float(value) for value in sheet.GetProperties2())
+    sheet_size = (properties[5], properties[6])
+    outputs = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Integral Pinion Arbor Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+    _assert_outline_unbroken(PNG, witness_spans, sheet_size)
+    return outputs
 
 
 # Text on text joined the gate with the bond-zone callout's move above the
