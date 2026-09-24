@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion lever retention pin.
 
-A plain 1/16 in drill-rod pin (MHA-135), cut to the lever hub's diameter and
-peened flush at assembly.  The side view carries the cut length, the projected
+A plain 1/16 in drill-rod pin (MHA-135), cut overlength, then trimmed and
+peened flush with the lever hub at assembly.  The side view carries the cut length, the projected
 end view the stock diameter, and a 4:1 isometric sits clear of the title block.
 
 Run with SolidWorks open::

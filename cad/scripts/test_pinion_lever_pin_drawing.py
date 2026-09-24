@@ -20,7 +20,9 @@ _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 def test_required_drawing_paths_and_registry_row() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/pinion-lever-pin.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/pinion-lever-pin.pdf")
-    assert DRAWINGS_BY_NAME["pinion_lever_pin"].script == Path(drawing.__file__).resolve()
+    assert (
+        DRAWINGS_BY_NAME["pinion_lever_pin"].script == Path(drawing.__file__).resolve()
+    )
     assert "draw_pinion_lever_pin.py" in PRECISION_MIGRATED_DRAWINGS
     row = _config.parts("pinion-lever-pin")
     assert row["number"] == "MHA-135"
@@ -31,7 +33,17 @@ def test_required_drawing_paths_and_registry_row() -> None:
 
 def test_pin_fills_the_match_drilled_hole_and_spans_the_hub() -> None:
     assert spec.PIN_DIA == lever.PIN_HOLE_DIA == 25.4 / 16.0
-    assert spec.PIN_LEN == lever.HUB_OD  # peened flush both ends
+    # Codex P1 (#844): the SHORTEST printed pin still stands a peen allowance
+    # proud of each face of the LARGEST printed hub (both at .X).
+    import pinion_lever_spec
+    from pinion_lever_pin_geometry import PEEN_ALLOWANCE
+
+    shortest_pin = spec.PIN_LEN - 0.8
+    largest_hub = lever.HUB_OD + 0.8
+    assert pinion_lever_spec.DRAWING_PRECISION_BY_NAME["HubOd"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
+    assert (shortest_pin - largest_hub) / 2.0 >= PEEN_ALLOWANCE >= 0.5
+    assert "TRIM AND PEEN" in spec.DRAWING_NOTES
 
 
 def test_cross_hole_webs_clear_two_millimetres_at_the_worst_case() -> None:

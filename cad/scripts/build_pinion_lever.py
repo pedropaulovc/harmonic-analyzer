@@ -9,7 +9,7 @@ to ~Ø6 at the tip; the 86 length and taper both re-derived from img07
 against the annotated 6 mm rod). Standing up = disengaged, folded flat
 = engaged; the model carries the DISENGAGED rest pose.
 
-Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.375
+Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
 from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 1.5)
 proud of the -Z face -- the lift rod's front end hides inside. Rod: a
 frustum revolved about +Y from y RodY0 (buried in the hub) to 86,
@@ -488,9 +488,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PinHoleProfile")
     drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
     cut = await adapter.create_cut_extrude(
-        ExtrusionParameters(
-            depth=2.0 * HUB_OD, both_directions=True
-        )
+        ExtrusionParameters(depth=2.0 * HUB_OD, both_directions=True)
     )
     if not cut.is_success:
         raise RuntimeError(f"pin hole cut failed: {cut.error}")

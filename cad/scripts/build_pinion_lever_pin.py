@@ -3,11 +3,11 @@ r"""Reproduction script: pinion lever retention pin (book ch. 25; MHA-135).
 U8 ruled a match-drilled cross-pin between the engage lever's hub and the lift
 rod ("retention pin shown at 3 o'clock", ch25 p.68 ``page002_img08``: a small
 flush dot on the domed hub); U36 sized it -- a plain 1/16 in drill-rod pin cut
-to the hub's 13.0 diameter, driven through the hole match-drilled at assembly
-at mid-engagement and peened flush at both ends.  Webs at the worst case: rod
+overlength (PIN_LEN), driven through the hole match-drilled at assembly at
+mid-engagement, then trimmed and peened flush at both ends.  Webs at the worst case: rod
 2.38 each side, hub wall 3.32.
 
-Layout: pin axis along local X, centred on the origin (x -6.5..+6.5), so the
+Layout: pin axis along local X, centred on the origin (x +-PIN_LEN/2), so the
 assembly seats it on the lift rod's "lever pin" axis with its Right Plane on
 the rod's Right Plane.
 

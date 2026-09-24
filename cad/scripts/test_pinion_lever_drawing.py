@@ -36,13 +36,20 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_bore_band_is_a_slip_fit_on_the_lift_rod() -> None:
-    # U36: the pin carries the torque, so the bore is 6.35 +0.05/0 about the
-    # h-band rod, held at its mid-limit in the model.
+    # U36: the pin carries the torque, so the bore only slides on the h-band
+    # rod.  Codex P2 (#844): the repo's REAM_SLIDE band, never line-to-line.
+    from _fit_limits import REAM_SLIDE, SHAFT_H
+    from pinion_lift_rod_spec import ROD_DIA
+
+    assert pinion_lever_spec.BORE_BAND == REAM_SLIDE
     low, high = (
         pinion_lever_spec.BORE + pinion_lever_spec.BORE_BAND[1],
         pinion_lever_spec.BORE + pinion_lever_spec.BORE_BAND[0],
     )
-    assert (round(low, 6), round(high, 6)) == (6.35, 6.4)
+    assert (round(low, 6), round(high, 6)) == (6.36, 6.375)
+    min_clearance = low - (ROD_DIA + SHAFT_H[0])
+    assert min_clearance > 0.0
+    assert round(min_clearance, 6) == 0.01
     assert model_toleranced_dimensions(lever) == {
         ("BarrelProfile", "HubBore"): "*deviations(BORE_BAND)",
         ("Wall", "EndWall"): "END_WALL_TOLERANCE_MM",

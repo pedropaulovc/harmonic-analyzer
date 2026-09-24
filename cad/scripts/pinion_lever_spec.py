@@ -11,6 +11,7 @@ part marks and drawing keeps in lockstep (``test_pinion_lever_drawing.py``).
 
 from __future__ import annotations
 
+from _fit_limits import REAM_SLIDE
 from pinion_lever_geometry import (
     BORE as BORE,
     BORE_DEPTH as BORE_DEPTH,
@@ -32,9 +33,10 @@ LIFT_ROD_NUMBER = "MHA-060"
 PIN_NUMBER = "MHA-135"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
-# 6.35 lift rod -- 6.35-6.40 (+0.05/0), held about the 6.375 mid-limit so the
-# model never makes a line-to-line cylinder with the rod.
-BORE_BAND = (0.025, -0.025)
+# 6.35 lift rod.  Codex P2 (#844): the former 6.35-6.40 band's minimum met the
+# rod's maximum line-to-line; REAM_SLIDE (+0.025/+0.010, the fit MHA-056 and
+# MHA-061 hold on the same shafts) guarantees 0.010 of clearance.
+BORE_BAND = REAM_SLIDE
 # The blind bore's bottom wall is the thinnest section a novice turns (U27:
 # >= 1.5 floor); the .XX row would allow 1.49, so it carries its own band.
 END_WALL_TOLERANCE_MM = 0.25
