@@ -619,7 +619,7 @@ sections:
         - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
-        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw, shared with slotted-screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
+        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
         - 'base-threaded STATIC at (−139.107, +1.929), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 4.250° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 7.779 mm signed clearance (derived and asserted against the base hole).'
         - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
@@ -1795,27 +1795,27 @@ sections:
       - confidence
       rows:
       - - Tooth count
-        - '42'
+        - '32'
         - —
-        - 'counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`): 7 tips per 60° sector × 6; tip-radius ratio to the meshing 120T cylinder gear = 0.36 = 44/122 confirms same DP'
-        - counted
+        - 'user correction 2026-09-22 (U25), superseding the 42 counted on the drum end view (engineerguy video 4/4 @ 8:00, frame `v4_pinion_018`); same DP as the meshing 120T cylinder gear'
+        - stated
         - high
       - - Pitch diameter
-        - 21.413 mm
-        - '0.843'
-        - 42 / DP 49.82 — same module as the cylinder train it meshes
+        - 16.314 mm
+        - '0.642'
+        - 32 / DP 49.82 — same module as the cylinder train it meshes
         - derived
         - med
       - - Outer diameter
-        - 22.433 mm
-        - '0.883'
-        - (42+2) / DP 49.82
+        - 17.334 mm
+        - '0.682'
+        - (32+2) / DP 49.82
         - derived
         - med
       - - Drum length
         - 143.2 mm
         - '5.638'
-        - 'spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch)'
+        - 'spans/engages all 20 cylinder gears at once (p.67 photo: drum ≈ cylinder stack length = 20 × 7.5 axial pitch); as modelled the back end stops 0.274 short of the j = 19 face (2.726 of 3.0 engaged), so the drum is located on the arbor from its back end'
         - derived
         - med
       - - Material
@@ -1825,31 +1825,31 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.8 × 4.0 brass strip; 28.0 foot, R2 bend, straight blade ~8.1° off vertical alongside the near-vertical parked strap, R1.5 × 20° return kink, 2.0 terminal flat (re-solved 2026-09 with the strap re-derive; `pinion_spring_geometry.py`)
+        - 0.8 × 4.0 brass strip; 34.0 foot (U28 2026-09-23: +6 with the lift rod's move out to 18.5), R2 bend, straight blade ~8.1° off vertical alongside the near-vertical parked strap, R1.5 × 20° return kink, 2.0 terminal flat (re-solved 2026-09 with the strap re-derive; `pinion_spring_geometry.py`)
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). Sized against the 5.0 strap; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). The 4.0-wide blade sits on the strap''s inboard half (0.5 in from the inner face, `SPRING_BLADE_INSET`) so the 2026-10 8.0 strap re-derive left its base foot-screw hole put; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
-        - 28.0 centre-to-centre × 15 wide × 5 thick, R7.5 ends, parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore; two R6.9 cam-relief scallops
+        - 28.0 centre-to-centre × 15 wide × 9 thick (U28 2026-09-23, inside the ch25 page001_img01 photo band 7.6–9.4; the 1.59 worst-case web beside the Ø4 blind follower-stud seat is a NAMED book-fidelity exception to the 2.0 target, 1.5 floor held), R7.5 ends, plain (no cam relief — U12), parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore
         - —
-        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — 36 × 18.75 × 12 blocks, lift bore 1.86 above the pivot bore)'
+        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — U28 2026-09-23: 40 × 20.5 × 10.25 blocks laid out lift bore | screw | PIVOT bore | screw from the west end (page002_img07/08), lift bore 18.5 west of and 2.16 above the pivot bore, hold-down screws ±8.5 about the pivot)'
         - scaled
         - med
-      - - Tee handle (2026-09 re-derive)
-        - Ø15 × 9 grip (SR10.9 crown) on a Ø6 cross rod, 65 overall (32 down / 33 up)
+      - - Pinion grip head and crossrod (2026-09 re-derive)
+        - Integral MHA-102 turned head Ø15 × 10.5 (SR10.9 crown; rule 12 W6, was × 9), neck Ø10.5 × 11.25, reamed Ø6.00 +0.10/0 for the separate MHA-058 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
         - —
-        - 'ch25 p.68: a ~Ø15 ball on a ~65 rod — SUPERSEDES the Ø23 × 14 drum on an 85 rod (`pinion_handle_geometry.py`)'
+        - 'ch25 p.68: a ~Ø15 ball on a ~65 rod. The one-piece arbor/head and separate crossrod are an approved photo-derived reconstruction choice, not proof of the historical joint detail. SUPERSEDES the Ø23 × 14 drum on an 85 rod and the unsupported socket / radial-retention-pin reconstruction.'
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −81.871° eccentric-cam contact rotation carries it through vertical to −71.871° toward machine +X at engagement
+        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −81.793° eccentric-cam contact rotation carries it through vertical to −71.793° toward machine +X at engagement (U28 2026-09-23: Ø14.6 × 9 collar, ecc 2.0, 2.115 thin-side wall, sub-flush M2.5 set screw; drum parked 2.2425 out so the 120T tips seat at C2C 38.990)
         - —
-        - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −81.871° cam rotation and a −71.871° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
+        - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −81.793° cam rotation and a −71.793° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
         - scaled + derived
         - med
       - - Cam-follower pin (per strap)
-        - Ø4 × 17 steel stud, seated 4.0 in a blind edge bore 6.0 ABOVE the pivot axis (2026-09 re-solve); 13 proud reaches the lift cam
+        - Ø4 × 20 steel stud, seated 4.0 in a blind edge bore 7.0 ABOVE the pivot axis (U28 2026-09-23 re-solve); 16 proud reaches the lift cam 18.5 out
         - —
         - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled
@@ -1865,41 +1865,41 @@ sections:
 
       ### Alignment-pinion layout — RESTORED 2026-07-02 (ch30 GT), level-inboard
 
-      The mechanism (42T zeroing drum + swing straps, pivot blocks, torque
-      shaft, lift rod, lever and tee handle) is BACK in
+      The mechanism (32T zeroing drum + swing straps, pivot blocks, torque
+      shaft, lift rod, lever, integral grip head and separate crossrod) is BACK in
       `build_drive_train_assembly.py`, re-solved against the ch30 GT
-      triangulation, then re-closed vertically around the v2 post. The 2026-06-18 removal argued the Ø22.4 drum could not
+      triangulation, then re-closed vertically around the v2 post. The 2026-06-18
+      removal used a superseded pre-correction drum model and argued it could not
       thread the 12.56 mm channel between the rocker-support frustum and the
       64T — but the GT shows the drum never lived there: pinion_front/pinion_back
-      triangulate its axis at machine x −10.16/−11.41, y ~104–107. The x evidence survives; the
-      exact v2 journal now overrides the image-derived height and keeps the rig LEVEL with
-      the drive line and INBOARD of the cylinder drum (between drum and machine
-      centreline), not in the frustum/64T channel at all. Modeled layout
-      (`APINION_*` constants): axis at machine (−16.077, 90.518) =
-      X_DRUM + (drum tip 31.10 + pinion tip 11.22 + 2.0 disengaged gap);
-      drum z −71.912..+71.288 (face 143.2, spanning all 20 stations), steel
-      arbor z −131.912..+94.338, and tee-handle hub at z −138.412. Straps:
-      15 wide × 5 thick with R7.5 ends (`v4_pinion_018` — the teeth stand
-      proud of both flanks), pivot (−12.113, 62.8), bore-to-bore c2c 28.0,
-      parked at an 8.139° lean; the swing rides the torque shaft as the p2
+      triangulate its axis near machine x −10 to −11, y ~104–107. The x evidence
+      establishes the level-inboard topology; the exact v2 journal, the
+      user-authoritative 32T count and the retained 2 mm parked tip gap now own
+      the derived rig location. Modeled layout (`APINION_*` constants): axis at
+      machine (−18.626, 90.518) = X_DRUM + (drum tip 31.10 + pinion tip 8.667 +
+      2.0 disengaged gap); drum z −71.912..+71.288 (face 143.2, spanning all 20
+      stations), integral steel arbor/head root z −131.912..+94.338,
+      head/crossrod axis z −138.412, and separate MHA-058 crossrod at +65°.
+      Straps: 15 wide × 5 thick with R7.5 ends, pivot (−14.663, 62.8),
+      bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing rides the
       setup DOF (a freed operational DOF, its angle drive spec recorded in
       the DOF manifest; articulated by the mobility probe / motion drives).
       The brass return spring (table row above) stands beside the back strap,
       foot on the base, and presses the swing to the disengaged rest —
       parked-pose clearances asserted in `build_drive_train_assembly`
       (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
-      blocks' other bores at (0.387, 64.656), and each strap tail carries a
+      blocks' other bores at (−2.163, 64.656), and each strap tail carries a
       Ø4 follower pin (table row above) that the rod's radial cam lifts. The
       cam eccentricity is 1.4 and its Ø10.32 OD retains a 0.575-mm thin-side
-      wall. Parked surface gap is 0.150; the solved −81.871° cam rotation
-      gives 1.202 mm engaged authority and leaves 7.015 mm of follower pin
+      wall. Parked surface gap is 0.150; the solved −81.876° cam rotation
+      gives 1.201 mm engaged authority and leaves 6.045 mm of follower pin
       beyond the contact station. Two open R6.90 bracket scallops cover the
       collar's complete parked-to-engaged swept envelope with 0.25 air and
       >2.5 pivot-bore ligament; the partially exposed follower-stud mouth is
       silver-brazed after pressing. All are asserted analytically (`CAM_*` +
-      the segment-distance scan). At DP 49.82
-      the drum is 42T Ø22.4 (same DP as the cylinder train it must mesh); the
-      table above records the book-vintage DP 30 readings.
+      the segment-distance scan). At DP 49.82 the drum is 32T Ø17.334 (the
+      same DP as the cylinder train it must mesh); the table above records the
+      book-vintage DP 30 readings.
 
 
       ---
@@ -1984,10 +1984,9 @@ sections:
          NOTE: ch. 23 translational gearing looks coarser than DP 30 in the video
          frames (`v4_transgear_*`) — its module is a separate question, measure when
          authoring those parts.
-      2. **Pinion tooth count** (ch. 25) — **RESOLVED in M4 prep: 42 teeth**
-         (counted on engineerguy video 4/4 frame `v4_pinion_018`; see ch. 25
-         section). Video stills live in `references/engineerguy-youtube/`
-         (see its README to re-fetch the videos; mp4/stills not committed).
+      2. **Pinion tooth count** (ch. 25) — **32 teeth, user-authoritative
+         correction 2026-09-22.** This supersedes the prior video-frame count;
+         no historical photo justification overrides the corrected count.
       3. **Channel pitch** — **RESOLVED in M6: 7.5 mm along the cone axis,
          7.06 mm projected on the machine depth (Z)**, uniform with the gear
          stack (vertical connecting rods, no splay). Measured on all four p.28
@@ -2129,10 +2128,10 @@ sections:
          33.785 mm to the shifted pinion; the relocated crank axis no longer overlaps the
          T120 rim radially.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
-         2026-07-02** (ch. 25). The removal-era impossibility (Ø22.4 drum vs
-         the 12.56 mm frustum/64T channel) dissolved with the ch30 GT: the
-         drum's true position is level-inboard at machine x ≈ −10, nowhere
-         near that channel. All 8 part scripts, their registry rows and
+         2026-07-02** (ch. 25). The removal-era impossibility used the now-
+         superseded pre-correction drum against the 12.56 mm frustum/64T
+         channel; the level-inboard topology from the ch30 GT removes that conflict.
+         All 8 part scripts, their registry rows and
          MIRROR_PLANE entries are back (adapted: longer stubs, strap c2c 43,
          torque-shaft/lift-rod spans for the z −155 chain-plane era), the
          swing is the p2 setup DOF again (mobility probe + motion drive

@@ -9,20 +9,18 @@ import pinion_cam_spec
 import draw_pinion_cam as drawing
 import build_pinion_cam as cam
 from _buildgraph import module_deps_of
-from _drawing_contract import model_toleranced_dimensions
+import pinion_lift_rod_spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
+    # Rule 5: the follower rides the cam OD; the set-screwed bore never moves
+    # on the rod, so the one roughness symbol sits on the OD.
     (control,) = pinion_cam_spec.SURFACE_FINISHES
-    assert control.key == "bore"
+    assert control.key == "cam_od"
     assert control.roughness_um == 1.6
-    assert control.face.diameter_mm == pinion_cam_spec.BORE
-    part_source = Path(cam.__file__).read_text(encoding="utf-8")
-    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "surface_finishes=SURFACE_FINISHES" in part_source
-    assert 'surface_finish_by_key(SURFACE_FINISHES, "bore")' in drawing_source
-    assert "roughness_ra=" not in drawing_source
+    assert control.face.diameter_mm == pinion_cam_spec.CAM_OD
 
 
 def test_required_drawing_paths() -> None:
@@ -35,12 +33,11 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert cam.DRAWING_DIMENSIONS is pinion_cam_spec.DRAWING_DIMENSIONS
     marked = set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SIDE_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert (drawing.CAM_OD, drawing.BORE, drawing.ECC) == (
+    assert (drawing.CAM_OD, drawing.ECC) == (
         pinion_cam_spec.CAM_OD,
-        pinion_cam_spec.BORE,
         pinion_cam_spec.ECC,
     )
     assert pinion_cam_spec.ECC == pinion_cam_geometry.ECC
@@ -57,87 +54,132 @@ def test_drive_train_recipe_depends_on_geometry_not_drawing_notes() -> None:
 def test_eccentricity_is_dimensioned_and_called_out() -> None:
     # The whole point of the cam: bore and OD are NOT concentric, so the offset
     # must be an explicit dimension, not implied by graphical alignment.
-    assert "CollarCy" in drawing.FRONT_KEEP
-    assert "BOTH END FACES" in drawing.DIMENSION_CALLOUTS["CollarCy"]
-    notes = pinion_cam_spec.DRAWING_NOTES
-    assert "NOT" in notes and "CONCENTRIC" in notes
-    assert "OFFSET 1.0" not in notes
-    assert pinion_cam_geometry.THIN_SIDE_WALL >= 0.5
-    assert pinion_cam_geometry.CAM_OD == 10.32
-
-
-def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
-    assert drawing.SHEET_SCALE == (3.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"*Isometric"' in source
-    assert "scale=(2, 1)" in source  # the isometric override
-    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == (
-        "ISOMETRIC VIEW SCALE 2:1\n(SET-SCREW BOSS HIDDEN AT REAR)"
+    eccentricity = drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "ECCENTRICITY" in eccentricity
+    assert "BORE AXIS TO OD AXIS" in eccentricity
+    assert "BOTH END FACES" not in eccentricity
+    # U27/U28: 2.0 target on the thin side, and the 1.5 floor holds at the
+    # printed worst case (OD and eccentricity each +/-0.05, bore at its top).
+    assert pinion_cam_geometry.THIN_SIDE_WALL >= 2.0
+    worst = (
+        (pinion_cam_geometry.CAM_OD - pinion_cam_spec.COLLAR_OD_TOLERANCE_MM) / 2.0
+        - (pinion_cam_geometry.BORE + pinion_cam_spec.BORE_BAND[0]) / 2.0
+        - (pinion_cam_geometry.ECC + pinion_cam_spec.COLLAR_AXIS_TOLERANCE_MM)
     )
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert worst >= 2.0  # 2.01 at the Ø6.43 bore limit
+    assert pinion_cam_geometry.CAM_OD == 14.6
+
+
+def test_sheet_runs_at_3_to_1_with_a_set_screw_showing_2_to_1_pictorial() -> None:
+    assert drawing.SHEET_SCALE == (3.0, 1.0)
+    assert pinion_cam_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
 
 
 def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "SLIDING FIT" not in notes
+    # Only the critical features carry bands: the reamed RUNNING bore and the
+    # cam OD / eccentricity that sets the follower lift.  Routine controlling
+    # dimensions take the title-block grade.
     assert model_toleranced_dimensions(cam) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
         ("CollarProfile", "CollarOd"): "COLLAR_OD_TOLERANCE_MM",
         ("CollarProfile", "CollarCy"): "COLLAR_AXIS_TOLERANCE_MM",
-        ("Collar", "Depth"): "COLLAR_DEPTH_TOLERANCE_MM",
-        ("BossProfile", "BossDia"): "BOSS_DIA_TOLERANCE_MM",
-        (
-            "SetPinBossProjection",
-            "BossProjection",
-        ): "BOSS_PROJECTION_TOLERANCE_MM",
     }
+    # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod.  A
+    # stock 6.4 reamer at +/-0.03 (the printed band is at least +/-0.025)
+    # against the MHA-060 rod's h band gives 0.02-0.10 diametral clearance.
+    assert pinion_cam_spec.BORE == 6.40
+    assert pinion_cam_spec.BORE_BAND == (0.03, -0.03)
+    assert min(abs(d) for d in pinion_cam_spec.BORE_BAND) >= 0.025
+    rod_max = pinion_lift_rod_spec.ROD_DIA + pinion_lift_rod_spec.ROD_DIA_BAND[0]
+    rod_min = pinion_lift_rod_spec.ROD_DIA + pinion_lift_rod_spec.ROD_DIA_BAND[1]
+    bore_min = pinion_cam_spec.BORE + pinion_cam_spec.BORE_BAND[1]
+    bore_max = pinion_cam_spec.BORE + pinion_cam_spec.BORE_BAND[0]
+    assert round(bore_min - rod_max, 6) == 0.02
+    assert round(bore_max - rod_min, 6) == 0.10
+    assert pinion_cam_spec.LIFT_ROD_NUMBER in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "SLIP FIT" in bore
+    assert "DIAMETRAL CLEARANCE" not in bore
+    assert "LOCK AFTER POSITIONING" not in bore
     assert "LINEAR +/-" not in notes
     assert "BRASS" not in notes
     assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
 def test_cam_attachment_is_fully_released_for_manufacture() -> None:
     notes = pinion_cam_spec.DRAWING_NOTES
     assert "RELEASE HOLD" not in notes
-    assert "M2.5 X 0.45-6H" in notes
     assert "ISO 4026" in notes
-    assert "2.00 MIN FULL THREAD" in notes
-    source = Path(cam.__file__).read_text(encoding="utf-8")
-    assert 'name_last_feature(adapter, "M2.5TapDrill")' in source
-    assert "TAP_DRILL_DIA" in source
+    tap = drawing.DIMENSION_CALLOUTS["TapDrillDia"]
+    assert "M2.5 X 0.45-6H" in tap
+    assert "THRU TO BORE" in tap
+    assert "BOSS" not in tap
+    assert "OPTIONAL" not in tap
 
 
-def test_direct_limits_and_native_gdt_control_the_cam_axes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 4
-    assert "def _front_end_edge(" in source
-    assert "edge_entity=_front_end_edge(top)" in source
-    assert source.count("add_feature_control_frame(") == 2
-    assert "set_basic_dimension(" in source
-    assert 'datums=("A", "B", "C")' in source
-    assert 'datums=("D",)' in source
-    assert 'quantity="BOSS OD AXIS"' in source
-    assert 'quantity="M2.5 TAP PITCH AXIS"' in source
-    assert "COMMON ZONE" not in pinion_cam_spec.DRAWING_NOTES
-    assert "POSITION TAP PITCH AXIS TO DATUM D" in pinion_cam_spec.DRAWING_NOTES
-    assert "add_surface_finish(" in source
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "FINAL REAM; THRU"
-    assert "*Bottom" in source
-    assert "BOSS END VIEW SCALE 2:1" in source
-    assert "A TO BOSS / TAP AXIS" in drawing.DIMENSION_CALLOUTS["BossCz"]
-    assert drawing.DIMENSION_CALLOUTS["CollarCy"] == "BOTH END FACES"
-    assert "BossProjection" in drawing.FRONT_KEEP
-    assert "+/-0.05" not in Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "BEYOND" in drawing.DIMENSION_CALLOUTS["BossProjection"]
-    assert "{CAM_OD:.2f} OD" in source
+def test_set_screw_thread_cannot_break_either_face_at_general_grade() -> None:
+    # A 1.7 station once left 0.45 nominal wall between the M2.5 major and the
+    # front face; the .X ±0.8 general grade the station prints under then
+    # permitted a breakout (codex iter3 blocker).  U28 centres the screw.
+    import pinion_cam_geometry as geometry
+
+    thread_major_r = 2.5 / 2.0
+    general_grade_mm = 0.8
+    assert geometry.SET_SCREW_Z - thread_major_r - general_grade_mm > 0.0
+    assert (
+        geometry.CAM_LEN - geometry.SET_SCREW_Z - thread_major_r - general_grade_mm
+        > 0.0
+    )
 
 
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(cam.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_set_screw_sits_below_the_od_in_the_heavy_side() -> None:
+    # U28: no raised boss, so the supplied M2.5 x 5 screw must seat fully
+    # inside the heavy-side wall with room to spare.
+    import pinion_cam_geometry as geometry
+
+    assert "M2.5 X 5" in pinion_cam_spec.DRAWING_NOTES
+    assert geometry.THICK_SIDE_WALL - 5.0 >= 1.0
+    assert not hasattr(geometry, "BOSS_DIA")
+
+
+def test_the_print_carries_no_gdt_and_dimensions_on_solid_edges() -> None:
+    assert not hasattr(pinion_cam_spec, "GEOMETRIC_TOLERANCES_MM")
+    for line in ("DATUM A", "POSITION ", "AXIS C IS PARALLEL"):
+        assert line not in pinion_cam_spec.DRAWING_NOTES, line
+    # The set-screw end view owns both tapped-hole dimensions; the collar OD
+    # stays in the length view and the bore in the circular front view.
+    assert set(drawing.BOTTOM_KEEP) == {"TapDrillDia", "TapCz"}
+    assert "TapCz" not in drawing.SIDE_KEEP
+    assert "CollarOd" in drawing.SIDE_KEEP
+    assert "BoreDia" in drawing.FRONT_KEEP
+    assert "CollarOd" not in drawing.FRONT_KEEP
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].startswith("REAM THRU")
+    assert "BOTH END FACES" not in drawing.DIMENSION_CALLOUTS["CollarCy"]
+    assert "TapCz" not in drawing.DIMENSION_CALLOUTS
+
+
+def test_the_part_owns_every_printed_decimal_place() -> None:
+    """Policy rule 2: the .SLDPRT owns places for every imported nominal.
+
+    Two places serve the critical trio (the reamed running bore, the cam OD
+    and the eccentricity that IS the lift) and the M2.5 tap drill, whose size
+    is the drill's; routine controls use one place.
+    """
+    by_name = pinion_cam_spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*pinion_cam_spec.DRAWING_DIMENSIONS.values())
+    assert {name for name, places in by_name.items() if places != 1} == {
+        "BoreDia",
+        "CollarOd",
+        "CollarCy",
+        "TapDrillDia",
+    }
+    assert max(by_name.values()) == 2
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_registry_retains_make_critical_properties() -> None:
     import _config
 
     spec = _config.parts("pinion-cam")
@@ -146,3 +188,20 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["finish"]
     assert "fit_class" not in spec
     assert int(spec["quantity"]) == 2
+
+
+def test_front_view_shows_which_side_the_set_screw_enters() -> None:
+    # Fable review r4 blocker: nothing tied the set-screw hole to the
+    # eccentricity.  The front view keeps hidden lines so the tap drill shows
+    # on the heavy side, opposite the bore offset; every other view is HLR.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible(adapter, front)" in source
+    assert "for view in (side, bottom, iso):" in source
+    assert "VIEW ALONG SET-SCREW AXIS" in source
+    import pinion_cam_geometry as geometry
+    import build_pinion_cam
+
+    # The tap plane sits on the heavy side: below the bore, where the collar
+    # centre (-ECC) also lies.
+    assert build_pinion_cam._TAP_PLANE_Y < 0.0
+    assert geometry.THICK_SIDE_WALL > geometry.THIN_SIDE_WALL

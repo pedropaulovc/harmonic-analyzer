@@ -30,8 +30,6 @@ from crank_pin_spec import (
     SMALL_END_DIA as _PIN_D1,
 )
 from crankshaft_spec import SHAFT_DIA as _CS_DIA
-from pinion_bracket_geometry import PIN_BORE, PIN_SEAT
-from pinion_cam_pin_geometry import PIN_DIA
 import summing_lever_spec
 from stock_anchor_geom import ANCHOR_9489T111
 from frame_attachment_spec import COLUMN_SOCKET_DIAMETER
@@ -69,9 +67,6 @@ def _numbered_pairs(
         for number in numbers
     }
 
-
-_CAM_PIN_OVERLAP_MM3 = math.pi * (PIN_DIA**2 - PIN_BORE**2) * PIN_SEAT / 4.0
-_CAM_PIN_GATE_LIMIT_MM3 = 1.10 * _CAM_PIN_OVERLAP_MM3
 
 # Crank taper pin in its PILOT holes (ch11 p.14, 2026-09-02): the released
 # drawings drill the arm #14 (4.623) and the shaft #9 (4.978) and taper-ream
@@ -133,8 +128,6 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    frozenset(("pinion-bracket-1", "pinion-cam-pin-1")): _CAM_PIN_GATE_LIMIT_MM3,
-    frozenset(("pinion-bracket-2", "pinion-cam-pin-2")): _CAM_PIN_GATE_LIMIT_MM3,
     # Rule-12 E11: #10-32 94025A164 (major 4.826) in the #21 (4.0386) tap
     # drill, ADJUSTER_EMBED 9.5 deep.
     frozenset(("cone-tip-adjuster-1", "cone-tip-block-1")): _smooth_annulus_limit_mm3(
@@ -309,11 +302,13 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "frame-1/harmonic-base",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 15.525),
     ),
+    # Rule 12 (audit E10): the 31.75 #8-32 x 1-1/4 block screws pass the
+    # 20.5 pinion block and engage 11.25 of the base seat.
     **_numbered_pairs(
         "drive-train-1/slotted-screw",
         range(1, 5),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 6.65),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 31.75 - 20.5),
     ),
     **_numbered_pairs(
         "drive-train-1/foot-screw",

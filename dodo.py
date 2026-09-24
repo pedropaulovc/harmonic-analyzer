@@ -2745,6 +2745,9 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
+        # its three drive-train support pins red with every gate green.
+        SCRIPTS_DIR / "test_drive_train_support_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

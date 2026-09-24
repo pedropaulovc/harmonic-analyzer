@@ -1,25 +1,26 @@
 r"""Pure-data dimensional contract shared by the pinion engage lever and its
 manufacturing drawing.
 
-PURE DATA, no SolidWorks/COM imports.  A hub seated over the lift rod, with a
-tapered grip rod rising out of it -- turned steel.  The nominals drive the part's
-named equation globals AND the drawing's coordinate math; the marked-dimension
-map keeps the part marks and drawing keeps in lockstep
-(``test_pinion_lever_drawing.py``).
+PURE DATA, no SolidWorks/COM imports.  A hub slipped over the lift rod's front
+end, with a tapered grip rod rising out of it -- turned steel.  The MHA-135 pin
+(U36) match-drilled through hub and rod at assembly carries the drive torque, so
+the bore is a plain slip fit.  The nominals drive the part's named equation
+globals AND the drawing's coordinate math; the marked-dimension map keeps the
+part marks and drawing keeps in lockstep (``test_pinion_lever_drawing.py``).
 """
 
 from __future__ import annotations
 
-import math
-
-from _gtol_spec import CylinderFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from pinion_lever_geometry import (
     BORE as BORE,
+    BORE_DEPTH as BORE_DEPTH,
     CAP_RADIUS as CAP_RADIUS,
     CAP_SAG as CAP_SAG,
     HUB_LEN as HUB_LEN,
     HUB_OD as HUB_OD,
+    PIN_HOLE_DIA as PIN_HOLE_DIA,
+    PIN_HOLE_FROM_MOUTH as PIN_HOLE_FROM_MOUTH,
+    PIN_HOLE_Z as PIN_HOLE_Z,
     ROD_LEN as ROD_LEN,
     ROD_ROOT_DIA as ROD_ROOT_DIA,
     ROD_TIP_DIA as ROD_TIP_DIA,
@@ -27,59 +28,76 @@ from pinion_lever_geometry import (
     WALL_T as WALL_T,
 )
 
-# Symmetric ream band about the 6.3675 mid nominal: 6.375 MAX / 6.360 MIN
-# (running fit on the Ø6.35 pivot shaft).
-BORE_BAND = (0.0075, -0.0075)
-BORE_DEPTH_BAND = (0.10, 0.00)
-END_WALL_TOLERANCE_MM = 0.05
-ROD_TIP_Y_TOLERANCE_MM = 0.25
-ROD_TIP_DIAMETER_TOLERANCE_MM = 0.05
-GRIP_HALF_ANGLE_TOLERANCE_DEG = 0.05
-CAP_RADIUS_TOLERANCE_MM = 0.10
-GRIP_HALF_ANGLE_DEG = math.degrees(
-    math.atan((ROD_TIP_DIA - ROD_ROOT_DIA) / (2.0 * (ROD_LEN - ROD_Y0)))
-)
+LIFT_ROD_NUMBER = "MHA-060"
+PIN_NUMBER = "MHA-135"
+
+# U36: the pin carries the torque, so the hub only has to slide onto the h-band
+# 6.35 lift rod -- 6.35-6.40 (+0.05/0), held about the 6.375 mid-limit so the
+# model never makes a line-to-line cylinder with the rod.
+BORE_BAND = (0.025, -0.025)
+# The blind bore's bottom wall is the thinnest section a novice turns (U27:
+# >= 1.5 floor); the .XX row would allow 1.49, so it carries its own band.
+END_WALL_TOLERANCE_MM = 0.25
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BarrelProfile": {"HubOd", "HubBore"},
     "Barrel": {"BoreDepth"},
     "Wall": {"EndWall"},
-    "RodProfile": {"RodTipY", "RodTipDia", "GripHalfAngle"},
+    # The taper prints as root and tip diameters over the 86.0 height.  The
+    # r7 render showed the 0.7-degree half-angle's extension line running to
+    # the cone's virtual apex, 163 mm below the root and off the sheet.
+    "RodProfile": {"RodTipY", "RodTipDia", "RodRootDia"},
     "CapProfile": {"CapR"},
+    "PinHoleProfile": {"PinHoleDia"},
+    # Rule 2 reference sketches: the grip axis and the pin-hole station are
+    # printed from face B (the flat mouth face), but neither is any feature's
+    # own dimension, so each gets a one-line construction sketch whose single
+    # driving dimension IS the value.
+    "GripStationReference": {"GripFromB"},
+    "PinHoleStationReference": {"PinHoleFromB"},
 }
 
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        key="hub_bore",
-        roughness_um=MACHINED_UM,
-        face=CylinderFace(diameter_mm=BORE),
-    ),
-)
+# Decimal places ARE the tolerance statement (policy rule 2); the part authors
+# them and the drawing reads them back.  Three on the banded bore; two on the
+# end wall (own band) and the grip station (the old +/-0.10 note, now the .XX
+# row); one everywhere a turned or hand-finished feature is routine.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BarrelProfile": {"HubOd": 1, "HubBore": 3},
+    "Barrel": {"BoreDepth": 1},
+    "Wall": {"EndWall": 2},
+    "RodProfile": {"RodTipY": 1, "RodTipDia": 1, "RodRootDia": 1},
+    "CapProfile": {"CapR": 1},
+    "PinHoleProfile": {"PinHoleDia": 2},
+    "GripStationReference": {"GripFromB": 2},
+    "PinHoleStationReference": {"PinHoleFromB": 1},
+}
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked dimension must state its decimal places")
 
+# Rule 5: nothing on the lever runs or slides any more -- the pinned hub is a
+# static slip fit -- so no surface carries a roughness symbol.
+SURFACE_FINISHES = ()
+
+# The match-drill requirement rides the pin hole's own callout (rule 6: matched
+# fits belong on the feature), so the note block keeps only the crown break.
+PIN_HOLE_CALLOUT = "\n".join(
+    (
+        f"MATCH-DRILL THRU AT ASSEMBLY ON {LIFT_ROD_NUMBER},",
+        f"GRIP PARKED; DRIVE {PIN_NUMBER}, PEEN FLUSH",
+    )
+)
 DRAWING_NOTES = "\n".join(
     (
-        "DATUM A IS FINISHED BORE AXIS;",
-        "  DATUM B IS FLAT END FACE.",
-        "BORE AND FINISH TO LIMITS IN THE",
-        "  HUB-TURNING SETUP. BLIND BORE BOTTOM",
-        "  MAY HAVE R0.15 MAX CORNER RADIUS.",
-        f"CROWN BREAK AT THE CROWN ROOT PLANE ({HUB_LEN:.2f} REF)",
-        "  SHALL BE R0.10 MAX AND IS EXEMPT FROM THE",
-        "  TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
-        f"GRIP AXIS: {HUB_LEN / 2.0:.2f}+/-0.10 FROM B, MEASURED AT THE",
-        "  POINT OF THE GRIP AXIS NEAREST A; 90+/-0.5 DEG TO A.",
-        "SHORTEST DISTANCE BETWEEN GRIP AXIS AND A:",
-        "  0.00 TO 0.10. GRIP-TO-HUB JUNCTION R0.25 MAX.",
+        "LEAVE THE CROWN ROOT CIRCLE SHARP;",
+        "  EXEMPT FROM TITLE-BLOCK EDGE-BREAK REQUIREMENT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "lever hub OD runout": "0.05",
-    "lever flat-face perpendicularity": "0.05",
-    "lever crown profile": "0.05",
-    "grip tip face flatness": "0.05",
-    "grip tip face perpendicularity": "0.10",
-}

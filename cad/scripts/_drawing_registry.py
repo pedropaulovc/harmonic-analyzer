@@ -385,6 +385,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="pinion_lever_pin",
+        part="pinion_lever_pin",
+        artifact_stem="pinion-lever-pin",
+        script_name="draw_pinion_lever_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pinion_pivot_shaft",
         part="pinion_pivot_shaft",
         artifact_stem="pinion-pivot-shaft",

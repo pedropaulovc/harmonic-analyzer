@@ -1,9 +1,10 @@
 pinion-arbor:
+  title: Integral Pinion Arbor and Grip Head
   number: MHA-102
-  material: Plain Carbon Steel
-  material_specification: AISI 1018 cold-finished steel shafting
-  finish: precision turned or ground, oiled
+  material: AISI 1018 cold-finished steel
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (steel)"
+  process: "turn integral arbor, neck, and head from one blank; ream head cross-hole 6.00 +0.10/0 for MHA-058 grip crossrod; bond crossrod with Loctite 638"
