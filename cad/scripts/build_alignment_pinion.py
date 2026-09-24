@@ -64,7 +64,7 @@ from alignment_pinion_spec import (
     GEAR_DATA,
     SURFACE_FINISHES,
 )
-from build_cone_gear import DP  # DP = train diametral_pitch (machine.yaml)
+from involute_gear import DP  # DP = train diametral_pitch (machine.yaml)
 
 PART_NAME = "alignment-pinion"
 MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train

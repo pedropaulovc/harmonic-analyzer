@@ -10,7 +10,7 @@ import pytest
 
 import _config
 from _buildgraph import module_deps_of
-from build_cone_gear import gear_facts
+from involute_gear import gear_facts
 import cylinder_gear_shaft_spec as arbor
 import cylinder_gear_spec as spec
 import draw_cylinder_gear as drawing

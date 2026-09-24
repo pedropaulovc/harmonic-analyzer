@@ -5,7 +5,7 @@ and crank-drive gear are not meshing in model") -- the study behind
 ``gear_train.crank_drive_backlash_mm``, ``fits.crank_mesh.c2c_slack_mm`` and
 the drive-train's ``MESH16_C2C`` / ``Y_CRANK`` / ``MESH_WINDOW_CENTRE_DEG``
 constants. It builds the exact modeled tooth solids -- the involute gap
-profile of ``build_cone_gear.gear_facts`` with the ``_gear.py`` widen /
+profile of ``involute_gear.gear_facts`` with the ``_gear.py`` widen /
 root-relief extensions, the 64T's teeth twisted as the TRUE helix
 ``build_crank_drive_gear`` sweeps (``slices`` optionally quantizes to the
 retired K-slice cut stack) -- places them on the live drive-train geometry
@@ -46,7 +46,7 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # real _common (every diag_*/probe_* script here relies on it)
 import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from build_cone_gear import gear_facts
+from involute_gear import gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
 
 IN = 25.4
