@@ -603,34 +603,43 @@ def _assert_corner_radius_attachment(
             center = model_point_in_view(adapter, view, circle[:3], label=f"{name} owned circle")
             if all(abs(center[i] - station_xy[i]) <= 0.001 for i in (0, 1)):
                 candidates.append((edge, circle, center))
-    if len(candidates) != 1:
-        raise RuntimeError(f"expected one {feature_name}-owned visible {name} edge at corner station, found {len(candidates)}")
-    edge, circle, center = candidates[0]
-    # Invert the measured plan-view X/Z basis at this owned edge's model Y.
-    px = model_point_in_view(adapter, view, (circle[0] + 0.001, circle[1], circle[2]), label=f"{name} X basis")
-    pz = model_point_in_view(adapter, view, (circle[0], circle[1], circle[2] + 0.001), label=f"{name} Z basis")
-    xx, xy = px[0] - center[0], px[1] - center[1]
-    zx, zy = pz[0] - center[0], pz[1] - center[1]
-    det = xx * zy - zx * xy
-    if abs(det) < 1e-12:
-        raise RuntimeError(f"{name} plan projection is singular")
-    dx, dy = arrow[0] - center[0], arrow[1] - center[1]
-    model_tip = (
-        circle[0] + 0.001 * (dx * zy - zx * dy) / det,
-        circle[1],
-        circle[2] + 0.001 * (xx * dy - dx * xy) / det,
-    )
-    # IEdge, not ICurve: the closest point is on the trimmed physical edge.
-    closest = tuple(float(value) for value in edge.GetClosestPointOn(*model_tip))
-    trim = _early_bound(edge.GetCurveParams3(), "ICurveParamData")
-    distance = math.dist(model_tip, closest[:3])
-    print(
-        f"{name} owned visible trimmed edge: arrow_sheet_m={arrow[:3]} radius_m={circle[6]} "
-        f"center_model_m={circle[:3]} trim_u=({trim.UMinValue},{trim.UMaxValue}) "
-        f"closest_u={closest[3]} arrow_model_m={model_tip} "
-        f"closest_model_m={closest[:3]} distance_m={distance}"
-    )
-    if not distance <= 0.00002:  # 0.01 mm on this 1:2 sheet; unchanged physical-edge bound.
+    # W18 (5db29554, run d9711228): the open pivot relief crosses the NW
+    # fillet, so its plan arc is two physical edges on one circle -- one on
+    # the 6.35 top, one on the 6.10 relief floor.  Every owned visible arc
+    # must share the plan centre and radius; the arrow must land on one.
+    if not candidates:
+        raise RuntimeError(f"no {feature_name}-owned visible {name} edge at corner station")
+    plan = [(circle[0], circle[2], circle[6]) for _edge, circle, _center in candidates]
+    if any(math.dist(item, plan[0]) > 1e-8 for item in plan[1:]):
+        raise RuntimeError(f"{name} owned arcs do not share one plan circle: {plan!r}")
+    distances = []
+    for edge, circle, center in candidates:
+        # Invert the measured plan-view X/Z basis at this owned edge's model Y.
+        px = model_point_in_view(adapter, view, (circle[0] + 0.001, circle[1], circle[2]), label=f"{name} X basis")
+        pz = model_point_in_view(adapter, view, (circle[0], circle[1], circle[2] + 0.001), label=f"{name} Z basis")
+        xx, xy = px[0] - center[0], px[1] - center[1]
+        zx, zy = pz[0] - center[0], pz[1] - center[1]
+        det = xx * zy - zx * xy
+        if abs(det) < 1e-12:
+            raise RuntimeError(f"{name} plan projection is singular")
+        dx, dy = arrow[0] - center[0], arrow[1] - center[1]
+        model_tip = (
+            circle[0] + 0.001 * (dx * zy - zx * dy) / det,
+            circle[1],
+            circle[2] + 0.001 * (xx * dy - dx * xy) / det,
+        )
+        # IEdge, not ICurve: the closest point is on the trimmed physical edge.
+        closest = tuple(float(value) for value in edge.GetClosestPointOn(*model_tip))
+        trim = _early_bound(edge.GetCurveParams3(), "ICurveParamData")
+        distance = math.dist(model_tip, closest[:3])
+        distances.append(distance)
+        print(
+            f"{name} owned visible trimmed edge: arrow_sheet_m={arrow[:3]} radius_m={circle[6]} "
+            f"center_model_m={circle[:3]} trim_u=({trim.UMinValue},{trim.UMaxValue}) "
+            f"closest_u={closest[3]} arrow_model_m={model_tip} "
+            f"closest_model_m={closest[:3]} distance_m={distance}"
+        )
+    if not min(distances) <= 0.00002:  # 0.01 mm on this 1:2 sheet; unchanged physical-edge bound.
         raise RuntimeError(f"{name} arrow does not land on its owned physical corner arc")
 
 
