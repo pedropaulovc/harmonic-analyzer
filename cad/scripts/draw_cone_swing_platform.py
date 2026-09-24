@@ -27,6 +27,7 @@ import argparse
 import math
 import sys
 from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Any
 
 import _telemetry
@@ -408,8 +409,18 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         )
 
 
+def _note_annotation_name(note: Any) -> str:
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    return str(annotation.GetName() or "")
+
+
 def _position_view_label(
-    adapter: Any, view: Any, lower_left: tuple[float, float], *, label: str
+    adapter: Any,
+    view: Any,
+    lower_left: tuple[float, float],
+    *,
+    label: str,
+    added_notes: Sequence[Any] = (),
 ) -> None:
     """Move a view's native label so its box's lower-left lands at ``lower_left``.
 
@@ -417,15 +428,27 @@ def _position_view_label(
     ``INote.GetExtent``, shift the anchor by the corner's error, read back.
     The sheet scale is pinned first; finalization re-applying it must not
     move a dynamic label after this readback.
+
+    ``IView::GetNotes`` returns every note in the view, so notes this script
+    added there (detail B's cutter notes: 498160d1 found 3) are excluded by
+    their own annotation names, not by text; exactly one native label must
+    remain.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
+    added = {_note_annotation_name(item) for item in added_notes}
+    if "" in added or len(added) != len(added_notes):
+        raise RuntimeError(f"{label}: added notes lack distinct annotation names")
     notes = tuple(_read_member(view, "GetNotes") or ())
-    if len(notes) != 1:
-        raise RuntimeError(f"expected one native {label}, found {len(notes)}")
-    note = _early_bound(notes[0], "INote")
+    native = [item for item in notes if _note_annotation_name(item) not in added]
+    if len(native) != 1 or len(notes) - len(native) != len(added):
+        raise RuntimeError(
+            f"expected one native {label} beside {len(added)} added notes, "
+            f"found {len(notes)} notes ({len(native)} not added here)"
+        )
+    note = _early_bound(native[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
     for _attempt in range(2):
         extent = tuple(float(v) for v in note.GetExtent())
@@ -1321,8 +1344,9 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )
-    for cutter_note in CUTTER_NOTES:
-        _add_cutter_note(adapter, detail, cutter_note)
+    cutter_notes = [
+        _add_cutter_note(adapter, detail, cutter_note) for cutter_note in CUTTER_NOTES
+    ]
 
     # Annotation insertion can invalidate the exported display geometry.
     for view in (profile, feature, notch, section, slot_section, iso):
@@ -1332,7 +1356,11 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, detail)
     # Last, after every annotation and display-mode regen could re-lay it.
     _position_view_label(
-        adapter, detail, DETAIL_LABEL_LOWER_LEFT, label="detail B label"
+        adapter,
+        detail,
+        DETAIL_LABEL_LOWER_LEFT,
+        label="detail B label",
+        added_notes=cutter_notes,
     )
     _position_view_label(
         adapter,
