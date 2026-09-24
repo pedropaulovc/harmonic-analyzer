@@ -253,8 +253,9 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
             for old_end in (147.3, 154.2, 161.1)
         )
     )
-    # Printed baseline stations from the big (journal) end, as ruled.
-    assert ends[1:] == pytest.approx((163.792, 170.692, 177.592, 202.267), abs=1e-3)
+    # Printed baseline stations from the big (journal) end, as ruled; the
+    # overall length follows the E11 #10-32 cup apex (202.267 before E11).
+    assert ends[1:] == pytest.approx((163.792, 170.692, 177.592, 200.886), abs=1e-3)
     assert ends[-1] == pytest.approx(
         cone_gear_shaft_spec.FRONT_STUB + 138.97882594770454
     )
@@ -262,7 +263,7 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
         115.6853574197016
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(24.6745185280)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(23.293468528)
     assert ends[-1] - ends[-2] == pytest.approx(
         cone_gear_shaft_spec.TIP_STUB_LENGTH
     )
@@ -292,7 +293,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # 375a122c) -- without adding a check of its own (no MUST), and carries
     # no number but the mate's part number, no tolerance, datum or method
     # word -- except the tailstock line, a user-ruled process requirement
-    # (U40, 2026-09-23: the 24.675 mm Ø1.588 tip land at L/D 15.5 is only
+    # (U40, 2026-09-23: the 23.293 mm Ø1.588 tip land at L/D 14.7 is only
     # turnable supported), so "TURN" is allowed in that one line only.  The
     # three-place-stations lines went in the U27 round: the places already
     # say it.

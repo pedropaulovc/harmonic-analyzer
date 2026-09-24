@@ -313,7 +313,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             # Rule-12 E1: 90280A110 (12.7), 6.47 scaled by far-jaw engagement.
             frozenset(("cone-tip-pinch-screw-1", "cone-tip-block-1")): 15.73,
-            frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 0.143,
+            # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
+            frozenset(("cone-tip-adjuster-1", "cone-gear-shaft-1")): 1.144,
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),

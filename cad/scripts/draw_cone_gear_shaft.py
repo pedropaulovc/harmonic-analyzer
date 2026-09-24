@@ -74,7 +74,7 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 202.27 mm shaft at 1:1 spans 0.0503..0.2526, leaving the
+# y < ~0.066).  The 200.89 mm shaft at 1:1 spans 0.0503..0.2512, leaving the
 # right third for the pictorial; the group sits just below mid-height so
 # the baseline stack below and the diameters above share the field with the
 # note block in the lower left (review 2026-09-23: at 0.170 rows A-B stood

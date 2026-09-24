@@ -75,8 +75,8 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # minimum-material radius is 1.3365 mm and its tooth depth 0.703 mm.  A
 # 1/16 in bore still leaves a 0.543 mm rim under that root (0.77x tooth
 # depth) on a soldered, keyless, near-torque-free gear.  Since U40 the land
-# carries T012 as well, so it runs 24.675 mm at L/D 15.5 (it was 17.775 at
-# L/D 11; at 1/32 in it would be L/D 31).  A manual lathe turns that only with
+# carries T012 as well, so it runs 23.293 mm at L/D 14.7 up to the E11 cup
+# apex (it was 17.775 at L/D 11 before U40; at 1/32 in it would be L/D 29).  A manual lathe turns that only with
 # the tip held on a tailstock centre -- unsupported, it whips off the tool --
 # which is why the tailstock note below is a requirement (U40), not a method.
 # The shaft still decreases monotonically toward the tip: the cone is
@@ -152,8 +152,8 @@ SURFACE_FINISHES = (
 # check the shop cannot make (codex, 375a122c), no digits but the mate's
 # number, no method words but one.  Lines stay short: the note block starts
 # 58 mm in and the title block begins at 216 mm.  The tailstock line is that
-# one process word, by user ruling (U40, 2026-09-23): the 24.675 mm
-# Ø1.588 terminal land (L/D 15.5) cannot be turned unsupported, so the
+# one process word, by user ruling (U40, 2026-09-23): the 23.293 mm
+# Ø1.588 terminal land (L/D 14.7) cannot be turned unsupported, so the
 # support IS the requirement (rule 6's exception), not a method preference.
 DRAWING_NOTES = "\n".join(
     (
