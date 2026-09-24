@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import _drawing_marks
 import _fit_limits
 import build_pinion_arbor as part
 import draw_pinion_arbor as drawing
@@ -101,7 +102,11 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
 
 
 def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
-    assert spec.JOURNAL_DIA_BAND is _fit_limits.SHAFT_H
+    assert spec.JOURNAL_DIA_BAND == (-0.01, -0.03)
+    # Both stacked bands print at 2 places: "-0.01/-0.03" and "-0.01/-0.10".
+    for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
+        assert _drawing_marks._tolerance_precision_mm(*_fit_limits.deviations(band)) == 2
+    assert _fit_limits.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
@@ -154,17 +159,22 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
 
     journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
-    assert strap_lower - journal_upper == pytest.approx(0.010)
-    assert strap_upper - journal_lower == pytest.approx(0.045)
+    # Running fit of each land in its MHA-056 REAM_SLIDE bore.
+    assert strap.ARBOR_BORE_BAND is _fit_limits.REAM_SLIDE
+    assert strap_lower - journal_upper == pytest.approx(0.020)
+    assert strap_upper - journal_lower == pytest.approx(0.055)
     # Every bore slides on from the back crown, so no zone may exceed 8.00.
     # The drum keeps its stock-H7 bore, so the bond zone sits 0.01 under it
     # for a guaranteed slide, and the worst gap stays inside Loctite 638's 0.25.
     shaft_upper, shaft_lower = spec.SHAFT_DIA_BAND
-    assert journal_upper == 0.0
     assert shaft_upper == pytest.approx(-0.010)
     drum_upper, drum_lower = drum.ARBOR_BORE_BAND
     assert drum_lower - shaft_upper == pytest.approx(0.010)
     assert drum_upper - shaft_lower <= 0.20 + 1e-9
+    # The drum passes over the back land on its way on, so "SLIDES BY HAND"
+    # must hold there too: every Ø8 zone it crosses stays 0.010 under its bore.
+    assert drum_lower - journal_upper == pytest.approx(0.010)
+    assert min(drum_lower - journal_upper, drum_lower - shaft_upper) >= 0.010 - 1e-9
 
 
 def test_retired_socket_and_retention_pin_are_not_exported() -> None:
