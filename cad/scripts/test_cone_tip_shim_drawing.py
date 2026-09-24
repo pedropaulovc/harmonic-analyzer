@@ -123,3 +123,24 @@ def test_drawing_registry_row() -> None:
     assert drawing.SPEC is reg
     assert reg.artifact_stem == part.PART_NAME
     assert reg.script == Path(drawing.__file__).resolve()
+
+
+def test_nominal_stack_text_leads_off_its_dimension_line() -> None:
+    """r1 printed "(Ø1.10)" across its own 4.4 mm-tall dimension line."""
+    line_x = drawing.FRONT_KEEP["Thickness"][0]
+    text_x, text_y = drawing.THICKNESS_TEXT
+    half_w = 0.030 / 2.0  # "NOMINAL STACK" callout, the widest text line
+    assert text_x - half_w >= line_x + 0.004
+    assert text_y + 0.006 < drawing.NOTES_XY[1] - 0.008  # below the notes block
+
+
+def test_reference_mark_carries_no_diameter_glyph() -> None:
+    """The plural helper prefixes "(<MOD-DIAM>"; the stack is a length."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_reference_dimensions(" not in source
+    assert "set_reference_dimension(" in source
+
+
+def test_radius_centre_locations_print_one_place() -> None:
+    assert drawing.LOCATION_PLACES == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == drawing.LOCATION_PLACES
