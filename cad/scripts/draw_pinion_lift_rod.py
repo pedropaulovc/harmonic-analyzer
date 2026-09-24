@@ -80,7 +80,10 @@ ISO_CENTER = (0.135, 0.125)
 DETAIL_CENTER = (0.335, 0.132)
 DETAIL_SCALE = (5, 1)
 DETAIL_RADIUS_MM = 7.0
-DETAIL_LABEL_XY = (0.312, 0.170)
+# The label anchors at its top centre. Above the circle it sat on the outline
+# and crowded the pin-hole callout (r7 slice3 eye-pass), so it goes in the
+# clear band between the circle (x <= 0.370) and the right border (0.419).
+DETAIL_LABEL_XY = (0.391, 0.150)
 
 # The rod's flank in the *Right view: the bearing finish leader drops onto it.
 ROD_FLANK_Y = RIGHT_CENTER[1] + ROD_DIA * SHEET_SCALE[0] / 2000.0
