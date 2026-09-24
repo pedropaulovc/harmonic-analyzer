@@ -19,9 +19,10 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   into the far casting wall through one #10-32 UNF-2B interrupted tap path.
 * Integral crossbar 22 wide at x -26..-4 spanning the window along Z,
   flush with BOTH faces (its underside 999.7 is the knife-mount seat
-  plane), with 18 x 18 plan gussets at all four rail junctions and two
-  O13.49 (1/2 close) hanger-stud holes at z 3.088 -/+ 87.06 -- the
-  knife-mount studs with their big hex nuts (top.png stud crops).
+  plan), with 18 x 18 plan gussets at all four rail junctions and two
+  nominal O13.49 (1/2 close) hanger-stud holes. The released frame is
+  match-drilled to its actual MHA-037 pair; the CAD stations preserve the
+  assembly seed, not an independent manufacturing location requirement.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 27 wide,
   O17 clearance bore for the O16 counter-spring post, underside boss
   O30 x 8 with twin V-gussets (ch30 p004), a 16 x 16 x 2 cast pocket and
@@ -174,7 +175,10 @@ INNER_Z = abs(FRONT_COLUMN_Z) - RAIL_W_FR / 2.0  # 93.0
 # --- Integral crossbar (old top-crossbar, merged) ---------------------------
 BAR_X0, BAR_X1 = -26.0, -4.0  # 22 wide, centred on KNIFE x = -15
 GUSSET = 18.0  # plan gusset legs at the four rail junctions
-HEX_Z_MID = 87.06  # knife-mount trunnion mid offset (build_summing_assembly)
+HEX_Z_MID = 87.06  # nominal knife-mount trunnion spacing for the assembly seed
+# These stations keep the final CAD nominal. The released MHA-077 holes are
+# match-drilled from the fitted actual MHA-037 pair and are not independently
+# positioned from the casting datums.
 STUD_Z_FRONT = SUMMING_Z - HEX_Z_MID  # -83.972
 STUD_Z_REAR = SUMMING_Z + HEX_Z_MID  # +90.148
 STUD_HOLE_SPEC = HoleSpec("clearance", "1/2", fit="close")  # O13.492
@@ -1174,10 +1178,10 @@ async def build(adapter) -> dict[str, str]:
     v_gn = math.pi * (GOOSENECK_BORE_DIA / 2.0) ** 2 * (RING_HEIGHT + HUB_BOSS_DROP)
     volume = await volume_check(adapter, "gooseneck bore", volume - v_gn, 60.0)
 
-    # 12. Hanger-stud clearance holes (1/2 close) through the crossbar,
-    #     drilled from the underside seat plane (one wizard feature, both
-    #     stations; the rear hole nicks the junction gusset -- material
-    #     continues, the removal is a full cylinder either way).
+    # 12. Nominal hanger-stud clearance-hole seed through the crossbar.
+    #     The production pair is located and match-drilled from the fitted
+    #     actual MHA-037 mounts; these CAD stations keep the released assembly
+    #     reference only. One wizard feature carries both final-size holes.
     wizard_holes(
         adapter,
         STUD_HOLE_SPEC,

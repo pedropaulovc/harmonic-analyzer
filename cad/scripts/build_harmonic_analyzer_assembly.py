@@ -67,6 +67,8 @@ from _interference_contracts import allowed_interference_pairs
 import _telemetry
 
 ASM_NAME = "harmonic-analyzer"
+# The title block's PART cell prints the document summary Title.
+ASSEMBLY_TITLE = "Harmonic Analyzer Assembly"
 
 SUBASSEMBLIES = (
     "frame",
@@ -105,7 +107,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
@@ -230,7 +231,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    apply_summary_info(adapter, title=f"{ASM_NAME} assembly")
+    apply_summary_info(adapter, title=ASSEMBLY_TITLE)
 
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the

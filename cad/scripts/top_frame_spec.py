@@ -124,11 +124,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SetPocketProfile": {"PocketRun", "PocketRise"},
     "GooseneckTap": {"SetTapZ"},
     "GooseneckProfile": {"GnDia", "GnX", "GnZ"},
-    # The hanger-stud and keeper-tap placement dims (StudFrontX ...,
-    # KeeperFrontX ...) are NOT marked: a Hole Wizard placement sketch
-    # measures from the origin -- mid-air on the print -- so sheet 3
-    # dimensions those stations from the socket bore axes with sheet-derived
-    # dimensions (DRAWING_REFERENCE_PRECISION below, policy rule 7).
+    # Hanger-stud placement dims (StudFrontX ... StudRearZ) are NOT released:
+    # the final MHA-077 holes are match-drilled from the fitted actual MHA-037
+    # pair. Keeper-tap placement dims are also unmarked because their Hole
+    # Wizard sketch measures from a mid-air origin; sheet 3 derives those
+    # keeper stations from the socket bore axes (policy rule 7).
     "CapRecessProfile": {"CapRecessDia"},
     "CapRecesses": {"CapRecessDepth"},
 }
@@ -142,12 +142,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_top_frame`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# One place is this casting's routine band.  The hanger and keeper stations are
-# drilled and tapped clearance features: .X (+/-0.8) is the band they need, and
-# a second place claimed a tolerance nothing on the part requires.  Two places
-# appear only where a fit lives there -- the cap recess diameter and depth carry
-# the bilateral bands above, and the gooseneck bore prints the clearance a
-# purchased post is set into.
+# One place is this casting's routine band. The keeper stations are drilled
+# and tapped clearance features: .X (+/-0.8) is the band they need, and a
+# second place claimed a tolerance nothing on the part requires. The matched
+# hanger-hole positions carry no independent coordinate tolerance. Two places
+# appear only where a fit lives there: the cap-recess diameter and depth carry
+# their bilateral bands, and the gooseneck bore prints the clearance a
+# purchased post is set into (rule-12 E5: a one-place band on that bore eats
+# the 1/4-20 set-screw thread that breaks into it).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": 1},
@@ -200,25 +202,25 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "overall casting width": 1,
     "overall casting depth": 1,
     "side flange width": 1,
-    "left window clear width": 1,
+    "central web centre from upper-left socket axis": 1,
     "right window clear width": 1,
     "central web width": 1,
+    "central web section width": 1,
+    # B-B sheet 2: one web thickness controls all four rail webs ("4X RAIL WEB").
     "rail web thickness": 1,
     "front rear flange width": 1,
     "top flange thickness": 1,
     "top rim chamfer": 1,
     "T rail root radius": 1,
-    "side rail web thickness": 1,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
     # column plan is drilled from, and MHA-035 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
-    # The hole stations, baseline from the socket bore axes (X from the left
-    # pair, Z from the upper pair): drilled positions under the general band.
-    "hanger x from left sockets": 1,
-    "front hanger z from upper sockets": 1,
-    "rear hanger z from upper sockets": 1,
+    # The keeper stations, baseline from the socket bore axes (X from the left
+    # pair, Z from the upper pair), are drilled positions under the general
+    # band. Hanger locations are intentionally absent: the actual MHA-037 pair
+    # locates those final match-drilled holes.
     "keeper x from left sockets": 1,
     "front keeper z from upper sockets": 1,
     "rear keeper z from upper sockets": 1,
@@ -245,6 +247,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
 
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit.
+# Hanger fit/location instructions live once in the native hole callout and the
+# owning summing-assembly sequence, not in this general note block.
 DRAWING_NOTES = (
     "MATCH EACH SOCKET TO ITS ASSIGNED ACTUAL MHA-083 TUBE.\n"
     "CLOSE HAND-SLIP; NO PERCEPTIBLE ROCK.\n"

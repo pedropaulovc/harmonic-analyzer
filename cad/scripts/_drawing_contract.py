@@ -43,7 +43,19 @@ _TOLERANCE_SETTERS = frozenset(
 # a ``*_spec`` constant (``DRAWING_REFERENCE_PRECISION``) -- never a literal.
 # The remaining fleet migrates under #766; until then the rule is scoped here.
 PRECISION_MIGRATED_DRAWINGS = frozenset(
-    {"draw_harmonic_base.py", "draw_top_frame.py", "draw_tube_frame.py"}
+    {
+        "draw_boss_hook.py",
+        "draw_counter_spring.py",
+        "draw_gooseneck.py",
+        "draw_harmonic_base.py",
+        "draw_knife_hanger_stud.py",
+        "draw_knife_hanger_washer.py",
+        "draw_knife_mount.py",
+        "draw_summing_assembly.py",
+        "draw_summing_lever.py",
+        "draw_top_frame.py",
+        "draw_tube_frame.py",
+    }
 )
 _PRECISION_SETTERS = frozenset({"set_dimension_precision"})
 _DIRECT_PRECISION_METHODS = frozenset({"SetPrecision3"})

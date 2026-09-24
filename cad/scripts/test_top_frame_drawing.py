@@ -127,3 +127,55 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
     )
     assert kept, "the top-frame sheets import no model dimensions"
     assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)
+
+
+def test_every_checked_dimension_label_has_a_spec_precision() -> None:
+    """Each sheet-derived dimension reads its places from top_frame_spec by label.
+
+    summing-topframe-r1 died with KeyError 'rail web thickness': the spec entry
+    was dropped while the B-B loop still dimensioned it. Collect every literal
+    label that reaches _checked_dimension, directly or through a for-loop's
+    tuple rows, and require a DRAWING_REFERENCE_PRECISION entry for each.
+    """
+    import ast
+    from pathlib import Path
+
+    import top_frame_spec
+
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+
+    def checked(node: ast.AST) -> bool:
+        return isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_checked_dimension"
+
+    labels = set()
+    for node in ast.walk(tree):
+        if checked(node):
+            labels |= {
+                kw.value.value
+                for kw in node.keywords
+                if kw.arg == "label" and isinstance(kw.value, ast.Constant)
+            }
+        if not isinstance(node, ast.For) or not isinstance(node.target, ast.Tuple):
+            continue
+        names = {
+            kw.value.id
+            for sub in node.body
+            for call in ast.walk(sub)
+            if checked(call)
+            for kw in call.keywords
+            if kw.arg == "label" and isinstance(kw.value, ast.Name)
+        }
+        slots = [
+            index
+            for index, target in enumerate(node.target.elts)
+            if isinstance(target, ast.Name) and target.id in names
+        ]
+        if not slots or not isinstance(node.iter, (ast.Tuple, ast.List)):
+            continue
+        for row in node.iter.elts:
+            for index in slots:
+                value = row.elts[index]
+                if isinstance(value, ast.Constant):
+                    labels.add(value.value)
+    assert "rail web thickness" in labels
+    assert sorted(labels - set(top_frame_spec.DRAWING_REFERENCE_PRECISION)) == []

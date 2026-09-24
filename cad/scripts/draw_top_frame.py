@@ -55,7 +55,6 @@ from _drawing_common import (
     set_hole_callout_precision,
     view_name,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     ViewEdges,
     rebuild_drawing,
     scan_view_edges,
@@ -114,7 +113,6 @@ from build_top_frame import (
     SIDE_TAP_DRILL_DIA,
     STUD_HOLE_DIA,
     STUD_Z_FRONT,
-    STUD_Z_REAR,
     TAP_DRILL_MM,
     TOP_SCREW_SEAT_Z,
 )
@@ -189,7 +187,7 @@ ORIENTATION_KEY_XY = (0.030, 0.052)
 ORIENTATION_KEY_TEXT = (
     "FACE NAMES ABOVE ARE THE PRINT'S: FRONT IS THE FACE THE FRONT VIEW SHOWS.\n"
     "MACHINE FRONT (OPERATOR SIDE) IS THE OPPOSITE RAIL, AT THE TOP OF THE PLAN;\n"
-    "SHEET 3 'FRONT' / 'REAR' HANGER AND KEEPER NAMES ARE THE MACHINE'S."
+    "SHEET 3 'FRONT' / 'REAR' KEEPER NAMES ARE THE MACHINE'S."
 )
 _LABEL_X = (BAR_X1 + INNER_X) / 2.0  # over the right window, clear of the web
 PICTORIAL_VIEWS = (
@@ -297,7 +295,7 @@ RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
 SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
-SIDE_SECTION_NOTE_XY = (0.290, 0.133)
+SIDE_SECTION_NOTE_XY = (0.290, 0.141)
 SIDE_WEB_TEXT_XY = (0.335, 0.120)
 
 # Only views drawn at a scale the title block does not state carry a label,
@@ -333,32 +331,25 @@ GEOMETRY_CALLOUTS = {
     "RingHeight": "RAIL HEIGHT",
 }
 
-# The boss/socket diameters leave the socket they qualify in opposite
-# directions so neither leader crosses the other's text.  The hole STATIONS
-# are not imported: the model's Hole Wizard placement dims measure from the
-# origin -- mid-air on the print, a centre the shop would first have to
-# derive from the socket pattern -- so sheet 3 dimensions every hole from
-# the socket bore axes instead (``HOLE_STATIONS``, policy rule 7).
+# The boss/socket diameter leaders leave the upper-left boss in opposite
+# directions: the socket text parks to its right, the boss text to its left.
+# Keeper stations are not imported: their Hole Wizard placement sketch
+# measures from the origin -- mid-air on the print -- so sheet 3 derives them
+# from socket bore axes instead (policy rule 7). Hanger positions are
+# deliberately absent from the released print: the final-size holes are
+# match-drilled from the fitted actual MHA-037 pair.
 DETAIL_TOP_KEEP = {
-    "C0Dia": (0.035, 0.232),
-    "B0Dia": (0.050, 0.252),
+    "C0Dia": (0.035, 0.220),
+    "B0Dia": (0.155, 0.235),
 }
-# Baseline stations from the socket bores the shop picks up: X from the left
-# socket pair's axis plane, Z from the upper pair's, each dimension picked on
-# a socket rim and a hole rim (centre to centre).  The Z stations stand in
-# the margins beside the socket they measure from, the hanger X above the
-# plan, the keeper X under the socket pitch it parallels -- its text pulled
-# left along the line, clear of the title block the 396.9 span reaches over.
-# The origin note sits in the sheet's empty lower-left, off the left
-# socket's extension lines; the boss callout reads from the left of its boss
-# so its leader never crosses the hanger X row.
+# The keeper baselines use the socket bores the shop picks up: X from the left
+# socket pair's axis plane and Z from the upper pair's. The origin note sits in
+# the sheet's empty lower-left, clear of the native matched-hole callout.
 HOLE_STATION_NOTE_XY = (0.030, 0.0585)
-# One coordinate system, not two origins: the upper-left socket bore is
-# the origin and the line joining the upper socket centres is the X
-# direction, so a keeper Z picked up from the upper-RIGHT socket lies on the
-# same baseline by construction (advisor review, 2026-09-16).
+# One coordinate system, not two origins: a keeper Z picked up from the
+# upper-right socket lies on the upper-left baseline by construction.
 HOLE_STATION_NOTE = (
-    "HOLE X, Z ORIGIN: UPPER-LEFT SOCKET\n"
+    "KEEPER X, Z ORIGIN: UPPER-LEFT SOCKET\n"
     "X ALONG THE LINE JOINING THE UPPER SOCKET CENTRES"
 )
 # Both are native.  The gooseneck bore diameter is GooseneckProfile's own
@@ -1129,12 +1120,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The face names are the PRINT's (FRONT is the face the front view
     # shows, +Z; RIGHT is +X), the ASME orientation-key reading and the one
-    # every *Front/*Right projection in the fleet follows.  The MACHINE's
+    # every *Front/*Right projection in the fleet follows. The MACHINE's
     # front is the operator side, model -Z -- the opposite rail, at the top
-    # of the plan -- and the model-owned hanger/keeper dimension names on
-    # sheet 3 (StudFrontZ -> "FRONT HANGER Z") keep that word.  A blind
-    # review read the two as conflicting hole locations (codex round 3), so
-    # the key says which is which once, here, where the reader starts.
+    # of the plan -- and the keeper station labels on sheet 3 use that
+    # machine convention. The key distinguishes the two once, where the
+    # reader starts.
     if add_note(adapter, ORIENTATION_KEY_TEXT, *ORIENTATION_KEY_XY) is None:
         raise RuntimeError("failed to add the pictorial sheet orientation key")
 
@@ -1207,18 +1197,52 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=RAIL_W_SIDE, orientation="horizontal", exact_linear=True,
         suffix="SIDE FLANGE\nWIDTH", edges=geometry_top_edges,
     )
-    for left_x, right_x, text_x, label in (
-        (-INNER_X, BAR_X0, 0.105, "left window clear width"),
-        (BAR_X1, INNER_X, 0.190, "right window clear width"),
-    ):
-        _checked_dimension(
-            adapter, geometry_top,
-            p0=(left_x, HALF_H - EDGE_CHAMFER, 0.0),
-            p1=(right_x, HALF_H - EDGE_CHAMFER, 0.0),
-            text_xy=(text_x, 0.118), label=label,
-            expected_mm=right_x-left_x, orientation="horizontal", exact_linear=True,
-            edges=geometry_top_edges,
-        )
+    central_web_x = (BAR_X0 + BAR_X1) / 2.0
+    central_web_axis = _add_view_centerlines(
+        adapter,
+        geometry_top,
+        (
+            (
+                (central_web_x, HALF_H, FRONT_COLUMN_Z),
+                (central_web_x, HALF_H, REAR_COLUMN_Z),
+            ),
+        ),
+    )[0]
+    # The socket bore opens at the cap-recess floor, not the boss top: the
+    # boss top carries the wider recess mouth (summing-integration-b1).
+    upper_left_socket_axis = geometry_top_edges.circle_at(
+        (-COLUMN_X, CAP_RECESS_FLOOR_Y, FRONT_COLUMN_Z),
+        BORE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="geometry plan upper-left socket axis",
+    ).edge
+    _checked_dimension(
+        adapter,
+        geometry_top,
+        p0=(-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
+        p1=(central_web_x, HALF_H, FRONT_COLUMN_Z),
+        text_xy=(0.105, 0.118),
+        label="central web centre from upper-left socket axis",
+        expected_mm=central_web_x + COLUMN_X,
+        orientation="horizontal",
+        center=True,
+        entity_types=("EDGE", "SKETCHSEGMENT"),
+        entities=(upper_left_socket_axis, central_web_axis),
+        suffix="WEB C/L\nFROM SOCKET AXIS",
+    )
+    _checked_dimension(
+        adapter,
+        geometry_top,
+        p0=(BAR_X1, HALF_H - EDGE_CHAMFER, 0.0),
+        p1=(INNER_X, HALF_H - EDGE_CHAMFER, 0.0),
+        text_xy=(0.165, 0.118),
+        label="right window clear width",
+        expected_mm=INNER_X - BAR_X1,
+        orientation="horizontal",
+        exact_linear=True,
+        reference=True,
+        edges=geometry_top_edges,
+    )
     _checked_dimension(
         adapter, geometry_top,
         p0=(BAR_X0, HALF_H-EDGE_CHAMFER, 0.0),
@@ -1258,7 +1282,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # now free for it -- that height is imported into the front view.
     for p0, p1, expected, xy, orientation, label, qualifier, offset in (
         ((rail_cut_x, 0.0, WEB_IN_Z), (rail_cut_x, 0.0, WEB_OUT_Z),
-         WEB_T, (0.380, 0.192), "horizontal", "rail web thickness", "WEB WIDTH", None),
+         WEB_T, (0.380, 0.192), "horizontal", "rail web thickness", "4X RAIL WEB", None),
         ((rail_cut_x, (FLANGE_BOT_Y+HALF_H-EDGE_CHAMFER)/2, INNER_Z),
          (rail_cut_x, (FLANGE_BOT_Y+HALF_H-EDGE_CHAMFER)/2, OUTER_Z),
          RAIL_W_FR, (0.328, 0.230), "horizontal", "front rear flange width",
@@ -1312,13 +1336,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_section_display(
         adapter, rail_section, label="B-B T rail section", cut_surface_only=True, removed=True
     )
-    # B-B cuts the front/rear rails only, so the 34.2 side rails and the
-    # 22.0 central web had no web thickness, root radius or rim chamfer
-    # anywhere on the print, yet the keeper taps and the hanger holes are cut
-    # into exactly that stock.  E-E is a second removed section: its cutting
-    # line runs from outside the left side rail to just past the central web,
-    # so the print shows the one side rail it dimensions and the full-height
-    # web beside it -- not the right rail's identical, unannotated twin.
+    # B-B's 12.7 control applies to all four rail webs. E-E is a second
+    # removed section: its cutting line runs from outside the left side rail
+    # to just past the central web, so the shop sees the actual 22.0 central
+    # rectangle and its reference width beside the side-rail T profile.
     side_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, SIDE_SECTION_Z/1000.0),
@@ -1334,14 +1355,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _orient_cut_section(adapter, side_section, (1.0, 0.0, 0.0))
     set_hidden_lines_removed(adapter, side_section)
+    side_section_edges = scan_view_edges(
+        side_section,
+        label="E-E side rail and central web section",
+    )
     _checked_dimension(
         adapter, side_section,
-        p0=(-WEB_OUT_X, 0.0, SIDE_SECTION_Z),
-        p1=(-WEB_IN_X, 0.0, SIDE_SECTION_Z),
-        text_xy=SIDE_WEB_TEXT_XY, label="side rail web thickness",
-        expected_mm=WEB_T, orientation="horizontal", exact_linear=True,
-        suffix="2X SIDE RAIL WEB",
-        edges=scan_view_edges(side_section, label="E-E side rail section"),
+        p0=(BAR_X0, 0.0, SIDE_SECTION_Z),
+        p1=(BAR_X1, 0.0, SIDE_SECTION_Z),
+        text_xy=SIDE_WEB_TEXT_XY, label="central web section width",
+        expected_mm=BAR_X1-BAR_X0, orientation="horizontal", exact_linear=True,
+        suffix="CENTRAL WEB", reference=True, edges=side_section_edges,
     )
     _position_view_caption(adapter, side_section, SIDE_SECTION_CAPTION_XY)
     if add_note(
@@ -1448,11 +1472,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=stud_edge,
-        # Right of the 182.0 hanger-X row's end, so the leader reaches the
-        # hole past that row instead of across it (codex round 5).
-        callout_xy=(0.262, 0.258),
-        label="2X hanger-stud clearance holes",
-        process="HANGER DRILL",
+        # The diameter remains a native final-size control; only its position is
+        # established from the fitted actual mount pair.
+        callout_xy=(0.245, 0.250),
+        label="2X matched hanger-stud clearance holes",
+        process=(
+            "MATCH-DRILL: TRANSFER FROM ACTUAL MHA-037\n"
+            "SET; REMOVE SET; DRILL"
+        ),
     )
     keeper_edge = model_point_in_view(
         adapter,
@@ -1469,7 +1496,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_top,
         edge_xy=keeper_edge,
-        callout_xy=(0.3660, 0.247),
+        callout_xy=(0.392, 0.238),
         label="2X fulcrum-keeper blind taps",
         process="KEEPER TAP",
     )
@@ -1481,18 +1508,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     upper_left_rim = (-COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
     upper_right_rim = (COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2)
-    hanger_x = (BAR_X0 + BAR_X1) / 2.0
     keeper_drill_r = TAP_DRILL_MM[KEEPER_TAP_SPEC.size] / 2.0
     for p0, p1, expected, xy, orientation, label, suffix in (
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
-         COLUMN_X + hanger_x, (0.162, 0.240), "horizontal",
-         "hanger x from left sockets", "2X HANGER X"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_FRONT + STUD_HOLE_DIA/2),
-         STUD_Z_FRONT - FRONT_COLUMN_Z, (0.062, 0.209), "vertical",
-         "front hanger z from upper sockets", "FRONT HANGER Z"),
-        (upper_left_rim, (hanger_x, HALF_H, STUD_Z_REAR + STUD_HOLE_DIA/2),
-         STUD_Z_REAR - FRONT_COLUMN_Z, (0.040, 0.165), "vertical",
-         "rear hanger z from upper sockets", "REAR HANGER Z"),
         (upper_left_rim, (KEEPER_TAP_X, HALF_H, KEEPER_TAP_Z_FRONT + keeper_drill_r),
          KEEPER_TAP_X + COLUMN_X, (0.150, 0.0745), "horizontal",
          "keeper x from left sockets", "KEEPER X"),
@@ -1739,11 +1756,10 @@ async def build(adapter: Any) -> dict[str, str]:
         # and crowded A-A's cap-recess callout (codex round 5).
         callout_xy=(0.148, 0.202),
         label="front/rear column-retention bottoming taps",
-        # The native "2X" is the count in THIS view (one tap per end on the
-        # face shown); the process lines carry the four-place scope for the
-        # spotface, drill depth and thread depth alike, since the machinist
-        # sets up from the total (codex round 3).
-        process="4X TOTAL: 2X PER END, BOTH WALLS\nALL DEPTHS FROM SPOTFACE\nBOTTOMING TAP, 4X TOTAL",
+        # The native "2X" is the count visible at this end. The prefix leads
+        # with the four-boss manufacturing total without replacing any native
+        # hole-size, depth, or thread variable.
+        process="4X TOTAL (ONE PER BOSS); BOTH WALLS\nALL DEPTHS FROM SPOTFACE\nBOTTOMING TAP",
     )
     set_hole_callout_precision(
         cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
@@ -1937,7 +1953,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(tap_x, 0.0, GOOSENECK_Z+tap_radius),
         text_xy=(0.230, 0.1125), label="set screw axis from rail top",
         expected_mm=HALF_H, orientation="vertical", center=True,
-        suffix="FROM RAIL TOP\nON BORE CENTRE",
+        suffix="SET TAP AXIS BELOW RAIL TOP\nON BORE AXIS",
         entities=(rail_top_edge, set_tap_edge), offset_text=(0.252, 0.1125),
     )
     # Both picks are entities, not sheet hit-tests: under hidden-lines-removed
@@ -2003,9 +2019,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_hidden_lines_removed(adapter, hub_bottom_parent)
     geometry_bottom = _hub_underside_detail(adapter, hub_bottom_parent)
-    # SolidWorks refuses hidden-lines-removed on this native detail view, so
-    # the enlarged underside keeps its parent's hidden lines.
-    set_hidden_lines_visible(adapter, geometry_bottom)
+    # Detail C already cuts the underside fit geometry clearly; hidden set-tap
+    # and pocket ghosts duplicate sheet 5 and obscure the boss/gusset controls.
+    set_hidden_lines_removed(adapter, geometry_bottom)
     hub_bottom_edges = scan_view_edges(hub_bottom_parent, label="underside locator")
     geometry_bottom_edges = scan_view_edges(geometry_bottom, label="enlarged underside")
     bottom_dimensions = curate_view_dimensions(

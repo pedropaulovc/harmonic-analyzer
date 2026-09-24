@@ -100,7 +100,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "knife-hanger-stud": _stock(
         "knife-hanger-stud",
-        "Medium-Strength Grade 5 Steel Hex Head Screw",
+        "Medium-Strength Grade 5 Steel Hex Head Screw (Turned and Threaded)",
         "91247A720",
     ),
     "knife-hanger-washer": _stock(
