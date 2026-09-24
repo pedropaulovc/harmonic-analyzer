@@ -104,7 +104,8 @@ DETAIL_KEEP = {
     # r7 eye-pass: above the detail the callout ran over the DETAIL A label
     # and past the right border; the open field left of the detail fits it.
     "PinHoleDia": (DETAIL_CENTER[0] - 0.090, DETAIL_CENTER[1] + 0.028),
-    "PinHoleZ": (DETAIL_CENTER[0] + 0.004, DETAIL_CENTER[1] - 0.034),
+    # Below the fence circle (bottom y 0.0975): at -0.034 the text sat on it.
+    "PinHoleZ": (DETAIL_CENTER[0] + 0.004, DETAIL_CENTER[1] - 0.045),
 }
 DIMENSION_CALLOUTS = {
     "PinHoleDia": PIN_HOLE_CALLOUT,

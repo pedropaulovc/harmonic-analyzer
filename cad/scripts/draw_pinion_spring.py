@@ -109,15 +109,18 @@ FRONT_KEEP = {
     "BendR": (0.172, 0.080),
     "KinkV": (0.176, 0.120),
     "KinkH": (_front_x(_FOOT_MID_X), 0.160),
-    "TipH": (_front_x(_FOOT_MID_X), 0.170),
+    "TipH": (_front_x(_FOOT_MID_X), 0.174),
 }
 TOP_KEEP = {
     "PadLen": (_front_x(FOOT_END[0] + 4.75), 0.226),
-    "PadWidth": (0.046, TOP_CENTER[1]),
+    # Outboard of the hole-edge 4.75 (text at x 0.056) so the two stack apart.
+    "PadWidth": (0.028, TOP_CENTER[1]),
     "StripWidth": (0.172, TOP_CENTER[1]),
 }
 DETAIL_KEEP = {
-    "KinkR": (0.278, 0.212),
+    # Upper-left of the fence: right of it the leader crossed the 2.0 flat
+    # dimension's extension lines and its arrowhead met the text.
+    "KinkR": (0.195, 0.232),
     "FlatLen": (0.278, 0.182),
 }
 DIMENSION_CALLOUTS = {
@@ -128,7 +131,9 @@ DIMENSION_CALLOUTS = {
 }
 HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] + 2.25), 0.236)
 HOLE_EDGE_TEXT_XY = (0.056, TOP_CENTER[1] + 0.004)
-HOLE_CALLOUT_XY = (0.045, 0.250)
+# Below the pad (bottom edge y 0.196): above it the leader crossed the 4.50
+# and 9.50 pad dimensions on its way down to the hole.
+HOLE_CALLOUT_XY = (0.045, 0.188)
 
 
 def _kink_detail(adapter: Any, front: Any) -> Any:

@@ -73,7 +73,9 @@ FRONT_BBOX_CY = (ROD_LEN - HUB_OD / 2.0) / 2.0
 FRONT_CENTER = (0.070, 0.160)
 SIDE_CENTER = (0.135, FRONT_CENTER[1])
 TOP_CENTER = (FRONT_CENTER[0], 0.240)
-ISO_CENTER = (0.355, 0.175)
+# Between the side view (x <= 0.152) and the detail fence (x >= 0.218), so the
+# field right of the detail is free for the pin-hole callout.
+ISO_CENTER = (0.184, 0.142)
 DETAIL_CENTER = (0.245, 0.170)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
@@ -101,14 +103,16 @@ TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
 # crown the right; the detail keeps that orientation at 3:1.
 # r7 eye-pass: the GRIP AXIS and TO CROWN ROOT texts ran into each other, and
 # the pin-hole callout sat across the hub outline.  The two top stations now
-# spread apart, and the callout goes above them with its leader dropping
-# between.
+# spread apart.  Converged-r7 review: a leader dropping between them read as
+# the GRIP AXIS extension line, so the callout sits right of the detail with
+# its underline at hole height and a short, near-horizontal leader (the
+# isometric moved out of that field).
 DETAIL_KEEP = {
     "GripFromB": (DETAIL_CENTER[0] - 0.020, DETAIL_CENTER[1] + 0.032),
     "EndWall": (DETAIL_CENTER[0] + 0.045, DETAIL_CENTER[1] + 0.032),
     "PinHoleFromB": (DETAIL_CENTER[0] - 3.0 * _DS, DETAIL_CENTER[1] - 0.031),
     "BoreDepth": (DETAIL_CENTER[0] - 1.0 * _DS, DETAIL_CENTER[1] - 0.041),
-    "PinHoleDia": (DETAIL_CENTER[0] + 0.055, DETAIL_CENTER[1] + 0.075),
+    "PinHoleDia": (DETAIL_CENTER[0] + 0.085, DETAIL_CENTER[1] + 0.008),
 }
 DIMENSION_CALLOUTS = {
     "HubBore": f"BORE OR REAM\nSLIP ON {LIFT_ROD_NUMBER}",
