@@ -51,6 +51,12 @@ def _world_point(
     )
 
 
+def _world_vector(
+    rows: list[list[float]], local: tuple[float, float, float]
+) -> tuple[float, float, float]:
+    return _world_point((0.0, 0.0, 0.0), rows, local)
+
+
 def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> None:
     # Released construction: MHA-058's component origin was the head/crossrod
     # axis, with the old Ø15x9 head followed by a 2 mm wall.  New construction:
@@ -62,7 +68,7 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     )
     new_head_axis = _world_point(
         (assembly.APINION_X, assembly.APINION_Y, assembly.ARBOR_Z0),
-        assembly.IDENTITY,
+        assembly.ARBOR_ROWS,
         (0.0, 0.0, arbor.HEAD_CENTER_Z),
     )
     new_crossrod_axis = _world_point(
@@ -70,9 +76,17 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         assembly.HANDLE_ROWS,
         (0.0, 0.0, 0.0),
     )
-    # The 32T alignment drum (MHA-002) shrinks TIP_APINION by 2.549 mm, so the
-    # arbor axis sits 2.549 mm closer to the drum than the 42T cutover pinned.
-    expected_axis = (-18.626440352466744, 90.518, -138.41241221957347)
+    rod_axis = _world_vector(assembly.HANDLE_ROWS, (0.0, 1.0, 0.0))
+    bore_axis = _world_vector(assembly.ARBOR_ROWS, (0.0, 1.0, 0.0))
+    shaft_axis = _world_vector(assembly.ARBOR_ROWS, (0.0, 0.0, 1.0))
+    expected_grip_axis = (
+        -0.9063077870366499,
+        0.42261826174069944,
+        0.0,
+    )
+    # x follows the drum's parked station: U28 (2026-09-23) parks it with a
+    # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
+    expected_axis = (-18.383940352466745, 90.518, -138.41241221957347)
     released_head_stations = (
         released_origin[2] - 9.0 / 2.0,
         released_origin[2] + 9.0 / 2.0,
@@ -100,15 +114,18 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     assert released_origin == pytest.approx(expected_axis, abs=1e-12)
     assert new_head_axis == pytest.approx(released_origin, abs=1e-12)
     assert new_crossrod_axis == pytest.approx(released_origin, abs=1e-12)
+    assert rod_axis == pytest.approx(expected_grip_axis, abs=1e-12)
+    assert bore_axis == pytest.approx(rod_axis, abs=1e-12)
+    assert shaft_axis == pytest.approx((0.0, 0.0, 1.0), abs=1e-12)
 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (10.375408832706054, 76.99421562429762, -138.41241221957347),
+            (10.617908832706053, 76.99421562429762, -138.41241221957347),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-48.53459732467619, 104.46440263744309, -138.41241221957347),
+            (-48.29209732467619, 104.46440263744309, -138.41241221957347),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)

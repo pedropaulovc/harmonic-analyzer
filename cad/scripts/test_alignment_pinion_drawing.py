@@ -156,9 +156,12 @@ def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
         math.pi / gear.TEETH - (math.pi / (2.0 * gear.TEETH) + inv)
     )
     gear_tip_r = gear.OUTSIDE_DIA / 2.0
-    # The base-chord gap floor stops the 120T tips 0.24 short of standard depth.
+    # The base-chord gap floor stops the 120T tips 0.24 short of standard depth;
+    # U28 (user, 2026-09-23) parks the drum 0.2425 further out so the swing
+    # lands exactly there -- the configured engaged centre distance IS the
+    # seated one.
     seated_c2c = gear_tip_r + spec.MIN_CHORD_FLOOR_DIA / 2.0
-    assert seated_c2c - engaged_c2c == pytest.approx(0.2425, abs=1e-3)
+    assert seated_c2c - engaged_c2c == pytest.approx(0.0, abs=1e-5)
 
     def contact_ratio(c2c: float, tip_r: float) -> float:
         working = math.acos((spec._BASE_RADIUS + gear_base_r) / c2c)

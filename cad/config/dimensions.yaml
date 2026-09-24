@@ -1825,15 +1825,15 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.8 × 4.0 brass strip; 28.0 foot, R2 bend, straight blade ~8.1° off vertical alongside the near-vertical parked strap, R1.5 × 20° return kink, 2.0 terminal flat (re-solved 2026-09 with the strap re-derive; `pinion_spring_geometry.py`)
+        - 0.8 × 4.0 brass strip; 34.0 foot (U28 2026-09-23: +6 with the lift rod's move out to 18.5), R2 bend, straight blade ~8.1° off vertical alongside the near-vertical parked strap, R1.5 × 20° return kink, 2.0 terminal flat (re-solved 2026-09 with the strap re-derive; `pinion_spring_geometry.py`)
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). Sized against the 5.0 strap; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). The 4.0-wide blade sits on the strap''s inboard half (0.5 in from the inner face, `SPRING_BLADE_INSET`) so the 2026-10 8.0 strap re-derive left its base foot-screw hole put; blade offset 10.1 east of the strap axis (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
-        - 28.0 centre-to-centre × 15 wide × 5 thick, R7.5 ends, parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore; two R6.9 cam-relief scallops
+        - 28.0 centre-to-centre × 15 wide × 9 thick (U28 2026-09-23, inside the ch25 page001_img01 photo band 7.6–9.4; the 1.59 worst-case web beside the Ø4 blind follower-stud seat is a NAMED book-fidelity exception to the 2.0 target, 1.5 floor held), R7.5 ends, plain (no cam relief — U12), parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore
         - —
-        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — 36 × 18.75 × 12 blocks, lift bore 1.86 above the pivot bore)'
+        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — U28 2026-09-23: 40 × 20.5 × 10.25 blocks laid out lift bore | screw | PIVOT bore | screw from the west end (page002_img07/08), lift bore 18.5 west of and 2.16 above the pivot bore, hold-down screws ±8.5 about the pivot)'
         - scaled
         - med
       - - Pinion grip head and crossrod (2026-09 re-derive)
@@ -1843,13 +1843,13 @@ sections:
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −81.871° eccentric-cam contact rotation carries it through vertical to −71.871° toward machine +X at engagement
+        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −81.793° eccentric-cam contact rotation carries it through vertical to −71.793° toward machine +X at engagement (U28 2026-09-23: Ø14.6 × 9 collar, ecc 2.0, 2.115 thin-side wall, sub-flush M2.5 set screw; drum parked 2.2425 out so the 120T tips seat at C2C 38.990)
         - —
-        - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −81.871° cam rotation and a −71.871° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
+        - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −81.793° cam rotation and a −71.793° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
         - scaled + derived
         - med
       - - Cam-follower pin (per strap)
-        - Ø4 × 17 steel stud, seated 4.0 in a blind edge bore 6.0 ABOVE the pivot axis (2026-09 re-solve); 13 proud reaches the lift cam
+        - Ø4 × 20 steel stud, seated 4.0 in a blind edge bore 7.0 ABOVE the pivot axis (U28 2026-09-23 re-solve); 16 proud reaches the lift cam 18.5 out
         - —
         - 'PR8 re-derivation of the p.69 block close-up (page002_img01): the bright follower reads as a fatter (~Ø4-5) stud at the pivot-height band, resting on the eccentric collar. A 4.0 blind edge seat is the geometry that clears the Ø6.35 pivot bore; contact reach + clearances are asserted analytically (build_drive_train CAM_*)'
         - scaled

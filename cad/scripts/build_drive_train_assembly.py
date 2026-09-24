@@ -760,10 +760,6 @@ from pinion_arbor_spec import (  # noqa: E402
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
-    CAM_RELIEF_ENGAGED_CENTER as STRAP_CAM_RELIEF_ENGAGED,
-    CAM_RELIEF_ENVELOPE_RADIUS as STRAP_CAM_RELIEF_ENVELOPE_R,
-    CAM_RELIEF_PARK_CENTER as STRAP_CAM_RELIEF_PARK,
-    CAM_RELIEF_RADIUS as STRAP_CAM_RELIEF_R,
     C2C as STRAP_C2C,
     PIN_BORE as STRAP_PIN_BORE,
     PIN_DROP as FPIN_DROP,
@@ -772,21 +768,19 @@ from pinion_bracket_geometry import (  # noqa: E402
     R_END as STRAP_R_END,
     THICKNESS as STRAP_T,
 )
-from build_pinion_pivot_block import (  # noqa: E402
+from pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
+    BLOCK_EAST,
     BLOCK_HEIGHT,
     BLOCK_WIDTH,
-    BORE_HALF_SPACING as BLOCK_BORE_HALF_SPACING,
     BORE_UP as BLOCK_BORE_UP,
     LIFT_BORE_RISE,
+    LIFT_BORE_SPACING,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
 )
-from pinion_pivot_block_spec import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
+from pinion_pivot_block_geometry import SCREW_HOLE_SPEC as BLOCK_SCREW_HOLE_SPEC  # noqa: E402
 from pinion_cam_geometry import (  # noqa: E402
     BORE as CAM_BORE_DIA,
-    BOSS_DIA as CAM_BOSS_DIA,
-    BOSS_PROUD as CAM_BOSS_PROUD,
-    BOSS_Z as CAM_BOSS_Z,
     CAM_LEN,
     CAM_OD,
     ECC as CAM_ECC,
@@ -1266,14 +1260,25 @@ for _ARB_Z, _min_gap in _ARB_Z_BANDS:
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
-# drum retains the train's DP 49.82 and the documented 2 mm parked tip gap, so
-# the drum, pivot blocks and lift axis move together when tooth count changes;
-# no superseded world coordinate is frozen into this placement.
+# drum retains the train's DP 49.82, so the drum, pivot blocks and lift axis move
+# together when tooth count or parked gap changes; no superseded world
+# coordinate is frozen into this placement.  The drum's as-cut gap floor is a
+# chord at its base circle, so the engage stroke ENDS where the 120T tips seat on
+# that floor -- 0.2425 outside the pitch-circle sum (reviewfirst Rule 11).  U28
+# (user, 2026-09-23) keeps those roots and parks the drum 0.2425 further out
+# (config disengaged_tip_gap_mm 2.2425), so the seated stop comes at the same
+# strap swing and lever angle as the pitch-circle design.
 APINION_TEETH = int(_config.machine("alignment_pinion", "teeth"))
 TIP_APINION = ((APINION_TEETH + 2.0) / DP_TRAIN) * 25.4 / 2.0
 TIP_DRUM120 = (122.0 / DP_TRAIN) * 25.4 / 2.0
 APINION_GAP = float(_config.machine("alignment_pinion", "disengaged_tip_gap_mm"))
-ENGAGED_C2C = (120.0 + APINION_TEETH) / 2.0 * 25.4 / DP_TRAIN
+_APINION_PA = math.radians(14.5)  # alignment_pinion_spec PRESSURE_ANGLE_DEG
+_APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
+_APINION_HALF_GAP = math.pi / APINION_TEETH - (
+    math.pi / (2.0 * APINION_TEETH) + math.tan(_APINION_PA) - _APINION_PA
+)
+APINION_FLOOR_R = _APINION_BASE_R * math.cos(_APINION_HALF_GAP)  # 7.890 chord
+ENGAGED_C2C = TIP_DRUM120 + APINION_FLOOR_R  # 38.990: 120T tips seat on the floor
 _CONFIG_ENGAGED_C2C = float(
     _config.machine("alignment_pinion", "engaged_center_distance_mm")
 )
@@ -1283,7 +1288,7 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
         f"{_CONFIG_ENGAGED_C2C:.6f} vs {ENGAGED_C2C:.6f} mm"
     )
 APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
-# Tip circles retain their configured parked gap at Delta-y = 0 (axis level).
+# Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
 APINION_DRUM_LEN = 143.2  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = -75.0 + MECHANISM_Z_SHIFT
@@ -1299,7 +1304,7 @@ PIVOT_X = APINION_X + math.sqrt(
 STRAP_LEAN_DEG = math.degrees(
     math.atan2(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y)
 )  # the v2 drive line makes the parked strap lean west of vertical
-LIFT_X = PIVOT_X + 2.0 * BLOCK_BORE_HALF_SPACING  # lift rod in the blocks' WEST bores
+LIFT_X = PIVOT_X + LIFT_BORE_SPACING  # lift rod in the blocks' WEST bores
 # east since the DP40 cram (issue #7 dodged the cone-pivot-post column);
 # the p.68-69 photos put the lever WEST of the grip head and the cam pins lift
 # the strap tails' follower pins from the WEST -- an east lift would
@@ -1315,9 +1320,10 @@ PIVOT_SHAFT_Z0 = -104.0 + MECHANISM_Z_SHIFT
 # Ø6.35 x 192 remains flush with the translated block outer faces.
 LIFT_ROD_Z0 = -114.0 + MECHANISM_Z_SHIFT
 # front end proud 10 south of the translated front block -- lever hub seat
-BLOCK_X = (PIVOT_X + LIFT_X) / 2.0  # block local origin midway the bores
+BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = -104.0 + MECHANISM_Z_SHIFT
-BLOCK_BACK_Z0 = 76.0 + MECHANISM_Z_SHIFT
+BLOCK_BACK_Z0 = 88.0 - BLOCK_DEPTH + MECHANISM_Z_SHIFT  # outer face fixed at 88;
+# U28 thinned the blocks (12 -> 10.25) so the 9-thick back strap keeps 0.30 air
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image
@@ -1343,6 +1349,10 @@ HANDLE_ROWS = [
     [-_HANDLE_S, _HANDLE_C, 0.0],
     [0.0, 0.0, 1.0],
 ]
+# MHA-102's grip bore and MHA-058's rod both run along local +Y.  They share
+# one Rz pose; the circular arbor shaft stays on the same machine-Z journal
+# axis while its cross-hole clocks onto the rod.
+ARBOR_ROWS = HANDLE_ROWS
 
 if abs(math.hypot(PIVOT_X - APINION_X, APINION_Y - PIVOT_Y) - STRAP_C2C) > 0.001:
     raise AssertionError("strap c2c does not span pivot -> pinion axis")
@@ -1421,7 +1431,18 @@ if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.2
 # check below is the one exception -- it relies on the gated east side.
 SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
-SPRING_Z = APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0  # 106.365: back strap
+# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
+# the 2026-10 thickness re-derive (5.0 -> 8.0) grows the strap OUTBOARD from
+# there.  The 4.0-wide leaf therefore stays referenced to that inner face --
+# SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
+# keeps its authored z (and with it the base's foot-screw hole), and riding the
+# strap's inboard half buys the foot 1.5 more clearance to the back pivot block.
+STRAP_Z_INNER = (
+    APINION_Z_FRONT - STRAP_AIR,  # -40.085
+    APINION_Z_BACK + STRAP_AIR,  # +103.865
+)
+SPRING_BLADE_INSET = 0.5  # blade inner edge, in from the strap's inner face
+SPRING_Z = STRAP_Z_INNER[1] + SPRING_BLADE_INSET + SPRING_W / 2.0  # 106.365
 _SPR_TH = math.radians(-STRAP_LEAN_DEG)  # blade leans east of vertical
 _SPR_U = (math.sin(_SPR_TH), math.cos(_SPR_TH))  # up the blade
 _SPR_N = (-math.cos(_SPR_TH), math.sin(_SPR_TH))  # east normal of the axis
@@ -1439,7 +1460,7 @@ if abs(SPR_BLADE_TILT_DEG - STRAP_LEAN_DEG) > 0.01:
     raise AssertionError("spring blade is not parallel to the parked strap")
 if SPRING_AXIS_OFF - STRAP_R_END - SPRING_T < 0.25 - 1e-9:
     raise AssertionError("spring blade touches the parked strap flank")
-if SPRING_W / 2.0 > STRAP_T / 2.0:
+if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
 if abs((LIFT_X - PIVOT_X) * _SPR_N[0] - SPRING_AXIS_OFF) - SPRING_T - 3.175 < 0.25:
     raise AssertionError("spring blade fouls the lift rod")  # perpendicular
@@ -1497,14 +1518,18 @@ if SPRING_HOLE_X + FSCREW_HEAD_DIA / 2.0 + 0.25 > SPRING_X - SPR_FOOT_END_L[0]:
 # authored pose) the collar top hovers a designed ~0.15 under the pin (exact
 # tangency tips the interference gate on FP noise -- the PR5 gap lesson); the
 # return spring holds the strap west on it.
-if not STRAP_PIN_BORE <= FPIN_DIA <= STRAP_PIN_BORE + 0.020:
-    raise AssertionError("follower pin nominal is outside the strap press-fit band")
+# U27: the drill-rod stud slips into the H7 seat line-to-line and is bonded
+# (LOCTITE 638), so the nominal solids touch without overlapping.
+if abs(FPIN_DIA - STRAP_PIN_BORE) > 1e-9:
+    raise AssertionError("follower pin nominal is not line-to-line with its seat")
 if abs(FPIN_SEAT - FPIN_SEAT_LEN) > 1e-9:
     raise AssertionError("pin SEAT_LEN disagrees with the bracket PIN_SEAT")
-if not 6.36 <= CAM_BORE_DIA <= 6.375:
-    raise AssertionError("cam bore nominal is outside its O6.360-O6.375 fit limits")
-if CAM_THIN_SIDE_WALL < 0.5:
-    raise AssertionError("cam thin-side wall is below 0.5 mm")
+# U27 slip fit: the set-screwed cam needs only 0.02-0.10 diametral clearance on
+# the Ø6.35 lift rod (pinion_cam_spec proves it at the printed limits).
+if not 0.02 <= CAM_BORE_DIA - 6.35 <= 0.10:
+    raise AssertionError("cam bore nominal is outside its 0.02-0.10 slip clearance")
+if CAM_THIN_SIDE_WALL < 1.5:
+    raise AssertionError("cam thin-side wall is below the 1.5 mm U27 floor")
 # Blind-seat integrity: nearest approach of the seat cylinder to the pivot
 # bore (perpendicular skew axes; the worst point is the seat bottom).
 _FPIN_S0 = STRAP_R_END - FPIN_SEAT  # 5.0: seat bottom, from the centreline
@@ -1523,35 +1548,21 @@ if _S_CAM - _FPIN_S0 < 2.0:
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
 # Cam z stations: the follower pin rides near each collar's BACK face --
-# station CAM_PIN_STATION of the 9-long collar, NOT the middle -- so the
-# set-pin boss (front region, BOSS_Z +- BOSS_R) clears BOTH the pin's z band
-# and (back cam) the spring foot crossing beneath, at EVERY azimuth of the
-# free cam spin (codex review 2026-07-05: a mid-mounted collar put the boss
-# 0.8 into the pin's band on the engaged side, invisible to the parked gate).
-_STRAP_MID_Z = (
-    APINION_Z_FRONT - STRAP_AIR - STRAP_T / 2.0,  # -42.335
-    APINION_Z_BACK + STRAP_AIR + STRAP_T / 2.0,  # +106.365
-)
-CAM_PIN_STATION = 7.0  # pin plane, from the collar front face
+# station CAM_PIN_STATION of the 9-long collar.  U28 (2026-09-23) deleted the
+# set-pin boss for a sub-flush M2.5 set screw at SET_SCREW_Z = 4.5, so the
+# collar is a bare cylinder at every azimuth of the free cam spin; the station
+# is kept where the boss-era band analysis left it.
+_STRAP_MID_Z = tuple(
+    z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
+)  # -44.085, +107.865
+# 7.5: CAM_LEN - 1 = 8.0 still leaves the pin on the collar.
+CAM_PIN_STATION = 7.5  # pin plane, from the collar front face
 CAM_Z0 = tuple(z - CAM_PIN_STATION for z in _STRAP_MID_Z)
 for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + 202.0 - 1.0:
         raise AssertionError("cam collar overhangs the lift rod")
-if not CAM_BOSS_Z + CAM_BOSS_DIA / 2.0 + 0.25 <= CAM_PIN_STATION - FPIN_DIA / 2.0:
-    raise AssertionError("set-pin boss z band reaches the follower pin's band")
 if CAM_PIN_STATION > CAM_LEN - 1.0:
     raise AssertionError("follower pin rides off the collar's back face")
-# Back cam only: the boss z band must also clear the spring foot's band
-# (the strip crosses under the collar at the same z region).
-_BOSS_Z_BACK = (
-    CAM_Z0[1] + CAM_BOSS_Z - CAM_BOSS_DIA / 2.0,
-    CAM_Z0[1] + CAM_BOSS_Z + CAM_BOSS_DIA / 2.0,
-)
-if (
-    _BOSS_Z_BACK[1] > SPRING_Z - SPRING_W / 2.0 - 0.25
-    and _BOSS_Z_BACK[0] < SPRING_Z + SPRING_W / 2.0 + 0.25
-):
-    raise AssertionError("set-pin boss z band overlaps the spring foot band")
 
 
 # PARK: collar (ecc down) under the pin, by design 0.10..0.25 of air. The
@@ -1651,72 +1662,29 @@ if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
     raise AssertionError("engaged pinion lever left the photographed +X-side range")
 
 
-# Bracket scallop closure. The lift rod is base-fixed while the bracket swings,
-# so its centre traces an arc in the bracket's local frame. The part carries
-# two R6.90 open scallops at the parked/engaged endpoint centres; their overlap
-# must cover the full collar sweep plus 0.25 air over the intervening arc.
-def _lift_axis_in_strap(lean_rad: float) -> tuple[float, float]:
-    dx, dy = LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y
-    c, s = math.cos(lean_rad), math.sin(lean_rad)
-    return (-dx * c - dy * s, -dx * s + dy * c)
-
-
-_RELIEF_PARK_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG))
-_RELIEF_ENG_ACTUAL = _lift_axis_in_strap(math.radians(STRAP_LEAN_DEG) + _PHI_ENG)
-for _label, _actual, _authored in (
-    ("parked", _RELIEF_PARK_ACTUAL, STRAP_CAM_RELIEF_PARK),
-    ("engaged", _RELIEF_ENG_ACTUAL, STRAP_CAM_RELIEF_ENGAGED),
-):
-    if math.dist(_actual, _authored) > 0.001:
-        raise AssertionError(
-            f"bracket cam relief {_label} centre {_authored} != linkage {_actual}"
-        )
-_RELIEF_CENTRE_CHORD = math.dist(_RELIEF_PARK_ACTUAL, _RELIEF_ENG_ACTUAL)
-_RELIEF_ARC_SAGITTA = math.hypot(LIFT_X - PIVOT_X, LIFT_Y - PIVOT_Y) * (
-    1.0 - math.cos(_PHI_ENG / 2.0)
-)
-_RELIEF_REQUIRED_R = (
-    math.hypot(STRAP_CAM_RELIEF_ENVELOPE_R, _RELIEF_CENTRE_CHORD / 2.0)
-    + _RELIEF_ARC_SAGITTA
-)
-if STRAP_CAM_RELIEF_R < _RELIEF_REQUIRED_R:
+# Follower-seat integrity in the uncut strap. The complete Ø4 mouth must land
+# on the straight -X flank, and the 4-deep blind seat must leave solid stock
+# before the opposite flank.
+_PIN_SEAT_Y = -FPIN_DROP
+_PIN_SEAT_R = FPIN_DIA / 2.0
+if _PIN_SEAT_Y - _PIN_SEAT_R < 0.0 or _PIN_SEAT_Y + _PIN_SEAT_R > STRAP_C2C:
+    raise AssertionError("follower-seat mouth leaves the bracket's straight flank")
+_PIN_SEAT_ENTRY_X = -STRAP_R_END
+_PIN_SEAT_BOTTOM_X = _PIN_SEAT_ENTRY_X + FPIN_SEAT
+_PIN_SEAT_REMAINING_WALL = STRAP_R_END - _PIN_SEAT_BOTTOM_X
+if _PIN_SEAT_REMAINING_WALL < _PIN_SEAT_R:
     raise AssertionError(
-        f"bracket cam relief R{STRAP_CAM_RELIEF_R:.3f} does not cover "
-        f"R{_RELIEF_REQUIRED_R:.3f} moving envelope"
-    )
-# Seat mouth: on the straight flank when the stud sits between the two bores
-# (0 <= -FPIN_DROP <= C2C), else on the end cap arc.
-_PIN_SEAT_SURFACE_X = (
-    -STRAP_R_END
-    if 0.0 <= -FPIN_DROP <= STRAP_C2C
-    else -math.sqrt(STRAP_R_END**2 - FPIN_DROP**2)
-)
-_PIN_SEAT_BOTTOM_X = -(STRAP_R_END - FPIN_SEAT)
-_PIN_SEAT_OPEN_X = _PIN_SEAT_SURFACE_X
-for _cx, _cy in (STRAP_CAM_RELIEF_PARK, STRAP_CAM_RELIEF_ENGAGED):
-    _dy = -FPIN_DROP - _cy
-    if abs(_dy) < STRAP_CAM_RELIEF_R:
-        _PIN_SEAT_OPEN_X = max(
-            _PIN_SEAT_OPEN_X,
-            _cx + math.sqrt(STRAP_CAM_RELIEF_R**2 - _dy**2),
-        )
-_PIN_SEAT_REMAINING = _PIN_SEAT_BOTTOM_X - _PIN_SEAT_OPEN_X
-if _PIN_SEAT_REMAINING < 1.5:
-    raise AssertionError(
-        f"cam scallop leaves only {_PIN_SEAT_REMAINING:.3f} mm follower-stud seat"
+        f"follower seat leaves only {_PIN_SEAT_REMAINING_WALL:.3f} mm "
+        "before the opposite flank"
     )
 
-# Full-rotation sweep of collar + set-pin boss about the rod axis. The boss
-# sweep books its OUTER CORNER -- hypot(axis reach, boss radius), not just
-# the axis tip (codex review 2026-07-05) -- against the base and the pivot
-# shaft; the spring foot shares z only with the bare collar (the boss z band
-# clears it above), so the foot books the collar OD sweep.
-_CAM_SWEEP_R = math.hypot(
-    CAM_ECC + CAM_OD / 2.0 + CAM_BOSS_PROUD, CAM_BOSS_DIA / 2.0
-)  # 6.31 corner
-_COLLAR_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 5.6 bare collar
+# Full-rotation sweep of the bare collar about the rod axis (U28: no boss, so
+# the eccentric OD's far point is the whole sweep) against the base, the
+# spring foot and the pivot shaft.
+_CAM_SWEEP_R = CAM_ECC + CAM_OD / 2.0  # 9.3: U28 boss deleted, bare collar
+_COLLAR_SWEEP_R = _CAM_SWEEP_R
 if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
-    raise AssertionError("cam boss sweep reaches the base top")
+    raise AssertionError("cam collar sweep reaches the base top")
 if LIFT_Y - _COLLAR_SWEEP_R - SPRING_FOOT_TOP < 0.25:
     raise AssertionError("cam collar sweep dips into the spring foot below")
 if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
@@ -1801,7 +1769,7 @@ if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
     raise AssertionError("lever throw plane reaches the integral grip head")
 
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
-# bounds the collar + boss sweep against the base, spring foot and shaft.)
+# bounds the collar sweep against the base, spring foot and shaft.)
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
 # The steel Ø8 arbor presses through the drum and journals in both straps'
@@ -1832,7 +1800,10 @@ if _BLOCK_SCREW_ENGAGEMENT < 1.0:
     raise AssertionError("block screw barely engages the base")
 if _BLOCK_SCREW_ENGAGEMENT > BASE_BLOCK_HOLE_DEPTH - 0.25:
     raise AssertionError("block screw bottoms out in the base tapped seat")
-if BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0 > BLOCK_WIDTH / 2.0 - 0.25:
+if (
+    BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0
+    > min(BLOCK_EAST, BLOCK_WIDTH - BLOCK_EAST) - 0.25
+):
     raise AssertionError("block screw head overhangs the block end")
 _BLOCK_SCREW_XZ = tuple(
     (BLOCK_X + sx, z0 + BLOCK_DEPTH / 2.0)
@@ -2351,7 +2322,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion-cam-pin {tag} (edge-seat follower)",
         )
     # Eccentric cam collars (PR8 items 8b/9): one per strap station, pinned to
-    # the lift rod in the authored PARK pose (ecc + boss straight down).
+    # the lift rod in the authored PARK pose (ecc straight down).
     pinion_cams: dict[str, str] = {}
     for tag, z0 in (("front", CAM_Z0[0]), ("back", CAM_Z0[1])):
         pinion_cams[tag] = await place_component(
@@ -2383,12 +2354,15 @@ async def build(adapter) -> dict[str, str]:
     )
     # MHA-102 is pressed through the brass drum and journaled in both straps'
     # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
+    # Rotate only about the circular shaft axis so its local-Y cross-hole is
+    # coaxial with MHA-058's local-Y rod; every world centre and Z station stays
+    # unchanged.
     pinion_arbor = await place_component(
         adapter,
         "pinion-arbor",
         [APINION_X, APINION_Y, ARBOR_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, HANDLE_TILT_DEG],
+        ARBOR_ROWS,
         ground=False,
         label="pinion-arbor (integral steel arbor and grip head)",
     )
@@ -3790,9 +3764,9 @@ async def build(adapter) -> dict[str, str]:
     )
     # Steel arbor (PR7 item 14): pressed through the drum on the same strap
     # bore axis -- coaxial + an axial seat (Front-plane distance, invariant
-    # under the z-parallel engage swing) + a parallel anti-spin to the drum
-    # it is pressed into (both inserted at IDENTITY, so their Right planes
-    # are parallel; riding the same swing group keeps the pair parallel).
+    # under the z-parallel engage swing) + a fixed 65-degree anti-spin phase
+    # to the drum.  The phase clocks its local-Y cross-hole onto the grip rod;
+    # an off-axis head witness distinguishes the two angle-mate branches.
     arb_o = _org(adapter, pinion_arbor)
     await coincident_mate(
         adapter,
@@ -3809,12 +3783,14 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion arbor axial d={abs(arb_o[2]):.2f}",
         verify=(pinion_arbor, arb_o),
     )
-    await parallel_mate(
+    await angle_driver(
         adapter,
         named_ref(f"Right Plane@{pinion_arbor}", "PLANE"),
         named_ref(f"Right Plane@{align_pinion}", "PLANE"),
-        label="pinion arbor anti-spin (pressed in the drum)",
+        HANDLE_TILT_DEG,
+        label=f"pinion arbor anti-spin (pressed phase={HANDLE_TILT_DEG:.2f})",
         verify=(pinion_arbor, arb_o),
+        witness_local=[0.0, ARBOR_HEAD_DIA / 2.0, ARBOR_HEAD_CENTER_Z],
     )
     # The separate grip crossrod is press-fitted in MHA-102's match-reamed
     # integral head.  A LOCK records that authored relative pose with no
