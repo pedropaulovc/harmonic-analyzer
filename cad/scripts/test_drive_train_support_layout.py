@@ -115,6 +115,29 @@ def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
     assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(rod_point, lever_point))
 
 
+def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
+    # MHA-135 is a component, not only a mated joint: BDT inserts it with
+    # the rod's phase at the rod's pin station (both holes' common point),
+    # and locks it to the rod, so it joins the freed lift-rod spin family.
+    import inspect
+
+    from _assembly import _ALLOWED_FREE_STEMS
+    from pinion_lever_geometry import ROD_PIN_HOLE_FROM_END
+
+    source = inspect.getsource(drive)
+    assert source.count('"pinion-lever-pin"') == 1
+    assert 'f"Axis2@{lift_rod}"' in source
+    pin_point = [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0 + ROD_PIN_HOLE_FROM_END]
+    rod_point = _world(
+        [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0],
+        drive.LIFT_ROD_ROWS,
+        [0.0, 0.0, ROD_PIN_HOLE_FROM_END],
+    )
+    assert all(math.isclose(a, b, abs_tol=1e-9) for a, b in zip(pin_point, rod_point))
+    free = _ALLOWED_FREE_STEMS["drive-train"]
+    assert "pinion-lever-pin" in free and "pinion-lift-rod" in free
+
+
 def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
     # The rod carries LEVER_TILT_DEG of phase; the cams must not: their world
     # rows stay the identity the park-gap and engage solves assume, tied back

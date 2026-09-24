@@ -799,6 +799,7 @@ from pinion_lever_geometry import (  # noqa: E402
     CAP_SAG as LEVER_CAP_SAG,
     HUB_LEN as LEVER_HUB_LEN,
     ROD_DIA as LEVER_ROD_DIA,
+    ROD_PIN_HOLE_FROM_END as LEVER_PIN_FROM_ROD_END,
     ROD_LEN as LEVER_ROD_LEN,
     WALL_T as LEVER_WALL_T,
 )
@@ -2394,6 +2395,18 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
+    # MHA-135: the 1/16 pin driven through the match-drilled hub and rod holes.
+    # Its axis is its local X, so it takes the rod's phase and sits centred on
+    # the rod's "lever pin" station.
+    lever_pin = await place_component(
+        adapter,
+        "pinion-lever-pin",
+        [LIFT_X, LIFT_Y, LIFT_ROD_Z0 + LEVER_PIN_FROM_ROD_END],
+        [0.0, 0.0, LEVER_TILT_DEG],
+        LIFT_ROD_ROWS,
+        ground=False,
+        label="pinion-lever-pin (MHA-135 through hub and rod)",
+    )
     grip_crossrod = await place_component(
         adapter,
         "pinion-handle",
@@ -3837,6 +3850,33 @@ async def build(adapter) -> dict[str, str]:
         label="lever clamp phase (parallel to the rod: coaxial pin holes)",
         verify=(lever, lev_o),
         witness_local=[0.0, LEVER_LEN, 0.0],
+    )
+    # MHA-135 locked to the rod: on the rod's pin-hole axis (Axis2), centred
+    # across it (Right planes coincident -- both contain the rod axis), and
+    # anti-spun about its own axis by a Top-plane parallel.  Rigid with the
+    # rod, it turns with the freed lift-rod spin.
+    lp_o = _org(adapter, lever_pin)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{lever_pin}", "AXIS"),
+        named_ref(f"Axis2@{lift_rod}", "AXIS"),
+        label="MHA-135 on the lift rod's pin-hole axis",
+        verify=(lever_pin, lp_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Right Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Right Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 centred across the lift rod",
+        verify=(lever_pin, lp_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Top Plane@{lever_pin}", "PLANE"),
+        named_ref(f"Top Plane@{lift_rod}", "PLANE"),
+        label="MHA-135 anti-spin (parallel to the rod)",
+        verify=(lever_pin, lp_o),
+        witness_local=[0.0, 0.0, 1.0],
     )
     # Pinion drum: journaled in the straps' top bores -- coaxial on the front
     # strap's Axis2 + an axial seat. Its free spin (real: the zeroing input) is

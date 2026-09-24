@@ -1643,6 +1643,8 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "pinion-cam-pin",
         "pinion-handle",
         "pinion-lever",
+        # MHA-135: locked to the lift rod, it turns with the freed rod spin.
+        "pinion-lever-pin",
         "pinion-lift-rod",
         # Option E-a: pinned to both straps, the torque shaft swings with them.
         "pinion-pivot-shaft",
