@@ -489,8 +489,9 @@ def test_every_station_names_the_same_head_rear_face() -> None:
     ambiguous for the datum every station runs from."""
     assert "HEAD SHOULDER" not in spec.DRAWING_NOTES
     assert not any("HEAD SHOULDER" in text for text in drawing.DIMENSION_CALLOUTS.values())
-    assert drawing.DIMENSION_CALLOUTS["BackRimFromHeadRear"].endswith(
-        "<MOD-DIAM>15 HEAD REAR FACE"
+    # c3419623 printed "TO  Ø15": <MOD-DIAM> brings its own leading gap.
+    assert drawing.DIMENSION_CALLOUTS["BackRimFromHeadRear"] == (
+        "FROM BACK CROWN ROOT TO<MOD-DIAM>15 HEAD REAR FACE"
     )
 
 
@@ -507,6 +508,20 @@ def test_front_journal_diameter_text_clears_the_drum_station_witness() -> None:
     assert drawing.DRUM_STATION_WITNESS_X - right >= 0.0025
     # Clear of the bond-zone diameter's line (above the shaft, tail below).
     assert left - drawing.PRINCIPAL_KEEP["BondZoneDia"][0] >= 0.010
+
+
+def test_drum_station_witness_starts_on_the_flank_not_the_axis() -> None:
+    """c3419623: from an axis point the drum station's sheet witness drew a
+    4 mm stub inside the Ø8 silhouette that read as a step (Main)."""
+    import inspect
+
+    assert part.DRUM_STATION_POINT_X == pytest.approx(spec.SHAFT_DIA / 2.0)
+    source = inspect.getsource(part.build)
+    call = source[source.index('feature_name="DrumStationReference"') :]
+    call = call[: call.index("\n    )")]
+    assert "end_on_flank=DRUM_STATION_POINT_X" in call
+    helper = inspect.getsource(part._add_axial_reference)
+    assert 'far_end = f"{line}.end" if flank is None else f"{flank}.start"' in helper
 
 
 def test_drum_station_text_clears_the_station_stack() -> None:

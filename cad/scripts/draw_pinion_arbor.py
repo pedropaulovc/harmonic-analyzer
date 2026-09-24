@@ -194,7 +194,8 @@ DIAMETER_POSITIONS = {
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
     # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
-    "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO <MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
+    # <MOD-DIAM> carries its own leading gap, so no space before it.
+    "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO<MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
     "DrumStationFromHeadRear": "DRUM STATION",
     "OverallLen": "OVERALL",
     "BackCapSagDim": "BACK CROWN",

@@ -122,6 +122,13 @@ JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
 # crown end, and the text hangs away from the side its extensions come from.
 JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
 JOURNAL_DIA_POINT_LEN = 1.0
+# The drum station has no feature on the shaft, so its far end is a short
+# construction witness ON THE Ø8 FLANK (sketch +x, the sheet's lower flank
+# under the -90 deg *Top profile), not a point on the axis: from the axis its
+# sheet witness drew a 4 mm stub inside the silhouette that read as a step a
+# machinist might cut (Main, c3419623).
+DRUM_STATION_POINT_X = SHAFT_R
+DRUM_STATION_POINT_LEN = 1.0
 # The bond-zone diameter's construction witness: a short run of the flank.
 BOND_ZONE_WITNESS_LEN = 4.0
 
@@ -167,8 +174,13 @@ async def _add_axial_reference(
     start_v: float,
     end_v: float,
     drive_expression: str,
+    end_on_flank: float | None = None,
 ) -> list[tuple[str, str]]:
-    """Author one native axial dimension without adding model geometry."""
+    """Author one native axial dimension without adding model geometry.
+
+    With ``end_on_flank`` the far end is the start of a short construction
+    witness that far off the axis (on the flank), not the axis point itself.
+    """
     dims = SketchDims()
     check(f"create sketch {feature_name}", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -176,7 +188,20 @@ async def _add_axial_reference(
         f"add {feature_name} witness",
         await adapter.add_centerline(0.0, start_v, 0.0, end_v),
     )
+    flank = None
+    if end_on_flank is not None:
+        flank = check(
+            f"add {feature_name} flank witness",
+            await adapter.add_line(
+                end_on_flank, end_v, end_on_flank, end_v + DRUM_STATION_POINT_LEN
+            ),
+        )
     set_sketch_direct_db(adapter, False)
+    if flank is not None:
+        segment = _early_bound(adapter._sketch_entities[flank], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{flank}: failed to become construction geometry")
     check(
         f"{feature_name} vertical",
         await adapter.add_sketch_constraint(line, None, "vertical"),
@@ -185,13 +210,37 @@ async def _add_axial_reference(
         adapter, f"{line}.start", 0.0, start_v, f"{feature_name} start"
     )
     dims.record(None, None)
+    far_end = f"{line}.end" if flank is None else f"{flank}.start"
     check(
         f"dimension {dimension_name}",
         await adapter.add_sketch_dimension(
-            f"{line}.start", f"{line}.end", "vertical_distance", abs(end_v - start_v)
+            f"{line}.start", far_end, "vertical_distance", abs(end_v - start_v)
         ),
     )
     dims.record(dimension_name, drive_expression)
+    if flank is not None:
+        for first, second, relation in (
+            (flank, None, "vertical"),
+            (f"{flank}.start", f"{line}.end", "horizontal_points"),
+        ):
+            check(
+                f"{feature_name} {first} {relation}",
+                await adapter.add_sketch_constraint(first, second, relation),
+            )
+        check(
+            f"{feature_name} flank offset",
+            await adapter.add_sketch_dimension(
+                f"{line}.end", f"{flank}.start", "horizontal_distance", end_on_flank
+            ),
+        )
+        dims.record(None, None)
+        check(
+            f"{feature_name} flank witness length",
+            await adapter.add_sketch_dimension(
+                f"{flank}.start", f"{flank}.end", "vertical_distance", DRUM_STATION_POINT_LEN
+            ),
+        )
+        dims.record(None, None)
     await ensure_fully_defined(adapter, feature_name)
     check(f"exit sketch {feature_name}", await adapter.exit_sketch())
     name_last_feature(adapter, feature_name)
@@ -754,6 +803,7 @@ async def build(adapter) -> dict[str, str]:
         start_v=-HEAD_REAR_Z,
         end_v=-(HEAD_REAR_Z + DRUM_STATION),
         drive_expression='"DrumStationFromHeadRear"',
+        end_on_flank=DRUM_STATION_POINT_X,
     )
     drive_jobs += await _add_axial_reference(
         adapter,
