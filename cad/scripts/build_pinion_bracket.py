@@ -81,6 +81,8 @@ from pinion_bracket_geometry import (
 )
 from pinion_bracket_spec import (
     ARBOR_BORE_BAND,
+    CROSS_HOLE_BAND,
+    CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PIN_SEAT_DIA_BAND,
@@ -202,6 +204,30 @@ def _pin_bore_removed() -> float:
 
 
 
+def _cross_hole_removed() -> float:
+    """Material the set-pin cross hole takes out of the strap foot.
+
+    The hole runs along X through the pivot-bore axis (y 0), centred on the
+    thickness, so it cuts two walls: for each (dy, dz) point of its disc the
+    removed length runs from the pivot bore x = sqrt(rb^2 - dy^2) out to the
+    strap edge on each side (the straight flank above y 0, the end-cap arc
+    below).  z drops out (the disc's z-chord scales it); Simpson over dy."""
+    r = CROSS_HOLE_DIA / 2.0
+    rb = PIVOT_BORE / 2.0
+    n = 2000
+    h = 2.0 * r / n
+
+    def f(dy: float) -> float:
+        chord = 2.0 * math.sqrt(max(r * r - dy * dy, 0.0))
+        wall = -_edge_x(dy) - math.sqrt(max(rb * rb - dy * dy, 0.0))
+        return chord * 2.0 * max(wall, 0.0)
+
+    total = f(-r) + f(r)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * f(-r + i * h)
+    return total * h / 3.0
+
+
 def _edge_x(y: float) -> float:
     """The strap's -X edge at *y*: the straight flank between the two bores,
     else the end-cap arc about the nearer bore centre."""
@@ -232,6 +258,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinBore", f"{PIN_BORE}mm")
     await set_global(adapter, "PinDrop", f"{PIN_DROP}mm")
     await set_global(adapter, "PinSeatDepth", f"{PIN_SEAT}mm")
+    await set_global(adapter, "CrossHoleDia", f"{CROSS_HOLE_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -417,6 +444,52 @@ async def build(adapter) -> dict[str, str]:
     expected -= v_bore
     await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
+    # Option E-a set-pin cross hole (pinion_strap_pin_spec): along X through
+    # the pivot-bore axis, centred on the thickness.  Sketched on the Right
+    # Plane (normal X; sketch u = -z) like the MHA-060 pin hole: the centre's
+    # zero height drops out of define_circle as an on-axis relation (the hole
+    # is ON the bore axis), so only its through-thickness station and diameter
+    # are dimensions.  Cut mid-plane well past both edges.  The mirror station
+    # (z -4.5) lies outside the bar, so a wrong side cuts nothing; the removed
+    # volume is gated against the analytic two-wall integral at 5% of the
+    # hole (a whole-part tolerance would pass a missing cut).
+    v_cross = _cross_hole_removed()
+    res = await adapter.get_mass_properties()
+    vol_before = res.data.volume
+    cross = SketchDims()
+    check("create_sketch cross hole", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        -THICKNESS / 2.0,
+        0.0,
+        CROSS_HOLE_DIA / 2.0,
+        "cross hole",
+        dims=cross,
+        names=("CrossHoleCz", "CrossHoleCy", "CrossHoleDia"),
+        drives=('"StrapThickness" / 2', None, '"CrossHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "cross hole sketch")
+    check("exit_sketch cross hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleProfile")
+    drive_jobs += cross.apply(adapter, "CrossHoleProfile")
+    cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=2.0 * WIDTH, both_directions=True)
+    )
+    if not cut.is_success:
+        raise RuntimeError(f"cross hole cut failed: {cut.error}")
+    name_last_feature(adapter, "CrossHole")
+    res = await adapter.get_mass_properties()
+    removed = vol_before - res.data.volume
+    if abs(removed - v_cross) > 0.05 * v_cross:
+        raise RuntimeError(
+            f"cross hole removed {removed:.2f} mm^3, expected {v_cross:.2f} "
+            "-- circle misplaced/resized or the cut missed a wall"
+        )
+    _telemetry.success(
+        f"cross hole removed {removed:.2f} mm^3 (analytic {v_cross:.2f})"
+    )
+    expected -= v_cross
+
     # Named bore axes for the assembly: the pivot bore (Axis1) rides the torque
     # shaft, the arbor bore (Axis2) journals the pinion. The p2 swing group keys
     # off these (concentric to the shaft + lock the pinion in -- build_drive_train).
@@ -456,6 +529,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "PinSeatProfile", "PinSeatDia", *deviations(PIN_SEAT_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_BAND)
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -1644,6 +1644,8 @@ _ALLOWED_FREE_STEMS: dict[str, tuple[str, ...]] = {
         "pinion-handle",
         "pinion-lever",
         "pinion-lift-rod",
+        # Option E-a: pinned to both straps, the torque shaft swings with them.
+        "pinion-pivot-shaft",
     ),
     "magnifier": (
         "lever-wire",
