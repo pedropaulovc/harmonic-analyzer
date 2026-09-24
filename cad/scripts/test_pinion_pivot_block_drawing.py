@@ -149,9 +149,11 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 def test_notes_stay_within_policy_and_carry_the_assembly_transfer() -> None:
     notes = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
     assert len(notes) <= 4  # policy rule 6
-    # Ruling (c): the transfer now sets the front block by feeler first.
-    assert "  CLUSTER ON BACK BLOCK; SPOT BASE SEATS THRU BLOCK HOLES." in notes
-    assert "0.25 FEELER" in notes[-2]
+    assert "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY." in notes
+    # The feeler setting is an assembly step (drive-train assembly drawing),
+    # and a note carries no dimension (rule 6, Codex #854).
+    assert not any(re.search(r"\d", line) and "MHA-" not in line for line in notes)
+    assert not any("FEELER" in line for line in notes)
     assert not any("FINISH" in line for line in notes)  # the title block owns it
 
 
@@ -216,13 +218,35 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     assert SHAFT_LEN == rig.TORQUE_SHAFT_LEN
     assert ROD_LEN == rig.LIFT_ROD_LEN
     # Back ends flush with the back block; the shaft's front end flush with
-    # the front block to within the one-place print rounding.
+    # the PHYSICAL front block, the rod >= LEVER_SEAT_PROUD proud of it.
     assert rig.TORQUE_SHAFT_Z0 + SHAFT_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
     assert rig.LIFT_ROD_Z0 + ROD_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
-    assert abs(rig.TORQUE_SHAFT_Z0 - rig.FRONT_BLOCK_Z0) <= 0.05 + 1e-9
-    assert rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0 == pytest.approx(
-        rig.LEVER_SEAT_PROUD, abs=0.05 + 1e-9
+    assert rig.TORQUE_SHAFT_Z0 == pytest.approx(
+        rig.PHYSICAL_FRONT_BLOCK_OUTER_Z, abs=0.005
     )
+    proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - rig.LIFT_ROD_Z0
+    assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
+    assert (SHAFT_LEN, ROD_LEN) == (181.95, 192.0)
+
+
+def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
+    # Codex #854 P1: the model pose's STRAP_AIR is not hardware.  The printed
+    # shaft length is the two blocks plus the solid stack (strap, drum, strap)
+    # plus the one feeler end play -- no STRAP_AIR term anywhere.
+    import pinion_rig_layout as rig
+    from pinion_bracket_geometry import THICKNESS
+
+    solid = 2.0 * THICKNESS + rig.DRUM_LEN
+    assert rig.PHYSICAL_INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
+    assert rig.TORQUE_SHAFT_LEN == pytest.approx(
+        2.0 * pinion_pivot_block_spec.BLOCK_DEPTH + solid + rig.FRONT_BLOCK_FEELER,
+        abs=0.005,
+    )
+    # The model's block span carries the pose air on top, and only it.
+    model_span = rig.BACK_BLOCK_Z0 - (
+        rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
+    )
+    assert model_span - rig.PHYSICAL_INNER_SPAN == pytest.approx(2.0 * rig.STRAP_AIR)
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:
