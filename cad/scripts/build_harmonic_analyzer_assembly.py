@@ -107,7 +107,6 @@ SUBASSEMBLIES = (
 # (STOP_DECK_GAP above it) and the bar rides SLOT_FLOOR + half the window
 # clearance above the block bottom. STICK_POS.y (the graduated top face) is
 # therefore derived from the stop's constants, never a literal.
-import _telemetry  # noqa: E402
 from build_measuring_stick import (  # noqa: E402
     BODY_THICKNESS as STICK_THICK,
     BODY_WIDTH as STICK_WIDTH,
