@@ -229,15 +229,44 @@ def test_every_printed_length_is_exact_at_its_authored_places() -> None:
         assert value == pytest.approx(round(value, places), abs=1e-9), name
 
 
-def test_back_journal_text_sits_head_side_clear_of_the_crown_witnesses() -> None:
-    """The back-crown/overall witnesses (sheet x 0.079-0.081) ran through the
-    back journal's "8.00" and "JOURNAL" (Main, 30620a85): its text now sits on
-    the head side, right of its Ra symbol, below the shaft."""
-    text_x, text_y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
-    _station_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
-    assert text_x > symbol_x + 0.015  # past the Ra symbol's ~17 mm width
-    assert text_y < symbol_y  # its shelf runs under the symbol
-    assert text_y < drawing.PRINCIPAL_CENTER[1]  # below; the bond zone is above
+def test_each_land_diameter_is_measured_a_short_extension_from_its_line() -> None:
+    """Main (aab2b98b): the land diameters were measured at the land's
+    head-side end, so their extensions ran 18-25 mm along the flank to the
+    text.  Each is now measured at a witness just inside the crown-side end
+    and its line stands 1 mm from it, so the extension cannot grow back."""
+    assert part.JOURNAL_DIA_POINT_FROM_CROWN_END == drawing.JOURNAL_DIA_POINT_FROM_CROWN_END
+    assert 0.0 < part.JOURNAL_DIA_POINT_FROM_CROWN_END <= 3.0
+    for key, land_z in (("Front", spec.FRONT_JOURNAL_Z), ("Back", spec.BACK_JOURNAL_Z)):
+        point_x = drawing._sheet_x(
+            land_z + spec.JOURNAL_LEN - part.JOURNAL_DIA_POINT_FROM_CROWN_END
+        )
+        line_x = drawing.PRINCIPAL_KEEP[f"{key}JournalDia"][0]
+        assert abs(line_x - point_x) <= 0.0015, key
+        crown_end = drawing._sheet_x(land_z + spec.JOURNAL_LEN)
+        head_end = drawing._sheet_x(land_z)
+        assert min(crown_end, head_end) < line_x < max(crown_end, head_end), key
+
+
+def test_back_journal_diameter_hangs_above_clear_of_the_crown_witnesses() -> None:
+    """Below the shaft the back land is boxed in: the back-crown/overall
+    witnesses (x 0.079-0.081) on its crown side ran through its text at
+    30620a85, and the 199.9 witness and Ra leader sit on its head side.  Its
+    diameter hangs above, text right of the line; its 19.0 goes below."""
+    width, height = drawing.DIAMETER_BLOCK_SIZE
+    x, y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    assert 0.003 <= (y - height / 2.0) - shaft_top <= 0.012
+    assert x - 0.081 >= 0.010  # clear of the crown witnesses rising to the sag
+    detail_left = drawing.DETAIL_LABEL_XY[0] - 0.017
+    assert detail_left - (x + width) >= 0.010
+    # The 19.0 sits below, under the Ra symbol and clear of its leader.
+    len_x, len_y = drawing.PRINCIPAL_KEEP["BackJournalLen"]
+    edge_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
+    leader_x = drawing._sheet_x(edge_z)
+    assert len_y < symbol_y - 0.005
+    assert leader_x - (len_x + 0.0055) >= 0.003
+    crown_end = drawing._sheet_x(spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN)
+    assert len_x - 0.0055 > crown_end
 
 
 def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> None:

@@ -114,6 +114,14 @@ V_BACK_CAP = math.pi * BACK_CAP_SAG**2 * (3.0 * BACK_CAP_R - BACK_CAP_SAG) / 3.0
 # the whole Ø8 face on both sides of the Top plane.
 SPLIT_OVERHANG = 2.0
 JOURNAL_AREA = math.pi * SHAFT_DIA * JOURNAL_LEN
+# Each land's diameter is measured at a short construction witness this far
+# in from the land's crown-side end, so the sheet's diameter line stands 1 mm
+# from it and its extensions are ~1 mm, not a run along the flank from the
+# land's head-side end (Main, 2026-09-24).  Just inside the end rather than on
+# it: the drum-station witness sits 4.4 mm head side of the front land's
+# crown end, and the text hangs away from the side its extensions come from.
+JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
+JOURNAL_DIA_POINT_LEN = 1.0
 # The bond-zone diameter's construction witness: a short run of the flank.
 BOND_ZONE_WITNESS_LEN = 4.0
 
@@ -248,11 +256,17 @@ async def _add_journal_land(
         f"{feature_name} flank witness",
         await adapter.add_line(SHAFT_R, start_v, SHAFT_R, end_v),
     )
+    dia_v = end_v + JOURNAL_DIA_POINT_FROM_CROWN_END
+    dia_witness = check(
+        f"{feature_name} diameter witness",
+        await adapter.add_line(SHAFT_R, dia_v, SHAFT_R, dia_v + JOURNAL_DIA_POINT_LEN),
+    )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{witness}: failed to become construction geometry")
+    for construction in (witness, dia_witness):
+        segment = _early_bound(adapter._sketch_entities[construction], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{construction}: failed to become construction geometry")
     for line, relation in (
         (axis, "vertical"),
         (witness, "vertical"),
@@ -302,11 +316,35 @@ async def _add_journal_land(
         ),
     )
     dims.record(f"{prefix}Len", '"JournalLen"')
+    check(
+        f"{feature_name} diameter witness on the flank",
+        await adapter.add_sketch_constraint(dia_witness, witness, "collinear"),
+    )
+    check(
+        f"{feature_name} diameter witness station",
+        await adapter.add_sketch_dimension(
+            f"{witness}.end",
+            f"{dia_witness}.start",
+            "vertical_distance",
+            JOURNAL_DIA_POINT_FROM_CROWN_END,
+        ),
+    )
+    dims.record(None, None)
+    check(
+        f"{feature_name} diameter witness length",
+        await adapter.add_sketch_dimension(
+            f"{dia_witness}.start",
+            f"{dia_witness}.end",
+            "vertical_distance",
+            JOURNAL_DIA_POINT_LEN,
+        ),
+    )
+    dims.record(None, None)
     await add_diametric_linear_dimension(
         adapter,
         axis,
-        f"{witness}.start",
-        (SHAFT_R + 5.0, (start_v + end_v) / 2.0),
+        f"{dia_witness}.start",
+        (SHAFT_R + 5.0, dia_v),
         f"{prefix}Dia",
     )
     dims.record(f"{prefix}Dia", '"ShaftDia"')

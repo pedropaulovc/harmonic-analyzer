@@ -42,6 +42,7 @@ from pinion_arbor_spec import (
     HEAD_DIA,
     HEAD_FRONT_Z,
     HEAD_REAR_Z,
+    JOURNAL_LEN,
     OVERALL_LEN,
     SHAFT_DIA,
     SURFACE_FINISHES,
@@ -89,9 +90,10 @@ DONOR_KEEP = {
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
 # x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
 # their centres (x 0.252 front, 0.099 back) hold whatever the derived land
-# length; only their ends move.  Land lengths ride just above the shaft, each
-# land's diameter hangs below it with its Ra symbol beside it, and the two
-# stations from the head shoulder stack under those.
+# length; only their ends move.  The front land's length rides above the
+# shaft and its diameter hangs below; the back land's are swapped (see
+# BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
+# below the shaft.
 MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
 
 
@@ -104,14 +106,29 @@ def _sheet_x(model_z: float) -> float:
 RA_SYMBOL_OFFSET = 0.0033
 FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
 BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
-# The back land's diameter text sits on the HEAD side, right of its Ra symbol
-# and below it: on the crown side the back-crown and overall-length witnesses
-# (x 0.079-0.081) ran through "8" and "JOURNAL", and the SR7.3 leader fills the
-# space left of them.  Its shelf passes under the Ra symbol and across the
-# back station witness, stopping short of the bond-zone text.
-BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
+# Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
+# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
+# test), and its line stands 1 mm from that point, so its extensions are ~1 mm
+# rather than a run along the flank (Main, 2026-09-24).  The text hangs away
+# from the side its extensions come from: left of the front line, right of the
+# back one.
+JOURNAL_DIA_POINT_FROM_CROWN_END = 2.0
+JOURNAL_DIA_LINE_OFFSET = 0.001
+FRONT_JOURNAL_DIA_POINT_X = _sheet_x(
+    FRONT_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
+)
+BACK_JOURNAL_DIA_POINT_X = _sheet_x(
+    BACK_JOURNAL_Z + JOURNAL_LEN - JOURNAL_DIA_POINT_FROM_CROWN_END
+)
+# The back land is boxed in below the shaft (the back-crown and overall
+# witnesses at x 0.079-0.081 on its crown side, the 199.9 witness and the Ra
+# leader on its head side), so its diameter hangs ABOVE the shaft, its text
+# right of the line over the land and clear of the back-crown sag witnesses,
+# and its 19.0 length moves below, under the Ra symbol.
+BACK_JOURNAL_TEXT_X = BACK_JOURNAL_DIA_POINT_X + JOURNAL_DIA_LINE_OFFSET
 # The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
-# of its drum-end witness.
+# of its drum-end witness: between that witness and the head face, the
+# neck-end witness drops through.
 DRUM_STATION_TEXT_WIDTH = 0.035
 DRUM_STATION_WITNESS_X = _sheet_x(HEAD_REAR_Z + DRUM_STATION)
 DRUM_STATION_TEXT_XY = (
@@ -120,12 +137,11 @@ DRUM_STATION_TEXT_XY = (
 )
 # The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
 # measured at 4e97c4d8), and the drum station's witness drops through the
-# whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  So the
-# line stands on the land just inside its crown-side end, the text block
-# ending 2.4 mm short of that witness.  Its extensions run along the flank
-# from the land's head-side end, like the back land's.
+# whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  Its
+# line stands on the land 1 mm crown side of its measuring point, the text
+# block ending ~2.4 mm short of that witness.
 JOURNAL_DIA_TEXT_OVERHANG = 0.001
-FRONT_JOURNAL_DIA_X = DRUM_STATION_WITNESS_X - 0.0028 - JOURNAL_DIA_TEXT_OVERHANG
+FRONT_JOURNAL_DIA_X = FRONT_JOURNAL_DIA_POINT_X - JOURNAL_DIA_LINE_OFFSET
 # The bond-zone diameter stands over the part's witness (x 0.195) but hangs
 # its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
 # two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
@@ -137,15 +153,15 @@ BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
 DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
-    "BackJournalLen": (0.099, 0.188),
+    # Below the shaft, under the back Ra symbol and its leader.
+    "BackJournalLen": (0.097, 0.143),
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
-    "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
+    "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.185),
     "FrontJournalFromHeadRear": (0.283, 0.130),
-    # The drum station stacks between the two land stations.  Its text sits
-    # outside, head side of nothing: left of its own drum-end witness, since
-    # between that witness and the head face the neck-end witness drops
-    # through it.  The back station's text moves left to clear it.
+    # The drum station stacks between the two land stations, its text left of
+    # its own drum-end witness.  The back station's text moves left to clear
+    # it.
     "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
     "BackJournalFromHeadRear": (0.170, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
