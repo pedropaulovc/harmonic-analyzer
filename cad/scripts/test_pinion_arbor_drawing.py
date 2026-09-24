@@ -230,12 +230,37 @@ def test_every_printed_length_is_exact_at_its_authored_places() -> None:
 def test_back_journal_text_sits_head_side_clear_of_the_crown_witnesses() -> None:
     """The back-crown/overall witnesses (sheet x 0.079-0.081) ran through the
     back journal's "8.00" and "JOURNAL" (Main, 30620a85): its text now sits on
-    the head side, right of its Ra symbol and short of the bond-zone text."""
+    the head side, right of its Ra symbol, below the shaft."""
     text_x, text_y = drawing.PRINCIPAL_KEEP["BackJournalDia"]
     _station_z, (symbol_x, symbol_y) = drawing.JOURNAL_FINISHES["back_journal"]
     assert text_x > symbol_x + 0.015  # past the Ra symbol's ~17 mm width
     assert text_y < symbol_y  # its shelf runs under the symbol
-    assert text_x + 0.030 < drawing.PRINCIPAL_KEEP["BondZoneDia"][0] - 0.020
+    assert text_y < drawing.PRINCIPAL_CENTER[1]  # below; the bond zone is above
+
+
+def test_bond_zone_callout_sits_above_the_shaft_clear_of_its_neighbours() -> None:
+    """At 63468ee9 the BOND ZONE shelf ended 1 mm short of the front JOURNAL
+    shelf below the shaft, so a novice could read -0.01/-0.10 as the
+    journal's (Main, Fable).  It now hangs above the shaft, where no other
+    diameter is, clear of detail A, its label and the front land's 19.0."""
+    width, height = drawing.DIAMETER_BLOCK_SIZE
+    x, y = drawing.PRINCIPAL_KEEP["BondZoneDia"]
+    left, right, bottom, top = x, x + width, y - height / 2.0, y + height / 2.0
+    shaft_top = drawing.PRINCIPAL_CENTER[1] + spec.SHAFT_DIA / 2000.0
+    # Short witnesses: the block starts a few mm off the silhouette.
+    assert 0.003 <= bottom - shaft_top <= 0.012
+    # Right of the DETAIL A label and the detail circle.
+    detail_x, detail_y = drawing.DETAIL_CENTER
+    detail_r = drawing.DETAIL_RADIUS_MM * 2 / 1000.0
+    near_x = max(left - detail_x, 0.0, detail_x - right)
+    near_y = max(bottom - detail_y, 0.0, detail_y - top)
+    assert (near_x**2 + near_y**2) ** 0.5 - detail_r >= 0.010
+    assert left - (drawing.DETAIL_LABEL_XY[0] + 0.017) >= 0.010
+    # Short of the front land's 19.0 witness and its outside arrow tail.
+    front_land_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
+    assert front_land_end - 0.006 - right >= 0.005
+    # Under detail A's "(3.0)" line (sheet y ~0.207).
+    assert top <= 0.200
 
 
 FENCE = {"center": (0.3132, 0.171), "radius": 0.015, "axis": (-1.0, 0.0)}
@@ -353,9 +378,10 @@ def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
 
     advisory = Finding(kind="leader-crosses-leader", sheet="Sheet1", detail="x")
     drawing._assert_no_text_on_line([advisory])
-    blocking = Finding(kind="text-on-line", sheet="Sheet1", detail="journal")
-    with pytest.raises(RuntimeError, match="text-on-line"):
-        drawing._assert_no_text_on_line([advisory, blocking])
+    for kind in ("text-on-line", "text-on-text"):
+        blocking = Finding(kind=kind, sheet="Sheet1", detail="journal")
+        with pytest.raises(RuntimeError, match="blocking finding"):
+            drawing._assert_no_text_on_line([advisory, blocking])
 
 
 def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:

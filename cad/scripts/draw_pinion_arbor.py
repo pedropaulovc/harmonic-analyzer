@@ -107,12 +107,20 @@ BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
 # space left of them.  Its shelf passes under the Ra symbol and across the
 # back station witness, stopping short of the bond-zone text.
 BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
+# The bond-zone diameter stands over the part's witness (x 0.195) but hangs
+# its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
+# two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
+# rises a few mm off the silhouette to the shelf, right of the DETAIL A label
+# and under detail A's "(3.0)", and short of the front land's 19.0 witnesses.
+BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
+# Rendered width and height of a two-place "Ø8.00 -0.01/-0.0x" callout block,
+# measured on the 63468ee9 sheet.
+DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     "BackJournalLen": (0.099, 0.188),
     "FrontJournalDia": (0.250, 0.150),
-    # Below the bond zone, between the two land diameters, over its own witness.
-    "BondZoneDia": (_sheet_x(BOND_ZONE_DIA_Z), 0.150),
+    "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     "BackJournalFromHeadRear": (0.207, 0.115),
@@ -493,13 +501,17 @@ async def build(adapter: Any) -> dict[str, str]:
         label="integral-arbor axis direction",
     )
     arrows = _dimension_arrows(adapter, principal)
+    # The tips ride the message text, not only an attribute: a farm leaf's
+    # task.log and the fleet workspace carry the text alone.
+    directions = ", ".join(
+        f"{name}@{tx * 1000:.1f},{ty * 1000:.1f}mm:{dx:+.3f}/{dy:+.3f}"
+        for name, ((tx, ty), (dx, dy)) in sorted(arrows.items())
+    )
     _telemetry.info(
-        f"pinion-arbor: {len(arrows)} profile dimensions carry a readable arrowhead",
+        f"pinion-arbor: {len(arrows)} profile dimensions carry a readable "
+        f"arrowhead: {directions}",
         arrows=len(arrows),
-        directions=",".join(
-            f"{name}@{tx * 1000:.1f},{ty * 1000:.1f}mm:{dx:+.3f}/{dy:+.3f}"
-            for name, ((tx, ty), (dx, dy)) in sorted(arrows.items())
-        ),
+        directions=directions,
     )
     _assert_witnesses_clear_of_detail_fence(
         [
@@ -524,18 +536,22 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
 
-BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line"})
+# Text on text joined the gate with the bond-zone callout's move above the
+# shaft, beside the DETAIL A label (63468ee9 read 0 advisory findings).
+BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
 
 def _assert_no_text_on_line(findings: list[Any]) -> None:
-    """Fail the sheet when any annotation's text sits on another's line.
+    """Fail the sheet when any annotation's text sits on another's line or text.
 
     Main's eye-pass of 30620a85 found the back-crown and overall witnesses
     running through the back journal's "8.00" and "JOURNAL".  The native audit
     reads every dimension's rendered witness, dimension and leader segments, so
     that defect is now a build failure with sheet-millimetre fix coordinates.
-    The audit's other finding kinds are logged, not gated: the diametric Ø6
-    leader crossing the SR10.9 leader inside detail A is conventional ink.
+    Text on text is gated too, since the bond-zone callout moved above the
+    shaft beside the DETAIL A label.  The audit's other finding kinds are
+    logged, not gated: the diametric Ø6 leader crossing the SR10.9 leader
+    inside detail A is conventional ink.
     """
     blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
     advisory = [f for f in findings if f.kind not in BLOCKING_LAYOUT_FINDINGS]
@@ -547,11 +563,11 @@ def _assert_no_text_on_line(findings: list[Any]) -> None:
         )
     if blocking:
         raise RuntimeError(
-            f"pinion-arbor layout audit: {len(blocking)} text-on-line finding(s)\n"
+            f"pinion-arbor layout audit: {len(blocking)} blocking finding(s)\n"
             + format_findings(blocking)
         )
     _telemetry.success(
-        f"pinion-arbor layout audit: no text on a foreign line "
+        f"pinion-arbor layout audit: no text on a foreign line or text "
         f"({len(advisory)} advisory)"
     )
 
