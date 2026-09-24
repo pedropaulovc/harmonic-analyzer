@@ -311,12 +311,14 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     # Ruling (c) (user, 2026-09-24): the block and spring-foot z stations come
     # from pinion_rig_layout -- the back block keeps its released seat, the
     # front block stands one feeler off the front strap, the spring rides with
-    # the back strap.
+    # the back strap.  The spring foot's seat is 20.0 east of the pivot bore
+    # (the 2026-09-24 re-derive: outboard of the back strap, not west of it).
     import pinion_rig_layout as rig
 
     former_block_x = (-17.226441649810653, -0.22644164981065273)
+    former_pivot_x = former_block_x[0] + 8.5
     former_feet = (
-        (16.87259321646788, rig.SPRING_Z - MECHANISM_Z_SHIFT),
+        (former_pivot_x - 20.0, rig.SPRING_PAD_Z - MECHANISM_Z_SHIFT),
         (-54.7, -95.5),
         (-54.7, 102.5),
     )
@@ -505,7 +507,7 @@ def test_rig_set_callouts_and_note_fit_the_accepted_sheet_2_layout() -> None:
     # The note carries both settings the transfers need.
     assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
     assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
-    assert "MHA-114 PAD 1.00 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
+    assert "MHA-114 PAD 0.65 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
