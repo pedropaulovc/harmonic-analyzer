@@ -33,9 +33,9 @@ def test_registry_paths_and_part_name() -> None:
 def test_part_registry_row_is_the_made_screw() -> None:
     row = _config.parts("crank-handle-pivot-screw")
     assert row["number"] == "MHA-139"
-    assert row["material"] == row["material_specification"]
-    assert "1018" in row["material_specification"]
-    assert "12L14" in row["material_specification"]
+    for grade in ("1018", "12L14", "3/8 in"):
+        assert grade in row["material"]
+        assert grade in row["material_specification"]
     assert int(row["quantity"]) == 1
     assert row["fit_class"] == "shaft_in_bushing"
     assert row["process"] != "purchased"
@@ -345,3 +345,12 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.SEAT_X < shoulder_dim_x < drawing.UNDERHEAD_X
     assert abs(drawing.CENTERLINE_PICK[0] - shoulder_dim_x) > 0.010
     assert abs(drawing.FINISH_PICK[0] - shoulder_dim_x) > 0.010
+
+
+def test_printed_material_fits_one_title_block_line() -> None:
+    """Farm 3591da7a: the 51-character material wrapped into the DRAWN PER row.
+    Gooseneck measured the MATERIAL cell at 36 characters; the long form stays
+    in material_specification."""
+    row = _config.parts("crank-handle-pivot-screw")
+    assert len(str(row["material"])) <= 36
+    assert "cold-finished" in str(row["material_specification"])
