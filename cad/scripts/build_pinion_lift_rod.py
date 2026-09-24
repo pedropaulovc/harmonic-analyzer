@@ -10,7 +10,7 @@ pins resting on them from above and swing the drum east into mesh
 photo shows plain rod + separate set-pinned collars, and the collar
 mechanism replaced the crossed-pin lift.
 
-Layout: rod axis Z, z 0..202, plain cylinder; crowned back end. U36: the
+Layout: rod axis Z, z 0..ROD_LEN, plain cylinder; crowned back end. U36: the
 MHA-135 pin hole crosses it along local X, 4.0 in from the flat front end
 (the lever hub's mid-engagement), match-drilled at assembly.
 
@@ -74,9 +74,9 @@ PART_NAME = "pinion-lift-rod"
 MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
 
 # ROD_DIA rides the block bores, same stock as the torque shaft (derived).
-# ROD_LEN spans machine z -114..+88 (PR7): back end FLUSH with the back
-# block's outer face (+88, crowned below); the front end reaches just far
-# enough south of the front block (-104) for the lever's clamp hub.
+# ROD_LEN (pinion_rig_layout): back end FLUSH with the back block's outer
+# face (crowned below); the front end reaches just far enough south of the
+# front block for the lever's clamp hub.
 # CAP_SAG is the back-end crown sagitta (the p.69 dome; the front end hides
 # under the lever hub's own domed cap). All three live in
 # pinion_lift_rod_spec.py, the dimensional contract the drawing shares.

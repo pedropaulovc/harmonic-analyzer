@@ -70,7 +70,7 @@ RIGHT_CENTER = (
     FRONT_CENTER[1],
 )
 ISO_CENTER = (0.355, 0.205)
-# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 a 192 mm
+# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 the ~180 mm
 # isometric bar runs over the right zone border, so the pictorial is halved and
 # a scale callout keeps the title block honest.
 ISO_SCALE = (1, 2)

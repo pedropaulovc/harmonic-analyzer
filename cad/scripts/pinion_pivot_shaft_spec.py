@@ -13,9 +13,12 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pinion_rig_layout import TORQUE_SHAFT_LEN
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
-SHAFT_LEN = 192.0  # ends flush with the pivot blocks' outer faces
+# Ends flush with the pivot blocks' outer faces; ruling (c) moved the front
+# block inboard to the front strap (pinion_rig_layout), 192 -> 182.4.
+SHAFT_LEN = TORQUE_SHAFT_LEN
 CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H

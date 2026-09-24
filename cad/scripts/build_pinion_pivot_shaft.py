@@ -5,8 +5,8 @@ parallel under the alignment-pinion drum through both pivot blocks'
 east bores (p. 68 close-ups; the engage lever and its cam pins live on
 the SEPARATE lift rod in the west bores -- build_pinion_lift_rod.py).
 
-Layout: shaft axis Z, z 0..192 (PR7: ends FLUSH with the pivot blocks'
-outer faces, machine -104/+88, instead of 2 proud), each end crowned by
+Layout: shaft axis Z, z 0..SHAFT_LEN (PR7: ends FLUSH with the pivot blocks'
+outer faces -- pinion_rig_layout -- instead of 2 proud), each end crowned by
 a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
 visible inside the strap bore).
 

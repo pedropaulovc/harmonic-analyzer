@@ -5,9 +5,13 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pinion_rig_layout import LIFT_ROD_LEN
 
 ROD_DIA = 6.35
-ROD_LEN = 202.0
+# Back end flush with the back block, front end the lever hub's seat past the
+# front block; ruling (c) moved that block inboard (pinion_rig_layout),
+# 202 -> 192.4.
+ROD_LEN = LIFT_ROD_LEN
 CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H

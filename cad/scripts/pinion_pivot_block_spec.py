@@ -94,7 +94,11 @@ DRAWING_NOTES = "\n".join(
         # functional acceptance; the REAM and hold-down callouts are not repeated.
         "PIVOT BORE RUNS ON MHA-062 TORQUE SHAFT, LIFT BORE ON",
         "  MHA-060 LIFT ROD; EACH SHAFT TURNS FREELY BY HAND.",
-        "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY.",
+        # User ruling (c), 2026-09-24: the blocks locate the swing cluster
+        # axially; the front block is set by feeler before the U28 transfer.
+        "SET FRONT BLOCK WITH 0.25 FEELER TO FRONT STRAP, CLUSTER",
+        "  HARD ON BACK BLOCK; THEN SPOT BASE SEATS THROUGH BLOCK",
+        "  HOLES AT ASSEMBLY.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
