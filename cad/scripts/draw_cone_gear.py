@@ -59,8 +59,8 @@ from cone_gear_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    MODULE_MM,
     bore_dia_mm,
+    outside_dia_mm,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -134,10 +134,6 @@ DIMENSION_CALLOUTS = {
     # Repeating them here made the long suffix collide with the bore callout.
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
 }
-
-
-def outside_dia_mm(teeth: int) -> float:
-    return (teeth + 2) * MODULE_MM
 
 
 def rendered_half_od(teeth: int) -> float:

@@ -5,7 +5,8 @@ family. All configuration-varying geometry is equation-driven so a switch
 regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
 
 * Equation-manager globals carry the involute math (base/tip radii in
-  INCHES, involute parameter span, tooth-gap angles). Two parser facts
+  INCHES, involute parameter span, tooth-gap angles; ``involute_gear`` holds
+  the Python mirror and the validating helpers). Two parser facts
   probed live on SW 2026: the equation manager evaluates trig in DEGREES
   (``atn`` returns degrees too), and ``CreateEquationSpline2`` expressions
   evaluate lengths in DOCUMENT units (the configured part template is IPS),
@@ -28,8 +29,9 @@ regenerates the gear from ``ToothCount``/``DP``/``PA`` alone:
 Tooth-gap profile derivation (standard involute, polar form): a point of the
 involute of base radius ``Rb`` at parameter t sits at radius ``Rb*sqrt(1+t^2)``
 and polar angle ``phi - atan(t)`` where ``phi`` is the rolling angle offset.
-With ``Delta = pi/(2N) + inv(PA)`` (half tooth angular thickness at the base
-circle, ``inv`` the involute function), the gap between tooth 0 (centred on
+With ``Delta = s/(2r) + inv(PA)`` (half tooth angular thickness at the base
+circle for circular thickness ``s`` at pitch radius ``r``, ``inv`` the
+involute function; ``pi/(2N) + inv(PA)`` for the standard tooth), the gap between tooth 0 (centred on
 +X) and tooth 1 is bounded below by tooth 0's upper flank (the mirrored
 involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 (the involute starting at ``Gamma - Delta``, ``Gamma = 2*pi/N``).
@@ -37,8 +39,9 @@ involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 Prototype scope notes:
 
 * **Configured bore, no keyway** (Appendix C #7 resolution): the shaft steps
-  down toward the tip and each bore matches its seat: 3/8" for T024..T120,
-  1/4" for T018, 1/8" for T012, and the approved 1/16" journal at T006.
+  down toward the tip and each bore matches its seat (U40 S1): 3/8" for
+  T030..T120, 1/4" for T024, 1/8" for T018, and 1/16" for T012 and T006 on
+  the 24.7 mm terminal land (L/D 15.5).
   The bore circle is origin-centred with a DRIVING diameter dimension linked
   to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
   smallest gears; no evidence supports a key, pin, set screw, or hub.
@@ -47,12 +50,21 @@ Prototype scope notes:
   tooth every configuration seeds on local +X, so the witness brackets a
   TOOTH for every even count (the retired bottom chord at 270 deg bracketed a
   GAP whenever N/2 is odd: T006, T018 ... T114).  The chord is the sketch's
-  only line: no radial construction line runs through the bore and body.  Its asymmetric band is derived from the configured ``gear_mesh``
-  backlash; it is not a drawing/model reference-status dimension.
-* Root geometry is simplified: the gap floor is the chord at the base circle,
-  not the true root circle + trochoid fillet (for N >= 96 the base circle is
-  slightly inside root; the 6T gear is severely undercut at standard
-  proportions anyway).
+  only line: no radial construction line runs through the bore and body.  It
+  carries the cone-specific deepened-mesh band; it is not a drawing/model
+  reference-status dimension.
+* **Deepened mesh** (U38 option 1b, user ruling U42): each configuration's tip
+  radius ``Ra`` and circular tooth thickness ``ToothThickness`` are
+  configuration literals from ``cone_gear_spec.DEEPENED_MESH_MM`` -- an
+  oversize blank (long addendum) and a thicker tooth -- and ``Delta`` solves
+  from ``ToothThickness``, so the printed thickness IS the modelled flank
+  spacing.
+* Root geometry is simplified: the gap floor joins the flank feet, not the
+  true root circle + trochoid fillet.  ``Tmin`` starts the flanks above the
+  base circle to raise the floor (T048+), and ``FloorDip`` bows it down to
+  the standard tooth's base chord (T006, T012); see
+  ``cone_gear_spec.floor_radius_mm``.  The sheet prints that floor as a MIN
+  diameter.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, face
 width 6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum
@@ -84,20 +96,27 @@ from _drawing_marks import (
 from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
-import cone_gear_shaft_spec
-from cone_gear_notes import DRAWING_NOTES, gear_data, tooth_thickness_band
+from cone_gear_notes import drawing_notes, gear_data
 from cone_gear_spec import (
     BLANK_DIA_BAND,
+    BORE_DIA_BAND,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    MM_PER_IN,
+    STANDARD_TOOTH_THICKNESS,
     SURFACE_FINISHES,
     TOOTH_THICKNESS,
-    base_chord_root_radius_mm,
+    TOOTH_THICKNESS_BAND,
     bore_dia_mm,
     configuration_number,
+    floor_dip_mm,
+    floor_radius_mm,
+    floor_tmin,
     material_specification,
+    outside_dia_mm,
+    tooth_thickness_mm,
 )
 from _common import (
     OUT_PNG,
@@ -120,15 +139,27 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-# NOTE: this module keeps its OWN validating ``set_global`` (below) -- it
+# NOTE: the validating ``set_global`` comes from ``involute_gear`` -- it
 # round-trips every gear-math global through the SW equation parser to assert
-# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do.
-# So we deliberately do NOT import ``_common.set_global`` (it would be shadowed
-# by the local def anyway). The self-naming helpers above drive only the two
+# the trig/sqr/pi dialect, which the plain ``_common.set_global`` does not do,
+# so ``_common.set_global`` is deliberately NOT imported. The self-naming
+# helpers above drive only the two
 # ORDINARY circle dims (blank OD, bore); the involute tooth-gap profile is left
 # undimensioned so it stays free to re-solve from the globals and mesh.
 
 import _telemetry
+from involute_gear import (
+    DP,
+    PA_DEG,
+    PI_LIT,
+    equation_curve,
+    gap_area_in_disc,
+    gear_facts,
+    pattern_count_dimension,
+    read_dimension,
+    set_global,
+    set_global_read,
+)
 
 PART_NAME = "cone-gear"
 MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
@@ -141,8 +172,6 @@ MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # (export_models comp_rgb -> IComponent2.GetMaterialPropertyValues2). The part
 # itself stays uniformly brass. See cad/config/materials.yaml.
 
-DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
 # pitch along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer
 # DP 49.82 module gives a shallower incline); face 6.0 (cone_gear_spec,
@@ -155,8 +184,6 @@ PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
 # always closes outside the blank.
 R_CLEAR_IN = 60.0 / 25.4
 
-PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
-
 # The full cone set: 20 gears, 6..120 teeth step 6 (DIMENSIONS.md ch. 12).
 CONFIGS = tuple((f"T{n:03d}", n) for n in CONFIGURATION_TEETH)
 DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
@@ -164,24 +191,38 @@ TOOTH_GAP_PROFILE = "ToothGapProfile"
 TOOTH_GAP_CUT = "ToothGapCut"
 TOOTH_PATTERN_FEATURE = "ToothGapPattern"
 
-# Model-owned bands, derived live from their named fit inputs.  Bands use the
-# repository's native ``(upper, lower)`` order.
-_BORE_CLEARANCE_MIN, _BORE_CLEARANCE_MAX = (
-    float(value)
-    for value in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
-)
-_LAND_UPPER, _LAND_LOWER = cone_gear_shaft_spec.SECTION_DIA_BAND
-BORE_DIA_BAND = (
-    _LAND_LOWER + _BORE_CLEARANCE_MAX,
-    _LAND_UPPER + _BORE_CLEARANCE_MIN,
-)
-BACKLASH_MM = tuple(float(value) for value in _config.fit("gear_mesh", "backlash_mm"))
-TOOTH_THICKNESS_BAND = tooth_thickness_band(BACKLASH_MM)
-
-
 def bore_dia_in(teeth: int) -> float:
     """Configured bore diameter in inches, matching the stepped-shaft seat."""
-    return bore_dia_mm(teeth) / 25.4
+    return bore_dia_mm(teeth) / MM_PER_IN
+
+
+def thicken_in(teeth: int) -> float:
+    """Modelled tooth thickness over standard, inches (deepened mesh)."""
+    return (tooth_thickness_mm(teeth) - STANDARD_TOOTH_THICKNESS) / MM_PER_IN
+
+
+def addendum_extra_in(teeth: int) -> float:
+    """Tip radius over the standard ``(N + 2) / DP / 2``, inches."""
+    return outside_dia_mm(teeth) / MM_PER_IN / 2.0 - (teeth + 2.0) / DP / 2.0
+
+
+def _mesh_kwargs(teeth: int) -> dict[str, float]:
+    return {
+        "thicken_in": thicken_in(teeth),
+        "addendum_extra_in": addendum_extra_in(teeth),
+        "tmin": floor_tmin(teeth),
+        "floor_dip_in": floor_dip_mm(teeth) / MM_PER_IN,
+    }
+
+
+def cone_facts(teeth: int) -> dict[str, float]:
+    """``gear_facts`` for one configuration of the deepened cone mesh."""
+    return gear_facts(teeth, **_mesh_kwargs(teeth))
+
+
+def cone_gap_area_in_disc(teeth: int) -> float:
+    """``gap_area_in_disc`` for one configuration of the deepened cone mesh."""
+    return gap_area_in_disc(teeth, **_mesh_kwargs(teeth))
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -261,155 +302,6 @@ async def _author_tooth_thickness_reference(adapter: Any) -> SketchDims:
     return tooth_reference
 
 
-def gear_facts(teeth: int, dp: float = DP, pa_deg: float = PA_DEG) -> dict[str, float]:
-    """Python mirror of the equation-manager globals (lengths in inches)."""
-    pa = math.radians(pa_deg)
-    rb = teeth / dp * math.cos(pa) / 2.0
-    ra = (teeth + 2.0) / dp / 2.0
-    tmax = math.sqrt((ra / rb) ** 2 - 1.0)
-    delta = math.pi / (2.0 * teeth) + math.tan(pa) - pa
-    gamma = 2.0 * math.pi / teeth
-    return {
-        "PArad": pa,
-        "Rb": rb,
-        "Ra": ra,
-        "Tmax": tmax,
-        "Delta": delta,
-        "Gamma": gamma,
-        "ThetaL": math.atan(tmax) - tmax + delta,
-        "ThetaU": tmax - math.atan(tmax) - delta + gamma,
-    }
-
-
-def gap_area_in_disc(
-    teeth: int, samples: int = 2000, dp: float = DP, pa_deg: float = PA_DEG
-) -> float:
-    """Exact in-blank area of one tooth gap (in^2), by Green's theorem.
-
-    Boundary: lower flank A1->B1, blank-rim arc B1->B2 at ``Ra`` (the
-    beyond-rim part of the cut profile removes nothing), upper flank B2->A2
-    reversed, base chord A2->A1 -- the same parametrisations as the live
-    equation curves, so the expected volume validates the involute shape,
-    not just that "some" cut happened.
-    """
-    f = gear_facts(teeth, dp, pa_deg)
-    rb, ra = f["Rb"], f["Ra"]
-    tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
-    pts: list[tuple[float, float]] = []
-    for i in range(samples + 1):  # lower flank (mirrored involute)
-        t = tmax * i / samples
-        ph = t - delta
-        pts.append((
-            rb * (math.cos(ph) + t * math.sin(ph)),
-            rb * (t * math.cos(ph) - math.sin(ph)),
-        ))
-    for i in range(1, samples + 1):  # rim arc ThetaL -> ThetaU
-        th = f["ThetaL"] + (f["ThetaU"] - f["ThetaL"]) * i / samples
-        pts.append((ra * math.cos(th), ra * math.sin(th)))
-    for i in range(1, samples + 1):  # upper flank, reversed
-        t = tmax * (samples - i) / samples
-        ph = t - delta + gamma
-        pts.append((
-            rb * (math.cos(ph) + t * math.sin(ph)),
-            rb * (math.sin(ph) - t * math.cos(ph)),
-        ))
-    for i in range(1, samples):  # base chord A2 -> A1
-        s = i / samples
-        pts.append((
-            rb * ((1 - s) * math.cos(gamma - delta) + s * math.cos(delta)),
-            rb * ((1 - s) * math.sin(gamma - delta) + s * math.sin(delta)),
-        ))
-    area = 0.0
-    for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1], strict=False):
-        area += x1 * y2 - x2 * y1
-    return abs(area) / 2.0
-
-
-async def set_global_read(adapter: Any, name: str, expression: str) -> float:
-    """Upsert a global variable and return the value SolidWorks evaluated."""
-    from solidworks_mcp.adapters.base import SetGlobalVariableParameters
-
-    res = await adapter.set_global_variable(
-        SetGlobalVariableParameters(name=name, expression=expression)
-    )
-    data = check(f"global {name} = {expression}", res)
-    value = data.get("value")
-    if value is None:
-        raise RuntimeError(f"global {name}: no evaluated value returned")
-    return float(value)
-
-
-async def set_global(adapter: Any, name: str, expression: str, expected: float) -> None:
-    """Upsert a global variable and assert SolidWorks evaluated it correctly.
-
-    The value round-trip is the live test of the equation parser (trig in
-    DEGREES -- probed live, see ``build`` -- ``sqr`` = square root, literal-pi
-    arithmetic); a mismatch means the expression dialect is wrong and every
-    downstream curve would be silently bogus.
-    """
-    value = await set_global_read(adapter, name, expression)
-    tol = max(1e-9, abs(expected) * 1e-6)
-    if abs(value - expected) > tol:
-        raise RuntimeError(
-            f"global {name}: SolidWorks evaluated {value!r}, expected "
-            f"{expected:.9g} -- equation-parser dialect mismatch"
-        )
-
-
-async def equation_curve(
-    adapter: Any, label: str, x_expr: str, y_expr: str
-) -> str:
-    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-        )
-    )
-    return check(f"curve {label}", res)
-
-
-def pattern_count_dimension(adapter: Any, feature_name: str, expected: float) -> str:
-    """Find the pattern's instance-count dimension name (``D?@<feature>``).
-
-    The circular-pattern dimension layout (which of D1/D2 is the count vs
-    the angle) is not documented stably across releases, so probe by value:
-    the count dimension is the one reading ``expected`` (the seed count must
-    differ from the 360-degree angle for this to be unambiguous).
-    """
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    for dim in ("D1", "D2", "D3", "D4"):
-        full = f"{dim}@{feature_name}"
-        param = adapter._attempt(lambda f=full: model.Parameter(f), default=None)
-        if param is None:
-            continue
-        try:
-            value = float(_read_member(param, "Value"))
-        except (TypeError, ValueError):
-            continue
-        _telemetry.debug(f"{full} reads {value:g}")
-        if abs(value - expected) < 1e-9:
-            return full
-    raise RuntimeError(
-        f"no dimension of {feature_name} reads {expected:g} -- cannot link "
-        "the instance count to ToothCount"
-    )
-
-
-def read_dimension(adapter: Any, full_name: str) -> float:
-    """Read a dimension's value in the active configuration."""
-    param = adapter._attempt(
-        lambda: adapter.currentModel.Parameter(full_name), default=None
-    )
-    if param is None:
-        raise RuntimeError(f"cannot read dimension {full_name}")
-    return float(_read_member(param, "Value"))
-
-
 def _active_configuration(model: Any) -> Any:
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     return _early_bound(manager.ActiveConfiguration, "IConfiguration")
@@ -431,13 +323,13 @@ def _activate_configuration(model: Any, configuration: str) -> Any:
 
 
 def _expected_configuration_volume(teeth: int) -> float:
-    facts = gear_facts(teeth)
+    facts = cone_facts(teeth)
     radius_mm = facts["Ra"] * 25.4
     blank_mm3 = math.pi * radius_mm**2 * FACE_WIDTH
     bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
     return (
         blank_mm3
-        - teeth * gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
+        - teeth * cone_gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
         - bore_mm3
     )
 
@@ -448,16 +340,17 @@ def _native_minimum_chord_floor_radius_mm(
     """Measure the minimum radius of the planar BREP root-chord edges.
 
     Root candidates lie on one end plane and have both endpoints on the
-    equation-driven base circle.  This topology filter excludes axial edges
+    flank-foot circle (the base circle unless the floor is raised).  This
+    topology filter excludes axial edges
     and the vertex-free cylindrical bore.  ``IEdge.GetClosestPointOn`` then
     measures the persisted edge itself without assuming the equation curve was
     simplified to an analytic line, using screen-space selection, approximate
     boxes, or substituting a volume proxy.
     """
     pressure_angle = math.radians(PA_DEG)
-    base_radius_mm = (
+    foot_radius_mm = (
         teeth / DP * math.cos(pressure_angle) / 2.0 * 25.4
-    )
+    ) * math.hypot(1.0, floor_tmin(teeth))
     candidates: list[float] = []
     for raw_edge in tuple(_early_bound(body, "IBody2").GetEdges() or ()):
         edge = _early_bound(raw_edge, "IEdge")
@@ -478,8 +371,8 @@ def _native_minimum_chord_floor_radius_mm(
         start_radius = math.hypot(start[0], start[1])
         end_radius = math.hypot(end[0], end[1])
         if max(
-            abs(start_radius - base_radius_mm),
-            abs(end_radius - base_radius_mm),
+            abs(start_radius - foot_radius_mm),
+            abs(end_radius - foot_radius_mm),
         ) > 0.002:
             continue
         closest = tuple(
@@ -498,7 +391,7 @@ def _native_minimum_chord_floor_radius_mm(
         candidates.append(math.hypot(closest[0], closest[1]))
     if not candidates:
         raise RuntimeError(
-            f"T{teeth:03d}: no planar base-circle chord edge in solid BREP"
+            f"T{teeth:03d}: no planar gap-floor edge in solid BREP"
         )
     return min(candidates), len(candidates)
 
@@ -596,7 +489,7 @@ async def _configuration_topology(
         native_root, chord_edges = _native_minimum_chord_floor_radius_mm(
             bodies[0], teeth=teeth
         )
-        expected_root = base_chord_root_radius_mm(teeth)
+        expected_root = floor_radius_mm(teeth)
         maximum_bore_radius = (
             bore_dia_mm(teeth) + BORE_DIA_BAND[0]
         ) / 2.0
@@ -855,7 +748,7 @@ async def build(adapter) -> dict[str, str]:
     # the atn return unit is probed because inverse trig need not match.
     # sqr = square root (VBA-style).
     # ------------------------------------------------------------------
-    facts = gear_facts(DEFAULT_TEETH)
+    facts = cone_facts(DEFAULT_TEETH)
     await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
     await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
     atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
@@ -870,19 +763,25 @@ async def build(adapter) -> dict[str, str]:
 
     await set_global(adapter, "ToothCount", str(DEFAULT_TEETH), DEFAULT_TEETH)
     await set_global(adapter, "DP", f"{DP:g}", DP)
+    # Tip radius and tooth thickness are configuration literals (set per
+    # configuration below, like BoreDia): the deepened mesh sizes each one
+    # from its own contact-ratio / tip-land / backlash limits
+    # (cone_gear_spec.DEEPENED_MESH_MM), not from a closed form in N.
     await set_global(
         adapter,
         "ToothThickness",
-        f'{PI_LIT} / (2 * "DP")',
-        TOOTH_THICKNESS / 25.4,
+        f'{facts["ToothThickness"]:.12g}',
+        facts["ToothThickness"],
     )
     await set_global(adapter, "PA", f"{PA_DEG:g}", PA_DEG)
     await set_global(adapter, "PArad", f'"PA" * {PI_LIT} / 180', facts["PArad"])
     await set_global(
         adapter, "Rb", '"ToothCount" / "DP" * cos("PA") / 2', facts["Rb"]
     )
+    await set_global(adapter, "Ra", f'{facts["Ra"]:.12g}', facts["Ra"])
+    await set_global(adapter, "Tmin", f'{facts["Tmin"]:.12g}', facts["Tmin"])
     await set_global(
-        adapter, "Ra", '("ToothCount" + 2) / "DP" / 2', facts["Ra"]
+        adapter, "FloorDip", f'{facts["FloorDip"]:.12g}', facts["FloorDip"]
     )
     await set_global(
         adapter, "Tmax", 'sqr("Ra" * "Ra" / ("Rb" * "Rb") - 1)', facts["Tmax"]
@@ -890,7 +789,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(
         adapter,
         "Delta",
-        f'{PI_LIT} / (2 * "ToothCount") + tan("PA") - "PArad"',
+        '"ToothThickness" * "DP" / "ToothCount" + tan("PA") - "PArad"',
         facts["Delta"],
     )
     await set_global(adapter, "Gamma", f'2 * {PI_LIT} / "ToothCount"', facts["Gamma"])
@@ -1052,10 +951,16 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     # One tooth gap, all six profile entities equation-driven (t in [0,1]).
     # Loop: A1 ->(lower flank)-> B1 ->(radial)-> arc -> (radial)-> B2
-    # ->(upper flank, reversed)-> A2 ->(base chord)-> A1.
+    # ->(upper flank, reversed)-> A2 ->(gap floor)-> A1.  The flanks start at
+    # involute parameter Tmin (0: on the base circle); the floor is the feet
+    # chord bowed down by FloorDip at the gap centre (a parabola through both
+    # feet), so one six-entity sketch carries all three floor constructions.
     # ------------------------------------------------------------------
     check("create_sketch gap", await adapter.create_sketch("Front"))
-    u = '("Tmax" * t)'
+    u = '("Tmin" + ("Tmax" - "Tmin") * t)'
+    foot_low = '("Tmin" - "Delta")'
+    foot_up = '("Tmin" - "Delta" + "Gamma")'
+    bow = '4 * t * (1 - t) * "FloorDip"'
     ph_low = f'({u} - "Delta")'
     ph_up = f'({u} - "Delta" + "Gamma")'
     gap_curves = [
@@ -1073,9 +978,13 @@ async def build(adapter) -> dict[str, str]:
         ),
         await equation_curve(
             adapter,
-            "base chord A2->A1",
-            '"Rb" * ((1 - t) * cos("Gamma" - "Delta") + t * cos("Delta"))',
-            '"Rb" * ((1 - t) * sin("Gamma" - "Delta") + t * sin("Delta"))',
+            "gap floor A2->A1",
+            f'"Rb" * ((1 - t) * (cos{foot_up} + "Tmin" * sin{foot_up})'
+            f' + t * (cos{foot_low} + "Tmin" * sin{foot_low}))'
+            f' - {bow} * cos("Gamma" / 2)',
+            f'"Rb" * ((1 - t) * (sin{foot_up} - "Tmin" * cos{foot_up})'
+            f' + t * ("Tmin" * cos{foot_low} - sin{foot_low}))'
+            f' - {bow} * sin("Gamma" / 2)',
         ),
         await equation_curve(
             adapter,
@@ -1182,7 +1091,7 @@ async def build(adapter) -> dict[str, str]:
     bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
     v_gear = (
         expected_blank
-        - DEFAULT_TEETH * gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
+        - DEFAULT_TEETH * cone_gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
         - bore_default_mm3
     )
     await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
@@ -1197,6 +1106,7 @@ async def build(adapter) -> dict[str, str]:
     # views (blanking it in the part would also suppress the dimension).
     tooth_reference = await _author_tooth_thickness_reference(adapter)
     tooth_sketch = name_last_feature(adapter, "ToothThicknessReference")
+    thickness_dim = f"ToothThickness@{tooth_sketch}"
     drive_jobs += tooth_reference.apply(adapter, tooth_sketch)
 
     # Apply every deferred drive equation after all targets exist: blank and
@@ -1251,6 +1161,17 @@ async def build(adapter) -> dict[str, str]:
                 )
             ),
         )
+        mesh = cone_facts(teeth)
+        for global_name in ("Ra", "ToothThickness", "Tmin", "FloorDip"):
+            value = f"{mesh[global_name]:.12g}"
+            check(
+                f"{global_name} = {value} in {name}",
+                await adapter.set_global_variable(
+                    SetGlobalVariableParameters(
+                        name=global_name, expression=value, configuration=name
+                    )
+                ),
+            )
 
     # Author before the existing 20-configuration regeneration sweep.  This is
     # the live regression gate for the model-owned symbol: a face-attached
@@ -1304,7 +1225,7 @@ async def build(adapter) -> dict[str, str]:
         if issues:
             raise RuntimeError(f"{observation}; issues={issues!r}")
         volumes[name] = volume
-        cfg = gear_facts(teeth)
+        cfg = cone_facts(teeth)
 
         # OD check via the equation-driven diameter dimension (selection-free;
         # the measure tool's point selection proved unreliable on the
@@ -1317,6 +1238,17 @@ async def build(adapter) -> dict[str, str]:
                 "regenerate"
             )
         _telemetry.success(f"{name}: blank diameter dim = {od:g}")
+        # The native thickness is the printed acceptance size: prove the
+        # configuration literal reached it (the involute flanks solve from the
+        # same ToothThickness global through Delta).
+        thickness = read_dimension(adapter, thickness_dim)
+        expected_thickness = cfg["ToothThickness"] * dim_unit
+        if abs(thickness - expected_thickness) > 1e-6 * expected_thickness:
+            raise RuntimeError(
+                f"{name}: {thickness_dim} reads {thickness:g}, expected "
+                f"{expected_thickness:g} -- ToothThickness did not regenerate"
+            )
+        _telemetry.success(f"{name}: tooth thickness dim = {thickness:g}")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -1389,8 +1321,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Gear Data": gear_data(DEFAULT_TEETH, BACKLASH_MM),
-            "Manufacturing Notes": DRAWING_NOTES,
+            "Gear Data": gear_data(DEFAULT_TEETH),
+            "Manufacturing Notes": drawing_notes(DEFAULT_TEETH),
         },
     )
     for configuration, teeth in CONFIGS:
@@ -1403,7 +1335,8 @@ async def build(adapter) -> dict[str, str]:
                 # names its own gear (Fable, 2026-09-23: twenty sheets carried
                 # one number).  The grouped BOM keeps MHA-013 (AlternateName).
                 "Number": configuration_number(part_number, teeth),
-                "Gear Data": gear_data(teeth, BACKLASH_MM),
+                "Gear Data": gear_data(teeth),
+                "Manufacturing Notes": drawing_notes(teeth),
                 "Material Specification": material_specification(teeth),
             },
         )
