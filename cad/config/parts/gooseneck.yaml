@@ -1,9 +1,10 @@
 gooseneck:
   number: MHA-032
   # The tube is purchased stock, printed as reference (gooseneck_spec
-  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block cell holds one
-  # line, so material abbreviates; material_specification spells it out.
-  material: A519 1010 CD SMLS TUBE 16 OD X 2 WALL; 1018 PLUG/SCREW
+  # TUBE_STOCK_WALL_TOL cites the A519 wall band). The title-block cell wraps
+  # past about 36 characters into the row below (farm r20), so material names
+  # the tube as OD x wall; material_specification spells it out.
+  material: A519 1010 16x2 TUBE; 1018 PLUG/SCREW
   material_specification: ASTM A519 1010 COLD-DRAWN SEAMLESS TUBE 16 OD X 2 WALL; AISI 1018 PLUG/SCREW
   finish: ASTM B456 SC2 NI-CR PLATE AFTER BRAZE; NO MASKING; DIMENSIONS PRE-PLATE
   quantity: 1

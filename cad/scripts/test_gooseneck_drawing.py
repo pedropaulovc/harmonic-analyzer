@@ -116,3 +116,11 @@ def test_stock_tube_wall_holds_the_floor_through_the_bend() -> None:
     bend = straight * 2.0 * geom.BEND_R / (2.0 * geom.BEND_R + geom.TUBE_DIA)
     assert round(straight, 9) >= 1.8
     assert bend >= 1.5
+
+
+def test_material_fits_one_title_block_line() -> None:
+    """Farm r20: a 51-character material wrapped into the DRAWN PER row; the
+    former 36-character string printed on one line."""
+    import _config
+
+    assert len(str(_config.parts("gooseneck")["material"])) <= 36
