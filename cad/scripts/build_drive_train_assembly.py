@@ -843,7 +843,8 @@ from build_cone_pivot_post import (  # noqa: E402
 from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_BORE_SPEC as TIP_ADJ_BORE_SPEC,
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
-    ADJUSTER_CSK as TIP_ADJ_CSK,
+    ADJUSTER_EMBED as TIP_ADJ_EMBED,
+    ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
@@ -942,16 +943,12 @@ for _lbl, _s0, _hx, _hz in (
             raise AssertionError(
                 f"{_lbl} overhangs the swing platform at station {_end:g}"
             )
-# The shaft's tip reaches through the block to the adjuster cup: past the
-# south countersink by 2.0 (E11/W1: the #10-32 cup rim sits 9.5 in from the
-# north face, so the tip lands ~3.7 inside), end short of the north face.
+# Where the tip ends is owned by the end-play stack below: it sits on the
+# adjuster's cup apex, and the cup rim stays inside the adjuster's working
+# window.  (The former ">= 5 inside the block" floor was the tip-JOURNAL
+# engagement of ada675b1, when the block was the tip bearing; f4462091 moved
+# radial support to the brass bushing and left the number behind.)
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
-if not (
-    TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 + TIP_ADJ_CSK + 2.0
-    <= _TIP_END_STATION
-    <= TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - 0.5
-):
-    raise AssertionError("shaft tip end does not reach the tip-block adjuster")
 # The stub end stands 1.0 mm proud of the post's inclined journal face.
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]
 _POST_SOUTH_STATION = POST_STATION - POST_CONE_BOSS_LENGTH / 2.0
@@ -974,13 +971,21 @@ _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
-if BUSH_STATION < _STUB_START + 1.0:
-    raise AssertionError("tip bushing rides off the 1/32in stub section")
+# tip_stub_radially_supported: the brass bushing is the tip's only radial
+# bearing, so its whole length rides the stub section on a matching bore.
+if not (
+    _STUB_START + 1.0 <= BUSH_STATION
+    and BUSH_STATION + BUSH_LEN <= _TIP_END_STATION
+):
+    raise AssertionError("tip stub is not radially supported: bushing rides off the stub")
 if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
     raise AssertionError("tip-bushing bore does not match the tip stub dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-if ADJ_EMBED > TIP_BLOCK_Z - TIP_ADJ_CSK - 0.5:
-    raise AssertionError("adjuster cup rim leaves the through thread's south end")
+# adjuster_cup_in_working_window: the fit-up embed is the block spec's.
+if ADJ_EMBED != TIP_ADJ_EMBED or not (
+    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_EMBED <= TIP_ADJ_EMBED_WINDOW[1]
+):
+    raise AssertionError("adjuster cup rim is outside its working window")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
     raise AssertionError("adjuster cup depth is outside the stock body")
 if ADJ_CUP_DIA < _STUB_DIA + 0.25:

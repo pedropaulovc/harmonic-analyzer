@@ -49,9 +49,10 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
 ADJUSTER_EMBED = 9.5
-# 45-degree break on each tap-drill mouth: a 90-degree countersink to about the
-# thread major, so the first full thread starts under it.
-ADJUSTER_CSK = 0.4
+# 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
+# the first thread starts full rather than on a feather edge (Main,
+# 2026-09-24).  Its depth is the 45-degree break on the tap drill.
+ADJUSTER_CSK_DIA = 5.0
 # ASME B1.1 #10-32 UNF-2B minimum minor diameter (0.1560 in): the tightest
 # envelope the shaft tip passes through.
 ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
@@ -89,6 +90,9 @@ if (FOOT_DEPTH - 0.8) - (FOOT_THREAD_DEPTH + 0.8) < 1.5 * _FOOT_PITCH_MM:
 PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
 ADJUSTER_BORE_SPEC = HoleSpec("tapped", ADJUSTER_THREAD)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
+ADJUSTER_CSK = (ADJUSTER_CSK_DIA - ADJUSTER_BORE_DIA) / 2.0
+if ADJUSTER_CSK_DIA < THREAD_MAJOR_MM[ADJUSTER_THREAD]:
+    raise AssertionError("adjuster countersink ends inside the thread major")
 PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
 FOOT_BORE_SPEC = HoleSpec(
     "tapped",
@@ -202,10 +206,22 @@ if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
         f"adjuster engagement {WORST_ADJUSTER_ENGAGEMENT_MM:.2f} < 1.5D at the "
         "printed worst case"
     )
-# The cup rim stays inside the block with a full thread past the south
-# countersink at the far end of the embed band.
-if ADJUSTER_EMBED + _GENERAL_1PL_MM > round(BLOCK_Z, 1) - _GENERAL_1PL_MM - ADJUSTER_CSK:
-    raise AssertionError("adjuster cup can leave the south thread at the printed limits")
+# The adjuster's working window, cup rim measured in from the north face:
+# shallow end = 1.5D of full thread under the north countersink; deep end = the
+# cup rim still on full thread above the south countersink with the block at
+# its .X-short depth.  Fit-up sets the block so the cup seats at
+# ADJUSTER_EMBED; end-play turns (1/8 turn = 0.099) move it inside the window.
+ADJUSTER_EMBED_WINDOW = (
+    1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
+    round(BLOCK_Z, 1) - _GENERAL_1PL_MM - ADJUSTER_CSK,
+)
+if not (
+    ADJUSTER_EMBED_WINDOW[0]
+    <= ADJUSTER_EMBED - _GENERAL_1PL_MM
+    <= ADJUSTER_EMBED + _GENERAL_1PL_MM
+    <= ADJUSTER_EMBED_WINDOW[1]
+):
+    raise AssertionError("adjuster embed band leaves its working window")
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything

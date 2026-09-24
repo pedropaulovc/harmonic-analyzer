@@ -37,10 +37,13 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
 def test_adjuster_engagement_closes_at_the_printed_worst_case() -> None:
     """min(L, embed - .X) - countersink >= 1.5D; the cup stays on full thread."""
     spec = cone_tip_block_spec
-    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(8.30)
+    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(8.2193)
     assert spec.WORST_ADJUSTER_ENGAGEMENT_MM >= 1.5 * 4.826
-    assert spec.ADJUSTER_EMBED + 0.8 <= spec.BLOCK_Z - 0.8 - spec.ADJUSTER_CSK
-    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø4.8 BOTH ENDS"
+    assert spec.ADJUSTER_CSK_DIA > 4.826
+    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((7.7197, 10.7193))
+    low, high = spec.ADJUSTER_EMBED_WINDOW
+    assert low <= spec.ADJUSTER_EMBED - 0.8 <= spec.ADJUSTER_EMBED + 0.8 <= high
+    assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø5.0 BOTH ENDS"
 
 
 def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
@@ -53,7 +56,7 @@ def test_adjuster_callout_names_both_countersinks_under_the_thread() -> None:
     rewritten = drawing._adjuster_callout_definitions(native)
     assert rewritten[5] == native[5]
     assert rewritten[7] == (
-        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø4.8 BOTH ENDS"
+        "<hw-threaddesc> <hw-threadclass> <hw-thru>\n90° CSK Ø5.0 BOTH ENDS"
     )
     with pytest.raises(RuntimeError):
         drawing._adjuster_callout_definitions({**native, 5: native[7]})
