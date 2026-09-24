@@ -401,6 +401,8 @@ BANK_STEPS = "\n".join(
         # Wording from dtscout (dt-bank-pedestal-layout-20260923.md sections 3
         # and 11): x is set on the mill DRO against the plinth east face, since
         # a square cannot resolve the band and a caliper cannot reach 168.21.
+        # dtscout's 168.21 +/-0.10 prints as the limits 168.11-168.31: the
+        # drawing-spec purity gate keeps bilateral bands in model/spec.
         # The band protects channel accuracy (error_budget axis_dx: drum axis
         # x against the rocker pivot tilts all 20 rods), not the cone mesh
         # (depthed at assembly) or the pinion rig (feeler-set).
@@ -418,11 +420,11 @@ BANK_STEPS = "\n".join(
         "   MHA-035 PLINTH EAST FACE (HOLE-TABLE DATUM) AND ZERO DRO X. AT EACH",
         "   END, EDGE-FIND BOTH SIDES OF THE PROTRUDING MHA-028 STOCK AND",
         "   HALVE; SHIFT THAT MHA-004, FEELER HELD, UNTIL THE STOCK CENTRE",
-        "   READS X 168.21 +/-0.10. HOLD, AND SPOT MHA-035 THROUGH EACH MHA-004",
+        "   READS X 168.11-168.31. HOLD, AND SPOT MHA-035 THROUGH EACH MHA-004",
         "   FOOT HOLE WITH AN 11/64 TRANSFER PUNCH. LIFT THE BANK AND BOTH",
         "   MHA-004 OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING), 2 PLACES; BLOW OUT CHIPS. REFIT; RE-SET THE FEELER AND",
-        "   X 168.21 +/-0.10 AT BOTH ENDS, THEN TIGHTEN 2X MHA-143 AND RECHECK.",
+        "   X 168.11-168.31 AT BOTH ENDS, THEN TIGHTEN 2X MHA-143 AND RECHECK.",
         "   MEASURE MHA-004 OUTER FACE TO OUTER FACE; CUT MHA-028 TO THAT -6.0",
         "   AND FACE BOTH ENDS; IT MUST SLIDE FREELY THROUGH BOTH BORES. FIT",
         "   MHA-125 IN EACH. END PLAY 0.5-0.8 EACH END.",
@@ -433,12 +435,23 @@ BANK_STEPS = "\n".join(
 RIG_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE CONT. - PINION RIG",
-        "10. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT. MATCH-REAM THE",
-        "    MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR SLIDE BY HAND).",
-        "11. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
-        "12. JOURNAL MHA-102 IN THE MHA-056 TOP BORES; HANG BOTH MHA-056 ON",
-        "    MHA-062 THROUGH {pivot_blocks}X MHA-061.",
-        "13. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
+        # The front MHA-056 top bore is a closed 8 mm hole: once MHA-002 is
+        # bonded, the drum blocks MHA-102 from the north and its 15 mm head
+        # from the south. So the arbor passes the front strap bare, back end
+        # first, and the drum is bonded after (reviewfirst, Main 2026-09-24).
+        "10. PRESS {cam_pins}X MHA-116 INTO THE MHA-056 SEATS PER ITS PRINT.",
+        "11. MATCH-REAM THE MHA-102 HEAD TO MHA-058; PRESS MHA-058 (NO TURN OR",
+        "    SLIDE BY HAND).",
+        # R1a (user): pinned retention collar MHA-144. Placeholder until the
+        # collar PR lands; the integration gate forbids shipping it.
+        "12. [PENDING: MHA-144 COLLAR - SLIDE IT ON FROM THE MHA-102 BACK END,",
+        "    PAST BOTH JOURNALS, TO ITS STATION; DRIVE ITS 1/16 SPRING PIN.]",
+        "13. PASS MHA-102, BACK END FIRST, THROUGH THE FRONT MHA-056 TOP BORE",
+        "    FROM THE HEAD SIDE.",
+        "14. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
+        "15. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
+        "    BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
+        "16. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
         "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
         "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
@@ -449,24 +462,27 @@ RIG_STEPS = "\n".join(
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
         # equal gap change; 2.5 is the physical rest gap, not the CAD gap
         # (pinioncluster, PR #837).
-        "14. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
+        "17. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
         "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
         "    ON THE BASE WITH MHA-114 FITTED.",
         "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
-        "15. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
+        "18. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
+        # E-a (user): the strap feet are pinned to the torque shaft, match-
+        # drilled at fit-up. Placeholder until pinioncluster's PR lands.
+        "19. [PENDING: MATCH-DRILL AND PIN THE MHA-056 FEET TO MHA-062.]",
         # Seat depths from the base's own seat specs (build_harmonic_base
         # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
         # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
         # 8.975 prints as 9.0: .X +/-0.8 is the honest band for a tap depth.
-        "16. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
+        "20. SPOT MHA-035 THROUGH THE MHA-061 HOLES; DRILL #29 X 15.0, TAP",
         "    #8-32 X 12.75 (PLUG, THEN BOTTOMING), {slotted} PLACES. SET",
         "    MHA-114 WITH ITS TERMINAL FLAT ON THE PARKED BACK MHA-056; SPOT",
         "    THROUGH ITS FOOT HOLE; DRILL #43 X 11.0, TAP #4-40 X 9.0 (PLUG,",
         "    THEN BOTTOMING), 1 PLACE. FIT {slotted}X MHA-101 AND 1X MHA-103.",
-        "17. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
+        "21. OTHER BASE MOUNTING: SEE SHEET 8, EXTERNAL INTERFACES.",
     )
 )
 
@@ -492,7 +508,7 @@ CHECKS = "\n".join(
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "   [PENDING: PINION BRACKET PLACEMENT AND TOOTH-COUNT RULINGS]",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 15).",
+        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 18).",
     )
 )
 

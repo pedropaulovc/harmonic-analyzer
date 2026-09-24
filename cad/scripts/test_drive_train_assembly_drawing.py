@@ -23,7 +23,7 @@ EXTERNAL_NUMBERS = frozenset({"MHA-035"})
 # 2026-09-23: drawing-only rulings commit). The integration commit that adds
 # the rows deletes this set; the test below fails once a row lands anyway.
 PRE_REGISTERED_NUMBERS = frozenset(
-    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143"}
+    {"MHA-139", "MHA-140", "MHA-141", "MHA-142", "MHA-143", "MHA-144"}
 )
 
 
@@ -149,11 +149,20 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
         assert phrase in steps, phrase
-    assert "ACCEPT 2.3-2.7 (SHEET 7, STEP 15)" in drawing.CHECKS
-    assert "15. FACE A MHA-002 TOOTH TIP" in steps
+    assert "ACCEPT 2.3-2.7 (SHEET 7, STEP 18)" in drawing.CHECKS
+    assert "18. FACE A MHA-002 TOOTH TIP" in steps
     assert "SEE SHEET 8" in drawing.ASSEMBLED_HEADING
     assert "SHEET 8" in drawing.RIG_STEPS
     assert "SHEET 7" in drawing.BANK_STEPS
+
+
+def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
+    """The front strap bore is closed: a bonded drum can no longer pass it."""
+    steps = drawing.RIG_STEPS
+    front = steps.index("THROUGH THE FRONT MHA-056 TOP BORE")
+    drum = steps.index("FIT MHA-002 ON MHA-102")
+    back = steps.index("IN THE BACK MHA-056 TOP BORE")
+    assert front < drum < back
 
 
 def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
