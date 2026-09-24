@@ -60,6 +60,7 @@ PARKED_AIR = 0.15
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
+PAD_LEN_PLACES = 2  # PadLen prints .XX (pinion_spring_spec)
 HOLE_FROM_END = 4.5
 FOOT_FLAT = 0.5
 FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
@@ -79,7 +80,7 @@ MODULUS_MPA = 110_000.0
 # low end.
 FORMED_BAND_MM = 0.5
 YIELD_MPA = 550.0
-PRESET_DEG = 3.6
+PRESET_DEG = 3.4
 
 _LAM = math.radians(STRAP_LEAN_DEG)
 STRAP_U = (math.sin(_LAM), math.cos(_LAM))  # up the strap axis
