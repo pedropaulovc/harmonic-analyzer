@@ -76,11 +76,16 @@ Catalog specifications checked on September 10, 2026:
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
   black-oxide alloy steel button head hex drive screw that holds the cone tip
-  block (U30, rule-12 W22). It was read on September 23, 2026: head Ø0.262 in
-  x 0.073 in, 5/64 hex drive, fully threaded. A re-read on September 24 was
-  refused (HTTP 403). No vendor SLDPRT is harvested:
-  `diag_build_91255A148.py` models it from those catalog dimensions, with its
-  assumed edge band and socket depth stated in its docstring.
+  block (U30, rule-12 W22). Source: the McMaster product page, supplied by
+  the user on September 24, 2026 (an agent fetch that day was refused, HTTP
+  403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
+  hex drive, 1/2 in under the head, fully threaded, 140 ksi, ASME B18.3 /
+  ASTM F835. `diag_build_91255A148.py` models it from those catalog
+  dimensions, with its assumed edge band and socket depth stated in its
+  docstring. The vendor file is local-only (© McMaster, gitignored) as
+  `91255A148.SLDPRT`; the replica gate against it is pending.
+  Evidence SHA-256: native SLDPRT
+  `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
