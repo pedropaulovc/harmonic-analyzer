@@ -161,11 +161,25 @@ def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> No
     pair = ("pinion-bracket-1", "pinion-cam-pin-1")
     monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
 
+    events: list[tuple[str, dict]] = []
+    infos: list[str] = []
+    monkeypatch.setattr(
+        _assembly._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    monkeypatch.setattr(_assembly._telemetry, "info", infos.append)
     adapter = _InterferenceAdapter(_Interference(pair, 0.37))
     _assembly.check_no_interference(
         adapter,
         allowed_pairs={frozenset(pair): 0.45},
     )
+    # The reading reaches an info-level farm task.log and the trace: a bounded
+    # limit is calibrated from it (#838: no leaf had ever recorded one).
+    [(name, attrs)] = events
+    assert name == "interference.bounded_pair"
+    assert attrs["pair"] == list(pair)
+    assert attrs["overlap_mm3"] == pytest.approx(0.37)
+    assert attrs["limit_mm3"] == 0.45
+    assert any("overlap 0.3700 mm^3 allowed (limit 0.4500 mm^3)" in line for line in infos)
 
     with pytest.raises(RuntimeError, match="0.46 mm\\^3"):
         _assembly.check_no_interference(

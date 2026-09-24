@@ -1993,10 +1993,19 @@ def check_no_interference(
                 f" (<= {max(chain_mesh_contacts):.2f} mm^3) allowed -- chain seated"
                 f" on the pitch circle"
             )
+        # Info, not debug, and a span event: a farm leaf keeps only its
+        # info-level task.log, and a bounded limit is calibrated from these
+        # readings.
         for names, volume_mm3, allowed_volume in bounded_contacts:
-            _telemetry.debug(
+            _telemetry.event(
+                "interference.bounded_pair",
+                pair=names,
+                overlap_mm3=volume_mm3,
+                limit_mm3=allowed_volume,
+            )
+            _telemetry.info(
                 f"{' <-> '.join(names)} intentional fit overlap "
-                f"{volume_mm3:.2f} mm^3 allowed (limit {allowed_volume:.2f} mm^3)"
+                f"{volume_mm3:.4f} mm^3 allowed (limit {allowed_volume:.4f} mm^3)"
             )
         if details:
             raise RuntimeError(f"{len(details)} interference(s): " + "; ".join(details))
