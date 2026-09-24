@@ -35,10 +35,13 @@ from pinion_arbor_spec import (
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
     DRAWING_PRECISION_BY_NAME,
+    DRUM_STATION,
     FRONT_JOURNAL_Z,
     HEAD_CAP_SAG,
     HEAD_CENTER_Z,
+    HEAD_DIA,
     HEAD_FRONT_Z,
+    HEAD_REAR_Z,
     OVERALL_LEN,
     SHAFT_DIA,
     SURFACE_FINISHES,
@@ -107,6 +110,13 @@ BACK_RA_X = _sheet_x(BACK_JOURNAL_Z) + RA_SYMBOL_OFFSET
 # space left of them.  Its shelf passes under the Ra symbol and across the
 # back station witness, stopping short of the bond-zone text.
 BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
+# The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
+# of its drum-end witness.
+DRUM_STATION_TEXT_WIDTH = 0.035
+DRUM_STATION_TEXT_XY = (
+    _sheet_x(HEAD_REAR_Z + DRUM_STATION) - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
+    0.123,
+)
 # The bond-zone diameter stands over the part's witness (x 0.195) but hangs
 # its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
 # two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
@@ -123,7 +133,12 @@ PRINCIPAL_KEEP = {
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
-    "BackJournalFromHeadRear": (0.207, 0.115),
+    # The drum station stacks between the two land stations.  Its text sits
+    # outside, head side of nothing: left of its own drum-end witness, since
+    # between that witness and the head face the neck-end witness drops
+    # through it.  The back station's text moves left to clear it.
+    "DrumStationFromHeadRear": DRUM_STATION_TEXT_XY,
+    "BackJournalFromHeadRear": (0.170, 0.115),
     # Right of the overall-length witness at the front crown apex (x 0.3215).
     "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
@@ -152,7 +167,10 @@ DIAMETER_POSITIONS = {
     "NeckDia": (0.300, 0.194),
 }
 DIMENSION_CALLOUTS = {
-    "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
+    # One name for the axial datum every station runs from (Fable m1): the
+    # head end has two shoulders, Ø8-Ø10.5 and Ø10.5-Ø15.
+    "BackRimFromHeadRear": f"FROM BACK CROWN ROOT TO <MOD-DIAM>{HEAD_DIA:.0f} HEAD REAR FACE",
+    "DrumStationFromHeadRear": "DRUM STATION",
     "OverallLen": "OVERALL",
     "BackCapSagDim": "BACK CROWN",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
@@ -504,7 +522,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The tips ride the message text, not only an attribute: a farm leaf's
     # task.log and the fleet workspace carry the text alone.
     directions = ", ".join(
-        f"{name}@{tx * 1000:.1f},{ty * 1000:.1f}mm:{dx:+.3f}/{dy:+.3f}"
+        f"{name} tip ({tx * 1000:.1f}, {ty * 1000:.1f}) mm dir ({dx:.3f}, {dy:.3f})"
         for name, ((tx, ty), (dx, dy)) in sorted(arrows.items())
     )
     _telemetry.info(

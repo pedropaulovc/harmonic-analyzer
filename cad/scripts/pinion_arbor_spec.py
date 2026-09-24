@@ -274,6 +274,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "BondZoneReference": {"BondZoneDia"},
+    # Where the MHA-002 drum's front end is bonded, from the Ø15 head rear
+    # face at the general .X band (ruling A); an assembly station, not a
+    # turned feature, so the note names it and the sheet dimensions it.
+    "DrumStationReference": {"DrumStationFromHeadRear"},
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
@@ -297,6 +301,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 2},
     "BondZoneReference": {"BondZoneDia": 2},
+    "DrumStationReference": {"DrumStationFromHeadRear": 2},
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},
@@ -325,12 +330,14 @@ CROSS_HOLE_CALLOUT = (
     "REAM THRU,\n"
     "CENTRED ON HEAD LENGTH"
 )
+# Notes never carry dimensions (Codex P1 on #814): the drum station is the
+# model's DrumStationFromHeadRear, printed on the profile as "DRUM STATION"
+# with its .X band, and the note only names it.
 DRAWING_NOTES = "\n".join(
     (
         "JOURNALS RUN IN MHA-056 REAMED BORES.",
         f"SHAFT SLIPS INTO MHA-002; BOND WITH {RETAINING_COMPOUND}, DRUM FRONT END",
-        f"  {DRUM_STATION:.2f} +/-{DRUM_STATION_BAND:.1f} FROM HEAD SHOULDER. "
-        "WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
+        "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

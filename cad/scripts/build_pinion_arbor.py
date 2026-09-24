@@ -45,6 +45,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
     set_dimension_prefix,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
@@ -64,6 +65,8 @@ from pinion_arbor_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRUM_STATION,
+    DRUM_STATION_BAND,
     EXPOSED_SHAFT_LEN,
     FRONT_JOURNAL_FROM_HEAD_REAR,
     FRONT_JOURNAL_Z,
@@ -449,6 +452,7 @@ async def build(adapter) -> dict[str, str]:
         "JournalLen": JOURNAL_LEN,
         "FrontJournalFromHeadRear": FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": BACK_JOURNAL_FROM_HEAD_REAR,
+        "DrumStationFromHeadRear": DRUM_STATION,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -707,6 +711,14 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += await _add_axial_reference(
         adapter,
+        feature_name="DrumStationReference",
+        dimension_name="DrumStationFromHeadRear",
+        start_v=-HEAD_REAR_Z,
+        end_v=-(HEAD_REAR_Z + DRUM_STATION),
+        drive_expression='"DrumStationFromHeadRear"',
+    )
+    drive_jobs += await _add_axial_reference(
+        adapter,
         feature_name="OverallReference",
         dimension_name="OverallLen",
         start_v=-(HEAD_FRONT_Z - HEAD_CAP_SAG),
@@ -743,6 +755,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "DrumStationReference", "DrumStationFromHeadRear", DRUM_STATION_BAND
     )
     set_dimension_bilateral_tolerance(
         adapter, "FrontJournalReference", "FrontJournalDia", *deviations(JOURNAL_DIA_BAND)

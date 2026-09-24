@@ -113,6 +113,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {
         ("BondZoneReference", "BondZoneDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("DrumStationReference", "DrumStationFromHeadRear"): "DRUM_STATION_BAND",
         ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_DIA_BAND)",
         ("FrontJournalReference", "FrontJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("BackJournalReference", "BackJournalDia"): "*deviations(JOURNAL_DIA_BAND)",
@@ -221,6 +222,7 @@ def test_every_printed_length_is_exact_at_its_authored_places() -> None:
         "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
         "FrontJournalLen": spec.JOURNAL_LEN,
         "BackJournalLen": spec.JOURNAL_LEN,
+        "DrumStationFromHeadRear": spec.DRUM_STATION,
     }
     for name, value in nominal.items():
         places = spec.DRAWING_PRECISION_BY_NAME[name]
@@ -435,13 +437,47 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert abs(back_mid - back_strap_mid) <= 0.05 + 1e-9
 
 
-def test_drum_bond_note_states_the_derived_station() -> None:
+def test_drum_station_is_a_model_dimension_the_note_only_names() -> None:
+    """Codex P1 on #814: notes never carry dimensions.  The drum station is
+    the model's own reference dimension from the Ø15 head rear face, printed
+    at .X with the "DRUM STATION" callout the note points to."""
     assert spec.DRAWING_NOTES.splitlines() == [
         "JOURNALS RUN IN MHA-056 REAMED BORES.",
         "SHAFT SLIPS INTO MHA-002; BOND WITH LOCTITE 638, DRUM FRONT END",
-        "  61.55 +/-0.8 FROM HEAD SHOULDER. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
+        "  AT DRUM STATION. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
     ]
-    assert f"{spec.DRUM_STATION:.2f} +/-{spec.DRUM_STATION_BAND:.1f}" in spec.DRAWING_NOTES
+    assert f"{spec.DRUM_STATION:.2f}" not in spec.DRAWING_NOTES
+    assert f"{spec.DRUM_STATION_BAND:.1f}" not in spec.DRAWING_NOTES
+    assert spec.DRAWING_DIMENSIONS["DrumStationReference"] == {"DrumStationFromHeadRear"}
+    assert spec.DRAWING_PRECISION_BY_NAME["DrumStationFromHeadRear"] == 2
+    assert drawing.DIMENSION_CALLOUTS["DrumStationFromHeadRear"] == "DRUM STATION"
+    assert "DRUM STATION" in spec.DRAWING_NOTES
+    assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND
+
+
+def test_every_station_names_the_same_head_rear_face() -> None:
+    """Fable m1: the head end has two shoulders, so "HEAD SHOULDER" was
+    ambiguous for the datum every station runs from."""
+    assert "HEAD SHOULDER" not in spec.DRAWING_NOTES
+    assert not any("HEAD SHOULDER" in text for text in drawing.DIMENSION_CALLOUTS.values())
+    assert drawing.DIMENSION_CALLOUTS["BackRimFromHeadRear"].endswith(
+        "<MOD-DIAM>15 HEAD REAR FACE"
+    )
+
+
+def test_drum_station_text_clears_the_station_stack() -> None:
+    """The drum station's text sits left of its drum-end witness: between
+    that witness and the head face, the neck-end witness drops through."""
+    x, y = drawing.PRINCIPAL_KEEP["DrumStationFromHeadRear"]
+    half = drawing.DRUM_STATION_TEXT_WIDTH / 2.0
+    drum_end = drawing._sheet_x(spec.HEAD_REAR_Z + spec.DRUM_STATION)
+    assert x + half <= drum_end - 0.003
+    # Between the 47.4 (above) and 199.9 (below) station lines.
+    assert drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][1] < y
+    assert y < drawing.PRINCIPAL_KEEP["FrontJournalFromHeadRear"][1]
+    # The 199.9 text (about 18 mm wide) stays clear of it horizontally.
+    back_x = drawing.PRINCIPAL_KEEP["BackJournalFromHeadRear"][0]
+    assert back_x + 0.009 + 0.010 <= x - half
 
 
 
