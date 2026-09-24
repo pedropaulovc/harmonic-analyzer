@@ -39,9 +39,10 @@ JOURNAL_DIA_BAND = (-0.010, -0.030)
 # their straps at nominal (to the one place they print at).  Each land must still cover its strap by
 # MIN_LAND_OVER_STRAP at the worst corner of every printed band (stations,
 # land length, strap thickness, drum length, drum-station band) and of the
-# drum's axial float.  JOURNAL_LEN is the smallest whole millimetre that does
-# so with a printed station band of at least MIN_DRUM_STATION_BAND; no .X band
-# is tightened to make it fit (U27).
+# drum's axial float.  The drum station prints the general .X band, and
+# JOURNAL_LEN is the smallest whole millimetre that keeps every margin with it;
+# no band is tightened to make it fit (U27, Main 2026-09-24: a longer land
+# rather than a tighter station).
 LINEAR_X_BAND = 0.8  # .X title-block row
 # MHA-056 prints its thickness at .X (pinion_bracket_spec.THICKNESS_BAND,
 # pinned equal by test).  Not imported: the drive-train recipe reads this spec
@@ -55,7 +56,7 @@ DRUM_STATION = DRUM_STATION_AS_BUILT + DRUM_AFT_SHIFT
 DRUM_LEN = 143.2  # MHA-002 FACE_WIDTH
 DRUM_LEN_BAND = (LINEAR_X_BAND, -LINEAR_X_BAND)  # general .X
 MIN_LAND_OVER_STRAP = 0.5
-MIN_DRUM_STATION_BAND = 0.5
+DRUM_STATION_BAND = LINEAR_X_BAND
 # User ruling 2026-09-24 (option c): the pivot blocks locate the swing cluster.
 # It is pushed against the back block, and the front block's slotted base
 # holes are set at fit-up with an END_PLAY feeler, within END_PLAY_SET_ERROR.
@@ -132,21 +133,20 @@ def worst_land_margins(
     return worst
 
 
-def drum_station_band(journal_len: float) -> float:
-    """The widest one-place station band that keeps every margin."""
-    slack = min(worst_land_margins(journal_len, 0.0).values()) - MIN_LAND_OVER_STRAP
-    return math.floor(slack * 10.0 + 1e-9) / 10.0
+def land_margin_slack(journal_len: float) -> float:
+    """Worst land-over-strap margin above the floor, both stops, printed bands."""
+    margins = worst_land_margins(journal_len, DRUM_STATION_BAND)
+    return min(margins.values()) - MIN_LAND_OVER_STRAP
 
 
 def _smallest_journal_len() -> float:
     for journal_len in range(int(STRAP_T) + 1, 40):
-        if drum_station_band(float(journal_len)) >= MIN_DRUM_STATION_BAND:
+        if land_margin_slack(float(journal_len)) >= -1e-9:
             return float(journal_len)
     raise AssertionError("no whole-mm journal land meets the drum-station stack")
 
 
 JOURNAL_LEN = _smallest_journal_len()
-DRUM_STATION_BAND = drum_station_band(JOURNAL_LEN)
 FRONT_JOURNAL_FROM_HEAD_REAR, BACK_JOURNAL_FROM_HEAD_REAR = land_stations(JOURNAL_LEN)
 LAND_MARGINS_AT_STOPS = {
     stop: worst_land_margins(JOURNAL_LEN, DRUM_STATION_BAND, stop=stop)

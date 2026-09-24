@@ -285,10 +285,10 @@ def test_layout_audit_gates_text_on_line_and_logs_the_rest() -> None:
 
 
 def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
-    """Ruling A on the user's located cluster (option c): the lands are the
-    smallest whole-mm length that keeps every land end over its strap by 0.5 at
-    the worst band corner, at BOTH stops of the fit-up end play, with a printed
-    drum-station band of at least 0.5; no .X band is tightened (U27)."""
+    """Ruling A on the user's located cluster (option c): with the drum station
+    at the general .X band, the lands are the smallest whole-mm length that
+    keeps every land end over its strap by 0.5 at the worst band corner, at
+    BOTH stops of the fit-up end play; no band is tightened (U27)."""
     import alignment_pinion_spec as drum
     import build_drive_train_assembly as assembly
     import pinion_bracket_geometry as strap
@@ -303,19 +303,20 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
         spec.DRUM_STATION_AS_BUILT + spec.DRUM_AFT_SHIFT
     )
 
-    assert spec.JOURNAL_LEN == pytest.approx(18.0)
+    assert spec.JOURNAL_LEN == pytest.approx(19.0)
     assert spec.DRUM_STATION == pytest.approx(61.55)
-    assert spec.DRUM_STATION_BAND == pytest.approx(0.6)
+    assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
+    assert spec.END_PLAY == 0.25 and spec.END_PLAY_SET_ERROR == 0.10
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
-        pytest.approx(47.9),
-        pytest.approx(200.4),
+        pytest.approx(47.4),
+        pytest.approx(199.9),
     )
     assert set(spec.LAND_MARGINS_AT_STOPS) == {"drum forward", "drum aft"}
     for margins in spec.LAND_MARGINS_AT_STOPS.values():
         assert set(margins) == set(spec.LAND_ENDS)
         assert min(margins.values()) >= 0.5 - 1e-9
     # One millimetre shorter fails: the derivation picked the smallest length.
-    assert spec.drum_station_band(spec.JOURNAL_LEN - 1.0) < 0.5
+    assert spec.land_margin_slack(spec.JOURNAL_LEN - 1.0) < 0.0
     # The drum never binds between the straps.
     assert spec.END_PLAY - spec.END_PLAY_SET_ERROR >= 0.1
     assert spec.drum_total_air() == (
@@ -337,7 +338,7 @@ def test_drum_bond_note_states_the_derived_station() -> None:
     assert spec.DRAWING_NOTES.splitlines() == [
         "JOURNALS RUN IN MHA-056 REAMED BORES.",
         "SHAFT SLIPS INTO MHA-002; BOND WITH LOCTITE 638, DRUM FRONT END",
-        "  61.55 +/-0.6 FROM HEAD SHOULDER. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
+        "  61.55 +/-0.8 FROM HEAD SHOULDER. WIPE SQUEEZE-OUT OFF JOURNAL LANDS.",
     ]
     assert f"{spec.DRUM_STATION:.2f} +/-{spec.DRUM_STATION_BAND:.1f}" in spec.DRAWING_NOTES
 
