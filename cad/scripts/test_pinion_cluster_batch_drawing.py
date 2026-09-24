@@ -127,27 +127,27 @@ class _Interference:
 
 
 class _InterferenceManager:
-    def __init__(self, interference: _Interference) -> None:
-        self._interference = interference
+    def __init__(self, *interferences: _Interference) -> None:
+        self._interferences = list(interferences)
 
     def GetInterferences(self) -> list[_Interference]:
-        return [self._interference]
+        return self._interferences
 
     def Done(self) -> None:
         pass
 
 
 class _InterferenceAssembly:
-    def __init__(self, interference: _Interference) -> None:
-        self.InterferenceDetectionManager = _InterferenceManager(interference)
+    def __init__(self, *interferences: _Interference) -> None:
+        self.InterferenceDetectionManager = _InterferenceManager(*interferences)
 
     def ToolsCheckInterference(self) -> None:
         pass
 
 
 class _InterferenceAdapter:
-    def __init__(self, interference: _Interference) -> None:
-        self.currentModel = _InterferenceAssembly(interference)
+    def __init__(self, *interferences: _Interference) -> None:
+        self.currentModel = _InterferenceAssembly(*interferences)
 
     @staticmethod
     def _attempt(action, *, default=None):
@@ -178,8 +178,12 @@ def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> No
     assert name == "interference.bounded_pair"
     assert attrs["pair"] == list(pair)
     assert attrs["overlap_mm3"] == pytest.approx(0.37)
+    assert attrs["body_count"] == 1
     assert attrs["limit_mm3"] == 0.45
-    assert any("overlap 0.3700 mm^3 allowed (limit 0.4500 mm^3)" in line for line in infos)
+    assert any(
+        "overlap 0.3700 mm^3 over 1 bodies allowed (limit 0.4500 mm^3)" in line
+        for line in infos
+    )
 
     with pytest.raises(RuntimeError, match="0.46 mm\\^3"):
         _assembly.check_no_interference(
@@ -194,6 +198,36 @@ def test_intentional_fit_allowance_is_pair_and_volume_bounded(monkeypatch) -> No
             ),
             allowed_pairs={frozenset(pair): 0.45},
         )
+
+
+def test_intentional_fit_allowance_bounds_the_pair_total(monkeypatch) -> None:
+    """#853: a pair split into several bodies is bounded by its TOTAL overlap.
+
+    662e4db1's adjuster/block thread annulus came back as 13 bodies, each
+    compared alone against the pair limit; a split pair whose every body is
+    under the limit but whose sum is over it passed.
+    """
+    pair = ("cone-tip-block-1", "cone-tip-adjuster-1")
+    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        _assembly._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    limit = {frozenset(pair): 1.0}
+
+    # Three bodies, each under the limit, 1.2 in total: a hard fault.
+    over = [_Interference(pair, 0.4) for _ in range(3)]
+    with pytest.raises(RuntimeError, match=r"1.2 mm\^3 over 3 bodies"):
+        _assembly.check_no_interference(_InterferenceAdapter(*over), allowed_pairs=limit)
+
+    # Under the limit both per body and in total: allowed, reported as one pair.
+    events.clear()
+    under = [_Interference(pair, 0.3), _Interference(tuple(reversed(pair)), 0.3)]
+    _assembly.check_no_interference(_InterferenceAdapter(*under), allowed_pairs=limit)
+    [(name, attrs)] = events
+    assert name == "interference.bounded_pair"
+    assert attrs["overlap_mm3"] == pytest.approx(0.6)
+    assert attrs["body_count"] == 2
 
 
 def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
