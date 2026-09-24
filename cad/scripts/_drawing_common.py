@@ -2752,6 +2752,7 @@ _VISIBILITY_HIDDEN = 1
 # swAnnotationVisibilityState_e: HalfHidden, Hidden
 _ANNOTATION_NOT_SHOWN = (2, 3)
 _SKETCH_FEATURE_TYPES = ("ProfileFeature", "3DProfileFeature")
+_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 
 
 def _model_hidden_sketches(
@@ -2770,9 +2771,13 @@ def _model_hidden_sketches(
     referenced = getattr(_early_bound(view, "IView"), "ReferencedDocument", None)
     if referenced is None:
         return [], {"*": "no referenced document"}
-    # Bound as IModelDoc2 (draw_harmonic_base / draw_cylinder_gear do the same):
-    # the raw ReferencedDocument dispatch exposes no FeatureByName to getattr.
-    model = _early_bound(referenced, "IModelDoc2")
+    # FeatureByName is IPartDoc's (r20: "IModelDoc2 does not declare
+    # 'FeatureByName'"); the raw dispatch answered getattr with nothing, which
+    # made r18/r19's check a silent no-op.  Only a part's own sketches count.
+    doc_type = int(_early_bound(referenced, "IModelDoc2").GetType())
+    if doc_type != _DOC_PART:
+        return [], {"*": f"referenced document type {doc_type}, not a part"}
+    model = _early_bound(referenced, "IPartDoc")
     hidden: list[str] = []
     report: dict[str, str] = {}
     for name in features:

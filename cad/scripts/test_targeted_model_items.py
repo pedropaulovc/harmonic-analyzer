@@ -303,6 +303,7 @@ class FakePart:
     """The view's referenced part; the import helper must only READ it."""
 
     def __init__(self, features: dict[str, tuple[str, int]]) -> None:
+        self.doc_type = 1  # swDocPART
         self.features = {
             name: FakeSketchFeature(type_name, visible)
             for name, (type_name, visible) in features.items()
@@ -310,6 +311,9 @@ class FakePart:
 
     def FeatureByName(self, name: str):
         return self.features.get(name)
+
+    def GetType(self) -> int:
+        return self.doc_type
 
 
 class VisibleAnnotation(FakeAnnotation):
@@ -463,3 +467,17 @@ def test_the_detection_report_is_logged_at_info(monkeypatch) -> None:
         "showing ['ArcReference']"
     )
     assert "dimension Visible states {'ArcCentreX': 1, 'Length': 1}" in infos[1]
+
+
+def test_a_view_of_an_assembly_is_not_checked_for_hidden_sketches(monkeypatch) -> None:
+    """Only a part's own sketches are toggled; anything else is reported."""
+    infos: list[str] = []
+    monkeypatch.setattr(drawing_common._telemetry, "info", infos.append)
+    adapter, drawing, view = _hidden_seat()
+    drawing.part.doc_type = 2  # swDocASSEMBLY
+    drawing_common.insert_feature_dimensions(adapter, view, ("Column",))
+    assert drawing.log == [("import", False)]
+    assert infos[0] == (
+        "hidden-sketch check Drawing View2: "
+        "{'*': 'referenced document type 2, not a part'}; showing []"
+    )
