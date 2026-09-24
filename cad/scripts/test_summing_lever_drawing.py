@@ -340,3 +340,32 @@ def test_web_and_plate_gate_rejects_a_thicker_web() -> None:
         "no summation web face on y=+2.54",
         "no summation web face on y=-2.54",
     ]
+
+
+def test_every_reference_sketch_is_saved_hidden() -> None:
+    """Each construction-only sketch that carries print dimensions renders
+    unless the part blanks it (asm, 2026-09-24: the R138.8 centre cross
+    floated off the part in the summing isometric), so every one the drawing
+    marks must be in the part's hide list."""
+    import build_summing_lever as build
+
+    marked = {
+        feature
+        for feature in summing_lever_spec.DRAWING_DIMENSIONS
+        if feature.endswith(("Reference", "References"))
+    }
+    assert marked == set(build.DRAWING_REFERENCE_SKETCHES)
+
+
+def test_only_orthographic_views_show_reference_sketches() -> None:
+    """Main's bar: the orthographic views keep the accepted sheet's marks and
+    the pictorial shows no reference-sketch geometry at all."""
+    import build_summing_lever as build
+
+    assert set(draw_summing_lever.VIEW_SKETCHES) == {
+        "form front",
+        "form top",
+        "spring-pattern plan",
+    }
+    for sketches in draw_summing_lever.VIEW_SKETCHES.values():
+        assert set(sketches) <= set(build.DRAWING_REFERENCE_SKETCHES)
