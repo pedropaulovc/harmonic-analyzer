@@ -308,7 +308,7 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     rel = (drive.PIVOT_X - drive.LIFT_X, drive.PIVOT_Y - drive.LIFT_Y)
     hub_clear = math.hypot(*rel) - lever.HUB_OD / 2.0 - shaft_r
     assert math.isclose(hub_clear, 8.95, abs_tol=5e-3)
-    arm_r = max(drive.LEVER_ROD_DIA, drive.LEVER_ROD_TIP_DIA) / 2.0
+    arm_r = drive.LEVER_ROD_DIA / 2.0
     steps = 200
     for k in range(steps + 1):
         t = math.radians(

@@ -798,9 +798,8 @@ from pinion_cam_pin_geometry import (  # noqa: E402
 from pinion_lever_geometry import (  # noqa: E402
     CAP_SAG as LEVER_CAP_SAG,
     HUB_LEN as LEVER_HUB_LEN,
+    ROD_DIA as LEVER_ROD_DIA,
     ROD_LEN as LEVER_ROD_LEN,
-    ROD_ROOT_DIA as LEVER_ROD_DIA,
-    ROD_TIP_DIA as LEVER_ROD_TIP_DIA,
     WALL_T as LEVER_WALL_T,
 )
 from pinion_handle_geometry import ROD_DIA as HANDLE_ROD_DIA  # noqa: E402
@@ -1399,10 +1398,9 @@ if abs((LEVER_Z - (LEVER_HUB_LEN / 2.0 - LEVER_WALL_T)) - LIFT_ROD_Z0) > 1e-9:
     raise AssertionError("lever hub bore floor off the lift rod's front end")
 # The parked lever shaft passes clear of the pinion ARBOR (PR7: the Ø8 steel
 # arbor replaced the drum's Ø6.35 stubs; it spans the lever's z band, so the
-# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod-root
+# 3D clearance is the 2D distance from the arbor's (x, y) to the Ø6 rod's
 # axis line). Perpendicular form when the foot lands on the rod segment,
-# endpoint distance otherwise. Rod ROOT dia books the worst case (the PR7
-# taper only thins toward the tip).
+# endpoint distance otherwise. The rod is a straight Ø6 (ch25 img07).
 _LEV_T = math.radians(LEVER_TILT_DEG)
 _LEV_U = (-math.sin(_LEV_T), math.cos(_LEV_T))  # positive tips machine -X
 _LEV_REL = (APINION_X - LIFT_X, APINION_Y - LIFT_Y)  # root -> arbor axis
@@ -1414,7 +1412,7 @@ else:
     _LEV_STUB_D = math.hypot(
         _LEV_REL[0] - _end * _LEV_U[0], _LEV_REL[1] - _end * _LEV_U[1]
     )
-if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+if _LEV_STUB_D < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
     raise AssertionError("lever shaft crowds the pinion arbor")
 
 # --- pinion return spring (ch. 25, p.68-69): keeps the drum disengaged -------
@@ -1773,7 +1771,7 @@ for _step in range(_LEV_SWEEP_STEPS + 1):
             _LEV_REL[0] - _end * _u[0],
             _LEV_REL[1] - _end * _u[1],
         )
-    if _d < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.25:
+    if _d < (ARBOR_DIA + LEVER_ROD_DIA) / 2.0 + 0.25:
         raise AssertionError("lever shaft crowds the arbor mid-throw")
 _LEV_Z = (LEVER_Z - 3.0, LEVER_Z + 3.0)  # rod plane through the throw
 if (

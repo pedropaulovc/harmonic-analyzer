@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A turned hub slipped over the MHA-060 lift rod's front end, with a tapered grip
-rod rising out of it; the MHA-135 pin (U36) match-drilled through hub and rod at
+A turned hub slipped over the MHA-060 lift rod's front end, with a straight Ø6
+grip rod rising out of it; the MHA-135 pin (U36) match-drilled through hub and rod at
 assembly carries the drive.  The 1:1 front view carries the hub and grip sizes,
 the projected top view the crown, and a 3:1 detail of the side view the hub's
 axial stations -- bore depth, end wall, grip axis and pin hole, all baselined
@@ -90,15 +90,14 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - FRONT_BBOX_CY) * _S
 
 
-ROD_ROOT_TEXT_Y = 20.0  # model height of the root-diameter text, clear of the hub
+ROD_DIA_TEXT_Y = 20.0  # model height of the rod-diameter text, clear of the hub
 
 
 FRONT_KEEP = {
     "HubOd": (0.030, _front_y(-HUB_OD / 2.0) - 0.010),
     "HubBore": (0.105, _front_y(-HUB_OD / 2.0) - 0.014),
     "RodTipY": (0.035, FRONT_CENTER[1] + 0.010),
-    "RodTipDia": (0.100, _front_y(ROD_LEN) + 0.012),
-    "RodRootDia": (0.105, _front_y(ROD_ROOT_TEXT_Y)),
+    "RodDia": (0.105, _front_y(ROD_DIA_TEXT_Y)),
 }
 TOP_KEEP = {"CapR": (0.105, TOP_CENTER[1] + 0.012)}
 # In the side view B (the mouth face, model z +5) is the LEFT end and the
@@ -123,8 +122,6 @@ DIMENSION_CALLOUTS = {
     "BoreDepth": "FLAT BOTTOM",
     "EndWall": "TO CROWN ROOT",
     "RodTipY": "FROM HUB AXIS",
-    "RodTipDia": "AT TIP",
-    "RodRootDia": "AT ROOT",
     "GripFromB": "GRIP AXIS",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
@@ -231,7 +228,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Engage Lever Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion engage lever; pinned hub; tapered grip rod",
+            3: "pinion engage lever; pinned hub; straight grip rod",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

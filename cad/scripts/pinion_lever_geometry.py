@@ -2,8 +2,9 @@ r"""Geometry-only contract for the pinion engage lever."""
 
 from __future__ import annotations
 
-ROD_ROOT_DIA = 4.0
-ROD_TIP_DIA = 6.0
+# Straight, no taper: ch25 page002_img07 annotates the rod "6 mm" beside the
+# hub, and equal-scale crops of its root and tip read the same width.
+ROD_DIA = 6.0
 ROD_LEN = 86.0
 ROD_Y0 = 3.5
 HUB_OD = 13.0
