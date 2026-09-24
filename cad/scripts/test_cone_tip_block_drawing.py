@@ -248,3 +248,54 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     }
     for keep in (drawing.TOP_KEEP, drawing.LEFT_KEEP, drawing.FRONT_KEEP):
         assert hidden_owners(keep) == set()
+
+
+def test_slot_width_text_stands_left_of_its_outside_arrows() -> None:
+    """Main eye-pass 5637ac42: the 1.2 slot's extension lines ran through "1.20"."""
+    slot_x = drawing.FRONT_CENTER[0]
+    text_x = drawing.FRONT_KEEP["SlitW"][0]
+    left_wall = slot_x - part.SLIT_W * drawing._S / 2.0
+    arrow_tail = left_wall - drawing.ARROW_LENGTH
+    assert text_x + drawing.VALUE_TEXT_HALF_WIDTH <= arrow_tail - 0.001
+    assert drawing.ARROWS_OUTSIDE == ("SlitW",)
+
+
+@pytest.mark.parametrize(
+    ("keep", "name", "center", "half_span"),
+    [
+        (drawing.BOTTOM_KEEP, "FootTapX", drawing.BOTTOM_CENTER[0], part.BLOCK_X),
+        (drawing.RIGHT_KEEP, "PinchDepthCenter", drawing.RIGHT_CENTER[0], part.BLOCK_Z),
+    ],
+)
+def test_half_block_station_values_clear_both_witnesses(
+    keep, name, center, half_span
+) -> None:
+    """Main eye-pass 5637ac42: the tap and hole witnesses ended in the decimal point.
+
+    Each station runs from a block edge to the centre; the value sits between
+    the two witness lines with room on both sides, not on either.
+    """
+    text_x = keep[name][0]
+    half_width = 0.0065 / 2.0  # a three-character value, measured on 5637ac42
+    edge = center - half_span * drawing._S / 2.0
+    assert edge + 0.002 <= text_x - half_width
+    assert text_x + half_width <= center - 0.002
+
+
+def test_foot_tap_z_value_clears_both_witnesses() -> None:
+    """The vertical station's value sits mid-span, off the tap's witness line."""
+    text_y = drawing.BOTTOM_KEEP["FootTapZ"][1]
+    half_height = 0.0019  # cap height ~3.8 mm on 5637ac42
+    tap_y = drawing.BOTTOM_CENTER[1]
+    edge_y = tap_y + part.BLOCK_Z * drawing._S / 2.0
+    assert tap_y + 0.002 <= text_y - half_height
+    assert text_y + half_height <= edge_y - 0.002
+
+
+def test_pinch_depth_dimension_line_stands_off_the_block_top() -> None:
+    """At +0.003 the 6.0's dimension line printed on the block's top edge."""
+    top = drawing._elevation_y(part.BLOCK_HEIGHT, drawing.RIGHT_CENTER)
+    assert drawing.RIGHT_KEEP["PinchDepthCenter"][1] - top == pytest.approx(
+        drawing.BOTTOM_KEEP["FootTapX"][1]
+        - (drawing.BOTTOM_CENTER[1] + part.BLOCK_Z * drawing._S / 2.0)
+    )

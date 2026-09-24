@@ -18,6 +18,7 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -45,6 +46,7 @@ from cone_tip_block_spec import (
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
     SLIT_DEPTH,
+    SLIT_W,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -86,11 +88,33 @@ def _elevation_y(model_y: float, center: tuple[float, float]) -> float:
     return center[1] + (model_y - BLOCK_HEIGHT / 2.0) * _S
 
 
+# Imported value text measured on run 5637ac42: a four-character value
+# ("1.20", "7.50") prints ~9.1 mm wide, a three-character one ("6.0", "7.5")
+# ~6.4 mm, and a native arrowhead ~3.4 mm long.  Main's eye-pass of that run
+# found values printed across their own witness lines and a hole centreline
+# (d976281d ruling: no text on a line), so the values below are placed from
+# these sizes rather than centred on a feature.
+VALUE_TEXT_HALF_WIDTH = 0.0046
+ARROW_LENGTH = 0.0034
+TEXT_CLEARANCE = 0.0015
+# The 1.2 slot prints 2.4 mm wide, narrower than its value, so the arrows
+# stand outside the slot walls and the text sits left of the left arrow's
+# tail on the extended dimension line.  Left, because on the adjuster
+# elevation PassageCenter's 7.50 span occupies the slot's right.
+SLIT_TEXT_OFFSET = (
+    SLIT_W * _S / 2.0 + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
+)
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _elevation_y(0.0, FRONT_CENTER) - 0.012),
     "BlockHt": (FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
-    "SlitW": (FRONT_CENTER[0], _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.014),
+    "SlitW": (
+        FRONT_CENTER[0] - SLIT_TEXT_OFFSET,
+        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.014,
+    ),
 }
+# swDimArrowsOutside: set, not left to the document's smart arrows.
+ARROWS_OUTSIDE = ("SlitW",)
+_DIM_ARROWS_OUTSIDE = 1
 TOP_KEEP = {"Depth": (TOP_CENTER[0] - 0.035, TOP_CENTER[1])}
 # The part-hidden reference sketch section A dimensions (PinchRise).
 SECTION_SKETCHES = ("PinchRiseReference",)
@@ -103,18 +127,31 @@ SECTION_KEEP = {
         ),
     )
 }
+# The half-block stations below run from a block edge to the hole centre, so
+# each value sits midway along its span, a quarter block from the centre.
+# Centred on the hole (run 5637ac42), the witness and centreline ended in the
+# decimal point.  PinchDepthCenter rides as high above the right view as
+# FootTapX does above the bottom one: at +0.003 its dimension line printed on
+# the block's top edge.
 RIGHT_KEEP = {
     "PinchDepthCenter": (
-        RIGHT_CENTER[0],
-        _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.003,
+        RIGHT_CENTER[0] - BLOCK_Z * _S / 4.0,
+        _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.007,
     )
 }
 LEFT_KEEP: dict[str, tuple[float, float]] = {}
 # The foot tap's two locations: FootTapX above the bottom view (between it and
 # the front view's 15.0), FootTapZ to its left; the view caption moves under it.
+# At the tap's height FootTapZ's witness ran into the end of its "6.0".
 BOTTOM_KEEP = {
-    "FootTapX": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.007),
-    "FootTapZ": (BOTTOM_CENTER[0] - BLOCK_X * _S / 2.0 - 0.009, BOTTOM_CENTER[1]),
+    "FootTapX": (
+        BOTTOM_CENTER[0] - BLOCK_X * _S / 4.0,
+        BOTTOM_CENTER[1] + BLOCK_Z * _S / 2.0 + 0.007,
+    ),
+    "FootTapZ": (
+        BOTTOM_CENTER[0] - BLOCK_X * _S / 2.0 - 0.009,
+        BOTTOM_CENTER[1] + BLOCK_Z * _S / 4.0,
+    ),
 }
 # A centreline runs a short way past the part it marks.
 AXIS_OVERRUN = 0.002
@@ -163,6 +200,25 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     if span < min_span_mm:
         raise RuntimeError(f"locating-foot edge span is only {span:.3f} mm")
     return edge
+
+
+def _set_arrows_outside(
+    adapter: Any, annotations: list[Any], names: tuple[str, ...]
+) -> None:
+    """Stand each named dimension's arrows outside its extension lines."""
+    remaining = set(names)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_OUTSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_OUTSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows outside")
+        remaining.discard(name)
+    if remaining:
+        raise RuntimeError(f"no dimension to set arrows outside: {sorted(remaining)}")
 
 
 def _add_adjuster_axis(adapter: Any, section: Any) -> None:
@@ -670,6 +726,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *back_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _set_arrows_outside(adapter, annotations, ARROWS_OUTSIDE)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (
