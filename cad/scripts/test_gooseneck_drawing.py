@@ -127,3 +127,28 @@ def test_material_fits_one_title_block_line() -> None:
     material = str(_config.parts("gooseneck")["material"])
     assert len(material) <= 36
     assert "CDS" in material
+
+
+def test_plating_spares_the_threads() -> None:
+    """Plating grows a 60-degree thread's pitch diameter ~4x its thickness, so
+    the screw is removed before plating and the plug thread is chased after;
+    the screw's own finish rides its view caption. The finish cell holds two
+    lines (~41-46 characters each)."""
+    import _config
+    import gooseneck_spec
+
+    finish = str(_config.parts("gooseneck")["finish"])
+    assert "SCREW REMOVED" in finish
+    assert "CHASE #6-32" in finish
+    assert len(finish) <= 82
+    assert "BLACK OXIDE, NOT PLATED" in gooseneck_spec.SCREW_VIEW_NOTE
+
+
+def test_plan_view_is_captioned() -> None:
+    from pathlib import Path
+
+    import gooseneck_spec
+
+    source = (Path(__file__).parent / "draw_gooseneck.py").read_text(encoding="utf-8")
+    assert gooseneck_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
+    assert 'add_property_linked_note(adapter, "Plan View Note"' in source

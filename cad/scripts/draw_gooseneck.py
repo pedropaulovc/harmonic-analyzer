@@ -130,6 +130,9 @@ POST_DIAMETER_ROW_MM = 24.0
 # section's outline still spans geometry it does not print.
 PLAN_CENTER = (0.085, 0.240)
 PLAN_SCALE = (1, 2)
+# Between the A-A cut letters (about 219 mm) and the plug-fit callout's top
+# (about 204 mm): more than one text height to each.
+PLAN_NOTE_XY = (0.085, 0.212)
 # A diametric dimension parked beyond its extension lines prints its text on a
 # shoulder running the SAME way as the extension lines (feature -> dim line,
 # measured r5). The plug diameter stands left of the plug, so its long fit
@@ -391,6 +394,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Plan View Note",
             "Screw View Note",
         ),
         required=(
@@ -401,6 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Plan View Note",
             "Screw View Note",
         ),
     )
@@ -498,6 +503,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate gooseneck fabrication sheet")
     plan = place_view(adapter, str(SOURCE), "*Top", *PLAN_CENTER, scale=PLAN_SCALE)
     set_hidden_lines_removed(adapter, plan)
+    add_property_linked_note(adapter, "Plan View Note", *PLAN_NOTE_XY)
     joint = create_section_view(
         adapter,
         plan,

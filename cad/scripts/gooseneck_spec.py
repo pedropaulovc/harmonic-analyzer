@@ -134,4 +134,9 @@ DRAWING_REFERENCE_PRECISION = 1
 
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
-SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1"
+# The screw is not plated with the tube and plug (see the part's finish), so
+# its own finish rides its view caption: stated once, next to the screw.
+SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1\nBLACK OXIDE, NOT PLATED"
+# The plan view only carries cutting line A-A, but it prints at 1:2 on a 1:3
+# sheet, so it is captioned like any unlabelled model view.
+PLAN_VIEW_NOTE = "PLAN VIEW SCALE 1:2"

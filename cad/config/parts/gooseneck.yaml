@@ -7,7 +7,13 @@ gooseneck:
   # it) and OD x wall; material_specification spells it out.
   material: A519 1010 CDS 16x2; 1018 PLUG/SCREW
   material_specification: ASTM A519 1010 COLD-DRAWN SEAMLESS TUBE 16 OD X 2 WALL; AISI 1018 PLUG/SCREW
-  finish: ASTM B456 SC2 NI-CR PLATE AFTER BRAZE; NO MASKING; DIMENSIONS PRE-PLATE
+  # Plating builds about 4x its thickness onto a 60-degree thread's pitch
+  # diameter, past the 2A/2B bands, so the screw comes out before plating (it
+  # is black-oxided instead: the screw view caption says so) and the builder
+  # chases the tapped plug afterwards rather than relying on the plater's
+  # masking (CodeRabbit review of 022c54f1; Main ruling). The cell holds two
+  # lines, so "DIMS PRE-PLATE" gave way first.
+  finish: "ASTM B456 SC2 NI-CR AFTER BRAZE, SCREW REMOVED; CHASE #6-32 THREAD AFTER PLATING"
   quantity: 1
   tolerance_class: machined_block
   process: "formed and silver-brazed steel fabrication"
