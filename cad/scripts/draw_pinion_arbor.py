@@ -60,7 +60,10 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-DETAIL_LABEL_XY = (0.110, 0.195)
+# Top-centre anchor. Beside the circle (x >= 0.135), clear of the SR7.3 BACK
+# CROWN note (x <= 0.078, y <= 0.224): below the circle it floated over the
+# 1:1 shaft and read as that view's label (Main, r7 eye-pass).
+DETAIL_LABEL_XY = (DETAIL_CENTER[0] - 0.057, DETAIL_CENTER[1] + 0.013)
 DONOR_KEEP = {
     "ShaftDia": (0.030, 0.145),
     "NeckDia": (0.055, 0.145),
