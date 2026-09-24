@@ -209,11 +209,6 @@ def test_gap_floor_constructions() -> None:
         assert spec.floor_dip_mm(teeth) == pytest.approx(0.0)
         assert (spec.floor_tmin(teeth) > 0.0) == (teeth >= 48)
     assert set(spec.FLOOR_LIMITS_MM) == {6, 12}
-    # T006 keeps the standard tooth's base chord (to the printed 0.001).
-    assert spec.FLOOR_LIMITS_MM[6][0] / 2.0 == pytest.approx(
-        spec.chord_floor_radius_mm(6, thickness_mm=spec.STANDARD_TOOTH_THICKNESS),
-        abs=0.0005,
-    )
 
 
 def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> None:
@@ -242,7 +237,7 @@ def test_notes_define_only_the_approved_plain_bore_attachment() -> None:
         )
         assert (cr_line in lines) == (teeth <= 42)
         web_line = (
-            "ROOT-TO-BORE WEB 0.61 MIN, BELOW 1.5: ACCEPTED EXCEPTION (BOOK FIDELITY)."
+            "ROOT-TO-BORE WEB 0.62 MIN, BELOW 1.5: ACCEPTED EXCEPTION (BOOK FIDELITY)."
         )
         assert (web_line in lines) == (teeth == 6)
         assert len(lines) == 4 + (teeth <= 42) + (teeth == 6)
@@ -361,6 +356,11 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
     assert spec.floor_radius_mm(12) - t012_bore >= 2.05
     assert (spec.FLOOR_LIMITS_MM[12][0] - 0.001) / 2.0 - t012_bore < 2.05
     assert set(spec.WEB_EXCEPTIONS_MM) == {6}
+    # U40: the user ruled T006's exception at a 0.621 worst-case web; any
+    # drift below it needs a new ruling, not a quiet edit.
+    t006_web = spec.floor_radius_mm(6) - (spec.bore_dia_mm(6) + upper) / 2.0
+    assert t006_web >= 0.621 - 1e-9
+    assert spec.WEB_EXCEPTIONS_MM[6] == 0.621
     assert [spec.bore_dia_mm(t) for t in (6, 12, 18, 24, 30)] == pytest.approx(
         [1.5875, 1.5875, 3.175, 6.35, 9.525]
     )
