@@ -3,6 +3,7 @@ r"""Create the simplicity-policy machinist drawing for the cone tip block."""
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -152,25 +153,34 @@ def _foot_edge(adapter: Any, view: Any, *, min_span_mm: float = 13.9) -> Any:
     return edge
 
 
-def _add_pinch_axis(adapter: Any, section: Any) -> None:
-    """Sketch the pinch bore's axis across section A-A.
+def _add_adjuster_axis(adapter: Any, section: Any) -> None:
+    """Sketch the adjuster bore's axis across section A-A.
 
-    The 8.85 rise runs from the adjuster centre to this axis; without the
-    centreline its extension line reads as rising from nothing (review
-    2026-09-23).  The cutting plane contains both bore axes, so the axis
-    projects from the model and is sketched sheet-owned, as the gear shaft's
+    The 8.85 pinch rise is measured from this axis to the pinch-bore centre;
+    without the centreline its extension line reads as rising from nothing
+    (review 2026-09-23).  The cutting plane is X = 0, so the adjuster axis
+    (along Z) lies in it and projects as a line, while the pinch axis (along
+    X) projects to a point -- run 71f5acc5 sketched that zero-length line and
+    CreateCenterLine returned None.  Sketched sheet-owned, as the gear shaft's
     and swing platform's axes are.
     """
-    half = BLOCK_X / 2000.0 + AXIS_OVERRUN / SHEET_SCALE[0]
+    half = BLOCK_Z / 2000.0 + AXIS_OVERRUN / SHEET_SCALE[0]
     ends = [
         model_point_in_view(
             adapter,
             section,
-            (x, PINCH_HEIGHT / 1000.0, 0.0),
-            label=f"pinch axis end {index}",
+            (0.0, ADJUSTER_AXIS_HEIGHT / 1000.0, z),
+            label=f"adjuster axis end {index}",
         )
-        for index, x in enumerate((-half, half))
+        for index, z in enumerate((-half, half))
     ]
+    length = math.dist(ends[0][:2], ends[1][:2])
+    expected = 2.0 * half * SHEET_SCALE[0] / SHEET_SCALE[1]
+    if abs(length - expected) > 0.0005:
+        raise RuntimeError(
+            f"adjuster axis projects {length:.4f} m long in section A-A, "
+            f"expected {expected:.4f}"
+        )
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     drawing.EditSheet()
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
@@ -178,7 +188,7 @@ def _add_pinch_axis(adapter: Any, section: Any) -> None:
         ends[0][0], ends[0][1], 0.0, ends[1][0], ends[1][1], 0.0
     )
     if centerline is None:
-        raise RuntimeError("failed to sketch the pinch axis in section A-A")
+        raise RuntimeError("failed to sketch the adjuster axis in section A-A")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
 
@@ -437,7 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="adjuster and pinch-bore centre section",
     )
     set_hidden_lines_removed(adapter, section)
-    _add_pinch_axis(adapter, section)
+    _add_adjuster_axis(adapter, section)
 
     adjuster_view, adjuster_center, adjuster_edge = _preferred_entry_circle(
         adapter,
