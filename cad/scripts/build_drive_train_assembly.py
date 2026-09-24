@@ -824,6 +824,7 @@ from pinion_spring_geometry import (  # noqa: E402
     KINK_C as SPR_KINK_C_L,
     KINK_DEG as SPR_KINK_DEG,
     KINK_START as SPR_KINK_START_L,
+    PAD_LEN as SPR_PAD_LEN,
     PAD_WIDTH as SPR_PAD_WIDTH,
     PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
@@ -1549,8 +1550,16 @@ if (
 if SPRING_Z + SPRING_W / 2.0 > BLOCK_BACK_Z0 - 0.25:
     raise AssertionError("spring reaches the back pivot block")
 # The foot's screw pad widens the free end symmetrically about the strip.
-# Booked at the printed .XX worst case (+0.51 on the width).
-if SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0 > BLOCK_BACK_Z0 - 0.25:
+# It lies on the base EAST of the back block's east end, so it clears the
+# block in x whatever its z band; where the two share a z band (booked at the
+# printed .XX worst case, +0.51 on the length and the width) the x gap must
+# hold 0.25.
+_SPR_PAD_WEST_X = SPRING_FOOT_END_X + SPR_PAD_LEN + 0.51
+_SPR_PAD_Z_HI = SPRING_Z + (SPR_PAD_WIDTH + 0.51) / 2.0
+if (
+    _SPR_PAD_Z_HI > BLOCK_BACK_Z0 - 0.25
+    and (PIVOT_X - BLOCK_EAST) - _SPR_PAD_WEST_X < 0.25
+):
     raise AssertionError("spring foot pad reaches the back pivot block")
 # The screw head sits on the pad: clear of the free end and of the bend.
 if (SPRING_HOLE_X - FSCREW_HEAD_DIA / 2.0) - SPRING_FOOT_END_X < 0.25:
@@ -1752,7 +1761,7 @@ if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
 # drum 175 g + arbor 65 g at the arbor axis, straps 80 g at mid-length) --
 # parked, then engaged, N.mm.  Both turn the cluster INTO mesh.
 _SWING_GRAVITY_NMM = (10.9, 19.2)
-_PRELOAD_MARGIN = 1.45  # over gravity, at the formed band's low end
+_PRELOAD_MARGIN = 1.5  # over gravity, at the formed band's low end
 _STRESS_SF = 1.5  # on yield, at the nominal preset
 _SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
 _SPR_BLADE_SAMPLES = 16

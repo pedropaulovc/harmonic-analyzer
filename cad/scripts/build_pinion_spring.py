@@ -48,6 +48,7 @@ from _common import (
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_rectilinear_chain,
     dimension_between,
@@ -80,6 +81,7 @@ from pinion_spring_spec import (
     FOOT_LEN,
     FORMED_DIMENSIONS,
     FORMED_TOLERANCE_MM,
+    FREE_FORM_SKETCH,
     ISOMETRIC_VIEW_NOTE,
     PAD_LEN,
     PAD_WIDTH,
@@ -96,6 +98,11 @@ from pinion_spring_geometry import (
     FOOT_END,
     FOOT_TAN,
     FOOT_Y,
+    FREE_BEND_EXIT,
+    FREE_FLAT_TIP,
+    FREE_KINK_C,
+    FREE_KINK_EXIT,
+    FREE_KINK_START,
     HOLE_DIA as HOLE_DIA,
     HOLE_FROM_END,
     HOLE_SPEC,
@@ -145,6 +152,147 @@ def _extreme_mm(adapter, direction: tuple[float, float, float], axis: int) -> fl
     return float(res[1 + axis]) * 1000.0
 
 
+INSTALLED_PATH = {
+    "flat_tip": FLAT_TIP,
+    "kink_exit": KINK_EXIT,
+    "kink_c": KINK_C,
+    "kink_start": KINK_START,
+    "bend_exit": BEND_EXIT,
+    "bend_c": (BEND_CX, BEND_CY),
+    "foot_tan": FOOT_TAN,
+    "foot_end": FOOT_END,
+}
+FREE_PATH = {
+    **INSTALLED_PATH,
+    "flat_tip": FREE_FLAT_TIP,
+    "kink_exit": FREE_KINK_EXIT,
+    "kink_c": FREE_KINK_C,
+    "kink_start": FREE_KINK_START,
+    "bend_exit": FREE_BEND_EXIT,
+}
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _formed_path(
+    adapter, pts: dict[str, tuple[float, float]], *, prefix: str, construction: bool
+) -> SketchDims:
+    """The strip's inside-surface path in the open Front sketch, fully defined.
+
+    Drawn from the free tip DOWN: flat -> crest (kink) -> blade -> bend ->
+    foot, endpoints merged at creation.  The traversal order sets the
+    one-sided thin wall's side (right of travel: west of the blade, under the
+    foot).  Inference OFF: the foot endpoints sit near the origin.  add_arc
+    runs counter-clockwise start -> end.  ``prefix`` names the dimensions
+    (the free form's are "Free*"); ``construction`` makes every segment
+    construction geometry (the hidden FreeForm reference sketch).
+    """
+    dims = SketchDims()
+    set_sketch_direct_db(adapter, True)
+    flat = check(
+        f"{prefix}flat line",
+        await adapter.add_line(*pts["flat_tip"], *pts["kink_exit"]),
+    )
+    kink = check(
+        f"{prefix}kink arc",
+        await adapter.add_arc(*pts["kink_c"], *pts["kink_exit"], *pts["kink_start"]),
+    )
+    blade = check(
+        f"{prefix}blade line",
+        await adapter.add_line(*pts["kink_start"], *pts["bend_exit"]),
+    )
+    bend = check(
+        f"{prefix}bend arc",
+        await adapter.add_arc(*pts["bend_c"], *pts["bend_exit"], *pts["foot_tan"]),
+    )
+    foot = check(
+        f"{prefix}foot line",
+        await adapter.add_line(*pts["foot_tan"], *pts["foot_end"]),
+    )
+    set_sketch_direct_db(adapter, False)
+    if construction:
+        for entity in (flat, kink, blade, bend, foot):
+            _as_construction(adapter, entity)
+
+    # Shape: the foot is horizontal, each arc is tangent to its neighbouring
+    # line at the merged endpoint. Position: foot free end anchored to the
+    # origin, foot length, both radii, then the kink start (the two literal
+    # lean-dependent dims) and the flat tip's x, which fixes the kink sweep.
+    # The print baselines the formed profile from the foot's free end (policy
+    # rule 7), so those locations dimension from foot.end, not the origin.
+    check(
+        f"{prefix}foot horizontal",
+        await adapter.add_sketch_constraint(foot, None, "horizontal"),
+    )
+    for label, first, second in (
+        ("bend tangent foot", bend, foot),
+        ("bend tangent blade", bend, blade),
+        ("kink tangent blade", kink, blade),
+        ("kink tangent flat", kink, flat),
+    ):
+        check(
+            f"{prefix}{label}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
+
+    foot_end, kink_start, flat_tip = pts["foot_end"], pts["kink_start"], pts["flat_tip"]
+    await anchor_point_to_origin(adapter, f"{foot}.end", *foot_end, "foot end")
+    dims.record(f"{prefix}FootEndX")
+    dims.record(f"{prefix}FootEndY")
+    await dimension_between(
+        adapter, f"{foot}.end", f"{foot}.start", "horizontal_distance", FOOT_LEN, "foot"
+    )
+    dims.record(f"{prefix}FootLen", '"FootLength"')
+    check(
+        f"{prefix}bend radius",
+        await adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
+    )
+    dims.record(f"{prefix}BendR", '"BendRadius"')
+    await dimension_between(
+        adapter,
+        f"{foot}.end",
+        f"{blade}.start",
+        "horizontal_distance",
+        foot_end[0] - kink_start[0],
+        "kink start from the free end",
+    )
+    dims.record(f"{prefix}KinkH")
+    await dimension_between(
+        adapter,
+        f"{foot}.end",
+        f"{blade}.start",
+        "vertical_distance",
+        kink_start[1] - foot_end[1],
+        "kink start above the foot",
+    )
+    dims.record(f"{prefix}KinkV")
+    check(
+        f"{prefix}kink radius",
+        await adapter.add_sketch_dimension(kink, None, "radial", R_KINK),
+    )
+    dims.record(f"{prefix}KinkR", '"KinkRadius"')
+    check(
+        f"{prefix}flat length",
+        await adapter.add_sketch_dimension(flat, None, "linear", FLAT_LEN),
+    )
+    dims.record(f"{prefix}FlatLen", '"FlatLength"')
+    await dimension_between(
+        adapter,
+        f"{foot}.end",
+        f"{flat}.start",
+        "horizontal_distance",
+        foot_end[0] - flat_tip[0],
+        "flat tip from the free end",
+    )
+    dims.record(f"{prefix}TipH")
+    return dims
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -165,120 +313,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PadWidth", f"{PAD_WIDTH}mm")
     await set_global(adapter, "PadLength", f"{PAD_LEN}mm")
 
-    # Open inside-surface path, drawn from the free tip DOWN: flat -> crest
-    # (kink) -> blade -> bend -> foot, endpoints merged at creation.  The
-    # traversal order sets the one-sided thin wall's side (right of travel:
-    # west of the blade, under the foot).  Inference OFF: the foot endpoints
-    # sit near the origin.  add_arc runs counter-clockwise start -> end.
-    spring = SketchDims()
+    # Open inside-surface path, drawn from the free tip DOWN (_formed_path).
     check("create_sketch spring", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    flat = check(
-        "add flat line",
-        await adapter.add_line(FLAT_TIP[0], FLAT_TIP[1], KINK_EXIT[0], KINK_EXIT[1]),
-    )
-    kink = check(
-        "add kink arc",
-        await adapter.add_arc(
-            KINK_C[0],
-            KINK_C[1],
-            KINK_EXIT[0],
-            KINK_EXIT[1],
-            KINK_START[0],
-            KINK_START[1],
-        ),
-    )
-    blade = check(
-        "add blade line",
-        await adapter.add_line(
-            KINK_START[0], KINK_START[1], BEND_EXIT[0], BEND_EXIT[1]
-        ),
-    )
-    bend = check(
-        "add bend arc",
-        await adapter.add_arc(
-            BEND_CX, BEND_CY, BEND_EXIT[0], BEND_EXIT[1], FOOT_TAN[0], FOOT_TAN[1]
-        ),
-    )
-    foot = check(
-        "add foot line",
-        await adapter.add_line(FOOT_TAN[0], FOOT_TAN[1], FOOT_END[0], FOOT_END[1]),
-    )
-    set_sketch_direct_db(adapter, False)
-
-    # Shape: the foot is horizontal, each arc is tangent to its neighbouring
-    # line at the merged endpoint. Position: foot free end anchored to the
-    # origin, foot length, both radii, then the kink start (the two literal
-    # lean-dependent dims) and the flat tip's x, which fixes the kink sweep.
-    # The print baselines the formed profile from the foot's free end (policy
-    # rule 7), so those locations dimension from foot.end, not the origin.
-    check(
-        "foot horizontal", await adapter.add_sketch_constraint(foot, None, "horizontal")
-    )
-    check(
-        "bend tangent foot", await adapter.add_sketch_constraint(bend, foot, "tangent")
-    )
-    check(
-        "bend tangent blade",
-        await adapter.add_sketch_constraint(bend, blade, "tangent"),
-    )
-    check(
-        "kink tangent blade",
-        await adapter.add_sketch_constraint(kink, blade, "tangent"),
-    )
-    check(
-        "kink tangent flat", await adapter.add_sketch_constraint(kink, flat, "tangent")
-    )
-
-    await anchor_point_to_origin(adapter, f"{foot}.end", *FOOT_END, "foot end")
-    spring.record("FootEndX")
-    spring.record("FootEndY")
-    await dimension_between(
-        adapter, f"{foot}.end", f"{foot}.start", "horizontal_distance", FOOT_LEN, "foot"
-    )
-    spring.record("FootLen", '"FootLength"')
-    check(
-        "bend radius",
-        await adapter.add_sketch_dimension(bend, None, "radial", R_BEND),
-    )
-    spring.record("BendR", '"BendRadius"')
-    await dimension_between(
-        adapter,
-        f"{foot}.end",
-        f"{blade}.start",
-        "horizontal_distance",
-        FOOT_END[0] - KINK_START[0],
-        "kink start from the free end",
-    )
-    spring.record("KinkH")
-    await dimension_between(
-        adapter,
-        f"{foot}.end",
-        f"{blade}.start",
-        "vertical_distance",
-        KINK_START[1] - FOOT_END[1],
-        "kink start above the foot",
-    )
-    spring.record("KinkV")
-    check(
-        "kink radius",
-        await adapter.add_sketch_dimension(kink, None, "radial", R_KINK),
-    )
-    spring.record("KinkR", '"KinkRadius"')
-    check(
-        "flat length",
-        await adapter.add_sketch_dimension(flat, None, "linear", FLAT_LEN),
-    )
-    spring.record("FlatLen", '"FlatLength"')
-    await dimension_between(
-        adapter,
-        f"{foot}.end",
-        f"{flat}.start",
-        "horizontal_distance",
-        FOOT_END[0] - FLAT_TIP[0],
-        "flat tip from the free end",
-    )
-    spring.record("TipH")
+    spring = await _formed_path(adapter, INSTALLED_PATH, prefix="", construction=False)
 
     await ensure_fully_defined(adapter, "spring sketch")
     check("exit_sketch spring", await adapter.exit_sketch())
@@ -372,6 +409,18 @@ async def build(adapter) -> dict[str, str]:
     volume -= v_hole
     await volume_check(adapter, "foot hole", volume, 0.05 * v_hole)
 
+    # O2 (Main, 2026-09-24): the part is the INSTALLED shape; the maker forms
+    # the FREE shape.  A hidden construction-only reference sketch carries the
+    # whole free profile -- the blade turned PRESET_DEG further toward the
+    # strap about the bend centre -- and owns the printed free locations; the
+    # drawing shows it as the phantom (_drawing_hidden_sketches).
+    check("create_sketch free form", await adapter.create_sketch("Front"))
+    free = await _formed_path(adapter, FREE_PATH, prefix="Free", construction=True)
+    await ensure_fully_defined(adapter, "free-form sketch")
+    check("exit_sketch free form", await adapter.exit_sketch())
+    name_last_feature(adapter, FREE_FORM_SKETCH)
+    drive_jobs += free.apply(adapter, FREE_FORM_SKETCH)
+
     # Deferred drive equations, then re-check neutrality (each evaluates to
     # the as-built value, so the geometry must not move).
     await force_rebuild(adapter)
@@ -394,6 +443,13 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+
+    # Hidden so no assembly instance renders it; the drawing shows it per view.
+    blank_sketch(adapter, FREE_FORM_SKETCH)
+    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = _early_bound(part_doc.FeatureByName(FREE_FORM_SKETCH), "IFeature")
+    if int(feature.Visible) != 1:  # swVisibilityStateHide
+        raise RuntimeError(f"{FREE_FORM_SKETCH} still visible after BlankSketch")
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
