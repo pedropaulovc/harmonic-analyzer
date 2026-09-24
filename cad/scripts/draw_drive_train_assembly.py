@@ -451,7 +451,19 @@ RIG_STEPS = "\n".join(
         "14. FIT MHA-002 ON MHA-102 PER THE MHA-102 PRINT.",
         "15. JOURNAL THE MHA-102 BACK END IN THE BACK MHA-056 TOP BORE; HANG",
         "    BOTH MHA-056 ON MHA-062 THROUGH {pivot_blocks}X MHA-061.",
-        "16. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
+        # E-a (user): the strap feet are pinned to the torque shaft. Right
+        # after the hang: MHA-062 is drilled off the machine (the cams sit
+        # ~18.5 west of the foot), and once the cams are on, the pin's west
+        # edge has 0.38 of air to the MHA-104 collar. Wording from
+        # pinioncluster (dt-torque-shaft-pin-fitup-steps-20260924.md);
+        # PENDING until #858 merges.
+        "16. [PENDING: PUSH THE HUNG CLUSTER HARD ON THE BACK MHA-061; SET",
+        "    MHA-062 FLUSH WITH ITS OUTER FACE. TRANSFER-PUNCH MHA-062 THROUGH",
+        "    EACH MHA-056 CROSS HOLE; WITHDRAW IT AND DRILL 1/16 THRU AT EACH",
+        "    MARK (V-BLOCK). REFIT MHA-062 FLUSH END BACK; DRIVE ONE 1/16 X 1/2",
+        "    SPRING PIN PER STRAP, SUB-FLUSH BOTH EDGES. THE CLUSTER SWINGS",
+        "    FREELY AND MHA-062 TURNS WITH IT IN BOTH MHA-061.]",
+        "17. FIT {cams}X MHA-104 AND MHA-059 ON MHA-060 IN THE MHA-061 LIFT",
         "    BORES. PARK EACH CAM ECCENTRIC DOWN; LOCK IT WITH THE M2.5 SET",
         "    SCREW SUPPLIED WITH MHA-104. SEAT MHA-059 ON MHA-060 TO THE BORE",
         "    FLOOR, GRIP AT ITS PARK ANGLE; AT 3 O'CLOCK MATCH-DRILL 1/16",
@@ -462,17 +474,14 @@ RIG_STEPS = "\n".join(
         # TRANSFER FROM MHA-061. The level line of centres makes block travel
         # equal gap change; 2.5 is the physical rest gap, not the CAD gap
         # (pinioncluster, PR #837).
-        "17. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
+        "18. LOCATE THE RIG ON BASE MHA-035 (FRAME ASSEMBLY MHA-A04); ITS",
         "    SEATS ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-061 LOOSE",
         "    ON THE BASE WITH MHA-114 FITTED.",
         "    PARK MHA-059: THE MHA-116 PINS REST ON THE CAMS UNDER THE SPRING.",
-        "18. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
+        "19. FACE A MHA-002 TOOTH TIP TO A MHA-027 TOOTH TIP ON THE LEVEL",
         "    LINE OF CENTRES. SLIDE THE RIG IN UNTIL A 2.5 FEELER (E.G. 2.00",
         "    + 0.50 LEAVES) IS SNUG; ACCEPT 2.3-2.7. SET IT AT THE FRONT AND",
         "    BACK STATIONS TO SQUARE BOTH MHA-061 TO THE DRUM; CLAMP.",
-        # E-a (user): the strap feet are pinned to the torque shaft, match-
-        # drilled at fit-up. Placeholder until pinioncluster's PR lands.
-        "19. [PENDING: MATCH-DRILL AND PIN THE MHA-056 FEET TO MHA-062.]",
         # Seat depths from the base's own seat specs (build_harmonic_base
         # BLOCK_/FOOT_SCREW_DRILL_DEPTH and _HOLE_DEPTH; the #8-32 pair is the
         # rule-12 E10 re-derive on dt-pinion-lever-pin #844). FOOT_HOLE_DEPTH
@@ -508,7 +517,7 @@ CHECKS = "\n".join(
         "6. PARKED, MHA-114 HOLDS MHA-002 CLEAR OF EVERY MHA-027.",
         "   [PENDING: PINION BRACKET PLACEMENT AND TOOTH-COUNT RULINGS]",
         "7. PARKED, PINS ON THE CAMS: A 2.5 FEELER IS SNUG TIP TO TIP AT THE",
-        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 18).",
+        "   FRONT AND BACK STATIONS; ACCEPT 2.3-2.7 (SHEET 7, STEP 19).",
     )
 )
 
