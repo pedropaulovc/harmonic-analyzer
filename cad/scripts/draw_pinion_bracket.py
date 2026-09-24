@@ -18,7 +18,9 @@ the isometric:
 * LEFT -- the seat flank, where the blind O4 seat mouth is a SOLID circle:
   its size, its station through the bar and the bar thickness; plus the
   (43.0) overall as a reference, so nobody saws the bar short of the two
-  end radii the 28.00 centre distance does not include.
+  end radii the 28.00 centre distance does not include.  The option E-a
+  set-pin cross hole's mouth is a solid circle here too, at the pivot-bore
+  axis height the follower-seat height is measured from.
 * SECTION B-B -- a cut through the follower-seat axis showing its legitimate
   blind depth and solid flat bottom.
 
@@ -59,6 +61,7 @@ from _surface_finish import surface_finish_by_key
 from pinion_bracket_spec import (
     ARBOR_BORE,
     C2C,
+    CROSS_HOLE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PIN_DROP,
@@ -140,6 +143,10 @@ LEFT_KEEP = {
     # dimension, so the callout sits below-right and its leader rises past the
     # text's left end to the seat, crossing only the bottom outline.
     "PinSeatDia": (0.125, 0.082),
+    # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
+    # axis height, below the seat.  Its four-line callout goes in the clear
+    # field left of the view, leader rising right to the mouth.
+    "CrossHoleDia": (0.030, 0.098),
 }
 SECTION_CENTER = (0.350, 0.115)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
@@ -168,6 +175,7 @@ DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
     "PinSeatDia": "FOLLOWER SEAT FOR MHA-116\nCENTRED ON THICKNESS\nBLIND FLAT-BOTTOM\nREAM",
+    "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
 

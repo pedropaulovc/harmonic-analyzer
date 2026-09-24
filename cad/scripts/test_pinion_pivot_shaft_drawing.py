@@ -65,9 +65,13 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert drawing.DIMENSION_CALLOUTS["ShaftDia"] == "FINAL SIZE"
     assert model_toleranced_dimensions(shaft) == {
         ("ShaftProfile", "ShaftDia"): "*deviations(SHAFT_DIA_BAND)",
+        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
     }
     # U27: the length reads the title-block .X band, not a tight tolerance.
-    assert pinion_pivot_shaft_spec.DRAWING_PRECISION == {"Shaft": {"Depth": 1}}
+    assert pinion_pivot_shaft_spec.DRAWING_PRECISION == {
+        "Shaft": {"Depth": 1},
+        "PinHoleProfile": {"PinHoleDia": 2},
+    }
     # General tolerances live in the title block ONLY.
     assert "LINEAR +/-" not in notes
     assert " BA " not in f" {notes} "
@@ -104,3 +108,19 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1
+
+
+def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
+    # Option E-a: the strap sets the stations at assembly (back-flush, cluster
+    # at the back stop), so the print carries the size and the match-drill
+    # callout, never a station a floating length band would contradict.
+    marked = set().union(*pinion_pivot_shaft_spec.DRAWING_DIMENSIONS.values())
+    assert {"PinHoleDia"} <= marked
+    assert not any(name.startswith("PinHole") and name.endswith("Z") for name in marked)
+    callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
+    assert callout is pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT
+    assert "MATCH-DRILL THRU AT ASSEMBLY" in callout
+    assert "MHA-056" in callout
+    assert "2 PL" in callout
+    assert pinion_pivot_shaft_spec.PIN_HOLE_DIA == 25.4 / 16.0
+    assert pinion_pivot_shaft_spec.PIN_HOLE_BAND == (0.06, 0.0)

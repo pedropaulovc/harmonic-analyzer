@@ -77,6 +77,7 @@ def test_every_band_traces_to_a_named_fit_class() -> None:
         ("StrapProfile", "PivotBoreDia"): "*deviations(PIVOT_BORE_BAND)",
         ("StrapProfile", "ArborBoreDia"): "*deviations(ARBOR_BORE_BAND)",
         ("PinSeatProfile", "PinSeatDia"): "*deviations(PIN_SEAT_DIA_BAND)",
+        ("CrossHoleProfile", "CrossHoleDia"): "*deviations(CROSS_HOLE_BAND)",
     }
     assert pinion_bracket_spec.PIVOT_BORE_BAND is REAM_SLIDE
     assert pinion_bracket_spec.ARBOR_BORE_BAND is REAM_SLIDE
@@ -135,7 +136,12 @@ def test_blind_seat_dimensions_are_assigned_to_readable_views() -> None:
     # location without dimensioning hidden lines.
     assert set(drawing.SECTION_KEEP) == {"PinSeatDepth"}
     assert pinion_bracket_geometry.PIN_SEAT < pinion_bracket_geometry.WIDTH
-    assert set(drawing.LEFT_KEEP) == {"PinSeatDia", "PinSeatCy", "Depth"}
+    assert set(drawing.LEFT_KEEP) == {
+        "PinSeatDia",
+        "PinSeatCy",
+        "Depth",
+        "CrossHoleDia",
+    }
 
 
 def test_follower_seat_is_printed_centred_with_a_rule_12_web() -> None:
@@ -144,7 +150,6 @@ def test_follower_seat_is_printed_centred_with_a_rule_12_web() -> None:
     assert "CENTRED ON THICKNESS" in drawing.DIMENSION_CALLOUTS["PinSeatDia"]
     assert "PinSeatCz" not in pinion_bracket_spec.DRAWING_PRECISION_BY_NAME
     assert pinion_bracket_spec.PIN_SEAT_WEB_WORST >= 2.0
-
 
 
 def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
@@ -156,9 +161,10 @@ def test_blind_seat_entry_face_is_complete_solid_flank() -> None:
     straight_end = pinion_bracket_geometry.C2C
     assert seat_y - seat_radius >= 0.0
     assert seat_y + seat_radius <= straight_end
-    assert pinion_bracket_geometry.WIDTH - pinion_bracket_geometry.PIN_SEAT >= seat_radius
+    assert (
+        pinion_bracket_geometry.WIDTH - pinion_bracket_geometry.PIN_SEAT >= seat_radius
+    )
     assert seat_y - pinion_bracket_geometry.PIVOT_BORE / 2.0 > 1.0
-
 
 
 def test_strap_thickness_carries_the_cam_pin_seat_and_the_photo_band() -> None:
@@ -180,3 +186,27 @@ def test_part_config_supplies_the_title_block_fields() -> None:
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2  # the book uses two swing brackets
+
+
+def test_set_pin_cross_hole_is_located_by_its_callout() -> None:
+    # Option E-a: the hole sits ON the pivot-bore axis and centred on the
+    # thickness.  Both are zero/centred locations with no dimension to band
+    # (and no frame on a bracket, rule 3), so the callout states them and the
+    # diameter is the only marked dimension -- a plain drilled hole under the
+    # title block's DRILLED HOLES row.
+    callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
+    assert callout is pinion_bracket_spec.CROSS_HOLE_CALLOUT
+    assert "THRU ON PIVOT-BORE AXIS" in callout
+    assert "CENTRED ON THICKNESS" in callout
+    assert "SUPPLY 1/16 X 1/2 SLOTTED SPRING" in callout
+    assert "PIN (ASME B18.8.2) LOOSE" in callout
+    assert len(callout.splitlines()) <= 4
+    body = callout.replace("1/16 X 1/2", "").replace("B18.8.2", "")
+    assert not any(ch.isdigit() for ch in body)
+    assert pinion_bracket_spec.DRAWING_DIMENSIONS["CrossHoleProfile"] == {
+        "CrossHoleDia"
+    }
+    assert pinion_bracket_spec.DRAWING_PRECISION_BY_NAME["CrossHoleDia"] == 2
+    assert pinion_bracket_spec.CROSS_HOLE_DIA == 25.4 / 16.0
+    # The spring pin's own band, resolvable at two places.
+    assert pinion_bracket_spec.CROSS_HOLE_BAND == (0.06, 0.0)

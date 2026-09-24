@@ -13,7 +13,13 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from pinion_rig_layout import TORQUE_SHAFT_LEN
+import pinion_strap_pin_spec as _strap_pin
+from pinion_rig_layout import (
+    STRAP_Z_INNER,
+    STRAP_Z_OUTER,
+    TORQUE_SHAFT_LEN,
+    TORQUE_SHAFT_Z0,
+)
 
 SHAFT_DIA = 6.35  # 1/4 in: rides both pivot blocks' east bores and the straps
 # Set back-flush with the back block's outer face; ruling (c) moved the front
@@ -26,16 +32,40 @@ CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
-# not a tight one.  Set back-flush, the longest shaft in the shortest stack
-# stands at worst 7.47 proud of the front block, the SR crown apex 8.67
-# (test_pinion_pivot_block_drawing::
-# test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack).
-# Nothing stands on the shaft's axis past either block: the nearest body,
-# the MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial
-# clear, arm >= 12.42 clear over the -82 degree throw
-# (test_drive_train_support_layout::
+# not a tight one.  Pinned to the straps (option E-a) the shaft rides the
+# cluster's end play (0.25 +/- 0.10): drilled back-flush at the back stop,
+# the longest shaft in the shortest stack stands at worst 7.47 proud of the
+# front block, 7.82 at the front stop with the SR crown apex at 9.02, and its
+# back end then sits 0.35 inside the back block.  Nothing stands on the
+# shaft's axis past either block: the nearest body, the MHA-059 lever, rides
+# the lift rod 18.63 off it -- hub 8.95 radial clear, arm >= 12.42 clear
+# over the -82 degree throw (test_drive_train_support_layout::
 # test_torque_shaft_length_band_clears_both_ends).
-DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "Shaft": {"Depth": 1},
+    # Two places resolve the spring pin's +0.06/0 hole band.
+    "PinHoleProfile": {"PinHoleDia": 2},
+}
+
+# Option E-a set pins (pinion_strap_pin_spec): one cross hole under each
+# MHA-056 strap, match-drilled through the strap's own cross hole with the
+# shaft back-flush and the cluster at the back stop -- the fit-up stack the
+# assembly shows (pinion_rig_layout) -- so they sit at its strap mid-planes,
+# from the front end (local z 0).  The print
+# carries no station: the strap sets it at assembly, so a printed one would be
+# a second, conflicting specification on a shaft whose length floats +/-0.8.
+PIN_HOLE_DIA = _strap_pin.HOLE_DIA
+PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
+PIN_HOLE_Z = tuple(
+    (outer + inner) / 2.0 - TORQUE_SHAFT_Z0
+    for outer, inner in zip(STRAP_Z_OUTER, STRAP_Z_INNER)
+)  # (front, back)
+PIN_HOLE_CALLOUT = "\n".join(
+    (
+        "MATCH-DRILL THRU AT ASSEMBLY",
+        "IN MHA-056 CROSS HOLES, 2 PL",
+    )
+)
 
 SURFACE_FINISHES = (
     SurfaceFinishControl("bearing", MACHINED_UM, CylinderFace(SHAFT_DIA)),
@@ -44,6 +74,7 @@ SURFACE_FINISHES = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDia"},
     "Shaft": {"Depth"},
+    "PinHoleProfile": {"PinHoleDia"},
 }
 
 DRAWING_NOTES = "\n".join(

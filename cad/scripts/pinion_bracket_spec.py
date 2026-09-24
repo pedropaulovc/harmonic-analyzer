@@ -36,6 +36,7 @@ from pinion_bracket_geometry import (
     THICKNESS_BAND as THICKNESS_BAND,
     WIDTH as WIDTH,
 )
+import pinion_strap_pin_spec as _strap_pin
 
 # --- Tolerance bands.  Only the three fitted bores carry one, and each traces
 # to a NAMED fit class in ``_fit_limits``; every other feature is governed by
@@ -44,11 +45,37 @@ from pinion_bracket_geometry import (
 # axis and through-thickness station, +/-0.05 on the bar thickness and a
 # +0.10/0 seat depth) traced to no fit class and to no error-budget row: they
 # were habit, not specification, and are gone. ---
-PIVOT_BORE_BAND = REAM_SLIDE  # torque shaft turns in it
+# Option E-a: the strap is pinned to the torque shaft, which turns with it in
+# the MHA-061 block bores.  The slide fit stays so the strap goes onto the
+# shaft for fit-up and the cross hole can be match-drilled through both.
+PIVOT_BORE_BAND = REAM_SLIDE
 ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
 # The MHA-116 drill-rod stud slips into this seat and is bonded with LOCTITE
 # 638 (U27; pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
 PIN_SEAT_DIA_BAND = REAM_H7
+
+# Option E-a set-pin cross hole (pinion_strap_pin_spec).  Its location is a
+# functional requirement, not habit: the hole is match-drilled on into the
+# MHA-062 shaft, and every bit it runs off the bore axis comes straight off
+# the shaft wall beside it (SHAFT_LIGAMENT_WORST).  The print states it on the
+# hole's own callout -- ON the axis, CENTRED on the thickness -- the same form
+# as the follower seat's, with no dimension to hang a band on (rule 6).  Read
+# against the full .XX grade the shaft wall still clears the 1.5 floor.  The
+# diameter carries the spring pin's own functional band (pinion_strap_pin_spec).
+CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
+CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
+CROSS_HOLE_CALLOUT = "\n".join(
+    (
+        "THRU ON PIVOT-BORE AXIS",
+        "CENTRED ON THICKNESS",
+        "SUPPLY 1/16 X 1/2 SLOTTED SPRING",
+        "PIN (ASME B18.8.2) LOOSE",
+    )
+)
+if "SUPPLY " + _strap_pin.PIN_SUPPLY + " LOOSE" != " ".join(
+    CROSS_HOLE_CALLOUT.splitlines()[2:]
+):
+    raise AssertionError("cross-hole callout drifted from the pin spec")
 
 # Rule 12 (#842, U27; audit W23) worst-case web from the centred blind seat to
 # either broad face: half the thickness at its .X minus band, minus the seat's
@@ -82,6 +109,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # so only the .X thickness band reaches the web -- see PIN_SEAT_WEB_WORST.
     "PinSeatProfile": {"PinSeatDia", "PinSeatCy"},
     "PinSeat": {"PinSeatDepth"},
+    # Option E-a: the set-pin cross hole, printed ON the pivot-bore axis and
+    # centred on the thickness by its callout (pinion_strap_pin_spec), so its
+    # diameter is the only marked dimension.
+    "CrossHoleProfile": {"CrossHoleDia"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
@@ -108,6 +139,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Strap": {"Depth": 1},
     "PinSeatProfile": {"PinSeatDia": 2, "PinSeatCy": 3},
     "PinSeat": {"PinSeatDepth": 1},
+    # Two places resolve the spring pin's +0.06/0 hole band.
+    "CrossHoleProfile": {"CrossHoleDia": 2},
 }
 
 _PRECISION_NAMES = [
