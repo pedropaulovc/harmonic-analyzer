@@ -26,6 +26,10 @@ PIN_SUPPLY = "1/16 X 1/2 SLOTTED SPRING PIN (ASME B18.8.2)"
 PIN_LEN_BAND = 0.010 * INCH
 
 HOLE_DIA = PIN_DIA
+# The one drill for every 1/16 pin on the rig (this pin, the MHA-135 lever pin
+# and the arbor-collar pin): the callout a sheet uses when it drills rather
+# than match-drills.
+DRILL_THRU_CALLOUT = "1/16 DRILL THRU"
 # A functional band, not habit (U27): B18.8.2's recommended hole for a 1/16
 # pin is 0.062-0.065 in (1.575-1.651).  The title block's DRILLED HOLES row
 # (+0.10/0) would let the hole open to 1.69, past what the pin can grip, so
