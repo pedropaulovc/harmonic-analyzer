@@ -64,8 +64,10 @@ DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
 # The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
-# circle, this far below it (the label's anchor is its top edge).
-DETAIL_LABEL_DROP = 0.002
+# circle, this far below it (the label's anchor is its top edge): clear of the
+# HeadLen text that rides the circle's lower edge.  The bond-zone ShaftDia
+# line then moves right of the label so its upper arrow misses "SCALE 2:1".
+DETAIL_LABEL_DROP = 0.010
 DETAIL_LABEL_XY = (
     DETAIL_CENTER[0],
     DETAIL_CENTER[1]
@@ -112,7 +114,7 @@ DIAMETER_POSITIONS = {
     "HeadDia": (0.340, 0.192),
     "NeckDia": (0.300, 0.194),
     # Below the bond zone, between the two land diameters.
-    "ShaftDia": (0.175, 0.150),
+    "ShaftDia": (0.195, 0.150),
 }
 DIMENSION_CALLOUTS = {
     "BackRimFromHeadRear": "FROM BACK CROWN ROOT TO HEAD SHOULDER",
