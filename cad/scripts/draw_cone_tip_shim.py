@@ -17,15 +17,14 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
+import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
@@ -46,7 +45,6 @@ from cone_tip_shim_spec import (
     SHIM_X,
     SHIM_Z,
     SLOT_OPEN_SIDE,
-    SLOT_R,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -84,6 +82,12 @@ TOP_KEEP = {
     "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),
     # Past the open mouth, level with the slot's centreline.
     "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
+    # The radius centre from the closed (right) edge and the lower edge,
+    # model-owned (the part's hidden reference sketches).  Each value sits
+    # midway along its span, off both witnesses (the tip block's 5637ac42
+    # lesson).
+    "SlotCentreX": (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012),
+    "SlotCentreZ": (TOP_CENTER[0] + HALF_X + 0.010, TOP_CENTER[1] - HALF_Z / 2.0),
 }
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 # The 1.10 span is 4.4 mm on the sheet, so its value cannot sit between the
@@ -91,60 +95,9 @@ FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 # right and a little below, clear of the line and of the notes above.
 THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.022, FRONT_CENTER[1] - 0.010)
 REFERENCE_DIMENSIONS = ("Thickness",)
-# The two radius-centre locations are routine lengths: one place, like the
-# 15.0 x 12.0 outline (the document default is two).
-LOCATION_PLACES = 1
 DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK", "SlotWidth": "SLOT, FULL R"}
 
-# Radius-centre location from the closed (right) edge and the lower edge.
-# Each value sits midway along its span, off both witnesses (the tip block's
-# 5637ac42 lesson).
-SLOT_X_TEXT = (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012)
-SLOT_Z_TEXT = (TOP_CENTER[0] + HALF_X + 0.010, TOP_CENTER[1] - HALF_Z / 2.0)
 NOTES_XY = (0.190, 0.120)
-
-
-def _slot_end_xy(angle_deg: float) -> tuple[float, float]:
-    """A point on the plan view's full-radius end, which spans -90..+90 deg."""
-    if abs(angle_deg) >= 90.0:
-        raise ValueError(f"{angle_deg} deg is off the slot's closed end")
-    r = SLOT_R * _S
-    a = math.radians(angle_deg)
-    return (TOP_CENTER[0] + r * math.cos(a), TOP_CENTER[1] + r * math.sin(a))
-
-
-def _checked_location(
-    adapter: Any,
-    view: Any,
-    *,
-    edge_xy: tuple[float, float],
-    text_xy: tuple[float, float],
-    orientation: str,
-    expected_mm: float,
-    label: str,
-) -> Any:
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=edge_xy,
-        p1=_slot_end_xy(-45.0),
-        text_xy=text_xy,
-        label=label,
-        orientation=orientation,
-    )
-    display = _early_bound(display, "IDisplayDimension")
-    measured = float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue)
-    if abs(measured * 1000.0 - expected_mm) > 1e-4:
-        raise RuntimeError(
-            f"{label} measured {measured * 1000.0:.4f} mm, expected {expected_mm:.4f}"
-        )
-    # swDimensionPrecisionSettings_e.swDoNotChangePrecisionSetting (-1) keeps
-    # the dual and tolerance precisions; the status return is undocumented,
-    # so read the primary back.
-    display.SetPrecision3(LOCATION_PLACES, -1, -1, -1)
-    if display.GetPrimaryPrecision2() != LOCATION_PLACES:
-        raise RuntimeError(f"{label}: {LOCATION_PLACES}-place precision did not take")
-    return display
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -192,7 +145,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    top_annotations = curate_view_dimensions(
+    # The plan imports the part-hidden SlotCentre reference sketches, so it
+    # takes the opt-in curation that shows them in this view only.
+    top_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         top,
         keep=TOP_KEEP,
@@ -215,25 +170,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-
-    _checked_location(
-        adapter,
-        top,
-        edge_xy=(TOP_CENTER[0] + HALF_X, TOP_CENTER[1] + HALF_Z / 2.0),
-        text_xy=SLOT_X_TEXT,
-        orientation="horizontal",
-        expected_mm=SHIM_X / 2.0,
-        label="slot radius centre from the closed edge",
-    )
-    _checked_location(
-        adapter,
-        top,
-        edge_xy=(TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z),
-        text_xy=SLOT_Z_TEXT,
-        orientation="vertical",
-        expected_mm=SHIM_Z / 2.0,
-        label="slot radius centre from the lower edge",
-    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
