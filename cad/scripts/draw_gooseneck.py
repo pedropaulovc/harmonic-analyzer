@@ -76,6 +76,7 @@ from gooseneck_spec import (
     SCREW_CALLOUT,
     SCREW_DIMENSIONS,
     TAP_CALLOUT,
+    TUBE_STOCK_CALLOUT,
 )
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
@@ -490,6 +491,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     # Purchased tube: the stock sizes are reference, the wall is the mill's.
+    set_dimension_callouts(
+        adapter, post_dimensions, {"TubeBoreDia": TUBE_STOCK_CALLOUT}, location="below"
+    )
     set_reference_dimensions(adapter, post_dimensions, ("TubeDia", "TubeBoreDia"))
     _place_view_label(
         adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),

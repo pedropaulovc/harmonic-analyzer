@@ -136,16 +136,26 @@ def test_material_fits_one_title_block_line() -> None:
 def test_plating_spares_the_threads() -> None:
     """Plating grows a 60-degree thread's pitch diameter ~4x its thickness, so
     the screw is removed before plating and the plug thread is chased after;
-    the screw's own finish rides its view caption. The finish cell holds two
-    lines (~41-46 characters each)."""
+    the screw's black oxide rides the same Finish field (Codex machinist r24).
+    The cell holds two lines of about 632 px at 200 dpi (r24)."""
     import _config
-    import gooseneck_spec
 
     finish = str(_config.parts("gooseneck")["finish"])
     assert "SCREW REMOVED" in finish
     assert "CHASE #6-32" in finish
-    assert len(finish) <= 82
-    assert "BLACK OXIDE, NOT PLATED" in gooseneck_spec.SCREW_VIEW_NOTE
+    assert "SCREW: BLACK OXIDE" in finish
+    assert len(finish) <= 94
+
+
+def test_sheets_name_the_part_and_its_tube_stock() -> None:
+    """The PART field prints the registry title, not the slug; section B-B
+    names the stock and its mill wall band (Codex machinist r24)."""
+    import _config
+    import gooseneck_spec
+
+    assert _config.parts("gooseneck")["title"] == "Gooseneck"
+    assert "16 OD X 2.0 WALL" in gooseneck_spec.TUBE_STOCK_CALLOUT
+    assert "+/-10%" in gooseneck_spec.TUBE_STOCK_CALLOUT
 
 
 def test_plan_view_is_captioned() -> None:
