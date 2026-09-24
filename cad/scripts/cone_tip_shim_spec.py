@@ -71,12 +71,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShimProfile": {"Width", "Depth"},
     "Shim": {"Thickness"},
     "SlotProfile": {"SlotWidth"},
+    # Construction-only sketches, saved hidden, that locate the slot's radius
+    # centre from the closed (+X) edge and the plan's lower (+Z) edge.  They
+    # are toleranced .X locations the machinist works to, so the model owns
+    # them and their places (Codex P1 on #857).
+    "SlotCentreXReference": {"SlotCentreX"},
+    "SlotCentreZReference": {"SlotCentreZ"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShimProfile": {"Width": 1, "Depth": 1},
     "Shim": {"Thickness": 2},
     "SlotProfile": {"SlotWidth": 2},
+    "SlotCentreXReference": {"SlotCentreX": 1},
+    "SlotCentreZReference": {"SlotCentreZ": 1},
 }
+REFERENCE_SKETCHES = ("SlotCentreXReference", "SlotCentreZReference")
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
