@@ -48,7 +48,6 @@ SCREW_HEAD_DIA = 12.0  # approved retention for the 1330K524 double-loop eye
 # The underside (HEAD_X, the clamp face) is unchanged; only the slotted end face
 # moves outboard. It stays 1.66 mm from the counter spring's raised half-turn,
 # which plateaus from T = 3.2 (1.92 at the old 2.0), and 3.72 mm from its coil.
-# The head diameter prints at .X: at Ø12.8 that clearance is still 1.26 mm.
 SCREW_HEAD_T = 4.2
 # Ø11.85 is the nominal model insert in the nominal Ø12.00 tube bore (0.075 mm
 # radial gap). The drawing does not assume stock-ID accuracy: it match-turns
@@ -61,12 +60,6 @@ PLUG_DIA = 11.85
 # Policy rule 12 (U27): full-thread engagement >= 1.5D at the printed worst
 # case. The plug prints at .X (+/-0.8), so 7.0 leaves 6.2 = 1.77D of #6-32
 # (the former 6.0 gave 5.2 = 1.48D). The under-head length grows with it.
-# All 6.2 is FULL thread: the plug is tapped through (TAP_CALLOUT "#6-32
-# UNC-2B THRU"), so it has no tap-lead loss, and in the installed, clamped
-# state the screw passes fully through it (9.58 reach at worst case), so its
-# tip threads sit past the plug. The 8.0 open gap is assembly access only: the
-# eye hangs loose and the screw carries no clamp load, so it is not a load case
-# for engagement (Main ruling on Codex machinist r19 B2).
 PLUG_T = 7.0
 PLUG_BRAZE_RADIAL_CLEARANCE = 0.075
 SPRING_SCREW_PLUG_ENGAGEMENT_MM = PLUG_T

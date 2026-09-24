@@ -50,7 +50,8 @@ for _partition in (
 # re-tensions anyway. So do the screw's under-head length (the through thread
 # adjusts it), the plug length (thread engagement, not a fit), the screw
 # head (sized so the slot web holds 2 mm at the worst case of this band) and
-# the head diameter (eye retention, not a fit; Codex machinist r19).
+# the head diameter (eye retention, not a fit; Codex machinist r19). At
+# Ø12.8 the head still clears the counter spring's raised half-turn by 1.26 mm.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
     "Leg": {"LegLength": 1},
@@ -89,6 +90,14 @@ PLUG_FIT_CALLOUT = (
     "0.051-0.127 RADIAL CLEARANCE\n"
     "CENTER CONCENTRIC; SILVER-BRAZE AWS A5.8 BAg-7"
 )
+# Policy rule 12 (U27) engagement: all of the worst-case 6.2 plug (7.0 at .X)
+# is FULL thread, 1.77D. The plug is tapped through, so it has no tap-lead
+# loss, and in the installed, clamped state the screw passes fully through it
+# (9.58 reach at worst case), so its tip threads sit past the plug. The 8.0
+# open gap is assembly access only: the eye hangs loose and the screw carries
+# no clamp load, so it is not a load case for engagement (Main ruling on Codex
+# machinist r19 B2). This lives here, not in gooseneck_geom, which the channel,
+# magnifier and summing recipes read.
 TAP_CALLOUT = "#6-32 UNC-2B THRU"
 # The bend radius is the tube-bender's centreline radius; its imported
 # dimension rides the (unshown) sweep path, so the sheet says so.
