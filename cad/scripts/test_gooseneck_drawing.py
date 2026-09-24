@@ -62,7 +62,8 @@ def test_screw_slot_leaves_a_two_millimetre_web_at_the_printed_worst_case() -> N
 
 def test_screw_engages_one_and_a_half_diameters_at_the_printed_worst_case() -> None:
     """Policy rule 12 (U27): full-thread engagement >= 1.5D at worst case, with
-    the screw clamped and at the open (eye-installation) gap."""
+    the screw clamped and at the open (eye-installation) gap, counting full
+    threads only (1.5 incomplete pitches off)."""
     import _config
     import gooseneck_spec
 
@@ -74,9 +75,10 @@ def test_screw_engages_one_and_a_half_diameters_at_the_printed_worst_case() -> N
 
     plug = geom.PLUG_T - band("PlugDepth")
     shank = geom.SPRING_SCREW_UNDERHEAD_LENGTH_MM - band("UnderHeadLength")
+    incomplete = 1.5 * geom.SCREW_THREAD_PITCH
     need = 1.5 * geom.SCREW_THREAD_MAJOR_DIA
     for gap in (geom.SPRING_SCREW_CLAMPED_GAP_MM, geom.SPRING_SCREW_OPEN_GAP_MM):
-        assert min(plug, shank - gap) >= need
+        assert min(plug, shank - gap) - incomplete >= need
 
 
 def test_thicker_head_clears_the_counter_spring_half_turn() -> None:
