@@ -51,7 +51,6 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
@@ -137,8 +136,10 @@ LEFT_KEEP = {
     "Depth": (0.080, 0.212),
     "PinSeatCy": (0.130, 0.125),
     # r6 eye-pass: beside the view its widest callout line ran across the
-    # flank; above the view the leader crosses only the outline.
-    "PinSeatDia": (0.050, 0.245),
+    # flank.  Converged-r7: above the view the leader crossed the 9.0 thickness
+    # dimension, so the callout sits below-right and its leader rises past the
+    # text's left end to the seat, crossing only the bottom outline.
+    "PinSeatDia": (0.125, 0.082),
 }
 SECTION_CENTER = (0.350, 0.115)
 # Right of the seat's witness lines (x <= 0.3394), callout below the value:
@@ -287,9 +288,11 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=(3.0, 1.0),
         label="follower seat depth section",
     )
-    for view in (front, left):
-        set_hidden_lines_visible(adapter, view)
-    for view in (iso, seat_section):
+    # Policy rule 7: every view is hidden-lines-removed.  The two reamed
+    # through-bores are fully defined by their callouts and the blind seat by
+    # its callout plus Section B-B, so no dashed line carries information here
+    # (converged-r7 Fable delta, reviewfirst).
+    for view in (front, left, iso, seat_section):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
