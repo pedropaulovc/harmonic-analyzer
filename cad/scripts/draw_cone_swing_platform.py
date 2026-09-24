@@ -142,7 +142,11 @@ NOTCH_KEEP = {
     "CapEDia": (0.285, 0.259),
 }
 SECTION_KEEP = {
-    "PlateThk": _shifted(0.300, 0.120),
+    # Outside its witnesses, the text hangs LEFT of the dimension line (away
+    # from the plate), right edge on the line and centred on this y.  The
+    # three lines (~26 x 15.3 mm) sit in x 0.2935..0.3195, y 0.1213..0.1366:
+    # under the 205.81 witness (0.1379), right of the 7.0 arrow (0.2697).
+    "PlateThk": _shifted(0.300, 0.114),
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
 
@@ -214,8 +218,10 @@ SLOT_SECTION_CENTER = (0.296, 0.096)
 SLOT_SECTION_KEEP = {
     "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.015, SLOT_SECTION_CENTER[1]),
 }
-# Its native label, above the strip and left of the finish symbol.
-SLOT_SECTION_LABEL_LOWER_LEFT = (0.258, 0.106)
+# Its native label, left of the strip's 2.80 (x >= 0.2691): above the strip
+# it held the pocket section A-A's thickness text now needs.  Between the
+# plan caption row (y <= 0.0853) and the drill callout RD1 (y >= 0.1042).
+SLOT_SECTION_LABEL_LOWER_LEFT = (0.2140, 0.0868)
 
 
 

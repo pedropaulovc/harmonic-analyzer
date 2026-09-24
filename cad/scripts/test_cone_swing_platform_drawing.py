@@ -184,6 +184,57 @@ def _boxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
+# Measured on the 81788ce9 render: outside its witnesses the thickness text
+# hangs left of the dimension line, right edge on it, centred on the keep y.
+# "(6.35)" over one callout line was 49.5 x 9.7 mm (21 characters, 5.5 mm line
+# pitch, 3.8 mm glyphs), so a character is ~2.36 mm.
+_CHAR_W, _LINE_PITCH, _GLYPH_H = 0.00236, 0.0055, 0.0038
+
+
+def _plate_thickness_text_box(
+    keep: tuple[float, float] | None = None, callout: str | None = None
+) -> tuple[float, float, float, float]:
+    x, y = keep or drawing.SECTION_KEEP["PlateThk"]
+    lines = ["(6.35)", *(callout or spec.PLATE_STOCK_CALLOUT).split("\n")]
+    width = max(len(line) for line in lines) * _CHAR_W
+    height = (len(lines) - 1) * _LINE_PITCH + _GLYPH_H + 0.0005
+    return (x - width, y - height / 2.0, x, y + height / 2.0)
+
+
+def test_plate_thickness_text_sits_beside_section_a_a() -> None:
+    """The (6.35) stock callout stays in the pocket left of section A-A.
+
+    Above it: the notch plan's 205.81 witness (y 0.1379) and the 7.0 arrow at
+    x 0.2697, both measured on the 81788ce9 render; below it the relocated
+    section C-C label.  Its keep y must stay above the top witness (plate top
+    0.1265) so SolidWorks keeps the text outside, not centred on the line.
+    """
+    box = _plate_thickness_text_box()
+    witness_205 = (0.2690, 0.1374, 0.3060, 0.1384)
+    arrow_7 = (0.2692, 0.1280, 0.2702, 0.1379)
+    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
+    cc_label = (lx, ly, lx + 0.0465, ly + 0.0162)
+    for other in (witness_205, arrow_7, cc_label):
+        assert not _boxes_overlap(box, other), other
+    assert drawing.SECTION_KEEP["PlateThk"][1] > 0.1265 + 0.001
+    assert box[2] < drawing.SECTION_CENTER[0] - 0.02  # left of the cut edge
+    # Positive control: 81788ce9's one-line callout at its old keep crossed
+    # the 205.81 witness (and touched the 7.0 arrow).
+    old = _plate_thickness_text_box((0.320, 0.135), "1/4 PLATE AS SUPPLIED")
+    assert abs((old[2] - old[0]) - 0.0496) < 0.001
+    assert _boxes_overlap(old, witness_205)
+
+
+def test_material_fits_one_title_block_line() -> None:
+    """81788ce9 wrapped the long material form onto a second title-block line.
+
+    The printed row is short; the full wording lives in material_specification.
+    """
+    row = _config.parts("cone-swing-platform")
+    assert len(str(row["material"])) <= 36
+    assert "1018" in str(row["material_specification"])
+
+
 def test_detail_band_clears_border_title_block_and_captions() -> None:
     """Detail B, its label and callouts, and the relief note share one band.
 
@@ -267,15 +318,18 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     (runs 2b643c17 and e86bf319): the notch plan, its caption, the relief
     dimension RD1, and section A-A's outline, finish symbol and thickness
     text.  The strip is the plate edge-on at 1:1 plus SolidWorks' ~4 mm
-    outline padding; the native label measured 46.5 x 16.2 mm.
+    outline padding; the native label measured 46.5 x 16.2 mm.  The thickness
+    text is its rendered extent (see the test below), not the audit's
+    nominal box (#852).
     """
     neighbours = {
         "notch view": (0.2394, 0.1286, 0.2806, 0.2514),
         "notch caption": (0.2448, 0.0805, 0.3045, 0.0853),
+        "hole caption": (0.1497, 0.0805, 0.2185, 0.0853),
         "RD1": (0.1900, 0.1042, 0.2460, 0.1077),
         "section A-A": (0.3246, 0.1081, 0.3854, 0.1319),
         "A-A finish": (0.3160, 0.1056, 0.3276, 0.1081),
-        "A-A thickness": (0.3084, 0.1322, 0.3245, 0.1357),
+        "A-A thickness": _plate_thickness_text_box(),
         "title block": (0.216, 0.0, 0.4318, 0.066),
     }
     half = drawing.SLOT_SECTION_HALF_SPAN_MM / 1000.0 + 0.004

@@ -26,7 +26,9 @@ PLATE_THICKNESS = 6.35
 # reference "(6.35)" with "1/4 PLATE AS SUPPLIED" -- no machined thickness
 # band.  Rule-12 stacks through the plate use the stock's mill tolerance.
 PLATE_STOCK_BAND = 0.13
-PLATE_STOCK_CALLOUT = "1/4 PLATE AS SUPPLIED"
+# Two lines: on one, the text hung 49.5 mm left of section A-A into the
+# notch plan's 7.0 and 205.81 (81788ce9 render).
+PLATE_STOCK_CALLOUT = "1/4 PLATE\nAS SUPPLIED"
 # The top relief is 10.50 wide, round-ended about the pivot and OPEN through
 # the north edge (rule-12 W18, Main 2026-09-23, option (d)): as a closed
 # Ø10.50 spotface 7.0 from that edge it left a 1.75 web.  The width keeps the
@@ -39,10 +41,9 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # and finished plate; do not invent a numerical axial-clearance band.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
     "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
-    "AND ACTUAL CONE-PIVOT-SCREW (McMASTER 91829A560).\n"
-    "WITH SCREW SHOULDER FULLY SEATED ON BASE AND LOCK\n"
-    "KNOB RELEASED, PLATFORM SHALL SWING FREELY WITHOUT\n"
-    "CLAMPING, WITH MINIMAL PERCEPTIBLE AXIAL PLAY."
+    "AND McMASTER 91829A560 CONE-PIVOT-SCREW.\n"
+    "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
+    "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
 )
 # The platform swings on the stock 1/4-in shoulder, but this occasional setup
 # pivot has no measured need for a close running bearing fit.  Preserve the
