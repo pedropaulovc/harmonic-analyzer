@@ -102,7 +102,10 @@ SCREW_TIP_X = HEAD_X - SCREW_HEAD_T
 SHANK_END_X = HEAD_X + SPRING_SCREW_UNDERHEAD_LENGTH_MM
 PLUG_END_X = ARM_END_X + PLUG_T
 POST_CUT_Y = 20.0  # above the Top-plane LegProfile sketch, below the bend
-JOINT_CUT_END_X = SHANK_END_X + 8.0  # past the screw tip, still in the arm
+# Past the screw tip, still in the arm. Kept short: the section grows right
+# with the under-head length, and at 8.0 the 15.0 shank (farm r18) pushed its
+# outline into the screw view's head-diameter leader.
+JOINT_CUT_END_X = SHANK_END_X + 4.0
 
 # Sheet 1 (sheet metres). The 1:3 elevation stays left; the post section and
 # its two diameters sit between it and the isometric, all above the title
@@ -127,6 +130,9 @@ POST_DIAMETER_ROW_MM = 24.0
 # section's outline still spans geometry it does not print.
 PLAN_CENTER = (0.085, 0.240)
 PLAN_SCALE = (1, 2)
+# Between the A-A cut letters (about 219 mm) and the plug-fit callout's top
+# (about 204 mm): more than one text height to each.
+PLAN_NOTE_XY = (0.085, 0.212)
 # A diametric dimension parked beyond its extension lines prints its text on a
 # shoulder running the SAME way as the extension lines (feature -> dim line,
 # measured r5). The plug diameter stands left of the plug, so its long fit
@@ -388,6 +394,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Plan View Note",
             "Screw View Note",
         ),
         required=(
@@ -398,6 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Manufacturing Notes",
             "Elevation View Note",
             "Isometric View Note",
+            "Plan View Note",
             "Screw View Note",
         ),
     )
@@ -481,6 +489,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "TubeBoreDia": _offset(post_center, 0.0, -POST_DIAMETER_ROW_MM),
         },
     )
+    # Purchased tube: the stock sizes are reference, the wall is the mill's.
+    set_reference_dimensions(adapter, post_dimensions, ("TubeDia", "TubeBoreDia"))
     _place_view_label(
         adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),
         label="section B-B label",
@@ -493,6 +503,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate gooseneck fabrication sheet")
     plan = place_view(adapter, str(SOURCE), "*Top", *PLAN_CENTER, scale=PLAN_SCALE)
     set_hidden_lines_removed(adapter, plan)
+    add_property_linked_note(adapter, "Plan View Note", *PLAN_NOTE_XY)
     joint = create_section_view(
         adapter,
         plan,

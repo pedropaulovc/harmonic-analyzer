@@ -105,3 +105,50 @@ def test_gooseneck_consumers_import_against_this_geometry() -> None:
     assert build_motion_study_springs.GOOSENECK_EYE[0] == (
         geom.ARM_END_X - geom.SPRING_EYE_CENTRE_FROM_ARM_END_MM
     )
+
+
+def test_stock_tube_wall_holds_the_floor_through_the_bend() -> None:
+    """The purchased tube's worst-case wall (A519 Table 9, +/-10%) stays >= the
+    1.5 mm floor straight and at the outer fibre of the R51 bend."""
+    import gooseneck_spec
+
+    straight = geom.WALL_T * (1.0 - gooseneck_spec.TUBE_STOCK_WALL_TOL)
+    bend = straight * 2.0 * geom.BEND_R / (2.0 * geom.BEND_R + geom.TUBE_DIA)
+    assert round(straight, 9) >= 1.8
+    assert bend >= 1.5
+
+
+def test_material_fits_one_title_block_line() -> None:
+    """Farm r20: a 51-character material wrapped into the DRAWN PER row; the
+    former 36-character string printed on one line. The printed field keeps
+    CDS: the 1.80 wall minimum is A519's cold-worked (Table 9) band."""
+    import _config
+
+    material = str(_config.parts("gooseneck")["material"])
+    assert len(material) <= 36
+    assert "CDS" in material
+
+
+def test_plating_spares_the_threads() -> None:
+    """Plating grows a 60-degree thread's pitch diameter ~4x its thickness, so
+    the screw is removed before plating and the plug thread is chased after;
+    the screw's own finish rides its view caption. The finish cell holds two
+    lines (~41-46 characters each)."""
+    import _config
+    import gooseneck_spec
+
+    finish = str(_config.parts("gooseneck")["finish"])
+    assert "SCREW REMOVED" in finish
+    assert "CHASE #6-32" in finish
+    assert len(finish) <= 82
+    assert "BLACK OXIDE, NOT PLATED" in gooseneck_spec.SCREW_VIEW_NOTE
+
+
+def test_plan_view_is_captioned() -> None:
+    from pathlib import Path
+
+    import gooseneck_spec
+
+    source = (Path(__file__).parent / "draw_gooseneck.py").read_text(encoding="utf-8")
+    assert gooseneck_spec.PLAN_VIEW_NOTE == "PLAN VIEW SCALE 1:2"
+    assert 'add_property_linked_note(adapter, "Plan View Note"' in source

@@ -89,6 +89,7 @@ from gooseneck_spec import (
     DRAWING_PRECISION,
     ELEVATION_VIEW_NOTE,
     ISOMETRIC_VIEW_NOTE,
+    PLAN_VIEW_NOTE,
     SCREW_VIEW_NOTE,
 )
 
@@ -892,6 +893,7 @@ async def build(adapter) -> dict[str, str]:
             "Manufacturing Notes": DRAWING_NOTES,
             "Elevation View Note": ELEVATION_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Plan View Note": PLAN_VIEW_NOTE,
             "Screw View Note": SCREW_VIEW_NOTE,
         },
     )

@@ -43,22 +43,35 @@ for _partition in (
     for _feature, _names in _partition.items():
         DRAWING_DIMENSIONS.setdefault(_feature, set()).update(_names)
 
+# The tube is purchased stock that nobody cuts, so its Ø16 and Ø12 print as
+# REFERENCE and Material names the stock (Main ruling on Codex machinist r19 B1;
+# the U41 swing-plate precedent). The wall is then the mill's, not a machining
+# band: ASTM A519-03 Table 8 footnote B sends an ID under 1/2 in (ours is
+# 0.472 in) to Table 9, which holds a wall <= 25% of OD with an ID up to
+# 1.499 in to +/-10.0%. So 2.0 * 0.9 = 1.80 min straight. Outer-fibre thinning
+# at the R51 bend is about 2R/(2R + OD) = 0.864, so 1.56 at the bend: at or
+# above rule 12's 1.5 floor, which covers MACHINED walls anyway. A519/A519M-24a
+# was not checked (paywalled).
+TUBE_STOCK_WALL_TOL = 0.10
+
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. Formed lengths and radii print to one
 # place: the arm run enters the counter moment about 1:1, so +/-0.8 on it is
 # about +/-1% of moment against the purchased spring's +/-10%, which setup
 # re-tensions anyway. So do the screw's under-head length (the through thread
-# adjusts it), the plug length (thread engagement, not a fit) and the screw
-# head (sized so the slot web holds 2 mm at the worst case of this band).
+# adjusts it), the plug length (thread engagement, not a fit), the screw
+# head (sized so the slot web holds 2 mm at the worst case of this band) and
+# the head diameter (eye retention, not a fit; Codex machinist r19). At
+# Ø12.8 the head still clears the counter spring's raised half-turn by 1.26 mm.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LegProfile": {"TubeDia": 2, "TubeBoreDia": 2},
+    "LegProfile": {"TubeDia": 1, "TubeBoreDia": 1},
     "Leg": {"LegLength": 1},
     "BendPath": {"BendRadius": 1, "ArmRun": 1},
     "EndPlugProfile": {"PlugDia": 2, "TapMinorDia": 3, "PlugDepth": 1},
     "ScrewProfile": {
         "ScrewShankDia": 3,
         "UnderHeadLength": 1,
-        "ScrewHeadDia": 2,
+        "ScrewHeadDia": 1,
         "HeadThickness": 1,
     },
     "ScrewSlotProfile": {"SlotDepth": 2, "SlotWidth": 2},
@@ -88,6 +101,14 @@ PLUG_FIT_CALLOUT = (
     "0.051-0.127 RADIAL CLEARANCE\n"
     "CENTER CONCENTRIC; SILVER-BRAZE AWS A5.8 BAg-7"
 )
+# Policy rule 12 (U27) engagement: all of the worst-case 6.2 plug (7.0 at .X)
+# is FULL thread, 1.77D. The plug is tapped through, so it has no tap-lead
+# loss, and in the installed, clamped state the screw passes fully through it
+# (9.58 reach at worst case), so its tip threads sit past the plug. The 8.0
+# open gap is assembly access only: the eye hangs loose and the screw carries
+# no clamp load, so it is not a load case for engagement (Main ruling on Codex
+# machinist r19 B2). This lives here, not in gooseneck_geom, which the channel,
+# magnifier and summing recipes read.
 TAP_CALLOUT = "#6-32 UNC-2B THRU"
 # The bend radius is the tube-bender's centreline radius; its imported
 # dimension rides the (unshown) sweep path, so the sheet says so.
@@ -113,4 +134,9 @@ DRAWING_REFERENCE_PRECISION = 1
 
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
-SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1"
+# The screw is not plated with the tube and plug (see the part's finish), so
+# its own finish rides its view caption: stated once, next to the screw.
+SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1\nBLACK OXIDE, NOT PLATED"
+# The plan view only carries cutting line A-A, but it prints at 1:2 on a 1:3
+# sheet, so it is captioned like any unlabelled model view.
+PLAN_VIEW_NOTE = "PLAN VIEW SCALE 1:2"
