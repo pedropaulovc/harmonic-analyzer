@@ -426,20 +426,22 @@ def _place_detail_letter(adapter: Any, front: Any) -> None:
         raise RuntimeError(f"knife-detail letter position did not persist: {actual}")
 
 
-def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
-    """Hide one model reference sketch in one drawing view that prints none of
-    its dimensions.
+def _show_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
+    """Show one model reference sketch in one drawing view, as a print mark.
 
-    ``BossAxialReference`` carries the construction line that locates the boss
-    axially, and the isometric and the spring-pattern view printed it as a stray
-    dash-dot stroke from the boss to the plate end; ``SummationArcReference``
-    would print its centre stub edge-on beside the boss in the front view.  ``BlankSketch`` is VT_VOID and there is no per-view
-    read-back, so the selection is the gate and the render the proof.
+    The part saves every drawing-reference sketch hidden
+    (``build_summing_lever.DRAWING_REFERENCE_SKETCHES``), so they stay out of
+    its renders and every assembly, and the targeted import shows each one only
+    for its own call (``_drawing_common.insert_feature_dimensions``).  Two are
+    print marks and are shown for good: the R138.8 centre cross in the top view
+    (Main's R7 "unmarked centres") and the knife envelope's centre "+" in the
+    front view and Detail A.  ``UnblankSketch`` is VT_VOID and there is no
+    per-view read-back, so the selection is the gate and the render the proof.
     """
     draw = adapter.currentModel
     name = view_name(adapter, view)
     if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate {name} to hide {sketch}")
+        raise RuntimeError(f"failed to activate {name} to show {sketch}")
     draw.ClearSelection2(True)
     # The middle qualifier is the view's own model instance ("summing-lever-N",
     # numbered per view), not the file stem: the stem refused on R4.
@@ -448,7 +450,7 @@ def _hide_view_sketch(adapter: Any, view: Any, sketch: str) -> None:
         qualified, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
         raise RuntimeError(f"cannot select {qualified}")
-    draw.BlankSketch()
+    draw.UnblankSketch()
     draw.ClearSelection2(True)
 
 
@@ -858,12 +860,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "counter-spring anchor tap",
     )
 
-    for sketch in (
-        "SummationArcReference",
-        "BossAxialReference",
-        "CylinderReference",
-    ):
-        _hide_view_sketch(adapter, front, sketch)
+    _show_view_sketch(adapter, top, "SummationArcReference")
+    # Before the detail, which takes its sketch display from its parent.
+    _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
     detail = _knife_detail(adapter, front)
     _place_detail_letter(adapter, front)
     set_hidden_lines_removed(adapter, detail)
@@ -874,6 +873,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="knife-end detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    # Again: the detail's import shows and re-blanks the knife envelope through
+    # its parent's model-item path, which undoes the parent's mark.
+    _show_view_sketch(adapter, front, "KnifeEnvelopeReference")
     knife_surface_mm = (HEX_W / 4.0, 3.0 * HEX_H / 8.0, HEX_Z_OUTER)
     detail_edges = scan_view_edges(detail, label="knife-end detail finish")
     knife_surface_edge = detail_edges.exact_line_through(
@@ -955,14 +957,6 @@ async def build(adapter: Any) -> dict[str, str]:
         HOLE_SPEC.thread_class,
         "spring-hole pattern",
     )
-    for view in (pattern, iso):
-        for sketch in (
-            "SummationArcReference",
-            "BossAxialReference",
-            "CylinderReference",
-        ):
-            _hide_view_sketch(adapter, view, sketch)
-    _hide_view_sketch(adapter, iso, "PatternReferences")
 
     for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
