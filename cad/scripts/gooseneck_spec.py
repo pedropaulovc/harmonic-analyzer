@@ -53,6 +53,9 @@ for _partition in (
 # above rule 12's 1.5 floor, which covers MACHINED walls anyway. A519/A519M-24a
 # was not checked (paywalled).
 TUBE_STOCK_WALL_TOL = 0.10
+# The reference diameters alone left the stock ungoverned on the sheet (Codex
+# machinist r24), so section B-B names the stock and its mill wall band.
+TUBE_STOCK_CALLOUT = "TUBE STOCK 16 OD X 2.0 WALL\nWALL +/-10% PER ASTM A519"
 
 # Decimal places are the tolerance statement (policy rule 2), so the model owns
 # them and the drawing verifies readback. Formed lengths and radii print to one
@@ -108,8 +111,11 @@ PLUG_FIT_CALLOUT = (
 # open gap is assembly access only: the eye hangs loose and the screw carries
 # no clamp load, so it is not a load case for engagement (Main ruling on Codex
 # machinist r19 B2). This lives here, not in gooseneck_geom, which the channel,
-# magnifier and summing recipes read.
-TAP_CALLOUT = "#6-32 UNC-2B THRU"
+# magnifier and summing recipes read. The sheet says FULL THREAD, so the tap
+# runs fully through the plug and a blind review does not charge a lead loss
+# (Codex machinist r19/r24 B2; Main ruling). It is a second line, because one
+# line would run into the screw view's Ø12 dimension line.
+TAP_CALLOUT = "#6-32 UNC-2B THRU\nFULL THREAD"
 # The bend radius is the tube-bender's centreline radius; its imported
 # dimension rides the (unshown) sweep path, so the sheet says so.
 BEND_RADIUS_CALLOUT = "AT TUBE CENTERLINE"
@@ -134,9 +140,7 @@ DRAWING_REFERENCE_PRECISION = 1
 
 ELEVATION_VIEW_NOTE = "ELEVATION SCALE 1:3"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
-# The screw is not plated with the tube and plug (see the part's finish), so
-# its own finish rides its view caption: stated once, next to the screw.
-SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1\nBLACK OXIDE, NOT PLATED"
+SCREW_VIEW_NOTE = "ADJUSTMENT SCREW SHOWN ALONE SCALE 7:1"
 # The plan view only carries cutting line A-A, but it prints at 1:2 on a 1:3
 # sheet, so it is captioned like any unlabelled model view.
 PLAN_VIEW_NOTE = "PLAN VIEW SCALE 1:2"

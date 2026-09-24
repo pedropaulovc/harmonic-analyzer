@@ -76,6 +76,7 @@ from gooseneck_spec import (
     SCREW_CALLOUT,
     SCREW_DIMENSIONS,
     TAP_CALLOUT,
+    TUBE_STOCK_CALLOUT,
 )
 
 SPEC = DRAWINGS_BY_NAME["gooseneck"]
@@ -111,7 +112,9 @@ JOINT_CUT_END_X = SHANK_END_X + 4.0
 # its two diameters sit between it and the isometric, all above the title
 # block (x > 218 mm is title block below y = 65 mm).
 FRONT_CENTER = (0.095, 0.145)
-POST_SECTION_CENTER = (0.190, 0.175)  # where the post AXIS lands
+# 0.210, not 0.190: the Ø12 row's stock callout runs LEFT from the ring and
+# at 0.190 its two lines crossed the 442.3 leg dimension line (farm r26).
+POST_SECTION_CENTER = (0.210, 0.175)  # where the post AXIS lands
 POST_SECTION_SCALE = (2, 1)
 ISO_CENTER = (0.330, 0.170)
 ISO_SCALE = (1, 3)
@@ -490,6 +493,9 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     # Purchased tube: the stock sizes are reference, the wall is the mill's.
+    set_dimension_callouts(
+        adapter, post_dimensions, {"TubeBoreDia": TUBE_STOCK_CALLOUT}, location="below"
+    )
     set_reference_dimensions(adapter, post_dimensions, ("TubeDia", "TubeBoreDia"))
     _place_view_label(
         adapter, post, _offset(post_center, 0.0, -POST_LABEL_BELOW_MM),
