@@ -46,9 +46,11 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
     {
         "draw_alignment_pinion.py",
         "draw_boss_hook.py",
+        "draw_cone_gear.py",
         "draw_cone_gear_shaft.py",
         "draw_cone_swing_platform.py",
         "draw_cone_tip_block.py",
+        "draw_cone_tip_bushing.py",
         "draw_counter_spring.py",
         "draw_crank_arm.py",
         "draw_crank_handle_pivot_screw.py",

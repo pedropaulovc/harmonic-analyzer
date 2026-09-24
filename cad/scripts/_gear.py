@@ -30,7 +30,7 @@ from _common import (
     name_last_feature,
     volume_check,
 )
-from build_cone_gear import gear_facts
+from involute_gear import gear_facts
 
 __all__ = [
     "build_fixed_gear",
@@ -223,7 +223,7 @@ def gap_area_in_disc_ext(
     """In-blank area of one tooth gap (in^2) with the widen/root extensions.
 
     The plain (widen 0, base-chord floor) case reduces exactly to
-    ``build_cone_gear.gap_area_in_disc`` (asserted by ``check:math``'s import
+    ``involute_gear.gap_area_in_disc`` (asserted by ``check:math``'s import
     of both). Same Green's-theorem boundary walk as the live curves in
     ``cut_tooth_gap``: lower flank (rotated -widen), rim arc at Ra, upper
     flank reversed (rotated +widen), then the floor -- base chord, or radial
@@ -278,7 +278,7 @@ def gap_area_in_disc_ext(
 # Import-time tripwire: at defaults the extended area must reduce to the cone
 # gear's exact expectation (same boundary, different code path) -- a drifted
 # copy would silently skew every _gear volume gate.
-from build_cone_gear import gap_area_in_disc as _gap_area_plain  # noqa: E402
+from involute_gear import gap_area_in_disc as _gap_area_plain  # noqa: E402
 
 for _t, _dp in ((16, 24.74), (64, 24.74), (12, 12.7)):
     _a, _b = gap_area_in_disc_ext(_t, dp=_dp), _gap_area_plain(_t, dp=_dp)
