@@ -26,16 +26,17 @@ gear faces (stations below quoted from the legacy pivot end):
 
 * 12.2308 mm x 43.011 -- v2 pivot-post bearing journal, 0.05 diametral
   running clearance
-* 3/8 in x 141.9 -- 64T at stations 14.9..24.9 + seats T120..T024
-* 1/4 in x 148.8 -- T018 seat
-* 1/8 in x 155.7 -- T012 seat
-* 1/32 in x 143.2599 -- T006 tip journal contacts the exact McMaster
-  94025A150 conical cup apex at 6 mm thread engagement.  Its 20.675 mm
-  terminal stub still spans the 4 mm tip bushing.  WARNING: the 0.79 mm
-  steel tip journal is mechanically marginal (it follows from the 62.2 OD
-  anchor, low confidence) -- flagged for Phase 3 rebuild validation; a real
-  builder would more likely keep the tip gears larger (i.e. the 62.2 reading
-  may be low).
+* 3/8 in x 135.0 -- 64T at stations 14.9..24.9 + seats T120..T030
+* 1/4 in x 141.9 -- T024 seat
+* 1/8 in x 148.8 -- T018 seat
+* 1/16 in x 138.9788 -- T012 and T006 seats and tip journal; contacts the
+  exact McMaster 94025A164 conical cup apex at 9.5 mm thread engagement
+  (rule-12 E11).  Its 23.294 mm terminal land also carries the 4 mm tip bushing.  U40
+  (2026-09-23) moved every small land one station toward the big end at
+  unchanged overall length, so this land now also carries T012 and runs at
+  L/D 14.7; it is turned with tailstock support (a drawing note).  1/16 in
+  is the largest step the T006 rim tolerates (0.543 mm under the as-cut
+  base-chord root) -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat
@@ -80,6 +81,7 @@ from _common import (
     set_global,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -91,10 +93,9 @@ from _part_pmi import author_part_pmi
 from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    END_VIEW_NOTE,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    SECTION_DIA_BAND,
+    DRAWING_PRECISION,
+    FILLET_RADIUS,
+    SECTION_DIA_BANDS,
     SECTIONS,
     SURFACE_FINISHES,
 )
@@ -115,16 +116,15 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # exact-tracking seat pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg,
 # the shallower incline at DP 49.82): seat j spans 28.25 + 6.8889 j +- 3.25
 # from the pivot end; each step station sits in the ~0.39 air gap between
-# faces (T024 north 141.72 | 141.9 | T018 south 142.11, and so on). Diameters
-# mirror build_cone_gear.bore_dia_in (snug perpendicular seats), stepping much
-# finer than the old DP 30 shaft because the tip gears shrank: T006 OD is now
-# 4.08 mm. WARNING the 1/32" (0.79 mm) tip journal is mechanically marginal --
-# it follows from the 62.2 OD anchor (ch13, low confidence) and is flagged
-# for Phase 3 rebuild validation.
+# faces (T030 north 134.83 | 135.0 | T024 south 135.22, and so on; U40).
+# Diameters agree with build_cone_gear.bore_dia_in (snug perpendicular seats),
+# stepping much finer than the old DP 30 shaft because the tip gears shrank:
+# T006 OD is now 4.08 mm.  The terminal land stops at 1/16": below that the
+# T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -146,10 +146,36 @@ async def build(adapter) -> dict[str, str]:
     prev_end = 0.0
     for i, (dia_in, end_z) in enumerate(SECTIONS):
         label = f"section d{dia_in:g}in to z={end_z:g}"
+        # Each land is a cylinder from the large-end face to its own end
+        # station, so every smaller land is contained in its larger neighbour
+        # and the running volume stays exact per section.
+        #
+        # WHERE the profile circle sits is a drawing decision: a diameter
+        # dimension can only be dragged into the side view at the station its
+        # sketch occupies.  Sketching all five circles on the Front plane put
+        # all five diameters at the large-end face, which is why the sheet
+        # used to pile them as leadered callouts beside an end view.  Land 0
+        # is sketched on the Front plane (its circle IS the large-end face);
+        # every other land is sketched on an offset plane AT ITS END STATION
+        # and extruded BACK to that face, which leaves each diameter on its
+        # own shoulder while the extrude depth is still the station itself.
+        if i == 0:
+            plane_name = "Front"
+        else:
+            check(
+                f"create_plane end of {label}",
+                await adapter.create_plane(
+                    CreatePlaneParameters(
+                        mode="offset", base_plane="Front Plane", offset=end_z
+                    )
+                ),
+            )
+            plane_name = f"Sec{i}EndPlane"
+            name_last_feature(adapter, plane_name)
         # On-axis circle (centre at the origin): define_circle records ONLY the
         # diameter dim (the X/Z centre slots are relations, not display dims).
         sec = SketchDims()
-        check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+        check(f"create_sketch {label}", await adapter.create_sketch(plane_name))
         await define_circle(
             adapter,
             0.0,
@@ -166,14 +192,38 @@ async def build(adapter) -> dict[str, str]:
         drive_jobs += sec.apply(adapter, f"Sec{i}Profile")
         check(
             f"extrude {label}",
-            await adapter.create_extrusion(ExtrusionParameters(depth=end_z)),
+            await adapter.create_extrusion(
+                ExtrusionParameters(depth=end_z, reverse_direction=i > 0)
+            ),
         )
         name_last_feature(adapter, f"Sec{i}")
         depth_dim = name_dimensions(adapter, f"Sec{i}", [f"Sec{i}End"])
         drive_jobs += [(depth_dim[0], f'"SecEnd{i}"')]
         volume += math.pi * (dia_in * IN / 2.0) ** 2 * (end_z - prev_end)
+        # A land extruded the wrong way lands inside its larger neighbour or
+        # off the end of the shaft, so the running volume is the direction
+        # check as well as the size check.
         await volume_check(adapter, label, volume, 0.005 * volume)
         prev_end = end_z
+
+    # Shoulder roots.  ONE constant-radius fillet over all four internal step
+    # edges, each picked by a point on the SMALLER land's circle at that
+    # station; the nearest other edge is 0.79 mm away radially and 6.9 mm
+    # axially.  Tangent propagation is off: every seed is already a complete
+    # closed circle.
+    fillet_edges = [
+        [SECTIONS[i + 1][0] * IN / 2.0, 0.0, end_z]
+        for i, (_dia_in, end_z) in enumerate(SECTIONS[:-1])
+    ]
+    check(
+        "fillet shoulder roots",
+        await adapter.add_fillet(FILLET_RADIUS, fillet_edges, propagate=False),
+    )
+    name_last_feature(adapter, "ShoulderFillets")
+    name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
+    # Four R0.10 rounds add ~0.15 mm^3 to a ~13000 mm^3 shaft: this checks
+    # that the fillet did not eat a land, not that it moved the number.
+    await volume_check(adapter, "shoulder fillets", volume, 0.005 * volume)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -194,31 +244,22 @@ async def build(adapter) -> dict[str, str]:
     # The five turned diameters carry their fit on the MODEL dimension, so
     # SolidWorks renders the limits and re-renders them on a unit change. The
     # sheet used to append "+0.00/-0.02" as frozen callout text instead.
-    for section in range(5):
+    for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
-            *deviations(SECTION_DIA_BAND),
+            *deviations(band),
         )
+    # Display precision is model-owned too (drawing-simplicity policy rule 2).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
-    apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "End View Note": END_VIEW_NOTE,
-        },
-    )
+    # The two lands that RUN carry a roughness symbol.  No datums and no
+    # feature-control frames (drawing-simplicity policy rule 3).
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 
