@@ -167,6 +167,7 @@ REFERENCE_WITNESSES = {
     "BondZoneReference": (BOND_ZONE_DIA_Z, BOND_ZONE_DIA_Z + BOND_ZONE_WITNESS_LEN),
 }
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
+REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the witnesses are fully defined sketch lengths
 # Exported-raster proof that the outline stays unbroken over each witness:
 # the grey witness core measured 107-128 and the black outline 0 (5471a6ef
 # PNG), so every raster column over a span needs at least two dark pixels
@@ -421,11 +422,19 @@ def _blacken_reference_witnesses(
         if kind != SW_SEL_EXT_SKETCH_SEGS:
             raise RuntimeError(f"{sketch_name} witness pick resolved to type {kind}")
         segment = _early_bound(selection.GetSelectedObject6(1, -1), "ISketchSegment")
-        owner = _early_bound(_early_bound(segment.GetSketch(), "ISketch"), "IFeature").Name
-        if owner != sketch_name or not bool(segment.ConstructionGeometry):
+        # Identify the pick by its own length, not its sketch's name: an
+        # ISketch is not an IFeature dispatch, so rebinding it reads another
+        # member (7885c0d9 got a 16-double matrix back for ``Name``).  The
+        # only other flank construction segment here is the front land's
+        # 19 mm witness.
+        name = str(segment.GetName())
+        length = float(segment.GetLength()) * 1000.0
+        expected = z1 - z0
+        construction = bool(segment.ConstructionGeometry)
+        if abs(length - expected) > REFERENCE_WITNESS_LEN_TOL or not construction:
             raise RuntimeError(
-                f"{sketch_name} witness pick resolved to {owner!r} "
-                f"(construction={bool(segment.ConstructionGeometry)})"
+                f"{sketch_name} witness pick resolved to {name} "
+                f"({length:.3f} mm, want {expected:.3f}; construction={construction})"
             )
         drawing.SetLineColor(REFERENCE_WITNESS_COLOR)
         draw.ClearSelection2(True)

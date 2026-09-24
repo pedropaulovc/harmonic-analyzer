@@ -543,6 +543,8 @@ def test_reference_witnesses_are_drawn_in_the_outline_black() -> None:
     helper = inspect.getsource(drawing._blacken_reference_witnesses)
     assert "drawing.SetLineColor(REFERENCE_WITNESS_COLOR)" in helper
     assert "SW_SEL_EXT_SKETCH_SEGS" in helper and "ConstructionGeometry" in helper
+    # 7885c0d9: rebinding the ISketch as IFeature read a matrix for Name.
+    assert '"IFeature"' not in helper and "segment.GetLength()" in helper
     source = inspect.getsource(drawing.build)
     blacken = source.index("_blacken_reference_witnesses(adapter, principal)")
     finalize = source.index("await finalize_drawing(")
