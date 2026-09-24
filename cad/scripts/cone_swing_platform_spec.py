@@ -27,8 +27,10 @@ PLATE_THICKNESS = 6.35
 # band.  Rule-12 stacks through the plate use the stock's mill tolerance.
 PLATE_STOCK_BAND = 0.13
 # Two lines: on one, the text hung 49.5 mm left of section A-A into the
-# notch plan's 7.0 and 205.81 (81788ce9 render).
-PLATE_STOCK_CALLOUT = "1/4 PLATE\nAS SUPPLIED"
+# notch plan's 7.0 and 205.81 (81788ce9 render).  Broken after "AS" so the
+# last line, beside the dimension's top arrowhead, is the short one and sits
+# back from it (aa9766da: "AS SUPPLIED" ran its D into the arrow).
+PLATE_STOCK_CALLOUT = "1/4 PLATE AS\nSUPPLIED"
 # The top relief is 10.50 wide, round-ended about the pivot and OPEN through
 # the north edge (rule-12 W18, Main 2026-09-23, option (d)): as a closed
 # Ø10.50 spotface 7.0 from that edge it left a 1.75 web.  The width keeps the

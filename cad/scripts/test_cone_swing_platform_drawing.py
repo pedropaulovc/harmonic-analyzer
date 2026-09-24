@@ -226,6 +226,89 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     assert _boxes_overlap(old, witness_205)
 
 
+# Section C-C's 2.80 depth dimension parks its text right of the strip; its
+# upper arrow line runs up from the plate top to ~9.5 mm above the strip's
+# view centre (aa9766da render: x 0.2993, top 0.1304 at centre 0.1109).
+_CC_DEPTH_LINE_DX, _CC_DEPTH_LINE_TOP_DY = 0.0203, 0.0195
+
+
+def _cc_depth_line(center: tuple[float, float] | None = None) -> tuple[float, ...]:
+    cx, cy = center or drawing.SLOT_SECTION_CENTER
+    x = cx + _CC_DEPTH_LINE_DX
+    return (x - 0.0003, cy, x + 0.0003, cy + _CC_DEPTH_LINE_TOP_DY)
+
+
+def test_plate_thickness_text_clears_the_cc_depth_line_and_its_own_arrow() -> None:
+    """aa9766da: the 2.80 arrow line ran up between "AS" and "SUPPLIED".
+
+    The stock text keeps 2 mm from that line, and the line beside the 6.35
+    dimension's top arrowhead is the short one, set back from the arrow by
+    at least 1.5 mm (there "AS SUPPLIED" ran its D into the arrowhead).
+    """
+    box = _plate_thickness_text_box()
+    line = _cc_depth_line()
+    assert box[0] - line[2] >= 0.002
+    assert line[3] > box[1]  # the line does reach the text's height
+    callout = spec.PLATE_STOCK_CALLOUT.split("\n")
+    widest = max(len(text) for text in ("(6.35)", *callout))
+    setback = (widest - len(callout[-1])) * _CHAR_W / 2.0
+    assert setback >= 0.0015
+    # Positive controls: aa9766da's shift crossed the line, and its callout
+    # put the widest line beside the arrow.
+    old_keep = (drawing.SECTION_KEEP["PlateThk"][0] - (drawing.SECTION_SHIFT[0] - 0.020),
+                drawing.SECTION_KEEP["PlateThk"][1])
+    old_box = _plate_thickness_text_box(old_keep, "1/4 PLATE\nAS SUPPLIED")
+    old_line = _cc_depth_line((0.279, 0.1109))
+    assert _boxes_overlap(old_box, old_line)
+    assert len("AS SUPPLIED") == max(len(t) for t in ("(6.35)", "1/4 PLATE", "AS SUPPLIED"))
+
+
+def _notch_caption_box() -> tuple[float, float, float, float]:
+    """The lock-notch caption, 59.7 x 4.8 mm from its upper-left anchor."""
+    x, y = drawing.NOTCH_CAPTION_UPPER_LEFT
+    return (x, y - 0.0048, x + 0.0597, y)
+
+
+def test_lock_notch_caption_sits_under_its_own_view() -> None:
+    """aa9766da printed it right under "SECTION C-C / SCALE 1:1" (one block).
+
+    Lifted off the plan caption row, it is centred under the notch plan,
+    under the 7.0 arrow tip (aa9766da: y 0.1276), and 5 mm or more above the
+    C-C strip's ink (aa9766da: top 0.1202 at view centre 0.1109) and well
+    clear of the C-C label and depth line.
+    """
+    box = _notch_caption_box()
+    assert (box[0] + box[2]) / 2.0 == pytest.approx(drawing.NOTCH_CENTER[0], abs=1e-4)
+    assert box[3] <= 0.1276 - 0.0015
+    strip_top = drawing.SLOT_SECTION_CENTER[1] + (0.1202 - 0.1109)
+    assert box[1] - strip_top >= 0.005
+    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
+    label = (lx, ly, lx + 0.0465, ly + 0.0162)
+    assert box[1] - label[3] >= 0.015
+    assert not _boxes_overlap(box, _cc_depth_line())
+    assert not _boxes_overlap(box, _plate_thickness_text_box())
+    # Positive control: aa9766da's caption on the plan row sat 1.2 mm under
+    # its C-C label, and would now overlap the lowered label outright.
+    old = (0.2448, 0.0805, 0.3045, 0.0853)
+    assert 0.0865 - old[3] < 0.002
+    assert _boxes_overlap(old, label)
+
+
+def test_section_a_a_group_stays_inside_the_border() -> None:
+    """Shifted 10 mm right, A-A's ink and its audited Ra box stay inside.
+
+    aa9766da's A-A group (section, relief fragment, 0.25, Ra 1.6, label) ended
+    at x 0.40005 with the border line at 0.4189.  The base-slide Ra symbol
+    keeps its sheet x: the audit boxes a finish 39 mm right of its anchor.
+    """
+    border = 0.4189
+    right = 0.40005 + (drawing.SECTION_SHIFT[0] - 0.020)
+    assert border - right >= 0.005
+    assert drawing.BASE_SLIDE_FINISH_XY[0] + 0.039 <= border - 0.004
+    # Positive control: shifting that anchor with the group would box past.
+    assert 0.355 + drawing.SECTION_SHIFT[0] + 0.039 > border
+
+
 def test_material_fits_one_title_block_line() -> None:
     """81788ce9 wrapped the long material form onto a second title-block line.
 
@@ -569,13 +652,16 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
     text is its rendered extent (see the test below), not the audit's
     nominal box (#852).
     """
+    # Section A-A's boxes were logged at SECTION_SHIFT x 0.020; they move
+    # with the shift.
+    dx_aa = drawing.SECTION_SHIFT[0] - 0.020
     neighbours = {
         "notch view": (0.2394, 0.1286, 0.2806, 0.2514),
-        "notch caption": (0.2448, 0.0805, 0.3045, 0.0853),
+        "notch caption": _notch_caption_box(),
         "hole caption": (0.1497, 0.0805, 0.2185, 0.0853),
         "RD1": (0.1900, 0.1042, 0.2460, 0.1077),
-        "section A-A": (0.3246, 0.1081, 0.3854, 0.1319),
-        "A-A finish": (0.3160, 0.1056, 0.3276, 0.1081),
+        "section A-A": (0.3246 + dx_aa, 0.1081, 0.3854 + dx_aa, 0.1319),
+        "A-A finish": (0.3160 + dx_aa, 0.1056, 0.3276 + dx_aa, 0.1081),
         "A-A thickness": _plate_thickness_text_box(),
         "title block": (0.216, 0.0, 0.4318, 0.066),
     }
@@ -610,9 +696,9 @@ def test_slot_section_pocket_clears_its_neighbours() -> None:
         for other, neighbour in neighbours.items():
             assert not _boxes_overlap(box, neighbour), (name, other)
     assert not _boxes_overlap(strip, label)
-    # Positive control: the pocket is real -- moving the strip onto the
-    # notch caption row is caught.
-    moved = (strip[0], 0.078, strip[2], 0.092)
+    # Positive control: the pocket is real -- moving the strip up onto the
+    # lifted notch caption is caught.
+    moved = (strip[0], 0.118, strip[2], 0.132)
     assert _boxes_overlap(moved, neighbours["notch caption"])
 
 

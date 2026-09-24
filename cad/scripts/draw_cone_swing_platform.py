@@ -105,7 +105,10 @@ NOTCH_CENTER = (0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
-SECTION_SHIFT = (0.020, 0.015)
+# x 0.030, not 0.020: at 0.020 section C-C's 2.80 arrow line ran up through
+# the "(6.35)" stock text left of A-A (aa9766da).  The group's right-hand ink
+# then ends ~410 mm, inside the 419 mm border.
+SECTION_SHIFT = (0.030, 0.015)
 
 
 def _shifted(x: float, y: float) -> tuple[float, float]:
@@ -113,6 +116,10 @@ def _shifted(x: float, y: float) -> tuple[float, float]:
 
 
 SECTION_CENTER = _shifted(0.335, 0.105)
+# The layout audit boxes an Ra symbol 39 mm right of its anchor, so the
+# base-slide finish keeps its aa9766da sheet x (box to 0.414) rather than
+# taking SECTION_SHIFT's extra 10 mm past the border (0.4189).
+BASE_SLIDE_FINISH_XY = (0.375, _shifted(0.355, 0.120)[1])
 
 PROFILE_KEEP = {
     "PlateLenDim": (0.025, PROFILE_CENTER[1]),
@@ -152,8 +159,11 @@ NOTCH_KEEP = {
 SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
     # from the plate), right edge on the line and centred on this y.  The
-    # three lines (~26 x 15.3 mm) sit in x 0.2935..0.3195, y 0.1213..0.1366:
-    # under the 205.81 witness (0.1379), right of the 7.0 arrow (0.2697).
+    # three lines (~26 x 15.3 mm) sit in x 0.3035..0.3295, y 0.1213..0.1366:
+    # under the 205.81 witness (0.1379), right of C-C's 2.80 arrow line
+    # (x 0.2993).  The flush widest line sits above the top witness, the
+    # set-back last line beside the arrowhead (aa9766da: "AS SUPPLIED" there
+    # ran its D into it).
     "PlateThk": _shifted(0.300, 0.114),
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
@@ -317,10 +327,11 @@ RELIEF_NOTE_XY = (0.120, 0.034)
 SLOT_SECTION_LINE_X_MM = (-26.0, 24.0)
 # 1:1, full width: the strip is the plate edge-on, 26.98 x 6.35, in the
 # pocket right of the drill callout RD1 (x <= 0.246), under the notch plan
-# (y >= 0.1286) and the (6.35) stock text (x >= 0.294, y >= 0.121), with its
-# native label centred directly under it, above the plan caption row
-# (y <= 0.0853): 8783776d printed the label 50 mm left of its strip.
-SLOT_SECTION_CENTER = (0.279, 0.1109)
+# (y >= 0.1286) and its lifted caption (y >= 0.1207), with its native label
+# centred directly under it, right of the plan caption row (x <= 0.2185)
+# and above the title block (y 0.066): 8783776d printed the label 50 mm left
+# of its strip.  5 mm lower than aa9766da, to make room for the caption.
+SLOT_SECTION_CENTER = (0.279, 0.1059)
 # Where the depth text hangs: beyond the strip's left end, or mirrored past
 # its right end when SolidWorks attaches the depth at the right-hand
 # counterbore edge (looking south mirrors the strip).
@@ -329,7 +340,13 @@ SLOT_SECTION_KEEP = {
 }
 SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.0205, SLOT_SECTION_CENTER[1])
 # The native label box measured 46.5 x 16.2 mm; centred under the strip.
-SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0865)
+SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
+# The lock-notch caption sits directly under its own view, not on the plan
+# caption row: there it printed right under "SECTION C-C / SCALE 1:1" and
+# read as that section's caption (aa9766da).  Its 59.7 x 4.8 mm box,
+# anchored upper-left and centred under the notch plan, clears the 7.0
+# arrow tip (y 0.1276) above and the C-C strip (ink top ~0.1152) below.
+NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
 # The pivot on the profile plan, from the NE/NW corner-radius stations below
 # (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
 PROFILE_PIVOT_XY = (0.0718, 0.1377)
@@ -1348,8 +1365,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         section,
-        # The layout audit boxes an Ra symbol 39 mm right of its anchor.
-        symbol_xy=_shifted(0.355, 0.120),
+        symbol_xy=BASE_SLIDE_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "base_slide"),
         label="base sliding-face finish",
         char_height=0.0025,
@@ -1359,7 +1375,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
-    add_property_linked_note(adapter, "Notch View Note", 0.245, 0.085)
+    add_property_linked_note(adapter, "Notch View Note", *NOTCH_CAPTION_UPPER_LEFT)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.158)
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
