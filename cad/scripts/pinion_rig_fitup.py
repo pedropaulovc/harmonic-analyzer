@@ -21,8 +21,11 @@ import it.
   BACK_COLLAR_LEAF_F off the back block (COLLAR_SET_STEP).  Nothing is cut
   there, so it is a drive-train assembly step, never an MHA-104 note (policy
   rule 6, as MHA-061 keeps its feeler off its own print).
-- The MHA-114 foot pad is set SPRING_PAD_LEAF off the back block before its
-  seat is transferred (the same RIG SET note).
+- The MHA-114 foot pad's aft edge, flush with the strip's, is set
+  SPRING_PAD_LEAF off the back block before its seat is transferred (the
+  same RIG SET note).  The foot lies east of the block's east end, so the
+  leaf stands on edge against the block's inner face and overhangs that
+  end to meet the pad.
 - ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The bonds and the
   MHA-135 drive-through are each part spec's ASSEMBLY_STEP (policy rule 6
   moved them off the part sheets, #814), imported here, never retyped.
