@@ -24,11 +24,13 @@ CAP_SAG = 1.2  # shallow spherical crown height at each end
 CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
-# not a tight one.  The only occupant outboard of either end on the shaft's
-# axis is the MHA-059 lever's throw plane south of the front block; with the
-# rod hard north (hub on the block) and the shaft 0.85 proud, it still clears
-# the shaft end by 1.15 (test_drive_train_support_layout).  Past the back block
-# nothing stands on the axis.  Each block still bears >= 9.5 of its 10.25.
+# not a tight one.  Set back-flush, the front end stands at worst 0.85 proud
+# of the front block, the SR crown apex 2.05.  Nothing stands on the shaft's
+# axis past either block: the nearest body, the MHA-059 lever, rides the lift
+# rod 18.63 off it -- hub 8.95 radial clear, arm >= 12.42 clear over the -82
+# degree throw (test_drive_train_support_layout::
+# test_torque_shaft_length_band_clears_both_ends).  Each block still bears
+# >= 9.5 of its 10.25.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
 
 SURFACE_FINISHES = (
