@@ -1,9 +1,9 @@
 pinion-spring:
   title: Pinion Return Leaf Spring
   number: MHA-114
-  material: CDA 260 half-hard, 0.8 mm
-  material_specification: CDA 260 brass sheet, half-hard; 0.8 mm (0.032 in) thick
-  finish: degreased after forming; bare brass, no coating
+  material: C51000 spring temper, 0.5 mm
+  material_specification: C51000 phosphor bronze strip, spring temper; 0.5 mm (0.020 in) thick
+  finish: degreased after forming; bare bronze, no coating
   quantity: 1
   tolerance_class: machined_block
-  process: "formed sheet blank (brass)"
+  process: "formed strip blank (phosphor bronze)"
