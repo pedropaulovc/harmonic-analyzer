@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,15 @@ from _drawing_contract import (
 
 def _rules(source: str) -> list[str]:
     return [item.rule for item in drawing_specification_violations(source)]
+
+
+def _tolerance_violations(source: str) -> list[object]:
+    """Every finding except the separate places rule, which any ``{x:.2f}`` trips."""
+    return [
+        item
+        for item in drawing_specification_violations(source)
+        if item.rule != "drawing-owned-precision"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -45,9 +55,7 @@ def test_detector_finds_frozen_manufacturing_string_fragments(value: str) -> Non
 
 
 def test_detector_preserves_f_string_signs_in_violation_evidence() -> None:
-    violations = drawing_specification_violations(
-        'CALLOUT = f"{upper:+.2f}/{lower:+.2f}"\n'
-    )
+    violations = _tolerance_violations('CALLOUT = f"{upper:+.2f}/{lower:+.2f}"\n')
     assert len(violations) == 1
     assert violations[0].rule == "drawing-spec-string"
     assert violations[0].evidence == "'+{...}/+{...}'"
@@ -63,7 +71,7 @@ def test_detector_preserves_f_string_signs_in_violation_evidence() -> None:
     ),
 )
 def test_detector_does_not_treat_unbanded_f_strings_as_tolerances(value: str) -> None:
-    assert drawing_specification_violations(f"LABEL = {value}\n") == ()
+    assert _tolerance_violations(f"LABEL = {value}\n") == []
 
 
 def test_detector_finds_fit_renderers_through_import_aliases() -> None:
@@ -343,11 +351,47 @@ THREAD = "1/4-20 UNC"
     assert drawing_specification_violations(source) == ()
 
 
+# Render-time places that predate the f-string and hole-callout detections.
+# Each entry is a known violation with an owner; the fleet test fails on any
+# NEW finding and on any entry that no longer fires, so this list only shrinks.
+# Keyed by (script, evidence), not line, so an unrelated edit cannot shift it.
+_HOLE_CALLOUT = (
+    "set_hole_callout_precision(...) writes callout places that are not the "
+    "spec's HOLE_CALLOUT_PRECISION"
+)
+KNOWN_PRECISION_DEBT = Counter(
+    {
+        # harmonic-base package: stamped-ID height typed into the serial note.
+        (
+            "draw_harmonic_base.py",
+            "f-string {SERIAL_HEIGHT_MM:.1f} types drawing-chosen decimal places "
+            "into sheet text",
+        ): 1,
+        # harmonic-base package: tapped-hole depth places set on the callout.
+        ("draw_harmonic_base.py", _HOLE_CALLOUT): 1,
+        # top-frame package: tapped-hole depth places set on two callouts.
+        ("draw_top_frame.py", _HOLE_CALLOUT): 2,
+    }
+)
+
+
 def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
     scripts = Path(__file__).parent.glob("draw_*.py")
     violations = drawing_fleet_specification_violations(scripts)
-    assert not violations, "drawing-owned manufacturing specifications:\n" + "\n".join(
-        str(item) for item in violations
+    found = Counter((Path(item.filename).name, item.evidence) for item in violations)
+    new = [
+        item
+        for item in violations
+        if found[(Path(item.filename).name, item.evidence)]
+        > KNOWN_PRECISION_DEBT[(Path(item.filename).name, item.evidence)]
+    ]
+    assert not new, "drawing-owned manufacturing specifications:\n" + "\n".join(
+        str(item) for item in new
+    )
+    retired = +(KNOWN_PRECISION_DEBT - found)
+    assert not retired, (
+        "fixed precision debt is still listed; delete it from KNOWN_PRECISION_DEBT: "
+        f"{sorted(retired)}"
     )
 
 
@@ -396,4 +440,180 @@ def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:
     legacy.write_text(body, encoding="utf-8")
     migrated.write_text(body, encoding="utf-8")
     violations = drawing_fleet_specification_violations([legacy, migrated])
-    assert [Path(item.filename).name for item in violations] == ["draw_harmonic_base.py"]
+    assert [Path(item.filename).name for item in violations] == [
+        "draw_harmonic_base.py"
+    ]
+
+
+def test_detector_flags_precision_typed_into_sheet_text() -> None:
+    """Policy rule 2's own example, ``f"{DEPTH:.1f} DEEP"``, in every sheet sink."""
+    source = """
+from _drawing_common import add_attached_note
+from pinion_arbor_spec import BACK_CAP_R, DEPTH
+
+CALLOUTS = {"BackCapSagDim": f"SR{BACK_CAP_R:.1f} BACK CROWN"}
+add_attached_note(adapter, view, text=f"{DEPTH:.1f} DEEP", label="depth")
+STEPS = "; ".join(f"{index}. SHIM {gap:.2f}" for index, gap in enumerate(gaps))
+PERCENT = f"{fill:.0%} FULL"
+GENERAL = f"{value:.3g}"
+PLACES = f"{value:.{places}f}"
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (5, "drawing-owned-precision"),
+        (6, "drawing-owned-precision"),
+        (7, "drawing-owned-precision"),
+        (8, "drawing-owned-precision"),
+        (9, "drawing-owned-precision"),
+        (10, "drawing-owned-precision"),
+    ]
+    assert violations[0].evidence == (
+        "f-string {BACK_CAP_R:.1f} types drawing-chosen decimal places into sheet text"
+    )
+    assert violations[-1].evidence == (
+        "f-string {value:.{...}f} types drawing-chosen decimal places into sheet text"
+    )
+
+
+def test_detector_ignores_diagnostic_and_unplaced_f_strings() -> None:
+    source = """
+import _telemetry
+from _common import check
+from arbor_spec import DRAWING_REFERENCE_PRECISION
+
+raise RuntimeError(f"measured {measured:.3f} mm")
+assert abs(error) < 1e-6, f"off by {error:.6f}"
+_telemetry.debug(f"pick at {x:.4f}, {y:.4f}")
+check(f"volume {volume:.2f}", ok)
+seen = "; ".join(f"dev={item:.3g}" for item in nearest)
+raise RuntimeError(f"no line; nearest: {seen}")
+WIDTH = f"{name:>8}"
+COUNT = f"{count:d} HOLES"
+GROUPED = f"{total:,}"
+REPR = f"{label!r}"
+REFERENCE = f"({height:.{DRAWING_REFERENCE_PRECISION}f})"
+
+
+def _layout_problems(box):
+    problems = []
+    if box[0] < 0.0:
+        problems.append(f"left {box[0] * 1000:.2f} mm is off the sheet")
+    return problems
+
+
+def _format_box(box):
+    return f"[{box[0] * 1000.0:.1f},{box[1] * 1000.0:.1f}]mm"
+
+
+def _pick(adapter, view, radial_mm):
+    where = f"at radius {radial_mm:.4f} mm"
+    where += f", station {radial_mm:.4f} mm"
+    point = model_point_in_view(adapter, view, (0, 0, 0), label=f"r {radial_mm:.3f}")
+    if point is None:
+        raise RuntimeError(f"no edge {where}")
+    return point
+"""
+    assert drawing_specification_violations(source) == ()
+
+
+def test_detector_follows_callout_tables_into_the_sheet() -> None:
+    source = """
+from _drawing_common import set_dimension_callouts
+from crank_arm_spec import SHAFT_CLEARANCE_MAX, SHAFT_CLEARANCE_MIN
+
+DIMENSION_CALLOUTS = {
+    "HubBore": f"{SHAFT_CLEARANCE_MIN:.2f}-{SHAFT_CLEARANCE_MAX:.2f} CLEARANCE",
+}
+set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+CALLOUTS["Dimple"] = f"{DEPTH:.1f} DEEP"
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (6, "drawing-owned-precision"),
+        (6, "drawing-owned-precision"),
+        (9, "drawing-owned-precision"),
+    ]
+
+
+def test_diagnostic_name_that_also_reaches_the_sheet_is_still_flagged() -> None:
+    source = """
+from _drawing_common import add_note
+
+text = f"{DEPTH:.1f} DEEP"
+add_note(adapter, text, 0.1, 0.2)
+raise RuntimeError(text)
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule) for item in violations] == [
+        (4, "drawing-owned-precision")
+    ]
+
+
+def test_detector_flags_hole_callout_precision_through_aliases() -> None:
+    source = """
+import _drawing_common as drawing
+from _drawing_common import set_hole_callout_precision
+from _drawing_common import set_hole_callout_precision as callout_places
+
+set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="tap")
+callout_places(display, {"hw-threaddepth": 1}, label="thread")
+drawing.set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="module")
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.rule, item.evidence) for item in violations] == [
+        (line, "drawing-owned-precision", _HOLE_CALLOUT) for line in (6, 7, 8)
+    ]
+
+
+def test_hole_callout_places_are_allowed_only_from_the_spec_constant() -> None:
+    """Callout places have no model-side home, so the part spec's
+    HOLE_CALLOUT_PRECISION (direct, aliased, module attribute, or an item of it,
+    positional or ``precision=``) is the one allowed source. A literal map, a
+    local alias, or any other *_spec value still fires."""
+    source = """
+import crank_arm_spec
+from _drawing_common import set_hole_callout_precision
+from knife_mount_spec import HOLE_CALLOUT_PRECISION
+from top_frame_spec import HOLE_CALLOUT_PRECISION as FRAME_PLACES, TAP_DEPTH
+
+set_hole_callout_precision(display, HOLE_CALLOUT_PRECISION, label="direct")
+set_hole_callout_precision(display, FRAME_PLACES["socket"], label="aliased item")
+set_hole_callout_precision(
+    display, precision=crank_arm_spec.HOLE_CALLOUT_PRECISION, label="module"
+)
+set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="literal")
+LOCAL = HOLE_CALLOUT_PRECISION
+set_hole_callout_precision(display, LOCAL, label="local alias")
+set_hole_callout_precision(display, TAP_DEPTH, label="other spec value")
+set_hole_callout_precision(display, crank_arm_spec.DRAWING_REFERENCE_PRECISION, label="x")
+set_hole_callout_precision(display, label="missing")
+"""
+    violations = drawing_specification_violations(source)
+    assert [(item.line, item.evidence) for item in violations] == [
+        (line, _HOLE_CALLOUT) for line in (12, 14, 15, 16, 17)
+    ]
+
+
+def test_hole_callout_constant_does_not_launder_set_precision3() -> None:
+    source = """
+from crank_arm_spec import HOLE_CALLOUT_PRECISION
+
+display.SetPrecision3(HOLE_CALLOUT_PRECISION["tap"], -1, -1, -1)
+"""
+    assert _rules(source) == ["drawing-owned-precision"]
+
+
+def test_new_precision_rules_are_scoped_to_migrated_drawings(tmp_path: Path) -> None:
+    body = (
+        'NOTE = f"{DEPTH:.1f} DEEP"\n'
+        'set_hole_callout_precision(display, {"hw-tapdrldepth": 1}, label="tap")\n'
+    )
+    legacy = tmp_path / "draw_legacy.py"
+    migrated = tmp_path / "draw_top_frame.py"
+    legacy.write_text(body, encoding="utf-8")
+    migrated.write_text(body, encoding="utf-8")
+    violations = drawing_fleet_specification_violations([legacy, migrated])
+    assert [(Path(item.filename).name, item.line) for item in violations] == [
+        ("draw_top_frame.py", 1),
+        ("draw_top_frame.py", 2),
+    ]

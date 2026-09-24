@@ -34,7 +34,9 @@ _TOLERANCE_SETTERS = frozenset(
 # Drawing scripts whose part builds own display precision (policy rule 2):
 # ``<part>_spec.DRAWING_PRECISION`` is applied natively on the .SLDPRT and the
 # drawing only reads it back.  A render-time ``SetPrecision3`` /
-# ``set_dimension_precision`` in one of these is a part missing its tolerance.
+# ``set_dimension_precision`` / ``set_hole_callout_precision``, or a number
+# typed into sheet text at chosen places (``f"{DEPTH:.1f} DEEP"``), in one of
+# these is a part missing its tolerance.
 #
 # One exception, and only one: a pure REFERENCE dimension is a read-only sum
 # of model-owned values, carries no tolerance, and has no model dimension to
@@ -45,8 +47,65 @@ _TOLERANCE_SETTERS = frozenset(
 PRECISION_MIGRATED_DRAWINGS = frozenset(
     {"draw_harmonic_base.py", "draw_top_frame.py", "draw_tube_frame.py"}
 )
-_PRECISION_SETTERS = frozenset({"set_dimension_precision"})
+_PRECISION_SETTERS = frozenset(
+    {
+        "set_dimension_precision",
+        # Per-variable ICalloutLengthVariable.Precision on a Hole Wizard callout:
+        # the same render-time places statement, one callout token at a time.
+        "set_hole_callout_precision",
+    }
+)
 _DIRECT_PRECISION_METHODS = frozenset({"SetPrecision3"})
+# A static ``{VALUE:.1f}`` spec (fixed, exponent, general, locale or percent
+# presentation) prints a number at places the DRAWING chose -- the note-text
+# form of a render-time precision (policy rule 2: ``f"{DEPTH:.1f} DEEP"``).
+# ``\x00`` stands in for a nested replacement field, ``{VALUE:.{PLACES}f}``.
+_FORMAT_PRECISION = re.compile(r"\.(?:\d+|\x00)[eEfFgGn%]?$")
+# Diagnostics never reach the sheet: an exception message, an assertion, a
+# telemetry/log/span record, a build-step ``check`` or a ``label=`` may format
+# numbers at any precision it likes.  So may a finding appended to a problem
+# list or a helper's return value -- both end in a raise far more often than on
+# the sheet, and the f-string rule only follows text into a CALL (see
+# ``_SheetFlow``).
+_DIAGNOSTIC_CALLS = frozenset(
+    {
+        "check",
+        "critical",
+        "debug",
+        "error",
+        "event",
+        "exception",
+        "info",
+        "log",
+        "print",
+        "span",
+        "success",
+        "warn",
+        "warning",
+    }
+)
+_COLLECTION_BUILDERS = frozenset({"add", "append", "appendleft", "extend", "insert"})
+# String and container plumbing that hands its text on to whatever consumes
+# the result (``_telemetry.event(nearest=tuple(f"..." for ...))``).
+_TRANSPARENT_CALLS = frozenset(
+    {
+        "format",
+        "frozenset",
+        "join",
+        "list",
+        "lower",
+        "lstrip",
+        "replace",
+        "rstrip",
+        "set",
+        "sorted",
+        "str",
+        "strip",
+        "tuple",
+        "upper",
+    }
+)
+_DIAGNOSTIC_KEYWORDS = frozenset({"description", "message", "reason"})
 
 _UNSIGNED_VALUE_FRAGMENT = r"(?:\d+(?:\.\d*)?|\.\d+|\x00)"
 _SIGNED_VALUE_FRAGMENT = rf"(?:[-+]\s*{_UNSIGNED_VALUE_FRAGMENT})"
@@ -189,10 +248,20 @@ def _part_spec_imports(tree: ast.AST) -> tuple[frozenset[str], frozenset[str]]:
 
 
 REFERENCE_PRECISION_NAME = "DRAWING_REFERENCE_PRECISION"
+# Hole Wizard callout places have no model-side home: ``SetPrecision3`` cannot
+# set a callout's per-variable places, so ``set_hole_callout_precision`` must
+# write them from the sheet.  The next-closest source of truth is the part's
+# spec, so the helper is allowed ONLY with the spec's ``HOLE_CALLOUT_PRECISION``
+# (or an item of it) -- never a literal map (policy rule 2).
+HOLE_CALLOUT_PRECISION_NAME = "HOLE_CALLOUT_PRECISION"
+_HOLE_CALLOUT_SETTER = "set_hole_callout_precision"
 
 
-def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
-    """Local bindings of a ``*_spec`` module's ``DRAWING_REFERENCE_PRECISION``."""
+def _reference_precision_names(
+    tree: ast.AST, constant: str = REFERENCE_PRECISION_NAME
+) -> frozenset[str]:
+    """Local bindings of a ``*_spec`` module's ``constant`` (by default
+    ``DRAWING_REFERENCE_PRECISION``)."""
     names: set[str] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.ImportFrom):
@@ -201,15 +270,17 @@ def _reference_precision_names(tree: ast.AST) -> frozenset[str]:
         if not leaf.endswith("_spec") or leaf.startswith("_"):
             continue
         names.update(
-            alias.asname or alias.name
-            for alias in node.names
-            if alias.name == REFERENCE_PRECISION_NAME
+            alias.asname or alias.name for alias in node.names if alias.name == constant
         )
     return frozenset(names)
 
 
 def _reference_precision_sourced(
-    expression: ast.expr, *, names: frozenset[str], modules: frozenset[str]
+    expression: ast.expr,
+    *,
+    names: frozenset[str],
+    modules: frozenset[str],
+    constant: str = REFERENCE_PRECISION_NAME,
 ) -> bool:
     """Whether ``expression`` IS the spec's ``DRAWING_REFERENCE_PRECISION`` (or an
     item of it) -- the one value a sheet may pass to ``SetPrecision3``. Any other
@@ -221,7 +292,7 @@ def _reference_precision_sourced(
         return expression.id in names
     if isinstance(expression, ast.Attribute):
         return (
-            expression.attr == REFERENCE_PRECISION_NAME
+            expression.attr == constant
             and isinstance(expression.value, ast.Name)
             and expression.value.id in modules
         )
@@ -627,6 +698,121 @@ def _is_tolerance_expression(node: ast.expr, names: frozenset[str]) -> bool:
     return False
 
 
+def _call_name(node: ast.Call) -> str:
+    return getattr(node.func, "id", None) or getattr(node.func, "attr", None) or ""
+
+
+def _is_diagnostic_call(node: ast.Call) -> bool:
+    name = _call_name(node)
+    return name in _DIAGNOSTIC_CALLS or name.endswith(("Error", "Exception", "Warning"))
+
+
+def _is_diagnostic_keyword(name: str | None) -> bool:
+    return bool(name) and ("label" in name or name in _DIAGNOSTIC_KEYWORDS)
+
+
+class _SheetFlow:
+    """Whether a string expression can reach sheet text, by syntactic flow.
+
+    Walk up from the expression. A raise, assert, return, diagnostic call,
+    ``label=``-style keyword or collection builder ends the flow as NOT sheet
+    text. Any other call is a sink: the text is handed to the drawing. An
+    assignment follows the bound name to its reads, module-wide by name, so a
+    name that reaches a sink anywhere counts (conflation can only flag more). A
+    name with no reads at all counts as sheet text, the conservative answer.
+    """
+
+    def __init__(self, tree: ast.AST, parent: dict[ast.AST, ast.AST]) -> None:
+        self._parent = parent
+        self._reads: dict[str, list[ast.Name]] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                self._reads.setdefault(node.id, []).append(node)
+        self._names: dict[str, bool] = {}
+
+    def bound(self, node: ast.AST) -> bool:
+        current = node
+        keyword: str | None = None
+        while current in self._parent:
+            current = self._parent[current]
+            if isinstance(current, (ast.Raise, ast.Assert, ast.Return)):
+                return False
+            if isinstance(current, (ast.Yield, ast.YieldFrom)):
+                return False
+            if isinstance(current, ast.keyword):
+                keyword = current.arg
+                continue
+            if isinstance(current, ast.Call):
+                if _is_diagnostic_call(current) or _is_diagnostic_keyword(keyword):
+                    return False
+                name = _call_name(current)
+                if name in _COLLECTION_BUILDERS:
+                    return False
+                if name in _TRANSPARENT_CALLS:
+                    keyword = None
+                    continue
+                return True
+            if isinstance(current, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                targets = (
+                    current.targets
+                    if isinstance(current, ast.Assign)
+                    else [current.target]
+                )
+                if not all(
+                    isinstance(target, (ast.Name, ast.Tuple, ast.List))
+                    for target in targets
+                ):
+                    # ``CALLOUTS["X"] = ...`` / ``obj.text = ...`` leave the
+                    # name flow; count them as sheet text.
+                    return True
+                return any(
+                    self._name_bound(name)
+                    for target in targets
+                    for name in _bound_names(target)
+                )
+            if isinstance(current, ast.stmt):
+                return False
+        return False
+
+    def _name_bound(self, name: str) -> bool:
+        if name in self._names:
+            return self._names[name]
+        # Provisional answer breaks a cycle (``text = text + ...``).
+        self._names[name] = False
+        reads = self._reads.get(name, [])
+        answer = not reads or any(self.bound(read) for read in reads)
+        self._names[name] = answer
+        return answer
+
+
+def _format_precision(
+    node: ast.FormattedValue,
+    *,
+    reference_names: frozenset[str],
+    reference_modules: frozenset[str],
+) -> str | None:
+    """The format spec when it fixes decimal places the drawing owns.
+
+    A nested ``{VALUE:.{PLACES}f}`` is the note-text twin of ``SetPrecision3``
+    and gets the same single exception: ``PLACES`` IS the spec's
+    ``DRAWING_REFERENCE_PRECISION``.
+    """
+    format_spec = node.format_spec
+    if not isinstance(format_spec, ast.JoinedStr):
+        return None
+    rendered, nested = _joined_string(format_spec)
+    if not _FORMAT_PRECISION.search(rendered):
+        return None
+    if nested and all(
+        _reference_precision_sourced(
+            expression, names=reference_names, modules=reference_modules
+        )
+        for expression in nested
+    ):
+        return None
+    return rendered.replace("\x00", "{...}")
+
+
 def _leaves_primary_precision(node: ast.Call) -> bool:
     """``SetPrecision3(-1, ...)``: the primary places are left alone.
 
@@ -665,6 +851,9 @@ def drawing_specification_violations(
     catalog_direct, catalog_modules = _surface_finish_imports(tree)
     part_spec_direct, part_spec_modules = _part_spec_imports(tree)
     reference_precision_names = _reference_precision_names(tree)
+    hole_callout_precision_names = _reference_precision_names(
+        tree, HOLE_CALLOUT_PRECISION_NAME
+    )
     finish_lookup_direct, finish_lookup_modules = _imported_functions(
         tree, "_surface_finish", frozenset({"surface_finish_by_key"})
     )
@@ -681,6 +870,35 @@ def drawing_specification_violations(
         tree, "_drawing_common", frozenset({"add_attached_note"})
     )
     tolerance_names = _tolerance_names(tree)
+    precision_direct, precision_modules = _imported_functions(
+        tree, "_drawing_common", _PRECISION_SETTERS
+    )
+    sheet_flow = _SheetFlow(tree, parent)
+    # A value formatted inside an attached note's ``WITHIN <limit>`` is a
+    # geometric limit, not a nominal's display precision: ``drawing-gdt-note``
+    # already governs it (a local value is flagged there, a part-contract value
+    # is allowed), so the f-string precision rule leaves it to that gate.
+    within_limits: set[int] = set()
+    for call in ast.walk(tree):
+        if not isinstance(call, ast.Call) or not _call_is(
+            call, "add_attached_note", note_direct, note_modules
+        ):
+            continue
+        text = next((kw.value for kw in call.keywords if kw.arg == "text"), None)
+        rendered_note = (
+            None
+            if text is None
+            else _rendered_string_expression(text, assignments=assignments)
+        )
+        if rendered_note is None:
+            continue
+        rendered_text, formatted_note = rendered_note
+        for match in _WITHIN_FRAGMENT.finditer(rendered_text):
+            within_limits.update(
+                id(expression)
+                for position, expression in formatted_note
+                if match.start() <= position < match.end()
+            )
     violations: list[DrawingSpecificationViolation] = []
 
     def add(node: ast.AST, rule: str, evidence: str) -> None:
@@ -705,6 +923,30 @@ def drawing_specification_violations(
         else:
             rendered = ""
             formatted = ()
+
+        if (
+            isinstance(node, ast.JoinedStr)
+            and not isinstance(parent.get(node), ast.FormattedValue)
+            and sheet_flow.bound(node)
+        ):
+            for value in node.values:
+                if (
+                    not isinstance(value, ast.FormattedValue)
+                    or id(value.value) in within_limits
+                ):
+                    continue
+                places = _format_precision(
+                    value,
+                    reference_names=reference_precision_names,
+                    reference_modules=part_spec_modules,
+                )
+                if places is not None:
+                    add(
+                        value,
+                        "drawing-owned-precision",
+                        f"f-string {{{ast.unparse(value.value)}:{places}}} types "
+                        "drawing-chosen decimal places into sheet text",
+                    )
 
         if rendered and not _PROPERTY_LINK.fullmatch(rendered):
             ra = _RA_FRAGMENT.search(rendered)
@@ -820,12 +1062,37 @@ def drawing_specification_violations(
                             )
 
             name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
-            if name in _PRECISION_SETTERS:
-                add(
-                    node,
-                    "drawing-owned-precision",
-                    f"{name}(...) rewrites display precision at render time",
+            if name in _PRECISION_SETTERS or any(
+                _call_is(node, setter, precision_direct, precision_modules)
+                for setter in _PRECISION_SETTERS
+            ):
+                setter = (
+                    name
+                    if name in _PRECISION_SETTERS
+                    else precision_direct.get(str(name), str(name))
                 )
+                places = next(
+                    (kw.value for kw in node.keywords if kw.arg == "precision"),
+                    node.args[1] if len(node.args) > 1 else None,
+                )
+                if setter != _HOLE_CALLOUT_SETTER:
+                    add(
+                        node,
+                        "drawing-owned-precision",
+                        f"{setter}(...) rewrites display precision at render time",
+                    )
+                elif places is None or not _reference_precision_sourced(
+                    places,
+                    names=hole_callout_precision_names,
+                    modules=part_spec_modules,
+                    constant=HOLE_CALLOUT_PRECISION_NAME,
+                ):
+                    add(
+                        node,
+                        "drawing-owned-precision",
+                        f"{setter}(...) writes callout places that are not the "
+                        f"spec's {HOLE_CALLOUT_PRECISION_NAME}",
+                    )
             if (
                 isinstance(node.func, ast.Attribute)
                 and node.func.attr in _DIRECT_PRECISION_METHODS
