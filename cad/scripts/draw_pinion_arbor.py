@@ -93,7 +93,8 @@ PRINCIPAL_KEEP = {
     "BackJournalDia": (0.099, 0.150),
     "FrontJournalFromHeadRear": (0.283, 0.130),
     "BackJournalFromHeadRear": (0.207, 0.115),
-    "NeckLen": (0.325, 0.100),
+    # Right of the overall-length witness at the front crown apex (x 0.3215).
+    "NeckLen": (0.340, 0.100),
     "BackRimFromHeadRear": (0.205, 0.095),
     "OverallLen": (0.205, 0.080),
     "BackCapSagDim": (0.055, 0.220),
@@ -107,9 +108,10 @@ DETAIL_KEEP = {
     "HeadCapSagDim": (0.205, 0.210),
     "CrossHoleDia": (0.245, 0.245),
 }
-# 5cc191fb's positions: the head and neck text sit above and right of the
-# head on the 1:1 profile, clear of detail A's fence and the NeckLen and
-# OverallLen witnesses.
+# The head and neck sit inside detail A's fence at the right end of the
+# profile (x 0.296-0.320, axis y 0.171): the neck's text rides above its own
+# station, and the head's is pushed right of the crown so the two stay apart
+# and clear of the isometric's lower end and the NeckLen/OverallLen witnesses.
 DIAMETER_POSITIONS = {
     "HeadDia": (0.340, 0.192),
     "NeckDia": (0.300, 0.194),
@@ -370,19 +372,36 @@ async def build(adapter: Any) -> dict[str, str]:
     detail_annotations = curate_view_dimensions(
         adapter, detail, keep=DETAIL_KEEP, view_label="integral-arbor head detail"
     )
-    moved_diameters = [
-        _move_dimension(
-            adapter,
-            annotation,
-            principal,
-            DIAMETER_POSITIONS[dimension_name(adapter, annotation)],
-            source_view=donor,
+    for label, kept in (
+        ("donor", donor_annotations),
+        ("principal", principal_annotations),
+        ("detail", detail_annotations),
+    ):
+        names = sorted(dimension_name(adapter, annotation) for annotation in kept)
+        _telemetry.info(
+            f"pinion-arbor {label} view kept {len(kept)} imported dimensions: {names}",
+            view=label,
+            kept=len(kept),
+            names=",".join(names),
         )
-        for annotation in donor_annotations
-    ]
+    moved_diameters = []
+    for annotation in donor_annotations:
+        name = dimension_name(adapter, annotation)
+        moved_diameters.append(
+            _move_dimension(
+                adapter,
+                annotation,
+                principal,
+                DIAMETER_POSITIONS[name],
+                source_view=donor,
+            )
+        )
+    principal_count = len(_early_bound(principal, "IView").GetAnnotations() or ())
     _telemetry.info(
-        f"pinion-arbor moved {len(moved_diameters)} diameters donor -> principal",
+        f"pinion-arbor moved {len(moved_diameters)} diameters donor -> principal; "
+        f"principal now carries {principal_count} annotations",
         moved=len(moved_diameters),
+        principal_annotations=principal_count,
     )
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)

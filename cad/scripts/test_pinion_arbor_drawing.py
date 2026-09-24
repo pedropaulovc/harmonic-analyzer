@@ -98,8 +98,8 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     for key, (station_z, _symbol_xy) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
     assert spec.JOURNAL_LEN == pytest.approx(12.0)
-    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(51.0)
-    assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(204.0)
+    assert spec.FRONT_JOURNAL_FROM_HEAD_REAR == pytest.approx(50.5)
+    assert spec.BACK_JOURNAL_FROM_HEAD_REAR == pytest.approx(203.2)
     assert "MHA-056" in spec.DRAWING_NOTES
     assert "BOND INTO MHA-002 WITH LOCTITE 638." in spec.DRAWING_NOTES
     assert "PRESSES INTO" not in spec.DRAWING_NOTES
@@ -171,3 +171,20 @@ def test_back_crown_radius_is_the_model_dimension_not_typed_text() -> None:
     assert "BackCapR" in drawing.PRINCIPAL_KEEP
     assert drawing.DIMENSION_CALLOUTS["BackCapSagDim"] == "BACK CROWN"
     assert not any("SR" in text for text in drawing.DIMENSION_CALLOUTS.values())
+
+
+def test_every_printed_length_is_exact_at_its_authored_places() -> None:
+    """A one-place print of 11.25 reads 11.3: the sheet would not state the model."""
+    nominal = {
+        "HeadLen": spec.HEAD_LEN,
+        "NeckLen": spec.NECK_LEN,
+        "BackRimFromHeadRear": spec.BACK_RIM_FROM_HEAD_REAR,
+        "OverallLen": spec.OVERALL_LEN,
+        "FrontJournalFromHeadRear": spec.FRONT_JOURNAL_FROM_HEAD_REAR,
+        "BackJournalFromHeadRear": spec.BACK_JOURNAL_FROM_HEAD_REAR,
+        "FrontJournalLen": spec.JOURNAL_LEN,
+        "BackJournalLen": spec.JOURNAL_LEN,
+    }
+    for name, value in nominal.items():
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        assert value == pytest.approx(round(value, places), abs=1e-9), name
