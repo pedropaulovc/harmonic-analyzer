@@ -272,6 +272,17 @@ def _note_box(note: drawing.CutterNote) -> tuple[float, float, float, float]:
     return (x, y - len(lines) * _NOTE_LINE_H, x + width, y)
 
 
+def _note_extent(note: drawing.CutterNote) -> tuple[float, float, float, float]:
+    """What INote.GetExtent -- the audit's box -- spans: text plus leader tip.
+
+    ec70186e logged the one-line slot note as [89.2, 59.1]..[158.9, 79.1] mm:
+    its leader tip on the arc up to 0.6 mm above its text anchor.
+    """
+    x0, y0, x1, y1 = _note_box(note)
+    tip = drawing.cutter_note_tip(note)
+    return (min(x0, tip[0]), min(y0, tip[1]), max(x1, tip[0]), max(y1 + 0.0006, tip[1]))
+
+
 def _segments_cross(a, b) -> bool:
     def orient(p, q, r):
         return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
@@ -324,6 +335,18 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     outline = (cx - r - pad, cy - r - pad, cx + r + pad, cy + r + pad)
     assert outline[1] > 0.0097
     notes = {f"{note.key} note": _note_box(note) for note in drawing.CUTTER_NOTES}
+    # The audit boxes each leadered note from leader tip to text (ec70186e):
+    # those extents stay apart by 3 mm, and clear of the label and relief.
+    extents = [_note_extent(note) for note in drawing.CUTTER_NOTES]
+    low, high = sorted(extents, key=lambda box: box[1])
+    assert high[1] - low[3] >= 0.003
+    for extent in extents:
+        assert not _boxes_overlap(extent, label) and not _boxes_overlap(extent, relief)
+    # Positive control: ec70186e's cbore note (text above its upper-quadrant
+    # tip) nested inside the slot note's extent.
+    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
+    old_cbore = dataclasses.replace(by_key["cbore"], text_xy=(0.121, 0.0715), tip_deg=35.0)
+    assert _boxes_overlap(_note_extent(old_cbore), _note_extent(by_key["slot"]))
     for other in (label, relief, *notes.values()):
         assert not _boxes_overlap(outline, other)
     for caption in captions:
@@ -427,7 +450,10 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
             model[0] - spec.TIP_SCREW_HALF_TRAVEL / 1000.0,
             model[2] - spec.TIP_SCREW_LOCAL_Z / 1000.0,
         ) == pytest.approx(note.radius_mm / 1000.0)
-        assert tip[1] > 0.055  # above pivot-to-slot's upper extension line
+    # The slot note rises from the upper quadrant, the counterbore note drops
+    # from the lower one (their audit extents must not nest, ec70186e).
+    assert by_key["slot"].tip_deg > 0.0 > by_key["cbore"].tip_deg
+    assert drawing.cutter_note_tip(by_key["slot"])[1] > 0.055
     boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
     obstacles = {
         name: boxes[name] for name in ("TipSlotZ", "TipSlotEastCx", "TipSlotWestCx")
@@ -441,8 +467,7 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
             assert not _segment_hits_box(segment, _note_box(by_key[other])), key
             for other_segment in fans[other]:
                 assert not _segments_cross(segment, other_segment)
-    # Positive control: stacked the other way (inner slot's note below the
-    # counterbore's), the two leaders cross.
+    # Positive control: with the texts swapped, the two leaders cross.
     swapped = [
         dataclasses.replace(by_key["slot"], text_xy=by_key["cbore"].text_xy),
         dataclasses.replace(by_key["cbore"], text_xy=by_key["slot"].text_xy),
