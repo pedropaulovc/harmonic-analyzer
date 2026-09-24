@@ -130,7 +130,7 @@ from build_lag_screw import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
-from pinion_pivot_block_spec import BLOCK_HEIGHT
+from pinion_pivot_block_geometry import BLOCK_HEIGHT
 from pinion_spring_geometry import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
@@ -345,23 +345,30 @@ STOP_SCREW_DRILL_DEPTH = 20.0
 
 # Alignment-pinion rig hold-downs, blind from the TOP face in the same
 # machine-handed convention: four #8-32 seats under the two pivot blocks
-# (2026-09 short-strap rig, the blocks right under the drum) and three #4-40
-# seats under the spring foot and both arbor-pedestal flanges.
+# and three #4-40 seats under the spring foot and both arbor-pedestal flanges.
+# The block and spring seats follow the user-authoritative 32T rig's parked
+# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
+# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
+# about the pivot bore, block mid-depth 5.125 in from each outer face; the
+# drum-axis pedestal seats remain unchanged.
 _FORMER_BLOCK_SCREW_XZ = (
-    (-13.669764612476252, -98.0),  # front block, east screw
-    (13.33023538752375, -98.0),  # front block, west screw
-    (-13.669764612476252, 82.0),  # back block, east screw
-    (13.33023538752375, 82.0),  # back block, west screw
+    (-17.226441649810653, -98.875),  # front block, east screw
+    (-0.22644164981065273, -98.875),  # front block, west screw
+    (-17.226441649810653, 82.875),  # back block, east screw
+    (-0.22644164981065273, 82.875),  # back block, west screw
 )
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_BLOCK_SCREW_XZ
 )
-# Stock 25.4-mm slotted screws penetrate 6.65 mm below each 18.75-mm block.
-BLOCK_SCREW_HOLE_DEPTH = 6.9  # stock engagement + 0.25 tip reserve
-BLOCK_SCREW_DRILL_DEPTH = 10.0
+# Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
+# 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
+# band.  The full-thread depth keeps the screw off the bottom at the worst
+# case (12.75 - 0.8 .X depth band >= 11.25 + 0.51 block band, 0.19 spare).
+BLOCK_SCREW_HOLE_DEPTH = 12.75
+BLOCK_SCREW_DRILL_DEPTH = 15.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    (13.179270253802283, 70.95),  # spring foot: 28 reach keeps its screw head
+    (16.87259321646788, 70.95),  # spring foot follows the shifted 32T swing rig
     # clear of the unchanged rocker-arm-support casting after the rig recenter
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the

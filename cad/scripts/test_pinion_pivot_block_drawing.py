@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pinion_pivot_block_spec
@@ -9,6 +10,7 @@ import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _fit_limits import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -47,10 +49,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # A callout can only annotate a dimension the print actually shows.
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     # The drawing's view math reads the spec's nominal spans, not a divergent copy.
-    assert (drawing.BLOCK_WIDTH, drawing.FRONT_BBOX_CY, drawing.BORE_HALF_SPACING) == (
+    assert (drawing.BLOCK_WIDTH, drawing.FRONT_BBOX_CY, drawing.FRONT_BBOX_CX) == (
         pinion_pivot_block_spec.BLOCK_WIDTH,
         pinion_pivot_block_spec.FRONT_BBOX_CY,
-        pinion_pivot_block_spec.BORE_HALF_SPACING,
+        pinion_pivot_block_spec.FRONT_BBOX_CX,
     )
 
 
@@ -64,16 +66,24 @@ def test_sheet_runs_at_3_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = pinion_pivot_block_spec.DRAWING_NOTES
-    assert "#8 NORMAL CLEARANCE Ø4.978 THRU" in notes
-    assert "1/4 IN REAM THRU" in notes
-    assert "1/4 IN" in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
+    # Fable review r4: the notes no longer restate the REAM and hold-down
+    # callouts; they name each running bore's mate (rule 2).
+    assert "Ø4.978" not in notes
+    assert "REAM" not in notes
+    assert "MHA-062 TORQUE SHAFT" in notes
+    assert "MHA-060 LIFT ROD" in notes
+    assert "TURNS FREELY BY HAND" in notes
+    # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-056; the
+    # stock 1/4 in reamer wording went with the line-to-line band.
+    assert pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
+    assert "1/4 IN" not in drawing.DIMENSION_CALLOUTS["PivotBoreDia"]
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.
     assert "LINEAR +/-" not in notes
     assert "HOLE CENTRES" not in notes
     # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
     # the period British Association series.
-    assert "BA" not in notes
+    assert not re.search(r"\bBA\b", notes)
     assert "X.XX" not in notes
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
@@ -91,20 +101,19 @@ def test_hole_states_are_annotated() -> None:
     }
 
 
-def test_native_gdt_replaces_form_orientation_notes() -> None:
+def test_block_carries_no_gdt_only_its_running_bore_finish() -> None:
+    # Drawing-simplicity policy rules 3/4: blocks are not on the GD&T
+    # allowlist, so no datum tags, no feature-control frames, no basic boxes.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert (
-        "        edge_xy=pivot_edge,\n"
-        "        symbol_xy=(_front_x(BORE_HALF_SPACING) + 0.0145, _front_y(0.0) - 0.026),\n"
-        '        datum="B",\n'
-        '        label="pivot bore axis",\n' in source
-    )
-    assert 'characteristic="parallelism"' in source
-    assert 'characteristic="position"' in source
+    assert "add_datum_feature(" not in source
+    assert "add_feature_control_frame(" not in source
+    assert "set_basic_dimension(" not in source
+    assert not hasattr(pinion_pivot_block_spec, "GEOMETRIC_TOLERANCES_MM")
+    assert "DATUM" not in pinion_pivot_block_spec.DRAWING_NOTES
     assert "add_surface_finish(" in source
-    assert "set_basic_dimension(" in source  # the 27 hold-down spacing
+    # The hold-downs are ordinary coordinates from the west end.
+    assert '"west hold-down station"' in source
+    assert '"east hold-down station"' in source
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
@@ -133,3 +142,45 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 2  # the book uses two blocks
+
+
+def test_notes_stay_within_policy_and_carry_the_assembly_transfer() -> None:
+    notes = pinion_pivot_block_spec.DRAWING_NOTES.splitlines()
+    assert len(notes) <= 4  # policy rule 6
+    assert "SPOT BASE SEATS THROUGH BLOCK HOLES AT ASSEMBLY." in notes
+    assert not any("FINISH" in line for line in notes)  # the title block owns it
+
+
+def test_assembly_and_base_depend_on_geometry_not_drawing_notes() -> None:
+    from _buildgraph import module_deps_of
+
+    for script in ("build_drive_train_assembly.py", "build_harmonic_base.py"):
+        deps = {
+            Path(path).name for path in module_deps_of(Path(__file__).with_name(script))
+        }
+        assert "pinion_pivot_block_geometry.py" in deps, script
+        assert "pinion_pivot_block_spec.py" not in deps, script
+        assert "build_pinion_pivot_block.py" not in deps, script
+
+
+def test_views_carry_no_hidden_lines_and_the_drill_callout_names_its_process() -> None:
+    # Fable review r4 (rule 7): the holes are standard drills and reams fully
+    # defined by their callouts, so every view is hidden-lines-removed.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_hidden_lines_visible" not in source
+    assert "for view in (front, top, right, iso):" in source
+    assert 'process="DRILL"' in source
+    assert "symbol_xy=(0.208, 0.170)" in source
+    assert "char_height=0.0025" in source
+    # The Ra leader must leave the block through its top face, left of the
+    # corner where BlockHeight's extension line starts.
+    rim = (
+        drawing._front_x(0.0) + drawing.BORE_R_SHEET * 0.866,
+        drawing._front_y(0.0) + drawing.BORE_R_SHEET * 0.5,
+    )
+    top_y = drawing._front_y(
+        pinion_pivot_block_spec.BLOCK_HEIGHT - pinion_pivot_block_spec.BORE_UP
+    )
+    slope = (0.170 - rim[1]) / (0.208 - rim[0])
+    exit_x = rim[0] + (top_y - rim[1]) / slope
+    assert exit_x < drawing._front_x(pinion_pivot_block_spec.BLOCK_EAST) - 0.003

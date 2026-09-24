@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the eight pinion-cluster drawings."""
+"""Cross-sheet offline contracts for the pinion-cluster drawings."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
 import pinion_handle_spec
+import pinion_lever_pin_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
@@ -29,6 +30,7 @@ SHEETS = (
     ("pinion-cam-pin", pinion_cam_pin_spec),
     ("pinion-handle", pinion_handle_spec),
     ("pinion-lever", pinion_lever_spec),
+    ("pinion-lever-pin", pinion_lever_pin_spec),
     ("pinion-pivot-shaft", pinion_pivot_shaft_spec),
     ("pinion-spring", pinion_spring_spec),
 )
@@ -186,6 +188,14 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
     return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
 
 
+def _press_fit_shell_limit(
+    outer_d: float,
+    bore_d: float,
+    host_chord: float,
+) -> float:
+    return math.pi * (outer_d**2 - bore_d**2) * host_chord / 4.0
+
+
 def _expected_numbered_pairs(
     first_stem: str,
     numbers: Iterable[int],
@@ -267,6 +277,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
+            # R1: MHA-058 is a bonded slip fit modelled line to line in the
+            # MHA-102 cross-hole, so the pair needs no interference allowance.
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -456,7 +468,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 4.1656,
                 3.454,
-                6.65,
+                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/foot-screw",
@@ -484,6 +496,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
     }
+    # U27 (Main, 2026-09-23): the follower studs slip line-to-line into
+    # their H7 seats and are bonded, so the drive train allows them NO
+    # overlap -- the former press allowance is gone.
     cam_pairs = {
         frozenset(("pinion-bracket-1", "pinion-cam-pin-1")),
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
@@ -493,7 +508,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
-        "drive-train": cam_pairs | crank_pairs,
+        "drive-train": crank_pairs,
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -503,12 +518,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             assert allowed[pair] == pytest.approx(expected_limit)
         assert all(limit > 0.0 and math.isfinite(limit) for limit in allowed.values())
 
-    cam_limits = {
-        _interference_contracts.allowed_interference_pairs("drive-train")[pair]
-        for pair in cam_pairs
-    }
-    assert len(cam_limits) == 1
-    assert 0.40 < cam_limits.pop() < 0.45
+    drive_train_allowed = _interference_contracts.allowed_interference_pairs(
+        "drive-train"
+    )
+    assert not cam_pairs & set(drive_train_allowed)
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
     assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
     assert _interference_contracts.allowed_interference_pairs("channel") == {}

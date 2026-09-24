@@ -123,7 +123,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "slotted-screw": _stock(
         "slotted-screw",
         "Steel Narrow Fillister Head Slotted Screw",
-        "90280A199",
+        "90280A201",
     ),
     "swing-stop-screw": _stock(
         "swing-stop-screw",
