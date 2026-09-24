@@ -680,6 +680,9 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "BackJournalReference", "BackJournalDia", *deviations(JOURNAL_DIA_BAND)
     )
+    # A diametric linear dimension on a side-view sketch prints no Ø by itself.
+    for prefix in ("FrontJournal", "BackJournal"):
+        set_dimension_prefix(adapter, f"{prefix}Reference", f"{prefix}Dia", "<MOD-DIAM>")
     set_dimension_prefix(adapter, "FrontCapProfile", "HeadCapR", "SR")
     set_dimension_prefix(adapter, "BackCapProfile", "BackCapR", "SR")
     clear_dimensions_for_drawing(adapter)

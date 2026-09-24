@@ -63,9 +63,15 @@ ISO_CENTER = (0.365, 0.225)
 DETAIL_CENTER = (0.165, 0.235)
 DETAIL_SCALE = (2, 1)
 DETAIL_RADIUS_MM = 15.0
-# The native "DETAIL A / SCALE 2:1" label sits centred under its own view,
-# this far below the view outline (its anchor is the label's top edge).
+# The native "DETAIL A / SCALE 2:1" label sits centred under its own detail
+# circle, this far below it (the label's anchor is its top edge).
 DETAIL_LABEL_DROP = 0.002
+DETAIL_LABEL_XY = (
+    DETAIL_CENTER[0],
+    DETAIL_CENTER[1]
+    - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+    - DETAIL_LABEL_DROP,
+)
 # Every turned diameter lives in an end-on Front-plane profile sketch, so the
 # end-on donor imports all three and each moves onto the 1:1 profile.
 DONOR_KEEP = {
@@ -288,10 +294,7 @@ def _position_detail_label(adapter: Any, detail: Any) -> None:
         raise RuntimeError(f"expected one native detail label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    outline = tuple(float(value) for value in _early_bound(detail, "IView").GetOutline())
-    if len(outline) != 4:
-        raise RuntimeError("integral-arbor head detail has invalid bounds")
-    target = ((outline[0] + outline[2]) / 2.0, outline[1] - DETAIL_LABEL_DROP, 0.0)
+    target = (*DETAIL_LABEL_XY, 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native detail label")
     adapter.currentModel.EditRebuild3()
