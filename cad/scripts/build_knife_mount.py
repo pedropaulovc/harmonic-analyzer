@@ -85,6 +85,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _part_pmi import author_part_pmi
+from _visibility import blank_reference_geometry
 from knife_mount_spec import (
     BOSS_DIA,
     BOSS_HEIGHT,
@@ -913,7 +914,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@summing-lever (the hex ridge) coincident to it.
-    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
+    knife_axis = await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis"
+    )
 
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check: each equation evaluates to the value just built, so
@@ -954,7 +957,30 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    _hide_reference_geometry(adapter, knife_axis)
     return await save_part_and_images(adapter, PART_NAME)
+
+
+def _hide_reference_geometry(adapter: Any, knife_axis: str) -> None:
+    """Hide the boss sketch plane and the knife axis from renders and assemblies.
+
+    Both stay selectable by name (the summing assembly mates the lever ridge to
+    the knife axis); no drawing view dimensions to either. They shipped shown
+    and leaked into the isometric and the summing assembly (asm census).
+    """
+    references = (("BlockTopPlane", "PLANE"), (knife_axis, "AXIS"))
+    blank_reference_geometry(adapter, references)
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    shown = {}
+    for name, _kind in references:
+        feature = model.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"reference geometry {name!r} is missing")
+        visible = int(_early_bound(feature, "IFeature").Visible)
+        if visible != 1:  # swVisibilityStateHide
+            shown[name] = visible
+    if shown:
+        raise RuntimeError(f"reference geometry still shown after blanking: {shown!r}")
 
 
 if __name__ == "__main__":
