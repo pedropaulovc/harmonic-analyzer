@@ -465,6 +465,21 @@ def test_every_station_names_the_same_head_rear_face() -> None:
     )
 
 
+def test_front_journal_diameter_text_clears_the_drum_station_witness() -> None:
+    """Run 059b5b0f: the drum station's witness (x 246.0) ran through the
+    front land's "Ø8.00 -0.01/-0.03 JOURNAL", whose text hangs left of its
+    line.  The line now stands on the land just inside its crown end."""
+    x, _ = drawing.PRINCIPAL_KEEP["FrontJournalDia"]
+    land_crown_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN)
+    land_head_end = drawing._sheet_x(spec.FRONT_JOURNAL_Z)
+    assert land_crown_end + 0.0008 <= x < land_head_end  # on the land
+    right = x + drawing.JOURNAL_DIA_TEXT_OVERHANG
+    left = x - 0.026
+    assert drawing.DRUM_STATION_WITNESS_X - right >= 0.0025
+    # Clear of the bond-zone diameter's line (above the shaft, tail below).
+    assert left - drawing.PRINCIPAL_KEEP["BondZoneDia"][0] >= 0.010
+
+
 def test_drum_station_text_clears_the_station_stack() -> None:
     """The drum station's text sits left of its drum-end witness: between
     that witness and the head face, the neck-end witness drops through."""

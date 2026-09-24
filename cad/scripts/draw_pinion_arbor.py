@@ -113,10 +113,19 @@ BACK_JOURNAL_TEXT_X = BACK_RA_X + 0.022
 # The drum station's text block (~35 mm "DRUM STATION" callout) ends 4 mm left
 # of its drum-end witness.
 DRUM_STATION_TEXT_WIDTH = 0.035
+DRUM_STATION_WITNESS_X = _sheet_x(HEAD_REAR_Z + DRUM_STATION)
 DRUM_STATION_TEXT_XY = (
-    _sheet_x(HEAD_REAR_Z + DRUM_STATION) - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
+    DRUM_STATION_WITNESS_X - 0.004 - DRUM_STATION_TEXT_WIDTH / 2.0,
     0.123,
 )
+# The front land's diameter text hangs LEFT of its line (x-0.026 .. x+0.001,
+# measured at 4e97c4d8), and the drum station's witness drops through the
+# whole band below the shaft (run 059b5b0f: text-on-line at x 246.0).  So the
+# line stands on the land just inside its crown-side end, the text block
+# ending 2.4 mm short of that witness.  Its extensions run along the flank
+# from the land's head-side end, like the back land's.
+JOURNAL_DIA_TEXT_OVERHANG = 0.001
+FRONT_JOURNAL_DIA_X = DRUM_STATION_WITNESS_X - 0.0028 - JOURNAL_DIA_TEXT_OVERHANG
 # The bond-zone diameter stands over the part's witness (x 0.195) but hangs
 # its text ABOVE the shaft: below it, beside the front "JOURNAL" shelf, the
 # two read as one paired callout (Main and Fable, 63468ee9).  Above, its line
@@ -129,7 +138,7 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 PRINCIPAL_KEEP = {
     "FrontJournalLen": (0.252, 0.188),
     "BackJournalLen": (0.099, 0.188),
-    "FrontJournalDia": (0.250, 0.150),
+    "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, 0.138),
     "FrontJournalFromHeadRear": (0.283, 0.130),
