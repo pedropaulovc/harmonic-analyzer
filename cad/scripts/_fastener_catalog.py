@@ -119,7 +119,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "lag-screw": _stock(
         "lag-screw",
         "18-8 Stainless Steel Hex Head Screw",
-        "92240A539",
+        "92240A540",
         material="AISI 304",
     ),
     "pedestal-hold-down-screw": _stock(

@@ -278,15 +278,14 @@ if (
 # four-hole foot pattern through the +90-degree installation and the v2 rear
 # shift. Base, support, and frame therefore cannot carry drifting copies.
 #
-# The selected 1/4-20 x 5/8 screw bears on the bottom of its vendor-modeled
+# The selected 1/4-20 x 3/4 screw bears on the bottom of its vendor-modeled
 # 0.277813 mm under-head washer transition. That physical bearing face crosses
-# the 6.35 mm support foot and leaves 9.247187 mm (1.456D) of engagement in
+# the 6.35 mm support foot and leaves 12.422187 mm (1.956D) of engagement in
 # this base. The seat is sized at its printed worst case (seat_thread_depth /
-# seat_drill_depth): full thread 10.05 keeps the tip 0.25 off the incomplete
-# threads at the thread's low limit, and the 17.45 drill keeps the plug
+# seat_drill_depth): full thread 13.20 keeps the tip 0.25 off the incomplete
+# threads at the thread's low limit, and the 20.60 drill keeps the plug
 # tap's five-pitch lead past its high limit. Keep all three lengths
-# explicit; they are different assembly/manufacturing constraints. The
-# engagement itself is under 1.5D: RELEASE_BLOCKER_SHORT_ENGAGEMENT.
+# explicit; they are different assembly/manufacturing constraints.
 HOLD_DOWN_THREAD = "1/4-20"
 HOLD_DOWN_THREAD_CLASS = "2B"
 HOLD_DOWN_PITCH = IN / 20.0
@@ -728,16 +727,6 @@ for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
         )
 
 
-# The one seat whose installed screw engages under 1.5D. Its fix is a
-# 1/4-20 x 3/4 screw (Main's ruling on the 2026-09-25 machinist review),
-# blocked on the user harvesting that McMaster SLDPRT and its SKU: the
-# vendor models are web downloads and are never tracked. Release blocker;
-# delete this entry when lag-screw moves to the 3/4 screw.
-RELEASE_BLOCKER_SHORT_ENGAGEMENT = {
-    "rocker support": "1/4-20 x 5/8 engages 1.456D; 3/4 screw harvest pending",
-}
-
-
 def require_blind_seat_fit(
     label: str,
     seat: HoleSpec,
@@ -765,7 +754,7 @@ def require_blind_seat_fit(
         raise AssertionError(
             f"{label}: less than one diameter of full-thread engagement"
         )
-    if engagement < 1.5 * diameter - 1e-9 and label not in RELEASE_BLOCKER_SHORT_ENGAGEMENT:
+    if engagement < 1.5 * diameter - 1e-9:
         raise AssertionError(
             f"{label}: screw engages {engagement / diameter:.3f}D, under 1.5D"
         )
@@ -1211,9 +1200,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Four blind native 1/4-20 UNC-2B seats from the support deck. The screws
     # bear on their vendor-modeled under-head washer faces and pass through
-    # the support's 5/16 clearance drills: 6.35 mm foot + 9.247187 mm (1.456D)
-    # engagement, with 0.25 mm thread beyond each tip. The separate 15.847187 mm
-    # cylindrical drill depth leaves five pitches for plug-tap lead and margin.
+    # the support's 5/16 clearance drills: 6.35 mm foot + 12.422187 mm (1.956D)
+    # engagement, sized at the printed band's worst case (HOLD_DOWN_THREAD_DEPTH,
+    # HOLD_DOWN_DRILL_DEPTH) with a five-pitch plug-tap lead past the thread.
     pre_holes = await _volume(adapter)
     fastener_cut = wizard_holes(
         adapter,

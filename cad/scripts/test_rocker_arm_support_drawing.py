@@ -151,7 +151,7 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
 def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
     import build_harmonic_base as base
 
-    assert screw.SPEC.skus == ("92240A539",)
+    assert screw.SPEC.skus == ("92240A540",)
     assert screw.THREAD_SIZE == base.HOLD_DOWN_THREAD == "1/4-20"
     assert (screw.THREAD_CLASS, base.HOLD_DOWN_THREAD_CLASS) == ("2A", "2B")
     assert screw.THREAD_LEN == screw.SHANK_LEN
@@ -164,7 +164,7 @@ def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
     assert base.HOLD_DOWN_ENGAGEMENT == pytest.approx(
         screw.SHANK_LEN - support.FOOT_THICKNESS - screw.BEARING_OFFSET
     )
-    assert base.HOLD_DOWN_ENGAGEMENT / screw.SHANK_DIA > 1.45
+    assert base.HOLD_DOWN_ENGAGEMENT / screw.SHANK_DIA >= 1.5
     # Sized at the printed .XX band's worst case (base.seat_thread_depth).
     assert base.HOLD_DOWN_THREAD_DEPTH == pytest.approx(
         base.seat_thread_depth(base.HOLD_DOWN_ENGAGEMENT)

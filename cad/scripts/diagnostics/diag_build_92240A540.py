@@ -7,9 +7,12 @@ engages 1.456D. McMaster's page (checked 2026-09-25) lists every field of
 flat tip, ASME B18.2.1. So this replay is the 92240A539 family law
 (``diag_build_92240A539.build_hex_screw``) at 19.05 mm.
 
-RELEASE BLOCKER: the vendor SLDPRT is not harvested yet (a web download that
-needs the user's sign-off). Until ``replica_main`` below has matched that
-harvest, ``build_lag_screw`` keeps building 92240A539.
+Its supplied SolidWorks model (``cad/references/mcmaster/92240A540.SLDPRT``,
+SHA-256 0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39,
+see cad/references/mcmaster/README.md) was harvested read-only. Vendor truth:
+volume 901.5330 mm^3, area 929.1943 mm^2, 22 faces; ``replica_main`` below
+matched all three and the face-area multiset on 2026-09-26. This is the SKU
+``build_lag_screw`` builds.
 
 Run standalone (SolidWorks open, harvested SLDPRT in cad/references/mcmaster)::
 

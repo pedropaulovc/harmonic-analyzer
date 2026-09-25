@@ -27,7 +27,7 @@ recipes:
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91255A148 | `cone-tip-block-screw` | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
-| 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
+| 92240A540 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
@@ -48,6 +48,21 @@ Catalog specifications checked on September 10, 2026:
   fully threaded, with a 7/16 in across-flats head 5/32 in high. Its supplied
   SolidWorks model was harvested read-only and the tracked diagnostic replay
   matches its 824.0529 mm3 volume, 832.0689 mm2 area, and 22-face multiset.
+  It was the rocker-support hold-down until the 2026-09-25 machinist review
+  (1.456D engagement in the base).
+- [92240A540](https://www.mcmaster.com/92240A540/), checked September 25,
+  2026, is the same screw 3/4 in long: 1/4-20 UNC class 2A, fully threaded,
+  7/16 in across flats x 5/32 in head, flat tip, ASME B18.2.1. Its supplied
+  SolidWorks model, supplied by the user as `92240A540_18-8 Stainless Steel
+  Hex Head Screw Made Outside The U.S..SLDPRT`, is stored locally as
+  `92240A540.SLDPRT` and was harvested read-only. The 92240A539 replay law
+  at 19.05 mm (`diag_build_92240A540.py`) passed the replica gate against
+  it on September 26, 2026: volume 901.5334 vs 901.5330 mm^3, area 929.1944
+  vs 929.1943 mm^2, 22 faces each with the same face-area multiset (largest
+  per-face delta 0.0001 mm^2), and matching centre of mass
+  (`cad/out/reference/92240A540-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39`.
 - [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
   with a 1/4-20 thread and a 19.05 mm (3/4 in) stud. The catalog's material
   field supplies the finish specification absent from the CAD properties.

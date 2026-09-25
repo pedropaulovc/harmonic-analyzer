@@ -27,13 +27,9 @@ PART_NAME = "lag-screw"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
-# The 2026-09-25 machinist review specified the 3/4 screw: the 5/8 engages
-# the base 1.456D, under 1.5D. Its replay is staged, but the vendor SLDPRT
-# it must match is not harvested, so the catalog row still names the 5/8.
-# Flipping that row (with its STOCK_RECIPES entry and yaml) moves this
-# part, the frame placement and the base seats together, and
-# test_harmonic_base_drawing then demands deleting the base's
-# RELEASE_BLOCKER_SHORT_ENGAGEMENT entry.
+# The 2026-09-25 machinist review specified the 3/4 screw: the 5/8
+# (92240A539) engaged the base 1.456D, under 1.5D. The catalog row keys the
+# replay, so this part, the frame placement and the base seats follow it.
 SPECIFIED_SKU = "92240A540"
 REPLAYS = {
     "92240A539": (diag_build_92240A539.LENGTH_MM, diag_build_92240A539.build_92240A539),

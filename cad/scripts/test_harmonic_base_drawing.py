@@ -1264,8 +1264,8 @@ def test_pre_band_seat_depths_fail_at_the_printed_low_limit(
 def test_seat_depths_derive_from_engagement_band_and_tap_lead() -> None:
     band = part.SEAT_DEPTH_BAND
     assert band == pytest.approx(0.51)  # the title block's .XX row
-    assert part.HOLD_DOWN_THREAD_DEPTH == pytest.approx(10.05)
-    assert part.HOLD_DOWN_DRILL_DEPTH == pytest.approx(17.45)
+    assert part.HOLD_DOWN_THREAD_DEPTH == pytest.approx(13.20)
+    assert part.HOLD_DOWN_DRILL_DEPTH == pytest.approx(20.60)
     for engagement, thread in (
         (part.HOLD_DOWN_ENGAGEMENT, part.HOLD_DOWN_THREAD_DEPTH),
         (part.PIVOT_THREAD_ENGAGEMENT, part.PIVOT_SCREW_HOLE_DEPTH),
@@ -1277,23 +1277,18 @@ def test_seat_depths_derive_from_engagement_band_and_tap_lead() -> None:
         assert needed <= thread < needed + part.SEAT_DEPTH_STEP
 
 
-def test_only_the_named_release_blocker_engages_under_one_and_a_half_d() -> None:
-    assert set(part.RELEASE_BLOCKER_SHORT_ENGAGEMENT) == {"rocker support"}
-    # The same short screw in any other seat fails loud.
+def test_no_seat_engages_under_one_and_a_half_d() -> None:
+    # The retired 5/8 hold-down (1.456D) fails loud in its own seat.
     with pytest.raises(AssertionError, match="under 1.5D"):
         part.require_blind_seat_fit(
-            "some other seat", part.HOLD_DOWN_SEAT_SPEC, part.HOLD_DOWN_ENGAGEMENT
+            "rocker support", part.HOLD_DOWN_SEAT_SPEC, 1.456 * 6.35
         )
 
 
-def test_short_engagement_blocker_lasts_until_the_specified_screw_ships() -> None:
+def test_hold_down_is_the_specified_screw() -> None:
     import build_lag_screw as screw
 
-    # Flipping lag-screw's catalog row to the specified 3/4 screw must delete
-    # the blocker in the same change, and the blocker cannot outlive it.
-    assert ("rocker support" in part.RELEASE_BLOCKER_SHORT_ENGAGEMENT) == (
-        screw.SKU != screw.SPECIFIED_SKU
-    )
+    assert screw.SKU == screw.SPECIFIED_SKU
 
 
 def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> None:

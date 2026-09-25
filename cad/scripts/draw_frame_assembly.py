@@ -122,7 +122,7 @@ BOM_DESCRIPTIONS = {
     "tube-frame": "OPEN-END TUBULAR FRAME COLUMN",
     "tube-frame-cap": "STEEL PUSH-ON CAP FOR 1 IN OD TUBE",
     "rocker-arm-support": "ROCKER-ARM SUPPORT CASTING",
-    "lag-screw": "1/4-20 X 5/8 HEX-HEAD SCREW, 18-8 SS",
+    "lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
     "top-frame": "TOP-FRAME CASTING",
     "nameplate": "ENGRAVED BRASS MAKER'S NAMEPLATE",
     "fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",

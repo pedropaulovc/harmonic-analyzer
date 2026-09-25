@@ -338,7 +338,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "harmonic-base",
                 6.35,
                 5.105,
-                9.2471875,
+                12.4221875,
             ),
             # MHA-132 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
             # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest

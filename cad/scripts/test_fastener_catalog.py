@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import _config
 from _fastener_catalog import FASTENERS
 
@@ -22,7 +24,7 @@ _EXPECTED = {
     "hanger-screw": (("93075A194",), "MHA-034", 1),
     "hex-bolt": (("92865A585",), "MHA-036", None),
     "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
-    "lag-screw": (("92240A539",), "MHA-039", 4),
+    "lag-screw": (("92240A540",), "MHA-039", 4),
     "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 2),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
     "post-mount-screw": (("40923898",), "MHA-142", 2),
@@ -89,3 +91,10 @@ def test_special_bom_titles_remain_machine_specific() -> None:
     assert _config.parts("knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
     assert _config.parts("knife-hanger-washer")["title"] == "Knife-Hanger Washer"
     assert _config.parts("lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
+
+
+def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
+    # Every catalog-spec figure comes from a real replica report; a
+    # placeholder token (HARVEST plus underscore) marks one never measured.
+    readme = Path(__file__).resolve().parents[1] / "references" / "mcmaster" / "README.md"
+    assert "HARVEST" + "_" not in readme.read_text(encoding="utf-8")
