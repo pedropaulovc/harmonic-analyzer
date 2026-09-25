@@ -10,7 +10,6 @@ hb-render-4 drawing-task.log, supports' "callout ... display data" lines and
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -22,9 +21,7 @@ from _layout_audit import (
     apply_transform,
     audit_dump,
     balloon_circle,
-    decode_dump_lines,
     find_merged_blocks,
-    encode_dump_lines,
     glyph_count,
     row_boxes,
     severity,
@@ -493,11 +490,34 @@ def test_a_leader_crossing_another_dimension_line_is_found():
     assert "leader-crosses-line" in _kinds(findings)
 
 
-def test_text_in_the_title_block_or_over_the_border_is_found():
-    inside = _dim("IN", "12.0", 0.300, 0.030)
-    outside = _dim("OUT", "12.0", 0.005, 0.150)
-    findings = audit_dump(_dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [inside, outside])]))
-    assert {"keep-out", "outside-border"} <= set(_kinds(findings))
+def test_dimension_text_over_the_title_block_or_off_the_sheet_is_found():
+    """Main's rider: the deleted ``_dim_element`` gave every dimension and hole
+    callout the border check and the title-block keep-out (Codex #269 thread
+    1). The shared audit boxes their measured text against both."""
+    over_block = _dim("OverBlock", "12.0", 0.300, 0.030)  # title block: x > 216, y < 66 mm
+    off_sheet = _dim("OffSheet", "12.0", SHEET_W + 0.010, 0.150)
+    in_border_band = _dim("InBand", "12.0", 0.005, 0.150)  # inside the 12.7 mm zone band
+    callout = _hole_callout(
+        "CalloutOverBlock", [(0.200, 0.100, 0.260, 0.050), (0.260, 0.050, 0.300, 0.050)], [("<MOD-DIAM>4.0 THRU", 0.262, 0.0502)]
+    )
+    clear = _dim("Clear", "12.0", 0.100, 0.150)
+    findings = audit_dump(
+        _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [over_block, off_sheet, in_border_band, callout, clear])])
+    )
+
+    def named(kind, name):
+        return [f for f in findings if f.kind == kind and f" {name} " in f" {f.a} "]
+
+    assert named("keep-out", "OverBlock")
+    assert named("keep-out", "CalloutOverBlock")
+    assert named("outside-border", "OffSheet")
+    assert named("outside-border", "InBand")
+    assert not [f for f in findings if " Clear " in f" {f.a} "]
+    assert all(
+        severity(f) is FindingSeverity.GATING
+        for f in findings
+        if f.kind in ("keep-out", "outside-border")
+    )
 
 
 def test_hidden_annotations_and_template_notes_are_not_audited():
@@ -563,15 +583,6 @@ def test_a_balloon_is_its_single_rendered_circle():
     assert balloon_circle({"arcs": [arc, arc]}) is None
 
 
-def test_dumps_survive_the_chunked_log_transport():
-    dump = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL)
-    # Incompressible padding forces several chunks.
-    dump["padding"] = [math.sin(i) for i in range(20_000)]
-    lines = [f"  --  [  1.0s] {line}" for line in encode_dump_lines("harmonic-base", dump)]
-    assert len(lines) > 1
-    assert decode_dump_lines(["noise", *reversed(lines)]) == [dump]
-
-
 def test_the_audit_ships_in_report_mode_until_the_fleet_report_is_triaged():
     """Main's gating decision (a), 2026-09-25: REPORT first, then GATE."""
     assert LAYOUT_AUDIT_MODE is LayoutAuditMode.REPORT
@@ -599,7 +610,7 @@ def median_ratio():
 
 
 # --------------------------------------------------------------------------
-# run_layout_audit: REPORT never fails the leaf, GATE fails on gating findings
+# run_layout_audit: the cached report, fail-loud faults, GATE on gating findings
 # --------------------------------------------------------------------------
 
 
@@ -615,45 +626,91 @@ def _patch_collect(monkeypatch, result):
     return live
 
 
-def _run(live, mode):
+def _run(live, mode, report):
     live.run_layout_audit(
-        object(), stem="fixture", sheet_layouts={}, is_pictorial=lambda _o: False, mode=mode
+        object(),
+        stem="fixture",
+        report=report,
+        sheet_layouts={},
+        is_pictorial=lambda _o: False,
+        mode=mode,
     )
 
 
-def test_report_mode_survives_a_collector_fault_and_gate_mode_does_not(monkeypatch):
+def test_a_collector_fault_fails_loud_in_every_mode(monkeypatch, tmp_path):
+    """Main's rider: a fault that skipped a sheet would silently under-count
+    the fleet report, so REPORT fails the drawing too, and writes no report."""
     live = _patch_collect(monkeypatch, RuntimeError("COM went away"))
-    _run(live, LayoutAuditMode.REPORT)
-    with pytest.raises(RuntimeError, match="COM went away"):
-        _run(live, LayoutAuditMode.GATE)
+    for mode in LayoutAuditMode:
+        with pytest.raises(RuntimeError, match="COM went away"):
+            _run(live, mode, tmp_path / f"{mode.value}.json")
+    assert not list(tmp_path.iterdir())
 
 
-def test_gate_mode_fails_on_a_gating_finding_and_report_mode_logs_it(monkeypatch):
-    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
-    _run(live, LayoutAuditMode.REPORT)
+def test_report_mode_writes_every_finding_and_dump_and_gate_mode_raises(monkeypatch, tmp_path):
+    import json
+
+    sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
+    live = _patch_collect(monkeypatch, [sheet])
+    report = tmp_path / "reports" / "fixture.json"
+    _run(live, LayoutAuditMode.REPORT, report)
+    content = json.loads(report.read_text(encoding="utf-8"))
+    assert content["mode"] == "report"
+    assert content["sheets"] == [sheet]
+    assert content["summary"]["findings"]["leader-through-text"] == 1
+    assert content["summary"]["gating"] >= 1
+    assert {f["kind"] for f in content["findings"]} >= {"leader-through-text"}
+    # The cached report replays to the same findings the seat saw.
+    assert [f.kind for f in audit_dump(content["sheets"][0])] == [
+        f["kind"] for f in content["findings"]
+    ]
     with pytest.raises(RuntimeError, match="leader-through-text"):
-        _run(live, LayoutAuditMode.GATE)
+        _run(live, LayoutAuditMode.GATE, tmp_path / "gate.json")
+    assert (tmp_path / "gate.json").is_file()  # written before the gate fails
 
 
-def test_gate_mode_passes_a_sheet_with_only_advisories(monkeypatch):
+def test_gate_mode_passes_a_sheet_with_only_advisories(monkeypatch, tmp_path):
     live = _patch_collect(monkeypatch, [_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
     findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
     assert all(severity(f) is FindingSeverity.ADVISORY for f in findings)
-    _run(live, LayoutAuditMode.GATE)
+    _run(live, LayoutAuditMode.GATE, tmp_path / "fixture.json")
 
 
-def test_the_logged_replay_copy_trims_only_oversized_polylines():
-    import _drawing_layout_audit as live
+def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
+    import _telemetry
 
-    small = [0.0] * 30
-    big = [0.0] * (live._LOGGED_POLYLINE_VALUES + 1)
-    dump = _dump(views=[_view("a", (0, 0, 1, 1), polylines=small), _view("b", (0, 0, 1, 1), polylines=big)])
-    logged = live.loggable_dump(dump)
-    assert logged["views"][0]["polylines"] == small
-    assert "polylines" not in logged["views"][1]
-    assert logged["views"][1]["polylines_omitted"] == len(big)
-    assert view_ink(logged["views"][1]).space == "omitted"
-    assert len(dump["views"][1]["polylines"]) == len(big)  # the audited copy is untouched
+    spans = []
+    real_span = _telemetry.span
+
+    def recording_span(name, **attrs):
+        context = real_span(name, **attrs)
+
+        class Recorder:
+            def __enter__(self):
+                self.span = context.__enter__()
+                spans.append((name, self))
+                self.attributes = {}
+                original = self.span.set_attribute
+
+                def set_attribute(key, value):
+                    self.attributes[key] = value
+                    return original(key, value)
+
+                self.span.set_attribute = set_attribute
+                return self.span
+
+            def __exit__(self, *exc):
+                return context.__exit__(*exc)
+
+        return Recorder()
+
+    live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
+    monkeypatch.setattr(live._telemetry, "span", recording_span)
+    _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+    [(name, recorder)] = spans
+    assert name == "layout.audit fixture"
+    assert recorder.attributes["findings.leader-through-text"] == 1
+    assert recorder.attributes["sheets"] == 1
 
 
 # hb-render-5 (375bf2aad, supports' fix): the cross-tap cut to three rows and
@@ -691,3 +748,27 @@ def test_hb_render_5_fixed_cross_tap_passes_the_block_rules():
         if f.kind in ("merged-blocks", "tall-block", "text-clearance", "text-separation")
         and "MHA-132" in f.a + f.b
     ]
+
+
+def test_every_drawing_task_targets_and_caches_its_layout_report():
+    """Main's rider: the report rides the remote cache, so a leaf restored
+    from cache still carries its findings -- it is a declared target of every
+    drawing task and one of the outputs the cache stores and restores. It is
+    not a release output (cut_release stages ``spec.outputs`` only)."""
+    import importlib.util
+    from pathlib import Path
+
+    from _drawing_registry import DRAWINGS, LAYOUT_REPORT_DIR
+
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location("dodo", root / "dodo.py")
+    dodo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dodo)
+    tasks = {task["name"]: task for task in dodo.task_drawing()}
+    assert LAYOUT_REPORT_DIR == root / "cad" / "out" / "reports" / "layout-audit"
+    for drawing in DRAWINGS:
+        report = drawing.layout_report.resolve()
+        assert report.parent == LAYOUT_REPORT_DIR.resolve()
+        assert str(report) in tasks[drawing.name]["targets"]
+        assert report in dodo._drawing_cache_outputs(drawing.name)
+        assert report not in drawing.outputs.values()

@@ -19,16 +19,18 @@ by the sheet's own view):
 * tables, boxed from anchor + row/column spans (as ``_drawing_common`` does);
 * the sheet size, zone margins and title-block keep-out.
 
-That dump is logged verbatim (chunked, see ``_layout_audit.encode_dump_lines``)
-so the offline calibration and tests replay exactly what the leaf saw, then
-audited by the SolidWorks-free ``_layout_audit.audit_dump``.
+The dumps are audited by the SolidWorks-free ``_layout_audit.audit_dump`` and
+written, with every finding, to the drawing's report
+(``_drawing_registry.layout_report_path``), a declared task target that rides
+the remote cache: the offline calibration and tests replay exactly what the
+building seat saw, whether the leaf was built or restored.
 """
 
 from __future__ import annotations
 
 import json
 import time
-import traceback
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 import _telemetry
@@ -36,15 +38,9 @@ from _common import _early_bound
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 from _layout_audit import (
     DUMP_SCHEMA,
-    FINDING_PREFIX,
     LAYOUT_AUDIT_MODE,
-    SUMMARY_PREFIX,
-    FindingSeverity,
     LayoutAuditMode,
-    audit_dump,
-    encode_dump_lines,
-    finding_record,
-    severity,
+    audit_report,
 )
 
 _ANNOT_DIM = 4
@@ -363,77 +359,43 @@ def collect_sheet_dumps(
 # A view's polylines are logged only up to this many values (~30k points):
 # an assembly view can carry millions, which no log line should. The in-process
 # audit always reads the full array; only the logged replay copy is trimmed.
-_LOGGED_POLYLINE_VALUES = 300_000
-
-
-def loggable_dump(dump: Mapping[str, Any]) -> dict[str, Any]:
-    """``dump`` with oversized view polylines replaced by their size."""
-    views = []
-    for view in dump.get("views", ()):
-        polylines = view.get("polylines") or ()
-        if len(polylines) > _LOGGED_POLYLINE_VALUES:
-            view = {k: v for k, v in view.items() if k != "polylines"}
-            view["polylines_omitted"] = len(polylines)
-        views.append(view)
-    return {**dump, "views": views}
-
-
 def run_layout_audit(
     adapter: Any,
     *,
     stem: str,
+    report: Path,
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
     mode: LayoutAuditMode = LAYOUT_AUDIT_MODE,
 ) -> None:
-    """Dump, audit and report every sheet; under GATE, raise on a gating finding.
+    """Dump and audit every sheet, write ``report``; under GATE, raise on a gating finding.
 
-    REPORT never fails the drawing, not even on a collector fault: the fleet
-    run it exists for must finish, and a fault is logged with its traceback
-    for the calibration to see.
+    A collector or audit fault fails the drawing in every mode: a report that
+    silently skipped a sheet would under-count the fleet calibration.
     """
-    with _telemetry.span("drawing.layout_audit", stem=stem, mode=mode.value):
+    with _telemetry.span(f"layout.audit {stem}", stem=stem, mode=mode.value) as span:
         started = time.perf_counter()
-        try:
-            dumps = collect_sheet_dumps(
-                adapter, stem=stem, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
-            )
-        except Exception:
-            if mode is LayoutAuditMode.GATE:
-                raise
-            _telemetry.error(f"layout-audit-error {stem} collect\n{traceback.format_exc()}")
-            return
+        dumps = collect_sheet_dumps(
+            adapter, stem=stem, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
+        )
         collected = time.perf_counter() - started
-        gating = []
-        counts: dict[str, int] = {}
-        for dump in dumps:
-            for line in encode_dump_lines(stem, loggable_dump(dump)):
-                _telemetry.info(line)
-            try:
-                findings = audit_dump(dump)
-            except Exception:
-                if mode is LayoutAuditMode.GATE:
-                    raise
-                _telemetry.error(
-                    f"layout-audit-error {stem} audit {dump.get('sheet')}\n{traceback.format_exc()}"
-                )
-                continue
-            for finding in findings:
-                record = finding_record(stem, finding)
-                counts[finding.kind] = counts.get(finding.kind, 0) + 1
-                _telemetry.info(f"{FINDING_PREFIX} {json.dumps(record, separators=(',', ':'))}")
-                if severity(finding) is FindingSeverity.GATING:
-                    gating.append(finding)
-        summary = {
-            "stem": stem,
-            "mode": mode.value,
-            "sheets": len(dumps),
-            "collect_s": round(collected, 3),
-            "total_s": round(time.perf_counter() - started, 3),
-            "findings": counts,
-            "gating": len(gating),
-        }
-        _telemetry.info(f"{SUMMARY_PREFIX} {json.dumps(summary, separators=(',', ':'))}")
+        content, gating = audit_report(stem, mode, dumps)
+        summary = content["summary"]
+        summary["collect_s"] = round(collected, 3)
+        summary["total_s"] = round(time.perf_counter() - started, 3)
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(json.dumps(content, separators=(",", ":")), encoding="utf-8")
+        for record in content["findings"]:
+            _telemetry.debug(f"layout finding {stem}: {record['kind']}: {record['detail']}")
+        span.set_attribute("sheets", summary["sheets"])
+        span.set_attribute("gating", summary["gating"])
+        span.set_attribute("collect_s", summary["collect_s"])
+        for kind, count in summary["findings"].items():
+            span.set_attribute(f"findings.{kind}", count)
+        _telemetry.info(
+            f"layout audit {stem}: {summary['sheets']} sheet(s), {summary['gating']} gating, "
+            f"{summary['findings']} -> {report}"
+        )
         if gating and mode is LayoutAuditMode.GATE:
             raise RuntimeError(
                 f"drawing layout audit failed for {stem}: {len(gating)} gating finding(s):\n"

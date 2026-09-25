@@ -39,10 +39,18 @@ redundant-note cleanup has already run). It walks every sheet through
 JSON and audited by `_layout_audit.audit_dump`. The offline tests and the
 calibration tool replay the same dumps through the same function.
 
-The dump is logged as chunked `layout-audit-dump <stem> <sheet> i/n <b64>`
-lines, followed by one `layout-audit-finding {json}` per finding and a
-`layout-audit-summary {json}`. Farm leaves upload `task.log`, so every leaf
-returns its own replay fixture.
+Every sheet dump, every finding and the per-class counts are written to the
+drawing's report, `cad/out/reports/layout-audit/<artifact-stem>.json`. The
+report is a declared target of the `drawing:<stem>` task and one of the
+outputs the remote cache stores and restores, so a leaf restored from cache
+carries the same report as the seat that built it, and the fleet report
+covers hits as well as misses. It is not a release output.
+
+Telemetry: one `layout.audit <stem>` span per drawing, with `sheets`,
+`gating`, `collect_s` and one `findings.<kind>` count per class as
+attributes; each finding is a debug log line. A collector or audit fault
+fails the drawing in every mode, because a silently skipped sheet would
+under-count the fleet report.
 
 ## What it checks
 
@@ -113,7 +121,8 @@ datum-origin case replay from the calibration run's dumps.
 
 ## Rollout
 
-1. **REPORT** (`LAYOUT_AUDIT_MODE`): logs everything and never fails a leaf.
+1. **REPORT** (`LAYOUT_AUDIT_MODE`): writes the report and never fails a leaf
+   on a finding (a fault still fails it).
    One fleet farm run produces each drawing's finding list for its owner.
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`
