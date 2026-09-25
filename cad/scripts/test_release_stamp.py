@@ -67,14 +67,17 @@ class _Document:
         at = next(i for i, doc in enumerate(resident) if doc is self)
         return resident[at + 1] if at + 1 < len(resident) else None
 
-    def Save3(self, _options: int) -> bool:
+    def Save3(self, _options: int) -> list:
+        """comtypes' shape: the [in, out] Errors and Warnings, then the result."""
         if self.path in self.session.refuse_save:
-            return False
+            return [0, 0, True]  # reports success, leaves the file as it was
         self.session.disk[self.path] = dict(self.props)
         with self.path.open("ab") as handle:
             handle.write(b"+saved")
+        if self.path in self.session.fail_save:
+            return [0x4, 0, False]  # touched the file, then failed
         self.session.saves.append(self.path)
-        return True
+        return [0, 0, True]
 
     def ForceRebuild3(self, _top_only: bool) -> bool:
         self.rebuilt = self.path not in self.session.refuse_rebuild
@@ -98,6 +101,7 @@ class _Session:
         self.exports: list[tuple[Path, Path]] = []
         self.opened: list[Path] = []
         self.refuse_save: set[Path] = set()
+        self.fail_save: set[Path] = set()
         self.refuse_rebuild: set[Path] = set()
         # (swFileLoadError_e, swFileLoadWarning_e) an open reports, by path.
         self.load_codes: dict[Path, tuple[int, int]] = {}
@@ -229,6 +233,28 @@ def test_comtypes_returns_opendoc6_errors_and_warnings_before_the_document():
     errors, warnings, document = seat.OpenDoc6("x.SLDASM", 2, 1, "", 0, 0)
 
     assert (errors, warnings, bool(document)) == (0x2, 0x100000, False)
+
+
+def test_comtypes_returns_save3_errors_and_warnings_before_the_result():
+    """save_document's unpacking, pinned the same way: a one-argument Save3
+    defaults the [in, out] codes and returns [Errors, Warnings, result]."""
+    from comtypes import COMObject
+
+    typelib = _solidworks_typelib()
+
+    class _Model(COMObject):
+        _com_interfaces_ = [typelib.IModelDoc2]
+
+        def Save3(self, this, _options, errors, warnings, result):
+            del this
+            errors[0] = 0x4
+            warnings[0] = 0x1
+            result[0] = False
+            return 0
+
+    model = _Model().QueryInterface(typelib.IModelDoc2)
+
+    assert model.Save3(package_native.SW_SAVE_SILENT) == [0x4, 0x1, False]
 
 
 def _opened(tmp_path: Path, errors: int, warnings: int) -> tuple[_Session, Path]:
@@ -402,6 +428,16 @@ def test_stamp_release_fails_when_a_drawing_rebuild_fails(packaged):
     with pytest.raises(RuntimeError, match="ForceRebuild3 failed on solidworks/platen-guide"):
         package_native.stamp_release(session, out, "v37")
     assert docs["native_drawing"] not in session.saves
+
+
+def test_stamp_release_fails_when_a_save_reports_failure_after_touching_the_file(packaged):
+    """Codex on #876: a changed file is not proof -- a save that wrote part of it
+    and then failed must not be published as stamped CAD."""
+    out, session, docs = packaged
+    session.fail_save.add(docs["native_part"])
+
+    with pytest.raises(RuntimeError, match="Save3 failed on platen-guide.SLDPRT: swFileSaveError_e 0x4"):
+        package_native.stamp_release(session, out, "v37")
 
 
 def test_stamp_release_fails_when_a_save_does_not_reach_disk(packaged):

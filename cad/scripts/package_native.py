@@ -655,16 +655,22 @@ def _file_state(path: Path) -> tuple[int, int]:
 
 
 def save_document(document: Any, path: Path) -> None:
-    """``Save3`` in place; the rewritten file on disk is the only proof.
+    """``Save3`` in place: it must report success AND rewrite the file on disk.
 
-    comtypes returns Save3's [out] error/warning codes alongside its result in
-    an order that is not worth trusting, so success is judged the way Pack-and-Go
-    already is: by the file itself changing.
+    comtypes returns the [in, out] Errors and Warnings ahead of the result, in
+    declaration order (pinned against the typelib in test_release_stamp.py). A
+    save that touched the file and then failed must not pass as stamped CAD,
+    and a reported success that left the file as it was is no proof either.
     """
     before = _file_state(path)
-    result = document.Save3(SW_SAVE_SILENT)
+    errors, warnings, saved = document.Save3(SW_SAVE_SILENT)
+    if errors or not saved:
+        raise RuntimeError(
+            f"Save3 failed on {path.name}: swFileSaveError_e {errors:#x}, "
+            f"swFileSaveWarning_e {warnings:#x}, result {saved!r}"
+        )
     if _file_state(path) == before:
-        raise RuntimeError(f"Save3 did not rewrite {path.name} (result {result!r})")
+        raise RuntimeError(f"Save3 did not rewrite {path.name}")
 
 
 def export_pdf(document: Any, pdf: Path) -> None:
