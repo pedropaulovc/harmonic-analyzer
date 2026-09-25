@@ -9,6 +9,8 @@ wording as assembly build logic.
 
 from __future__ import annotations
 
+from _printed_tolerance import printed_band_mm
+
 
 # cad/config/dimensions.yaml "Chapter 25", photo-scaled.  The pivot bore is at
 # the origin, the arbor bore at (0, C2C), and the blind follower-pin seat enters
@@ -32,6 +34,8 @@ C2C = 28.0
 # it is now printed CENTRED on the thickness, which leaves 2.04 at the worst
 # case (pinion_bracket_spec.PIN_SEAT_WEB_WORST) with no exception needed.
 THICKNESS = 9.0
+THICKNESS_PLACES = 1  # Depth prints .X (pinion_bracket_spec.DRAWING_PRECISION)
+THICKNESS_BAND = printed_band_mm(THICKNESS_PLACES)  # 0.8; the rig's stack reads it
 PIVOT_BORE = 6.35
 ARBOR_BORE = 8.0
 PIN_BORE = 4.0

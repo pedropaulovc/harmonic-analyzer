@@ -463,6 +463,29 @@ def test_drum_station_stack_derives_the_land_length_and_station_band() -> None:
     assert spec.DRUM_STATION == pytest.approx(61.55)
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND == pytest.approx(0.8)
     assert spec.END_PLAY == 0.25 and spec.END_PLAY_SET_ERROR == 0.10
+    # Codex #854 review (Main): no copies of values the rig and the title block
+    # own -- the spec reads them, so a feeler or row change reaches the lands.
+    import inspect
+
+    import pinion_rig_layout as rig
+    from _printed_tolerance import printed_band_mm
+
+    assert (spec.END_PLAY, spec.END_PLAY_SET_ERROR) == (
+        rig.FRONT_BLOCK_FEELER,
+        rig.FRONT_BLOCK_FEELER_BAND,
+    )
+    assert spec.LINEAR_X_BAND == spec.HEAD_LEN_BAND == printed_band_mm(1)
+    assert spec.DRUM_LEN == rig.DRUM_LEN
+    assert spec.STRAP_T_BAND == strap.THICKNESS_BAND
+    spec_source = inspect.getsource(spec)
+    for literal in (
+        "LINEAR_X_BAND = 0.8",
+        "HEAD_LEN_BAND = 0.8",
+        "END_PLAY = 0.25",
+        "END_PLAY_SET_ERROR = 0.10",
+        "DRUM_LEN = 143.2",
+    ):
+        assert literal not in spec_source, literal
     assert (spec.FRONT_JOURNAL_FROM_HEAD_REAR, spec.BACK_JOURNAL_FROM_HEAD_REAR) == (
         pytest.approx(47.4),
         pytest.approx(199.9),

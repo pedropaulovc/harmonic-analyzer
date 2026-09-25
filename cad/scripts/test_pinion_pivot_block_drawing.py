@@ -10,7 +10,10 @@ import pytest
 import pinion_pivot_block_spec
 import draw_pinion_pivot_block as drawing
 import build_pinion_pivot_block as block
-from _drawing_contract import model_toleranced_dimensions
+from _drawing_contract import (
+    PRECISION_MIGRATED_DRAWINGS,
+    model_toleranced_dimensions,
+)
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fit_limits import REAM_SLIDE
 from _hole_spec import blind_cut_dia_mm
@@ -224,10 +227,14 @@ def test_rig_layout_shaft_and_rod_stay_flush_with_the_block_faces() -> None:
     assert rig.TORQUE_SHAFT_Z0 + SHAFT_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
     assert rig.LIFT_ROD_Z0 + ROD_LEN == pytest.approx(rig.BACK_BLOCK_OUTER_Z)
     shaft_proud = rig.FRONT_BLOCK_Z0 - rig.TORQUE_SHAFT_Z0
-    assert -1e-9 <= shaft_proud <= 0.1
+    assert shaft_proud == pytest.approx(
+        rig.TORQUE_SHAFT_LEN - 2.0 * rig.BLOCK_DEPTH - rig.INNER_SPAN
+    )
     proud = rig.FRONT_BLOCK_Z0 - rig.LIFT_ROD_Z0
     assert rig.LEVER_SEAT_PROUD - 1e-9 <= proud <= rig.LEVER_SEAT_PROUD + 0.1
-    assert (SHAFT_LEN, ROD_LEN) == (182.0, 192.0)
+    # The shaft is budgeted on the worst fitted stack (its own test below);
+    # at nominal it stands that allowance proud of the front block.
+    assert (SHAFT_LEN, ROD_LEN) == (185.1, 192.0)
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
@@ -285,7 +292,7 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
 
 def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and
-    # so the 182.0 shaft and 192.0 rod) true is ruling (c)'s 0.25 +/- 0.10
+    # so the 185.1 shaft and 192.0 rod) true is ruling (c)'s 0.25 +/- 0.10
     # feeler between the front strap and the front block.  The band is a
     # named fit-up value so the MHA-A03 step and every worst-case gate read
     # one source; it never closes the gap or doubles it.  It lives outside
@@ -309,14 +316,69 @@ def test_manufactured_block_span_is_the_solid_stack_plus_one_feeler() -> None:
 
     solid = 2.0 * THICKNESS + rig.DRUM_LEN
     assert rig.INNER_SPAN == pytest.approx(solid + rig.FRONT_BLOCK_FEELER)
-    physical = (
-        2.0 * pinion_pivot_block_spec.BLOCK_DEPTH + solid + rig.FRONT_BLOCK_FEELER
-    )
-    assert 0.0 <= rig.TORQUE_SHAFT_LEN - physical < 0.1  # rounded up to .X
     model_span = rig.BACK_BLOCK_Z0 - (
         rig.FRONT_BLOCK_Z0 + pinion_pivot_block_spec.BLOCK_DEPTH
     )
     assert model_span == pytest.approx(rig.INNER_SPAN, abs=1e-9)
+
+
+def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
+    # Codex #854 P1: the shaft was sized at nominal only, and at the worst
+    # fitted stack (back block, both straps, drum and feeler at their maxima,
+    # the shaft at its .X minimum) it reached only ~6.49 into the front block.
+    # Each band is re-derived here from the grade its dimension prints at.
+    import math
+
+    import pinion_bracket_spec
+    import pinion_rig_layout as rig
+    from pinion_lever_geometry import HUB_OD
+    from pinion_pivot_block_geometry import LIFT_BORE_RISE, LIFT_BORE_SPACING
+    from pinion_pivot_shaft_spec import DRAWING_PRECISION, SHAFT_DIA
+
+    x_band, xx_band = 0.8, 0.51  # title-block .X / .XX
+    assert pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
+    assert DRAWING_PRECISION["Shaft"]["Depth"] == 1
+    # MHA-061 is not precision-migrated, so its 10.25 Depth prints at the
+    # document's two places.
+    assert "draw_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
+    assert f"{pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "10.25"
+    assert (rig.STRAP_T_BAND, rig.DRUM_LEN_BAND, rig.LENGTH_BAND) == (x_band,) * 3
+    assert rig.BLOCK_DEPTH_BAND == xx_band
+    # Main (Codex #854 P1): each band is the title block's row for the places
+    # its dimension prints at, so a sheet that prints more places tightens its
+    # term by itself.  The layout's places must be the sheets' places.
+    from _printed_tolerance import printed_band_mm, printed_deviations
+    from alignment_pinion_spec import DRAWING_PRECISION as DRUM_PRECISION
+    from pinion_lift_rod_spec import DRAWING_PRECISION as ROD_PRECISION
+
+    assert (printed_band_mm(1), printed_band_mm(2)) == (x_band, xx_band)
+    assert rig.BLOCK_DEPTH_PLACES == 2  # the unmigrated sheet's document places
+    assert rig.STRAP_T_PLACES == pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"]
+    assert rig.DRUM_LEN_PLACES == DRUM_PRECISION["GearBlank"]["FaceWidth"]
+    assert rig.LENGTH_PLACES == DRAWING_PRECISION["Shaft"]["Depth"]
+    assert rig.LENGTH_PLACES == ROD_PRECISION["Rod"]["Depth"]
+    # A nominal that does not print exactly moves its term by the rounding.
+    assert printed_deviations(10.254, 2) == pytest.approx((-0.514, 0.506))
+    assert rig.FRONT_BLOCK_FEELER_BAND == 0.10
+
+    depth = pinion_pivot_block_spec.BLOCK_DEPTH
+    shortest_shaft = rig.TORQUE_SHAFT_LEN - x_band
+    longest_span = (depth + xx_band) + rig.INNER_SPAN + 2.0 * x_band + x_band + 0.10
+    bearing = shortest_shaft - longest_span
+    assert bearing == pytest.approx(sum(rig.TORQUE_SHAFT_BEARING_STACK.values()))
+    assert bearing >= rig.FRONT_BLOCK_MIN_BEARING == 9.5
+    # The smallest .X length that does it: 0.1 shorter falls under 9.5.
+    assert bearing - 0.1 < rig.FRONT_BLOCK_MIN_BEARING
+    # Other extreme: the longest shaft in the shortest stack stands proud of
+    # the front block, and nothing sits on its axis there -- the MHA-059 lever
+    # hub rides the lift rod, which the blocks carry off the shaft axis.
+    longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
+    shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.5
+    assert longest_shaft - shortest_outer == pytest.approx(7.47, abs=5e-3)
+    hub_clear = (
+        math.hypot(LIFT_BORE_SPACING, LIFT_BORE_RISE) - (HUB_OD + SHAFT_DIA) / 2.0
+    )
+    assert hub_clear == pytest.approx(8.95, abs=5e-3)
 
 
 def test_spring_blade_stays_on_the_back_strap_flank_at_every_stack() -> None:

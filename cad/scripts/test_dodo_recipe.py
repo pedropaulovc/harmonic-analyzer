@@ -2562,6 +2562,26 @@ def test_export_cache_ships_every_file_it_certifies():
     )
 
 
+def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
+    monkeypatch,
+) -> None:
+    # Codex #854 review (Main): pinion_rig_layout sizes the torque shaft and the
+    # lift rod from the title block's printed rows (_printed_tolerance), so a
+    # row edit moves drive-train placements.  The title_block token must
+    # survive for such an assembly even if it stopped stamping; only a
+    # stamp-free assembly that reads no geometry from it drops the token.
+    import _buildgraph
+
+    dodo = _load_dodo()
+    drive_train = dodo.script_for("drive_train")
+    channel = dodo.script_for("channel")
+    assert _buildgraph.reads_title_block_geometry(drive_train)
+    assert not _buildgraph.reads_title_block_geometry(channel)
+    monkeypatch.setattr(dodo, "stamps_title_block_properties", lambda _script: False)
+    assert dodo._expand_title_block_token("assembly", drive_train)
+    assert dodo._expand_title_block_token("assembly", channel) == []
+
+
 def test_check_gates_depend_on_everything_they_execute():
     """Every ``check:*`` stamp must go stale when code or config it EXECUTES
     changes, or the gate reports green without running.
