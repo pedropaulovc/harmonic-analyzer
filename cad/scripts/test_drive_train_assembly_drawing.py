@@ -95,6 +95,21 @@ def test_bom_part_numbers_match_the_parts_registry() -> None:
         assert row["number"] == number, stem
 
 
+def test_bom_catalog_numbers_match_the_parts_registry() -> None:
+    """A vendor number in a BOM description is the registry's SKU, and every
+    registry SKU is printed: a re-sourced fastener cannot leave a stale row."""
+    for stem, text in drawing.BOM_DESCRIPTIONS.items():
+        path = PARTS / f"{stem}.yaml"
+        if not path.exists():
+            continue
+        skus = yaml.safe_load(path.read_text(encoding="utf-8"))[stem].get("supplier_skus")
+        printed = re.findall(r"\b(?:MCMASTER|MSC) (\S+)$", text)
+        if not skus:
+            assert not printed, stem
+            continue
+        assert printed == [skus[0]], stem
+
+
 def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     texts = (
         drawing.ASSEMBLED_HEADING,

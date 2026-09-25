@@ -286,8 +286,8 @@ BOM_DESCRIPTIONS = {
     "cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
     "cone-tip-block": "CONE TIP BLOCK",
     "cone-tip-bushing": "CONE TIP BUSHING",
-    "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A150",
-    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
+    "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
+    "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A110",
     "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 91882A425",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "swing-stop-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
@@ -315,7 +315,7 @@ BOM_DESCRIPTIONS = {
     "pinion-handle": "PINION GRIP CROSSROD",
     "pinion-arbor": "INTEGRAL PINION ARBOR AND GRIP HEAD",
     "pinion-arbor-collar": "PINION ARBOR RETENTION COLLAR",
-    "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A199",
+    "slotted-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A201",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("drive-train BOM description coverage is incomplete")
