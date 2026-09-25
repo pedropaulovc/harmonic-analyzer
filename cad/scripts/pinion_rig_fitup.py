@@ -11,9 +11,11 @@ import it.
   MHA-061 and the MHA-A03 fit-up), which sets the pinned cluster's end play.
 - MHA-062 is match-drilled on a DRUM_END_SHIM leaf at the drum's front end
   (MHA-062's drilling note), which sets the drum's end play.
-- The rig's axial datum (user ruling P1-2): the drum's back end is set
-  RIG_SET_LEAF_D off the north MHA-027's back face before the block seats are
-  transferred (the base's transfer callout, RIG_SET_STEP).
+- The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
+  pushed north, the drum's back end is set RIG_SET_LEAF_D off the north
+  MHA-027's back face before the block seats are transferred (the base's
+  transfer callout, RIG_SET_STEP).  The bank pushed north is what keeps its end
+  play out of j = 19's stack (#743), so the step says so.
 - The MHA-104 collars (user ruling P1-1): the front collar's front face
   FRONT_COLLAR_LEAF off the front block, the back collar's back face
   BACK_COLLAR_LEAF_F off the back block (COLLAR_SET_STEP).  Nothing is cut
@@ -80,6 +82,11 @@ if FEELER_SET_ERROR != FRONT_BLOCK_FEELER_BAND or DRUM_END_SHIM_SET_ERROR != (
     raise AssertionError("a fit-up setting carries its own band")
 
 
+# The set-up the rig-set leaf assumes (#743): the bank's end play taken up
+# north, so g19 never sits north of the datum D is measured from.
+RIG_SET_BANK_PRECONDITION = "BANK PUSHED NORTH"
+
+
 def _leaves_text(leaves: tuple[float, ...]) -> str:
     return " + ".join(f"{leaf:.2f}" for leaf in leaves)
 
@@ -90,7 +97,7 @@ def _leaves_text(leaves: tuple[float, ...]) -> str:
 # semicolon.
 RIG_SET_STEP = (
     f"RIG SET: MHA-002 BACK END\n{_leaves_text(RIG_SET_LEAVES)} LEAVES OFF\n"
-    "NORTH MHA-027 BACK FACE;"
+    f"NORTH MHA-027 BACK FACE,\n{RIG_SET_BANK_PRECONDITION};"
 )
 SPRING_SET_STEP = f"PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061;"
 COLLAR_SET_STEP = (
@@ -111,6 +118,7 @@ __all__ = [
     "FRONT_BLOCK_FEELER",
     "FRONT_BLOCK_FEELER_BAND",
     "FRONT_COLLAR_LEAF",
+    "RIG_SET_BANK_PRECONDITION",
     "RIG_SET_LEAF_D",
     "RIG_SET_LEAVES",
     "RIG_SET_STEP",
