@@ -56,6 +56,15 @@ in the directory it last opened, and Windows refuses to remove a directory that
 is any process's cwd -- which on a farm worker is how an unrelated leaf's source
 root cleanup fails with ``WinError 32``.
 
+The COM session runs under the same watchdog ``_common.run_build`` arms
+(``_watchdog``): this entry attaches through comtypes rather than ``run_build``,
+so it starts and stops the watchdog itself. A crashed seat, a blocking modal or
+15 min without a span boundary or log record hard-exits 86/87/88, which
+``dodo._exec_com`` answers with force-recover + retry -- 2026-09-25 rekey2 sat ~83
+min inside one drawing's ``OpenDoc6`` with nothing to end it. Every COM step is a
+span NAMED for its document (``package.open magnifier-assembly.SLDDRW``), so an
+idle abort's ``last_op`` says which document the seat wedged on.
+
 Requires SolidWorks already open (3DEXPERIENCE Platform shortcut) and NOTHING
 else driving it -- single STA COM server.
 """
@@ -80,6 +89,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS, DrawingLayout
 
 import _config
 import _telemetry
+import _watchdog
 
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
@@ -275,7 +285,8 @@ def _pack_and_go_document(
     """
     # Discard any open docs silently first: a dirty referenced child (left by a
     # prior motion verify) would make CloseAllDocuments(True) prompt.
-    _discard_open_documents(sw)
+    with _telemetry.span(f"package.discard {source.name}", document=source.name):
+        _discard_open_documents(sw)
     log("discarded any open documents (clean session)")
     open_silently(sw, source, doc_type)
     log(f"opened {source.name}")
@@ -289,6 +300,16 @@ def _pack_and_go_document(
             f"active document {active_path} != Pack-and-Go source {source.resolve()}"
         )
 
+    with _telemetry.span(
+        f"package.pack_and_go {source.name}", document=source.name
+    ) as sp:
+        documents = _save_pack_and_go(active, zip_path)
+        sp.set_attribute("documents", len(documents))
+    return documents
+
+
+def _save_pack_and_go(active: Any, zip_path: Path) -> tuple[Path, ...]:
+    """Pack-and-Go the active document into ``zip_path``; its original sources."""
     ext = active.Extension
     pg = ext.GetPackAndGo()
     if pg is None:
@@ -633,7 +654,12 @@ def open_silently(sw: Any, path: Path, doc_type: int) -> None:
     warning bits and every reference resident with it, since OpenDoc6 does not
     say which reference an IdMismatch came from.
     """
-    errors, warnings, _document = sw.OpenDoc6(str(path), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    # Named for the document: the watchdog's idle abort reports the last span
+    # boundary, so a wedged open names the file it wedged on.
+    with _telemetry.span(f"package.open {path.name}", document=path.name, doc_type=doc_type):
+        errors, warnings, _document = sw.OpenDoc6(
+            str(path), doc_type, SW_OPEN_SILENT, "", 0, 0
+        )
     if errors:
         raise RuntimeError(f"OpenDoc6 {path.name}: swFileLoadError_e {errors:#x}")
     unresolved = [
@@ -698,7 +724,8 @@ def save_document(document: Any, path: Path) -> None:
     and a reported success that left the file as it was is no proof either.
     """
     before = _file_state(path)
-    errors, warnings, saved = document.Save3(SW_SAVE_SILENT)
+    with _telemetry.span(f"package.save {path.name}", document=path.name):
+        errors, warnings, saved = document.Save3(SW_SAVE_SILENT)
     if errors or not saved:
         raise RuntimeError(
             f"Save3 failed on {path.name}: swFileSaveError_e {errors:#x}, "
@@ -712,7 +739,8 @@ def export_pdf(document: Any, pdf: Path) -> None:
     """The build's own PDF export (``save_drawing``'s extension-driven SaveAs3)."""
     pdf.parent.mkdir(parents=True, exist_ok=True)
     pdf.unlink(missing_ok=True)
-    result = document.SaveAs3(str(pdf), 0, 0)
+    with _telemetry.span(f"package.export_pdf {pdf.name}", document=pdf.name):
+        result = document.SaveAs3(str(pdf), 0, 0)
     if not pdf.is_file() or pdf.stat().st_size == 0:
         raise RuntimeError(f"SaveAs3 produced no PDF at {pdf} (result {result!r})")
 
@@ -1054,7 +1082,35 @@ def package_native(out: Path) -> dict[str, Any]:
 
     # The one read of release.yaml in the whole pipeline's COM half.
     cad_revision = _config.release_revision()
-    sw, revision = attach_solidworks()
+    # Armed for the whole COM session, exactly as run_build arms it, and stopped
+    # before the SolidWorks-free print checks and sidecar write.
+    _watchdog.start()
+    try:
+        revision, documents, drawings, stamped = _package_with_seat(
+            out, top, cad_revision
+        )
+    finally:
+        _watchdog.stop()
+    prints = finish_release_prints(out, cad_revision, stamped["pdfs"])
+    with _telemetry.span("package.sidecar"):
+        return write_sidecar(
+            out,
+            revision,
+            documents,
+            drawings,
+            cad_revision=cad_revision,
+            stamped=stamped,
+            prints=prints,
+        )
+
+
+def _package_with_seat(
+    out: Path, top: Path, cad_revision: str
+) -> tuple[str, tuple[Path, ...], dict[str, dict[str, Any]], dict[str, Any]]:
+    """Attach, Pack-and-Go the top assembly and every drawing, stamp both trees,
+    release the seat."""
+    with _telemetry.span("package.attach"):
+        sw, revision = attach_solidworks()
     failed = False
     try:
         # Release the seat BEFORE wiping ``out``: a run that died mid-stamping (a
@@ -1062,7 +1118,8 @@ def package_native(out: Path) -> dict[str, Any]:
         # seat's working directory parked inside ``out``. Either one fails the
         # rmtree (a share lock, or WinError 32) before anything could release
         # it, so close every document AND park the directory first.
-        _release_seat(sw)
+        with _telemetry.span("package.release_seat", phase="before-wipe"):
+            _release_seat(sw)
         prepare_out(out)
         RELEASE_DIR.mkdir(parents=True, exist_ok=True)
         with _telemetry.span("package.top_assembly", document=top.name) as sp:
@@ -1076,7 +1133,8 @@ def package_native(out: Path) -> dict[str, Any]:
         raise
     finally:
         try:
-            _release_seat(sw)
+            with _telemetry.span("package.release_seat"):
+                _release_seat(sw)
         except Exception:
             _telemetry.error(
                 "could not close every open document -- SolidWorks may still "
@@ -1087,16 +1145,7 @@ def package_native(out: Path) -> dict[str, Any]:
             )
             if not failed:
                 raise
-    prints = finish_release_prints(out, cad_revision, stamped["pdfs"])
-    return write_sidecar(
-        out,
-        revision,
-        documents,
-        drawings,
-        cad_revision=cad_revision,
-        stamped=stamped,
-        prints=prints,
-    )
+    return revision, documents, drawings, stamped
 
 
 # --------------------------------------------------------------------------- #

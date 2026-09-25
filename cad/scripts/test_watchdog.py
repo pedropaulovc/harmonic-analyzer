@@ -13,12 +13,16 @@ idle timeout is only as good as the instrumentation poking it. And the session
 contract ``run_build`` owes the NEXT leaf: the teardown leaves the seat holding
 no ``cad/out`` document AND no directory of this checkout (SolidWorks parks its
 own process current directory in the last directory it opened, which on a farm
-worker blocks the agent from removing the source root).
+worker blocks the agent from removing the source root). ``package_native``
+attaches through comtypes, not ``run_build``, so its own arming is pinned too:
+a Pack-and-Go open that never returns must end in the op-timeout exit, naming
+the document.
 """
 
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -687,4 +691,131 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
         "sw.dispatch",
         "seat.identity",
         "seat.discard",
+    ]
+def _package_seat(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, open_doc):
+    """package_native pointed at a tmp top assembly and a mock seat whose
+    ``OpenDoc6`` is ``open_doc``; returns the prepared-tree directory."""
+    import package_native
+
+    sldasm = tmp_path / "sldasm"
+    sldasm.mkdir()
+    (sldasm / f"{package_native.TOP_ASSEMBLY}.SLDASM").write_bytes(b"asm")
+    monkeypatch.setattr(package_native, "OUT_SLDASM", sldasm)
+    monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(
+        package_native._seat_forensics, "release_seat_working_directory", lambda _sw: None
+    )
+    seat = SimpleNamespace(
+        IActiveDoc2=None, CloseAllDocuments=Mock(), CloseDoc=Mock(), OpenDoc6=open_doc
+    )
+    monkeypatch.setattr(package_native, "attach_solidworks", lambda: (seat, "34.0"))
+    return tmp_path / "release" / "native"
+
+
+def test_a_pack_and_go_open_that_never_returns_trips_the_watchdog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rekey2, 2026-09-25: package:release sat 78 min inside one drawing's open
+    with nothing to end it -- package_native attaches through comtypes, not
+    run_build, so the watchdog was never armed. The real Watchdog, a short op
+    timeout and a seat whose OpenDoc6 blocks: the idle abort must fire with the
+    op-timeout exit code and name the document the seat wedged on."""
+    import package_native
+
+    released = threading.Event()
+    aborts: list[dict[str, object]] = []
+    exits: list[int] = []
+
+    def open_doc(path, *_args):
+        released.wait(5)
+        raise RuntimeError(f"seat killed while opening {Path(path).name}")
+
+    def record_abort(reason, message, code, **fields):
+        aborts.append({"reason": reason, "code": code, **fields})
+
+    def record_exit(code):
+        exits.append(code)
+        released.set()
+
+    dogs: list[Watchdog] = []
+
+    def start():
+        dog = Watchdog(
+            op_timeout=0.3,
+            poll_interval=0.05,
+            crash_pids=set,
+            hung_probe=lambda: False,
+            dialog_probe=lambda: None,
+            exit_fn=record_exit,
+        )
+        dog.start()
+        dogs.append(dog)
+        return dog
+
+    monkeypatch.setattr(_watchdog, "_abort", record_abort)
+    monkeypatch.setattr(_watchdog, "start", start)
+    monkeypatch.setattr(_watchdog, "stop", lambda: dogs[-1].stop())
+    out = _package_seat(tmp_path, monkeypatch, open_doc)
+
+    with pytest.raises(RuntimeError, match="seat killed while opening"):
+        package_native.package_native(out)
+
+    assert exits[:1] == [EXIT_OP_TIMEOUT]
+    assert (aborts[0]["reason"], aborts[0]["code"]) == ("op-timeout", EXIT_OP_TIMEOUT)
+    assert aborts[0]["last_op"] == (
+        f"span-start package.open {package_native.TOP_ASSEMBLY}.SLDASM"
+    )
+    assert dogs[-1]._stop.is_set()  # disarmed on the way out, even on failure
+
+
+def test_package_native_arms_the_watchdog_around_the_seat_session_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Armed before attach, disarmed after the seat is released (Pack-and-Go AND
+    the release stamping are inside), and NOT armed for the SolidWorks-free print
+    checks and sidecar write -- the order run_build keeps."""
+    import package_native
+
+    events: list[str] = []
+    monkeypatch.setattr(_watchdog, "start", lambda: events.append("arm"))
+    monkeypatch.setattr(_watchdog, "stop", lambda: events.append("disarm"))
+    out = _package_seat(tmp_path, monkeypatch, Mock())
+    attach = package_native.attach_solidworks
+    monkeypatch.setattr(
+        package_native, "attach_solidworks", lambda: (events.append("attach"), attach())[1]
+    )
+    monkeypatch.setattr(
+        package_native,
+        "package_top_assembly",
+        lambda _sw, _out: (events.append("top"), ())[1],
+    )
+    monkeypatch.setattr(
+        package_native,
+        "package_drawings",
+        lambda _sw, _out, _sources: (events.append("drawings"), {})[1],
+    )
+    monkeypatch.setattr(
+        package_native,
+        "stamp_release",
+        lambda _sw, _out, _revision: (events.append("stamp"), {"pdfs": {}})[1],
+    )
+    monkeypatch.setattr(
+        package_native, "_release_seat", lambda _sw: events.append("release")
+    )
+    monkeypatch.setattr(
+        package_native,
+        "finish_release_prints",
+        lambda *_a: (events.append("prints"), {})[1],
+    )
+    monkeypatch.setattr(
+        package_native,
+        "write_sidecar",
+        lambda *_a, **_k: (events.append("sidecar"), {"solidworks_revision": "34.0"})[1],
+    )
+
+    package_native.package_native(out)
+
+    assert events == [
+        "arm", "attach", "release", "top", "drawings", "stamp", "release", "disarm",
+        "prints", "sidecar",
     ]
