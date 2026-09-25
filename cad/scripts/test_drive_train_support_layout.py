@@ -246,8 +246,8 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-060's 192.4 length carries the title-block .X band (Main 2026-09-24:
-# keep it loose).  The front end is located by the lever hub (the rod bottoms
+# MHA-060's body length (LIFT_ROD_LEN) carries the title-block .X band (Main
+# 2026-09-24: keep it loose).  The front end is located by the lever hub (the rod bottoms
 # in its bore), so the whole band lands at the back end, on top of the rod's
 # axial float.
 _ROD_LEN_BAND = 0.8
@@ -257,13 +257,17 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     import arbor_pedestal_spec as ped
     import harmonic_base_spec as base
     import pinion_rig_layout as rig
-    from pinion_lift_rod_spec import ROD_DIA
+    from pinion_lift_rod_spec import CAP_SAG, ROD_DIA
     from rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
 
     rod_r = ROD_DIA / 2.0
     # Longest rod, hard north (hub on the front block): the back end's reach.
-    reach = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + _hub_gap()
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 2.85, abs_tol=5e-3)
+    # The body ends 2.85 past the block; the SR crown stands CAP_SAG beyond
+    # that (Codex #855 P2), and the envelope runs to the crown's apex.
+    body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + _hub_gap()
+    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 2.85, abs_tol=5e-3)
+    reach = body_end + CAP_SAG
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 4.05, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
