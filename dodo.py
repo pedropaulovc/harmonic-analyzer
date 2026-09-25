@@ -2061,7 +2061,7 @@ def _release_seat_documents(label: str) -> None:
 
 def _reprobe_under_seat(
     key: str, outputs: list[Path], label: str, probed: str
-) -> bool:
+) -> str:
     """The under-seat re-probe every cached COM action runs: a peer may have
     published this exact artefact while we blocked for the seat, so restore it
     rather than rebuild (the fleet cache-split win; fable/codex review). Its OWN
@@ -2071,7 +2071,9 @@ def _reprobe_under_seat(
     reads ``locked`` -- the outside one, or this one after a peer published
     while we queued -- gets ONE release of the seat's documents and one more
     probe; a probe still locked after the release is fatal.
-    Returns True on a hit (the caller skips the build)."""
+    Returns the disposition: ``hit-after-wait`` (the caller skips the build),
+    else ``miss`` or ``auth-failed`` -- which the build's task span carries,
+    so a build the cache could not rule out never reads as a genuine miss."""
     released = False
     if probed == "locked":
         _release_seat_documents(label)
@@ -2084,7 +2086,7 @@ def _reprobe_under_seat(
         ) as reprobe:
             outcome = _probe_cache(key, outputs, label, reprobe, hit="hit-after-wait")
         if outcome != "locked":
-            return outcome == "hit-after-wait"
+            return outcome
         if released:
             raise RuntimeError(
                 f"{label}: cached outputs still share-locked after releasing the "
@@ -2133,7 +2135,8 @@ def _cached_com_action(
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(key, outputs, label, probed):
+        reprobed = _reprobe_under_seat(key, outputs, label, probed)
+        if reprobed == "hit-after-wait":
             return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
@@ -2141,7 +2144,7 @@ def _cached_com_action(
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, key)
             _exec_com(cmd, label, log_stem=log_stem)
             if stamp is not None:
@@ -2293,7 +2296,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(key, outputs, label, probed):
+        reprobed = _reprobe_under_seat(key, outputs, label, probed)
+        if reprobed == "hit-after-wait":
             _stamp_part_execution(stem)
             return
 
@@ -2302,7 +2306,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, key)
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
@@ -2562,7 +2566,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
         return
 
     with _com_seat(label) as waited:
-        if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
+        reprobed = _reprobe_under_seat(cache_key, cache_outputs, label, probed)
+        if reprobed == "hit-after-wait":
             _stamp_assembly_execution(stem)
             _record_recipe_digest()
             return
@@ -2574,7 +2579,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
             f"task {label}", label=label, service=_stage_name(label)
         ) as sp:
             _tag_seat_wait(sp, waited)
-            sp.set_attribute("cache", "miss")
+            sp.set_attribute("cache", reprobed)
             _tag_cache_key(sp, cache_key)
 
             target_missing = not Path(targets[0]).exists()
