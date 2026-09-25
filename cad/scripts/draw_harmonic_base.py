@@ -51,6 +51,7 @@ from _drawing_common import (
     view_name,
 )
 
+from _drawing_common import _iter_tables, _iter_view_annotations
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
@@ -645,6 +646,125 @@ def _log_tapped_hole_notes(adapter: Any, ddoc: Any) -> None:
     )
 
 
+# Sheet 2's native hole callouts are display dimensions, which the shared
+# layout audit boxes only as a nominal square around their text anchor
+# (_drawing_common._dim_element, NONE scope). So the MHA-004/MHA-061 transfer
+# callouts running into each other, and the MHA-114 callout struck through by
+# the plan outline, both passed it (hb-notes-2 eye pass, 2026-09-25). This
+# drawing-local check boxes each callout from its own display data and fails
+# on any clash; it stays out of _drawing_common so no other drawing re-keys.
+CALLOUT_CLEARANCE_M = 0.001
+_LAYOUT_LABEL_WORDS = ("SCALE", "SECTION")  # view labels among a view's notes
+
+Box = tuple[float, float, float, float]
+
+
+def box_gap(a: Box, b: Box) -> float:
+    """Clearance between two (xmin, ymin, xmax, ymax) boxes; negative on overlap."""
+    return max(a[0] - b[2], b[0] - a[2], a[1] - b[3], b[1] - a[3])
+
+
+def find_callout_clashes(
+    callouts: dict[str, Box],
+    obstacles: dict[str, Box],
+    clearance: float = CALLOUT_CLEARANCE_M,
+) -> list[str]:
+    """Every callout pair, and every callout-obstacle pair, closer than
+    ``clearance`` (sheet metres), named with its clearance in mm."""
+    findings = []
+    names = sorted(callouts)
+    for index, name in enumerate(names):
+        others = [(f"callout {other}", callouts[other]) for other in names[index + 1 :]]
+        others += sorted(obstacles.items())
+        for other, other_box in others:
+            gap = box_gap(callouts[name], other_box)
+            if gap < clearance:
+                findings.append(f"callout {name} vs {other}: clearance {gap * 1000.0:.1f} mm")
+    return findings
+
+
+def _callout_box(display: Any, label: str) -> Box:
+    """A native hole callout's text block: its text anchor plus the horizontal
+    shoulder lines SolidWorks draws under it, in sheet metres."""
+    display = _early_bound(display, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    anchor = [float(v) for v in annotation.GetPosition()][:2]
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    # GetLineAtIndex2 -> [color, lineType, ?, ?, start xyz, end xyz].
+    lines = []
+    for index in range(int(data.GetLineCount())):
+        values = [float(v) for v in data.GetLineAtIndex2(index)]
+        lines.append((values[4], values[5], values[7], values[8]))
+    texts = [
+        (
+            str(data.GetTextAtIndex(index)),
+            [float(v) for v in (data.GetTextPositionAtIndex(index) or ())],
+            float(data.GetTextHeightAtIndex(index)),
+        )
+        for index in range(int(data.GetTextCount()))
+    ]
+    _telemetry.info(
+        f"callout {label} display data: anchor={anchor!r} lines={lines!r} texts={texts!r}"
+    )
+    shoulders = [line for line in lines if abs(line[1] - line[3]) < 1e-7]
+    if not shoulders:
+        raise RuntimeError(f"callout {label} has no horizontal shoulder line: {lines!r}")
+    xs = [anchor[0], *(x for line in shoulders for x in (line[0], line[2]))]
+    ys = [anchor[1], *(line[1] for line in shoulders)]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _view_geometry_box(adapter: Any, view: Any, label: str) -> Box:
+    """The casting's own outline in ``view``: its bounding-box corners projected
+    onto the sheet, free of GetOutline's padding and attached annotations."""
+    points = [
+        model_point_in_view(adapter, view, (x, y, z), label=f"{label} extent")
+        for x in (-BOTTOM_LENGTH / 2000.0, BOTTOM_LENGTH / 2000.0)
+        for y in (0.0, RIM_TOP / 1000.0)
+        for z in (BOTTOM_FRONT_Z / 1000.0, BOTTOM_REAR_Z / 1000.0)
+    ]
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _check_hole_sheet_callouts(
+    adapter: Any, ddoc: Any, *, callouts: dict[str, Any], views: dict[str, Any]
+) -> None:
+    """Fail loud on any sheet-2 callout that crowds another callout, a free
+    note, a view label, the hole table or any view's casting outline."""
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate the holes sheet for the callout check")
+    boxes = {label: _callout_box(display, label) for label, display in callouts.items()}
+    obstacles = {
+        f"view {label}": _view_geometry_box(adapter, view, label)
+        for label, view in views.items()
+    }
+    sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
+    for element, _annotation in _iter_view_annotations(adapter, sheet_view):
+        if element.kind == "note":
+            obstacles[f"note {element.label}"] = element.box
+    for view in views.values():
+        for element, _annotation in _iter_view_annotations(adapter, view):
+            if element.kind == "note" and any(
+                word in element.label.upper() for word in _LAYOUT_LABEL_WORDS
+            ):
+                obstacles[f"label {element.label}"] = element.box
+    tables = [
+        element
+        for view in (sheet_view, *views.values())
+        for element in _iter_tables(adapter, view)
+    ]
+    if not tables:
+        raise RuntimeError("callout check found no hole table on the holes sheet")
+    for element in tables:
+        obstacles[f"table {element.label}"] = element.box
+    _telemetry.info(f"hole-sheet callout boxes: {boxes!r}; obstacles: {obstacles!r}")
+    findings = find_callout_clashes(boxes, obstacles)
+    if findings:
+        raise RuntimeError("hole-sheet callout clashes: " + "; ".join(findings))
+
+
 def _visible_hole_table_entities(
     adapter: Any, view: Any, holes: tuple[tuple[float, float, float], ...]
 ) -> tuple[tuple[Any, ...], Any, Any]:
@@ -1074,7 +1194,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # spring callout keeps the band between the plan's bottom edge and the
     # cross-screw callout, left of the section-A arrow (render r4 had it
     # colliding with the 4X cross-screw callout).
-    add_native_hole_callout(
+    block_callout = add_native_hole_callout(
         adapter,
         hole_top,
         edge=transfer_block_rim,
@@ -1082,7 +1202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pinion-block transfer seats",
         process=TRANSFER_BLOCK_CALLOUT,
     )
-    add_native_hole_callout(
+    pedestal_callout = add_native_hole_callout(
         adapter,
         hole_top,
         edge=transfer_pedestal_rim,
@@ -1090,7 +1210,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="arbor-pedestal transfer seats",
         process=TRANSFER_PEDESTAL_CALLOUT,
     )
-    add_native_hole_callout(
+    spring_callout = add_native_hole_callout(
         adapter,
         hole_top,
         edge=transfer_spring_rim,
@@ -1255,6 +1375,17 @@ async def build(adapter: Any) -> dict[str, str]:
         DRAWING_PRECISION_BY_NAME,
     )
 
+    _check_hole_sheet_callouts(
+        adapter,
+        ddoc,
+        callouts={
+            "MHA-061 block transfer": block_callout,
+            "MHA-004 pedestal transfer": pedestal_callout,
+            "MHA-114 spring transfer": spring_callout,
+            "MHA-132 cross-tap": tap_callout,
+        },
+        views={"holes top": hole_top, "holes front": hole_side, "section A-A": section},
+    )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(
         adapter,

@@ -523,3 +523,65 @@ def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None
     assert ast.unparse(keywords["expected_redundant_notes"]) == "TAPPED_HOLE_NOTES"
     assert ast.unparse(keywords["redundant_note_substrings"]) == "(TAPPED_HOLE_NOTE,)"
     assert sheet.TAPPED_HOLE_NOTE == "Tapped Hole"
+
+
+def test_callout_clash_check_names_overlaps_and_crowding() -> None:
+    import draw_harmonic_base as sheet
+
+    callouts = {
+        "left": (0.160, 0.245, 0.240, 0.265),
+        "right": (0.228, 0.245, 0.310, 0.265),  # overlaps "left" by 12 mm
+        "clear": (0.320, 0.100, 0.330, 0.110),
+    }
+    obstacles = {
+        "view holes top": (0.225, 0.160, 0.345, 0.240),
+        "table": (0.010, 0.130, 0.1595, 0.270),  # 0.5 mm from "left"
+    }
+    findings = sheet.find_callout_clashes(callouts, obstacles)
+    assert findings == [
+        "callout left vs callout right: clearance -12.0 mm",
+        "callout left vs table: clearance 0.5 mm",
+    ]
+    assert sheet.box_gap((0.0, 0.0, 1.0, 1.0), (1.5, 0.0, 2.0, 1.0)) == pytest.approx(0.5)
+    assert sheet.find_callout_clashes({"a": (0.0, 0.0, 0.01, 0.01)}, {"b": (0.0115, 0.0, 0.02, 0.01)}) == []
+
+
+def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> None:
+    import ast
+    from pathlib import Path
+
+    import draw_harmonic_base as sheet
+
+    tree = ast.parse(Path(sheet.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    check = [call for call in calls if getattr(call.func, "id", None) == "_check_hole_sheet_callouts"]
+    assert len(check) == 1
+    keywords = {kw.arg: kw.value for kw in check[0].keywords}
+    callout_names = {ast.unparse(value) for value in keywords["callouts"].values}
+    placed = {
+        target.id
+        for node in ast.walk(build)
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "id", None) == "add_native_hole_callout"
+        for target in node.targets
+    }
+    unassigned = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "id", None) == "add_native_hole_callout"
+    ]
+    assert not unassigned  # every callout is kept, so every one is checked
+    assert callout_names == placed == {
+        "block_callout", "pedestal_callout", "spring_callout", "tap_callout"
+    }
+    assert {ast.unparse(value) for value in keywords["views"].values} == {
+        "hole_top", "hole_side", "section"
+    }
+    finalize = next(call for call in calls if getattr(call.func, "id", None) == "finalize_drawing")
+    assert check[0].lineno < finalize.lineno
