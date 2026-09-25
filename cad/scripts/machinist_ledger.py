@@ -1332,6 +1332,14 @@ def record_review(
         )
     if both_families:  # either family's review counts; drawing_status needs each
         slot = f"{BOTH_FAMILIES}_{reviewer_family(review['reviewer'])}"
+    elif script_author.model is None:  # no trailer: a ruling or the class rule decides
+        ruled = ruled_family(name, script_author, rulings)
+        if ruled.family is not None and ruled.family != author_family:
+            raise ValueError(
+                f"{name}: --author-family {author_family} disagrees with the "
+                f"{ruled.source} ({ruled.family}) for {script_author.script} at "
+                f"{script_author.commit[:12]}"
+            )
     author = resolve_author(
         name, author_family, author_model, repo=repo, known=script_author
     )
@@ -1469,6 +1477,7 @@ class Status:
     last_resort: str  # "-" (none recorded) | "matches" | "drift"
     diff_files: tuple[str, ...] = ()
     missing: tuple[str, ...] = ()  # reviewer families a both-families drawing lacks
+    accepting: tuple[str, ...] = ()  # slots whose counting entries match these sheets
 
 
 @dataclass
@@ -1588,6 +1597,7 @@ def drawing_status(
             _reviewed(cross),
             f"{CROSS_FAMILY} {cross['status']}",
             last_resort,
+            accepting=(CROSS_FAMILY,),
         )
     if last_resort == "matches" and last["counts"]:
         return Status(
@@ -1596,6 +1606,7 @@ def drawing_status(
             _reviewed(last),
             f"{LAST_RESORT} {last['status']}",
             last_resort,
+            accepting=(LAST_RESORT,),
         )
     fallback = entry.get(OUTAGE_FALLBACK)
     if fallback is not None and not _compare(fallback, current, references).problem:
@@ -1650,6 +1661,7 @@ def _both_families_status(
 ) -> Status:
     """OK only when a counting review from every reviewer family matches."""
     matched: dict[str, str] = {}  # reviewer family -> "<slot> <status>"
+    accepting: list[str] = []
     drifted: list[tuple[dict[str, Any], Comparison]] = []
     for slot, recorded in entry.items():
         if not recorded.get("counts"):
@@ -1659,17 +1671,34 @@ def _both_families_status(
             drifted.append((recorded, comparison))
             continue
         matched.setdefault(recorded["reviewer_family"], f"{slot} {recorded['status']}")
+        accepting.append(slot)
     missing = tuple(family for family in REVIEW_FAMILIES if family not in matched)
     if not missing:
         via = " + ".join(matched[family] for family in REVIEW_FAMILIES)
-        return Status(name, State.OK, f"{BOTH_FAMILIES}: {reason}", via, "-")
+        return Status(
+            name,
+            State.OK,
+            f"{BOTH_FAMILIES}: {reason}",
+            via,
+            "-",
+            accepting=tuple(accepting),
+        )
     detail = (
         f"both families required ({reason}); no counting {', '.join(missing)} "
         "review of these sheets"
     )
     drift = [(r, c) for r, c in drifted if r["reviewer_family"] in missing]
     if not drift:
-        return Status(name, State.UNREVIEWED, detail, "", "-", (), missing)
+        return Status(
+            name,
+            State.UNREVIEWED,
+            detail,
+            "",
+            "-",
+            (),
+            missing,
+            tuple(accepting),
+        )
     reference, comparison = drift[0]
     files: list[Path] = []
     if report_dir is not None and comparison.differences:
@@ -1682,6 +1711,7 @@ def _both_families_status(
         "-",
         tuple(path.as_posix() for path in files),
         missing,
+        tuple(accepting),
     )
 
 
@@ -2267,6 +2297,30 @@ def backfill(
     return result
 
 
+def _objections_to_recorded(
+    name: str,
+    status: Status,
+    ledger: dict[str, Any],
+    ledger_path: Path,
+    matcher: _Matcher,
+    found: Found,
+) -> dict[str, str]:
+    """Each recorded entry ``status`` rests on that a newer failing verdict withdraws.
+
+    Every accepting slot: the one entry of an accepted drawing, both of a
+    both-families one, and those a both-families drawing still missing a
+    family already has, so a new review never completes a pair on a
+    contradicted half.
+    """
+    objected: dict[str, str] = {}
+    for slot in status.accepting:
+        recorded = Candidate(ledger_path, ledger["drawings"][name][slot], name)
+        objection = _objection(recorded, matcher, found)
+        if objection:
+            objected[slot] = objection
+    return objected
+
+
 def _backfill_drawings(
     by_drawing: dict[str, list[Candidate]],
     found: Found,
@@ -2316,30 +2370,11 @@ def _backfill_drawings(
                 author=authors.get(name),
                 repo=repo,
             )
-            if status.state == State.OK:
-                # Every entry the acceptance rests on: both, for a both-families one.
-                matcher = _Matcher(pdf, cache)
-                objected = {
-                    slot: objection
-                    for slot in (part.split()[0] for part in status.via.split(" + "))
-                    if (
-                        objection := _objection(
-                            Candidate(
-                                ledger_path, ledger["drawings"][name][slot], name
-                            ),
-                            matcher,
-                            found,
-                        )
-                    )
-                }
-                if not objected:
-                    rows.append(
-                        BackfillRow(
-                            name, Backfill.RECORDED, f"{status.via} {status.detail}"
-                        )
-                    )
-                    continue
-                # A newer failing verdict of these sheets withdraws the entry.
+            objected = _objections_to_recorded(
+                name, status, ledger, ledger_path, _Matcher(pdf, cache), found
+            )
+            if objected:
+                # A newer failing verdict of these sheets withdraws each entry.
                 dropped = "dropped from the ledger" if apply else "to drop (--apply)"
                 why = "; ".join(
                     f"recorded {slot}: {objection}"
@@ -2358,6 +2393,13 @@ def _backfill_drawings(
                     if not ledger["drawings"][name]:
                         del ledger["drawings"][name]
                     save_ledger(ledger, ledger_path)
+                continue
+            if status.state == State.OK:
+                rows.append(
+                    BackfillRow(
+                        name, Backfill.RECORDED, f"{status.via} {status.detail}"
+                    )
+                )
                 continue
             if status.missing:  # both families required: only a missing one helps
                 ships = [

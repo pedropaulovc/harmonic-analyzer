@@ -2375,6 +2375,68 @@ def test_backfill_rechecks_every_entry_a_both_families_acceptance_rests_on(
     assert (status.state, status.missing) == (ml.State.UNREVIEWED, ("gpt",))
 
 
+def test_backfill_withdraws_a_contradicted_half_before_completing_a_pair(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    rulings = ml.load_author_rulings(
+        _author_rulings(tmp_path, family="gpt", both_families=BOTH_REASON)
+    )
+    pdf = _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    t1, t2, t3 = ((NOW - timedelta(hours=h)).isoformat() for h in (3, 2, 1))
+    ml.record_review(
+        _review(pdf, reviewer="codex", reviewed_at=t1),
+        pdf,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+        rulings=rulings,
+    )
+    # A newer codex FIX of the same sheets, then a Claude SHIP that would complete it.
+    _on_record(records, "wt-fix", reviewer="codex", passed=False, reviewed_at=t2)
+    _on_record(records, "wt-claude", reviewer="claude", reviewed_at=t3)
+
+    row = _backfill(tmp_path, records, rulings=rulings, apply=True)
+
+    assert row.outcome == ml.Backfill.CONTRADICTED, row.detail
+    assert "recorded both_families_gpt" in row.detail
+    assert "both_families_gpt" not in ml.load_ledger(ledger_path)["drawings"].get(
+        "crank_arm", {}
+    )
+    [status] = ml.check(["crank_arm"], ledger_path=ledger_path, rulings=rulings)
+    assert status.state != ml.State.OK
+
+
+def test_an_untrailered_scripts_family_comes_from_the_rulings_not_the_caller(
+    tmp_path: Path, registry: Path
+) -> None:
+    rulings = ml.AuthorRulings({}, UNTRAILERED_RULE)  # untrailered = Claude
+    pdf = _sheet(registry)
+    kwargs = {"provenance": {}, "ledger_path": tmp_path / "ledger.json"}
+
+    # A Claude reviewer cannot make itself cross-family by claiming a GPT author.
+    with pytest.raises(ValueError, match="disagrees with the rule: no trailer"):
+        ml.record_review(
+            _review(pdf, reviewer="claude"),
+            pdf,
+            author_family="gpt",
+            rulings=rulings,
+            **kwargs,
+        )
+    same = ml.record_review(
+        _review(pdf, reviewer="claude"),
+        pdf,
+        author_family="claude",
+        rulings=rulings,
+        **kwargs,
+    )
+    assert (same.slot, same.counts) == (ml.LAST_RESORT, False)
+    cross = ml.record_review(
+        _review(pdf), pdf, author_family="claude", rulings=rulings, **kwargs
+    )
+    assert (cross.slot, cross.counts) == (ml.CROSS_FAMILY, True)
+
+
 def test_backfill_adds_only_the_family_a_both_families_drawing_lacks(
     tmp_path: Path, registry: Path, records: Path
 ) -> None:
