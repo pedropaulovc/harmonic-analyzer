@@ -610,7 +610,9 @@ def _stage_name(label: str) -> str:
     return "harmonic-analyzer"
 
 
-def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _exec(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Run a subprocess from the repo root; raise on non-zero (fail-loud). The
     subprocess CONTINUES the active span via the injected ``TRACEPARENT`` and is
     labelled with its pipeline stage via ``OTEL_SERVICE_NAME`` (:func:`_stage_name`).
@@ -626,7 +628,7 @@ def _exec(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     non-release happy path. Decode the pipe as UTF-8 (errors=replace) so the gate
     labels' non-ASCII glyphs survive on a cp1252 Windows console."""
     started = time.time()
-    rc = _run_subprocess(cmd, label, log_stem)
+    rc = _run_subprocess(cmd, label, log_stem, task=task)
     if rc:
         _fail_task(label, rc, started=started)
 
@@ -647,16 +649,23 @@ def _external_console_level() -> str:
     return _EXTERNAL_LOG_LEVELS.get(raw, "WARNING")
 
 
-def _run_subprocess(cmd: list[str], label: str, log_stem: str | None = None) -> int:
+def _run_subprocess(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> int:
     """Run the subprocess (span-less) and return its exit code (the raise-on-failure
     part is :func:`_exec`; the COM-retry wrapper :func:`_exec_com` needs the raw code
-    to tell a SolidWorks crash/op-timeout (86/87) from an ordinary gate failure)."""
+    to tell a SolidWorks crash/op-timeout (86/87) from an ordinary gate failure).
+
+    ``label`` is the display name; ``task`` is the doit task the subprocess works
+    for (default: ``label``, which already is one for most callers). The fastener
+    guard is keyed on ``task``, so a FULL/REFRESH/hook subprocess with a display
+    label still gets its assembly's rows."""
     _telemetry.info(f">> {label}: {' '.join(cmd)}")
     env = _telemetry.inject_env()
     env["OTEL_SERVICE_NAME"] = _stage_name(label)
     # The catalog rows this task's cache key folds; `fastener` refuses others.
     env.pop("HARMONIC_FASTENER_ROWS", None)
-    fastener_rows = _fastener_rows_env(label)
+    fastener_rows = _fastener_rows_env(task or label)
     if fastener_rows is not None:
         env["HARMONIC_FASTENER_ROWS"] = fastener_rows
     # The MCP adapter uses Loguru directly. Keep its console sink aligned with
@@ -863,7 +872,9 @@ def _sw_ensure_once() -> None:
     _sw_preflight()
 
 
-def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _exec_com(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
     If the subprocess exits with a watchdog crash/op-timeout/modal-dialog code
@@ -880,7 +891,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
     ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip retry, plain ``_exec``)."""
     if not _sw_autostart_enabled():
-        _exec(cmd, label, log_stem)
+        _exec(cmd, label, log_stem, task=task)
         return
 
     backoff = _com_retry_backoff()
@@ -890,7 +901,7 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         # capture, not the previous attempt's (they differ by exactly the seat
         # state this evidence exists to compare).
         started = time.time()
-        rc = _run_subprocess(cmd, label, log_stem)
+        rc = _run_subprocess(cmd, label, log_stem, task=task)
         if rc == 0:
             return
         sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
@@ -929,7 +940,9 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
             _sw_lifecycle.wait_until_ready()
 
 
-def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
+def _run(
+    cmd: list[str], label: str, log_stem: str | None = None, *, task: str | None = None
+) -> None:
     """Open a ``task <label>`` span and run the subprocess inside it (see
     :func:`_exec`). One span per task action, NAMED for the doit task
     (``task check:math``) so the trace reads as the task itself; the subprocess
@@ -944,7 +957,7 @@ def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:
     with _telemetry.span(
         f"task {label}", label=label, cmd=" ".join(cmd), service=_stage_name(label)
     ):
-        _exec(cmd, label, log_stem)
+        _exec(cmd, label, log_stem, task=task)
 
 
 # --- Per-script helper dependencies, computed from each build script's REAL
@@ -1305,12 +1318,12 @@ _CHECK_NAMES = (
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
 
 
-def _run_stamped(cmd: list[str], label: str, stamp: str) -> None:
+def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
     """Run a SolidWorks-free gate subprocess; on success write its stamp target.
     _run raises on non-zero, so a failed gate never writes a stamp (stays stale ->
     re-runs). The COM gates (``verify:*``/``preflight``) do NOT come here: they are
     cache-keyed leaves whose stamp is written by :func:`_cached_com_action`."""
-    _run(cmd, label, log_stem=Path(stamp).stem)
+    _run(cmd, label, log_stem=Path(stamp).stem, task=task)
     Path(stamp).parent.mkdir(parents=True, exist_ok=True)
     Path(stamp).write_text(f"{label}\n", encoding="utf-8")
 
@@ -1716,21 +1729,35 @@ def _narrow_fastener_catalog(
     return [sidecar if dep == str(_FASTENER_CATALOG) else dep for dep in deps]
 
 
-def _fastener_rows_env(label: str) -> str | None:
-    """The ``HARMONIC_FASTENER_ROWS`` value for ``label``'s build subprocess.
+def _fastener_rows_env(task: str) -> str | None:
+    """The ``HARMONIC_FASTENER_ROWS`` value for ``task``'s build subprocess.
+
+    ``task`` must be a doit task name (``part:x``, ``check:math``, ``release``).
+    Only part, assembly and drawing recipes are narrowed, so any other task folds
+    the whole catalog (when it reads it at all) and runs unguarded. A display
+    label (``FULL build channel (...)``) or an unknown part/assembly/drawing stem
+    raises: silently dropping the guard would let a read the static analysis
+    missed publish under a key that does not fold its row.
 
     Recomputed from the task's own file_dep function when this process never
     built the graph (a ``doit -n`` worker), so the guard never depends on which
     process ran the task."""
-    family, _, stem = label.partition(":")
-    if label not in _FASTENER_ROWS:
-        if family == "part":
+    if not task or any(ch.isspace() for ch in task):
+        raise ValueError(
+            f"{task!r} is not a doit task name; pass the task the subprocess works "
+            "for, or its fastener-row guard is lost"
+        )
+    family, _, stem = task.partition(":")
+    if task not in _FASTENER_ROWS:
+        if family == "part" and stem in part_stems():
             _part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem)
         elif family == "assembly" and stem in ASSEMBLY_ORDER:
             _recipe_files(stem)
         elif family == "drawing" and stem in DRAWINGS_BY_NAME:
             _drawing_file_deps(stem)
-    rows = _FASTENER_ROWS.get(label)
+        elif family in ("part", "assembly", "drawing"):
+            raise ValueError(f"{task!r} names no {family} task; its fastener rows are unknown")
+    rows = _FASTENER_ROWS.get(task)
     return None if rows is None else ",".join(sorted(rows))
 
 
@@ -2001,6 +2028,7 @@ def _release_seat_documents(label: str) -> None:
             [sys.executable, str(SCRIPTS_DIR / "release_seat_documents.py")],
             f"release documents {label}",
             log_stem="release-seat-documents",
+            task=label,
         )
 
 
@@ -2518,12 +2546,14 @@ def build_or_refresh(stem, dependencies, changed, targets):
                     [sys.executable, str(asm_script)],
                     f"FULL build {stem} ({why})",
                     log_stem=f"assembly-{stem}",
+                    task=label,
                 )
                 for hook in hooks:
                     _exec_com(
                         [sys.executable, str(hook)],
                         f"hook {hook.name}",
                         log_stem=f"hook-{stem}-{hook.stem}",
+                        task=label,
                     )
             else:
                 sp.set_attribute("mode", "refresh")
@@ -2531,6 +2561,7 @@ def build_or_refresh(stem, dependencies, changed, targets):
                     [sys.executable, str(SCRIPTS_DIR / "refresh_assembly.py"), stem],
                     f"REFRESH {stem}",
                     log_stem=f"assembly-{stem}",
+                    task=label,
                 )
             # _exec raised if the build failed, so we only get here on success: record
             # this build's recipe digest for the next run's FULL/REFRESH decision.
@@ -3171,7 +3202,9 @@ def task_check():
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
             "targets": [stamp],
-            "actions": [(_run_stamped, [spec["cmd"], f"check {name}", stamp])],
+            "actions": [
+                (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
+            ],
             "clean": True,
             "verbosity": 2,
         }
@@ -3354,7 +3387,7 @@ def _run_release(relargs):
     neither blocks another worktree's build nor needs SolidWorks on this machine --
     which is the whole point: a release can be cut from a seatless box, with every
     COM stage dispatched to the farm."""
-    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release")
+    _run([sys.executable, str(RELEASE_PY), *relargs], "cut release", task="release")
 
 
 def task_release():
