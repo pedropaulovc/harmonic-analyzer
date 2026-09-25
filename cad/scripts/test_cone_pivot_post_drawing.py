@@ -207,9 +207,8 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     assert 'plan.record("InclineAngle", \'"ConeIncline"\')' in source
     assert "add_angular_reference_dimension" not in source
     # A blanked sketch's dimensions never reach InsertModelAnnotations3.
-    assert "JournalPlanReference" not in source.split(
-        "_blank_reference_geometry(\n        adapter,"
-    )[1]
+    blanked = source.split("_blank_reference_geometry(\n        adapter,")[1]
+    assert "JournalPlanReference" not in blanked.split("\n    )\n")[0]
 
 
 def test_machined_faces_are_called_out_on_the_casting() -> None:
@@ -550,3 +549,93 @@ def test_registry_titles_the_part_for_the_title_block() -> None:
     import _config
 
     assert _config.parts("cone-pivot-post")["title"] == "Cone Pivot Post"
+
+
+class _Dim:
+    def __init__(self, state: int, radians: float, reference: bool = False) -> None:
+        self.DrivenState = state
+        self.SystemValue = radians
+        self._reference = reference
+
+    def IsReference(self) -> bool:
+        return self._reference
+
+
+class _Model:
+    def __init__(self, dims: dict[str, _Dim]) -> None:
+        self._dims = dims
+
+    def Parameter(self, name: str) -> _Dim | None:
+        return self._dims.get(name)
+
+
+def _ownership_fixture(monkeypatch, dims, equations):
+    import math
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        part,
+        "_equations_for",
+        lambda _adapter, lhs: [e for e in equations if e.startswith(lhs + " ")],
+    )
+    return SimpleNamespace(currentModel=_Model(dims)), math.radians(spec.INCLINE_DEG)
+
+
+def _owned_dims(incline: float) -> dict[str, _Dim]:
+    return {
+        "D1@ConeShaftNormal": _Dim(1, incline),
+        "D1@CrankInterfacePlane": _Dim(1, 0.0213753),
+        "InclineAngle@JournalPlanReference": _Dim(1, incline),
+        "CrankBossStartZ@JournalPlanReference": _Dim(1, 0.0213753),
+    }
+
+
+_OWNED_EQUATIONS = [
+    '"D1@ConeShaftNormal" = "ConeIncline"',
+    '"InclineAngle@JournalPlanReference" = "ConeIncline"',
+]
+
+
+def test_cone_incline_single_ownership_gate_passes_on_one_equation_owner(
+    monkeypatch,
+) -> None:
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "    _assert_cone_incline_single_owner(adapter)\n" in source.replace(
+        "\r\n", "\n"
+    )
+    adapter, incline = _ownership_fixture(monkeypatch, {}, _OWNED_EQUATIONS)
+    adapter.currentModel = _Model(_owned_dims(incline))
+    part._assert_cone_incline_single_owner(adapter)
+
+
+def test_cone_incline_single_ownership_gate_rejects_each_failure(monkeypatch) -> None:
+    import pytest
+
+    adapter, incline = _ownership_fixture(monkeypatch, {}, _OWNED_EQUATIONS)
+    # A second owner, a missing owner, a reference demotion, a state unlike the
+    # control, and a non-neutral drive must each fail loud.
+    cases = []
+    doubled = _OWNED_EQUATIONS + ['"D1@ConeShaftNormal" = 12.5182deg']
+    cases.append((_owned_dims(incline), doubled, "expected one equation"))
+    cases.append((_owned_dims(incline), _OWNED_EQUATIONS[1:], "expected one equation"))
+    demoted = _owned_dims(incline)
+    demoted["D1@ConeShaftNormal"] = _Dim(1, incline, reference=True)
+    cases.append((demoted, _OWNED_EQUATIONS, "reference dimension"))
+    unlike = _owned_dims(incline)
+    unlike["InclineAngle@JournalPlanReference"] = _Dim(2, incline)
+    cases.append((unlike, _OWNED_EQUATIONS, "differs from the equation-owned control"))
+    moved = _owned_dims(incline)
+    moved["D1@ConeShaftNormal"] = _Dim(1, incline + 1e-6)
+    cases.append((moved, _OWNED_EQUATIONS, "reads"))
+    for dims, equations, message in cases:
+        monkeypatch.setattr(
+            part,
+            "_equations_for",
+            lambda _adapter, lhs, eqs=equations: [
+                e for e in eqs if e.startswith(lhs + " ")
+            ],
+        )
+        adapter.currentModel = _Model(dims)
+        with pytest.raises(RuntimeError, match=message):
+            part._assert_cone_incline_single_owner(adapter)

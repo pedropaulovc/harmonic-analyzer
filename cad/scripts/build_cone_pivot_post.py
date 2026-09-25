@@ -795,6 +795,7 @@ async def build(adapter: Any) -> dict[str, str]:
         HARVESTED_VOLUME_MM3,
         0.001 * HARVESTED_VOLUME_MM3,
     )
+    _assert_cone_incline_single_owner(adapter)
     # Three accuracy features on this casting: the two running bores carry the
     # ONE band that closes the `shaft_in_bushing` fit class against their
     # turned shafts (cad/docs/tolerance-policy.md), and the spacing between
@@ -979,6 +980,84 @@ def _create_feature_cylinder_axis(
         f"axis {label} from {feature_name} r={radius_mm:g} mm "
         f"({len(candidates)} candidate face(s))"
     )
+
+
+def _equations_for(adapter: Any, lhs: str) -> list[str]:
+    """Every equation whose left-hand side is exactly ``lhs``."""
+    from solidworks_mcp.adapters.solidworks.parametrics import (
+        _equation_manager,
+        _read_member,
+    )
+
+    # The same flagged manager + GetCount read the adapter's own
+    # _equation_index_by_lhs uses (GetCount resolves as a property or a method
+    # depending on the dispatch).
+    manager = _equation_manager(adapter)
+    matches = []
+    for index in range(int(_read_member(manager, "GetCount") or 0)):
+        text = str(manager.Equation(index) or "")
+        if text.partition("=")[0].strip() == lhs:
+            matches.append(text)
+    return matches
+
+
+# Each ConeIncline-owned dimension against a control of its own kind whose
+# equation ownership the farm has already proven on this part: the plane
+# angle against the CrankInterfacePlane offset, the sketch angle against the
+# spot-face station in the same sketch.
+_CONE_INCLINE_OWNED = (
+    ("D1@ConeShaftNormal", "D1@CrankInterfacePlane"),
+    ("InclineAngle@JournalPlanReference", "CrankBossStartZ@JournalPlanReference"),
+)
+
+
+@_telemetry.traced("dim.cone_incline_ownership")
+def _assert_cone_incline_single_owner(adapter: Any) -> None:
+    """After the deferred equations and the final rebuild.
+
+    ``ConeIncline`` must be the ONE owner of both the plane the inclined
+    features are built on and the plan angle the print carries.  An
+    equation-owned dimension reads DrivenState 1 (driven), never 2, so the gate
+    is single ownership: exactly one equation per dimension, the same state as
+    an equation-owned control of the same kind, not a reference dimension, and
+    still the as-built incline (the drive is neutral).
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    expected_rad = math.radians(INCLINE_DEG)
+    problems: list[str] = []
+    for name, control_name in _CONE_INCLINE_OWNED:
+        dimension = model.Parameter(name)
+        control = model.Parameter(control_name)
+        if dimension is None or control is None:
+            problems.append(f"{name} or its control {control_name} not found")
+            continue
+        dimension = _early_bound(dimension, "IDimension")
+        control = _early_bound(control, "IDimension")
+        equations = _equations_for(adapter, f'"{name}"')
+        evidence = {
+            "dimension": name,
+            "equations": equations,
+            "driven_state": int(dimension.DrivenState),
+            "control_driven_state": int(control.DrivenState),
+            "is_reference": bool(dimension.IsReference()),
+            "value_deg": math.degrees(abs(float(dimension.SystemValue))),
+        }
+        _telemetry.info(f"cone incline ownership {evidence}")
+        if len(equations) != 1:
+            problems.append(f"{name}: expected one equation, found {equations}")
+        if evidence["driven_state"] != evidence["control_driven_state"]:
+            problems.append(
+                f"{name}: DrivenState {evidence['driven_state']} differs from "
+                f"the equation-owned control {control_name} "
+                f"({evidence['control_driven_state']})"
+            )
+        if evidence["is_reference"]:
+            problems.append(f"{name}: became a reference dimension")
+        if abs(abs(float(dimension.SystemValue)) - expected_rad) > 1e-8:
+            problems.append(f"{name}: reads {evidence['value_deg']:.6f} deg")
+    if problems:
+        raise RuntimeError("ConeIncline ownership: " + "; ".join(problems))
+    _telemetry.success(f"ConeIncline owns {len(_CONE_INCLINE_OWNED)} dimensions")
 
 
 def _journal_axis_misalignment(vector: tuple[float, float, float]) -> float:
