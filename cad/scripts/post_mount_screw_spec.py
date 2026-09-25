@@ -162,6 +162,88 @@ if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
         f"{MIN_ENGAGEMENT_DIAMETERS:.2f}D"
     )
 
+# --- The modification the shop makes (Main's ruling on the cut end) ---
+# The supplied screw is 3-1/2 in, factory-chamfered at its tip.  Cutting it to
+# fit removes that tip, so the 0.1 break at the new end is MHA-142's own
+# modification, not a property of the fillister family: the builder builds
+# the stock screw at its supplied length through the shared recipe
+# (untouched), then trims it at CutLength and breaks the new end with
+# CutEndBreak.
+STOCK_LENGTH_MM = 3.5 * 25.4
+# The family's factory tip: 45 deg x 0.7P (diag_mcmaster_fillister's law).
+FACTORY_TIP_CHAMFER_MM = 0.7 * _PITCH
+MAJOR_RADIUS_MM = THREAD_DIA_MM / 2.0
+# The family's thread groove (same module): root flat P/8 at the major radius
+# less 0.75 of the sharp-V height, 30 deg flanks.  At radius r the groove's
+# axial width is P/8 + (2/sqrt 3)(r - root).
+_ROOT_RADIUS_MM = MAJOR_RADIUS_MM - 0.75 * (_PITCH * math.sqrt(3.0) / 2.0)
+
+
+def _groove_per_mm_mm3(section_radius_mm: float) -> float:
+    """Metal the groove removes per mm of height inside a section of this
+    radius -- exact: a screw motion preserves volume, so at every radius the
+    groove takes a width/pitch share of the circumference, whatever the
+    phase (stock_anchor_geom.thread_groove_volume_per_mm_mm3's argument)."""
+    if section_radius_mm <= _ROOT_RADIUS_MM:
+        return 0.0
+    slope = 2.0 / math.sqrt(3.0)
+    offset = _PITCH / 8.0 - slope * _ROOT_RADIUS_MM
+
+    def primitive(r: float) -> float:
+        return 2.0 * math.pi / _PITCH * (offset * r * r / 2.0 + slope * r**3 / 3.0)
+
+    return primitive(section_radius_mm) - primitive(_ROOT_RADIUS_MM)
+
+
+def _metal_per_mm_mm3(section_radius_mm: float) -> float:
+    return math.pi * section_radius_mm**2 - _groove_per_mm_mm3(section_radius_mm)
+
+
+def _simpson(function, low: float, high: float, steps: int = 64) -> float:
+    """Composite Simpson: exact here, every integrand being a cubic in height."""
+    width = (high - low) / steps
+    total = function(low) + function(high)
+    for index in range(1, steps):
+        total += (4 if index % 2 else 2) * function(low + index * width)
+    return total * width / 3.0
+
+
+def _trim_section_radius(height_above_tip_mm: float) -> float:
+    return min(
+        MAJOR_RADIUS_MM,
+        MAJOR_RADIUS_MM - FACTORY_TIP_CHAMFER_MM + height_above_tip_mm,
+    )
+
+
+# Metal the trim removes: the factory tip (a threaded 45 deg cone) plus the
+# plain threaded run up to the cut.  Split where the section radius reaches
+# the root, so each piece is one cubic.
+_ROOT_REACHED_MM = _ROOT_RADIUS_MM - (MAJOR_RADIUS_MM - FACTORY_TIP_CHAMFER_MM)
+TRIM_REMOVED_MM3 = (
+    _simpson(
+        lambda h: _metal_per_mm_mm3(_trim_section_radius(h)), 0.0, _ROOT_REACHED_MM
+    )
+    + _simpson(
+        lambda h: _metal_per_mm_mm3(_trim_section_radius(h)),
+        _ROOT_REACHED_MM,
+        FACTORY_TIP_CHAMFER_MM,
+    )
+    + _metal_per_mm_mm3(MAJOR_RADIUS_MM)
+    * (STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM - CUT_LENGTH_MM)
+)
+# Metal the 45 deg break removes at the new end: between the cone and the
+# major radius, over the break's height.
+CUT_END_DEBURR_REMOVED_MM3 = _simpson(
+    lambda h: _metal_per_mm_mm3(MAJOR_RADIUS_MM)
+    - _metal_per_mm_mm3(MAJOR_RADIUS_MM - CUT_END_BREAK_MM + h),
+    0.0,
+    CUT_END_BREAK_MM,
+)
+if not 0.0 < _ROOT_REACHED_MM < FACTORY_TIP_CHAMFER_MM:
+    raise ValueError("the factory tip no longer cuts below the thread root")
+if STOCK_LENGTH_MM - FACTORY_TIP_CHAMFER_MM <= CUT_LENGTH_MM:
+    raise ValueError("the cut no longer clears the factory tip")
+
 # Rule 6: no dimension, no tolerance, no installation sequence.  The cut
 # length is the reference dimension above; cutting each screw to its hole is
 # an MHA-A03 step.

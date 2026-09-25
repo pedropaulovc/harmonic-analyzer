@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import math
 from pathlib import Path
 
 import pytest
@@ -18,6 +20,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_40923898 as recipe
+from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
 IN = 25.4
 # Screw head seated on the counterbore floor: its under-head face is this far
@@ -156,6 +159,113 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
     assert worst == pytest.approx(5.72)
     assert worst / part.SHANK_DIA >= 0.90
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
+
+
+# The shared fillister recipe's git blobs (LF-normalised) at 695af67a0.  The
+# cut end is MHA-142's own modification: it must never leak into the family.
+_RECIPE_BLOBS = {
+    "diagnostics/diag_mcmaster_fillister.py": "01b1860f31fd5ffd179bbe1e1fd73de590425383",
+    "diagnostics/diag_build_40923898.py": "fed1a2b1c89e1cdf7ddc01baa01980b2aed39470",
+}
+
+
+def _git_blob_sha(path: Path) -> str:
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def test_shared_fillister_recipe_is_untouched() -> None:
+    """Main's ruling on the cut end: the modification lives in MHA-142's
+    builder, never in the family recipe (which would re-key every
+    fillister screw for one part's fact)."""
+    scripts = Path(part.__file__).resolve().parent
+    for relative, blob in _RECIPE_BLOBS.items():
+        assert _git_blob_sha(scripts / relative) == blob, relative
+    assert FILLISTER_SIZES["40923898"][1] == 86.0
+
+
+def test_stock_is_built_at_its_supplied_length_then_restored() -> None:
+    """The recipe runs at the supplied 3-1/2 in, so the trim has a factory
+    tip to remove; the size row comes back even if the recipe raises."""
+    assert spec.STOCK_LENGTH_MM == pytest.approx(3.5 * 25.4)
+    modelled = FILLISTER_SIZES["40923898"]
+    with pytest.raises(RuntimeError):
+        with part._supplied_stock_length():
+            assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
+            assert FILLISTER_SIZES["40923898"][0] == modelled[0]
+            raise RuntimeError("recipe failed")
+    assert FILLISTER_SIZES["40923898"] == modelled
+
+
+def _independent_removal() -> tuple[float, float]:
+    """Brute-force the two removed volumes (midpoint rule, 20k slices):
+    at radius r the groove takes w(r)/P of the circumference, w(r) the
+    cutter's axial width, P/8 at the root, widening 2 tan 30 per mm."""
+    radius, pitch = part.SHANK_DIA / 2.0, part.THREAD_PITCH
+    root = radius - 0.75 * pitch * math.sqrt(3.0) / 2.0
+    tip = 0.7 * pitch
+
+    def metal(section: float, steps: int = 400) -> float:
+        total = math.pi * section**2
+        if section > root:
+            width = (section - root) / steps
+            for i in range(steps):
+                r = root + (i + 0.5) * width
+                groove = pitch / 8.0 + 2.0 / math.sqrt(3.0) * (r - root)
+                total -= 2.0 * math.pi * r * groove / pitch * width
+        return total
+
+    stock, cut = spec.STOCK_LENGTH_MM, spec.CUT_LENGTH_MM
+    slices = 2000
+    height = tip / slices
+    trim = sum(
+        metal(radius - tip + (i + 0.5) * height) * height for i in range(slices)
+    )
+    trim += metal(radius) * (stock - tip - cut)
+    brk = spec.CUT_END_BREAK_MM
+    height = brk / slices
+    deburr = sum(
+        (metal(radius) - metal(radius - brk + (i + 0.5) * height)) * height
+        for i in range(slices)
+    )
+    return trim, deburr
+
+
+def test_analytic_removal_volumes_match_a_brute_force_integral() -> None:
+    trim, deburr = _independent_removal()
+    assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
+    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
+    assert spec.TRIM_REMOVED_MM3 == pytest.approx(67.581, abs=1e-3)
+    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(0.0153, abs=1e-4)
+
+
+def test_cut_end_features_are_driven_by_the_model_dimensions() -> None:
+    """The trim follows CutLength and the 45 deg break's legs follow
+    CutEndBreak, by equation; the build proves the end face's rim sits at
+    the major radius less CutEndBreak."""
+    assert part.TRIM_DRIVES == {"TrimAt": '"CutLength@CutLengthReference"'}
+    assert part.DEBURR_DRIVES["CutEnd"] == '"CutLength@CutLengthReference"'
+    for leg in ("CutterRun", "CutterRise"):
+        assert part.DEBURR_DRIVES[leg] == (
+            '"CutEndBreak@CutEndBreakReference" + "CutEndDeburrMargin"'
+        )
+    assert (part.TRIM_FEATURE, part.DEBURR_FEATURE) == ("CutToLength", "CutEndDeburr")
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source.split("async def _modify_stock", 1)[1].split("\ndef ", 1)[0]
+    for step in (
+        "_trim_to_cut_length(adapter)",
+        "_check_removed(\"trim to cut length\"",
+        "_break_cut_end(adapter)",
+        "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION",
+        "MAJOR_RADIUS_MM - brk",
+    ):
+        assert step in body, step
+    wrapper = source.split("async def _cut_to_length", 1)[1]
+    assert wrapper.index("_supplied_stock_length()") < wrapper.index("_modify_stock")
+    # The trimmed tip cannot reach into what the stock carries: the cut
+    # clears the factory tip, and the volume gate outruns the sweep's slack.
+    assert spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM > spec.CUT_LENGTH_MM
+    assert part.TRIM_VOLUME_TOL_MM3 < 0.01 * spec.TRIM_REMOVED_MM3
 
 
 def test_finish_oils_the_bare_cut_end() -> None:
