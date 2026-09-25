@@ -8,7 +8,7 @@ from dataclasses import replace
 import pytest
 
 import build_harmonic_base as part
-import build_cone_swing_platform as platform
+import cone_swing_platform_geometry as platform
 import cone_pivot_post_installation
 import cone_line
 import harmonic_base_spec

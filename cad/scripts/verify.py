@@ -1781,7 +1781,7 @@ def verify_base_footprint(report: Report) -> None:
     def _mounts_on_plate() -> None:
         import build_arbor_pedestal as arbor_post
         import build_cone_pivot_screw as pscrew
-        import build_cone_swing_platform as platform
+        import cone_swing_platform_geometry as platform
         import build_drive_train_assembly as train
         import harmonic_base_spec as base
         import build_swing_stop_screw as sscrew

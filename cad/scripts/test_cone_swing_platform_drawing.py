@@ -9,6 +9,8 @@ import _config
 import build_cone_pivot_screw
 import build_cone_swing_platform as part
 import cone_pivot_post_spec
+import cone_swing_platform_drawing_spec as drawing_spec
+import cone_swing_platform_geometry as geometry
 import cone_swing_platform_spec as spec
 import draw_cone_swing_platform as drawing
 import pytest
@@ -20,8 +22,8 @@ from _surface_finish import MACHINED_UM, SEAT_UM
 
 
 def test_every_marked_model_dimension_has_one_view_and_native_precision() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert part.DRAWING_DIMENSIONS is drawing_spec.DRAWING_DIMENSIONS
+    marked = set().union(*drawing_spec.DRAWING_DIMENSIONS.values())
     view_sets = (
         set(drawing.PROFILE_KEEP),
         set(drawing.FEATURE_KEEP),
@@ -33,9 +35,9 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
     kept = set().union(*view_sets)
     assert kept == marked
     assert sum(len(names) for names in view_sets) == len(kept)
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert drawing_spec.DRAWING_PRECISION_BY_NAME["PlateLenDim"] == 1
+    assert set(drawing_spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
 
 
 def test_pivot_preserves_native_close_clearance_hole() -> None:
@@ -51,7 +53,7 @@ def test_pivot_preserves_native_close_clearance_hole() -> None:
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
     assert spec.POST_ATTACHMENT_SPACING == cone_pivot_post_spec.ATTACHMENT_SPACING
     assert spec.POST_BLOCK_DIA == cone_pivot_post_spec.BLOCK_DIA
-    assert part.POST_MOUNT_HALF_PITCH == spec.POST_ATTACHMENT_SPACING / 2.0
+    assert geometry.POST_MOUNT_HALF_PITCH == spec.POST_ATTACHMENT_SPACING / 2.0
     assert math.isclose(
         math.hypot(
             part.POST_MOUNT_WEST_XZ[0] - part.POST_MOUNT_EAST_XZ[0],
@@ -82,9 +84,9 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
     assert "mil-dtl-13924 class 1" in str(registry["finish"]).lower()
     assert "oil seal" in str(registry["finish"]).lower()
     assert int(registry["quantity"]) == 1
-    assert spec.DRAWING_PRECISION["Plate"]["PlateThk"] == 2
-    assert spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 2
-    assert spec.DRAWING_PRECISION["PostMountHoles"] == {
+    assert drawing_spec.DRAWING_PRECISION["Plate"]["PlateThk"] == 2
+    assert drawing_spec.DRAWING_PRECISION["PivotBearingRelief"]["PivotBearingReliefDepth"] == 2
+    assert drawing_spec.DRAWING_PRECISION["PostMountHoles"] == {
         "PostMountWestX": 2,
         "PostMountWestZ": 2,
         "PostMountEastX": 2,
@@ -98,10 +100,10 @@ def test_plate_and_nonfit_features_remain_at_general_grade() -> None:
 
 def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
     assert part.PLATE_LEN == pytest.approx(223.3541869456341)
-    assert part.POST_SOUTH_MARGIN == pytest.approx(3.175)
-    assert part.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
-    assert part.POST_MAIN_DIA == spec.POST_BLOCK_DIA
-    assert part.POST_FOOT_CONTAINMENT >= 0.25
+    assert geometry.POST_SOUTH_MARGIN == pytest.approx(3.175)
+    assert geometry.PLATE_SOUTH_Z == pytest.approx(-216.3541869456341)
+    assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
+    assert geometry.POST_FOOT_CONTAINMENT >= 0.25
     assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
@@ -164,21 +166,21 @@ def test_disengaged_collar_margin_survives_general_bands() -> None:
     """Linear worst case at .X plate outline and .XX base holes keeps 2.0 mm (U27)."""
     general, base_axis = 0.8, 0.51
     east_slope = (part.EAST_HALF_S - part.HALF_WIDTH_N) / part.PLATE_LEN
-    stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - part.STOP_LOCAL_Z))
+    stop_x = -(part.HALF_WIDTH_N + east_slope * (part.NORTH_OVERHANG - geometry.STOP_LOCAL_Z))
     normal = (-1.0, east_slope)
     norm = math.hypot(*normal)
-    lever = abs(part.STOP_LOCAL_Z * normal[0] - stop_x * normal[1]) / norm
-    stop_gain = part.SLOT_R / lever
+    lever = abs(geometry.STOP_LOCAL_Z * normal[0] - stop_x * normal[1]) / norm
+    stop_gain = geometry.SLOT_R / lever
     east_edge = stop_gain * general
     west_edge = general
     stop_hole = stop_gain * base_axis * (abs(normal[0]) + abs(normal[1])) / norm
-    stud_hole = base_axis * (abs(part._SLOT_TX) + abs(part._SLOT_TZ))
+    stud_hole = base_axis * (abs(geometry.SLOT_TX) + abs(geometry.SLOT_TZ))
     diameters = 0.35
-    worst = part.DISENGAGE_COLLAR_MARGIN - (
+    worst = geometry.DISENGAGE_COLLAR_MARGIN - (
         east_edge + west_edge + stop_hole + stud_hole + diameters
     )
     assert worst >= 2.0
-    assert set(spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
+    assert set(drawing_spec.DRAWING_PRECISION["PlateProfile"].values()) == {1}
 
 
 def _boxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:

@@ -66,9 +66,11 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
-from cone_swing_platform_spec import (
+from cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+)
+from cone_swing_platform_spec import (
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,

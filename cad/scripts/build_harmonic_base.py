@@ -117,7 +117,7 @@ from build_cone_lock_knob import (
     STUD_LEN as LOCK_STUD_LEN,
     THREAD as LOCK_THREAD,
 )
-from build_cone_swing_platform import PLATE_T, swing_hardware_geometry
+from cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
 from build_swing_stop_screw import (
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,

@@ -1402,6 +1402,19 @@ def test_cone_line_consumers_do_not_import_the_drive_train_script():
         assert "build_drive_train_assembly" not in deps, script
 
 
+def test_swing_platform_consumers_read_geometry_not_the_builder():
+    """The base and the drive train read the platform's plan geometry, not its
+    builder or its print data: a sketch, precision or caption edit on MHA-091
+    re-keys the platform and its sheet only (#880)."""
+    builder = _helper_names("build_cone_swing_platform.py")
+    assert {"cone_swing_platform_geometry", "cone_swing_platform_drawing_spec"} <= builder
+    for script in ("build_harmonic_base.py", "build_drive_train_assembly.py"):
+        deps = _helper_names(script)
+        assert "cone_swing_platform_geometry" in deps, script
+        assert "build_cone_swing_platform" not in deps, script
+        assert "cone_swing_platform_drawing_spec" not in deps, script
+
+
 # Part builders an assembly script (or an interference-contract module) still
 # imports directly.  Importing a part BUILDER puts its whole recipe -- sketch
 # code, drawing marks and the config it reads -- on the assembly's cache key;
@@ -1415,7 +1428,6 @@ _ASSEMBLY_BUILDER_IMPORTS = {
         "build_cone_lock_knob",
         "build_cone_pivot_post",
         "build_cone_pivot_screw",
-        "build_cone_swing_platform",
         "build_cone_tip_adjuster",
         "build_cone_tip_bushing",
         "build_cone_tip_pinch_screw",

@@ -763,7 +763,7 @@ if _SHAFT_NORTH_END - (PINION_PIN_Z + PINION_PIN_DIA / 2.0) < 1.0:
 # they must agree with the live cone-shaft line placed here. Imported, not
 # copied (the CAM_ECC precedent), and asserted at import so a drifted anchor
 # fails before any COM work.
-from build_cone_swing_platform import (  # noqa: E402
+from cone_swing_platform_geometry import (  # noqa: E402
     CRANK_AXIS_OFF as PLAT_CRANK_OFF,
     CRANK_AXIS_Y as PLAT_CRANK_Y,
     EAST_HALF_S as PLAT_EAST_S,
@@ -778,15 +778,17 @@ from build_cone_swing_platform import (  # noqa: E402
     CRANK_SEAT_ANCHOR as PLAT_SEAT_ANCHOR,
     PLATE_LEN as PLAT_LEN,
     PLATE_T as PLAT_T,
-    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
-    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
-    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     SLOT_E_X as PLAT_SLOT_E_X,
     SLOT_E_Z as PLAT_SLOT_E_Z,
     SLOT_W as PLAT_SLOT_W,
     WEST_HALF_S as PLAT_WEST_S,
 )
-from cone_swing_platform_spec import PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA  # noqa: E402
+from cone_swing_platform_spec import (  # noqa: E402
+    PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
+    PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
+    PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
+    PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
+)
 from build_cone_lock_knob import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
