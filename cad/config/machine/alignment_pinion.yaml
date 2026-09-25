@@ -1,11 +1,16 @@
 
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 32
-  disengaged_tip_gap_mm: 2.0       # PINION_GAP
-  engaged_center_distance_mm: 38.747491  # (120+32)/2 * 25.4/49.82
-  source: "user correction 2026-09-22 (32 teeth); DIMENSIONS.md ch25 (mechanism)"
+  disengaged_tip_gap_mm: 2.2425    # PINION_GAP; U28 park-out (was 2.0)
+  engaged_center_distance_mm: 38.990010  # 120T tip r31.099960 + drum gap-floor chord r7.890050 (tips seat)
+  source: "user correction 2026-09-22 (32 teeth); U28 2026-09-23 (park-out); DIMENSIONS.md ch25 (mechanism)"
   confidence: "high tooth count; low placement"
   notes: >-
     The user-authoritative 32T drum swings into the 120T cylinder set to zero
-    all channels. Engaged centre distance is (120+32)/2 · 25.4/DP =
-    38.747491 mm at DP 49.82; disengaged it stands off with a 2 mm tip gap.
+    all channels. Its as-cut roots are shallow (gap floor a chord at the base
+    circle, r7.890), so the engage stroke ends where the 120T tips seat on
+    that floor: engaged centre distance 38.990010 mm, 0.2425 mm outside the
+    38.747491 pitch-circle sum at DP 49.82 (reviewfirst Rule 11). U28 (user,
+    2026-09-23) keeps the roots and parks the drum 0.2425 further out instead
+    (2.2425 mm disengaged tip gap), so the seated stop is reached at the same
+    6.314-degree strap swing and photographed -71.8-degree lever as before.
