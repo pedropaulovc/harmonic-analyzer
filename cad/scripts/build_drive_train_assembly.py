@@ -291,7 +291,19 @@ SEC_I = 1.0 / COS_I
 INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
+from cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa: E402
 from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
+from cone_gear_spec import outside_dia_mm as cone_gear_outside_dia_mm  # noqa: E402
+
+
+def _cone_tip_radius_max(teeth: int) -> float:
+    """Largest cone-gear tip radius the print allows (#834 long addendum).
+
+    The deepened mesh cuts each gear from an oversize blank, so the tip is
+    not the standard pitch radius + addendum; clearance checks use the
+    printed outside diameter at its upper limit.
+    """
+    return (cone_gear_outside_dia_mm(teeth) + CONE_GEAR_BLANK_DIA_BAND[0]) / 2.0
 
 # Cone gear face (cone_gear_spec.FACE_WIDTH, 6.0 since the U27 ruling of
 # 2026-09-23).  Every station, the 64T gap and the T006 -> bushing -> tip-block
@@ -307,7 +319,12 @@ GEAR64_FACE = 8.0
 # The 10 mm reference face is placement history, not current part geometry.
 GEAR64_CENTRE_REFERENCE_FACE = 10.0
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
-PINION_FACE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
+# The 16T south face stays on the 10.8 reference face centred on the 64T row
+# (the crankshaft's SeatPinion datum); option A (Main, 2026-09-23) shortens
+# the teeth from the NORTH to 10.4 so the deepened T120 tip (#834) keeps
+# its 0.25 axial air.  Mirrors CONE_FACE_STATION_REFERENCE.
+PINION_FACE = 10.4
+PINION_FACE_STATION_REFERENCE = 10.8  # re-derived 2026-07-14: fills the casting-face -> T120
 # span (0.32 wall / 0.30 T120 clearance, span-fit assert below); ch12
 # page002_img06 shows the pinion proud of the casting spanning the 64T row
 # (the old 12.0 "slightly wider than the drive gear's 10" was a low-
@@ -444,12 +461,13 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The 10.8-wide pinion stands north of the v2 casting's finite crank boss and
-# is centred on the 64T contact row. The relocated cast-in axis removes the
+# The pinion stands north of the v2 casting's finite crank boss; its 10.8
+# reference face is centred on the 64T contact row and the 10.4 teeth keep
+# that face's south end. The relocated cast-in axis removes the
 # former T120-rim radial overlap; the exact boss/T12/pinion closure below owns
 # the axial clearances.
 _GEAR64_CONTACT_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
-PINION_TOOTH_Z = _GEAR64_CONTACT_Z
+PINION_TOOTH_Z = _GEAR64_CONTACT_Z - (PINION_FACE_STATION_REFERENCE - PINION_FACE) / 2.0
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
@@ -1210,14 +1228,17 @@ if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
     raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
 if not 0.24 < _BOSS_NORTH_GAP < 1.0:
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
-if abs(PINION_TOOTH_Z - _GEAR64_CONTACT_Z) > 0.05:
-    raise AssertionError("16T is no longer centred on the 64T contact row")
+if abs(
+    (PINION_TOOTH_Z - PINION_FACE / 2.0)
+    - (_GEAR64_CONTACT_Z - PINION_FACE_STATION_REFERENCE / 2.0)
+) > 0.05:
+    raise AssertionError("16T south face left its 64T-row reference station")
 
 # The relocated v2 crank axis also clears the inclined T120 rim radially. Keep
 # the exact arc scan as a tripwire: if a later diameter/station change restores
 # radial overlap, the pinion's north face must retain 0.25 mm axial air.
 _T120_SEAT = cone_station(SHAFT_T120_STATION + GEAR_AXIS_SHIFT)
-_TIP120 = CONE_T120_PITCH_R + ADDENDUM
+_TIP120 = _cone_tip_radius_max(120)
 _T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
 for _k in range(7200):
     _c = _TIP120 * math.cos(math.radians(0.05 * _k))
@@ -1317,7 +1338,7 @@ if (
 ):
     raise AssertionError("cone-lock knob head crowds the 64T crank-drive gear")
 for _j in range(20):
-    _cone_tip_r = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _cone_tip_r = _cone_tip_radius_max(120 - 6 * _j)
     _cone_x, _cone_z = cone_seat(_j)
     if (
         math.hypot(KNOB_X - _cone_x, KNOB_Z - _cone_z) - _KNOB_R - _cone_tip_r
@@ -1529,7 +1550,7 @@ if (
 if math.hypot(PIVOT_X - X_DRUM, Y_DRIVE - PIVOT_Y) > ENGAGED_C2C + STRAP_C2C - 0.25:
     raise AssertionError("engage swing cannot reach the meshed centre distance")
 for _j in range(20):
-    _tip = CONE_T120_PITCH_R - RADIUS_STEP * _j + ADDENDUM
+    _tip = _cone_tip_radius_max(120 - 6 * _j)
     if (
         math.hypot(APINION_X - cone_seat(_j)[0], Y_DRIVE - APINION_Y)
         < _tip + TIP_APINION + 0.25
