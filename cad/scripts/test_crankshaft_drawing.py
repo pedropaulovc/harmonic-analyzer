@@ -334,3 +334,30 @@ def test_shaft_length_is_unilateral_and_printed_from_the_model() -> None:
     assert '"Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)' in build
     assert "Depth" in spec.DRAWING_DIMENSIONS["Shaft"]
     assert "Depth" not in spec.REFERENCE_DIMENSIONS
+
+
+def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # RULING W15-SHAFT-BAND (machinist review of f0c105531 flagged the band as
+    # over-specified): the unilateral +0/-0.4 is functional. With the shaft at
+    # the title block's .X +/-0.8 instead, both W15 stacks fail.
+    import build_drive_train_assembly as bdt
+
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "# RULING W15-SHAFT-BAND (Main 2026-09-25)" in source
+    shaft, pinion = spec.SHAFT_LENGTH, bdt.PINION_OVERALL_LENGTH
+    edge_nominal, recess_nominal = bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL, bdt.PINION_RECESS_NOMINAL
+    assert sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values()) >= (
+        bdt.PINION_PIN_EDGE_MIN_WORST
+    )
+    assert sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values()) >= (
+        bdt.PINION_RECESS_MIN_WORST
+    )
+    monkeypatch.setattr(bdt, "_SHAFT_LENGTH_LIMITS", (-0.8, 0.8))
+    edge = sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values())
+    recess = sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values())
+    assert edge == pytest.approx(1.873, abs=1e-3)
+    assert edge < bdt.PINION_PIN_EDGE_MIN_WORST
+    assert recess == pytest.approx(-0.461, abs=1e-3)
+    assert recess < bdt.PINION_RECESS_MIN_WORST

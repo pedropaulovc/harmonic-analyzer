@@ -47,6 +47,10 @@ if not (
 # Unilateral: a long shaft would stand proud of the boss, and a short one only
 # deepens the recess and shortens the pin's wall, which build_drive_train_
 # assembly's worst-case stacks carry.  Printed on Depth from the model.
+# RULING W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
+# the W15 pin-wall and recess stacks (pinion_pin_edge_stack /
+# pinion_recess_stack in build_drive_train_assembly); at the title-block .X
+# +/-0.8 the wall is 1.873 < 2.0 and the recess -0.461.
 SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
 # The installed v2 pivot post remains fixed.  Its Ø11.438 bore spans world
