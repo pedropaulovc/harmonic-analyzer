@@ -2282,8 +2282,13 @@ async def _seat_on_crank(
 
     The part is coaxial on the crank axis and its Z-normal Front plane seats
     coincident to a named crankshaft datum (SeatT12 or SeatPinion).  Coincident
-    avoids the reflected branch of an unsigned plane distance.  The caller
-    supplies the anti-spin, leaving only the shared crank rotation.
+    replaces the old UNSIGNED plane-plane distance, whose two solution branches
+    let the free-spinning crank family reflect about the shaft origin on a
+    re-solve: the 16T rendered floating ~200 south of its seat with every gate
+    green (render-gate catch, 2026-07-04).  The seat must reference the
+    crankshaft, NOT a world datum (a world plane pins the crank axis to machine
+    z and through it the whole p1 swing).  The caller supplies the anti-spin,
+    leaving only the shared crank rotation.  Returns the part's live origin.
     """
     o = _org(adapter, part)
     await coincident_mate(
