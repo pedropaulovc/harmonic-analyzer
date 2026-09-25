@@ -105,6 +105,17 @@ TEXT_CLEARANCE_HEIGHTS = 0.5
 # callout's underline). ADVISORY until the fleet report's distribution sets it.
 TEXT_SEPARATION_HEIGHTS = 1.0
 
+# Two callout blocks stacked in one column (their x spans overlap) read as ONE
+# block unless the gap between them is wider than the spacing between their
+# own rows. SolidWorks sets rows 5.556 mm apart at 3.5 mm text; the spring
+# block 1.7 mm over the cross-tap block read as its fourth row (Main's
+# hb-render-4 eye pass, supports' find_merged_blocks at 375bf2aad).
+ROW_PITCH_HEIGHTS = 0.005556 / 0.0035
+
+# A callout or note runs to four rows at most (Main's hb-render-4 ruling: the
+# six-row cross-tap callout; supports' find_tall_callouts at 375bf2aad).
+TEXT_ROW_LIMIT = 4
+
 # A leader leaves its shoulder at the corner of the row sitting on it, so its
 # own rows are tested shrunk by this much (supports' OWN_ROW_INSET_M).
 OWN_ROW_INSET_M = 0.0002
@@ -612,6 +623,25 @@ def _classify(
     return roles
 
 
+@dataclass(frozen=True)
+class AuditAnnotation(AnnotationGeometry):
+    """An annotation plus the height of its TEXT.
+
+    A free note's exact extent is its whole multi-row block and a balloon's is
+    its circle, so neither box height is a text height; every threshold scaled
+    by text height reads this instead.
+    """
+
+    text_height: float = 0.0
+
+
+def text_height(annotation: AnnotationGeometry) -> float:
+    height = getattr(annotation, "text_height", 0.0)
+    if height > 0.0:
+        return height
+    return min((box.height for box in annotation.text_boxes), default=0.0)
+
+
 def annotation_geometry(
     annotation: Mapping[str, Any], *, owner: str, advance: float
 ) -> AnnotationGeometry | None:
@@ -623,7 +653,9 @@ def annotation_geometry(
     display = annotation.get("display") or {}
     items = text_items(display)
     segments = _display_segments(display)
-    shoulders = _shoulders(segments, items) if kind in ("dim", "note") else []
+    if kind == "dim" and (annotation.get("dim") or {}).get("hole_callout"):
+        kind = "hole-callout"
+    shoulders = _shoulders(segments, items) if kind in ("dim", "hole-callout", "note") else []
     segments = _classify(kind, annotation, segments, shoulders)
     segments.extend(_registered_leaders(annotation))
 
@@ -649,8 +681,21 @@ def annotation_geometry(
         rows = []
     if not rows and not segments:
         return None
+    heights = [item.height for item in items]
+    if heights:
+        height = max(heights)
+    elif circle is not None:
+        # No text items: a balloon circle is ~2.7 text heights across
+        # (4.72 mm radius at 3.5 mm text, pen-assembly).
+        height = 2.0 * circle[2] / 2.7
+    elif exact and rows:
+        # n rows of a free note span one text height plus n-1 row pitches.
+        lines = max(1, len([t for t in str(note.get("text", "")).splitlines() if t.strip()]))
+        height = rows[0][1].height / (1.0 + (lines - 1) * ROW_PITCH_HEIGHTS)
+    else:
+        height = 0.0
     position = _floats(annotation.get("pos"))
-    return AnnotationGeometry(
+    return AuditAnnotation(
         label=f"{kind} {label}" + (f" {rows[0][0]!r}" if rows and rows[0][0] else ""),
         kind=kind,
         owner=owner,
@@ -658,6 +703,7 @@ def annotation_geometry(
         segments=tuple(segments),
         position=(position[0], position[1]) if len(position) >= 2 else None,
         exact=exact,
+        text_height=height,
     )
 
 
@@ -948,7 +994,7 @@ def find_text_clearance(
             continue
         if first.kind == second.kind == "table":
             continue
-        rows = [box.height for item, box in ((first, box_a), (second, box_b)) if item.kind != "table"]
+        rows = [text_height(item) for item in (first, second) if item.kind != "table"]
         clearance = heights * min(rows)
         gap = _box_gap(box_a, box_b)
         if gap >= clearance:
@@ -1000,7 +1046,7 @@ def find_text_separation(
         block = annotation.text_boxes[0]
         for box in annotation.text_boxes[1:]:
             block = block.union(box)
-        row_height = min(box.height for box in annotation.text_boxes)
+        row_height = text_height(annotation)
         blocks.append((annotation, block, row_height))
     findings = []
     for (first, a, ha), (second, b, hb) in combinations(blocks, 2):
@@ -1021,6 +1067,105 @@ def find_text_separation(
                 ),
                 at_mm=tuple(value * MM for value in a.center()),
                 extra={"gap_mm": gap * MM, "limit_mm": limit * MM},
+            )
+        )
+    return findings
+
+
+def _callout_blocks(sheet: SheetGeometry) -> list[tuple[AnnotationGeometry, Box, float]]:
+    """Each CALLOUT's whole text block and its text height.
+
+    A callout is a hole callout or a leadered note. Free notes (view labels,
+    general notes) are not callouts, balloons are circles, and plain
+    dimensions stack in ladders at dimension-line spacing, which the
+    clearance rule already covers.
+    """
+    blocks = []
+    for annotation in sheet.annotations:
+        if not annotation.text_boxes:
+            continue
+        leadered_note = (
+            annotation.kind == "note" and not annotation.exact and annotation.leader_segments()
+        )
+        if annotation.kind != "hole-callout" and not leadered_note:
+            continue
+        block = annotation.text_boxes[0]
+        for box in annotation.text_boxes[1:]:
+            block = block.union(box)
+        blocks.append((annotation, block, text_height(annotation)))
+    return blocks
+
+
+def find_merged_blocks(
+    sheet: SheetGeometry, *, pitch_heights: float = ROW_PITCH_HEIGHTS
+) -> list[Finding]:
+    """Two callout blocks in one column, closer than a row pitch: they read as one."""
+    findings = []
+    for (first, a, ha), (second, b, hb) in combinations(_callout_blocks(sheet), 2):
+        if first.label == second.label:
+            continue
+        if min(a.xmax, b.xmax) <= max(a.xmin, b.xmin):
+            continue  # side by side, not stacked
+        gap = max(a.ymin - b.ymax, b.ymin - a.ymax)
+        limit = pitch_heights * min(ha, hb)
+        if gap >= limit:
+            continue
+        findings.append(
+            Finding(
+                kind="merged-blocks",
+                sheet=sheet.name,
+                a=first.label,
+                b=second.label,
+                detail=(
+                    f"{first.label!r} {a.format_mm()} and {second.label!r} "
+                    f"{b.format_mm()} are stacked {gap * MM:.2f}mm apart, under "
+                    f"the {limit * MM:.2f}mm row pitch: they read as one block"
+                ),
+                at_mm=tuple(value * MM for value in a.center()),
+                extra={"gap_mm": gap * MM, "limit_mm": limit * MM},
+            )
+        )
+    return findings
+
+
+def find_tall_blocks(dump: Mapping[str, Any], *, limit: int = TEXT_ROW_LIMIT) -> list[Finding]:
+    """Every note or hole callout whose text runs over ``limit`` rows."""
+    owned = [
+        (str(view.get("name", "")), annotation)
+        for view in dump.get("views", ())
+        for annotation in view.get("annotations", ())
+    ] + [
+        ("sheet", annotation)
+        for annotation in dump.get("sheet_annotations", ())
+        if int(annotation.get("owner_type", _OWNER_DRAWING_SHEET)) == _OWNER_DRAWING_SHEET
+    ]
+    findings = []
+    for owner, annotation in owned:
+        kind = ANNOTATION_KINDS.get(int(annotation.get("type", 0)), "other")
+        note = annotation.get("note") or {}
+        hole_callout = bool((annotation.get("dim") or {}).get("hole_callout"))
+        if not (kind == "note" and not note.get("balloon")) and not hole_callout:
+            continue
+        if int(annotation.get("visible", 1) or 1) in _HIDDEN_STATES:
+            continue
+        items = text_items(annotation.get("display") or {})
+        if items:
+            rows = [" ".join(item.text.strip() for item in row) for row in group_rows(items)]
+        else:
+            rows = [line for line in str(note.get("text", "")).splitlines() if line.strip()]
+        if len(rows) <= limit:
+            continue
+        label = f"{'hole-callout' if hole_callout else kind} {annotation.get('name') or kind}"
+        position = _floats(annotation.get("pos"))
+        findings.append(
+            Finding(
+                kind="tall-block",
+                sheet=str(dump.get("sheet", "")),
+                a=label,
+                b=owner,
+                detail=f"{label!r} runs {len(rows)} rows, over the {limit}-row limit: {rows[0]!r} ...",
+                at_mm=(position[0] * MM, position[1] * MM) if len(position) >= 2 else None,
+                extra={"rows": len(rows)},
             )
         )
     return findings
@@ -1163,6 +1308,8 @@ GATING_KINDS = frozenset(
         "outside-border",
         "keep-out",
         "view-geometry-unresolved",
+        "merged-blocks",
+        "tall-block",
     }
 )
 
@@ -1186,15 +1333,21 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
             for a in sheet.annotations
         ),
     )
+    clearance = find_text_clearance(sheet)
+    touching = {frozenset((f.a, f.b)) for f in clearance}
+    merged = [f for f in find_merged_blocks(sheet) if frozenset((f.a, f.b)) not in touching]
+    reported = touching | {frozenset((f.a, f.b)) for f in merged}
     return [
-        *find_text_clearance(sheet),
+        *clearance,
+        *merged,
+        *find_tall_blocks(dump),
         *find_text_on_line(unled),
         *find_leader_through_text(sheet),
         *find_leader_across_lines(sheet),
         *find_leader_crossings(sheet),
         *find_border_breaches(sheet),
         *find_unresolved_views(model),
-        *find_text_separation(sheet),
+        *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),
     ]
 
 

@@ -23,6 +23,7 @@ from _layout_audit import (
     audit_dump,
     balloon_circle,
     decode_dump_lines,
+    find_merged_blocks,
     encode_dump_lines,
     glyph_count,
     row_boxes,
@@ -237,11 +238,35 @@ def test_hb_render_4_cross_tap_under_the_spring_underline_reads_as_one_callout()
     pair = [
         f
         for f in findings
-        if f.kind in ("text-clearance", "text-separation")
+        if f.kind in ("text-clearance", "merged-blocks", "text-separation")
         and {f.a.split()[1], f.b.split()[1]} == {"MHA-114", "MHA-132"}
     ]
     assert pair
     assert min(f.extra["gap_mm"] for f in pair) == pytest.approx(1.75, abs=0.05)
+
+
+def test_stacked_callouts_under_a_row_pitch_apart_read_as_one_block():
+    """Port of supports' find_merged_blocks: Main's hb-render-4 eye pass read
+    the spring block 1.7 mm over the cross-tap block as its fourth row. The
+    side-by-side transfer pair (x spans disjoint, 2.5 mm apart) is not one
+    column, and the plan's view label is not a callout."""
+    sheet = sheet_model(
+        _holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK, HB4_SPRING, HB4_CROSS_TAP)
+    ).geometry
+    merged = find_merged_blocks(sheet)
+    assert [(f.a.split()[1], f.b.split()[1]) for f in merged] == [("MHA-114", "MHA-132")]
+    assert merged[0].extra["gap_mm"] == pytest.approx(1.75, abs=0.05)
+    assert merged[0].extra["limit_mm"] == pytest.approx(5.556, abs=0.01)
+    assert severity(merged[0]) is FindingSeverity.GATING
+
+
+def test_a_callout_over_four_rows_is_a_tall_block():
+    """Port of supports' find_tall_callouts: hb-render-4's cross-tap ran six
+    rows (Main's 4-row ruling). The 3-row spring and 4-row transfer pass."""
+    findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB4_SPRING, HB4_CROSS_TAP))
+    tall = [f for f in findings if f.kind == "tall-block"]
+    assert [(f.a, f.extra["rows"]) for f in tall] == [("hole-callout MHA-132", 6)]
+    assert severity(tall[0]) is FindingSeverity.GATING
 
 
 def test_callout_rows_centre_on_the_shoulder_and_tokens_are_one_glyph():

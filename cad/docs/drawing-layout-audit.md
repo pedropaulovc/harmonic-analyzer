@@ -58,6 +58,8 @@ and a balloon keeps its rendered circle.
 | `leader-crosses-line` | gating | a leader crosses another annotation's dimension, witness or frame line transversally |
 | `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |
 | `outside-border` / `keep-out` | gating | past the zone frame, or inside the title block |
+| `merged-blocks` | gating | two callouts (hole callouts or leadered notes) stacked in one column, x spans overlapping, less than a row pitch (1.59 h, 5.556 mm at 3.5 mm text) apart; supports' `find_merged_blocks` |
+| `tall-block` | gating | a note or hole callout over four rows (Main's hb-render-4 ruling); supports' `find_tall_callouts` |
 | `view-geometry-unresolved` | gating | a view's model edges could not be placed on the sheet, so its text-vs-geometry check would be blind |
 | `text-separation` | advisory | distinct annotation blocks clear of each other but closer than one text height; they read as one callout |
 
@@ -70,6 +72,11 @@ and a balloon keeps its rendered circle.
   1.75 mm under the spring callout's underline, tighter than the 2.06 mm row
   gap inside a single callout. The fleet report's distribution sets the final
   value.
+* **Row pitch 1.59 h and four rows**, both from Main's hb-render-4 eye pass:
+  the spring block 1.7 mm over the cross-tap block read as its fourth row,
+  and the cross-tap ran six rows. Ported from supports' drawing-local rules
+  at 375bf2aad. Text height is the display items' height, never an exact
+  multi-row extent or a balloon circle.
 * **Line through text 0.15 mm** and **own-row inset 0.2 mm** are inherited
   from `_layout_geometry` and supports' calibration.
 
