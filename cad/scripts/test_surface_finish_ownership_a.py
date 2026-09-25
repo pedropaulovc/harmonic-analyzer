@@ -11,6 +11,7 @@ import build_arbor_pedestal
 import build_cone_gear
 import build_cone_gear_shaft
 import build_cone_tip_bushing
+import build_cone_swing_platform
 import build_connecting_rod
 import build_crank_drive_gear
 import build_crank_pinion
@@ -19,6 +20,7 @@ import build_cylinder_gear_shaft
 import cone_gear_shaft_spec
 import cone_gear_spec
 import cone_tip_bushing_spec
+import cone_swing_platform_spec
 import connecting_rod_spec
 import crank_drive_gear_spec
 import crank_pinion_spec
@@ -28,6 +30,7 @@ import draw_alignment_pinion
 import draw_arbor_pedestal
 import draw_cone_gear
 import draw_cone_gear_shaft
+import draw_cone_swing_platform
 import draw_cone_tip_bushing
 import draw_connecting_rod
 import draw_crank_drive_gear
@@ -112,6 +115,19 @@ CASES = (
                     contains_y_mm=cone_tip_bushing_spec.LENGTH / 2.0,
                 ),
             ),
+        ),
+    ),
+    (
+        cone_swing_platform_spec,
+        build_cone_swing_platform,
+        draw_cone_swing_platform,
+        (
+            SurfaceFinishControl(
+                "post_seat",
+                SEAT_UM,
+                PlanarFace((0, 1, 0), cone_swing_platform_spec.PLATE_THICKNESS),
+            ),
+            SurfaceFinishControl("base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)),
         ),
     ),
     (
