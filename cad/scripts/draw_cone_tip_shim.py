@@ -4,10 +4,11 @@ One plan view carries the whole blank at 4:1: the 15.0 x 12.0 outline, the
 horseshoe slot's width with its full-radius callout, and the radius centre
 located from the closed edge and the lower edge (policy rule 7: a location
 starts on a face the shop can pick up, never the model origin).  An edge
-view below it shows the nominal stack as a reference dimension; the
-stack-to-fit range rides the manufacturing notes and the leaf stock the
-material specification, because the fitted thickness is set at assembly,
-not machined.
+view below it carries the thickness dimension, which reads the stack-to-fit
+range around the model's nominal ("0.05–2.20 STACK (1.10 NOM)"): the fitted
+thickness is set at assembly, not machined, and rule 6 keeps the range out
+of a note.  The leaf stock is the material specification; the sheet has no
+general note.
 
 Run with SolidWorks open::
 
@@ -22,10 +23,9 @@ from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -33,18 +33,21 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     offset_dimension_text,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    SHIM_T,
     SHIM_X,
     SHIM_Z,
     SLOT_OPEN_SIDE,
+    THICKNESS_TEXT_PREFIX,
+    THICKNESS_TEXT_SUFFIX,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -92,12 +95,43 @@ TOP_KEEP = {
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 # The 1.10 span is 4.4 mm on the sheet, so its value cannot sit between the
 # arrows: r1 printed it across its own dimension line.  Lead it out to the
-# right and a little below, clear of the line and of the notes above.
-THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.022, FRONT_CENTER[1] - 0.010)
-REFERENCE_DIMENSIONS = ("Thickness",)
-DIMENSION_CALLOUTS = {"Thickness": "NOMINAL STACK", "SlotWidth": "SLOT, FULL R"}
+# right and a little below.  The text is one line of ~26 characters (about
+# 60 mm at the sheet's character height), positioned by its centre, so the
+# centre stands far enough right that the left end clears the line.
+THICKNESS_TEXT = (FRONT_KEEP["Thickness"][0] + 0.044, FRONT_CENTER[1] - 0.010)
+DIMENSION_CALLOUTS = {"SlotWidth": "SLOT, FULL R"}
 
-NOTES_XY = (0.190, 0.120)
+
+def _set_stack_text(adapter: Any, annotations: list[Any]) -> None:
+    """Wrap the imported thickness in the stack range: prefix + value + suffix.
+
+    Rule 6 keeps the range out of a note, so it rides the dimension's own
+    text.  Prefix and suffix, not a whole-text override: the value between
+    them stays the model's dimension at its model-owned places, so the sheet
+    cannot print a nominal the part does not carry.  The parentheses mark
+    that nominal as reference; the range is the requirement.  Same native
+    channel (``SetText`` prefix/suffix, read back) as
+    ``_drawing_common.set_reference_dimension``.
+    """
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) != "Thickness":
+            continue
+        annotation = _early_bound(annotation, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        if abs(float(dimension.SystemValue) - SHIM_T / 1000.0) > 1e-9:
+            raise RuntimeError(
+                f"stack thickness nominal {float(dimension.SystemValue)!r} m "
+                f"is not the modelled {SHIM_T} mm"
+            )
+        display.SetText(1, THICKNESS_TEXT_PREFIX)  # swDimensionTextPrefix
+        display.SetText(2, THICKNESS_TEXT_SUFFIX)  # swDimensionTextSuffix
+        readback = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if readback != (THICKNESS_TEXT_PREFIX, THICKNESS_TEXT_SUFFIX):
+            raise RuntimeError(f"stack thickness text did not persist: {readback!r}")
+        rebuild_drawing(adapter, label="stack thickness text")
+        return
+    raise RuntimeError("stack edge view has no Thickness dimension to label")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -114,14 +148,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -162,16 +194,10 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*top_annotations, *front_annotations]
-    # The singular helper: the plural one adds a diameter glyph ("(Ø1.10)"
-    # in r1), since its only other callers mark diameters.
-    for annotation in annotations:
-        if dimension_name(adapter, annotation) in REFERENCE_DIMENSIONS:
-            set_reference_dimension(adapter, annotation, label="nominal stack")
+    _set_stack_text(adapter, front_annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     offset_dimension_text(adapter, front_annotations, {"Thickness": THICKNESS_TEXT})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     for view in (top, front):
         set_hidden_lines_removed(adapter, view)
