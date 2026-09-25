@@ -144,9 +144,12 @@ LEFT_KEEP = {
     "PinSeatCy": (0.130, 0.125),
     # r6 eye-pass: beside the view its widest callout line ran across the
     # flank.  Converged-r7: above the view the leader crossed the 9.0 thickness
-    # dimension, so the callout sits below-right and its leader rises past the
-    # text's left end to the seat, crossing only the bottom outline.
-    "PinSeatDia": (0.125, 0.082),
+    # dimension.  pc-ra eye pass (Main, nit C): below-right, its leader ran
+    # a few pixels from the cross-hole callout's and grazed the cross hole's
+    # rim, so the callout sits up-right in the lane between the views --
+    # right of the (43.0), above the 7.000, under the arbor finish leader --
+    # and its leader comes down onto the seat from the upper right.
+    "PinSeatDia": (0.156, 0.170),
     # Option E-a: the cross-hole mouth sits on the flank at the pivot-bore
     # axis height, below the seat.  pc-ea eye pass: left of the view its
     # 32-character line ran off the sheet's left border, so the callout sits
