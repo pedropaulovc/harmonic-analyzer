@@ -1273,3 +1273,8 @@ def test_no_build_task_reads_the_ledger() -> None:
         "machinist_review.py",
         "test_machinist_ledger.py",
     }
+
+
+def test_the_tracked_ledger_matches_this_checkouts_fingerprint_settings() -> None:
+    ledger = ml.load_ledger(ml.LEDGER_PATH)
+    assert ledger["fingerprint"] == ml.empty_ledger()["fingerprint"]
