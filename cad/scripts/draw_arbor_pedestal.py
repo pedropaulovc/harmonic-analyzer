@@ -14,7 +14,6 @@ from _drawing_common import (
     add_surface_finish,
     add_native_hole_callout,
     assert_imported_precision,
-    curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -26,11 +25,13 @@ from _drawing_common import (
     stamp_drawing_summary,
     visible_view_entities,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     FOOT_HEIGHT,
@@ -100,6 +101,12 @@ def _top_y(model_z: float) -> float:
     return TOP_CENTER[1] - (model_z - FOOT_MID_Z) * _S
 
 
+# Lanes for the two lateral locations: below the seat in the elevation (the
+# bore's centreline extends down through the part, crossing no other
+# dimension's extension line), and between the plan and the foot-width lane.
+BORE_LATERAL_XY = (FRONT_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _front_y(0.0) - 0.010)
+HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 0.008)
+
 # The elevation carries the height chain off the foot seat plus the fitted
 # bore; the plan carries the foot rectangle, the strap band and the hold-down
 # hole. Nested left lanes work outward from the shortest span (foot height,
@@ -109,12 +116,24 @@ FRONT_KEEP = {
     "FootHt": (FRONT_CENTER[0] - 0.034, _front_y(FOOT_HEIGHT / 2.0)),
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     "BoreDia": (FRONT_CENTER[0] + 0.043, _front_y(BORE_HEIGHT) - 0.010),
+    "BoreLateral": BORE_LATERAL_XY,
 }
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
     # Outer left lane; its text sits above the hold-down lane's text so the
     # two nested dimensions never read side by side.
     "Depth": (TOP_CENTER[0] - 0.048, _top_y(FOOT_NEAR_Z) - 0.012),
+    # Both plan depths work off the foot's far face -- the one face the strap
+    # is flush with, so a shop can set the whole Z chain from a single edge.
+    "HoldDownLocation": (
+        TOP_CENTER[0] - 0.036,
+        _top_y((STRAP_INNER_Z + SCREW_Z) / 2.0),
+    ),
+    "StrapDepth": (
+        TOP_CENTER[0] + 0.036,
+        _top_y((STRAP_INNER_Z + STRAP_ROOT_Z) / 2.0),
+    ),
+    "HoleLateral": HOLE_LATERAL_XY,
 }
 # X on this part starts on a FEATURE, never the symmetry axis (policy rule 7):
 # the bore in the elevation and the hold-down hole in the plan are both
@@ -124,20 +143,15 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "REAM THRU",
 }
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
-# Lanes for the two lateral locations: below the seat in the elevation (the
-# bore's centreline extends down through the part, crossing no other
-# dimension's extension line), and between the plan and the foot-width lane.
-BORE_LATERAL_XY = (FRONT_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _front_y(0.0) - 0.010)
-HOLE_LATERAL_XY = (TOP_CENTER[0] - FOOT_WIDTH / 4.0 * _S, _top_y(FOOT_NEAR_Z) + 0.008)
 
 
 def _set_reference_precision(display: Any, label: str) -> None:
     """Give a SHEET-derived dimension its PART-authored decimal places.
 
     Policy rule 2 puts display precision on the model, and every imported
-    dimension here is read back by ``assert_imported_precision``. What is left
-    are distances no single model dimension expresses -- the strap band
-    between two faces, the hold-down hole off the foot's far face -- plus the
+    dimension here is read back by ``assert_imported_precision``. The strap
+    band, the hold-down station and both lateral locations are owned by the
+    part's hidden reference sketches (#810 Codex l4afp). What is left is the
     crown radius (the boss is a full circle in the model, an arc on the part)
     and the parenthesised overall height. Their places are still
     specification, so they come from the spec, never a literal.
@@ -200,66 +214,6 @@ def _front_entities(adapter: Any, view: Any) -> tuple[Any, Any, Any]:
     if abs(dome_radius - TOP_RADIUS) > 0.01 or abs(dome_height - BORE_HEIGHT) > 0.01:
         raise RuntimeError("front view has no circular dome edge")
     return foot_edge, bore_edge, dome_edge
-
-
-def _top_depth_edge(adapter: Any, view: Any, z_mm: float, *, label: str) -> Any:
-    """Return a plan-view edge at one modeled depth station."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} plan edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
-            continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-        if abs(p0[2] - z_mm) <= 0.01 and abs(p1[2] - z_mm) <= 0.01:
-            candidates.append((abs(p1[0] - p0[0]), edge))
-    if not candidates:
-        raise RuntimeError(f"plan view has no {label} edge at z={z_mm:.3f} mm")
-    return max(candidates, key=lambda item: item[0])[1]
-
-
-def _side_face_edge(adapter: Any, view: Any, x_mm: float, *, label: str) -> Any:
-    """Return the longest straight view edge lying on the plane x = ``x_mm``."""
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} edges"):
-        edge = _early_bound(raw_edge, "IEdge")
-        start = edge.GetStartVertex()
-        end = edge.GetEndVertex()
-        if start is None or end is None:
-            continue
-        start = _early_bound(start, "IVertex")
-        end = _early_bound(end, "IVertex")
-        p0 = tuple(float(value) * 1000.0 for value in start.GetPoint())
-        p1 = tuple(float(value) * 1000.0 for value in end.GetPoint())
-        if abs(p0[0] - x_mm) <= 0.01 and abs(p1[0] - x_mm) <= 0.01:
-            span = max(abs(p1[1] - p0[1]), abs(p1[2] - p0[2]))
-            candidates.append((span, edge))
-    if not candidates:
-        raise RuntimeError(f"{label}: no view edge on the plane x={x_mm:.3f} mm")
-    return max(candidates, key=lambda item: item[0])[1]
-
-
-def _circle_entity(adapter: Any, view: Any, radius_mm: float, *, label: str) -> Any:
-    candidates: list[tuple[float, Any]] = []
-    for raw_edge in visible_view_entities(view, 1, label=f"{label} circles"):
-        edge = _early_bound(raw_edge, "IEdge")
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        radius = float(curve.CircleParams[6]) * 1000.0
-        candidates.append((abs(radius - radius_mm), edge))
-    if not candidates or candidates[0][0] > 0.01:
-        candidates.sort(key=lambda item: item[0])
-    if not candidates or min(candidates, key=lambda item: item[0])[0] > 0.01:
-        raise RuntimeError(f"{label} has no circle of radius {radius_mm:.3f} mm")
-    return min(candidates, key=lambda item: item[0])[1]
 
 
 @_telemetry.traced("drawing.radial_dimension", label_param="label")
@@ -404,11 +358,23 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
+    # The strap band, hold-down station and lateral locations are owned by
+    # reference sketches the part saves blanked (arbor_pedestal_spec
+    # REFERENCE_SKETCHES); the hidden-owner curate shows each in the one view
+    # that dimensions it.
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     top_annotations = curate_view_dimensions(
-        adapter, top, keep=TOP_KEEP, view_label="top"
+        adapter,
+        top,
+        keep=TOP_KEEP,
+        view_label="top",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     imported_annotations = [*front_annotations, *top_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
@@ -498,68 +464,6 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("crown radius annotation did not persist")
     _set_reference_precision(radius_dimension, "crown radius")
     adapter.currentModel.GraphicsRedraw2()
-    screw_entity = _circle_entity(
-        adapter,
-        top,
-        SCREW_HOLE_DIA / 2.0,
-        label="flange hold-down hole",
-    )
-    strap_near_entity = _top_depth_edge(
-        adapter,
-        top,
-        STRAP_ROOT_Z,
-        label="strap near-face",
-    )
-    far_face_entity = _top_depth_edge(
-        adapter, top, STRAP_INNER_Z, label="foot and strap far-face"
-    )
-    # Both plan depths work off the foot's far face -- the one face the strap
-    # is flush with, so a shop can set the whole Z chain from a single edge.
-    hold_down_dimension = _add_entity_dimension(
-        adapter,
-        top,
-        far_face_entity,
-        screw_entity,
-        orientation="vertical",
-        position=(TOP_CENTER[0] - 0.036, _top_y((STRAP_INNER_Z + SCREW_Z) / 2.0)),
-        label="hold-down hole location",
-        arc_endpoint="center",
-    )
-    strap_dimension = _add_entity_dimension(
-        adapter,
-        top,
-        strap_near_entity,
-        far_face_entity,
-        orientation="vertical",
-        position=(TOP_CENTER[0] + 0.036, _top_y((STRAP_INNER_Z + STRAP_ROOT_Z) / 2.0)),
-        label="strap depth",
-    )
-    _set_reference_precision(hold_down_dimension, "hold-down hole location")
-    _set_reference_precision(strap_dimension, "strap depth")
-    # Lateral locations off the foot's west side face (x = -FOOT_WIDTH/2), the
-    # same face in both views.
-    bore_lateral = _add_entity_dimension(
-        adapter,
-        front,
-        _side_face_edge(adapter, front, -FOOT_WIDTH / 2.0, label="elevation west side"),
-        bore_entity,
-        orientation="horizontal",
-        position=BORE_LATERAL_XY,
-        label="bore lateral location",
-        arc_endpoint="center",
-    )
-    hole_lateral = _add_entity_dimension(
-        adapter,
-        top,
-        _side_face_edge(adapter, top, -FOOT_WIDTH / 2.0, label="plan west side"),
-        screw_entity,
-        orientation="horizontal",
-        position=HOLE_LATERAL_XY,
-        label="hold-down hole lateral location",
-        arc_endpoint="center",
-    )
-    _set_reference_precision(bore_lateral, "bore lateral location")
-    _set_reference_precision(hole_lateral, "hold-down hole lateral location")
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
     # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
     # wide at 2:1, so anchoring it near the view buried its left half in the
