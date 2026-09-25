@@ -345,7 +345,7 @@ def _bore_leaders_clear_section_line(
         {
             "BoreFit": leader_segments(_early_bound(bore_fit, "INote").GetAnnotation()),
             "BoreFinish": leader_segments(finish.GetAnnotation()),
-            "SectionLine": section_line_segments(front),
+            "SectionLine": section_line_segments(adapter, front),
         },
         centre=FRONT_CENTER,
         keep_out={},
