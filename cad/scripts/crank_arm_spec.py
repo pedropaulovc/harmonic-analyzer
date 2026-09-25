@@ -24,90 +24,135 @@ without SolidWorks in ~1 s.
 """
 
 from __future__ import annotations
-from _hole_spec import HoleSpec
 
+import math
+
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
-
-# inch -> mm. Mirrors ``_common.IN`` but kept local so the spec pulls in NO COM
-# module (importing ``_common`` would drag the SolidWorks adapter back into the
-# drawing's recipe closure -- the very coupling this split removes).
-MM_PER_IN = 25.4
-
-# --- Nominal geometry (DIMENSIONS.md "Chapter 11", photo-scaled low unless noted).
-# These drive the part's named equation globals AND the drawing's coordinate math. ---
-ARM_C2C = 75.0  # shaft-to-handle-pivot centres -- 2026-09 re-derive from the ch30
-# FRONT view (p002, registered pair: the arm reads 107 px hub-to-pivot against the
-# model's 92 px at 66 -> 77, less ~2% perspective for the crank standing 60 mm
-# nearer the camera than the columns) and the ch11 p.13 studio photo (~78 at the
-# arm-width scale). The earlier 66 came from the angle-90 side view, where the
-# crank is the closest thing to the camera and the base depth it was scaled to
-# sits 200 mm behind it. The crank hangs straight down; the handle axis lands
-# 4.0 mm above the base top and the handle itself hangs in front of the base
-# (its grip runs -Z, south of the base front). The former 150 (cone-axial
-# scaled, low) was >2x too long (med).
-ARM_WIDTH = 16.0  # arm width (low)
-ARM_THICKNESS = 8.0  # ~half the arm width, p.12 photo (low)
-SQUARE_END_OVERHANG = 10.0  # square end past the pivot (low)
-SHAFT_BORE_DIA = 0.375 * MM_PER_IN  # 9.525: 3/8" crankshaft (med); the legacy 9.5
-SHAFT_BORE_BAND = (0.05, 0.00)  # (upper, lower) deviations
-# rounding left the bore 0.025 smaller than the shaft (caught in M6.2)
-PIN_HOLE_SPEC = HoleSpec("drilled_number", "#14")
-HANDLE_PIVOT_HOLE_SPEC = HoleSpec("drilled_fractional", "15/64")
-DIMPLE_DIA = 8.0  # fiducial indentation (low)
-DIMPLE_DEPTH = 0.5  # fiducial indentation (low)
-DIMPLE_X = 30.0  # on the arm near the boss (low)
-# Keeper-ring anchor (2026-09-02, ch11 p.14 page001_img02): a small slotted
-# screw in the arm's FRONT (operator) face between the hub and the dimple,
-# near one edge, clamping a brass wire eyelet that hangs toward the handle
-# (the chain to the pin's ring is lost -- only the eye remains). The dimple
-# is on that same face in the photo.
-ANCHOR_SCREW_X = 20.0  # along the arm from the shaft axis (low)
-ANCHOR_SCREW_Y = 4.5  # off the arm centreline toward the local +y edge (machine -X
-# once placed; low). Kept POSITIVE: a driven placement dim is a magnitude.
-ANCHOR_THREAD_DEPTH = 5.5  # full #4-40 thread for 5.33 stock-screw insertion
-ANCHOR_DRILL_DEPTH = 6.5  # cylindrical depth; bottoming tap leaves 1.0 lead room
-ANCHOR_HOLE_SPEC = HoleSpec(
-    "tapped_bottoming",
-    "#4-40",
-    end="blind",
-    depth_mm=ANCHOR_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": ANCHOR_THREAD_DEPTH},
+from crank_hub_geometry import (
+    ARM_FIDUCIAL_RADIUS,
+    ARM_THICKNESS,
+    ARM_WIDTH,
+    AXIAL_PIN_DIA,
+    AXIAL_PIN_LENGTH,
+    AXIAL_PIN_RADIUS_FROM_AXIS,
+    FIDUCIAL_MODEL_DEPTH,
+    FIDUCIAL_MODEL_DIA,
+    GENERAL_1PL_TOL_MM,
+    HUB_SEAT_DIA,
+    WALL_TARGET_MM,
 )
-# The 118-degree drill point extends another 0.679: back-face wall is 0.821.
 
-# No roughness callouts: the arm is pinned to its crankshaft, so nothing runs
-# on the bore; every face is "as cast/machined" per the title block
-# (cad/docs/drawing-simplicity-policy.md rule 5).
+
+# --- Nominal geometry -------------------------------------------------------
+ARM_C2C = 75.0
+SQUARE_END_OVERHANG = 10.0
+# U33: the MHA-139 slotted shoulder screw threads through the arm and carries
+# the handle.  Its tapped web to the square end is judged at the .X worst case
+# of both stations (U27).
+HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", "#10-24")
+_PIVOT_THREAD_R = THREAD_MAJOR_MM[HANDLE_PIVOT_HOLE_SPEC.size] / 2.0
+PIVOT_END_WEB_NOMINAL = SQUARE_END_OVERHANG - _PIVOT_THREAD_R
+PIVOT_END_WEB_WORST = PIVOT_END_WEB_NOMINAL - 2.0 * GENERAL_1PL_TOL_MM
+if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
+    raise AssertionError(
+        f"handle-pivot thread leaves {PIVOT_END_WEB_WORST:.2f} mm to the arm end"
+    )
+
+# The axial MHA-138 groove is match-drilled in the assembled arm/hub.  Its
+# centre rides the hub-seat interface at six o'clock (toward the hanging handle);
+# the 4-mm length is shared as exactly half the 8-mm arm thickness.
+AXIAL_PIN_X = AXIAL_PIN_RADIUS_FROM_AXIS
+AXIAL_PIN_Y = 0.0
+
+# Restrained visual representation of the two alignment witnesses.  The arm
+# owns one shallow punched mark; the matching mark is on the crankshaft dome.
+# Neither diameter nor depth is a manufacturing dimension on the print.
+_FIDUCIAL_AXIS = ARM_FIDUCIAL_RADIUS / math.sqrt(2.0)
+FIDUCIAL_X = -_FIDUCIAL_AXIS
+FIDUCIAL_Y = _FIDUCIAL_AXIS
+
+# Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
+# face clamps the brass eyelet that once tethered removable pin MHA-024.
+# Tapped THRU the 5/16 bar (policy rule 12, audit W7): a blind 6.5 drill left
+# its point 0.76 from the inboard face nominal and through it at the printed
+# band; through, the screw has 7.94 of thread (2.79D) and nothing to bottom on.
+ANCHOR_SCREW_X = 20.0
+ANCHOR_SCREW_Y = 4.5
+ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
+
+# MHA-020 is match-fitted to MHA-137 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
-# Derived spans (equations of the primitives above).
-ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG  # 85.0: square end past the shaft-bore origin
-HALF_WIDTH = ARM_WIDTH / 2.0  # 8.0
+# Derived spans.
+ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
+HALF_WIDTH = ARM_WIDTH / 2.0
 
-# --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows. ``build_crank_arm`` marks exactly these; ``draw_crank_arm`` keeps
-# exactly their union across its per-view ``keep`` maps. The offline test enforces
-# ``union(marks) == union(keeps)`` so a rename in one script that isn't mirrored in
-# the other fails before any SolidWorks build. ---
+# Marked dimensions imported by the drawing.  The punch and axial seam groove
+# are assembly-match features, so their representation geometry carries no
+# independent size or location dimension.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"ArmEndX", "BossRadius"},
     "Arm": {"Depth"},
-    "ShaftBoreProfile": {"ShaftBoreDia"},
-    "DimpleProfile": {"DimpleX", "DimpleDia"},
+    "HubSeatProfile": {"HubSeatDia"},
+    "StationReference": {
+        "PivotStation",
+        "AnchorStation",
+        "AnchorOffset",
+        "AxisOffset",
+        "Width",
+    },
 }
 
-# Notes: part-specific process and exceptional feature-tolerance facts only,
-# never a duplicate of the title block (drawing-simplicity-policy.md rule 6).
+# Decimal places are authored on the model.  The match-fitted hub seat is a
+# one-place nominal; the actual assigned MHA-137 governs its final size.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
+    "Arm": {"Depth": 1},
+    "HubSeatProfile": {"HubSeatDia": 1},
+    "StationReference": {
+        "PivotStation": 1,
+        "AnchorStation": 1,
+        "AnchorOffset": 1,
+        "AxisOffset": 1,
+        "Width": 1,
+    },
+}
+
+_PRECISION_NAMES = [
+    (feature, name) for feature, names in DRAWING_PRECISION.items() for name in names
+]
+if any(
+    name not in DRAWING_DIMENSIONS.get(feature, frozenset())
+    for feature, name in _PRECISION_NAMES
+):
+    raise AssertionError("DRAWING_PRECISION names a dimension the part never marks")
+if any(
+    name not in {name for names in DRAWING_PRECISION.values() for name in names}
+    for names in DRAWING_DIMENSIONS.values()
+    for name in names
+):
+    raise AssertionError("a marked dimension prints without part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: DRAWING_PRECISION[feature][name] for feature, name in _PRECISION_NAMES
+}
+if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
+    raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
+
+# The one sheet-derived dimension: the parenthesised boss-extreme-to-arm-end
+# overall, a read-only sum of the boss radius and ArmEndX with no model
+# dimension to import. Its places are still specification, so the sheet
+# reads them here instead of typing a literal (policy rule 2).
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
+
+# Policy rule 6: at most four short lines, each under ~75 characters so the
+# block stays left of the title block.  The section line is a requirement,
+# not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
+# the mill's width tolerance, not at the .X band.
 DRAWING_NOTES = "\n".join(
     (
-        "SHAFT BORE CENTRED ACROSS 16 WIDTH.",
-        "THE CROSS-HOLE CALLOUT IS THE FINISHED SIZE FOR THIS PART.",
-        "CROSS-HOLE AXIS INTERSECTS SHAFT AXIS.",
-        "DIMPLE: <MOD-DIAM>8 FLAT-BOTTOM, 0.50 +0.20/-0.10 DEEP; LOCATION +/-0.25.",
-        "DIMPLE AND ANCHOR TAP ON THE HANDLE-SIDE (FRONT) FACE.",
-        f"ANCHOR TAP: {ANCHOR_HOLE_SPEC.size} UNC-{ANCHOR_HOLE_SPEC.thread_class}"
-        f" X {ANCHOR_THREAD_DEPTH:.1f} FULL THREAD DEEP; BOTTOMING TAP.",
-        f"ANCHOR DRILL: {ANCHOR_HOLE_SPEC.depth_mm:.1f} DEEP (DO NOT BREAK THROUGH).",
+        "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
+        "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

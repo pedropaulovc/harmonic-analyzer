@@ -118,6 +118,27 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_hub",
+        part="crank_hub",
+        artifact_stem="crank-hub",
+        script_name="draw_crank_hub.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_hub_pin",
+        part="crank_hub_pin",
+        artifact_stem="crank-hub-pin",
+        script_name="draw_crank_hub_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_handle_pivot_screw",
+        part="crank_handle_pivot_screw",
+        artifact_stem="crank-handle-pivot-screw",
+        script_name="draw_crank_handle_pivot_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="rocker_arm_support",
         part="rocker_arm_support",
         artifact_stem="rocker-arm-support",
@@ -396,6 +417,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pinion_handle",
         artifact_stem="pinion-handle",
         script_name="draw_pinion_handle.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="pinion_handle_pin",
+        part="pinion_handle_pin",
+        artifact_stem="pinion-handle-pin",
+        script_name="draw_pinion_handle_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

@@ -100,6 +100,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
     drawing_only = {
         "pinion_cam_spec.py",
         "pinion_cam_pin_spec.py",
+        "pinion_handle_pin_spec.py",
         "pinion_handle_spec.py",
         "pinion_lever_spec.py",
         "pinion_spring_spec.py",
@@ -109,6 +110,7 @@ def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
         "pinion_cam_geometry.py",
         "pinion_cam_pin_geometry.py",
         "pinion_handle_geometry.py",
+        "pinion_handle_pin_geometry.py",
         "pinion_lever_geometry.py",
         "pinion_spring_geometry.py",
     } <= deps
@@ -489,7 +491,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("pinion-bracket-2", "pinion-cam-pin-2")),
     }
     crank_pairs = {
-        frozenset(("crank-pin-1", "crank-arm-1")),
+        frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
     special_pairs = {
@@ -510,6 +512,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert len(cam_limits) == 1
     assert 0.40 < cam_limits.pop() < 0.45
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
-    assert all(60.0 < crank_allowed[pair] < 65.0 for pair in crank_pairs)
+    hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
+    shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
+    # The U29 hub barrel (Ø25.4) sets the MHA-024 pilot spans: a longer hub
+    # chord, and the shaft crossing further down the taper.
+    assert 136.0 < crank_allowed[hub_pair] < 137.0
+    assert 53.0 < crank_allowed[shaft_pair] < 54.0
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

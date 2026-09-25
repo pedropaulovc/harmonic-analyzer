@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import draw_pinion_handle as drawing
 import pinion_handle_spec as spec
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DrawingLayout
 
 
@@ -78,6 +80,11 @@ def rendered_recipe(monkeypatch, tmp_path):
         lambda _a, view: setattr(view, "hidden", True),
     )
     monkeypatch.setattr(
+        drawing,
+        "set_hidden_lines_removed",
+        lambda _a, view: setattr(view, "hidden", False),
+    )
+    monkeypatch.setattr(
         drawing, "_point", lambda _a, _v, xyz: (xyz[0] / 1000, xyz[1] / 1000)
     )
 
@@ -101,11 +108,14 @@ def rendered_recipe(monkeypatch, tmp_path):
         for annotation in annotations:
             annotation.callout = values.get(annotation.name, "")
 
-    def precision(_adapter, annotations, values):
+    asserted_places: dict[str, int] = {}
+
+    def imported_precision(_adapter, annotations, values):
         for annotation in annotations:
             annotation.precision = values[annotation.name]
+            asserted_places[annotation.name] = values[annotation.name]
 
-    def reference(_adapter, annotations, names):
+    def reference_dimensions(_adapter, annotations, names):
         for annotation in annotations:
             annotation.reference = annotation.name in names
 
@@ -114,10 +124,6 @@ def rendered_recipe(monkeypatch, tmp_path):
             if annotation.name in positions:
                 annotation.text_xy = positions[annotation.name]
 
-    def measured(_adapter, view, **kwargs):
-        annotation = SimpleNamespace(name=kwargs.pop("label"), view=view, **kwargs)
-        dimensions.append(annotation)
-        return annotation
 
     def forbidden(*args, **kwargs):
         pytest.fail(
@@ -139,12 +145,14 @@ def rendered_recipe(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(drawing, "_move_dimension", move)
     monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
-    monkeypatch.setattr(drawing, "set_dimension_precision", precision)
-    monkeypatch.setattr(drawing, "set_reference_dimensions", reference)
+    monkeypatch.setattr(drawing, "assert_imported_precision", imported_precision)
+    monkeypatch.setattr(drawing, "set_reference_dimensions", reference_dimensions)
     monkeypatch.setattr(drawing, "offset_dimension_text", offset)
-    monkeypatch.setattr(drawing, "_checked_dimension", measured)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *args, **kwargs: True)
     monkeypatch.setattr(drawing, "_add_body_centerline", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_shorten_radius_leader", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(drawing, "add_note", lambda *args: object())
     monkeypatch.setattr(
         drawing, "add_property_linked_note", lambda _a, name, *xy: notes.append(name)
@@ -160,29 +168,40 @@ def rendered_recipe(monkeypatch, tmp_path):
         dimensions={item.name: item for item in dimensions},
         notes=notes,
         result=result,
+        asserted_places=asserted_places,
     )
 
 
 def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     package = rendered_recipe
     orthographic = [view for view in package.views if view.orientation != "*Isometric"]
-    assert all(view.hidden for view in orthographic)
     (iso,) = [view for view in package.views if view.orientation == "*Isometric"]
     assert iso.body is None and iso.Angle == 0.0
     assert package.result["layout"] == DrawingLayout.LANDSCAPE
     (section,) = [view for view in package.views if view.section]
+    # Sections are always hidden-lines-removed (policy rule 7).
+    assert not section.hidden
     assert section.body == section.parent.body == "body"
     hole = package.dimensions["RodHoleDia"]
     assert hole.view.body == "body" and hole.view.orientation == "*Top"
     assert "REAM" in hole.callout and "THRU" in hole.callout
+    retention = package.dimensions["RetentionHoleDia"]
+    assert retention.view is hole.view
+    assert "MHA-102" in retention.callout
+    assert "MHA-136" in retention.callout
+    assert "LIGHT DRIVE FIT" in retention.callout
     bore = package.dimensions["TubeId"]
     assert (
         bore.view is section and "REAM" in bore.callout and "THRU" not in bore.callout
     )
+    assert "DIAMETRAL CLEARANCE" in bore.callout
     assert package.dimensions["TubeLen"].view is section
     rod = package.dimensions["RodDia"]
     assert rod.view is package.dimensions["RodSpan"].view
     assert abs(rod.view.Angle) == pytest.approx(1.5707963267948966)
+    # Rule 7: one hidden-line view only -- the assembled cross-rod view, the
+    # only place the pressed rod's engagement inside the grip is shown.
+    assert [view for view in orthographic if view.hidden] == [rod.view]
     for name in ("GripDia", "TubeOd"):
         assert package.dimensions[name].view.orientation == "*Right"
     front = section.parent
@@ -193,80 +212,87 @@ def test_policy_views_expose_both_components_and_blind_socket(rendered_recipe):
     assert not spec.SURFACE_FINISHES
 
 
-def test_body_dimensions_are_direct_baselines_not_note_substitutes(rendered_recipe):
+def test_body_dimensions_are_model_baselines_from_the_socket_end(rendered_recipe):
+    """Rule 7 (one feature origin per view) meets rule 2 (the model owns it).
+
+    The hub length, body overall, cross-hole axes and rod reach have no natural
+    feature dimension, so the part's reference sketches own them and each
+    prints in the view whose plane its sketch sits on.
+    """
     dimensions = rendered_recipe.dimensions
-    axial = [
-        dimensions[name]
-        for name in (
-            "hub projection",
-            "socket end to crown root",
-            "body overall length",
-        )
-    ]
-    assert {item.p0 for item in axial} == {(0.0, spec.TUBE_OD / 4.0, drawing.HUB_END_Z)}
-    assert all(item.orientation == "horizontal" for item in axial)
-    assert [item.expected_mm for item in axial] == pytest.approx([12.0, 21.0, 24.0])
-    assert dimensions["socket end to cross-hole axis"].expected_mm == pytest.approx(
-        16.5
-    )
-    assert dimensions["socket end to cross-hole axis"].center
-    assert dimensions["rod placement from body axis"].expected_mm == pytest.approx(32.0)
-    assert dimensions["rod placement from body axis"].center
+    right = dimensions["GripDia"].view
+    top = dimensions["RodHoleDia"].view
+    assembled = dimensions["RodSpan"].view
+    assert dimensions["HubLen"].view is dimensions["BodyLen"].view is right
+    assert dimensions["RodHoleZ"].view is top
+    assert dimensions["RetentionPinFromMouth"].view is top
+    assert dimensions["RodDown"].view is assembled
+    assert drawing.HUB_END_Z == pytest.approx(16.5)
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked <= dimensions.keys()
     assert "Manufacturing Notes" in rendered_recipe.notes
-    assert 1 <= len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert not any(character.isdigit() for character in spec.DRAWING_NOTES)
-    for forbidden in (
-        "DATUM",
-        "BASIC",
-        "+/-",
-        "MATERIAL",
-        "TOLERANCE",
-        "FINISH",
-        "TURN ",
-    ):
+    assert len(spec.DRAWING_NOTES.splitlines()) == 3
+    assert "MHA-136" not in spec.DRAWING_NOTES
+    assert "ACTUAL Ø6 STEEL CROSS ROD" in spec.DRAWING_NOTES
+    assert "SHALL NOT TURN OR SLIDE BY HAND" in spec.DRAWING_NOTES
+    for forbidden in ("DATUM", "BASIC", "+/-", "MATERIAL", "TOLERANCE", "FINISH"):
         assert forbidden not in spec.DRAWING_NOTES.upper()
 
 
-def test_socket_fit_limits_remain_native():
-    assert (
-        spec.TUBE_ID + spec.TUBE_ID_BAND[1],
-        spec.TUBE_ID + spec.TUBE_ID_BAND[0],
-    ) == pytest.approx((8.010, 8.025))
+def test_socket_takes_the_title_block_grade_and_names_its_mate():
+    """No local size band on a part with no running fit, gear or locating seat.
+
+    A band that cannot cite a fit class or the error budget is an
+    over-specification (cad/docs/tolerance-policy.md); the socket is a slip
+    clearance over the arbor, so the title block's drilled-hole row governs it
+    and the callout says which arbor it has to slip over.
+    """
+    assert not [name for name in vars(spec) if name.endswith("_BAND")]
+    socket = drawing.DIMENSION_CALLOUTS["TubeId"]
+    assert "REAM" in socket and "MHA-102" in socket
+    assert "DIAMETRAL CLEARANCE" in socket
+    retention = drawing.DIMENSION_CALLOUTS["RetentionHoleDia"]
+    assert "MATCH-DRILL" in retention
+    assert "MHA-102" in retention and "MHA-136" in retention
+    assert "LIGHT DRIVE FIT" in retention
+    assert "NOT HAND-REMOVABLE" in retention
+    assert "ENDS FLUSH WITH SOCKET O.D." in retention
 
 
-def test_recipe_preserves_fine_fit_digits_without_tightening_routine_features(
-    rendered_recipe,
-):
+def test_the_part_owns_every_printed_decimal_place(rendered_recipe):
+    """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
+
+    Two places on the reamed socket alone; one everywhere else on a turned
+    handle nothing runs on.  The sheet reads every marked dimension's places
+    back and never rewrites them.
+    """
+    by_name = spec.DRAWING_PRECISION_BY_NAME
+    assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert {name for name, places in by_name.items() if places != 1} == {"TubeId"}
+    assert by_name["TubeId"] == 2
+    assert rendered_recipe.asserted_places == by_name
     dims = rendered_recipe.dimensions
-    assert dims["RodDia"].precision == 1
-    assert dims["RodDia"].reference
-    assert dims["TubeId"].precision == 3
-    assert dims["RodHoleDia"].precision == 1
-    assert dims["GripDia"].precision == dims["TubeOd"].precision == 1
-    assert dims["CapR"].precision == 1
-    assert dims["RodSpan"].precision == 1
+    assert dims["RodDia"].reference and dims["RodDia"].precision == 1
+    assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_wrong_native_edge_measurement_blocks_release(monkeypatch):
-    display = SimpleNamespace(
-        GetDimension2=lambda _index: SimpleNamespace(SystemValue=0.023)
+def test_upper_handle_retention_is_distinct_and_coaxial_with_the_arbor():
+    assert spec.RETENTION_PIN_DIA == pytest.approx(2.0)
+    assert spec.RETENTION_PIN_LEN == pytest.approx(spec.TUBE_OD)
+    assert spec.RETENTION_PIN_STATION_FROM_FLOOR == pytest.approx(
+        spec.TUBE_LEN / 2.0
     )
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "_point", lambda _a, _v, xyz: xyz[:2])
-    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *args, **kwargs: display)
-    with pytest.raises(RuntimeError, match="measured 23, expected 24"):
-        drawing._checked_dimension(
-            None,
-            None,
-            p0=(0, 0, 16.5),
-            p1=(0, 0, -7.5),
-            text_xy=(0.1, 0.2),
-            label="body overall",
-            expected_mm=24.0,
-            orientation="horizontal",
-        )
+    assert spec.RETENTION_PIN_STATION_FROM_MOUTH == pytest.approx(
+        spec.TUBE_LEN / 2.0
+    )
+    assert spec.RETENTION_PIN_CENTER_Z == pytest.approx(
+        spec.GRIP_LEN / 2.0
+        + spec.WALL_T
+        + spec.RETENTION_PIN_STATION_FROM_FLOOR
+    )
+    assert spec.RETENTION_PIN_DIA < spec.ROD_DIA
+
+
 
 
 def test_refused_native_dimension_move_blocks_release(monkeypatch):

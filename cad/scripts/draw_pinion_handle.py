@@ -2,9 +2,10 @@ r"""Create the pinion-handle manufacturing drawing under the simplicity policy.
 
 The turned body is shown horizontally, with baseline lengths from the flat
 socket end. An axial section exposes the blind socket; the body-only top view
-exposes the transverse reamed hole before the rod is pressed. The assembled
-front view is rotated so the cross rod lies horizontally. Source geometry and
-native model fits remain authoritative; no drawing text substitutes for them.
+exposes the grip cross-hole and the separate handle-to-arbor retention hole.
+The assembled front view is rotated so the cross rod lies horizontally. Source
+geometry and native model fits remain authoritative; no drawing text
+substitutes for them.
 
 Run with SolidWorks open::
 
@@ -22,8 +23,8 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
+    assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
     dimension_name,
@@ -32,10 +33,8 @@ from _drawing_common import (
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
-    set_arc_endpoints_to_center,
-    set_arc_endpoints_to_max,
     set_dimension_callouts,
-    set_dimension_precision,
+    set_hidden_lines_removed,
     set_hidden_lines_visible,
     set_reference_dimensions,
     stamp_drawing_summary,
@@ -44,15 +43,18 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from pinion_handle_spec import (
     CAP_SAG,
+    DRAWING_PRECISION_BY_NAME,
     GRIP_DIA,
     GRIP_LEN,
-    ROD_DOWN,
-    ROD_HOLE_DIA,
+    RETENTION_HOLE_CALLOUT,
     ROD_SPAN,
+    TUBE_ID,
     TUBE_LEN,
     TUBE_OD,
     WALL_T,
+    socket_clearance_callout,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -79,47 +81,57 @@ ISO_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.075, 0.150)
 RIGHT_CENTER = (0.175, 0.150)
 TOP_CENTER = (0.075, 0.230)
-SECTION_CENTER = (0.295, 0.155)
+SECTION_CENTER = (0.270, 0.145)
 ASSEMBLED_CENTER = (0.115, 0.090)
 ROD_END_CENTER = (0.220, 0.050)
-ISO_CENTER = (0.355, 0.225)
+ISO_CENTER = (0.325, 0.210)
 SECTION_SCALE = (3, 1)
 
 # Import in the actual authoring planes, then MOVE the native dimensions to
 # their manufacturing views. Importing these names directly into *Right gives
 # no dimensions: the circle sketches were authored normal to the arbor axis.
+# The axial stations (hub length, body overall, cross-hole axis, rod reach)
+# are the part's reference-sketch dims, each authored on the plane of the
+# view that prints it.
 FRONT_KEEP = {
     "GripDia": (0.035, 0.175),
     "TubeOd": (0.035, 0.155),
 }
-TOP_KEEP = {"RodHoleDia": (0.104, 0.215), "CapR": (0.048, 0.260)}
-SECTION_KEEP = {"TubeLen": (0.347, 0.145), "TubeId": (0.250, 0.114)}
-ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032)}
+RIGHT_KEEP = {
+    "HubLen": (RIGHT_CENTER[0], 0.188),
+    "BodyLen": (RIGHT_CENTER[0], 0.219),
+}
+TOP_KEEP = {
+    "RodHoleDia": (0.045, 0.205),
+    "CapR": (0.035, 0.255),
+    "RodHoleZ": (0.122, 0.223),
+    "RetentionHoleDia": (0.177, 0.250),
+    "RetentionPinFromMouth": (0.145, 0.223),
+}
+# TubeId's text stands right of the section, under the seating-depth callout:
+# its dimension line runs in the 13 mm between the socket mouth (sheet 0.120)
+# and the SECTION A-A label (top 0.105); the four-line block clears the
+# seating-depth callout above it.  Centred under the view it printed on top of
+# that label and against the assembled view's (Ø6.0) rod reference.
+SECTION_KEEP = {"TubeLen": (0.322, 0.135), "TubeId": (0.355, 0.116)}
+SEATING_DEPTH_TEXT_XY = (0.353, 0.141)
+ASSEMBLED_KEEP = {"RodSpan": (0.115, 0.032), "RodDown": (0.080, 0.125)}
 ROD_END_KEEP = {"RodDia": (0.220, 0.078)}
 SIDE_DIAMETERS = {"GripDia": (0.228, 0.173), "TubeOd": (0.140, 0.178)}
 ROD_DIAMETER_XY = (0.202, 0.106)
 DIMENSION_CALLOUTS = {
-    "TubeId": "REAM",
+    "TubeId": socket_clearance_callout(),
     "TubeLen": "SEATING DEPTH",
     "RodHoleDia": "REAM THRU",
+    "RetentionHoleDia": RETENTION_HOLE_CALLOUT,
     "RodSpan": "OAL",
 }
-DIMENSION_PRECISION = {
-    "GripDia": 1,
-    "TubeOd": 1,
-    "TubeId": 3,
-    "TubeLen": 2,
-    "CapR": 1,
-    "RodHoleDia": 1,
-    "RodDia": 1,
-    "RodSpan": 1,
-}
+# Decimal places are the part's (pinion_handle_spec.DRAWING_PRECISION, applied
+# by build_pinion_handle); the sheet only reads them back.
 
 HUB_END_Z = GRIP_LEN / 2.0 + WALL_T + TUBE_LEN
 CROWN_ROOT_Z = -GRIP_LEN / 2.0
 CROWN_TIP_Z = CROWN_ROOT_Z - CAP_SAG
-SHOULDER_Z = GRIP_LEN / 2.0
-BODY_OVERALL = HUB_END_Z - CROWN_TIP_Z
 
 
 def _source_bodies(model: Any) -> tuple[Any, Any]:
@@ -192,72 +204,166 @@ def _point(
         label="handle dimension pick",
     )
 
-
-def _checked_dimension(
-    adapter: Any,
-    view: Any,
-    *,
-    p0: tuple[float, float, float],
-    p1: tuple[float, float, float],
-    text_xy: tuple[float, float],
-    label: str,
-    expected_mm: float,
-    orientation: str,
-    entity_types: tuple[str, str] = ("EDGE", "EDGE"),
-    center: bool = False,
-    maximum: bool = False,
-) -> Any:
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=_point(adapter, view, p0),
-        p1=_point(adapter, view, p1),
-        text_xy=text_xy,
-        label=label,
-        orientation=orientation,
-        entity_types=entity_types,
+def _shorten_radius_leader(
+    adapter: Any, annotation: Any, position: tuple[float, float]
+) -> None:
+    """Shorten the spherical-radius leader, then restore its curated position."""
+    native_annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(
+        native_annotation.GetSpecificAnnotation(), "IDisplayDimension"
     )
-    if center:
-        set_arc_endpoints_to_center(adapter, display, label=label)
-    if maximum:
-        set_arc_endpoints_to_max(adapter, display, label=label)
-    native = _early_bound(display, "IDisplayDimension")
-    measured_mm = (
-        float(_early_bound(native.GetDimension2(0), "IDimension").SystemValue) * 1000.0
-    )
-    if abs(measured_mm - expected_mm) > 1e-5:
+    display.ShortenedRadius = True
+    # SolidWorks recentres radial text when ShortenedRadius changes.  Move it
+    # only after that transition so the SR callout stays outside the crown.
+    if native_annotation.SetPosition2(position[0], position[1], 0.0) is not True:
+        raise RuntimeError("failed to restore handle crown-radius position")
+    adapter.currentModel.GraphicsRedraw2()
+    if display.ShortenedRadius is not True:
+        raise RuntimeError("handle crown radius did not retain shortened leader")
+    actual = tuple(float(value) for value in (native_annotation.GetPosition() or ()))
+    if len(actual) < 2 or any(
+        abs(measured - expected) > 1e-6
+        for measured, expected in zip(actual[:2], position, strict=True)
+    ):
         raise RuntimeError(
-            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+            f"handle crown radius position did not persist: {actual!r}"
         )
-    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
-    set_dimension_precision(
-        adapter, [annotation], {dimension_name(adapter, annotation): 1}
-    )
-    return display
+
+
+
+
+
 
 
 def _add_body_centerline(adapter: Any, view: Any) -> None:
-    """Use the two visible socket flanks, as in the pen-marker recipe."""
+    """Insert the socket axis from an opposite, overlapping OD-flank pair."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, view)):
         raise RuntimeError("failed to activate body centerline view")
+    native_view = _early_bound(view, "IView")
+    native_view.UpdateViewDisplayGeometry()
+    candidates: list[
+        tuple[
+            Any,
+            tuple[float, float, float],
+            tuple[float, float, float],
+            tuple[float, float, float],
+        ]
+    ] = []
+    components = adapter._attempt(native_view.GetVisibleComponents, default=()) or ()
+    for component in components:
+        silhouettes = (
+            adapter._attempt(
+                lambda c=component: native_view.GetVisibleEntities2(c, 4),
+                default=(),
+            )
+            or ()
+        )
+        for raw_silhouette in silhouettes:
+            silhouette = _early_bound(raw_silhouette, "ISilhouetteEdge")
+            face = adapter._attempt(silhouette.GetFace)
+            if face is None:
+                continue
+            surface = _early_bound(_early_bound(face, "IFace2").GetSurface(), "ISurface")
+            if not surface.IsCylinder():
+                continue
+            parameters = surface.CylinderParams
+            if abs(float(parameters[6]) - TUBE_OD / 2000.0) > 1e-7:
+                continue
+            start_point = adapter._attempt(silhouette.GetStartPoint)
+            end_point = adapter._attempt(silhouette.GetEndPoint)
+            if start_point is None or end_point is None:
+                continue
+            start_data = adapter._get_attr_or_call(start_point, "ArrayData")
+            end_data = adapter._get_attr_or_call(end_point, "ArrayData")
+            if start_data is None or end_data is None:
+                continue
+            start = tuple(float(value) for value in start_data[:3])
+            end = tuple(float(value) for value in end_data[:3])
+            length = math.dist(start, end)
+            if length <= 1e-9:
+                continue
+            direction = tuple((b - a) / length for a, b in zip(start, end))
+            candidates.append((silhouette, start, end, direction))
+    pairs: list[tuple[float, float, Any, Any]] = []
+    expected_separation = TUBE_OD / 1000.0
+    for index, (first, first_start, first_end, first_direction) in enumerate(
+        candidates
+    ):
+        for second, second_start, second_end, second_direction in candidates[index + 1 :]:
+            alignment = abs(
+                sum(a * b for a, b in zip(first_direction, second_direction))
+            )
+            if alignment < 1.0 - 1e-6:
+                continue
+            offset = tuple(b - a for a, b in zip(first_start, second_start))
+            axial_offset = sum(
+                value * axis for value, axis in zip(offset, first_direction)
+            )
+            radial_offset = tuple(
+                value - axial_offset * axis
+                for value, axis in zip(offset, first_direction)
+            )
+            separation = math.sqrt(sum(value * value for value in radial_offset))
+            if separation < 0.8 * expected_separation:
+                continue
+            first_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(first_start, first_direction)),
+                    sum(a * b for a, b in zip(first_end, first_direction)),
+                )
+            )
+            second_interval = sorted(
+                (
+                    sum(a * b for a, b in zip(second_start, first_direction)),
+                    sum(a * b for a, b in zip(second_end, first_direction)),
+                )
+            )
+            overlap = min(first_interval[1], second_interval[1]) - max(
+                first_interval[0], second_interval[0]
+            )
+            if overlap > 1e-6:
+                pairs.append(
+                    (
+                        overlap,
+                        abs(separation - expected_separation),
+                        first,
+                        second,
+                    )
+                )
+    if not pairs:
+        raise RuntimeError("socket OD has no opposite overlapping silhouette pair")
+    overlap, separation_error, first, second = max(
+        pairs, key=lambda item: (item[0], -item[1])
+    )
+    if separation_error > 2e-4:
+        raise RuntimeError(
+            f"socket flank separation misses OD by {separation_error * 1000:g} mm"
+        )
+    if overlap < 1e-3:
+        raise RuntimeError("socket flank pair has less than 1 mm axial overlap")
+    flanks = (first, second)
     draw.ClearSelection2(True)
-    station = SHOULDER_Z + WALL_T + TUBE_LEN / 2.0
-    for index, side in enumerate((-1.0, 1.0)):
-        x, y = _point(adapter, view, (0.0, side * TUBE_OD / 2.0, station))
-        if not draw.Extension.SelectByID2(
-            "", "SILHOUETTE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        ):
-            raise RuntimeError("failed to select body centerline socket flank")
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = _early_bound(selection_manager.CreateSelectData(), "ISelectData")
+    selection_data.View = view
+    for index, flank in enumerate(flanks):
+        selectable = _sw_type_info.early_bound_or_flag(
+            flank, "ISilhouetteEdge", "Select2"
+        )
+        if not bool(selectable.Select2(index > 0, selection_data)):
+            raise RuntimeError(
+                f"failed to select enumerated socket flank {index + 1}"
+            )
+    if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
+        raise RuntimeError("body centerline socket-flank selection was not a pair")
     centerline = ddoc.InsertCenterLine2()
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     if centerline is None:
         raise RuntimeError("failed to insert centerline between socket flanks")
     # SOLIDWORKS also generates axes for the omitted rod and coaxial body faces.
-    # Retain one native turning axis by its sheet geometry, never annotation IDs.
-    native_view = _early_bound(view, "IView")
     axis_y = _point(adapter, view, (0.0, 0.0, 0.0))[1]
     body_x = sorted(
         _point(adapter, view, (0.0, 0.0, z))[0] for z in (CROWN_TIP_Z, HUB_END_Z)
@@ -343,13 +449,18 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=SHEET_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    # Hidden lines are removed from every orthographic view: section A-A
+    # already shows the blind socket, while the body-only top view shows both
+    # transverse holes directly as solid circles.  The assembled view below
+    # keeps hidden lines because it is the only place the pressed grip rod's
+    # engagement inside the body is shown.
     for view, label in (
         (front, "body end"),
         (right, "body side"),
         (top, "body cross-hole"),
     ):
         _isolate_body(adapter, view, body, label=label)
-        set_hidden_lines_visible(adapter, view)
+        set_hidden_lines_removed(adapter, view)
 
     # The XZ section contains the arbor axis and cuts normal to the omitted
     # cross rod, exposing its circular hole as well as the blind axial socket.
@@ -364,7 +475,9 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SECTION_SCALE,
         label="turned-body axial socket section",
     )
-    set_hidden_lines_visible(adapter, section)
+    # Sections are always hidden-lines-removed: the dashed chord across the
+    # hatched cap only said the cut had been drawn through it twice.
+    set_hidden_lines_removed(adapter, section)
     assembled = place_view(
         adapter, str(SOURCE), "*Front", *ASSEMBLED_CENTER, scale=SHEET_SCALE
     )
@@ -399,13 +512,23 @@ async def build(adapter: Any) -> dict[str, str]:
     section_annotations = curate_view_dimensions(
         adapter, section, keep=SECTION_KEEP, view_label="socket section"
     )
+    # After the section has claimed TubeLen: the body side view imports only
+    # the Right-plane reference sketch's hub length and body overall.
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="body side"
+    )
     assembled_annotations = curate_view_dimensions(
         adapter, assembled, keep=ASSEMBLED_KEEP, view_label="assembled rod"
     )
     rod_annotations = curate_view_dimensions(
         adapter, rod_end, keep=ROD_END_KEEP, view_label="rod end"
     )
-    annotations = [*top_annotations, *section_annotations, *assembled_annotations]
+    annotations = [
+        *top_annotations,
+        *section_annotations,
+        *right_annotations,
+        *assembled_annotations,
+    ]
     for annotation in front_annotations:
         name = dimension_name(adapter, annotation)
         annotations.append(
@@ -427,66 +550,21 @@ async def build(adapter: Any) -> dict[str, str]:
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
         raise RuntimeError("failed to delete the empty rod-dimension donor view")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
+    cap_radius = [
+        annotation
+        for annotation in top_annotations
+        if dimension_name(adapter, annotation) == "CapR"
+    ]
+    if len(cap_radius) != 1:
+        raise RuntimeError("expected one handle crown-radius dimension")
+    _shorten_radius_leader(adapter, cap_radius[0], TOP_KEEP["CapR"])
+    # Every place the part authored (policy rule 2) must have survived the
+    # import and the moves: a dimension that fell back to the sheet default
+    # would print a band nobody specified.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"RodDia"})
-    offset_dimension_text(adapter, annotations, {"TubeLen": (0.378, 0.145)})
+    offset_dimension_text(adapter, annotations, {"TubeLen": SEATING_DEPTH_TEXT_XY})
 
-    # Visible shoulders and crown root, all measured from the flat socket end.
-    end = (0.0, TUBE_OD / 4.0, HUB_END_Z)
-    for station, y, expected, label in (
-        (SHOULDER_Z, 0.188, HUB_END_Z - SHOULDER_Z, "hub projection"),
-        (CROWN_ROOT_Z, 0.202, HUB_END_Z - CROWN_ROOT_Z, "socket end to crown root"),
-    ):
-        baseline = _checked_dimension(
-            adapter,
-            right,
-            p0=end,
-            p1=(0.0, (TUBE_OD + GRIP_DIA) / 4.0, station),
-            text_xy=(RIGHT_CENTER[0], y),
-            label=label,
-            expected_mm=expected,
-            orientation="horizontal",
-        )
-        if station == CROWN_ROOT_Z:
-            # Overall length, sphere radius and grip diameter define this junction.
-            reference = _early_bound(baseline, "IDisplayDimension")
-            reference.ShowParenthesis = True
-            if not reference.ShowParenthesis:
-                raise RuntimeError("crown-root baseline was not shown as reference")
-    _checked_dimension(
-        adapter,
-        right,
-        p0=end,
-        p1=(0.0, 0.0, CROWN_TIP_Z),
-        text_xy=(RIGHT_CENTER[0], 0.219),
-        label="body overall length",
-        expected_mm=BODY_OVERALL,
-        orientation="horizontal",
-        entity_types=("EDGE", "SILHOUETTE"),
-        maximum=True,
-    )
-    _checked_dimension(
-        adapter,
-        top,
-        p0=(TUBE_OD / 4.0, 0.0, HUB_END_Z),
-        p1=(0.0, 0.0, ROD_HOLE_DIA / 2.0),
-        text_xy=(0.122, 0.223),
-        label="socket end to cross-hole axis",
-        expected_mm=HUB_END_Z,
-        orientation="vertical",
-        center=True,
-    )
-    _checked_dimension(
-        adapter,
-        assembled,
-        p0=(GRIP_DIA / 2.0, 0.0, CROWN_ROOT_Z),
-        p1=(0.0, -ROD_DOWN, 0.0),
-        text_xy=(0.080, 0.125),
-        label="rod placement from body axis",
-        expected_mm=ROD_DOWN,
-        orientation="horizontal",
-        center=True,
-    )
 
     for view, label in ((front, "body end"), (top, "cross-hole")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -494,13 +572,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_body_centerline(adapter, right)
     for text, xy in (
         ("BODY", (0.158, 0.120)),
-        ("BODY CROSS-HOLE", (0.047, 0.195)),
+        ("BODY CROSS-HOLES", (0.047, 0.195)),
         ("CROSS ROD IN BODY", (0.058, 0.068)),
     ):
         if add_note(adapter, text, *xy) is None:
             raise RuntimeError(f"failed to add {text} view caption")
     add_property_linked_note(adapter, "Manufacturing Notes", 0.058, 0.060)
-    add_property_linked_note(adapter, "Isometric View Note", 0.322, 0.196)
+    add_property_linked_note(adapter, "Isometric View Note", 0.292, 0.181)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
