@@ -394,6 +394,77 @@ def test_mha_092_collisions_fail_the_shared_audit_and_passed_the_old_one():
     assert not pair("text-on-line", "Adjuster", "view right geometry")
 
 
+# Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
+# 5100 x 3300 px, 11.81 px/mm) by swing: dark-pixel component boxes in sheet
+# mm (test_cone_tip_block_drawing @ 287c5cf6a, _I31_TEXT_MM and friends).
+I31_TEXT_MM = {
+    "FlangeLen": ("plan", "20.8", (37.68, 229.19, 46.31, 232.66)),
+    "FlangeSlotCtoC": ("plan", "8.42", (46.99, 229.70, 55.63, 233.09)),
+    "PinchClearance": ("front", "<MOD-DIAM>3.26 <HOLE-DEPTH>6.9", (118.11, 170.60, 149.52, 175.68)),
+    "PinchDepthCenter": ("right", "6.0", (143.00, 169.42, 148.84, 172.72)),
+    "Adjuster": ("front", "ADJUSTER\nENTRY\nTHRU ALL", (85.60, 106.51, 142.66, 122.68)),
+}
+I31_RIGHT_BODY_MM = (141.31, 93.81, 159.43, 164.17)
+I31_HEEL_HEIGHT_LINE_MM = ((119.25, 87.55), (119.25, 108.46))
+
+
+def test_mha_092_i31_ink_fails_on_every_collision_the_eye_pass_found():
+    """Positive control on the I31 render's own ink: all four of Main's
+    collisions gate -- "20.8"/"8.42" 0.68 mm apart, the pinch callout on the
+    6.0, the adjuster callout over the right view's body, and the 5.56
+    heel-height line through the adjuster callout."""
+    by_view = {"plan": [], "front": [], "right": []}
+    for name, (view, text, box) in I31_TEXT_MM.items():
+        by_view[view].append(_note(name, text, tuple(v / 1000.0 for v in box)))
+    (hx0, hy0), (hx1, hy1) = I31_HEEL_HEIGHT_LINE_MM
+    by_view["front"].append(
+        _dim("HeelReliefHt", "5.56", 0.1100, 0.0950, lines=[(hx0 / 1000, hy0 / 1000, hx1 / 1000, hy1 / 1000)])
+    )
+    x0, y0, x1, y1 = (v / 1000.0 for v in I31_RIGHT_BODY_MM)
+    border = [x0, y0, 0.0, x1, y0, 0.0, x1, y1, 0.0, x0, y1, 0.0, x0, y0, 0.0]
+    pad = 0.003  # GetOutline pads the body with whitespace
+    dump = _dump(
+        views=[
+            _view("plan", (0.020, 0.190, 0.120, 0.250), by_view["plan"]),
+            _view("front", (0.060, 0.090, 0.118, 0.170), by_view["front"]),
+            _view(
+                "right",
+                (x0 - pad, y0 - pad, x1 + pad, y1 + pad),
+                by_view["right"],
+                polylines=[0, 0, 0, 0, 0, 1, 0, 0, 5, *border],
+            ),
+        ]
+    )
+    gating = [f for f in audit_dump(dump) if severity(f) is FindingSeverity.GATING]
+
+    def hits(kind, a, b):
+        return [f for f in gating if f.kind == kind and a in f.a + f.b and b in f.a + f.b]
+
+    near = hits("text-clearance", "FlangeLen", "FlangeSlotCtoC")
+    assert len(near) == 1 and near[0].extra["gap_mm"] == pytest.approx(0.68, abs=0.01)
+    assert hits("text-clearance", "PinchClearance", "PinchDepthCenter")
+    assert hits("text-on-view", "Adjuster", "view right")
+    assert hits("text-on-line", "HeelReliefHt", "Adjuster")
+
+
+def test_a_shoulder_crossed_by_a_foreign_dimension_line_is_found():
+    """Swing's class d: a dimension line crossing a callout's shoulder, the
+    run under its text, below the text box itself."""
+    h = 0.0035
+    callout = _hole_callout(
+        "Adjuster",
+        [(0.080, 0.090, 0.100, 0.1000), (0.100, 0.1000, 0.140, 0.1000)],
+        [("THRU ALL", 0.100, 0.1001)],
+        height=h,
+    )
+    heel = _dim("HeelReliefHt", "5.56", 0.150, 0.080, lines=[(0.1190, 0.0875, 0.1190, 0.0990)])
+    heel["display"]["lines"].append(_line(0.1190, 0.0990, 0.1190, 0.1010))
+    findings = audit_dump(_dump(views=[_view("front", (0.05, 0.05, 0.2, 0.2), [callout, heel])]))
+    crossed = [f for f in findings if f.kind == "shoulder-crosses-line"]
+    assert [(f.a.split()[1], f.b.split()[1]) for f in crossed] == [("Adjuster", "HeelReliefHt")]
+    assert severity(crossed[0]) is FindingSeverity.GATING
+
+
 def test_a_leader_through_its_own_rows_is_found_but_its_shoulder_joint_is_not():
     h = 0.0035
     rows = [("TOP ROW TEXT", 0.100, 0.110), ("BOTTOM ROW", 0.100, 0.1044)]

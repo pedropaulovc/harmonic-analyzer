@@ -1229,17 +1229,21 @@ def find_leader_through_text(
 
 
 def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
-    """A leader transversally crossing another annotation's dimension/witness line.
+    """A leader or callout shoulder transversally crossing another annotation's
+    dimension/witness line.
 
-    Rule 8: no leader crosses a dimension line. Touches (a leader landing ON a
-    line) are not crossings -- see ``_drawing_layout_check._proper_crossing``.
+    Rule 8: no leader crosses a dimension line. A callout's shoulder is its
+    leader's last run under the text: MHA-092's 5.56 heel-height line crossed
+    the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
+    leader landing ON a line) are not crossings -- see
+    ``_drawing_layout_check._proper_crossing``.
     """
     findings = []
     leaders = [
         (annotation, segment)
         for annotation in sheet.annotations
         for segment in annotation.segments
-        if segment.role == "leader"
+        if segment.role in ("leader", "shoulder")
     ]
     lines = [
         (annotation, segment)
@@ -1263,12 +1267,12 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
             seen.add((source.label, target.label))
             findings.append(
                 Finding(
-                    kind="leader-crosses-line",
+                    kind="shoulder-crosses-line" if leader.role == "shoulder" else "leader-crosses-line",
                     sheet=sheet.name,
                     a=source.label,
                     b=target.label,
                     detail=(
-                        f"leader of {source.label!r} {leader.format_mm()} crosses "
+                        f"{leader.role} of {source.label!r} {leader.format_mm()} crosses "
                         f"{target.label!r}'s line {line.format_mm()}"
                     ),
                     at_mm=(point[0] * MM, point[1] * MM),
@@ -1362,6 +1366,7 @@ GATING_KINDS = frozenset(
         "leader-through-text",
         "leader-through-own-text",
         "leader-crosses-line",
+        "shoulder-crosses-line",
         "leader-crosses-view",
         "leader-crosses-leader",
         "outside-border",

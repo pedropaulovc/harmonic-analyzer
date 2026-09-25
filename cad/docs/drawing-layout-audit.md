@@ -60,7 +60,7 @@ and a balloon keeps its rendered circle.
 | `text-on-line` | gating | a foreign line runs through text; covers annotation lines and visible model edges (`IView::GetPolylines7`), datum-origin, section-line and detail-circle ink |
 | `text-on-view` | gating | text printed inside a view its annotation does not belong to, between that view's edges (the view's `GetOutline`, inset as for leaders; pictorial views skipped); from swing's MHA-092 gap diff |
 | `leader-through-text` / `leader-through-own-text` | gating | a leader runs through foreign text, or through its own rows (0.2 mm inset, shoulder excluded) |
-| `leader-crosses-line` | gating | a leader crosses another annotation's dimension, witness or frame line transversally |
+| `leader-crosses-line` / `shoulder-crosses-line` | gating | a leader, or a callout's shoulder under its text, crosses another annotation's dimension, witness or frame line transversally (MHA-092's heel-height line through the ADJUSTER shoulder) |
 | `leader-crosses-view` / `leader-crosses-leader` | gating | as in `_drawing_layout_check` |
 | `outside-border` / `keep-out` | gating | past the zone frame, or inside the title block |
 | `merged-blocks` | gating | two callouts (hole callouts or leadered notes) stacked in one column, x spans overlapping, less than a row pitch (1.59 h, 5.556 mm at 3.5 mm text) apart; supports' `find_merged_blocks` |
