@@ -10,8 +10,13 @@ Dimensions estimated from the p.18 top-down and the v4_t00393 still
 (low). The adjuster axis above the block base is ADJUSTER_AXIS_HEIGHT; the platform
 adds PLATE_T and the fit-up shim pack (SHIM_NOMINAL, U30) under the foot, and
 ADJUSTER_AXIS_HEIGHT + SHIM_NOMINAL + PLATE_T must equal the drive height above
-the base top -- asserted module-level in build_drive_train_assembly. One
-hidden #6-32 socket head cap screw holds the foot down through the platform.
+the base top -- asserted module-level in build_drive_train_assembly.
+
+I31 (Main, 2026-09-25): the foot runs on south as a flange, FLANGE_T thick,
+with an axial slot.  One #6-32 hex-head screw rises from under the platform
+through that slot into a nylon-insert locknut on the flange top, so the
+block is clamped wherever the shaft tip sets it along the axis.  A heel
+relief along the north-bottom edge clears the cone pivot screw's head.
 
 Layout: block standing on the Top plane, plan centred on the origin,
 adjuster axis along Z at y = ADJUSTER_AXIS_HEIGHT (the assembly rotates the
@@ -41,6 +46,7 @@ from _common import (
     define_centered_rectangle,
     define_rectilinear_chain,
     dimension_between,
+    extrude_at_offset,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -59,6 +65,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
@@ -70,8 +77,13 @@ from cone_tip_block_spec import (
     BLOCK_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    FOOT_BORE_DIA,
-    FOOT_BORE_SPEC,
+    FLANGE_LEN,
+    FLANGE_SLOT_CTOC,
+    FLANGE_SLOT_W,
+    FLANGE_SLOT_W_BAND,
+    FLANGE_SLOT_X,
+    FLANGE_SLOT_Z,
+    FLANGE_T,
     HEEL_RELIEF_DEPTH,
     HEEL_RELIEF_HEIGHT,
     MIN_WEB_MM,
@@ -88,7 +100,8 @@ from cone_tip_block_spec import (
     WORST_SLIT_MOUTH_WEB_MM,
     WORST_TOP_LIGAMENT_MM,
 )
-from _holes import blind_hole_volume_mm3, wizard_holes
+from _fit_limits import deviations
+from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 
 PART_NAME = "cone-tip-block"
@@ -101,8 +114,8 @@ REFERENCE_SKETCHES = (
     "AxisHeightReference",
     "PinchDepthReference",
     "PinchRiseReference",
-    "FootTapXReference",
-    "FootTapZReference",
+    "FlangeSlotXReference",
+    "FlangeSlotZReference",
 )
 
 # Geometry envelope comes from cone_tip_block_spec — the drawing's single
@@ -223,6 +236,77 @@ async def _author_reference_dimension(
     await force_rebuild(adapter)
 
 
+# The flange slot's centre in Top-plane sketch coordinates (y = -Z).
+_FLANGE_SLOT_Y = BLOCK_Z / 2.0 + FLANGE_SLOT_Z
+
+
+async def _sketch_flange_slot(adapter) -> SketchDims:
+    """Top-plane round-ended slot along the cone axis (sketch y), centred
+    across the block: two lines and two tangent end arcs.  The north arc's
+    centre is anchored on the Y axis; the spacing between the arc centres
+    and the width between the lines are the printed sizes."""
+    dims = SketchDims()
+    r = FLANGE_SLOT_W / 2.0
+    y_n = _FLANGE_SLOT_Y - FLANGE_SLOT_CTOC / 2.0
+    y_s = _FLANGE_SLOT_Y + FLANGE_SLOT_CTOC / 2.0
+    check("create_sketch flange slot", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    line_a = check("flange slot line a", await adapter.add_line(r, y_n, r, y_s))
+    arc_s = check(
+        "flange slot south arc", await adapter.add_arc(0.0, y_s, r, y_s, -r, y_s)
+    )
+    line_b = check("flange slot line b", await adapter.add_line(-r, y_s, -r, y_n))
+    arc_n = check(
+        "flange slot north arc", await adapter.add_arc(0.0, y_n, -r, y_n, r, y_n)
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{arc_n}.center", 0.0, y_n, "flange slot north end")
+    dims.record(
+        "FlangeSlotNorthY", '"BlockZ" / 2 + "FlangeSlotZ" - "FlangeSlotCtoC" / 2'
+    )
+    check(
+        "flange slot end centres in line",
+        await adapter.add_sketch_constraint(
+            f"{arc_n}.center", f"{arc_s}.center", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{arc_n}.center",
+        f"{arc_s}.center",
+        "vertical_distance",
+        FLANGE_SLOT_CTOC,
+        "flange slot spacing",
+    )
+    dims.record("FlangeSlotCtoC", '"FlangeSlotCtoC"')
+    check(
+        "vertical flange slot line a",
+        await adapter.add_sketch_constraint(line_a, None, "vertical"),
+    )
+    for junction, e1, e2 in (
+        ("a-south", line_a, arc_s),
+        ("south-b", arc_s, line_b),
+        ("b-north", line_b, arc_n),
+        ("north-a", arc_n, line_a),
+    ):
+        check(
+            f"flange slot tangent {junction}",
+            await adapter.add_sketch_constraint(e1, e2, "tangent"),
+        )
+    await dimension_between(
+        adapter,
+        f"{line_a}.start",
+        f"{line_b}.end",
+        "horizontal_distance",
+        FLANGE_SLOT_W,
+        "flange slot width",
+    )
+    dims.record("FlangeSlotW", '"FlangeSlotW"')
+    await ensure_fully_defined(adapter, "flange slot sketch")
+    check("exit_sketch flange slot", await adapter.exit_sketch())
+    return dims
+
+
 def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
     """Hide the reference sketches in the part so no instance renders them.
 
@@ -258,8 +342,12 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PinchRise", f"{PINCH_RISE}mm")
     await set_global(adapter, "PassageCenter", '"BlockX" / 2')
     await set_global(adapter, "PinchDepthCenter", '"BlockZ" / 2')
-    await set_global(adapter, "FootTapX", '"BlockX" / 2')
-    await set_global(adapter, "FootTapZ", '"BlockZ" / 2')
+    await set_global(adapter, "FlangeLen", f"{FLANGE_LEN}mm")
+    await set_global(adapter, "FlangeT", f"{FLANGE_T}mm")
+    await set_global(adapter, "FlangeSlotW", f"{FLANGE_SLOT_W}mm")
+    await set_global(adapter, "FlangeSlotCtoC", f"{FLANGE_SLOT_CTOC}mm")
+    await set_global(adapter, "FlangeSlotX", '"BlockX" / 2')
+    await set_global(adapter, "FlangeSlotZ", f"{FLANGE_SLOT_Z}mm")
     await set_global(adapter, "HeelReliefDepth", f"{HEEL_RELIEF_DEPTH}mm")
     await set_global(adapter, "HeelReliefHt", f"{HEEL_RELIEF_HEIGHT}mm")
     await set_global(
@@ -391,21 +479,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "pinch clearance", volume - v_clearance, 0.08 * v_clearance
     )
 
-    # U30 hold-down: one native #6-32 blind tap up into the foot centre. The
-    # #6-32 socket head cap screw comes up through the platform's counterbored
-    # lateral slot; the slot and the shim pack under the foot absorb the
-    # block's fit-up alignment, so the tap needs no location tighter than the
-    # footprint it is centred in.
-    wizard_holes(
-        adapter, FOOT_BORE_SPEC,
-        [[0.0, 0.0, 0.0]],
-        (0.0, -1.0, 0.0),
-        f"foot hold-down tapped hole ({FOOT_BORE_SPEC.size} blind)",
-        name="FootBore",
-    )
-    v_foot = blind_hole_volume_mm3(FOOT_BORE_DIA, FOOT_BORE_SPEC.depth_mm)
-    volume = await volume_check(adapter, "foot tap", volume - v_foot, 0.03 * v_foot)
-
     # I31 heel relief: a step along the whole north-bottom edge, so the cone
     # pivot screw's head (on the platform top, just north of the block) never
     # meets the north face at the fit-up extreme.  The Right plane reads the
@@ -443,6 +516,56 @@ async def build(adapter) -> dict[str, str]:
     v_heel = BLOCK_X * HEEL_RELIEF_DEPTH * HEEL_RELIEF_HEIGHT
     volume = await volume_check(adapter, "heel relief", volume - v_heel, 0.01 * v_heel)
 
+    # I31 foot flange: the block's full width, FLANGE_LEN past the south face
+    # (Top-plane sketch y = -Z, so south is +y), FLANGE_T up from the foot,
+    # merged with the body along the south face.
+    flange = SketchDims()
+    flange_pts = [
+        (-BLOCK_X / 2.0, BLOCK_Z / 2.0),
+        (BLOCK_X / 2.0, BLOCK_Z / 2.0),
+        (BLOCK_X / 2.0, BLOCK_Z / 2.0 + FLANGE_LEN),
+        (-BLOCK_X / 2.0, BLOCK_Z / 2.0 + FLANGE_LEN),
+    ]
+    check("create_sketch flange", await adapter.create_sketch("Top"))
+    flange_lines = await add_line_chain(adapter, flange_pts)
+    await define_rectilinear_chain(
+        adapter,
+        flange_lines,
+        flange_pts,
+        label="flange",
+        dims=flange,
+        names=["FlangeWidth", "FlangeLen", "FlangeEdgeX", "FlangeRoot"],
+        drives=['"BlockX"', '"FlangeLen"', '"BlockX" / 2', '"BlockZ" / 2'],
+    )
+    await ensure_fully_defined(adapter, "flange sketch")
+    check("exit_sketch flange", await adapter.exit_sketch())
+    name_last_feature(adapter, "FlangeProfile")
+    drive_jobs += flange.apply(adapter, "FlangeProfile")
+    extrude_at_offset(adapter, FLANGE_T, 0.0)
+    name_last_feature(adapter, "Flange")
+    flange_t_dim = name_dimensions(adapter, "Flange", ["FlangeT"])
+    drive_jobs += [(flange_t_dim[0], '"FlangeT"')]
+    v_flange = BLOCK_X * FLANGE_LEN * FLANGE_T
+    volume = await volume_check(adapter, "foot flange", volume + v_flange, 0.005 * v_flange)
+
+    # The flange's axial slot: one pass of a 5/32 end mill along the cone
+    # axis, centred across the block, its arc centres FLANGE_SLOT_CTOC apart
+    # about FLANGE_SLOT_Z south of the south face.  Cut through the flange.
+    slot = await _sketch_flange_slot(adapter)
+    name_last_feature(adapter, "FlangeSlotProfile")
+    drive_jobs += slot.apply(adapter, "FlangeSlotProfile")
+    check(
+        "cut flange slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=4.0 * FLANGE_T, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "FlangeSlot")
+    v_slot = (
+        FLANGE_SLOT_W * FLANGE_SLOT_CTOC + math.pi * (FLANGE_SLOT_W / 2.0) ** 2
+    ) * FLANGE_T
+    volume = await volume_check(adapter, "flange slot", volume - v_slot, 0.01 * v_slot)
+
     # Named bore axis for the view-independent coaxial mate: the shaft tip
     # positions this block (coaxial + axial distance), no face picks.
     await name_bore_axis(
@@ -464,6 +587,9 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven block (equations neutral)", volume, 0.01 * v_cb)
+    set_dimension_bilateral_tolerance(
+        adapter, "FlangeSlotProfile", "FlangeSlotW", *deviations(FLANGE_SLOT_W_BAND)
+    )
 
     # Model-owned functional interfaces: construction-only dimensions carry
     # every centre location that a machinist must set from a finished face.
@@ -517,31 +643,31 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="PinchRise",
         drive_expression='"PinchRise"',
     )
-    # The foot tap sits at the foot centre (it is placed at the origin); these
-    # two construction-only dimensions locate it from the -X and -Z faces.
+    # The flange slot's centre from the +X face (the PassageCenter datum) and
+    # from the body's south face.
     await _author_reference_dimension(
         adapter,
         plane="Top",
-        start=(-BLOCK_X / 2.0, 0.0),
-        end=(0.0, 0.0),
+        start=(BLOCK_X / 2.0, _FLANGE_SLOT_Y),
+        end=(0.0, _FLANGE_SLOT_Y),
         orientation="horizontal",
         dimension_type="horizontal_distance",
-        value_mm=BLOCK_X / 2.0,
-        feature_name="FootTapXReference",
-        dimension_name="FootTapX",
-        drive_expression='"FootTapX"',
+        value_mm=FLANGE_SLOT_X,
+        feature_name="FlangeSlotXReference",
+        dimension_name="FlangeSlotX",
+        drive_expression='"FlangeSlotX"',
     )
     await _author_reference_dimension(
         adapter,
         plane="Top",
-        start=(0.0, -BLOCK_Z / 2.0),
-        end=(0.0, 0.0),
+        start=(0.0, BLOCK_Z / 2.0),
+        end=(0.0, _FLANGE_SLOT_Y),
         orientation="vertical",
         dimension_type="vertical_distance",
-        value_mm=BLOCK_Z / 2.0,
-        feature_name="FootTapZReference",
-        dimension_name="FootTapZ",
-        drive_expression='"FootTapZ"',
+        value_mm=FLANGE_SLOT_Z,
+        feature_name="FlangeSlotZReference",
+        dimension_name="FlangeSlotZ",
+        drive_expression='"FlangeSlotZ"',
     )
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)

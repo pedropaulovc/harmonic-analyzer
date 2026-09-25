@@ -2,7 +2,10 @@ r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing
 
 from __future__ import annotations
 
+import math
+
 import _config
+from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
@@ -57,36 +60,16 @@ ADJUSTER_CSK_DIA = 5.0
 # envelope the shaft tip passes through.
 ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
 SHAFT_PASSAGE_DIA = ADJUSTER_MINOR_MIN_DIA
-# U30 hold-down: one #6-32 x 1/2 button-head socket cap screw (McMaster
-# 91255A148, head 0.262 x 0.073; rule-12 W22 swapped it in for the taller
-# socket head) comes up through the platform's counterbored lateral slot into
-# the foot centre. Under the head the platform leaves a ledge of stock
-# thickness (6.35 +/-0.13, user ruling U41: "1/4 PLATE AS SUPPLIED") less the
-# 2.80 .XX counterbore depth, 2.91..4.19
-# (cone_swing_platform_spec.TIP_LEDGE_RANGE), and the fit-up shim pack is
-# 0.05..2.20, so the 12.7 screw reaches 6.31..9.74 into the block (1.80D at
-# the short end).  Judged at the printed worst case: engagement >= 1.5D, and
-# the deepest reach stays on full thread -- ThreadDepth .X, so 0.8 under
-# nominal.
+# I31 option 1 (Main, 2026-09-25): the block is held down through a south
+# foot flange.  One #6-32 x 5/8 hex-head screw (McMaster 93075A150) rises from
+# the swing platform's counterbored lateral slot, through the fit-up shim pack
+# and an axial slot in the flange, into a #6-32 nylon-insert locknut
+# (McMaster 90631A007) on the flange top.  The plate slot lets the block move
+# across the cone axis, the flange slot along it, so the block sits wherever
+# the shaft tip puts it and the screw clamps it there; the counterbore slot's
+# walls hold the hex head, so the nut is turned from above alone.
 FOOT_THREAD = "#6-32"
-FOOT_SCREW_LENGTH = 12.7
-FOOT_LEDGE_RANGE_MM = (2.91, 4.19)
 FOOT_SHIM_RANGE_MM = (0.05, 2.20)
-FOOT_SCREW_REACH_MM = (
-    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[1] - FOOT_SHIM_RANGE_MM[1],
-    FOOT_SCREW_LENGTH - FOOT_LEDGE_RANGE_MM[0] - FOOT_SHIM_RANGE_MM[0],
-)
-FOOT_THREAD_DEPTH = 12.5
-# The tap drill runs 1.5P past the deepest full thread at the printed limits
-# (both depths .X), so a plug tap's lead never eats the full-thread depth.
-FOOT_DEPTH = 15.5
-_FOOT_PITCH_MM = 25.4 / 32.0
-if FOOT_SCREW_REACH_MM[0] < 1.5 * THREAD_MAJOR_MM[FOOT_THREAD]:
-    raise AssertionError("foot screw engagement falls below 1.5D")
-if FOOT_SCREW_REACH_MM[1] > FOOT_THREAD_DEPTH - 0.8 - 0.25:
-    raise AssertionError("foot screw can reach the tap's incomplete lead threads")
-if (FOOT_DEPTH - 0.8) - (FOOT_THREAD_DEPTH + 0.8) < 1.5 * _FOOT_PITCH_MM:
-    raise AssertionError("foot tap drill leaves no lead room past the full thread")
 PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
 ADJUSTER_BORE_SPEC = HoleSpec("tapped", ADJUSTER_THREAD)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
@@ -94,14 +77,6 @@ ADJUSTER_CSK = (ADJUSTER_CSK_DIA - ADJUSTER_BORE_DIA) / 2.0
 if ADJUSTER_CSK_DIA < THREAD_MAJOR_MM[ADJUSTER_THREAD]:
     raise AssertionError("adjuster countersink ends inside the thread major")
 PINCH_BORE_SPEC = HoleSpec("tapped", PINCH_THREAD)
-FOOT_BORE_SPEC = HoleSpec(
-    "tapped",
-    FOOT_THREAD,
-    end="blind",
-    depth_mm=FOOT_DEPTH,
-    overrides_mm={"ThreadDepth": FOOT_THREAD_DEPTH},
-)
-FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
 PINCH_BORE_DIA = blind_cut_dia_mm(PINCH_BORE_SPEC)
 PINCH_CLEARANCE_SPEC = HoleSpec(
     "clearance",
@@ -234,22 +209,158 @@ if not (
 # them (build_drive_train_assembly, "heel relief").
 HEEL_RELIEF_DEPTH = 1.53
 HEEL_RELIEF_HEIGHT = 5.56
-# The relief's inner face and the foot tap share the foot: FootTapZ prints
-# .XX from the north face (the relief's own datum), so the web between the
-# relief and the tap's thread major closes at the printed limits.  It clears
-# the 1.5 floor but not the 2.0 target (U27): the tap is transient, I31's
-# flange hold-down retires it.
-WORST_HEEL_RELIEF_TAP_WEB_MM = (
-    round(BLOCK_Z / 2.0, 2)
-    - _GENERAL_2PL_MM
-    - THREAD_MAJOR_MM[FOOT_THREAD] / 2.0
-    - (HEEL_RELIEF_DEPTH + _GENERAL_2PL_MM)
+# --- I31 foot flange and its axial slot --------------------------------------
+# The purchased hardware the flange is sized for, from the McMaster product
+# pages (read 2026-09-25): 93075A150 is a 6-32 x 5/8 low-strength zinc-plated
+# steel hex head screw, head 1/4 wide x 3/32 high (ASME B18.6.3); 90631A007 is
+# a 6-32 zinc-plated steel nylon-insert locknut, 5/16 wide x 11/64 high.  The
+# catalogue gives no insert height, so the whole 11/64 counts as nut and the
+# screw must stand a full pitch past its top face.
+HOLDDOWN_SCREW_LENGTH = 0.625 * 25.4
+HOLDDOWN_NUT_AF = 5.0 / 16.0 * 25.4
+HOLDDOWN_NUT_H = 11.0 / 64.0 * 25.4
+# Sharp corners: the largest the nut can sweep.
+HOLDDOWN_NUT_AC = HOLDDOWN_NUT_AF / (3.0**0.5 / 2.0)
+HOLDDOWN_PITCH_MM = 25.4 / 32.0
+_HOLDDOWN_MAJOR_MM = THREAD_MAJOR_MM[FOOT_THREAD]
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+# The flange slot is one pass of a 5/32 end mill, so its width carries the
+# cutter's one-sided +0.10/0 band (the title block's drilled-hole row),
+# written (upper, lower) like every _fit_limits band and only ever read
+# through _fit_limits.deviations, here and on the model -- never by index.
+FLANGE_SLOT_W = 5.0 / 32.0 * 25.4
+FLANGE_SLOT_W_BAND = (_DRILLED_HOLE_PLUS_MM, 0.0)
+_FLANGE_SLOT_W_LOWER, _FLANGE_SLOT_W_UPPER = deviations(FLANGE_SLOT_W_BAND)
+FLANGE_SLOT_W_MIN = FLANGE_SLOT_W + _FLANGE_SLOT_W_LOWER
+FLANGE_SLOT_W_MAX = FLANGE_SLOT_W + _FLANGE_SLOT_W_UPPER
+FLANGE_SLOT_FLOAT = (FLANGE_SLOT_W_MAX - _HOLDDOWN_MAJOR_MM) / 2.0
+# Fit-up chain: how far the screw can sit from where the block needs it,
+# along the axis.  The block's north face follows the shaft tip (the cup seats
+# at ADJUSTER_EMBED), so the chain runs tip -> north face -> south face ->
+# flange-slot centre -> screw -> plate slot centre: the shaft's overall
+# length Sec4End (.X; asserted against the shaft spec in
+# build_drive_train_assembly), the block Depth (.X), FlangeSlotZ (.X), the
+# plate's TipSlotZ station (.XX; asserted against the platform spec there
+# too) and the screw's float across the plate's 4.0 +0.10 slot.
+SHAFT_OVERALL_LENGTH_PLACES = 1
+BLOCK_DEPTH_PLACES = 1
+FLANGE_SLOT_Z_PLACES = 1
+PLATE_TIP_SLOT_Z_PLACES = 2
+PLATE_TIP_SLOT_W = 4.0
+PLATE_TIP_SLOT_W_PLUS = _DRILLED_HOLE_PLUS_MM
+PLATE_TIP_SLOT_FLOAT = (
+    PLATE_TIP_SLOT_W + PLATE_TIP_SLOT_W_PLUS - _HOLDDOWN_MAJOR_MM
+) / 2.0
+FIT_UP_CHAIN_MM = (
+    _BAND_BY_PLACES[SHAFT_OVERALL_LENGTH_PLACES]
+    + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
+    + _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
+    + _BAND_BY_PLACES[PLATE_TIP_SLOT_Z_PLACES]
+    + PLATE_TIP_SLOT_FLOAT
 )
-MIN_WEB_FLOOR_MM = 1.5
-if round(WORST_HEEL_RELIEF_TAP_WEB_MM, 6) < MIN_WEB_FLOOR_MM:
+FIT_UP_MARGIN_MM = 1.0
+FLANGE_SLOT_HALF_TRAVEL = FIT_UP_CHAIN_MM + FIT_UP_MARGIN_MM
+# The slot prints its arc-centre spacing (.XX), rounded up.
+FLANGE_SLOT_CTOC = math.ceil(2.0 * FLANGE_SLOT_HALF_TRAVEL * 100.0 - 1e-6) / 100.0
+_SLOT_HALF_CTOC = (
+    (FLANGE_SLOT_CTOC - _GENERAL_2PL_MM) / 2.0,
+    (FLANGE_SLOT_CTOC + _GENERAL_2PL_MM) / 2.0,
+)
+if _SLOT_HALF_CTOC[0] + FLANGE_SLOT_FLOAT < FIT_UP_CHAIN_MM:
+    raise AssertionError("flange slot no longer covers the fit-up chain at its short limit")
+FLANGE_SLOT_LEN = FLANGE_SLOT_CTOC + FLANGE_SLOT_W
+# The nut sits on the flange top next to the body's south wall.  At the
+# slot's north end (spacing at its long limit, the screw floating north,
+# FlangeSlotZ short) its corners keep NUT_WALL_AIR off the wall.
+NUT_WALL_AIR = 0.5
+FLANGE_SLOT_Z = (
+    math.ceil(
+        (
+            HOLDDOWN_NUT_AC / 2.0
+            + NUT_WALL_AIR
+            + _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
+            + _SLOT_HALF_CTOC[1]
+            + FLANGE_SLOT_FLOAT
+        )
+        * 10.0
+        - 1e-6
+    )
+    / 10.0
+)
+# From the south face; the flange's own length is .X like the body's plan.
+_SLOT_SOUTH_EDGE_MAX = (
+    FLANGE_SLOT_Z
+    + _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
+    + _SLOT_HALF_CTOC[1]
+    + (FLANGE_SLOT_W_MAX) / 2.0
+)
+FLANGE_LEN = (
+    math.ceil((_SLOT_SOUTH_EDGE_MAX + MIN_WEB_MM + _GENERAL_1PL_MM) * 10.0 - 1e-6) / 10.0
+)
+# The slot is on the block's centre plane, located .XX from the +X face (the
+# PassageCenter datum); the flange is the block's full width (.X).
+FLANGE_SLOT_X = BLOCK_X / 2.0
+WORST_FLANGE_SIDE_WEB_MM = min(
+    round(FLANGE_SLOT_X, 2) - _GENERAL_2PL_MM,
+    round(BLOCK_X, 1) - _GENERAL_1PL_MM - (round(FLANGE_SLOT_X, 2) + _GENERAL_2PL_MM),
+) - (FLANGE_SLOT_W_MAX) / 2.0
+WORST_FLANGE_END_WEB_MM = FLANGE_LEN - _GENERAL_1PL_MM - _SLOT_SOUTH_EDGE_MAX
+WORST_FLANGE_ROOT_WEB_MM = (
+    FLANGE_SLOT_Z
+    - _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
+    - _SLOT_HALF_CTOC[1]
+    - (FLANGE_SLOT_W_MAX) / 2.0
+)
+WORST_NUT_WALL_AIR_MM = (
+    FLANGE_SLOT_Z
+    - _BAND_BY_PLACES[FLANGE_SLOT_Z_PLACES]
+    - _SLOT_HALF_CTOC[1]
+    - FLANGE_SLOT_FLOAT
+    - HOLDDOWN_NUT_AC / 2.0
+)
+# The nut bears on the flange beside the slot without a washer.
+NUT_BEARING_MM = (HOLDDOWN_NUT_AF - (FLANGE_SLOT_W_MAX)) / 2.0
+for _name, _web in (
+    ("flange side web", WORST_FLANGE_SIDE_WEB_MM),
+    ("flange end web", WORST_FLANGE_END_WEB_MM),
+    ("flange root web", WORST_FLANGE_ROOT_WEB_MM),
+):
+    if round(_web, 6) < MIN_WEB_MM:
+        raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
+if WORST_NUT_WALL_AIR_MM < NUT_WALL_AIR - 1e-9:
+    raise AssertionError("the hold-down nut can reach the block's south wall")
+if NUT_BEARING_MM < 1.0:
+    raise AssertionError("the hold-down nut bears on under 1.0 beside the flange slot")
+if FLANGE_SLOT_W_MIN - _HOLDDOWN_MAJOR_MM < 0.25:
+    raise AssertionError("flange slot does not clear the #6-32 major")
+# Flange thickness (.XX): with the thickest ledge under the head (the
+# platform's stock-plate and counterbore bands, cone_swing_platform_spec
+# TIP_LEDGE_RANGE, asserted equal in build_drive_train_assembly) and the
+# thickest shim stack, the 5/8 screw still stands a pitch past the nut.
+FLANGE_T = 3.50
+HOLDDOWN_LEDGE_RANGE_MM = (2.71, 3.99)
+HOLDDOWN_PROTRUSION_MM = (
+    HOLDDOWN_SCREW_LENGTH
+    - (
+        HOLDDOWN_LEDGE_RANGE_MM[1]
+        + FOOT_SHIM_RANGE_MM[1]
+        + FLANGE_T
+        + _GENERAL_2PL_MM
+        + HOLDDOWN_NUT_H
+    ),
+    HOLDDOWN_SCREW_LENGTH
+    - (
+        HOLDDOWN_LEDGE_RANGE_MM[0]
+        + FOOT_SHIM_RANGE_MM[0]
+        + FLANGE_T
+        - _GENERAL_2PL_MM
+        + HOLDDOWN_NUT_H
+    ),
+)
+if HOLDDOWN_PROTRUSION_MM[0] < HOLDDOWN_PITCH_MM:
     raise AssertionError(
-        f"heel relief leaves {WORST_HEEL_RELIEF_TAP_WEB_MM:.3f} to the foot tap "
-        "at the printed limits (< 1.5 floor, U27)"
+        f"hold-down screw stands {HOLDDOWN_PROTRUSION_MM[0]:.3f} past the nut at "
+        "the thickest stack (< one pitch past the nylon insert)"
     )
 # The relief stays in the foot, well under the adjuster thread and its
 # countersink.
@@ -276,12 +387,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinchRiseReference": {"PinchRise"},
     "SlitProfile": {"SlitW"},
     "TopSlit": {"SlitDepth"},
-    # The #6-32 foot tap, located from two finished faces (review
-    # 2026-09-23: centre marks alone are not a location).
-    "FootTapXReference": {"FootTapX"},
-    "FootTapZReference": {"FootTapZ"},
     # I31 heel relief: depth from the north face, height from the foot.
     "HeelReliefProfile": {"HeelReliefDepth", "HeelReliefHt"},
+    # I31 foot flange: its length past the south face and its thickness; the
+    # axial slot's width and arc-centre spacing, located from the +X face and
+    # the south face (hidden reference sketches, like the old foot tap's).
+    "FlangeProfile": {"FlangeLen"},
+    "Flange": {"FlangeT"},
+    "FlangeSlotProfile": {"FlangeSlotW", "FlangeSlotCtoC"},
+    "FlangeSlotXReference": {"FlangeSlotX"},
+    "FlangeSlotZReference": {"FlangeSlotZ"},
 }
 
 # Decimal places carry the general tolerance and therefore live on the model.
@@ -297,13 +412,21 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchRiseReference": {"PinchRise": 2},
     "SlitProfile": {"SlitW": 2},
     "TopSlit": {"SlitDepth": 1},
-    # A centred tap in a 15 x 12 foot: .X leaves 4.95 of wall to the edge.
-    "FootTapXReference": {"FootTapX": 1},
-    # .XX from the north face: the heel relief shares that face, and the web
-    # between them misses the 1.5 floor at .X (1.41).
-    "FootTapZReference": {"FootTapZ": 2},
     "HeelReliefProfile": {"HeelReliefDepth": 2, "HeelReliefHt": 2},
+    "FlangeProfile": {"FlangeLen": 1},
+    "Flange": {"FlangeT": 2},
+    # The width is the 5/32 cutter's (+0.10/0, set on the model); the spacing
+    # is .XX (the fit-up travel spends its band).
+    "FlangeSlotProfile": {"FlangeSlotW": 2, "FlangeSlotCtoC": 2},
+    "FlangeSlotXReference": {"FlangeSlotX": 2},
+    "FlangeSlotZReference": {"FlangeSlotZ": FLANGE_SLOT_Z_PLACES},
 }
+# The fit-up chain above reads these grades; the print must carry them.
+if (
+    DRAWING_PRECISION["BlockProfile"]["Depth"] != BLOCK_DEPTH_PLACES
+    or DRAWING_PRECISION["FlangeSlotZReference"]["FlangeSlotZ"] != FLANGE_SLOT_Z_PLACES
+):
+    raise AssertionError("the flange fit-up chain reads grades the print does not carry")
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
