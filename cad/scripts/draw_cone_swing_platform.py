@@ -393,6 +393,38 @@ SLOT_SECTION_KEEP = {
     "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.0205, SLOT_SECTION_CENTER[1]),
 }
 SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.0205, SLOT_SECTION_CENTER[1])
+
+# The view that owns each kept model dimension: it prints once, there.  A
+# targeted import brings a feature's every marked dimension, so a view that
+# shares a feature with another (the notch plan and detail B both import
+# TipScrewSlotProfile) receives the other's dimensions and must delete them;
+# the sheet-wide walk after curation proves the deletion held.
+VIEW_KEEPS: dict[str, dict[str, tuple[float, float]]] = {
+    "profile plan": PROFILE_KEEP,
+    "feature plan": FEATURE_KEEP,
+    "notch plan": NOTCH_KEEP,
+    "pivot section": SECTION_KEEP,
+    "tip screw slot detail": DETAIL_KEEP,
+    "tip screw slot section": SLOT_SECTION_KEEP,
+}
+DIMENSION_OWNER: dict[str, str] = {
+    name: view for view, keep in VIEW_KEEPS.items() for name in keep
+}
+if len(DIMENSION_OWNER) != sum(len(keep) for keep in VIEW_KEEPS.values()):
+    raise AssertionError("a kept dimension is kept by two views")
+
+
+def dimension_placement_errors(seen: dict[str, Sequence[str]]) -> list[str]:
+    """Kept dimensions not printed exactly once, on their owning view.
+
+    ``seen`` maps each view label to the model-dimension names its
+    annotations carry; names no view keeps (hole callouts) are ignored."""
+    errors = []
+    for name, owner in sorted(DIMENSION_OWNER.items()):
+        places = [view for view, names in seen.items() for item in names if item == name]
+        if places != [owner]:
+            errors.append(f"{name}: expected once on {owner}, found on {places}")
+    return errors
 # The native label box measured 46.5 x 16.2 mm; centred under the strip.
 SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
 # The lock-notch caption sits directly under its own view, not on the plan
@@ -401,9 +433,19 @@ SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
 # anchored upper-left and centred under the notch plan, clears the 7.0
 # arrow tip (y 0.1276) above and the C-C strip (ink top ~0.1152) below.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
-# The pivot on the profile plan, from the NE/NW corner-radius stations below
-# (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
+# The pivot on the profile plan, as the farm measured it (plan_xy agrees to
+# 0.05 mm; the corner stations below are projected, not read off a render).
 PROFILE_PIVOT_XY = (0.0718, 0.1377)
+
+
+def corner_station_model_m(label: str) -> tuple[float, float, float]:
+    """Model point (m) of a corner fillet's centre on the plate top.
+
+    The profile's radius proof matches each owned arc against this point
+    projected into the view, so the station follows the outline whenever the
+    part moves a corner."""
+    x, z = _part.corner_fillet_center(label)
+    return (x / 1000.0, PLATE_THICKNESS / 1000.0, z / 1000.0)
 
 
 def plate_edge_mm(z_mm: float, side: int) -> float:
@@ -412,6 +454,57 @@ def plate_edge_mm(z_mm: float, side: int) -> float:
     if side < 0:
         return -(_part.HALF_WIDTH_N + (_part.EAST_HALF_S - _part.HALF_WIDTH_N) * run)
     return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
+
+
+def plate_outline_x_mm(z_mm: float, side: int) -> float:
+    """Model x of the finished outline, north corner rounds included, at ``z_mm``.
+
+    North of where a north corner's round meets its side edge the outline is
+    the round, not the straight edge ``plate_edge_mm`` gives: at the pivot
+    station the NE R10 trims the east end to -15.89 (the straight edge would
+    read -16.25)."""
+    label = "NE" if side < 0 else "NW"
+    labels = [corner[0] for corner in _part._CORNERS]
+    index = labels.index(label)
+    _label, x, z, radius = _part._CORNERS[index]
+    south = _part._CORNERS[index - 1 if side < 0 else (index + 1) % 4]
+    dx, dz = south[1] - x, south[2] - z
+    length = math.hypot(dx, dz)
+    cx, cz = _part.corner_fillet_center(label)
+    # The round meets the side edge at the centre's foot on that edge.
+    tangent_z = z + ((cx - x) * dx + (cz - z) * dz) / length * dz / length
+    if z_mm <= tangent_z:
+        return x + (z_mm - z) / dz * dx
+    return cx + side * math.sqrt(radius * radius - (z_mm - cz) ** 2)
+
+
+# Section A-A cuts across the plan at the pivot (model z 0) at 2:1 and shows
+# only the cut face, so SolidWorks centres that strip on SECTION_CENTER.  The
+# PlateThk witnesses stop PLATE_THK_WITNESS_SET_BACK short of the strip's
+# east end.  I31's wider north-west lengthened the strip 2.9 mm west, which
+# moves the pivot and the east end 2.9 mm (sheet) left; the witness origin
+# (the plate's south-west extreme, x415 before I31) moves with them, so the
+# gap holds and only the absolute end moves.  Before I31 the east end was
+# x310.2 -- test_pivot_section_east_end_matches_the_pre_i31_measurement.
+PIVOT_SECTION_SCALE = 2.0 / 1000.0
+PLATE_THK_WITNESS_SET_BACK = 0.0012
+
+
+def pivot_section_strip_mm() -> tuple[float, float]:
+    """Model x of section A-A's east and west cut ends (the pivot station)."""
+    return (plate_outline_x_mm(0.0, -1), plate_outline_x_mm(0.0, +1))
+
+
+def pivot_section_pivot_x() -> float:
+    """Sheet x of the pivot in section A-A (sheet +x is model +x, west)."""
+    east, west = pivot_section_strip_mm()
+    return SECTION_CENTER[0] - (east + west) / 2.0 * PIVOT_SECTION_SCALE
+
+
+def plate_thk_witness_end_x(pivot_x: float) -> float:
+    """Sheet x where the PlateThk witnesses should stop, given the pivot's."""
+    east, _west = pivot_section_strip_mm()
+    return pivot_x + east * PIVOT_SECTION_SCALE - PLATE_THK_WITNESS_SET_BACK
 
 
 _CC_LETTER_FAR_Z = TIP_SCREW_LOCAL_Z - CC_LETTER_TOP_SHEET / PLAN_SCALE
@@ -1227,6 +1320,26 @@ def _assert_corner_radius_attachment(
     )
 
 
+def _assert_each_kept_dimension_once(adapter: Any, views: dict[str, Any]) -> None:
+    """Walk every view's annotations: each kept dimension once, on its owner.
+
+    ``curate_view_dimensions`` deletes a view's unrequested imports and drops
+    them from the list it returns, so a deletion that did not hold would
+    otherwise print a duplicate unseen."""
+    seen: dict[str, list[str]] = {}
+    for label, view in views.items():
+        names = []
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            name = dimension_name(adapter, _early_bound(raw, "IAnnotation"))
+            if name:
+                names.append(name)
+        seen[label] = sorted(names)
+        print(f"{label} dimensions: {seen[label]}")
+    errors = dimension_placement_errors(seen)
+    if errors:
+        raise RuntimeError("kept dimensions misplaced on the sheet: " + "; ".join(errors))
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1396,8 +1509,10 @@ async def build(adapter: Any) -> dict[str, str]:
                 if ok is not True:
                     raise RuntimeError("plate thickness witness gap could not be read")
                 # Measured native witness origin is x415; the actual cut edge
-                # is x310.2. Leave a visible 1.2 mm gap at x309, without
-                # changing the model dimension or hiding either witness.
+                # was x310.2 (before I31). Leave a visible 1.2 mm gap short of
+                # the cut edge, without changing the model dimension or hiding
+                # either witness. Origin and cut end move together with the
+                # strip (see PLATE_THK_WITNESS_SET_BACK), so the gap is fixed.
                 gap = float(old_gap) + 0.106
                 if display.SetWitnessLineGap(witness_index, False, gap) is not True:
                     raise RuntimeError("plate thickness witness gap was refused")
@@ -1542,16 +1657,36 @@ async def build(adapter: Any) -> dict[str, str]:
         str(thickness_reference.GetText(2)),
     ) != ("(", ")"):
         raise RuntimeError("stock plate thickness reference state did not persist")
-    for name, feature_name, radius_m, station_xy in (
-        ("CornerSWR", "CornerSW", 0.005, (0.0875, 0.2433)),
-        ("CornerNWR", "CornerNW", 0.008, (0.0723, 0.1382)),
-        ("CornerNER", "CornerNE", 0.010, (0.0686, 0.1392)),
-        ("CornerSER", "CornerSE", 0.012, (0.0660, 0.2398)),
-    ):
+    # Each corner's station is its fillet centre projected into the profile:
+    # the sheet literals these replaced went stale when I31 widened the
+    # north-west (the NW centre moved 1.39 mm on the sheet, past the 1 mm
+    # match window: "expected 2 owned visible CornerNWR arc(s) ... found 0").
+    for label, _x, _z, radius_mm in _part._CORNERS:
+        model_center = corner_station_model_m(label)
+        station_xy = model_point_in_view(
+            adapter, profile, model_center, label=f"Corner{label} fillet centre"
+        )[:2]
+        print(
+            f"Corner{label}R station: fillet_centre_model_m={model_center} "
+            f"sheet_m=({station_xy[0]:.5f},{station_xy[1]:.5f})"
+        )
         _assert_corner_radius_attachment(
             adapter, profile, profile_annotations,
-            name=name, feature_name=feature_name, radius_m=radius_m, station_xy=station_xy,
+            name=f"Corner{label}R", feature_name=f"Corner{label}",
+            radius_m=radius_mm / 1000.0, station_xy=station_xy,
         )
+    _assert_each_kept_dimension_once(
+        adapter,
+        {
+            "profile plan": profile,
+            "feature plan": feature,
+            "notch plan": notch,
+            "isometric": iso,
+            "pivot section": section,
+            "tip screw slot detail": detail,
+            "tip screw slot section": slot_section,
+        },
+    )
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section lost its cut-only display after annotation")
     for face_name, model_y in (
@@ -1565,6 +1700,15 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section face {face_name}: model_y_mm={model_y * 1000:.3f} "
             f"sheet_xy_mm=({projected[0] * 1000:.3f},{projected[1] * 1000:.3f})"
         )
+    section_pivot_x = model_point_in_view(
+        adapter, section, (0.0, 0.0, 0.0), label="pivot in section A-A"
+    )[0]
+    witness_end_x = plate_thk_witness_end_x(section_pivot_x)
+    print(
+        f"section A-A pivot sheet_x={section_pivot_x:.5f} "
+        f"predicted={pivot_section_pivot_x():.5f} "
+        f"strip_mm={pivot_section_strip_mm()} witness_end_x={witness_end_x:.5f}"
+    )
     for sheet_geometry in collect_document(adapter):
         print(describe_sheet(sheet_geometry))
         thickness_geometry = [
@@ -1581,7 +1725,7 @@ async def build(adapter: Any) -> dict[str, str]:
             )
         ]
         if len(witnesses) != 2 or any(
-            abs(max(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.309) > 0.0005
+            abs(max(segment.x0, segment.x1) - witness_end_x) > 0.0005
             or abs(min(segment.x0, segment.x1) - SECTION_SHIFT[0] - 0.299) > 0.0005
             for segment in witnesses
         ):

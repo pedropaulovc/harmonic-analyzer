@@ -822,6 +822,155 @@ def _clears_plate(box, side: int) -> bool:
     return box[2] < edge if side < 0 else box[0] > edge
 
 
+def _profile_station(label: str) -> tuple[float, float]:
+    """A corner fillet centre on the profile plan, sheet metres."""
+    return drawing.plan_xy(drawing.PROFILE_CENTER, *part.corner_fillet_center(label))
+
+
+def _corner_leader_tip(label: str, side: int) -> tuple[float, float]:
+    """Where a corner radius's leader meets its arc: 45 deg off the centre,
+    sheet-up (model north) and toward the corner's own side."""
+    radius = {corner[0]: corner[3] for corner in part._CORNERS}[label]
+    x, y = _profile_station(label)
+    offset = radius * drawing.PLAN_SCALE / math.sqrt(2.0)
+    return (x + side * offset, y - offset)
+
+
+# The profile's corner-radius stations as the farm measured them before I31
+# (they were sheet literals in draw_cone_swing_platform until tipslot-2762).
+_PRE_I31_CORNER_STATIONS = {
+    "SW": (0.0875, 0.2433),
+    "NW": (0.0723, 0.1382),
+    "NE": (0.0686, 0.1392),
+    "SE": (0.0660, 0.2398),
+}
+_STATION_WINDOW_M = 0.001  # _assert_corner_radius_attachment's match window
+
+
+def _station_matches(station, expected) -> bool:
+    return all(abs(station[i] - expected[i]) <= _STATION_WINDOW_M for i in (0, 1))
+
+
+def _pre_i31_corners(monkeypatch) -> None:
+    """The part as it stood before I31: the north-west half-width 8.0."""
+    corners = list(part._CORNERS)
+    corners[1] = ("NW", 8.0, *corners[1][2:])
+    monkeypatch.setattr(part, "_CORNERS", tuple(corners))
+    monkeypatch.setattr(part, "WEST_HALF_N", 8.0)
+
+
+def test_corner_fillet_centres_sit_one_radius_in_from_both_edges() -> None:
+    corners = part._CORNERS
+    for index, (label, x, z, radius) in enumerate(corners):
+        cx, cz = part.corner_fillet_center(label)
+        for neighbour in (corners[index - 1], corners[(index + 1) % 4]):
+            dx, dz = neighbour[1] - x, neighbour[2] - z
+            distance = abs(dx * (cz - z) - dz * (cx - x)) / math.hypot(dx, dz)
+            assert distance == pytest.approx(radius, abs=1e-9), (label, neighbour[0])
+        # Inside the plate, toward the plan centre.
+        assert (cx - x) * (drawing._PLAN_MID_X - x) > 0.0, label
+        assert (cz - z) * (drawing._PLAN_MID_Z - z) > 0.0, label
+        assert drawing.corner_station_model_m(label) == pytest.approx(
+            (cx / 1000.0, spec.PLATE_THICKNESS / 1000.0, cz / 1000.0)
+        )
+
+
+def test_corner_radius_stations_follow_the_fillet_centres(monkeypatch) -> None:
+    """tipslot-2762: "expected 2 owned visible CornerNWR arc(s) at corner
+    station, found 0".  The NW station was a sheet literal from before I31,
+    whose wider north-west moved the fillet centre 1.39 mm (sheet) east of
+    it -- outside the proof's 1 mm window.  The build now projects every
+    corner's fillet centre into the profile; here the same centres go
+    through plan_xy, which the farm's profile pivot confirms to 0.05 mm."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    for literal in _PRE_I31_CORNER_STATIONS.values():
+        assert f"({literal[0]:.4f}, {literal[1]:.4f})" not in source, literal
+    assert "station_xy = model_point_in_view(" in source
+    assert "corner_station_model_m(label)" in source
+    # The old NW literal against the new geometry: rejected, as on the farm.
+    assert not _station_matches(_PRE_I31_CORNER_STATIONS["NW"], _profile_station("NW"))
+    assert abs(_PRE_I31_CORNER_STATIONS["NW"][0] - _profile_station("NW")[0]) > 0.0013
+    # The other three corners did not move: their literals (0.1 mm, as
+    # measured) agree.
+    for label in ("NE", "SW", "SE"):
+        station = _profile_station(label)
+        assert math.dist(station, _PRE_I31_CORNER_STATIONS[label]) < 0.00015, label
+    # Positive control: before I31 the derivation lands on every literal the
+    # farm proved, the north-west included.
+    _pre_i31_corners(monkeypatch)
+    for label, literal in _PRE_I31_CORNER_STATIONS.items():
+        assert math.dist(_profile_station(label), literal) < 0.00015, label
+
+
+def test_pivot_section_east_end_matches_the_pre_i31_measurement(monkeypatch) -> None:
+    """Section A-A's strip, the pivot and the PlateThk witness end.
+
+    Before I31 the farm measured the pivot at x361.982 (eaafbc73, when
+    SECTION_SHIFT was 0.020) and the east cut edge at x310.2 unshifted, and
+    the witness end was the literal x309 + shift.  I31's wider north-west
+    lengthens the strip 2.9 mm west, which moves the pivot and the east end
+    2.9 mm left on the sheet: the old x309 missed the witness window."""
+    east, west = drawing.pivot_section_strip_mm()
+    # The NE R10 trims the east end at the pivot station (the straight edge
+    # would read -16.25); the NW R8 still runs there, meeting its side edge
+    # at z -0.07 (NW_ROUND_END_Z), so it trims the west end by 0.4 um.
+    assert east == pytest.approx(-15.8912, abs=1e-4)
+    assert drawing.plate_edge_mm(0.0, -1) == pytest.approx(-16.2507, abs=1e-4)
+    assert 0.0 < drawing.plate_edge_mm(0.0, +1) - west < 1e-3
+    assert west == pytest.approx(11.8145, abs=1e-4)
+    new_pivot = drawing.pivot_section_pivot_x()
+    new_end = drawing.plate_thk_witness_end_x(new_pivot)
+    old_end = drawing.SECTION_SHIFT[0] + 0.309
+    assert abs(new_end - old_end) > 0.0005 + 0.002
+    _pre_i31_corners(monkeypatch)
+    old_east, old_west = drawing.pivot_section_strip_mm()
+    assert old_west == pytest.approx(8.909, abs=1e-3)
+    pivot = drawing.pivot_section_pivot_x()
+    assert pivot - (drawing.SECTION_SHIFT[0] - 0.020) == pytest.approx(0.361982, abs=5e-5)
+    cut = pivot + old_east * drawing.PIVOT_SECTION_SCALE - drawing.SECTION_SHIFT[0]
+    assert cut == pytest.approx(0.3102, abs=5e-5)
+    assert drawing.plate_thk_witness_end_x(pivot) == pytest.approx(old_end, abs=5e-5)
+    assert pivot - new_pivot == pytest.approx(0.0029, abs=1e-4)
+
+
+def test_every_kept_dimension_prints_once_on_its_owning_view() -> None:
+    """The notch plan imports TipScrewSlotProfile for TipSlotZ and so receives
+    the slot's other dimensions too (tipslot-2762 leaf log: "delivered
+    unrequested annotations ... TipSlotEastCx, TipSlotW, TipSlotWestCx;
+    deleting them").  Each belongs to detail B; the sheet-wide walk after
+    curation fails the build if a deletion did not hold."""
+    owner = drawing.DIMENSION_OWNER
+    assert owner["TipSlotZ"] == "notch plan"
+    for name in ("TipSlotEastCx", "TipSlotWestCx", "TipSlotW", "TipCboreW"):
+        assert owner[name] == "tip screw slot detail", name
+    assert owner["TipCboreDepth"] == "tip screw slot section"
+    # Every dimension the part marks for drawing has one owning view.
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert set(owner) == marked
+    clean = {view: [] for view in (*drawing.VIEW_KEEPS, "isometric")}
+    for name, view in owner.items():
+        clean[view].append(name)
+    clean["feature plan"].append("")  # a hole callout: no model dimension
+    assert drawing.dimension_placement_errors(clean) == []
+    # A deletion that did not hold: the slot's dimensions twice.
+    doubled = {view: list(names) for view, names in clean.items()}
+    doubled["notch plan"] += ["TipSlotEastCx", "TipSlotW", "TipSlotWestCx"]
+    errors = drawing.dimension_placement_errors(doubled)
+    assert len(errors) == 3 and all("found on ['notch plan'" in e for e in errors)
+    # Detail B came up without its end centres (7ab69742b).
+    missing = {view: list(names) for view, names in clean.items()}
+    missing["tip screw slot detail"] = ["TipCboreW", "TipSlotW"]
+    assert len(drawing.dimension_placement_errors(missing)) == 2
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    call = source.split("_assert_each_kept_dimension_once(\n        adapter,")[1]
+    for view in (*drawing.VIEW_KEEPS, "isometric"):
+        assert f'"{view}":' in call.split(")")[0], view
+    # Walked after the last curation and the corner proofs.
+    assert source.index("_assert_each_kept_dimension_once(\n") > source.index(
+        "keep=SLOT_SECTION_KEEP"
+    )
+
+
 def test_slot_section_arrows_clear_the_profile_plan() -> None:
     """C-C's arrows and letters, looking south, stand outside the plate.
 
@@ -834,8 +983,8 @@ def test_slot_section_arrows_clear_the_profile_plan() -> None:
     arrows, letters = _cc_arrows_and_letters(drawing.SLOT_SECTION_LINE_X_MM)
     for side, arrow, letter in zip((-1, 1), arrows, letters):
         assert _clears_plate(arrow, side) and _clears_plate(letter, side)
-    r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
-    r8_leader = ((0.135, 0.118), (0.0723 + 0.00283, 0.1382 - 0.00283))
+    r10_leader = ((0.051, 0.139), _corner_leader_tip("NE", -1))
+    r8_leader = ((0.135, 0.118), _corner_leader_tip("NW", +1))
     north_edge_y = py - part.NORTH_OVERHANG * 0.0005
     nw_x = px + part.WEST_HALF_N * 0.0005
     nw_extension = ((nw_x, 0.113), (nw_x, north_edge_y))

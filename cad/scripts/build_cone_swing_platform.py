@@ -765,6 +765,25 @@ def _corner_theta(label: str) -> float:
     return math.acos(dot / (math.hypot(*v1) * math.hypot(*v2)))
 
 
+def corner_fillet_center(label: str) -> tuple[float, float]:
+    """Plan centre (authored x, local z; mm) of the named corner's fillet.
+
+    On the bisector of the corner's two edges, ``r / sin(theta / 2)`` in from
+    the sharp corner, so it is ``r`` from both edges.  The NW corner is not
+    square (``_NW_TURN``), so no corner may assume a 90 deg inset."""
+    idx = [c[0] for c in _CORNERS].index(label)
+    _label, x, z, r = _CORNERS[idx]
+    bisector = [0.0, 0.0]
+    for neighbour in (_CORNERS[idx - 1], _CORNERS[(idx + 1) % 4]):
+        dx, dz = neighbour[1] - x, neighbour[2] - z
+        length = math.hypot(dx, dz)
+        bisector[0] += dx / length
+        bisector[1] += dz / length
+    length = math.hypot(*bisector)
+    inset = r / math.sin(_corner_theta(label) / 2.0)
+    return (x + bisector[0] / length * inset, z + bisector[1] / length * inset)
+
+
 def _corner_fillet_area(label: str, r: float) -> float:
     """Plan area a radius-r fillet removes at the named sharp corner."""
     theta = _corner_theta(label)
