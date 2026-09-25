@@ -8,9 +8,10 @@ BOTH packaged trees is stamped and saved before any drawing opens, every drawing
 is stamped, rebuilt, saved and (portable tree) exported, a reference resolved
 outside the package fails the leaf, and the offline print gate reads the PDF
 text. The COM calls themselves are proven on the farm (the release dry run);
-the one marshalling fact the fake cannot show -- comtypes cannot unpack a
-SAFEARRAY of IDispatch, which is why residents are walked one by one -- is
-pinned against comtypes itself, with no seat.
+the marshalling facts the fake cannot show are pinned against comtypes itself,
+with no seat: it cannot unpack a SAFEARRAY of IDispatch, which is why residents
+are walked one by one, and OpenDoc6 hands back Errors and Warnings ahead of the
+document.
 """
 
 from __future__ import annotations
@@ -76,8 +77,8 @@ class _Document:
         return True
 
     def ForceRebuild3(self, _top_only: bool) -> bool:
-        self.rebuilt = True
-        return True
+        self.rebuilt = self.path not in self.session.refuse_rebuild
+        return self.rebuilt
 
     def SaveAs3(self, name: str, _version: int, _options: int) -> int:
         assert self.rebuilt, "a print must be exported after the REV cell refresh"
@@ -97,18 +98,23 @@ class _Session:
         self.exports: list[tuple[Path, Path]] = []
         self.opened: list[Path] = []
         self.refuse_save: set[Path] = set()
+        self.refuse_rebuild: set[Path] = set()
+        # (swFileLoadError_e, swFileLoadWarning_e) an open reports, by path.
+        self.load_codes: dict[Path, tuple[int, int]] = {}
 
     @property
     def IActiveDoc2(self):
         return self.resident[0] if self.resident else None
 
     def OpenDoc6(self, name, _kind, _options, _config, _errors, _warnings):
+        """comtypes' shape: the [in, out] Errors and Warnings, then the document."""
         path = Path(name).resolve()
         self.opened.append(path)
         self.resident = [_Document(self, path)] + [
             _Document(self, ref) for ref in self.references.get(path, [])
         ]
-        return self.resident[0]
+        errors, warnings = self.load_codes.get(path, (0, 0))
+        return [errors, warnings, self.resident[0]]
 
     def GetFirstDocument(self):
         return self.resident[0] if self.resident else None
@@ -183,6 +189,81 @@ def test_comtypes_cannot_unpack_a_safearray_of_idispatch():
     with pytest.raises(KeyError) as err:
         array_of(VT_DISPATCH).value
     assert err.value.args == (VT_DISPATCH,)
+
+
+def _solidworks_typelib():
+    """The generated SolidWorks typelib module, or a skip where it is not registered."""
+    if sys.platform != "win32":
+        pytest.skip("Win32 only: the SolidWorks typelib")
+    import comtypes
+    import comtypes.client
+
+    try:
+        return comtypes.client.GetModule(
+            (comtypes.GUID(package_native.SW_TYPELIB), *package_native.SW_TYPELIB_VER)
+        )
+    except OSError as error:
+        pytest.skip(f"SolidWorks typelib not registered: {error}")
+
+
+def test_comtypes_returns_opendoc6_errors_and_warnings_before_the_document():
+    """The order open_silently unpacks, against the real ISldWorks typelib and
+    an in-process COM object -- no seat: [in, out] Errors, [in, out] Warnings,
+    then the [out, retval] document, in declaration order."""
+    from comtypes import COMObject
+
+    typelib = _solidworks_typelib()
+
+    class _Seat(COMObject):
+        _com_interfaces_ = [typelib.ISldWorks]
+
+        def OpenDoc6(self, this, _name, _kind, _options, _config, errors, warnings, _doc):
+            # comtypes passes the interface pointer only to a parameter named "this".
+            del this
+            errors[0] = 0x2
+            warnings[0] = 0x100000
+            return 0
+
+    seat = _Seat().QueryInterface(typelib.ISldWorks)
+
+    errors, warnings, document = seat.OpenDoc6("x.SLDASM", 2, 1, "", 0, 0)
+
+    assert (errors, warnings, bool(document)) == (0x2, 0x100000, False)
+
+
+def _opened(tmp_path: Path, errors: int, warnings: int) -> tuple[_Session, Path]:
+    assembly = (tmp_path / "a.SLDASM").resolve()
+    session = _Session({})
+    session.load_codes[assembly] = (errors, warnings)
+    return session, assembly
+
+
+@pytest.mark.parametrize(
+    ("warnings", "named"),
+    [(0x100000, "MissingExternalReferences"), (0x40, "BasePartNotLoaded")],
+)
+def test_an_open_whose_references_did_not_load_fails(tmp_path, warnings, named):
+    """Codex on #876: a silent open hands back the parent even when a component
+    did not load, and the resident walk cannot see what never loaded."""
+    session, assembly = _opened(tmp_path, 0, warnings)
+
+    with pytest.raises(RuntimeError, match=rf"references did not load \({named}"):
+        package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
+
+
+def test_an_open_that_reports_a_load_error_fails(tmp_path):
+    session, assembly = _opened(tmp_path, 0x2, 0)
+
+    with pytest.raises(RuntimeError, match="swFileLoadError_e 0x2"):
+        package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
+
+
+def test_an_open_with_other_warnings_only_warns(tmp_path, capsys):
+    session, assembly = _opened(tmp_path, 0, 0x20)  # swFileLoadWarning_NeedsRegen
+
+    package_native.open_silently(session, assembly, package_native.SW_DOC_ASSEMBLY)
+
+    assert "swFileLoadWarning_e 0x20" in capsys.readouterr().err
 
 
 def _tree(root: Path, names: list[str]) -> list[Path]:
@@ -312,6 +393,17 @@ def test_stamp_release_fails_when_a_drawing_opens_without_its_model(packaged):
         package_native.stamp_release(session, out, "v37")
 
 
+def test_stamp_release_fails_when_a_drawing_rebuild_fails(packaged):
+    """Codex on #876: a failed rebuild leaves the REV cell stale, and only the
+    portable copy's print is checked -- the native drawing must not be saved."""
+    out, session, docs = packaged
+    session.refuse_rebuild.add(docs["native_drawing"])
+
+    with pytest.raises(RuntimeError, match="ForceRebuild3 failed on solidworks/platen-guide"):
+        package_native.stamp_release(session, out, "v37")
+    assert docs["native_drawing"] not in session.saves
+
+
 def test_stamp_release_fails_when_a_save_does_not_reach_disk(packaged):
     out, session, docs = packaged
     session.refuse_save.add(docs["portable_part"])
@@ -364,13 +456,22 @@ def test_release_print_gate_reads_every_page(tmp_path: Path):
         package_native.assert_pdf_revision(stale, "v37", pages=2)
 
     missing = _pdf(tmp_path / "missing.pdf", ["REV v36 BUILD v36"])
-    with pytest.raises(RuntimeError, match="page 1 does not name v37"):
+    with pytest.raises(RuntimeError, match="page 1 BUILD cell does not name v37"):
         package_native.assert_pdf_revision(missing, "v37", pages=1)
 
     # v370 is not v37: the match is a whole token.
-    longer = _pdf(tmp_path / "longer.pdf", ["REV v370"])
-    with pytest.raises(RuntimeError, match="does not name v37"):
+    longer = _pdf(tmp_path / "longer.pdf", ["REV v370 BUILD v370"])
+    with pytest.raises(RuntimeError, match="BUILD cell does not name v37"):
         package_native.assert_pdf_revision(longer, "v37", pages=1)
+
+    # Codex on #876: each cell is checked on its own, so a fresh BUILD cannot
+    # stand in for a stale or blank REV.
+    stale_rev = _pdf(tmp_path / "stale-rev.pdf", ["REV v36 BUILD v37"])
+    with pytest.raises(RuntimeError, match="page 1 REV cell does not name v37"):
+        package_native.assert_pdf_revision(stale_rev, "v37", pages=1)
+    blank_rev = _pdf(tmp_path / "blank-rev.pdf", ["REV BUILD v37"])
+    with pytest.raises(RuntimeError, match="page 1 REV cell does not name v37"):
+        package_native.assert_pdf_revision(blank_rev, "v37", pages=1)
 
     with pytest.raises(RuntimeError, match="has 1 pages, expected 2"):
         package_native.assert_pdf_revision(missing, "v36", pages=2)

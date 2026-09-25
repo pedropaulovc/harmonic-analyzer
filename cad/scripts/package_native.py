@@ -120,6 +120,12 @@ SW_DOC_ASSEMBLY = 2  # swDocumentTypes_e.swDocASSEMBLY
 SW_DOC_DRAWING = 3  # swDocumentTypes_e.swDocDRAWING
 SW_OPEN_SILENT = 1  # swOpenDocOptions_e.swOpenDocOptions_Silent
 SW_SAVE_SILENT = 1  # swSaveAsOptions_e.swSaveAsOptions_Silent
+# swFileLoadWarning_e bits that mean a reference did not load: a silent open
+# still hands back the parent, which would then be packaged or stamped without it.
+SW_OPEN_UNLOADED_REFERENCES = {
+    0x40: "BasePartNotLoaded",
+    0x100000: "MissingExternalReferences",
+}
 SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
 SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 _MODEL_DOC_TYPES = {".sldprt": SW_DOC_PART, ".sldasm": SW_DOC_ASSEMBLY}
@@ -254,7 +260,7 @@ def _pack_and_go_document(
     # prior motion verify) would make CloseAllDocuments(True) prompt.
     _discard_open_documents(sw)
     log("discarded any open documents (clean session)")
-    sw.OpenDoc6(str(source), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    open_silently(sw, source, doc_type)
     log(f"opened {source.name}")
 
     active = sw.IActiveDoc2
@@ -598,9 +604,31 @@ def assert_contained(sw: Any, tree: Path, tree_names: set[str]) -> set[str]:
     return external
 
 
+def open_silently(sw: Any, path: Path, doc_type: int) -> None:
+    """``OpenDoc6`` without dialogs; fail on a load error or an unloaded reference.
+
+    comtypes returns the [in, out] Errors and Warnings ahead of the document, in
+    declaration order (pinned against the typelib in test_release_stamp.py). A
+    silent open reports a component that did not load only there: the parent
+    still opens, and the resident walk cannot see a document that never loaded.
+    Other warnings are logged, not fatal.
+    """
+    errors, warnings, _document = sw.OpenDoc6(str(path), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    if errors:
+        raise RuntimeError(f"OpenDoc6 {path.name}: swFileLoadError_e {errors:#x}")
+    unloaded = [name for bit, name in SW_OPEN_UNLOADED_REFERENCES.items() if warnings & bit]
+    if unloaded:
+        raise RuntimeError(
+            f"OpenDoc6 {path.name}: references did not load ({', '.join(unloaded)}, "
+            f"swFileLoadWarning_e {warnings:#x})"
+        )
+    if warnings:
+        _telemetry.warn(f"OpenDoc6 {path.name}: swFileLoadWarning_e {warnings:#x}")
+
+
 def _open_document(sw: Any, path: Path, doc_type: int) -> Any:
     """Open ``path`` silently and return it as the active IModelDoc2."""
-    sw.OpenDoc6(str(path), doc_type, SW_OPEN_SILENT, "", 0, 0)
+    open_silently(sw, path, doc_type)
     active = sw.IActiveDoc2
     if active is None:
         raise RuntimeError(f"SolidWorks did not open {path}")
@@ -754,7 +782,8 @@ def stamp_drawings(
             set_document_property(document, BUILD_ID_PROPERTY, revision)
             # The REV cell is a $PRPSHEET link: a rebuild re-reads the stamped
             # model property before the save and the export capture it.
-            document.ForceRebuild3(False)
+            if not document.ForceRebuild3(False):
+                raise RuntimeError(f"ForceRebuild3 failed on {tree.name}/{path.name}")
             save_document(document, path)
             if pdf_dir is not None and entry is not None:
                 name, outputs = entry
@@ -866,10 +895,12 @@ def page_layouts(pdf: Path, allowed: Sequence[DrawingLayout]) -> tuple[DrawingLa
 
 
 def assert_pdf_revision(pdf: Path, revision: str, *, pages: int) -> None:
-    """Every page names ``revision`` and no page says the build's ``DEV``.
+    """Both title-block cells on every page name ``revision``; none says ``DEV``.
 
     End-to-end proof that the title block's REV (a link to the model) and
-    BUILD (the drawing's own property) cells refreshed before the export.
+    BUILD (the drawing's own property) cells refreshed before the export. The
+    BUILD cell extracts as "BUILD <id>" and the REV cell as a bare token, so
+    each is checked on its own: a stale REV next to a fresh BUILD fails.
     """
     from pypdf import PdfReader
 
@@ -878,12 +909,18 @@ def assert_pdf_revision(pdf: Path, revision: str, *, pages: int) -> None:
         raise RuntimeError(f"{pdf.name} has {len(reader.pages)} pages, expected {pages}")
     wanted = re.compile(rf"\b{re.escape(revision)}\b")
     build = re.compile(rf"\b{re.escape(BUILD_REVISION)}\b")
+    build_cell = re.compile(r"\bBUILD\s+(\S+)")
     for index, page in enumerate(reader.pages, start=1):
         text = page.extract_text() or ""
         if build.search(text):
             raise RuntimeError(f"{pdf.name} page {index} still says {BUILD_REVISION}")
-        if not wanted.search(text):
-            raise RuntimeError(f"{pdf.name} page {index} does not name {revision}")
+        cells = build_cell.findall(text)
+        if cells != [revision]:
+            raise RuntimeError(
+                f"{pdf.name} page {index} BUILD cell does not name {revision}: {cells}"
+            )
+        if not wanted.search(build_cell.sub("", text)):
+            raise RuntimeError(f"{pdf.name} page {index} REV cell does not name {revision}")
 
 
 def finish_release_prints(
