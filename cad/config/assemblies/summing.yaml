@@ -1,0 +1,20 @@
+# summing assembly contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the summing
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. List every signature THIS build queries that needs inverting; a
+#   signature shared with another assembly goes in both files. A build that
+#   lands a mate on the wrong side fails with "flip-seed MISS ... toggle sig",
+#   naming this file; the end-of-build seed audit logs every queried signature
+#   and warns on entries no mate queried.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+flip_invert:
+  - summing lever axial
+allowed_free_stems:
+  - summing-lever
+  - boss-hook

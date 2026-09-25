@@ -106,6 +106,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    activate_assembly_contract,
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
@@ -588,6 +589,8 @@ def _create_frame_explode(adapter: Any) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
+    activate_assembly_contract(ASM_NAME)
     from solidworks_mcp.adapters.base import InsertComponentParameters
 
     base_path = _part("harmonic-base")

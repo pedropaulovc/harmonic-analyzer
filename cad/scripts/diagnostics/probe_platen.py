@@ -21,6 +21,7 @@ from _common import (
     run_build,
 )
 from _assembly import (
+    activate_assembly_contract,
     angle_driver,
     component_transform,
     distance_driver,
@@ -28,6 +29,10 @@ from _assembly import (
     place_component,
     world_point,
 )
+
+# Distance drivers seed their side from paper-drive's flip seeds
+# (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
+activate_assembly_contract("paper-drive")
 
 PLATE_X0 = -33.213
 PLATE_Y0 = 273.234

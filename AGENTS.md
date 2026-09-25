@@ -613,6 +613,23 @@ whole config — so it can only over-rebuild, never skip a real change. Don't ad
 new `_config` accessor without mapping it in `_buildgraph` (`check:graph`'s
 coverage test fails loud otherwise).
 
+**Per-assembly contracts — `cad/config/assemblies/<dashed-stem>.yaml`.** Data
+that belongs to ONE assembly (its learned `flip_invert` seeds and its
+`allowed_free_stems` set) lives in its own file, read through
+`_assembly_contract.py` — never as a stem-keyed table in `_assembly.py`, which is
+on every assembly's recipe (one drive-train seed there used to re-key all eight
+assemblies and every gate behind them). Any closure reaching `_assembly_contract`
+gets the `assemblies/*` token; `dodo._config_deps` narrows it to the task's OWN
+file for an assembly task, and `_soundness_file_deps` adds the gate's own file.
+Each `build_<stem>_assembly.build()` opens with
+`activate_assembly_contract(ASM_NAME)` — the file its seeds come from is the file
+its recipe depends on. A signature two assemblies both query goes in BOTH files
+(the reverted #193 split was disjoint). `_seed_flip` records every signature it
+queries, and the save chokepoint's `audit_flip_seeds` logs them and warns on
+entries no mate queried. `check:recipe` (`test_assembly_contract.py`) pins all of
+this. The accessor is deliberately not in `_config.py`: editing that re-keys
+every part.
+
 ## Three-tier submodule digest (part vs assembly vs drawing)
 
 The vendored `SolidworksMCP-python` submodule is a runtime input of every COM task,
@@ -693,7 +710,8 @@ DOF (drive-train + channel + magnifier + paper-drive + summing + pen) is
 checked by the **free-DOF set gate** (`assert_free_dof_necessity`) — at least
 the expected number of top-level components read under-constrained, each freed
 DOF's own family among them (necessity), AND, where the assembly's allowed
-coupled-family list is pinned (`verify._ALLOWED_FREE_STEMS`), no component
+coupled-family list is pinned (`allowed_free_stems` in its
+`cad/config/assemblies/<stem>.yaml`), no component
 OUTSIDE that list reads under-constrained (the exact-set direction — an
 unintended freedom, e.g. a dropped mate on a structural part, fails soundness
 loud). Every assembly with nothing freed gets the strict 0-DOF check,
@@ -775,7 +793,7 @@ fixed, and the replay path was a recurring bug source. See
 There is **no scalar DOF API** in SolidWorks COM. `soundness` proves the free
 set from both directions with one status walk (`assert_free_dof_necessity`):
 ≥ N components under-constrained with each freed DOF's family present
-(necessity), and — where `verify._ALLOWED_FREE_STEMS` pins the assembly's
+(necessity), and — where the contract's `allowed_free_stems` pins the assembly's
 coupled families — no component outside that list under-constrained (exact
 set). As a hand-run diagnostic, `build_mobility_probe.py` authors the manifest
 drives to reconstitute a 0-DOF baseline, then suppresses each to show it frees

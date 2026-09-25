@@ -82,10 +82,10 @@ from _common import (
     run_build,
 )
 from _assembly import (
-    _ALLOWED_FREE_STEMS,
     _export_assembly_images,
     _invalidate_massprops_proof,
     _massprops_sidecar,
+    allowed_free_stems,
     assert_components_fully_defined,
     assert_free_dof_necessity,
     assert_model_healthy,
@@ -920,7 +920,7 @@ def _run_soundness_battery(
                     resolve=False,
                     required_stems=stems,
                     required_instances=insts,
-                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                    allowed_stems=allowed_free_stems(name),
                 ),
             )
     else:
@@ -1057,7 +1057,7 @@ async def _verify_static_one(
                     resolve=False,
                     required_stems=stems,
                     required_instances=insts,
-                    allowed_stems=_ALLOWED_FREE_STEMS.get(name, ()),
+                    allowed_stems=allowed_free_stems(name),
                 ),
             )
     else:

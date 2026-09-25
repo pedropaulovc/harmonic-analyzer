@@ -105,6 +105,7 @@ def _neutralize_com_method_flagging():
 import _assembly  # noqa: E402
 import _telemetry  # noqa: E402
 import verify  # noqa: E402
+from _buildgraph import ASSEMBLY_ORDER  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 # Timing model -- base seconds per COM call, lifted from verify-soundness.log   #
@@ -212,6 +213,9 @@ class MockIDM:
         pass
 
 
+_ASSEMBLIES = frozenset(stem.replace("_", "-") for stem in ASSEMBLY_ORDER)
+
+
 class MockModel:
     def __init__(self, name: str, n_components: int) -> None:
         self._name = name
@@ -222,7 +226,9 @@ class MockModel:
         # so the mock can't drift. Rename every non-seed component into the
         # allowed set (cycling), which also covers the required stems (they
         # are a subset); index 0 stays the grounded "-1" seed (IsFixed).
-        allowed = (verify._ALLOWED_FREE_STEMS.get(name)
+        # Only an assembly has a contract; the mock also models part documents.
+        contract = verify.allowed_free_stems(name) if name in _ASSEMBLIES else ()
+        allowed = (contract
                    or verify._REQUIRED_FREE_STEMS.get(name, ()))
         required = verify._REQUIRED_FREE_STEMS.get(name, ())
         stems = list(required) + [s for s in allowed if s not in required]

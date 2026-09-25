@@ -1,0 +1,29 @@
+# pen assembly contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the pen
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. List every signature THIS build queries that needs inverting; a
+#   signature shared with another assembly goes in both files. A build that
+#   lands a mate on the wrong side fails with "flip-seed MISS ... toggle sig",
+#   naming this file; the end-of-build seed audit logs every queried signature
+#   and warns on entries no mate queried.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+flip_invert:
+  - hanger screw head plane
+  # (was "pen rod travel snapshot" -- the label gained the PARK-driver tag
+  # 2026-07-07; same mate, same learned side)
+  - pen rod travel PARK driver (freed in default build)
+# The carriage riders (v-block, marker, stirrup frame, thumb screw) are
+# lock-mated to the free rod and read under-constrained with it.
+allowed_free_stems:
+  - pen-rod
+  - pen-marker
+  - pen-wire
+  - pen-v-block
+  - pen-frame
+  - pen-set-screw

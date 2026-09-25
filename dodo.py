@@ -101,8 +101,11 @@ from _buildgraph import (  # noqa: E402
     CAD_OUT,
     POST_ASSEMBLY,
     SCRIPTS_DIR,
+    ASSEMBLY_CONTRACTS_TOKEN,
     all_config_files,
     artefact_for,
+    assembly_contract_file,
+    assembly_contract_files,
     config_files_of,
     data_deps_of,
     drawing_registry_reads_selected,
@@ -1011,6 +1014,16 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
     return [str((CONFIG_DIR / "title_block.yaml").resolve())]
 
 
+def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
+    """Per-task expansion of the ``"assemblies/*"`` token (any closure reaching
+    ``_assembly_contract``). An ASSEMBLY task reads only its OWN contract -- the
+    build activates its own stem -- so a sibling's seed or free-stem edit never
+    re-keys it; any other consumer keeps the whole family (conservative)."""
+    if kind == "assembly" and stem is not None:
+        return [assembly_contract_file(stem)]
+    return assembly_contract_files()
+
+
 def _config_deps(script, stem: str | None = None, kind: str | None = None) -> list[str]:
     """The cad/config FILES this build script actually reads (fine-grained;
     conservative whole-config fallback on any unclassifiable ``_config`` use).
@@ -1032,6 +1045,8 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
             out.update(_expand_parts_token(stem, kind, script))
         elif tok == "title_block":
             out.update(_expand_title_block_token(kind, script))
+        elif tok == ASSEMBLY_CONTRACTS_TOKEN:
+            out.update(_expand_assembly_contracts_token(stem, kind))
         else:
             out.add(str((CONFIG_DIR / tok).resolve()))
     return sorted(out)
@@ -1742,11 +1757,14 @@ def _cad_identity_deps() -> list[str]:
 def _soundness_file_deps(stem: str) -> list[str]:
     """One assembly's soundness-gate inputs: verify.py, the gate logic that lives
     outside every build closure (_assembly_postbuild, the interference contract),
-    and the assembly itself with its execution token."""
+    the assembly's OWN contract (its free-DOF sets decide the verdict, and
+    verify.py is not run through ``_config_deps``), and the assembly itself with
+    its execution token."""
     deps = [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
         str(INTERFERENCE_CONTRACTS_PY),
+        assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
     ]
@@ -2684,6 +2702,9 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # Per-assembly contracts stay per-assembly (no stem-keyed tables in
+        # _assembly.py; each recipe carries its own contract only).
+        SCRIPTS_DIR / "test_assembly_contract.py",
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_export_models.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
