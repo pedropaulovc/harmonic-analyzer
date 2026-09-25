@@ -17,9 +17,15 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 
 
-def test_pack_is_cut_to_the_block_footprint_at_the_nominal_stack() -> None:
-    """U30 / handoff item 3: 15.0 x 12.0 x SHIM_NOMINAL, coplanar with the foot."""
-    assert (spec.SHIM_X, spec.SHIM_Z) == (block.BLOCK_X, block.BLOCK_Z)
+def test_pack_is_cut_to_the_block_foot_face_at_the_nominal_stack() -> None:
+    """U30 / handoff item 3: the block's width, from its south face to the
+    I31 heel relief's inner face (15.0 x 10.47), at SHIM_NOMINAL."""
+    assert spec.SHIM_X == block.BLOCK_X
+    assert spec.SHIM_SOUTH_Z == pytest.approx(-block.BLOCK_Z / 2.0)
+    assert spec.SHIM_NORTH_Z == pytest.approx(
+        block.BLOCK_Z / 2.0 - block.HEEL_RELIEF_DEPTH
+    )
+    assert spec.SHIM_Z == pytest.approx(10.47)
     assert spec.SHIM_T == block.SHIM_NOMINAL == 1.10
     assert spec.STACK_RANGE_MM == block.FOOT_SHIM_RANGE_MM
     low, high = spec.STACK_RANGE_MM
@@ -46,7 +52,7 @@ def test_horseshoe_slot_passes_the_screw_with_clearance_and_webs() -> None:
     major = THREAD_MAJOR_MM[block.FOOT_THREAD]
     assert spec.SLOT_W - major >= 0.25
     assert spec.SIDE_WEB_MM >= 2.0
-    assert spec.SIDE_WEB_MM == pytest.approx((block.BLOCK_Z - spec.SLOT_W) / 2.0)
+    assert spec.SIDE_WEB_MM == pytest.approx(spec.SHIM_NORTH_Z - spec.SLOT_R)
     assert spec.END_WEB_MM >= 2.0
     assert spec.END_WEB_MM == pytest.approx(block.BLOCK_X / 2.0 - spec.SLOT_R)
 
@@ -88,7 +94,12 @@ def test_every_marked_dimension_has_a_view_and_a_precision() -> None:
 def test_slot_width_reads_past_the_open_mouth() -> None:
     x, y = drawing.TOP_KEEP["SlotWidth"]
     assert x < drawing.TOP_CENTER[0] - drawing.HALF_X
-    assert y == pytest.approx(drawing.TOP_CENTER[1])
+    assert y == pytest.approx(drawing.SLOT_AXIS_Y)
+    # North (the trimmed edge) is at the bottom of the plan, so the axis sits
+    # below the view centre by half the trim.
+    assert drawing.TOP_CENTER[1] - y == pytest.approx(
+        block.HEEL_RELIEF_DEPTH / 2.0 * drawing._S
+    )
 
 
 def test_depth_stands_outside_the_radius_centre_location() -> None:
@@ -103,7 +114,7 @@ def test_slot_location_values_sit_between_their_witnesses() -> None:
     assert drawing.TOP_CENTER[0] + 0.002 <= x - half_w and x + half_w <= right - 0.002
     lower = drawing.TOP_CENTER[1] - drawing.HALF_Z
     y = drawing.TOP_KEEP["SlotCentreZ"][1]
-    assert lower + 0.002 <= y - 0.0019 and y + 0.0019 <= drawing.TOP_CENTER[1] - 0.002
+    assert lower + 0.002 <= y - 0.0019 and y + 0.0019 <= drawing.SLOT_AXIS_Y - 0.002
 
 
 def test_drawing_registry_row() -> None:

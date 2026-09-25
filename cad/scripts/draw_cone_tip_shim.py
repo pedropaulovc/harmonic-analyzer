@@ -42,6 +42,8 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    SHIM_NORTH_Z,
+    SHIM_SOUTH_Z,
     SHIM_X,
     SHIM_Z,
     SLOT_OPEN_SIDE,
@@ -68,7 +70,12 @@ TOP_CENTER = (0.120, 0.170)
 FRONT_CENTER = (TOP_CENTER[0], 0.100)
 ISO_CENTER = (0.320, 0.180)
 HALF_X = SHIM_X * _S / 2.0  # 0.030 on the sheet
-HALF_Z = SHIM_Z * _S / 2.0  # 0.024 on the sheet
+HALF_Z = SHIM_Z * _S / 2.0  # 0.021 on the sheet
+# The view centres on the plan's box.  Since the I31 heel-relief trim the
+# plan is no longer centred on the slot axis: the *Top view shows model +Z
+# (north, the trimmed edge) at the bottom, so the axis sits this far below
+# the view centre.
+SLOT_AXIS_Y = TOP_CENTER[1] + (SHIM_NORTH_Z + SHIM_SOUTH_Z) / 2.0 * _S
 
 # The *Top view keeps model +X to the right, so the slot opens to the LEFT
 # edge and the closed (radius) end looks right.
@@ -81,13 +88,16 @@ TOP_KEEP = {
     "Width": (TOP_CENTER[0], TOP_CENTER[1] + HALF_Z + 0.014),
     "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),
     # Past the open mouth, level with the slot's centreline.
-    "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, TOP_CENTER[1]),
+    "SlotWidth": (TOP_CENTER[0] - HALF_X - 0.016, SLOT_AXIS_Y),
     # The radius centre from the closed (right) edge and the lower edge,
     # model-owned (the part's hidden reference sketches).  Each value sits
     # midway along its span, off both witnesses (the tip block's 5637ac42
     # lesson).
     "SlotCentreX": (TOP_CENTER[0] + HALF_X / 2.0, TOP_CENTER[1] - HALF_Z - 0.012),
-    "SlotCentreZ": (TOP_CENTER[0] + HALF_X + 0.010, TOP_CENTER[1] - HALF_Z / 2.0),
+    "SlotCentreZ": (
+        TOP_CENTER[0] + HALF_X + 0.010,
+        (SLOT_AXIS_Y + TOP_CENTER[1] - HALF_Z) / 2.0,
+    ),
 }
 FRONT_KEEP = {"Thickness": (TOP_CENTER[0] + HALF_X + 0.016, FRONT_CENTER[1])}
 # The 1.10 span is 4.4 mm on the sheet, so its value cannot sit between the
