@@ -1054,11 +1054,15 @@ def package_native(out: Path) -> dict[str, Any]:
 
     # The one read of release.yaml in the whole pipeline's COM half.
     cad_revision = _config.release_revision()
-    prepare_out(out)
-    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
     sw, revision = attach_solidworks()
     failed = False
     try:
+        # Empty the seat BEFORE wiping ``out``: a run that died mid-stamping (a
+        # watchdog abort, a leaf timeout) can leave a packaged copy open, and
+        # its share lock would fail the rmtree before anything could close it.
+        _discard_open_documents(sw)
+        prepare_out(out)
+        RELEASE_DIR.mkdir(parents=True, exist_ok=True)
         with _telemetry.span("package.top_assembly", document=top.name) as sp:
             documents = package_top_assembly(sw, out)
             sp.set_attribute("documents", len(documents))

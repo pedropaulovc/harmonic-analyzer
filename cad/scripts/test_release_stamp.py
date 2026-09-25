@@ -586,3 +586,37 @@ def test_build_print_is_never_a_release_print(tmp_path: Path, monkeypatch):
     build_pdf = _pdf(tmp_path / "platen-guide.pdf", ["REV DEV BUILD DEV"])
     with pytest.raises(RuntimeError, match="still says DEV"):
         package_native.assert_pdf_revision(build_pdf, "v37", pages=1)
+
+
+def test_package_native_empties_the_seat_before_wiping_the_prepared_tree(
+    tmp_path: Path, monkeypatch
+):
+    """Codex round 4 on #876: a run killed mid-stamping can leave a packaged copy
+    open and share-locked, so the next run must close it before prepare_out's
+    rmtree -- not after, when the rmtree has already failed."""
+    events: list[str] = []
+    sldasm = tmp_path / "sldasm"
+    sldasm.mkdir()
+    (sldasm / f"{package_native.TOP_ASSEMBLY}.SLDASM").write_bytes(b"asm")
+    monkeypatch.setattr(package_native, "OUT_SLDASM", sldasm)
+    monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(package_native._config, "release_revision", lambda: "v37")
+    monkeypatch.setattr(
+        package_native, "attach_solidworks", lambda: (events.append("attach"), (object(), "34.0"))[1]
+    )
+    monkeypatch.setattr(
+        package_native, "_discard_open_documents", lambda _sw: events.append("discard")
+    )
+    monkeypatch.setattr(package_native, "prepare_out", lambda _out: events.append("wipe"))
+    monkeypatch.setattr(
+        package_native, "package_top_assembly", lambda _sw, _out: (events.append("top"), ())[1]
+    )
+    monkeypatch.setattr(package_native, "package_drawings", lambda *_a: {})
+    monkeypatch.setattr(package_native, "stamp_release", lambda *_a: {"pdfs": {}})
+    monkeypatch.setattr(package_native, "_release_seat", lambda _sw: events.append("release"))
+    monkeypatch.setattr(package_native, "finish_release_prints", lambda *_a: {})
+    monkeypatch.setattr(package_native, "write_sidecar", lambda *_a, **_k: {})
+
+    package_native.package_native(tmp_path / "release" / "native")
+
+    assert events == ["attach", "discard", "wipe", "top", "release"]
