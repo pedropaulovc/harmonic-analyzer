@@ -134,7 +134,7 @@ from build_lag_screw import (
 )
 from pinion_pivot_block_geometry import BLOCK_HEIGHT
 from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_Z
-from pinion_spring_geometry import THICK as SPRING_THICKNESS
+from pinion_spring_section import THICK as SPRING_THICKNESS
 from arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
 from build_rocker_arm_support import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
@@ -368,9 +368,11 @@ BLOCK_SCREW_HOLE_DEPTH = 12.75
 BLOCK_SCREW_DRILL_DEPTH = 15.0
 # Bottoming tap: 3.1 mm runout exceeds two #8-32 pitches (1.5875 mm).
 _FORMER_FOOT_SCREW_XZ = (
-    # spring foot follows the shifted 32T swing rig, clear of the unchanged
-    # rocker-arm-support casting after the rig recenter (z: pinion_rig_layout)
-    (16.87259321646788, SPRING_Z - MECHANISM_Z_SHIFT),
+    # spring foot: 20.0 EAST of the swing pivot bore (the east block screw
+    # is 8.5 east of it), outboard of the back strap (re-derived 2026-09-24;
+    # pinion_spring_geometry.SCREW_EAST_OF_PIVOT, the drive train asserts it;
+    # z: pinion_rig_layout)
+    (_FORMER_BLOCK_SCREW_X[0] + 8.5 - 20.0, SPRING_Z - MECHANISM_Z_SHIFT),
     (-54.7, -95.5),  # south arbor-pedestal flange (build_arbor_pedestal SCREW_Z)
     (-54.7, 102.5),  # NORTH arbor-pedestal flange (PR8, ch12 img09: the
     # mirrored base-standing clamp at z 97.5; ry180 flips its flange to +z)
@@ -378,9 +380,9 @@ _FORMER_FOOT_SCREW_XZ = (
 FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
-# The stock 9.525-mm foot screw penetrates 8.725 mm below the 0.8-mm spring.
-FOOT_SCREW_HOLE_DEPTH = 8.975  # stock engagement + 0.25 tip reserve
-FOOT_SCREW_DRILL_DEPTH = 11.0
+# The stock 9.525-mm foot screw penetrates 9.025 mm below the 0.5-mm spring.
+FOOT_SCREW_HOLE_DEPTH = 9.275  # stock engagement + 0.25 tip reserve
+FOOT_SCREW_DRILL_DEPTH = 11.3
 # Bottoming tap: 2.025 mm runout exceeds two #4-40 pitches (1.27 mm).
 
 # Maker's nameplate seats (2026-09-02 ch26 p.71 re-derive: four brass slotted

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 import build_drive_train_assembly as drive
 from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
@@ -70,13 +72,34 @@ def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
     assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
 
 
-def test_return_spring_foot_clears_the_fixed_rocker_support() -> None:
+def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
+    # 2026-09-24 re-derive: the foot no longer runs west under the lift rod
+    # toward the rocker-arm support; it is screwed down east of the back strap
+    # (machine east = -x), its pad clear of the back pivot block's east end.
+    from pinion_spring_geometry import PAD_LEN
+
+    block_east_face = drive.PIVOT_X - BLOCK_EAST
+    pad_west_edge = drive.SPRING_FOOT_END_X + PAD_LEN
+    assert block_east_face - pad_west_edge >= 0.25
+    assert drive.SPRING_FOOT_TAN_X < drive.PIVOT_X - drive.STRAP_R_END
     rocker_near_face = SUPPORT_WORLD_X - 31.75
-    spring_foot_end = drive.SPRING_X - drive.SPR_FOOT_END_L[0]
-    assert rocker_near_face - spring_foot_end >= 0.25
-    assert (
-        rocker_near_face - (drive.SPRING_HOLE_X + drive.FSCREW_HEAD_DIA / 2.0) >= 0.25
+    assert rocker_near_face - drive.SPRING_FOOT_TAN_X >= 0.25
+
+
+def test_return_spring_preload_and_stress_hold_across_the_swing() -> None:
+    # Parked (formed band's low end) the leaf beats gravity, engaged it still
+    # returns the cluster, and the engaged root stress keeps its SF on yield.
+    import pinion_spring_geometry as leaf
+
+    parked, engaged = drive.SPRING_DEFLECTION
+    assert parked == pytest.approx(leaf.PRESET)
+    assert engaged - parked == pytest.approx(
+        drive._spr_station[-1] * drive._PHI_ENG, rel=0.05
     )
+    band = leaf.FORMED_BAND_MM
+    assert leaf.contact_force(parked - band) * 23.0 > drive._SWING_GRAVITY_NMM[0]
+    assert leaf.contact_force(engaged - band) * 23.0 > drive._SWING_GRAVITY_NMM[1]
+    assert leaf.YIELD_MPA / leaf.root_stress(engaged) >= 1.5
 
 
 def test_base_holes_follow_the_rederived_support() -> None:

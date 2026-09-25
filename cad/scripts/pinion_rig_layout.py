@@ -29,7 +29,7 @@ import math
 from cone_pivot_post_installation import MECHANISM_Z_SHIFT
 from pinion_bracket_geometry import THICKNESS as STRAP_T
 from pinion_pivot_block_geometry import BLOCK_DEPTH
-from pinion_spring_geometry import WIDTH as SPRING_W
+from pinion_spring_section import WIDTH as SPRING_W
 
 # MHA-002 drum.  The length is alignment_pinion_spec.FACE_WIDTH (a drawing
 # contract this module must not import); a lockstep test pins the two.
@@ -84,7 +84,7 @@ LIFT_ROD_LEN = _up_to_tenth(
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
 # MHA-114 return spring: the blade rides the back strap's flank.  The inset
-# from the model strap's inner face keeps the whole 4.0-wide blade on the
+# from the model strap's inner face keeps the whole 5.0-wide blade on the
 # flank at every split of P and every strap thickness in its .X band (the
 # worst case is T = 8.2 with the strap hard back: inner face 0.8 aft of the
 # model's), which the support-layout gate proves.
