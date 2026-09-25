@@ -162,9 +162,9 @@ def registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _trailer(monkeypatch: pytest.MonkeyPatch, model: str | None) -> None:
     author = ml.Author(model, "c" * 40, "cad/scripts/draw_crank_arm.py")
-    monkeypatch.setattr(ml, "draw_script_author", lambda name: author)
+    monkeypatch.setattr(ml, "draw_script_author", lambda name, **_: author)
     monkeypatch.setattr(
-        ml, "draw_script_authors", lambda names: {n: author for n in names}
+        ml, "draw_script_authors", lambda names, **_: {n: author for n in names}
     )
 
 
@@ -1989,3 +1989,254 @@ def test_machinist_review_runs_the_directed_fallback_during_an_outage(
     entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]
     assert list(entry) == [ml.OUTAGE_FALLBACK]
     assert entry[ml.OUTAGE_FALLBACK]["outage"]["quote"] == OUTAGE_QUOTE
+
+
+# --- backfill ----------------------------------------------------------------------
+
+EARLIER = (NOW - timedelta(hours=5)).isoformat()
+_SHEET_ARGS = ("revision", "note", "size", "note_x", "edge_x", "producer")
+
+
+@pytest.fixture
+def records(tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A search root for review records; crank_arm is the whole registry."""
+    monkeypatch.setattr(
+        ml, "DRAWINGS_BY_NAME", {"crank_arm": ml.DRAWINGS_BY_NAME["crank_arm"]}
+    )
+    root = tmp_path / "records"
+    root.mkdir()
+    return root
+
+
+def _on_record(
+    records: Path,
+    worktree: str,
+    *,
+    reviewed_at: str = EARLIER,
+    pdf_name: str = "crank-arm.pdf",
+    **options,
+) -> Path:
+    """A verdict on record: the reviewed PDF and its JSON, as a worktree leaves them."""
+    out = records / worktree / "cad" / "out"
+    (out / "pdf").mkdir(parents=True)
+    sheet = {key: options.pop(key) for key in _SHEET_ARGS if key in options}
+    pdf = _sheet(out / "pdf" / pdf_name, **sheet)
+    review = _review(pdf, reviewed_at=reviewed_at, **options)
+    mr.write_review(mr.Review(**review), out / "reports" / "machinist-review")
+    return pdf
+
+
+def _backfill(tmp_path: Path, records: Path, **kwargs) -> ml.BackfillRow:
+    result = ml.backfill([records], ledger_path=tmp_path / "ledger.json", **kwargs)
+    [row] = result.rows
+    return row
+
+
+def test_backfill_ingests_a_matching_cross_family_ship_only_when_applied(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    reviewed = _on_record(records, "wt-a", producer="reviewed render")
+    _sheet(registry, revision="DEV", producer="release render")
+    ledger_path = tmp_path / "ledger.json"
+
+    row = _backfill(tmp_path, records)
+    assert row.outcome == ml.Backfill.INGESTED
+    assert "matches (exact)" in row.detail and "cross_family" in row.detail
+    assert not ledger_path.exists()  # a dry run writes nothing
+
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(ledger_path)["drawings"]["crank_arm"]["cross_family"]
+    provenance = entry["provenance"]
+    assert provenance["backfilled_from"].endswith(
+        "wt-a/cad/out/reports/machinist-review/crank_arm.json"
+    )
+    assert provenance["reviewed_pdf_found_at"] == reviewed.resolve().as_posix()
+    assert provenance["author_family_source"] == "trailer"
+    assert provenance["match"] == "exact"
+    assert (ml.sheets_dir(ledger_path) / f"{entry['pdf']}.pdf").is_file()
+    assert ml.check(["crank_arm"], ledger_path=ledger_path)[0].state == ml.State.OK
+
+    # Idempotent: the next run finds the ledger already accepting these sheets.
+    assert _backfill(tmp_path, records).outcome == ml.Backfill.RECORDED
+
+
+def test_backfill_leaves_a_drifted_ship_out(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-a")
+    _sheet(registry, edge_x=40.0 + 6 * PT_PER_PX)  # beyond the ink tolerance
+
+    row = _backfill(tmp_path, records, apply=True)
+
+    assert row.outcome == ml.Backfill.DRIFTED
+    assert row.detail.startswith("sheet 1 (")
+    assert not (tmp_path / "ledger.json").exists()
+
+
+def test_backfill_finds_the_reviewed_bytes_wherever_they_moved(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    reviewed = _on_record(records, "wt-a", producer="reviewed render")
+    snapshot = records / "handoff" / "pdf" / reviewed.name
+    snapshot.parent.mkdir(parents=True)
+    snapshot.write_bytes(reviewed.read_bytes())
+    _sheet(reviewed, producer="the worktree re-rendered")  # same name, new bytes
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == ml.Backfill.INGESTED
+    assert row.tried[0].candidate.pdf == snapshot
+
+
+def test_backfill_reports_a_ship_whose_reviewed_bytes_are_gone(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    reviewed = _on_record(records, "wt-a", producer="reviewed render")
+    _sheet(reviewed, producer="the worktree re-rendered")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == ml.Backfill.PDF_LOST
+    assert "no file holds the reviewed" in row.detail
+
+
+def test_backfill_holds_a_same_family_ship_to_the_last_resort_rule(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    reviewed = _on_record(
+        records, "wt-a", reviewer="claude", effort="high", reviewed_at=REVIEWED_AT
+    )
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.NOT_COUNTED
+    assert "no recorded quota refusal" in row.detail
+    assert not (tmp_path / "ledger.json").exists()
+
+    refused = _refused(tmp_path, reviewed)
+    refused.rename(records / "wt-a" / refused.name)
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert list(entry) == ["last_resort"] and entry["last_resort"]["counts"]
+
+
+def test_backfill_needs_a_ruling_where_no_trailer_names_the_author(
+    tmp_path: Path, registry: Path, records: Path
+) -> None:
+    _on_record(records, "wt-a")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+    assert row.outcome == ml.Backfill.AUTHOR_UNKNOWN
+    assert "--author-family crank_arm=<family>" in row.detail
+
+    row = _backfill(tmp_path, records, rulings={"crank_arm": "claude"}, apply=True)
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    author = entry["cross_family"]["author"]
+    assert (author["family"], author["model_source"]) == ("claude", "claimed")
+    assert entry["cross_family"]["provenance"]["author_family_source"] == "ruling"
+
+
+def test_backfill_records_the_newest_matching_ship(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-old", producer="old", reviewed_at=EARLIER)
+    _on_record(records, "wt-new", producer="new", reviewed_at=REVIEWED_AT)
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records, apply=True)
+
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    assert entry["cross_family"]["reviewed_at"] == REVIEWED_AT
+    assert "wt-new" in entry["cross_family"]["provenance"]["backfilled_from"]
+
+
+@pytest.mark.parametrize(
+    ("fix_sheet", "lose_fix_pdf", "outcome"),
+    [
+        ({}, False, ml.Backfill.CONTRADICTED),  # a later FIX of these very sheets
+        ({"edge_x": 60.0}, False, ml.Backfill.INGESTED),  # it reviewed other sheets
+        ({"edge_x": 60.0}, True, ml.Backfill.CONTRADICTED),  # nothing shows which
+    ],
+    ids=["same-sheets", "other-sheets", "fix-pdf-lost"],
+)
+def test_a_newer_failing_verdict_can_overrule_a_ship(
+    tmp_path: Path,
+    registry: Path,
+    records: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fix_sheet: dict,
+    lose_fix_pdf: bool,
+    outcome: ml.Backfill,
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-ship", reviewed_at=EARLIER)
+    fixed = _on_record(
+        records, "wt-fix", passed=False, reviewed_at=REVIEWED_AT, **fix_sheet
+    )
+    if lose_fix_pdf:
+        _sheet(fixed, producer="re-rendered since", **fix_sheet)
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == outcome
+    if outcome == ml.Backfill.CONTRADICTED:
+        assert "newer codex/gpt-6-astra" in row.detail and "wt-fix" in row.detail
+
+
+def test_backfill_skips_what_cannot_be_ingested_and_honours_exclusions(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-a", name="crank-arm_drawing-1234")  # found by PDF name
+    _on_record(
+        records,
+        "wt-b",
+        name="retired_part",
+        pdf_name="retired-part.pdf",
+        reviewed_at=REVIEWED_AT,
+    )
+    _sheet(registry)
+
+    result = ml.backfill([records], ledger_path=tmp_path / "ledger.json", apply=True)
+    [row] = result.rows
+    assert row.outcome == ml.Backfill.INGESTED
+    entry = ml.load_ledger(tmp_path / "ledger.json")["drawings"]["crank_arm"]
+    provenance = entry["cross_family"]["provenance"]
+    assert provenance["reviewed_as"] == "crank-arm_drawing-1234"
+    skipped = [candidate.skip for candidate in result.skipped]
+    assert skipped == ["'retired_part' is not a registry drawing"]
+
+    excluded = _backfill(tmp_path, records, exclude=["crank_arm"])
+    assert excluded.outcome == ml.Backfill.EXCLUDED
+    with pytest.raises(ValueError, match="unknown drawing names"):
+        ml.backfill([records], exclude=["crank_arn"], ledger_path=tmp_path / "l.json")
+
+
+def test_backfill_cli_prints_the_table_and_its_counts(
+    tmp_path: Path, registry: Path, records: Path, capsys
+) -> None:
+    _on_record(records, "wt-a")
+    _sheet(registry)
+    argv = ["--ledger", str(tmp_path / "ledger.json"), "backfill", str(records)]
+
+    assert ml.main([*argv, "--author-family", "crank_arm=gpt"]) == 0
+    out, err = capsys.readouterr()
+    assert out.startswith("not-counted ")  # codex on a gpt author: same family
+    assert "dry run, nothing written" in err and "not-counted: 1" in err
+
+    assert ml.main([*argv, "--author-family", "crank_arm"]) == 2
+    assert "expected NAME=FAMILY" in capsys.readouterr().err
