@@ -114,7 +114,10 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "clear_dimensions_for_drawing" in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     spec = _config.parts("pinion-spring")
-    assert spec["material"] == spec["material_specification"]
-    assert "0.8" in spec["material_specification"]
+    # The title-block cell holds one line (<= 30 characters); the full
+    # stock callout stays in the material specification.
+    assert len(spec["material"]) <= 30
+    assert "half-hard" in spec["material"] and "0.8" in spec["material"]
+    assert "0.8 mm (0.032 in)" in spec["material_specification"]
     assert spec["finish"]
     assert int(spec["quantity"]) == 1

@@ -122,8 +122,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.168)}
 TOP_KEEP = {}
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "THRU - REAM 1/4 IN",
-    "LiftBoreDia": "THRU - REAM 1/4 IN",
+    "PivotBoreDia": "THRU - REAM",
+    "LiftBoreDia": "THRU - REAM",
 }
 
 

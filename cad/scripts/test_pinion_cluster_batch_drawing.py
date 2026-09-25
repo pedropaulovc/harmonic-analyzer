@@ -1,4 +1,4 @@
-"""Cross-sheet offline contracts for the eight pinion-cluster drawings."""
+"""Cross-sheet offline contracts for the pinion-cluster drawings."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import pinion_bracket_spec
 import pinion_cam_pin_spec
 import pinion_cam_spec
 import pinion_handle_spec
+import pinion_lever_pin_spec
 import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
@@ -29,6 +30,7 @@ SHEETS = (
     ("pinion-cam-pin", pinion_cam_pin_spec),
     ("pinion-handle", pinion_handle_spec),
     ("pinion-lever", pinion_lever_spec),
+    ("pinion-lever-pin", pinion_lever_pin_spec),
     ("pinion-pivot-shaft", pinion_pivot_shaft_spec),
     ("pinion-spring", pinion_spring_spec),
 )
@@ -470,7 +472,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "frame-1/harmonic-base",
                 4.1656,
                 3.454,
-                6.65,
+                11.25,  # rule 12 E10: #8-32 x 1-1/4 through the 20.5 block
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/foot-screw",

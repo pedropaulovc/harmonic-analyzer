@@ -19,14 +19,20 @@ SHAFT_DIA_BAND = SHAFT_H
 BACK_CAP_SAG = 1.2
 BACK_CAP_R = (SHAFT_DIA / 2.0) ** 2 / (2.0 * BACK_CAP_SAG) + BACK_CAP_SAG / 2.0
 
-# Preserved former handle-body envelope, now turned integrally with the arbor.
+# Former handle-body envelope, turned integrally with the arbor.  Rule 12
+# (audit W6, 2026-09-23): the Ø6.005 crossrod hole left 1.50 of wall to each
+# face of the 9.0 head at nominal and -0.10 at the printed worst case (HeadLen
+# and the hole station both .X).  The head grows to 10.5 about the unchanged
+# crossrod station (world z -6.5), and the hole is printed CENTRED on the head
+# length rather than located by a .X station, so only the HeadLen band reaches
+# the web: (10.5 - 0.8) / 2 - 6.005 / 2 - 0.05 = 1.80 worst case.
 HEAD_DIA = 15.0
-HEAD_LEN = 9.0
+HEAD_LEN = 10.5
 HEAD_CAP_SAG = 3.0
 HEAD_CAP_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_CAP_SAG**2) / (2.0 * HEAD_CAP_SAG)
-HEAD_REAR_Z = -2.0
-HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
-HEAD_CENTER_Z = HEAD_FRONT_Z + HEAD_LEN / 2.0
+HEAD_CENTER_Z = -6.5  # the released crossrod station
+HEAD_REAR_Z = HEAD_CENTER_Z + HEAD_LEN / 2.0
+HEAD_FRONT_Z = HEAD_CENTER_Z - HEAD_LEN / 2.0
 NECK_DIA = 10.5
 NECK_END_Z = 10.0
 NECK_LEN = NECK_END_Z - HEAD_REAR_Z
@@ -34,10 +40,18 @@ EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 CROSS_HOLE_DIA = 6.005
 OVERALL_LEN = SHAFT_LEN + BACK_CAP_SAG - (HEAD_FRONT_Z - HEAD_CAP_SAG)
 BACK_RIM_FROM_HEAD_REAR = SHAFT_LEN - HEAD_REAR_Z
-CROSS_HOLE_FROM_HEAD_REAR = HEAD_REAR_Z - HEAD_CENTER_Z
 
-if HEAD_CENTER_Z != -6.5:
-    raise AssertionError("integral head center must preserve the released world station")
+# Rule 12 worst-case web from the centred crossrod hole to either head face:
+# the .X HeadLen band split over both sides, the hole's own drilled-hole
+# allowance on its radius.
+HEAD_LEN_BAND = 0.8  # .X title-block row
+CROSS_HOLE_WEB_WORST = (
+    (HEAD_LEN - HEAD_LEN_BAND) / 2.0 - CROSS_HOLE_DIA / 2.0 - 0.05
+)
+if CROSS_HOLE_WEB_WORST < 1.5:
+    raise AssertionError(
+        f"crossrod hole web {CROSS_HOLE_WEB_WORST:.2f} is under the 1.5 floor"
+    )
 if abs(ROD_DIA - CROSS_HOLE_DIA - 0.0125) > 1e-12:
     raise AssertionError("crossrod/head nominal interference changed")
 if min(HEAD_LEN, NECK_LEN, EXPOSED_SHAFT_LEN) <= 0.0:
@@ -48,6 +62,12 @@ SURFACE_FINISHES = (
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    # Head and neck diameters are the same Front-plane circle pattern as
+    # ShaftDia: imported end-on on the donor view and moved onto the 1:1
+    # profile (5cc191fb's proven path; a detail silhouette screen pick is
+    # seat-dependent and failed on w6).
+    "HeadProfile": {"HeadDia"},
+    "NeckProfile": {"NeckDia"},
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "ShaftProfile": {"ShaftDia"},
@@ -55,11 +75,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BackCapProfile": {"BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
     "BackRimReference": {"BackRimFromHeadRear"},
-    "CrossHoleReference": {"CrossHoleFromHeadRear"},
     "OverallReference": {"OverallLen"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "HeadProfile": {"HeadDia": 1},
+    "NeckProfile": {"NeckDia": 1},
     "Head": {"HeadLen": 1},
     "Neck": {"NeckLen": 1},
     "ShaftProfile": {"ShaftDia": 2},
@@ -67,7 +88,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BackCapProfile": {"BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 1},
     "BackRimReference": {"BackRimFromHeadRear": 1},
-    "CrossHoleReference": {"CrossHoleFromHeadRear": 1},
     "OverallReference": {"OverallLen": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -79,7 +99,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked integral-arbor dimension needs authored places")
 
 CROSS_HOLE_CALLOUT = (
-    "MATCH-REAM THRU\n"
+    "MATCH-REAM THRU, CENTRED ON HEAD LENGTH,\n"
     "TO MHA-058 GRIP ROD\n"
     "LIGHT ARBOR-PRESS FIT"
 )

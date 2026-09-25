@@ -24,7 +24,7 @@ _EXPECTED = {
     "lag-screw": (("92240A539",), "MHA-039", 4),
     "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 2),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
-    "slotted-screw": (("90280A199",), "MHA-101", 4),
+    "slotted-screw": (("90280A201",), "MHA-101", 4),
     "swing-stop-screw": (("90280A199",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
@@ -58,13 +58,18 @@ def test_purchased_config_preserves_bom_identity_and_quantity() -> None:
             assert int(row["quantity"]) == quantity
 
 
-def test_shared_stop_stock_reduces_inventory_without_changing_fleet_quantity() -> None:
-    shared_quantity = sum(
-        int(_config.parts(stem)["quantity"])
-        for stem, spec in FASTENERS.items()
-        if "90280A199" in spec.skus
-    )
-    assert shared_quantity == 5
+def test_fillister_stock_is_shared_across_the_fleet() -> None:
+    def fleet_quantity(sku: str) -> int:
+        return sum(
+            int(_config.parts(stem)["quantity"])
+            for stem, spec in FASTENERS.items()
+            if sku in spec.skus
+        )
+
+    # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
+    # the clamp screws' #8-32 x 1-1/4, leaving the swing stop on the x 1.
+    assert fleet_quantity("90280A199") == 1
+    assert fleet_quantity("90280A201") == 10
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:

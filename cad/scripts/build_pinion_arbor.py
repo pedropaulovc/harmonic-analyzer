@@ -49,7 +49,6 @@ from pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
     BACK_CAP_SAG,
-    CROSS_HOLE_FROM_HEAD_REAR,
     CROSS_HOLE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -187,7 +186,6 @@ async def build(adapter) -> dict[str, str]:
         "BackCapSag": BACK_CAP_SAG,
         "CrossHoleDia": CROSS_HOLE_DIA,
         "BackRimFromHeadRear": BACK_RIM_FROM_HEAD_REAR,
-        "CrossHoleFromHeadRear": CROSS_HOLE_FROM_HEAD_REAR,
         "OverallLen": OVERALL_LEN,
     }
     for name, value in globals_mm.items():
@@ -347,7 +345,7 @@ async def build(adapter) -> dict[str, str]:
         "grip cross-hole",
         dims=cross_hole,
         names=("CrossHoleCx", "HeadCenterZ", "CrossHoleDia"),
-        drives=(None, '-"HeadCenterZ"', '"CrossHoleDia"'),
+        drives=(None, '-("HeadFrontZ" + "HeadLen" / 2)', '"CrossHoleDia"'),
     )
     await ensure_fully_defined(adapter, "grip-cross-hole sketch")
     check("exit_sketch cross hole", await adapter.exit_sketch())
@@ -444,14 +442,6 @@ async def build(adapter) -> dict[str, str]:
         start_v=-HEAD_REAR_Z,
         end_v=-SHAFT_LEN,
         drive_expression='"BackRimFromHeadRear"',
-    )
-    drive_jobs += await _add_axial_reference(
-        adapter,
-        feature_name="CrossHoleReference",
-        dimension_name="CrossHoleFromHeadRear",
-        start_v=-HEAD_REAR_Z,
-        end_v=-HEAD_CENTER_Z,
-        drive_expression='"CrossHoleFromHeadRear"',
     )
     drive_jobs += await _add_axial_reference(
         adapter,

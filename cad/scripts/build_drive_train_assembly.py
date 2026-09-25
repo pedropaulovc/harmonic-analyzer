@@ -858,7 +858,6 @@ from pinion_spring_geometry import (  # noqa: E402
     HOLE_FROM_END as SPR_HOLE_FROM_END,
     HOLE_SPEC as SPR_HOLE_SPEC,
     KINK_START as SPR_CREST_L,
-    PAD_LEN as SPR_PAD_LEN,
     PAD_WIDTH as SPR_PAD_WIDTH,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
@@ -1842,8 +1841,9 @@ if abs(HANDLE_ROD_DIA - ARBOR_CROSS_HOLE_DIA - 0.0125) > 1e-9:
     raise AssertionError("grip crossrod/head nominal interference changed")
 if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
-# Block screws: exact 90280A199 #8-32 x 25.4 stock screws pass through normal
-# #8 clearance holes and engage 6.65 mm in the base's #8-32 UNC-2B seats.
+# Block screws: exact 90280A201 #8-32 x 31.75 stock screws pass through normal
+# #8 clearance holes and engage 11.25 mm (2.7D; 2.58D worst case, rule 12
+# audit E10) in the base's #8-32 UNC-2B seats.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
 _require_tapped_thread(
@@ -1950,6 +1950,24 @@ PINCH_WEST_EULER = euler_from_rows(ROT_PINCH_WEST)  # [180-INCLINE, 0, -90]
 def rot_z_rows(deg: float) -> list[list[float]]:
     c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
+
+
+# MHA-135 is match-drilled through the lever hub and the lift rod at assembly,
+# so both pin holes share one axis.  Each part cuts its hole along its own
+# local X; the lever is photographed at LEVER_TILT_DEG, so the ROD is phased to
+# the lever (the rod is round: its phase is free and never printed) and the
+# lever clamps parallel to it.  The cams keep their world phase (ecc straight
+# down) through an angle tie of the same LEVER_TILT_DEG back off the rod.
+LIFT_ROD_ROWS = rot_z_rows(LEVER_TILT_DEG)
+LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
+PINION_CAM_ROWS = IDENTITY
+# Rod Top-plane normal (local +Y) against the assembly Right normal (+X): the
+# freed pinion_cam spin's rest dihedral -- 90 + LEVER_TILT_DEG.
+LIFT_ROD_PARK_DEG = math.degrees(math.acos(LIFT_ROD_ROWS[1][0]))
+# Cam Right-plane normal against the rod's: the set-pin phase.
+CAM_ROD_PHASE_DEG = math.degrees(
+    math.acos(sum(a * b for a, b in zip(PINION_CAM_ROWS[0], LIFT_ROD_ROWS[0])))
+)
 
 
 def _org(adapter, name: str) -> list[float]:
@@ -2353,8 +2371,8 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "pinion-lift-rod",
         [LIFT_X, LIFT_Y, LIFT_ROD_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 0.0, LEVER_TILT_DEG],
+        LIFT_ROD_ROWS,  # phased to the lever: coaxial MHA-135 pin holes
         ground=False,
         label="pinion-lift-rod (in the blocks' raised west bores)",
     )
@@ -2387,7 +2405,7 @@ async def build(adapter) -> dict[str, str]:
             "pinion-cam",
             [LIFT_X, LIFT_Y, z0],
             [0.0, 0.0, 0.0],
-            IDENTITY,
+            PINION_CAM_ROWS,
             ground=False,
             label=f"pinion-cam {tag} (parked ecc down)",
         )
@@ -2396,7 +2414,7 @@ async def build(adapter) -> dict[str, str]:
         "pinion-lever",
         [LIFT_X, LIFT_Y, LEVER_Z],
         [0.0, 0.0, LEVER_TILT_DEG],
-        rot_z_rows(LEVER_TILT_DEG),  # positive rest angle tips machine -X
+        LEVER_ROWS,  # positive rest angle tips machine -X
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
@@ -3743,14 +3761,21 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Top Plane@{lift_rod}", "PLANE"),
         named_ref("Right Plane", "PLANE"),
-        90.0,
-        label="lift rod spin PARK driver (cams parked ecc-down, a=90.00)",
+        LIFT_ROD_PARK_DEG,
+        label=(
+            "lift rod spin PARK driver (cams parked ecc-down, "
+            f"a={LIFT_ROD_PARK_DEG:.2f})"
+        ),
         verify=(lift_rod, lr_o),
         free_dof_key="pinion_cam",
+        # The rod origin sits on the spin axis: an off-axis witness pins the
+        # branch (a +/-LEVER_TILT_DEG mirror would re-phase the cams).
+        witness_local=[0.0, 5.0, 0.0],
     )
     # Eccentric cams: pinned to the rod (set pin) -- coaxial on the rod's axis
-    # + an axial seat + a parallel anti-spin to the rod (both at IDENTITY, so
-    # their Right planes are parallel; the pair spins as one with the rod).
+    # + an axial seat + an angle anti-spin at CAM_ROD_PHASE_DEG to the rod (the
+    # rod is phased to the lever's pin hole, the cams stay ecc-down in the
+    # world), so the set spins as one with the rod.
     for tag in ("front", "back"):
         cam = pinion_cams[tag]
         cam_o = _org(adapter, cam)
@@ -3770,16 +3795,19 @@ async def build(adapter) -> dict[str, str]:
             label=f"pinion cam {tag} set-pin axial d={_cam_ax:.2f}",
             verify=(cam, cam_o),
         )
-        await parallel_mate(
+        await angle_driver(
             adapter,
             named_ref(f"Right Plane@{cam}", "PLANE"),
             named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-            label=f"pinion cam {tag} set-pin anti-spin",
+            CAM_ROD_PHASE_DEG,
+            label=(f"pinion cam {tag} set-pin anti-spin (a={CAM_ROD_PHASE_DEG:.2f})"),
             verify=(cam, cam_o),
+            witness_local=[0.0, 5.0, 0.0],
         )
-    # Lever: clamped on the rod's front end -- coaxial + axial + an angle tie
-    # to the ROD at the photographed 10-degree parked dihedral, so it spins
-    # WITH the rod: dragging the lever in the saved free model turns the cams.
+    # Lever: clamped on the rod's front end -- coaxial + axial + a parallel
+    # tie to the ROD (the rod carries the photographed 10-degree parked phase,
+    # so the match-drilled MHA-135 holes stay coaxial) -- so it spins WITH the
+    # rod: dragging the lever in the saved free model turns the cams.
     lev_o = _org(adapter, lever)
     await coincident_mate(
         adapter,
@@ -3796,12 +3824,11 @@ async def build(adapter) -> dict[str, str]:
         label=f"lever axial seat d={abs(lev_o[2] - lr_o[2]):.2f}",
         verify=(lever, lev_o),
     )
-    await angle_driver(
+    await parallel_mate(
         adapter,
         named_ref(f"Right Plane@{lever}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-        abs(LEVER_TILT_DEG),
-        label=f"lever clamp phase (a={abs(LEVER_TILT_DEG):.2f})",
+        label="lever clamp phase (parallel to the rod: coaxial pin holes)",
         verify=(lever, lev_o),
         witness_local=[0.0, LEVER_LEN, 0.0],
     )

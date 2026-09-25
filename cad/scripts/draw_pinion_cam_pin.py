@@ -91,7 +91,9 @@ FRONT_KEEP = {
 # without crossing a dimension line.
 RIGHT_KEEP = {
     "Depth": (0.205, 0.150),
-    "CapR": (0.290, 0.110),
+    # Level with the crown centre and well outside the R2.90 circle: nearer,
+    # the arc extension ran through OUTER CROWN.
+    "CapR": (0.307, 0.100),
 }
 OVERALL_TEXT_XY = (0.160, 0.165)
 DIMENSION_CALLOUTS = {
