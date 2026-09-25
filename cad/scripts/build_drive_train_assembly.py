@@ -1391,13 +1391,17 @@ LIFT_Y = PIVOT_Y + LIFT_BORE_RISE  # v2 closure: the steep strap carries its
 # follower contact above the pivot at the WEST cam station.  The eccentric cam
 # collars still meet the pins from below; the pins rest on the collar ODs.
 PIVOT_SHAFT_Z0 = RIG.TORQUE_SHAFT_Z0
-# Ø6.35 torque shaft flush with both block outer faces.
+# Ø6.35 torque shaft, set back-flush; its front end stands the worst-stack
+# allowance proud of the front block (pinion_rig_layout).
 LIFT_ROD_Z0 = RIG.LIFT_ROD_Z0
-# front end ~10 proud south of the front block -- lever hub seat
+# front end LEVER_SEAT_PROUD (15.05) south of the front block -- the lever
+# hub's seat, sized so the hub never stops the rod (pinion_rig_layout)
 BLOCK_X = PIVOT_X  # block local origin ON the pivot bore (datum B, U28)
 BLOCK_FRONT_Z0 = RIG.FRONT_BLOCK_Z0  # one 0.25 feeler off the front strap
 BLOCK_BACK_Z0 = RIG.BACK_BLOCK_Z0  # outer face fixed at 88; the (c) back stop
-# U28 thinned the blocks (12 -> 10.25) so the 9-thick back strap keeps 0.30 air
+# U28 thinned the blocks (12 -> 10.25); ruling (c) then put the back strap hard
+# on the back block, and pinion_rig_layout sizes the shaft and rod from the
+# worst fitted stack (Codex #837)
 LEVER_TILT_DEG = 10.0  # parked, from vertical toward machine -X
 # ch25 p.68 page002_img08 is explicitly the FRONT side and shows the
 # disengaged lever only about 10 degrees from vertical, with its tip to image
@@ -1640,7 +1644,7 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
 )  # -75.862, +76.338 (pinion_rig_layout)
-CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
+CAM_PIN_STATION = (STRAP_T / 2.0, RIG.BACK_CAM_PIN_STATION)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
     if _z0 < LIFT_ROD_Z0 + 1.0 or _z0 + CAM_LEN > LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN - 1.0:

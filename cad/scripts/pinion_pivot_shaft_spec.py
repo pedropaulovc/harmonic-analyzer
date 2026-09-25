@@ -27,11 +27,14 @@ CAP_RADIUS = ((SHAFT_DIA / 2.0) ** 2 + CAP_SAG**2) / (2.0 * CAP_SAG)
 SHAFT_DIA_BAND = SHAFT_H
 # U27 (Main, 2026-09-24): the length carries the title-block .X band (+/-0.8),
 # not a tight one.  Set back-flush, the longest shaft in the shortest stack
-# stands proud of the front block; nothing stands on the shaft's axis past
-# either block -- the nearest body, the MHA-059 lever hub, rides the lift rod
-# 18.63 off it, 8.95 radially clear.  Both are proven in
-# test_pinion_pivot_block_drawing::
-# test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack.
+# stands at worst 7.47 proud of the front block, the SR crown apex 8.67
+# (test_pinion_pivot_block_drawing::
+# test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack).
+# Nothing stands on the shaft's axis past either block: the nearest body,
+# the MHA-059 lever, rides the lift rod 18.63 off it -- hub 8.95 radial
+# clear, arm >= 12.42 clear over the -82 degree throw
+# (test_drive_train_support_layout::
+# test_torque_shaft_length_band_clears_both_ends).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {"Shaft": {"Depth": 1}}
 
 SURFACE_FINISHES = (

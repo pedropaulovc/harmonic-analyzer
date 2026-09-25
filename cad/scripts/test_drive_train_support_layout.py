@@ -6,6 +6,7 @@ import math
 
 import build_drive_train_assembly as drive
 import pinion_rig_fitup as FITUP
+import pinion_rig_layout as RIG
 from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
 
@@ -140,27 +141,27 @@ def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
 # The lift rod floats axially.  Southward, the front cam collar stops on the
 # front block's inner face; it is set there with the same 0.25 feeler, so up
 # to 0.35 of play.  Northward, the lever hub does NOT bear on the front block
-# (its bore takes 8 of the rod's >= 10 proud, leaving it about 2.05 off the
-# PHYSICAL block face), so the rod runs about 1.5 north, until the back cam
-# collar lands on the back block, and only then does the hub stop it.  Main
-# 2026-09-24: keep that float, since every follower gate below holds at its
-# true extremes.  The rod is set back-flush, so its travel is measured from
-# there against the PHYSICAL front block (pinion_rig_layout; the model's sits
-# 2 x STRAP_AIR further south, Codex #854).
+# (its bore takes 8 of the rod's LEVER_SEAT_PROUD, leaving it at least the back
+# collar's largest gap plus 0.25 off the block face at the worst stack, Codex
+# #837), so the rod runs about 1.5 north, until the back cam collar lands on
+# the back block, and the hub never stops it.  Main 2026-09-24: keep that
+# float, since every follower gate below holds at its true extremes.  The rod
+# is set back-flush, so its travel is measured from there against the front
+# block (pinion_rig_layout: the pose is the fit-up stack, Codex #854).
 _P_MAX = FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND
 _FEELER_BAND = (  # front collar set gap to the block
     FITUP.FRONT_BLOCK_FEELER - FITUP.FRONT_BLOCK_FEELER_BAND,
     FITUP.FRONT_BLOCK_FEELER + FITUP.FRONT_BLOCK_FEELER_BAND,
 )
-_BACK_CAM_SET_ERR = 0.5  # the back collar is set to its pin by eye
+_BACK_CAM_SET_ERR = RIG.BACK_CAM_SET_ERR  # the back collar is set to its pin by eye
 
 
 def _hub_gap() -> float:
-    """Lever hub to the physical front block, with the rod set back-flush."""
+    """Lever hub to the front block, with the rod set back-flush."""
     import pinion_rig_layout as rig
 
     hub_north = drive.LEVER_Z + drive.LEVER_HUB_LEN / 2.0
-    hub_gap = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - hub_north
+    hub_gap = rig.FRONT_BLOCK_Z0 - hub_north
     assert hub_gap >= 0.25, hub_gap
     return hub_gap
 
@@ -171,9 +172,7 @@ def _back_collar_gap(t: float, e: float) -> float:
 
 
 def _strap_t_band() -> tuple[float, float]:
-    from pinion_bracket_spec import THICKNESS_BAND
-
-    return (drive.STRAP_T - THICKNESS_BAND, drive.STRAP_T + THICKNESS_BAND)
+    return (drive.STRAP_T - RIG.STRAP_T_BAND, drive.STRAP_T + RIG.STRAP_T_BAND)
 
 
 def test_j19_keeps_two_thirds_face_at_the_worst_stack() -> None:
@@ -191,7 +190,7 @@ def test_j19_keeps_two_thirds_face_at_the_worst_stack() -> None:
     assert math.isclose(worst, 2.126, abs_tol=5e-3)
     # j = 0 at the front: the drum's front end never uncovers gear 0.
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
-    face_min = drive.APINION_DRUM_LEN - 0.8
+    face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     for t in _strap_t_band():
         assert drive.BLOCK_BACK_Z0 - t - face_min <= g0_front - 1.0
 
@@ -228,7 +227,11 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
         assert min(stations) >= 1.0, stations
         assert max(stations) <= drive.CAM_LEN - 1.0, stations
     assert math.isclose(min(front), 2.15, abs_tol=5e-3)
-    assert math.isclose(min(back), 3.10, abs_tol=5e-3)
+    # 2.75, not the old 3.10: at the thickest back strap and the late set,
+    # the 2.05 hub gap used to stop the rod before the 2.4 back collar did
+    # (Codex #837).  The hub now never is the stop, so the collar's whole gap
+    # applies.
+    assert math.isclose(min(back), 2.75, abs_tol=5e-3)
     # North float at the nominal set: the back collar lands first.
     assert math.isclose(_back_collar_gap(drive.STRAP_T, 0.0), 1.5, abs_tol=5e-3)
     assert _back_collar_gap(drive.STRAP_T, 0.0) < _hub_gap() - 0.25
@@ -246,11 +249,111 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-060's body length (LIFT_ROD_LEN) carries the title-block .X band (Main
-# 2026-09-24: keep it loose).  The front end is located by the lever hub (the rod bottoms
-# in its bore), so the whole band lands at the back end, on top of the rod's
-# axial float.
-_ROD_LEN_BAND = 0.8
+# MHA-060's and MHA-062's body lengths carry the title-block .X band (Main
+# 2026-09-24: keep it loose).  Both are set back-flush at fit-up, so the band
+# lands at their front ends; the back-end envelope below still takes the whole
+# band at the back as well, so either reference is covered.
+_ROD_LEN_BAND = RIG.LENGTH_BAND
+
+
+def _stack_vertices():
+    """Every vertex of the fitted stack: (front block inner and outer faces,
+    back strap thickness).
+
+    Measured from the back block's outer face, where the shaft and rod are set
+    flush: the back block's depth in its .XX band (Codex #854 P1), both straps
+    and the drum in their .X bands and the feeler in its ruled band (Codex #837
+    P1) move the front block's inner face; its own .XX depth moves its outer
+    face.  The back strap's own thickness also sets the back collar's gap, so
+    it is carried separately.
+    """
+    import itertools
+
+    t_lo, t_hi = _strap_t_band()
+    d_block = (-RIG.BLOCK_DEPTH_BAND, RIG.BLOCK_DEPTH_BAND)
+    inner_nominal = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
+    for t_f, t_b, d_drum, d_feel, d_back, d_front in itertools.product(
+        (t_lo, t_hi),
+        (t_lo, t_hi),
+        (-RIG.DRUM_LEN_BAND, RIG.DRUM_LEN_BAND),
+        (-RIG.FRONT_BLOCK_FEELER_BAND, RIG.FRONT_BLOCK_FEELER_BAND),
+        d_block,
+        d_block,
+    ):
+        growth = (t_f - drive.STRAP_T) + (t_b - drive.STRAP_T) + d_drum + d_feel
+        inner = inner_nominal - growth - d_back
+        yield inner, inner - (RIG.BLOCK_DEPTH + d_front), t_b
+
+
+def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
+    # Codex #837 P1: the back-flush shaft and rod are fixed .X lengths, while
+    # the front block swings with both straps, the drum and the feeler -- and,
+    # Codex #854 P1, each block's .XX depth band on top.  At the longest stack the
+    # shortest shaft must still bear 9.5 of the block, and the shortest rod
+    # must stand the lever hub's bore plus the back collar's largest gap (and a
+    # margin) proud, so the hub never becomes the rod's north stop.  Before
+    # this, the 182.0 shaft bore 7.0 and the 192.0 rod stood 6.75 proud --
+    # 1.25 short of even bottoming in the 8-deep bore; the 184.5 / 195.9 that
+    # followed left out the blocks' own depth band (8.99 of bearing).
+    from pinion_lever_geometry import BORE_DEPTH
+
+    assert not hasattr(RIG, "STACK_BAND")  # the stacks name every term
+    assert (RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN) == (185.1, 197.0)
+    assert math.isclose(RIG.BACK_COLLAR_GAP_MAX, 2.4, abs_tol=1e-9)
+    bearing_min = math.inf
+    hub_margin_min = math.inf
+    nominal_inner = RIG.FRONT_BLOCK_Z0 + RIG.BLOCK_DEPTH
+    # The sweep's longest stack is the named-term budget's growth, term for
+    # term: everything in it but the nominal and the shaft's own band.
+    growth = -sum(
+        value
+        for name, value in RIG.TORQUE_SHAFT_BEARING_STACK.items()
+        if not name.startswith(("nominal", "MHA-062"))
+    )
+    assert math.isclose(
+        max(nominal_inner - inner for inner, _o, _t in _stack_vertices()),
+        growth,
+        abs_tol=1e-9,
+    )
+    for inner, outer, t_b in _stack_vertices():
+        for dl in (-_ROD_LEN_BAND, _ROD_LEN_BAND):
+            shaft_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.TORQUE_SHAFT_LEN + dl)
+            bearing = inner - max(shaft_front, outer)
+            bearing_min = min(bearing_min, bearing)
+            rod_front = RIG.BACK_BLOCK_OUTER_Z - (RIG.LIFT_ROD_LEN + dl)
+            hub_gap = outer - (rod_front + BORE_DEPTH)
+            for e in (-_BACK_CAM_SET_ERR, _BACK_CAM_SET_ERR):
+                margin = hub_gap - _back_collar_gap(t_b, e)
+                hub_margin_min = min(hub_margin_min, margin)
+    assert bearing_min >= RIG.FRONT_BLOCK_MIN_BEARING - 1e-9
+    # The sweep's minimum is the layout's named-term budget, term for term.
+    assert math.isclose(
+        bearing_min, sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()), abs_tol=1e-9
+    )
+    assert math.isclose(bearing_min, 9.59, abs_tol=5e-3)
+    assert hub_margin_min >= RIG.HUB_STOP_MARGIN - 1e-9
+    assert math.isclose(
+        hub_margin_min,
+        sum(RIG.LIFT_ROD_SEAT_STACK.values())
+        - RIG.LEVER_SEAT_MIN
+        + RIG.HUB_STOP_MARGIN,
+        abs_tol=1e-9,
+    )
+    assert math.isclose(hub_margin_min, 0.33, abs_tol=5e-3)
+
+
+def test_lever_station_clears_at_both_rod_extremes() -> None:
+    # The lever rides the rod's front end, so its station moves with the rod's
+    # length band and its float (north to the back collar's largest gap, south
+    # to the front collar's widest feeler), never with the stack.  BDT's
+    # z-proxy gates hold at every extreme, not only at the model pose.
+    north = _ROD_LEN_BAND + RIG.BACK_COLLAR_GAP_MAX  # short rod, floated north
+    south = _ROD_LEN_BAND + _P_MAX  # long rod, floated south
+    shaft_front_south = drive.PIVOT_SHAFT_Z0 - _ROD_LEN_BAND  # longest shaft
+    assert drive._LEV_Z[1] + north <= shaft_front_south - 0.25
+    assert drive._LEV_Z[0] - south >= drive._GRIP_HEAD_Z[1] + 0.25
+    hub_lo = drive.LEVER_Z - drive.LEVER_HUB_LEN / 2.0 - drive.LEVER_CAP_SAG
+    assert hub_lo - south >= drive._GRIP_ROD_Z[1] + 0.25
 
 
 def test_lift_rod_length_band_clears_past_the_back_block() -> None:
@@ -261,13 +364,15 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
     from rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
 
     rod_r = ROD_DIA / 2.0
-    # Longest rod, hard north (hub on the front block): the back end's reach.
-    # The body ends 2.85 past the block; the SR crown stands CAP_SAG beyond
-    # that (Codex #855 P2), and the envelope runs to the crown's apex.
-    body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + _hub_gap()
-    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 2.85, abs_tol=5e-3)
+    # Longest rod, floated hard north: the back collar is its north stop,
+    # never the hub (test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod),
+    # so the body ends the band plus the collar's largest gap past the block.
+    # The SR crown stands CAP_SAG beyond that (Codex #855 P2), and the envelope
+    # runs to the crown's apex.
+    body_end = rig.BACK_BLOCK_OUTER_Z + _ROD_LEN_BAND + rig.BACK_COLLAR_GAP_MAX
+    assert math.isclose(body_end - rig.BACK_BLOCK_OUTER_Z, 3.2, abs_tol=5e-3)
     reach = body_end + CAP_SAG
-    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 4.05, abs_tol=5e-3)
+    assert math.isclose(reach - rig.BACK_BLOCK_OUTER_Z, 4.4, abs_tol=5e-3)
     band = (rig.BACK_BLOCK_OUTER_Z, reach + 0.25)
     # Occupants of that z band near the rod axis (drive_train + frame):
     # the north arbor pedestal stands on the drum axis, well west of the rod.
@@ -291,9 +396,10 @@ def test_lift_rod_length_band_clears_past_the_back_block() -> None:
 
 
 def test_torque_shaft_length_band_clears_both_ends() -> None:
-    # MHA-062 at the title-block .X band (U27): set back-flush, the shaft's
-    # body end stands up to 0.8 + rounding proud of the physical front block,
-    # and its SR crown 1.2 beyond that.
+    # MHA-062 at the title-block .X band (U27), set back-flush: at the
+    # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
+    # body end stands 7.47 proud of the front block, and its SR crown 1.2
+    # beyond that (Codex #837 P1).
     import arbor_pedestal_spec as ped
     import pinion_lever_geometry as lever
     import pinion_rig_layout as rig
@@ -301,9 +407,22 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     from rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
 
     front_end = rig.BACK_BLOCK_OUTER_Z - rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
-    proud = rig.PHYSICAL_FRONT_BLOCK_OUTER_Z - front_end
-    assert math.isclose(proud, 0.85, abs_tol=5e-3)
-    assert math.isclose(proud + CAP_SAG, 2.05, abs_tol=5e-3)
+    # The shortest stack mirrors the named-term long stack of the front
+    # block's OUTER face (both blocks' depths, both straps, the drum and the
+    # feeler: the lift rod's budget less its nominal and the rod's own band),
+    # since every nominal in it prints exactly.
+    shrink = -sum(
+        value
+        for name, value in rig.LIFT_ROD_SEAT_STACK.items()
+        if not name.startswith(("nominal", "MHA-060"))
+    )
+    shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
+    proud = shortest_outer - front_end
+    assert math.isclose(proud, 7.47, abs_tol=5e-3)
+    assert math.isclose(proud + CAP_SAG, 8.67, abs_tol=5e-3)
+    assert math.isclose(
+        max(outer for _i, outer, _t in _stack_vertices()), shortest_outer, abs_tol=1e-9
+    )
     # South of the front block nothing stands on the shaft's axis at any z.
     # The nearest body is the MHA-059 lever on the lift rod: its hub keeps
     # 8.95 radial clearance, and its arm points away from the shaft over the
@@ -322,10 +441,8 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
         foot = min(max(rel[0] * u[0] + rel[1] * u[1], 0.0), drive.LEVER_LEN)
         gap = math.hypot(rel[0] - foot * u[0], rel[1] - foot * u[1])
         assert gap - arm_r - shaft_r >= 5.0, (k, gap)
-    # Shortest shaft: still bears most of the front block.
-    recess = rig.TORQUE_SHAFT_LEN - _ROD_LEN_BAND
-    bearing = recess - (rig.BACK_BLOCK_OUTER_Z - rig.PHYSICAL_FRONT_BLOCK_OUTER_Z)
-    assert drive.BLOCK_DEPTH + bearing >= 9.5 - 1e-9
+    # The shortest shaft's bearing in the longest stack is swept in
+    # test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod.
     # Past the back block (the same band pushed north) nothing stands on the
     # shaft's axis: the north pedestal is well west, the rocker support ends
     # short of the block face, and the base deck lies under the shaft.
