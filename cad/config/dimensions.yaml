@@ -338,7 +338,7 @@ sections:
       - - Gear bores (configured `BoreDia`)
         - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.5 (3/8") T024–T120; 6.35 (1/4") T018; 3.18 (1/8") T012; 1.59 (1/16") T006; no keyway'
         - —
-        - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module the T012 bore drops to 1/8" (full-depth root r 2.42) and T006 to 1/16": these teeth are through-cut from the modules own DXF profile, whose gap floor is the chord across the base circle, so T006s as-cut root radius is 1.3365 (not the 0.939 a full-depth cutter would reach) and a 1/16" bore leaves a 0.543 mm rim, 0.77x the 0.703 as-cut tooth depth; p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere'
+        - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module T006 takes a 1/16" bore. Its gap floor is printed at 2.880 mm MIN diameter (U40), so the nominal bore leaves a 0.646 mm radial web and the maximum allowed bore 0.621 mm, the one named web exception (cone_gear_spec.WEB_EXCEPTIONS_MM). The p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere.'
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)

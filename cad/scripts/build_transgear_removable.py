@@ -51,12 +51,12 @@ from _common import (
 )
 from _grouped_bom_properties import apply_grouped_bom_properties
 # ``set_global`` is imported from _common under a distinct name: the gear-math
-# globals below use build_cone_gear's stricter 4-arg ``set_global`` (asserts the
+# globals below use involute_gear's stricter 4-arg ``set_global`` (asserts the
 # round-tripped value to test the equation-parser dialect), while the plain
 # length knobs added for the self-naming conversion use _common's mm-suffixing
 # 3-arg upsert. Keeping both avoids touching the validated involute math.
 from _common import set_global as set_global_mm
-from build_cone_gear import (
+from involute_gear import (
     PI_LIT,
     equation_curve,
     gap_area_in_disc,

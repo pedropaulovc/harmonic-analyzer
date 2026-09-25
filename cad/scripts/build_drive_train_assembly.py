@@ -291,7 +291,17 @@ SEC_I = 1.0 / COS_I
 INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
-CONE_FACE = 6.5  # M6.7 mesh packing (annotated 7 -- build_cone_gear.py)
+from cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
+
+# Cone gear face (cone_gear_spec.FACE_WIDTH, 6.0 since the U27 ruling of
+# 2026-09-23).  Every station, the 64T gap and the T006 -> bushing -> tip-block
+# stack stay on the historical 6.5 reference face: each gear is narrowed from
+# its SOUTH face only (seed placed (reference - face)/2 north of its station),
+# so all north faces -- and the tip end-play stack against T006 -- are
+# unchanged; the drum's engaged zone ([-0.50, +1.60] about the reference
+# centre) stays inside the minimum 5.2 face.
+CONE_FACE = CONE_GEAR_FACE_WIDTH
+CONE_FACE_STATION_REFERENCE = 6.5
 GEAR64_FACE = 8.0
 # Preserve the rederived gear centre while narrowing both axial faces equally.
 # The 10 mm reference face is placement history, not current part geometry.
@@ -335,7 +345,7 @@ def cone_seat(j: int) -> tuple[float, float]:
 # CONE_ORIGIN stays the PIVOT END (station 0, the station datum); the physical
 # shaft now runs FRONT_STUB further south (ch30 GT), so the part -- authored
 # from its front stub end -- is PLACED at SHAFT_FRONT_STATION instead.
-SHAFT_T120_STATION = 25.0 + CONE_FACE / 2.0  # 28.25
+SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
 _GEAR_CONE_ORIGIN = [
     cone_seat(0)[0] - SHAFT_T120_STATION * SIN_I,
     Y_DRIVE,
@@ -381,7 +391,7 @@ for _j in range(20):
 # T120 (p.20).  Its station remains the rederived 19.9 mm centre; narrowing
 # the face symmetrically increases the axial air to T120 and the post to 1.1 mm.
 GEAR64_STATION = (
-    SHAFT_T120_STATION - (CONE_FACE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
+    SHAFT_T120_STATION - (CONE_FACE_STATION_REFERENCE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
 )  # 19.9
 GEAR64_SEAT = cone_station(GEAR64_STATION + GEAR_AXIS_SHIFT)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
@@ -713,7 +723,7 @@ if _SHAFT_NORTH_END - (PINION_PIN_Z + PINION_PIN_DIA / 2.0) < 1.0:
 # against its north face; the block follows after one bushing-half-width of
 # clearance, and the pivot keeps its established 11 mm offset from the block.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
-T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE / 2.0
+T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
@@ -1150,7 +1160,7 @@ for _k in range(7200):
         <= R16 + ADD16
     ):
         _T120_SOUTH = min(
-            _T120_SOUTH, _T120_SEAT[2] - _c * SIN_I - CONE_FACE / 2.0 * COS_I
+            _T120_SOUTH, _T120_SEAT[2] - _c * SIN_I + (CONE_FACE_STATION_REFERENCE / 2.0 - CONE_FACE) * COS_I
         )
 if PINION_TOOTH_Z + PINION_FACE / 2.0 > _T120_SOUTH - 0.25:
     raise AssertionError(
@@ -2710,7 +2720,7 @@ async def build(adapter) -> dict[str, str]:
     seed_cg = await _place_on_shaft(
         adapter,
         "cone-gear",
-        SHAFT_T120_STATION + GEAR_AXIS_SHIFT,
+        SHAFT_T120_STATION + GEAR_AXIS_SHIFT + (CONE_FACE_STATION_REFERENCE - CONE_FACE) / 2.0,
         CONE_FACE,
         configuration=f"T{seed_teeth:03d}",
         label=f"cone-gear T{seed_teeth:03d}",

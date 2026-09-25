@@ -33,9 +33,9 @@ gear faces (stations below quoted from the legacy pivot end):
   McMaster 94025A150 conical cup apex at 6 mm thread engagement.  Its
   20.675 mm terminal land also carries the 4 mm tip bushing.  It was
   1/32 in while the bore rule was read literally off the gear seat; at
-  L/D 26 that land could not be turned in steel.  1/16 in is the largest
-  step the T006 rim tolerates (0.543 mm under the as-cut base-chord root)
-  and leaves L/D 13 -- see cone_gear_shaft_spec.SECTIONS.
+  L/D 26 that land could not be turned in steel.  The chosen 1/16 in step
+  leaves T006 the 0.621 mm worst-case web accepted as its named exception
+  (U40) and L/D 13 -- see cone_gear_shaft_spec.SECTIONS.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat
