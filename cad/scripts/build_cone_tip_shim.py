@@ -6,7 +6,8 @@ from shim stock, stacked at fit-up so the block's adjuster axis lands on the
 cone axis, then clamped between the swing platform's top face and the
 block's foot by the MHA-140 hold-down screw. The model is ONE solid at the
 nominal stack (cone_tip_shim_spec.SHIM_T); the drawing states the stack
-range and the leaf stock.
+range on the thickness dimension and the leaf stock in the material
+specification.
 
 Layout: origin on the bottom face, on the block's foot-tap axis (the plan
 runs from the block's south face to its heel relief), footprint on the Top plane
@@ -59,7 +60,6 @@ from _drawing_marks import (
 from cone_tip_shim_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    MANUFACTURING_NOTES,
     REFERENCE_SKETCHES,
     SHIM_NORTH_Z,
     SHIM_SOUTH_Z,
@@ -291,9 +291,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     _blank_reference_sketches(adapter)
-    apply_drawing_properties(
-        adapter, PART_NAME, extra={"Manufacturing Notes": MANUFACTURING_NOTES}
-    )
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

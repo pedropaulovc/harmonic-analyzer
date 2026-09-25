@@ -66,12 +66,37 @@ def test_slot_opens_away_from_the_drum() -> None:
     assert part.CUT_DEPTH / 2.0 > spec.SHIM_T
 
 
-def test_notes_state_the_stack_range_and_nominal_only() -> None:
-    lines = spec.MANUFACTURING_NOTES.splitlines()
-    assert lines == ["SHIM PACK, STACK TO FIT 0.05-2.20, NOMINAL 1.10."]
-    # The fitting procedure is an assembly step (MHA-A03), not a part note.
-    for method in ("SLIDE", "BACK", "SCREW", "INSTALL", "ADJUST"):
-        assert method not in spec.MANUFACTURING_NOTES
+def test_stack_range_rides_the_thickness_dimension_not_a_note() -> None:
+    """Rule 6 (Main's eye pass of warm-c486): no dimension in a note.  The
+    stack range wraps the imported thickness, derived from the spec's range
+    at the model's places; the value between is the model's own."""
+    places = spec.DRAWING_PRECISION_BY_NAME["Thickness"]
+    low, high = spec.STACK_RANGE_MM
+    shown = (
+        f"{spec.THICKNESS_TEXT_PREFIX}{spec.SHIM_T:.{places}f}"
+        f"{spec.THICKNESS_TEXT_SUFFIX}"
+    )
+    assert shown == f"{low:.2f}–{high:.2f} STACK (1.10 NOM)"
+    # The nominal is the model's dimension, never typed into the text.
+    assert f"{spec.SHIM_T:.{places}f}" not in spec.THICKNESS_TEXT_PREFIX
+    assert not any(ch.isdigit() for ch in spec.THICKNESS_TEXT_SUFFIX)
+    assert drawing.THICKNESS_TEXT_PREFIX is spec.THICKNESS_TEXT_PREFIX
+    assert drawing.THICKNESS_TEXT_SUFFIX is spec.THICKNESS_TEXT_SUFFIX
+    # Nothing else labels the thickness: no reference parentheses of its own
+    # and no "NOMINAL STACK" callout competing with the stack text.
+    assert "Thickness" not in drawing.DIMENSION_CALLOUTS
+    assert not hasattr(drawing, "REFERENCE_DIMENSIONS")
+
+
+def test_sheet_carries_no_general_note() -> None:
+    """The leaf stock is the material specification and blackening the
+    finish (rule 1); the fitting procedure is an MHA-A03 assembly step.  So
+    no Manufacturing Notes block is authored, stamped or placed."""
+    assert not hasattr(spec, "MANUFACTURING_NOTES")
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source
+        assert "MANUFACTURING_NOTES" not in source
 
 
 def test_registry_row_is_the_bom_shim_pack() -> None:
@@ -88,8 +113,7 @@ def test_every_marked_dimension_has_a_view_and_a_precision() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.DRAWING_PRECISION_BY_NAME["Thickness"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["SlotWidth"] == 2
-    assert drawing.REFERENCE_DIMENSIONS == ("Thickness",)
-    assert drawing.DIMENSION_CALLOUTS["SlotWidth"] == "SLOT, FULL R"
+    assert drawing.DIMENSION_CALLOUTS == {"SlotWidth": "SLOT, FULL R"}
 
 
 def test_slot_width_reads_past_the_open_mouth() -> None:
@@ -125,20 +149,34 @@ def test_drawing_registry_row() -> None:
     assert reg.script == Path(drawing.__file__).resolve()
 
 
-def test_nominal_stack_text_leads_off_its_dimension_line() -> None:
-    """r1 printed "(Ø1.10)" across its own 4.4 mm-tall dimension line."""
+def test_stack_text_leads_off_its_dimension_line() -> None:
+    """r1 printed "(Ø1.10)" across its own 4.4 mm-tall dimension line.
+
+    warm-c486 measured the sheet's 3.5 mm text at ~2.85 mm per capital and
+    ~1.95 per digit or stop; 2.6 mm per character bounds the one-line stack
+    text, positioned by its centre.  The title block's top edge sits at
+    ~65 mm on the B sheet (the same render).
+    """
+    places = spec.DRAWING_PRECISION_BY_NAME["Thickness"]
+    text = (
+        f"{spec.THICKNESS_TEXT_PREFIX}{spec.SHIM_T:.{places}f}"
+        f"{spec.THICKNESS_TEXT_SUFFIX}"
+    )
     line_x = drawing.FRONT_KEEP["Thickness"][0]
     text_x, text_y = drawing.THICKNESS_TEXT
-    half_w = 0.030 / 2.0  # "NOMINAL STACK" callout, the widest text line
+    half_w = len(text) * 0.0026 / 2.0
     assert text_x - half_w >= line_x + 0.004
-    assert text_y + 0.006 < drawing.NOTES_XY[1] - 0.008  # below the notes block
+    assert text_y - 0.003 > 0.065 + 0.008  # clear above the title block
+    # Right end stays short of the isometric's cell.
+    assert text_x + half_w < drawing.ISO_CENTER[0] - 0.040
 
 
-def test_reference_mark_carries_no_diameter_glyph() -> None:
-    """The plural helper prefixes "(<MOD-DIAM>"; the stack is a length."""
+def test_stack_text_carries_no_diameter_glyph() -> None:
+    """The plural reference helper prefixes "(<MOD-DIAM>" ("(Ø1.10)" in r1);
+    the stack is a length, and its prefix is the spec's plain text."""
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_reference_dimensions(" not in source
-    assert "set_reference_dimension(" in source
+    assert "MOD-DIAM" not in spec.THICKNESS_TEXT_PREFIX
 
 
 def test_radius_centre_locations_are_model_owned_one_place() -> None:
