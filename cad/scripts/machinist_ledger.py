@@ -1314,7 +1314,36 @@ class Found:
     candidates: list[Candidate]
     objections: list[Candidate]  # failing verdicts (FIX, or SHIP with findings)
     refusals: list[tuple[Path, dict[str, Any]]]
-    pdfs: dict[str, list[Path]]
+    pdfs: _PdfIndex
+
+
+class _PdfIndex:
+    """Every PDF under the roots, found by content.
+
+    The file a verdict names is tried first, then any ``<sha256>.pdf`` store,
+    and only then is every other PDF hashed -- once, and only when a reviewed
+    PDF was renamed or is lost -- so the lookup is by content wherever it lives.
+    """
+
+    def __init__(self) -> None:
+        self.by_name: dict[str, list[Path]] = {}
+        self.hashes: dict[Path, str] = {}
+
+    def add(self, path: Path) -> None:
+        self.by_name.setdefault(path.name, []).append(path)
+
+    def _digest(self, path: Path) -> str:
+        if path not in self.hashes:
+            self.hashes[path] = sha256_file(path)
+        return self.hashes[path]
+
+    def find(self, sha: str, name: str) -> Path | None:
+        likely = [*self.by_name.get(name, []), *self.by_name.get(f"{sha}.pdf", [])]
+        everything = (path for paths in self.by_name.values() for path in paths)
+        for path in (*likely, *everything):
+            if self._digest(path) == sha:
+                return path
+        return None
 
 
 def _walk(roots: Sequence[Path]) -> Iterable[Path]:
@@ -1353,11 +1382,11 @@ def find_reviews(roots: Sequence[Path]) -> Found:
     candidates: list[Candidate] = []
     objections: list[Candidate] = []
     refusals: list[tuple[Path, dict[str, Any]]] = []
-    pdfs: dict[str, list[Path]] = {}
+    pdfs = _PdfIndex()
     seen: set[Path] = set()
     for path in _walk(roots):
         if path.suffix == ".pdf":
-            pdfs.setdefault(path.name, []).append(path)
+            pdfs.add(path)
             continue
         resolved = path.resolve()
         if resolved in seen:
@@ -1400,18 +1429,10 @@ class _Located(_References):
         return self.paths[sha]
 
 
-def _locate(
-    candidate: Candidate, pdfs: dict[str, list[Path]], hashes: dict[Path, str]
-) -> Path | None:
+def _locate(candidate: Candidate, pdfs: _PdfIndex) -> Path | None:
     """A file holding exactly the bytes the review saw, wherever it is now."""
     sha = candidate.review["source_sha256"][0]
-    name = Path(str(candidate.review["sources"][0])).name
-    for path in [*pdfs.get(name, []), *pdfs.get(f"{sha}.pdf", [])]:
-        if path not in hashes:
-            hashes[path] = sha256_file(path)
-        if hashes[path] == sha:
-            return path
-    return None
+    return pdfs.find(sha, Path(str(candidate.review["sources"][0])).name)
 
 
 def _refusal_for(
@@ -1451,7 +1472,6 @@ def _objection(
     candidate: Candidate,
     current: Sequence[Sheet],
     found: Found,
-    hashes: dict[Path, str],
 ) -> str:
     """A failing verdict, newer than ``candidate``, that may have seen these sheets.
 
@@ -1466,7 +1486,7 @@ def _objection(
         if datetime.fromisoformat(other.review["reviewed_at"]) <= shipped:
             continue
         what = f"{_reviewed(other.review)} {other.review['verdict']['verdict']}"
-        pdf = _locate(other, found.pdfs, hashes)
+        pdf = _locate(other, found.pdfs)
         if pdf is None:
             return (
                 f"newer {what} reviewed a PDF that is lost, so it may have seen "
@@ -1496,7 +1516,6 @@ def _try(
     author: Author | ValueError,
     ruled_family: str | None,
     found: Found,
-    hashes: dict[Path, str],
     checkout: Path,
     scratch: Path,
 ) -> Tried:
@@ -1508,7 +1527,7 @@ def _try(
     exact = reviewed == [sheet_digest(sheet.ink) for sheet in current]
     match = "exact" if exact else "within tolerance"
     matched = f"{_reviewed(review)} matches ({match})"
-    objection = _objection(candidate, current, found, hashes)
+    objection = _objection(candidate, current, found)
     if objection:
         return Tried(candidate, Backfill.CONTRADICTED, f"{matched}; {objection}")
     if isinstance(author, ValueError):
@@ -1589,12 +1608,11 @@ def backfill(
         raise ValueError(f"unknown drawing names: {unknown}")
     repo = checkout or REPO_ROOT
     found = find_reviews(roots)
-    hashes: dict[Path, str] = {}
     by_drawing: dict[str, list[Candidate]] = {}
     for candidate in found.candidates:
         if candidate.skip:
             continue
-        candidate.pdf = _locate(candidate, found.pdfs, hashes)
+        candidate.pdf = _locate(candidate, found.pdfs)
         by_drawing.setdefault(candidate.drawing, []).append(candidate)
     ledger = load_ledger(ledger_path)
     references = _References(sheets_dir(ledger_path))
@@ -1625,11 +1643,31 @@ def backfill(
                 continue
             status = drawing_status(name, ledger, references=references, pdf=pdf)
             if status.state == State.OK:
+                slot = status.via.split()[0]
+                entry = ledger["drawings"][name][slot]
+                recorded = Candidate(ledger_path, entry, name)
+                objection = _objection(recorded, read_sheets(pdf), found)
+                if not objection:
+                    rows.append(
+                        BackfillRow(
+                            name, Backfill.RECORDED, f"{status.via} {status.detail}"
+                        )
+                    )
+                    continue
+                # A newer failing verdict of these sheets withdraws the entry.
+                dropped = "dropped from the ledger" if apply else "to drop (--apply)"
                 rows.append(
                     BackfillRow(
-                        name, Backfill.RECORDED, f"{status.via} {status.detail}"
+                        name,
+                        Backfill.CONTRADICTED,
+                        f"recorded {slot} {status.detail}: {objection}; {dropped}",
                     )
                 )
+                if apply:
+                    del ledger["drawings"][name][slot]
+                    if not ledger["drawings"][name]:
+                        del ledger["drawings"][name]
+                    save_ledger(ledger, ledger_path)
                 continue
             if not ships:
                 rows.append(
@@ -1655,7 +1693,6 @@ def backfill(
                     author=authors[name],
                     ruled_family=(rulings or {}).get(name),
                     found=found,
-                    hashes=hashes,
                     checkout=repo,
                     # its own directory: a scratch save prunes its sheets dir
                     scratch=Path(tmp) / name / str(index) / "ledger.json",

@@ -1835,3 +1835,42 @@ def test_backfill_cli_prints_the_table_and_its_counts(
 
     assert ml.main([*argv, "--author-family", "crank_arm"]) == 2
     assert "expected NAME=FAMILY" in capsys.readouterr().err
+
+
+def test_backfill_finds_a_reviewed_pdf_archived_under_another_name(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    reviewed = _on_record(records, "wt-a", producer="reviewed render")
+    archived = records / "handoff" / "r3-snapshot.pdf"
+    archived.parent.mkdir(parents=True)
+    archived.write_bytes(reviewed.read_bytes())
+    _sheet(reviewed, producer="the worktree re-rendered")
+    _sheet(registry)
+
+    row = _backfill(tmp_path, records)
+
+    assert row.outcome == ml.Backfill.INGESTED
+    assert row.tried[0].candidate.pdf == archived
+
+
+def test_a_newer_failing_verdict_withdraws_a_recorded_entry(
+    tmp_path: Path, registry: Path, records: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _trailer(monkeypatch, "claude-opus-5-5")
+    _on_record(records, "wt-ship", reviewed_at=EARLIER)
+    _sheet(registry)
+    ledger_path = tmp_path / "ledger.json"
+    assert _backfill(tmp_path, records, apply=True).outcome == ml.Backfill.INGESTED
+    _on_record(records, "wt-fix", passed=False, reviewed_at=REVIEWED_AT)
+
+    row = _backfill(tmp_path, records)
+    assert row.outcome == ml.Backfill.CONTRADICTED
+    assert "to drop (--apply)" in row.detail and "wt-fix" in row.detail
+    assert ml.check(["crank_arm"], ledger_path=ledger_path)[0].state == ml.State.OK
+
+    row = _backfill(tmp_path, records, apply=True)
+    assert row.outcome == ml.Backfill.CONTRADICTED
+    assert "dropped from the ledger" in row.detail
+    status = ml.check(["crank_arm"], ledger_path=ledger_path)[0]
+    assert status.state == ml.State.UNREVIEWED
