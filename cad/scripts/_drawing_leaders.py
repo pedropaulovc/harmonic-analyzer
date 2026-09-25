@@ -8,7 +8,24 @@ leaders met at the bore). This module reads each annotation's ink as sheet
 segments so a drawing can fail its build on such a crossing.
 
 Opt-in, like ``_drawing_hidden_sketches``: only the drawings that import it
-re-key when it changes; ``_drawing_common`` is in every drawing's key.
+re-key when it changes; ``_drawing_common`` is in every drawing's key. It is
+the fleet's one leader and dimension-line reader; extend it rather than
+growing another.
+
+What a seat has shown, and what it has not yet:
+
+- Farm run w15-3d3a9d762 (20260925T193429474Z-35f59b07): drawing:crank_arm
+  (15d4e3b95dbf, seat pid 12100, "done in 22.0s") and
+  drawing:crank_drive_gear (d48669b89a14) built and passed
+  ``assert_leaders_clear``. So ``GetLineAtIndex2`` and
+  ``GetLeaderPointsAtIndex`` returned ink for every named annotation (the
+  no-ink branch fails loud).
+- That pass did NOT prove the COORDINATE SPACE: segments in view space would
+  miss every keep-out and crossing vacuously. ``lands_within`` closes that
+  gap (each named annotation must end at its feature, in sheet metres), and
+  the ``leaders clear`` info line puts the segment counts and landing
+  distances in the leaf log. The first leaf that passes it is the proof; add
+  its line here.
 """
 
 from __future__ import annotations
@@ -82,6 +99,64 @@ def dimension_segments(annotation: Any) -> list[Segment]:
     return segments
 
 
+def parse_section_line_info(values: Sequence[float]) -> list[Segment]:
+    """Section-line strokes from ``IView.GetSectionLineInfo2``'s flat array.
+
+    Layout: [count, layer, then per line: nSegments, nSegments x (lineType,
+    start[3], end[3]), arrow1 (start[3], end[3], width, height, style), arrow2
+    (same), text1[3], text2[3], textHeight]. The chain-line segments and both
+    arrow shafts come back; the labels' text points do not.
+    """
+    values = [float(v) for v in values]
+    if not values:
+        return []
+    count, index, segments = int(values[0]), 2, []
+    for _ in range(count):
+        n = int(values[index])
+        index += 1
+        for _ in range(n):
+            start, end = values[index + 1 : index + 3], values[index + 4 : index + 6]
+            segments.append(((start[0], start[1]), (end[0], end[1])))
+            index += 7
+        for _ in range(2):
+            start, end = values[index : index + 2], values[index + 3 : index + 5]
+            segments.append(((start[0], start[1]), (end[0], end[1])))
+            index += 9
+        index += 7
+    if index != len(values):
+        raise RuntimeError(f"section-line info has {len(values)} values, parsed {index}")
+    return segments
+
+
+def section_line_segments(view: Any) -> list[Segment]:
+    """The cutting-plane strokes (chain line and arrow shafts) a view carries."""
+    view = _sw_type_info.early_bound_or_flag(view, "IView", "GetSectionLineInfo2")
+    return parse_section_line_info(tuple(view.GetSectionLineInfo2() or ()))
+
+
+def dimension_text_points(annotation: Any) -> list[Point]:
+    """A display dimension's text positions in sheet metres (same space as its lines)."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation, "IAnnotation", "GetSpecificAnnotation"
+    )
+    display = _sw_type_info.early_bound_or_flag(
+        annotation.GetSpecificAnnotation(), "IDisplayDimension", "GetDisplayData"
+    )
+    data = _sw_type_info.early_bound_or_flag(
+        display.GetDisplayData(), "IDisplayData", "GetTextPositionAtIndex", "GetTextCount"
+    )
+    return [
+        tuple(float(v) for v in tuple(data.GetTextPositionAtIndex(index))[:2])
+        for index in range(int(data.GetTextCount()))
+    ]
+
+
+def points_inside(points: Sequence[Point], box: tuple[float, float, float, float]) -> list[Point]:
+    """The points strictly inside ``box`` = (x0, y0, x1, y1)."""
+    x0, y0, x1, y1 = box
+    return [p for p in points if x0 < p[0] < x1 and y0 < p[1] < y1]
+
+
 def leader_segments(annotation: Any) -> list[Segment]:
     """An annotation's leader polylines (straight or bent) in sheet metres."""
     annotation = _sw_type_info.early_bound_or_flag(
@@ -99,12 +174,50 @@ def _orientation(a: Point, b: Point, c: Point) -> float:
     return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 
 
-def segments_cross(first: Segment, second: Segment) -> bool:
-    """True when the two segments properly intersect (a shared endpoint is not a crossing)."""
+# Two lines closer than this, and sharing more than this of their length,
+# read as one stroke on a printed sheet (sheet metres: 0.1 mm).
+COLLINEAR_TOLERANCE = 1e-4
+
+
+def _collinear_overlap(first: Segment, second: Segment, tolerance: float) -> bool:
+    """True when ``second`` lies along ``first`` for more than ``tolerance``."""
+    (a, b), (c, d) = first, second
+    length = math.dist(a, b)
+    if length <= tolerance:
+        return False
+    if max(distance_to_line(first, c), distance_to_line(first, d)) > tolerance:
+        return False
+    ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+    tc = (c[0] - a[0]) * ux + (c[1] - a[1]) * uy
+    td = (d[0] - a[0]) * ux + (d[1] - a[1]) * uy
+    return min(length, max(tc, td)) - max(0.0, min(tc, td)) > tolerance
+
+
+def segments_cross(
+    first: Segment, second: Segment, tolerance: float = COLLINEAR_TOLERANCE
+) -> bool:
+    """True when the segments properly intersect or one lies along the other.
+
+    A shared endpoint is not a crossing; a leader laid along another line for
+    more than ``tolerance`` is, since the two strokes print as one.
+    """
     (a, b), (c, d) = first, second
     d1, d2 = _orientation(c, d, a), _orientation(c, d, b)
     d3, d4 = _orientation(a, b, c), _orientation(a, b, d)
-    return d1 * d2 < 0.0 and d3 * d4 < 0.0
+    if d1 * d2 < 0.0 and d3 * d4 < 0.0:
+        return True
+    return _collinear_overlap(first, second, tolerance) or _collinear_overlap(
+        second, first, tolerance
+    )
+
+
+def distance_to_line(segment: Segment, point: Point) -> float:
+    """Distance from ``point`` to the infinite line through the segment."""
+    (x0, y0), (x1, y1) = segment
+    length = math.dist((x0, y0), (x1, y1))
+    if length == 0.0:
+        return math.dist((x0, y0), point)
+    return abs((x1 - x0) * (y0 - point[1]) - (x0 - point[0]) * (y1 - y0)) / length
 
 
 def distance_to_point(segment: Segment, point: Point) -> float:
@@ -131,30 +244,63 @@ def leader_crossings(groups: Mapping[str, Sequence[Segment]]) -> list[tuple[str,
     return crossings
 
 
+def landing_distance(segments: Sequence[Segment], centre: Point) -> float:
+    """How close the annotation's nearest segment END comes to ``centre``."""
+    return min(math.dist(end, centre) for segment in segments for end in segment)
+
+
 def assert_leaders_clear(
     groups: Mapping[str, Sequence[Segment]],
     *,
     centre: Point,
     keep_out: Mapping[str, float],
+    lands_within: Mapping[str, tuple[float, float]],
     label: str,
 ) -> None:
-    """Fail when named annotations cross, or one runs inside its keep-out of ``centre``."""
+    """Fail unless every named annotation lands at its feature and none cross.
+
+    ``lands_within[name] = (low, high)``: the annotation's nearest segment end
+    lies that far from ``centre`` (its rim, or the centre itself). Every
+    annotation must have a band, which proves the segments are sheet metres
+    before the crossing and keep-out checks can pass. ``keep_out[name]``: no
+    segment of it comes closer to ``centre`` than that.
+    """
+    missing = sorted(set(groups) - set(lands_within))
+    if missing:
+        raise ValueError(f"{label}: no landing band for {missing}")
+    empty = [name for name, segments in groups.items() if not segments]
+    landings = {
+        name: landing_distance(segments, centre)
+        for name, segments in groups.items()
+        if segments
+    }
+    astray = {
+        name: distance
+        for name, distance in landings.items()
+        if not lands_within[name][0] <= distance <= lands_within[name][1]
+    }
     crossings = leader_crossings(groups)
     intrusions = {
         name: min(distance_to_point(segment, centre) for segment in groups[name])
         for name, radius in keep_out.items()
         if groups[name] and min(distance_to_point(s, centre) for s in groups[name]) < radius
     }
+    summary = {
+        name: f"{len(segments)} seg, lands {landings.get(name, float('nan')) * 1000:.2f} mm"
+        for name, segments in groups.items()
+    }
     _telemetry.event(
         "drawing.leaders_clear",
         label=label,
-        segments=str({name: len(segments) for name, segments in groups.items()}),
+        segments=str(summary),
         crossings=str(crossings),
         intrusions=str(intrusions),
+        astray=str(astray),
     )
-    empty = [name for name, segments in groups.items() if not segments]
-    if empty or crossings or intrusions:
+    if empty or astray or crossings or intrusions:
         raise RuntimeError(
-            f"{label}: leaders not clear -- no ink read for {empty}, crossings {crossings}, "
-            f"inside the keep-out of {centre}: {intrusions}; segments {dict(groups)}"
+            f"{label}: leaders not clear -- no ink read for {empty}, landing off its "
+            f"feature {astray}, crossings {crossings}, inside the keep-out of {centre}: "
+            f"{intrusions}; segments {dict(groups)}"
         )
+    _telemetry.info(f"{label}: leaders clear {summary}")
