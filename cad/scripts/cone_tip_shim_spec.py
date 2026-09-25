@@ -59,16 +59,6 @@ if END_WEB_MM < 2.0:
 if min(LEAF_STOCK_MM) > STACK_RANGE_MM[0]:
     raise ValueError("the thinnest leaf cannot reach the minimum stack")
 
-# Rule 6: at most four short lines.  The leaf stock is the material
-# specification; blackening is the finish.  The pack requirement stays here;
-# how the leaves go in (screw backed off, leaves slid under the foot) is a
-# fit-up step, so it lives in the drive-train sheet's MHA-A03 sequence, not
-# on the part print (Codex P2 on #857).
-MANUFACTURING_NOTES = (
-    f"SHIM PACK, STACK TO FIT {STACK_RANGE_MM[0]:.2f}-{STACK_RANGE_MM[1]:.2f}, "
-    f"NOMINAL {SHIM_T:.2f}."
-)
-
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShimProfile": {"Width", "Depth"},
     "Shim": {"Thickness"},
@@ -93,3 +83,19 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
+
+# Rule 6: a note never carries a dimension.  The stack range IS the
+# thickness requirement, so it rides the thickness dimension's own text,
+# around the model's nominal: "0.05–2.20 STACK (1.10 NOM)".  The drawing
+# sets these as the dimension's prefix and suffix; the value between them
+# is the imported model dimension at its model-owned places (Main's eye
+# pass of warm-c486).  The leaf stock is the material specification and
+# blackening the finish (rule 1), so the sheet carries no general note; how
+# the leaves go in is a fit-up step in the MHA-A03 sequence (Codex P2 on
+# #857).
+_THICKNESS_PLACES = DRAWING_PRECISION["Shim"]["Thickness"]
+THICKNESS_TEXT_PREFIX = (
+    f"{STACK_RANGE_MM[0]:.{_THICKNESS_PLACES}f}"
+    f"–{STACK_RANGE_MM[1]:.{_THICKNESS_PLACES}f} STACK ("
+)
+THICKNESS_TEXT_SUFFIX = " NOM)"
