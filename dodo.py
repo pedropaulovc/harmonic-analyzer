@@ -2748,6 +2748,12 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        # The mirror-retirement diagnostic's drive-train rows equal the rows the
+        # assembly places with (Codex on #814 and #844).
+        SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
+        # Every cad/scripts/test_*.py runs in some check:* gate or is exempted
+        # with a reason, so a new test cannot ship un-enrolled (Codex on #844).
+        SCRIPTS_DIR / "test_check_gate_enrollment.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.
