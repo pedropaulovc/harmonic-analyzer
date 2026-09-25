@@ -705,7 +705,10 @@ _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
 # Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog):
 # 86 crash, 87 op timeout, 88 a modal dialog blocking the seat (the 2026-09-02
 # low-committed-memory box) -- all three recover by kill + relaunch + retry.
-_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88})
+# The recovery reason each watchdog exit names on ``sw.force_recover``
+# (_watchdog.EXIT_CRASH / EXIT_OP_TIMEOUT / EXIT_MODAL_DIALOG).
+_WATCHDOG_REASONS = {86: "watchdog_crash", 87: "watchdog_op_timeout", 88: "watchdog_modal"}
+_WATCHDOG_EXIT_CODES = frozenset(_WATCHDOG_REASONS)
 # Pre-task memory preflight. SolidWorks' commit charge grows across a day of
 # builds (66 GB after ~10 h on 2026-09-02, on a 127 GB seat) until SolidWorks
 # itself pops "Warning! Your system is running critically low on committed
@@ -842,7 +845,12 @@ def _sw_preflight() -> None:
         _telemetry.event(
             "sw.memory_restart", commit_gb=round(commit, 1), budget_gb=budget
         )
-        state = _sw_lifecycle.force_recover()
+        state = _sw_lifecycle.force_recover(
+            "memory",
+            caller="memory_preflight",
+            commit_gb=round(commit, 1),
+            budget_gb=budget,
+        )
         if state != _sw_lifecycle.CONNECTED_STATE:
             state = _sw_lifecycle.wait_until_ready()
         span.set_attribute("final_state", state)
@@ -898,19 +906,22 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
         rc = _run_subprocess(cmd, label, log_stem)
         if rc == 0:
             return
-        sw_broke = rc in _WATCHDOG_EXIT_CODES or not _sw_lifecycle.is_connected()
-        if not sw_broke or attempt == last:
+        reason = _recover_reason(rc)
+        if reason is None or attempt == last:
             _fail_task(label, rc, started=started)
         delay = backoff[attempt]
         _telemetry.warn(
-            f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy; backoff "
-            f"{delay}s then force-recover + retry {attempt + 1}/{last}",
+            f"[sw] {label} failed (exit {rc}) with SolidWorks unhealthy ({reason}); "
+            f"backoff {delay}s then force-recover + retry {attempt + 1}/{last}",
             exit_code=rc,
             attempt=attempt + 1,
             backoff_s=delay,
+            reason=reason,
         )
         time.sleep(delay)
-        state = _sw_lifecycle.force_recover()
+        state = _sw_lifecycle.force_recover(
+            reason, caller="exec_com", label=label, exit_code=rc, attempt=attempt + 1
+        )
         # A recovery that ends anywhere but CONNECTED means SolidWorks is still
         # coming up, and the retry we are about to release would spend its whole
         # 60 s COM-attach window on a process that cannot answer yet -- a retry
@@ -932,6 +943,21 @@ def _exec_com(cmd: list[str], label: str, log_stem: str | None = None) -> None:
                 "sw.cold_start_wait", label=label, state=state, attempt=attempt + 1
             )
             _sw_lifecycle.wait_until_ready()
+
+
+def _recover_reason(rc: int) -> str | None:
+    """Why a failed COM subprocess earns a SolidWorks recovery, or ``None`` when
+    SolidWorks is healthy (an ordinary failure, raised as is).
+
+    A watchdog exit names itself; otherwise the seat state read now
+    (``seat_starting``, ``seat_not_running``, ...). A probe failure propagates,
+    as it always has: only a watchdog exit short-circuits the probe."""
+    if rc in _WATCHDOG_REASONS:
+        return _WATCHDOG_REASONS[rc]
+    state = _sw_lifecycle.current_state()
+    if state == _sw_lifecycle.CONNECTED_STATE:
+        return None
+    return f"seat_{state}"
 
 
 def _run(cmd: list[str], label: str, log_stem: str | None = None) -> None:

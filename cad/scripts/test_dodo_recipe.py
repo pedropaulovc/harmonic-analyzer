@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 import sys
 from types import ModuleType
+import types
 
 import pytest
 
@@ -2320,7 +2321,7 @@ def test_retry_waits_out_a_cold_start_instead_of_spending_an_attempt(monkeypatch
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "starting")[1],
+        lambda *_a, **_kw: (calls.append("recover"), "starting")[1],
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2348,7 +2349,7 @@ def test_retry_does_not_wait_when_recovery_came_back_connected(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "connected")[1],
+        lambda *_a, **_kw: (calls.append("recover"), "connected")[1],
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2394,7 +2395,7 @@ def test_post_recovery_grace_is_bounded_not_a_second_full_budget(monkeypatch):
 def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     """force_recover returns "error" exactly when detect_state() raised.
 
-    Re-probing with is_connected() would re-run that same failing call and let
+    Re-probing with current_state() would re-run that same failing call and let
     the exception escape _exec_com, aborting the task instead of retrying --
     the opposite of the best-effort contract. The decision reads the returned
     state instead, so a lifecycle that is itself broken still gets its retry.
@@ -2415,9 +2416,9 @@ def test_a_state_probe_failure_cannot_abort_the_retry_path(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: (calls.append("recover"), "error")[1],
+        lambda *_a, **_kw: (calls.append("recover"), "error")[1],
     )
-    monkeypatch.setattr(dodo._sw_lifecycle, "is_connected", boom)
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", boom)
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "wait_until_ready",
@@ -2470,7 +2471,7 @@ def test_sw_preflight_restarts_only_past_the_commit_budget(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: calls.append("recover") or "connected",
+        lambda *_a, **_kw: calls.append("recover") or "connected",
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2505,7 +2506,7 @@ def test_sw_preflight_waits_out_a_slow_cold_start(monkeypatch):
     monkeypatch.setattr(
         dodo._sw_lifecycle,
         "force_recover",
-        lambda: calls.append("recover") or "starting",
+        lambda *_a, **_kw: calls.append("recover") or "starting",
     )
     monkeypatch.setattr(
         dodo._sw_lifecycle,
@@ -2606,3 +2607,301 @@ def test_check_gates_depend_on_everything_they_execute():
         f"check:{name} misses {len(paths)}: {', '.join(paths)}"
         for name, paths in sorted(gaps.items())
     )
+
+
+def test_recover_reason_names_the_watchdog_exit_or_the_seat_state(monkeypatch):
+    """17 of 24 recoveries on record had no trigger in the trace: the reason now
+    rides on the recover span, from the exit code or the seat state."""
+    dodo = _load_dodo()
+
+    def boom():
+        raise RuntimeError("probe failed")
+
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", boom)
+    assert dodo._recover_reason(86) == "watchdog_crash"
+    assert dodo._recover_reason(87) == "watchdog_op_timeout"
+    assert dodo._recover_reason(88) == "watchdog_modal"
+    with pytest.raises(RuntimeError, match="probe failed"):
+        dodo._recover_reason(1)  # a probe failure propagates, as is_connected() did
+
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: "starting")
+    assert dodo._recover_reason(1) == "seat_starting"
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: "connected")
+    assert dodo._recover_reason(1) is None
+
+
+def test_exec_com_hands_the_trigger_to_force_recover(monkeypatch):
+    dodo = _load_dodo()
+    recovered = []
+    runs = iter([1, 0])
+
+    monkeypatch.setattr(dodo, "_sw_autostart_enabled", lambda: True)
+    monkeypatch.setattr(dodo, "_com_retry_backoff", lambda: (0,))
+    monkeypatch.setattr(dodo, "_run_subprocess", lambda *_a, **_kw: next(runs))
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: "running_disconnected")
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda reason, **kw: recovered.append((reason, kw)) or "connected",
+    )
+
+    dodo._exec_com(["x"], "part:thing")
+
+    assert recovered == [
+        (
+            "seat_running_disconnected",
+            {"caller": "exec_com", "label": "part:thing", "exit_code": 1, "attempt": 1},
+        )
+    ]
+
+
+def test_memory_preflight_names_itself_as_the_trigger(monkeypatch):
+    dodo = _load_dodo()
+    recovered = []
+    monkeypatch.setattr(
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda reason, **kw: recovered.append((reason, kw)) or "connected",
+    )
+    monkeypatch.setenv("HARMONIC_SW_MAX_COMMIT_GB", "40")
+    monkeypatch.setattr(dodo, "_sw_commit_gb", lambda: 66.3)
+
+    dodo._sw_preflight()
+
+    assert recovered == [
+        ("memory", {"caller": "memory_preflight", "commit_gb": 66.3, "budget_gb": 40.0})
+    ]
+
+
+class _RecordedSpan:
+    def __init__(self, name, attributes):
+        self.name, self.attributes, self.status = name, dict(attributes), None
+        self.exceptions = []
+
+    def set_attribute(self, key, value):
+        self.attributes[key] = value
+
+    def set_status(self, status):
+        self.status = status
+
+    def record_exception(self, exc):
+        self.exceptions.append(exc)
+
+
+def _lifecycle_on_a_fake_seat(monkeypatch, state_at, *, launched=True, signin=None):
+    """``_sw_lifecycle`` against a scripted seat: ``state_at(t)`` is the state at
+    fake time ``t``; the poll's sleep advances the clock. Returns the lifecycle,
+    the spans and the events it recorded."""
+    from solidworks_mcp.adapters import sw_recovery
+    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
+
+    lifecycle = _load_dodo()._sw_lifecycle
+    clock = [0.0]
+    spans: list[_RecordedSpan] = []
+    events: list[tuple[str, dict]] = []
+
+    @contextlib.contextmanager
+    def record_span(name, service=None, **attributes):
+        spans.append(_RecordedSpan(name, attributes))
+        yield spans[-1]
+
+    monkeypatch.setattr(lifecycle, "_monotonic", lambda: clock[0])
+    monkeypatch.setattr(lifecycle, "_sleep", lambda s: clock.__setitem__(0, clock[0] + s))
+    monkeypatch.setattr(lifecycle._telemetry, "span", record_span)
+    monkeypatch.setattr(
+        lifecycle._telemetry, "event", lambda name, **kw: events.append((name, kw))
+    )
+    monkeypatch.setattr(lifecycle, "_kill_crash_handler", lambda: None)
+    monkeypatch.setattr(lifecycle, "_signin_window", lambda: signin)
+    monkeypatch.setattr(lifecycle, "_connect_timeout", lambda: 900.0)
+    monkeypatch.setattr(sw_recovery, "stop_solidworks", lambda: True)
+    monkeypatch.setattr(sw_recovery, "start_solidworks", lambda: launched)
+    monkeypatch.setattr(
+        sw_recovery, "detect_state", lambda: SolidWorksState(state_at(clock[0]))
+    )
+    return lifecycle, spans, events
+
+
+def test_force_recover_records_where_the_connect_wait_went(monkeypatch):
+    def seat(t):
+        if t < 10:
+            return "not_running"
+        return "starting" if t < 400 else "connected"
+
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(monkeypatch, seat)
+
+    assert lifecycle.force_recover("watchdog_crash", exit_code=86) == "connected"
+
+    recover = next(s for s in spans if s.name == "sw.force_recover")
+    start = next(s for s in spans if s.name == "sw.start")
+    assert recover.attributes["recover.reason"] == "watchdog_crash"
+    assert recover.attributes["recover.exit_code"] == 86
+    assert recover.attributes["stop.ok"] is True
+    assert recover.attributes["outcome"] == "connected"
+    assert recover.status is None  # connected: the span closes OK
+    assert start.attributes["start.launched"] is True
+    assert [kw["state"] for name, kw in events if name == "sw.state"] == [
+        "not_running",
+        "starting",
+        "connected",
+    ]  # one per transition, not one per 2 s poll
+    assert start.attributes["dwell.not_running_s"] == 10.0
+    assert start.attributes["dwell.starting_s"] == 390.0
+    assert start.attributes["wait.s"] == 400.0
+    assert not [name for name, _ in events if name == "sw.no_process"]
+
+
+def test_a_recovery_that_burns_its_budget_is_an_error_span(monkeypatch):
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    assert lifecycle.force_recover("seat_starting") == "starting"
+
+    recover = next(s for s in spans if s.name == "sw.force_recover")
+    start = next(s for s in spans if s.name == "sw.start")
+    assert recover.attributes["outcome"] == "timeout"
+    assert recover.status is not None and not recover.status.is_ok
+    assert start.attributes["wait.outcome"] == "timeout"
+    assert start.attributes["dwell.starting_s"] >= 900.0
+
+
+def test_a_launch_with_no_process_is_named_once(monkeypatch):
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(
+        monkeypatch, lambda t: "not_running"
+    )
+
+    lifecycle.force_recover("seat_not_running")
+
+    stalls = [kw for name, kw in events if name == "sw.no_process"]
+    assert len(stalls) == 1 and stalls[0]["elapsed_s"] >= 120.0
+
+
+def test_a_refused_launch_is_recorded_not_waited_on(monkeypatch):
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(
+        monkeypatch, lambda t: "running_disconnected", launched=False
+    )
+
+    assert lifecycle.force_recover("seat_running_disconnected") == "running_disconnected"
+
+    recover = next(s for s in spans if s.name == "sw.force_recover")
+    start = next(s for s in spans if s.name == "sw.start")
+    assert start.attributes["start.launched"] is False
+    assert "wait.s" not in start.attributes
+    assert recover.attributes["outcome"] == "not_launched"
+    assert recover.status is not None and not recover.status.is_ok
+
+
+def test_a_signin_prompt_during_the_wait_is_named_once(monkeypatch):
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(
+        monkeypatch,
+        lambda t: "starting" if t < 30 else "connected",
+        signin="Login | 3DEXPERIENCE ID",
+    )
+
+    lifecycle.force_recover("seat_starting")
+
+    prompts = [kw for name, kw in events if name == "sw.signin_window"]
+    assert prompts == [{"title": "Login | 3DEXPERIENCE ID", "elapsed_s": 0.0}]
+
+
+def test_the_signin_scan_reads_a_window_whose_handle_exceeds_32_bits(monkeypatch):
+    """Codex on #871: user32's exports carry no prototype, so an undeclared call
+    converts a 64-bit HWND as a C ``int``; the overflow inside the EnumWindows
+    callback ends the scan before it reaches the sign-in window. No real window
+    is touched: EnumWindows is faked, and the two readers are untyped function
+    pointers over Python thunks -- exactly how an unprototyped export behaves."""
+    import ctypes
+    from ctypes import wintypes
+
+    lifecycle = _load_dodo()._sw_lifecycle
+    high, signin = 0x1_0000_0010, 0x2_0000_0020
+    titles = {high: "Untitled - Notepad", signin: "Login | 3DEXPERIENCE ID"}
+
+    def visible(_hwnd):
+        return True
+
+    def text(hwnd, buffer, size):
+        title = titles.get(hwnd, "")[: size - 1]
+        ctypes.memmove(buffer, ctypes.create_unicode_buffer(title), (len(title) + 1) * 2)
+        return len(title)
+
+    class Unprototyped(ctypes._CFuncPtr):
+        _flags_ = ctypes._FUNCFLAG_STDCALL
+        _restype_ = ctypes.c_int
+
+    thunks = [
+        ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND)(visible),
+        ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HWND, ctypes.c_void_p, ctypes.c_int)(text),
+    ]
+    user32 = types.SimpleNamespace(
+        EnumWindows=lambda callback, _lparam: all(callback(h, 0) for h in titles),
+        IsWindowVisible=Unprototyped(ctypes.cast(thunks[0], ctypes.c_void_p).value),
+        GetWindowTextW=Unprototyped(ctypes.cast(thunks[1], ctypes.c_void_p).value),
+    )
+    monkeypatch.setattr(ctypes, "WinDLL", lambda *_a, **_k: user32)
+
+    assert lifecycle._signin_window() == "Login | 3DEXPERIENCE ID"
+
+
+def test_an_abandoned_grace_names_its_outcome(monkeypatch):
+    lifecycle, spans, events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    assert lifecycle.wait_until_ready() == "starting"
+
+    abandoned = [kw for name, kw in events if name == "sw.grace_abandoned"]
+    assert len(abandoned) == 1 and abandoned[0]["reason"] == "timeout"
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-5", "banana"])
+def test_connect_timeout_rejects_a_value_the_poll_could_never_reach(monkeypatch, raw):
+    """Codex on #871: a NaN deadline never compares as reached, so the connect
+    poll would spin forever; nan/inf/non-positive fall back to the default."""
+    lifecycle = _load_dodo()._sw_lifecycle
+    warned = []
+    monkeypatch.setattr(lifecycle._telemetry, "warn", lambda msg, **_kw: warned.append(msg))
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", raw)
+
+    assert lifecycle._connect_timeout() == lifecycle._DEFAULT_CONNECT_TIMEOUT
+    assert len(warned) == 1 and "HARMONIC_SW_CONNECT_TIMEOUT" in warned[0]
+
+
+def test_connect_timeout_keeps_a_valid_override(monkeypatch):
+    lifecycle = _load_dodo()._sw_lifecycle
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "450")
+    assert lifecycle._connect_timeout() == 450.0
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "")
+    assert lifecycle._connect_timeout() == lifecycle._DEFAULT_CONNECT_TIMEOUT
+
+
+def test_a_recovery_that_raises_is_an_error_span(monkeypatch):
+    """Codex on #871: a stop/start/wait that RAISES is swallowed (best-effort),
+    and the span must still end ERROR with the exception, not OK."""
+    from solidworks_mcp.adapters import sw_recovery
+
+    lifecycle, spans, _events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    def stop_fails():
+        raise OSError("taskkill denied")
+
+    monkeypatch.setattr(sw_recovery, "stop_solidworks", stop_fails)
+
+    assert lifecycle.force_recover("watchdog_crash") == "error"
+
+    recover = next(s for s in spans if s.name == "sw.force_recover")
+    assert recover.status is not None and not recover.status.is_ok
+    assert "taskkill denied" in recover.status.description
+    assert [str(exc) for exc in recover.exceptions] == ["taskkill denied"]
+
+
+def test_an_abandoned_grace_that_raised_is_an_error_span(monkeypatch):
+    lifecycle, spans, _events = _lifecycle_on_a_fake_seat(monkeypatch, lambda t: "starting")
+
+    def wait_fails(_recovery, _timeout):
+        raise RuntimeError("registry unreadable")
+
+    monkeypatch.setattr(lifecycle, "_wait", wait_fails)
+
+    assert lifecycle.wait_until_ready() == "starting"
+
+    wait = next(s for s in spans if s.name == "sw.wait_ready")
+    assert wait.status is not None and not wait.status.is_ok
+    assert [str(exc) for exc in wait.exceptions] == ["registry unreadable"]
