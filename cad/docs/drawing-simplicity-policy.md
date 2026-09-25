@@ -338,10 +338,11 @@ all sheet images to one review, using the rubric for that package kind. A
 downscaled contact-sheet preview is not a substitute for reviewing every page.
 A package passes when
 the verdict is `SHIP` with no blocker, no over-specification and no clarity
-finding. The runner passes `SHIP` only, so a `FIX` whose only gating findings
-are blockers matching a named exception still exits nonzero; it is accepted by
-hand, citing the row in the PR, and the durable cure is stating the exception
-on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
+finding. A `FIX` whose gating findings are each answered by a user ruling or a
+named exception is accepted only through `--rebuttals`, which cites the ruling
+or row for every finding and records the verdict as `accepted_with_rulings`;
+without it the runner passes `SHIP` only. The durable cure is still stating the
+exception on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
 line counts, or mocked API-call sequences. Native drawing generation must verify
 persisted dimension values, tolerances, reference state, and required view modes;
