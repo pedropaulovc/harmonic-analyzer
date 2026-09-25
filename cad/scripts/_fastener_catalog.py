@@ -59,8 +59,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "cone-tip-pinch-screw": _stock(
         "cone-tip-pinch-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A110",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A112",
+        material="AISI 304",
     ),
     "fillister-screw": _stock(
         "fillister-screw",

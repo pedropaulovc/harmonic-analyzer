@@ -114,13 +114,17 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 # contact with the shaft end at 0.13 mm3.  That is the 45 deg cup's analytic
 # (2/3)*pi*r^3 for the 0.79 stub (0.131); rule-12 E11's 94025A164 cup is also
 # 45 deg (vendor Sketch2), so the observation carries over until the next
-# drive-train build re-observes it.  Rule-12 E1 lengthened the pinch
-# screw to the 12.7 90280A110 (5.80 in the far jaw), so its limit scales that
-# observation by engagement -- an over-estimate, since the runout share does
-# not grow -- until the next drive-train build re-observes it.  Ten-percent
-# bounded headroom still fails any materially deeper insertion.
-# 6.47 * 5.80 / 2.625 = 14.296, rounded up.
-_TIP_PINCH_OBSERVED_MM3 = 14.30
+# drive-train build re-observes it.  The pinch screw's thread meets metal
+# only in the far jaw, from the slit's far wall to its tip, so its limit
+# scales that observation by that length: 6.47 was read on the 14-wide block
+# (4952fc085: far wall 7.0 + 0.6 from the head face, 9.525 screw, 1.925 in
+# the jaw).  r3 (user ruling, Main option (a)) seats the 15.875 91794A112 in
+# the 17-wide block: far wall 8.5 + 0.6, so 6.775 in the jaw.  (The 12.7
+# rescale measured from the near wall instead.)  An analytic figure until the
+# next drive-train build re-observes it; ten-percent bounded headroom still
+# fails any materially deeper insertion.
+# 6.47 * 6.775 / 1.925 = 22.771, rounded up.
+_TIP_PINCH_OBSERVED_MM3 = 22.78
 _TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
 _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 1.10
 

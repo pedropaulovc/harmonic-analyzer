@@ -1,7 +1,9 @@
-r"""Shared recipe for the McMaster 90280A* narrow fillister head screws.
+r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
+the 91794A112 stainless fillister screw on the same #4-40 head.
 
 The vendor drives every derived number off 5 named dims via equations,
-reproduced here. The 90280A837 extension awaits its native comparison:
+reproduced here. The 90280A837 and 91794A112 extensions await their native
+comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -47,11 +49,13 @@ from frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
     "90280A108": (2.8448, 9.525, 2.7178, 4.6482, 0.635),
-    "90280A110": (2.8448, 12.7, 2.7178, 4.6482, 0.635),
     "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
     "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
     "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
     "90280A837": (SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH),
+    # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
+    # 91794A product table, read 2026-09-25).
+    "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
 }
 
 

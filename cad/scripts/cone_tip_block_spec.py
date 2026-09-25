@@ -3,6 +3,7 @@ r"""Pure-data dimensional contract shared by the cone-tip-block part and drawing
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 import _config
 from _fit_limits import deviations
@@ -16,7 +17,10 @@ from _surface_finish import SEAT_UM, SurfaceFinishControl
 # is the drawing's single source of the marked dimensions.
 # U24b (2026-09-23): 15 wide so the adjuster thread's side walls keep 2.05 at
 # the printed width (.X) and passage-centre (.XX) bands.
-BLOCK_X = 15.0  # plan width across the shaft
+# r3 (user ruling, Main option (a), 2026-09-25): 17 wide, the narrowest .X
+# width whose lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
+# PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
+BLOCK_X = 17.0  # plan width across the shaft
 BLOCK_Z = 12.0  # plan depth along the shaft
 # User ruling U30 (2026-09-23): the block stands on a blackened shim pack
 # (1.10 nominal, set at fit-up) and is held by one hidden #6-32 screw from
@@ -110,12 +114,45 @@ _DRILLED_HOLE_PLUS_MM = float(
     str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
 )
 _BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+# The title block's general bands as (upper, lower) fit bands, so every stack
+# below reads its limits through _fit_limits.deviations like any other band.
+GENERAL_BAND_BY_PLACES = {
+    places: (band, -band) for places, band in _BAND_BY_PLACES.items()
+}
 
 
 def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
     """(min, max) the print allows a general-tolerance dimension."""
     printed = round(nominal, places)
-    return printed - _BAND_BY_PLACES[places], printed + _BAND_BY_PLACES[places]
+    lower, upper = deviations(GENERAL_BAND_BY_PLACES[places])
+    return printed + lower, printed + upper
+
+
+# r3 (Main, 2026-09-25): PassageCenter -- and FlangeSlotX with it -- prints
+# from the -X (west) face.  The +X (east) face carries only the pinch screw's
+# head, so the width's .X band lands on that side, and the west half, which
+# the swing platform's trimmed north-west corner bounds, keeps the .XX band
+# (build_drive_train_assembly asserts the print-worst containment).
+XDatumFace = Literal["-X", "+X"]
+PASSAGE_CENTER_DATUM: XDatumFace = "-X"
+
+
+def worst_half_widths_mm(datum: XDatumFace) -> dict[XDatumFace, float]:
+    """Farthest each side face can stand from the adjuster axis at the
+    printed limits, with PassageCenter (.XX) measured from ``datum``: that
+    side is PassageCenter's upper limit, the other the width's upper limit
+    less PassageCenter's lower."""
+    if datum not in ("-X", "+X"):
+        raise ValueError(f"unknown PassageCenter datum face {datum!r}")
+    passage = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
+    width = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
+    far = width[1] - passage[0]
+    if datum == "-X":
+        return {"-X": passage[1], "+X": far}
+    return {"+X": passage[1], "-X": far}
+
+
+WORST_HALF_WIDTH_MM = worst_half_widths_mm(PASSAGE_CENTER_DATUM)
 
 
 # Title block: REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX.
@@ -221,18 +258,18 @@ if WORST_SLIT_BREAKTHROUGH_MM < SLIT_BREAKTHROUGH_MARGIN_MM - 1e-9:
 # slit.  The model keeps its blind depth exactly to the nominal near wall,
 # where the drill point ends in the slit, so the solid is the same.
 #
-# The near wall's worst station, by either chain the shop might hold:
-# PassageCenter (.XX) from the +X face less half the narrowest slit, or the
-# width (.X) less PassageCenter taken from the -X face.  Drilled full diameter
-# PINCH_BREAKTHROUGH_MARGIN_MM past it, the 118-degree point must meet the far
-# jaw (the narrowest slit's width on) inside the tap drill already through it.
+# The near wall's worst station from the +X (drilling) face, taking the
+# deeper of the two datums PassageCenter could print from -- the width's band
+# on that side under the -X datum the print uses -- less half the narrowest
+# slit.  Drilled full diameter PINCH_BREAKTHROUGH_MARGIN_MM past it, the
+# 118-degree point must meet the far jaw (the narrowest slit's width on)
+# inside the tap drill already through it.
 PINCH_BREAKTHROUGH_MARGIN_MM = 0.25
 DRILL_POINT_ANGLE_DEG = 118.0
-_passage_limits = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
 _width_limits = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
-WORST_PINCH_NEAR_WALL_MM = max(
-    _passage_limits[1] - _min_slit_half,
-    _width_limits[1] - _passage_limits[0] - _min_slit_half,
+WORST_PINCH_NEAR_WALL_MM = (
+    max(worst_half_widths_mm(datum)["+X"] for datum in ("-X", "+X"))
+    - _min_slit_half
 )
 PINCH_TO_SLOT_DEPTH_MM = WORST_PINCH_NEAR_WALL_MM + PINCH_BREAKTHROUGH_MARGIN_MM
 _clearance_max_dia = 2.0 * _worst_clearance_radius
@@ -267,21 +304,32 @@ if (
     or PINCH_CLEARANCE_DIA <= THREAD_MAJOR_MM[PINCH_THREAD]
 ):
     raise AssertionError("the far jaw is not tapped full-thread through to the slit")
-# Rule-12 E1: the #4-40 x 1/2 pinch screw (McMaster 90280A110, 12.7 under the
-# head) seats on the +X face.  PassageCenter prints .XX from that same face,
-# so the near jaw is at most PassageCenter + band - (SlitW - band)/2 and the
-# far jaw keeps >= 1.5D of thread; the tip stays short of the -X face.
-PINCH_SCREW_LENGTH = 12.7
-WORST_PINCH_NEAR_JAW_MM = (
-    round(BLOCK_X / 2.0, 2) + _GENERAL_2PL_MM - _min_slit_half
+# Rule-12 E1 (user ruling, Main option (a), 2026-09-25): a #4-40 x 5/8 18-8
+# stainless fillister screw (McMaster 91794A112, 15.875 under the head) seats
+# on the +X face and threads only into the far jaw, whose thread starts at the
+# slit's far wall.  From the head face that wall stands at most the +X half
+# (its worst under the print's datum) plus half the widest slit, so the far
+# jaw keeps >= 1.5D of thread there; and at the width's lower limit the tip
+# stays PINCH_SCREW_RECESS_MM inside the -X face.  (72ab measured the
+# engagement to the NEAR wall, crediting the slit's width as thread.)
+PINCH_SCREW_SKU = "91794A112"
+PINCH_SCREW_LENGTH = 15.875
+PINCH_SCREW_RECESS_MM = 0.25
+WORST_PINCH_FAR_WALL_MM = (
+    WORST_HALF_WIDTH_MM["+X"] + _printed_limits(SLIT_W, SLIT_W_PLACES)[1] / 2.0
 )
-WORST_PINCH_ENGAGEMENT_MM = PINCH_SCREW_LENGTH - WORST_PINCH_NEAR_JAW_MM
+WORST_PINCH_ENGAGEMENT_MM = PINCH_SCREW_LENGTH - WORST_PINCH_FAR_WALL_MM
 if WORST_PINCH_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[PINCH_THREAD]:
     raise AssertionError(
-        f"pinch screw far-jaw engagement {WORST_PINCH_ENGAGEMENT_MM:.2f} < 1.5D"
+        f"pinch screw far-jaw engagement {WORST_PINCH_ENGAGEMENT_MM:.3f} < 1.5D "
+        "at the printed worst case"
     )
-if PINCH_SCREW_LENGTH > round(BLOCK_X, 1) - _GENERAL_1PL_MM:
-    raise AssertionError("pinch screw can stand proud of the far (-X) face")
+WORST_PINCH_TIP_RECESS_MM = _width_limits[0] - PINCH_SCREW_LENGTH
+if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
+    raise AssertionError(
+        f"pinch screw tip can stand {WORST_PINCH_TIP_RECESS_MM:.3f} inside the -X "
+        f"face at the printed width minimum (< {PINCH_SCREW_RECESS_MM})"
+    )
 # E11/W1: the through thread is the whole block, so the screw is the limit.
 WORST_ADJUSTER_ENGAGEMENT_MM = (
     min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - _GENERAL_1PL_MM) - ADJUSTER_CSK
@@ -410,7 +458,7 @@ NUT_WALL_AIR = 0.5
 # From the south face; the flange's own length is .X like the body's plan.
 _SLOT_SOUTH_EDGE_MAX = _south_end_limits[1] + FLANGE_SLOT_W_MAX / 2.0
 FLANGE_LEN = 20.8
-# The slot is on the block's centre plane, located .XX from the +X face (the
+# The slot is on the block's centre plane, located .XX from the -X face (the
 # PassageCenter datum); the flange is the block's full width (.X).
 FLANGE_SLOT_X = BLOCK_X / 2.0
 WORST_FLANGE_SIDE_WEB_MM = min(
@@ -513,8 +561,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # reaches past the far jaw's tap drill at .X), the heel relief (asserted
 # against the pivot-screw head in build_drive_train_assembly), the flange
 # thickness (the hold-down protrusion stack) and the flange slot's cutter
-# fit.  PassageCenter and FlangeSlotX keep I31's .XX though no stack here
-# needs it (both close at .X); dropping them is left to review.
+# fit, and PassageCenter (at .X the west half could reach 9.3 against the
+# platform's 9.558 there; build_drive_train_assembly's print-worst
+# containment).  FlangeSlotX keeps I31's .XX though no stack needs it (its
+# side webs close at .X); dropping it is left to review.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},

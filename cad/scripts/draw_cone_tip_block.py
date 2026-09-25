@@ -134,9 +134,12 @@ VALUE_TEXT_HALF_HEIGHT = 0.0019
 ARROW_LENGTH = 0.0034
 TEXT_CLEARANCE = 0.0015
 # The 1.2 slot prints 1.8 mm wide, narrower than its value, so the arrows
-# stand outside the slot walls and the text sits left of the left arrow's
-# tail on the extended dimension line.  Left, because on the adjuster
-# elevation PassageCenter's 7.50 span occupies the slot's right.
+# stand outside the slot walls and the text sits right of the right arrow's
+# tail on the extended dimension line.  Right, because on the adjuster
+# elevation PassageCenter's span from the -X face (r3) occupies the slot's
+# left; 14.5 mm over the top, so its line clears the pinch clearance
+# callout below it by 1.9 mm.
+SLIT_TEXT_RISE = 0.0145
 SLIT_TEXT_OFFSET = (
     SLIT_W * _S / 2.0 + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
 )
@@ -144,8 +147,8 @@ FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], _elevation_y(0.0, FRONT_CENTER) - 0.012),
     "BlockHt": (FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
     "SlitW": (
-        FRONT_CENTER[0] - SLIT_TEXT_OFFSET,
-        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + 0.012,
+        FRONT_CENTER[0] + SLIT_TEXT_OFFSET,
+        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + SLIT_TEXT_RISE,
     ),
 }
 # PassageCenter stands above SlitW on the adjuster elevation; the plan's
@@ -167,7 +170,9 @@ _DIM_ARROWS_INSIDE = 0
 # leave the south face's -X corner, one shared witness.  Right of it: the
 # slot width's value (arrows outside) level with the slot's midpoint.  Above
 # the flange's south end, higher than the A-A cutting-plane arrow and its
-# letter at that end: the slot's location from the +X face.
+# letter at that end: the slot's location from the -X face (r3, the
+# PassageCenter datum), its witness rising from the flange's south-west
+# corner.
 _PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
 # Each line stands one value-width plus air outside the last: a vertical
@@ -201,7 +206,7 @@ TOP_KEEP = {
         _plan_y(FLANGE_SLOT_W_Z),
     ),
     "FlangeSlotX": (
-        TOP_CENTER[0] + BLOCK_X * _S / 4.0,
+        TOP_CENTER[0] - BLOCK_X * _S / 4.0,
         _plan_y(Z_SOUTH) + FLANGE_SLOT_X_RISE,
     ),
 }
@@ -297,9 +302,10 @@ ADJUSTER_ENTRY_RISE = 0.0135
 # outside the 6.0's left arrow tail and under its north-face witness, into
 # the view across its north face.  r3: DRILL TO SLOT prints about 20 mm wider
 # than the blind depth did (PINCH_CLEARANCE_CALLOUT_EXTENT, an estimate), so
-# the callout steps 2.5 mm further left, where its left end still clears the
-# adjuster elevation's PassageCenter witness at W 17, and drops 4.5 mm so its
-# leader leaves the shoulder low enough to pass outside the 6.0's arrow tail.
+# the callout steps 2.5 mm further left, its left end 1 mm right of the
+# adjuster elevation's right edge at W 17, above that view and under the slit
+# width's value, and drops 4.5 mm so its leader leaves the shoulder low
+# enough to pass outside the 6.0's arrow tail.
 PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.0605, 0.1715)
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.016, 0.190)
 ROTATED_NOTE_XY = (SECTION_CENTER[0] - 0.015, 0.195)
@@ -317,14 +323,16 @@ def _adjuster_axis_keep(
     adjuster_center: tuple[float, float],
 ) -> dict[str, tuple[float, float]]:
     """The adjuster-axis values, kept on whichever elevation shows its entry."""
-    plus_x_side = 1.0 if adjuster_center == FRONT_CENTER else -1.0
+    # r3: PassageCenter measures from the -X face (PASSAGE_CENTER_DATUM), so
+    # its value stands over the -X half of whichever elevation shows it.
+    minus_x_side = -1.0 if adjuster_center == FRONT_CENTER else 1.0
     return {
         "AxisHeight": (
             adjuster_center[0] - 0.045,
             _elevation_y(ADJUSTER_AXIS_HEIGHT / 2.0, adjuster_center),
         ),
         "PassageCenter": (
-            adjuster_center[0] + plus_x_side * BLOCK_X * _S / 4.0,
+            adjuster_center[0] + minus_x_side * BLOCK_X * _S / 4.0,
             _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
         ),
         "SlitDepth": (
@@ -425,6 +433,19 @@ _NOTE_EXTENTS = {
 # SolidWorks places section A-A's "SECTION A-A / SCALE 3:2" label under the
 # view; its ink relative to SECTION_CENTER.
 SECTION_LABEL_BOX = (-0.0227, -0.0537, 0.0227, -0.0392)
+# Section A-A's cutting-plane arrows.  SolidWorks draws one from each end of
+# the chain line (SECTION_LINE_OVERSHOOT past the plan's ends) toward the
+# section view on the right: a 12 mm shaft (run 1's leaf dump, d09c2b9eb,
+# GetSectionLineInfo2) and a head 1/4 in long and 1/8 in across (6.0-6.2 by
+# 3.0-3.1 measured on the run-1 and 72ab renders), with its letter printed
+# just past the tip (SECTION_LETTER_BOX, from the tip: the 72ab render's "A"
+# ink, 2.44..8.12 right and -1.12..4.89 up, padded 0.2).
+# Until r3 this audit never saw them: layoutcheck's replay of run 1 found
+# its north arrow 1.45 mm over PassageCenter's 7.50.
+SECTION_LINE_OVERSHOOT = 0.004
+SECTION_ARROW_LENGTH = 0.012
+SECTION_ARROW_HEAD = (0.00635, 0.003175)  # along the shaft, across it
+SECTION_LETTER_BOX = (0.0022, -0.0013, 0.0083, 0.0051)
 # The locating-foot finish symbol: its leader lands midway along the right
 # half of the foot edge; measured on the 287c render, its ink (shoulder,
 # triangle, arm and "Ra 3.2") spans this far round the commanded point and
@@ -553,6 +574,9 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
         boxes[label] = _extent_box(text_xy, VIEW_LETTER_EXTENT)
     for text, x, y in _sheet_notes(adjuster_center):
         boxes[text.split("\n")[0]] = _extent_box((x, y), _NOTE_EXTENTS[text])
+    for name, (_tail, tip) in sheet_section_arrows().items():
+        left, down, right, up = SECTION_LETTER_BOX
+        boxes[name] = (tip[0] + left, tip[1] + down, tip[0] + right, tip[1] + up)
     x0, y0, x1, y1 = SECTION_LABEL_BOX
     boxes["SECTION A-A label"] = (
         SECTION_CENTER[0] + x0,
@@ -665,7 +689,8 @@ def _dimension_ink(
 def sheet_dimension_ink(
     adjuster_center: tuple[float, float] = FRONT_CENTER,
 ) -> dict[str, DimensionInk]:
-    """Every kept dimension's printed lines and arrows."""
+    """Every kept dimension's printed lines and arrows, and section A-A's
+    cutting-plane arrows (shaft and head, keyed like their letters)."""
     texts = sheet_text_boxes(adjuster_center)
     keeps = {
         **FRONT_KEEP,
@@ -714,7 +739,7 @@ def sheet_dimension_ink(
             inside,
         ),
         "PassageCenter": (
-            h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out
+            h, (ax - plus_x * half_x, ax), (top, top), drop("PassageCenter"), out
         ),
         "SlitDepth": (
             v,
@@ -745,7 +770,7 @@ def sheet_dimension_ink(
         ),
         "FlangeSlotW": (h, (tc - slot_w, tc + slot_w), (None, None), drop("FlangeSlotW"), out),
         "FlangeSlotX": (
-            h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out
+            h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out
         ),
         "PinchDepthCenter": (
             h,
@@ -779,12 +804,35 @@ def sheet_dimension_ink(
             inside,
         ),
     }
-    return {
+    ink = {
         name: _dimension_ink(
             axis, ends, origins, line, set_sides.get(name, arrows), texts[name]
         )
         for name, (axis, ends, origins, line, arrows) in specs.items()
     }
+    for name, (tail, tip) in sheet_section_arrows().items():
+        ink[name] = section_arrow_ink(tail, tip)
+    return ink
+
+
+def sheet_section_arrows() -> dict[str, tuple[Point, Point]]:
+    """Section A-A's two cutting-plane arrows, (tail on the chain line, tip)."""
+    tail_x = TOP_CENTER[0]
+    ends = (
+        ("north", _plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT),
+        ("south", _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
+    )
+    return {
+        f"section A {end}": ((tail_x, y), (tail_x + SECTION_ARROW_LENGTH, y))
+        for end, y in ends
+    }
+
+
+def section_arrow_ink(tail: Point, tip: Point) -> DimensionInk:
+    """One cutting-plane arrow: its shaft and its head's outline."""
+    along, across = SECTION_ARROW_HEAD
+    head = _drawing_leaders.arrowhead_outline((tail, tip), along, across)[:3]
+    return DimensionInk(arrows=((tail, tip), *head))
 
 
 def _leader_to_circle(start: Point, center: Point, radius: float) -> Leader:
@@ -1441,8 +1489,8 @@ async def build(adapter: Any) -> dict[str, str]:
     section = create_section_view(
         adapter,
         top,
-        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - 0.004),
-        line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + 0.004),
+        line_start=(TOP_CENTER[0], _plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT),
+        line_end=(TOP_CENTER[0], _plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=SHEET_SCALE,

@@ -89,6 +89,7 @@ from cone_tip_block_spec import (
     HEEL_RELIEF_DEPTH,
     HEEL_RELIEF_HEIGHT,
     MIN_WEB_MM,
+    PASSAGE_CENTER_DATUM,
     PINCH_CLEARANCE_DIA,
     PINCH_BORE_SPEC,
     PINCH_BORE_DIA,
@@ -130,9 +131,12 @@ REFERENCE_SKETCHES = (
 # tap-drill diameter is manufacturing geometry, distinct from the purchased
 # screw's true major-diameter solid.  The shaft tip enters through the same
 # thread from the south face.
-# McMaster 90280A110 is a #4-40 screw. The near jaw receives a normal-fit #4
+# McMaster 91794A112 is a #4-40 screw. The near jaw receives a normal-fit #4
 # clearance hole; the far jaw carries the coaxial #4-40 UNC-2B thread.
 PINCH_BORE_Y = PINCH_HEIGHT
+# The side face PassageCenter and FlangeSlotX measure from (sketch x on the
+# Front and Top planes, both +X to the right).
+DATUM_FACE_X = {"-X": -BLOCK_X / 2.0, "+X": BLOCK_X / 2.0}[PASSAGE_CENTER_DATUM]
 
 # The print-level guards in the spec include every applicable tolerance band.
 # These nominal checks catch a model/feature drift before the native build.
@@ -477,7 +481,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Top slit + perpendicular pinch screw: the 1.2-wide slit runs below the
-    # cross-bore so the exact McMaster 90280A110 #4-40 screw can squeeze the
+    # cross-bore so the exact McMaster 91794A112 #4-40 screw can squeeze the
     # two jaws around the adjuster thread.
     check("create_plane BlockTop", await adapter.create_plane(
         CreatePlaneParameters(mode="offset", base_plane="Top Plane",
@@ -653,10 +657,12 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned functional interfaces: construction-only dimensions carry
     # every centre location that a machinist must set from a finished face.
+    # r3 (Main, 2026-09-25): the axis locates from the -X face (the far jaw's;
+    # PASSAGE_CENTER_DATUM), so the width's band falls on the pinch head's side.
     await _author_reference_dimension(
         adapter,
         plane="Front",
-        start=(BLOCK_X / 2.0, ADJUSTER_AXIS_HEIGHT),
+        start=(DATUM_FACE_X, ADJUSTER_AXIS_HEIGHT),
         end=(0.0, ADJUSTER_AXIS_HEIGHT),
         orientation="horizontal",
         dimension_type="horizontal_distance",
@@ -707,11 +713,11 @@ async def build(adapter) -> dict[str, str]:
         drive_expression='"PinchBoreY"',
         start_drives=('"BlockZ" / 2 + "FlangeLen"',),
     )
-    # The flange slot's centre from the +X face (the PassageCenter datum).
+    # The flange slot's centre from the -X face (the PassageCenter datum).
     await _author_reference_dimension(
         adapter,
         plane="Top",
-        start=(BLOCK_X / 2.0, _FLANGE_SLOT_Y),
+        start=(DATUM_FACE_X, _FLANGE_SLOT_Y),
         end=(0.0, _FLANGE_SLOT_Y),
         orientation="horizontal",
         dimension_type="horizontal_distance",

@@ -18,13 +18,13 @@ recipes:
 | 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A110 | `cone-tip-pinch-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | `slotted-screw`, `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
+| 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A539 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |

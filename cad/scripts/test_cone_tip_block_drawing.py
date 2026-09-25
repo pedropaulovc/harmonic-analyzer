@@ -119,10 +119,11 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
     # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
-    # r3: PinchHeight .XX from the foot, AxisHeight and BlockHt .X.
+    # r3: PinchHeight .XX from the foot, AxisHeight and BlockHt .X; the
+    # 17 block (5/8 pinch screw) adds 1.0 to the adjuster's side wall.
     assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.834, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.19, abs=1e-6)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(3.670, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(4.670, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -282,13 +283,17 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     }
 
 
-def test_slot_width_text_stands_left_of_its_outside_arrows() -> None:
-    """Main eye-pass 5637ac42: the 1.2 slot's extension lines ran through "1.20"."""
+def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
+    """Main eye-pass 5637ac42: the 1.2 slot's extension lines ran through "1.20".
+    r3: PassageCenter's span from the -X face takes the slit's left, so the
+    value stands right of the right arrow's tail."""
     slot_x = drawing.FRONT_CENTER[0]
     text_x = drawing.FRONT_KEEP["SlitW"][0]
-    left_wall = slot_x - part.SLIT_W * drawing._S / 2.0
-    arrow_tail = left_wall - drawing.ARROW_LENGTH
-    assert text_x + drawing.VALUE_TEXT_HALF_WIDTH <= arrow_tail - 0.001
+    right_wall = slot_x + part.SLIT_W * drawing._S / 2.0
+    arrow_tail = right_wall + drawing.ARROW_LENGTH
+    assert text_x - drawing.VALUE_TEXT_HALF_WIDTH >= arrow_tail + 0.001
+    passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
+    assert passage_x < slot_x < text_x
     assert drawing.ARROWS_OUTSIDE == (
         "SlitW",
         "HeelReliefDepth",
@@ -403,7 +408,7 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     baselined from the body's south face (r3, option A), then Depth and
     FlangeLen chained on one line, each value mid-span.  Right: the slot
     width, its line across the slot's middle.  Above the south end, higher
-    than the A-A arrow: the slot's location from +X."""
+    than the A-A arrow: the slot's location from -X (r3's datum)."""
     keep = drawing.TOP_KEEP
     half_width = drawing.VALUE_TEXT_HALF_WIDTH
     half_height = drawing.VALUE_TEXT_HALF_HEIGHT
@@ -448,11 +453,14 @@ def test_plan_values_stand_off_the_part_and_each_other() -> None:
     value_left = width_x - drawing._VALUE_EXTENTS["FlangeSlotW"][0]
     assert value_left == pytest.approx(plan_right + 0.002)
     loc_x, loc_y = keep["FlangeSlotX"]
-    assert drawing.TOP_CENTER[0] < loc_x < plan_right
+    assert plan_left < loc_x < drawing.TOP_CENTER[0]
     assert loc_y - drawing._plan_y(drawing.Z_SOUTH) >= 0.015
-    # VIEW C's letter stands left of the stem, clear of the location's value.
-    view_c_note = drawing.VIEW_C_ARROW[0]
-    assert view_c_note[0] + drawing.VIEW_LETTER_HEIGHT <= loc_x - half_width
+    # VIEW C's letter, left of the stem, now stands under the location's
+    # value (r3): clear of the value and of its line by TEXT_CLEARANCE.
+    letter = drawing.sheet_text_boxes()["view C letter"]
+    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
+    assert letter[3] + drawing.TEXT_CLEARANCE <= location_line_y
+    assert letter[2] <= drawing.TOP_CENTER[0]
 
 
 # Ink measured on the I31 farm render (7ab69742b, cone-tip-block_drawing.png,
@@ -543,6 +551,24 @@ _R287_PLACEMENT = {
     'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")': (
         'ARROWS_INSIDE = ("FlangeSlotSouthZ", "PinchHeight")'
     ),
+    # r3 widened the block to 17 and moved PassageCenter's datum (and
+    # FlangeSlotX's) to the -X face; 287c printed a 15 block from +X, with
+    # the slit width's value on the slit's left at 12 mm.
+    'SPEC = DRAWINGS_BY_NAME["cone_tip_block"]': (
+        'BLOCK_X = 15.0\nSPEC = DRAWINGS_BY_NAME["cone_tip_block"]'
+    ),
+    "adjuster_center[0] + minus_x_side * BLOCK_X * _S / 4.0,": (
+        "adjuster_center[0] - minus_x_side * BLOCK_X * _S / 4.0,"
+    ),
+    'h, (ax - plus_x * half_x, ax), (top, top), drop("PassageCenter"), out': (
+        'h, (ax, ax + plus_x * half_x), (top, top), drop("PassageCenter"), out'
+    ),
+    "TOP_CENTER[0] - BLOCK_X * _S / 4.0,": "TOP_CENTER[0] + BLOCK_X * _S / 4.0,",
+    'h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out': (
+        'h, (tc, _PLAN_RIGHT), (_plan_y(Z_SOUTH),) * 2, drop("FlangeSlotX"), out'
+    ),
+    "FRONT_CENTER[0] + SLIT_TEXT_OFFSET,": "FRONT_CENTER[0] - SLIT_TEXT_OFFSET,",
+    "SLIT_TEXT_RISE = 0.0145": "SLIT_TEXT_RISE = 0.012",
 }
 # ... and what the I31 sheet commanded at 7ab69742b, before round 1.
 _I31_PLACEMENT = {
@@ -566,6 +592,9 @@ _R287_FINDINGS = [
     "arrow-near-text: FlangeSlotX's arrow ... 'view C letter'",
     "arrow-near-text: HeelReliefHt's arrow ... 'foot finish'",
     "arrow-near-text: SlitDepth's arrow ... 'ADJUSTER ENTRY'",
+    # r3 models section A-A's cutting-plane arrows: 287c's north arrow stood
+    # 1.49 mm over the 7.50 (layoutcheck read 1.45 mm on run 1's render).
+    "arrow-near-text: section A north's arrow ... 'PassageCenter'",
 ]
 
 
@@ -715,13 +744,16 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
     ("reverted", "expected"),
     [
         # r3: the 8.42 is gone, but the chain's step out is still what keeps
-        # "20.8" off the south arc centre's "14.9" and its line.
+        # "20.8" off the south arc centre's "14.9", and (the 17 plan reaching
+        # 1.5 mm further left) the chain's arrows off the north one's "6.5".
         (
             ("PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP",),
             [
                 "text-on-text: 'FlangeLen' and 'FlangeSlotSouthZ'",
-                "text-on-line: FlangeSlotSouthZ's dimension line crosses 'FlangeLen'",
-                "text-on-line: FlangeLen's dimension line crosses 'FlangeSlotSouthZ'",
+                "arrow-near-text: Depth's arrow ... 'FlangeSlotNorthZ'",
+                "arrow-near-text: FlangeLen's arrow ... 'FlangeSlotNorthZ'",
+                "arrow-near-text: FlangeSlotNorthZ's arrow ... 'Depth'",
+                "arrow-near-text: FlangeSlotNorthZ's arrow ... 'FlangeLen'",
                 "arrow-near-text: FlangeSlotSouthZ's arrow ... 'FlangeLen'",
             ],
         ),
@@ -732,15 +764,12 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
                 "arrow-near-text: PinchDepthCenter's arrow ... 'pinch clearance callout'",
             ],
         ),
-        # The right view's 5 mm slide still clears the adjuster callout; r3's
-        # wider pinch callout, placed from the right view, rides with it.
+        # The right view's 5 mm slide still clears the adjuster callout.  (r3's
+        # wider pinch callout rides with it; with PassageCenter now on the
+        # slit's left and SlitW's value raised, nothing else meets it.)
         (
             ("RIGHT_CENTER = (0.171,", "LEFT_CENTER = (0.243,", "BACK_CENTER = (0.315,"),
-            [
-                _I31_FINDINGS[2],
-                "text-on-line: PassageCenter's dimension line crosses 'pinch clearance callout'",
-                "arrow-near-text: SlitW's arrow ... 'pinch clearance callout'",
-            ],
+            [_I31_FINDINGS[2]],
         ),
         (
             ("ADJUSTER_CALLOUT_Y = 0.121",),
@@ -829,6 +858,21 @@ def _moved_r287_fixture(names: tuple[str, ...]):
         )
         for name, box in texts.items()
         for dx, dy in [moves.get(name, still)]
+    }
+    # r3 moved FlangeSlotX's datum to the -X face: its ink mirrors about the
+    # plan's centre line rather than translating.
+    centre_x = drawing.TOP_CENTER[0]
+    mirrored = {"FlangeSlotX"}
+    dimensions = {
+        name: (
+            drawing.DimensionInk(
+                tuple(tuple((2.0 * centre_x - x, y) for x, y in s) for s in ink.lines),
+                tuple(tuple((2.0 * centre_x - x, y) for x, y in s) for s in ink.arrows),
+            )
+            if name in mirrored
+            else ink
+        )
+        for name, ink in dimensions.items()
     }
     turned = set(drawing.ARROWS_INSIDE) - set(old.ARROWS_INSIDE)
     dimensions = {
@@ -958,7 +1002,12 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
                 "arrow-near-text: SlitDepth's arrow ... 'pinch clearance callout'",
             ],
         ),
-        (("_plan_y(Z_SOUTH) + 0.0105)",), [_R287_FINDINGS[3]]),
+        # r3: the location's value now stands over the letter, so at 287c's
+        # height the letter meets the value itself.
+        (
+            ("_plan_y(Z_SOUTH) + 0.0105)",),
+            ["text-on-text: 'FlangeSlotX' and 'view C letter'"],
+        ),
     ],
     ids=[
         "plan-3.97-value",
@@ -1288,9 +1337,9 @@ def test_top_ligament_needs_the_pinch_height_at_two_places() -> None:
 
 
 def _reference_call(body: str, feature: str) -> str:
-    """The build's one offset-reference call that authors ``feature``."""
+    """The build's one reference-dimension call that authors ``feature``."""
     at = body.index(f'feature_name="{feature}"')
-    start = body.rindex("await _author_offset_reference_dimension(", 0, at)
+    start = body.rindex("await _author_", 0, at)
     return body[start : body.index("\n    )\n", at)]
 
 
@@ -1381,3 +1430,192 @@ def test_flange_slot_fit_keeps_its_cutter_band_for_a_reason() -> None:
     assert spec.FLANGE_SLOT_W + lower - 0.138 * 25.4 >= 0.25
     source = Path(spec.__file__).read_text(encoding="utf-8")
     assert "the fit is\n# no longer needed" in source
+
+
+# --- r3, round two: the 17 block, the 5/8 pinch screw, the -X datum ---------
+# Main's ruling (option (a), 2026-09-25): a #4-40 x 5/8 18-8 stainless
+# fillister (McMaster 91794A112) in a 17-wide block, PassageCenter and
+# FlangeSlotX printed from the -X face, and a print-worst containment
+# contract.  As above, each number is recomputed from the print's grades.
+_PINCH_MAJOR_MM = 0.112 * 25.4  # #4-40 basic major
+
+
+def _datum_face_x(feature: str) -> float:
+    """Sketch x of the face the model's ``feature`` reference measures from."""
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    start = re.search(r"start=\(([^,]+),", _reference_call(body, feature))
+    assert start is not None, feature
+    return float(eval(start.group(1), vars(part)))
+
+
+def _worst_head_face_half() -> float:
+    """Farthest the +X (screw-head) face can stand from the adjuster axis at
+    the printed limits, PassageCenter taken from the face the model uses."""
+    spec = cone_tip_block_spec
+    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
+    width = _printed("Width", spec.BLOCK_X)
+    if _datum_face_x("PassageCenterReference") < 0.0:
+        return width[1] - passage[0]
+    return passage[1]
+
+
+def _worst_far_wall_from_head() -> float:
+    """The slit's far wall, where the far jaw's thread starts, from the head."""
+    spec = cone_tip_block_spec
+    return _worst_head_face_half() + _printed("SlitW", spec.SLIT_W)[1] / 2.0
+
+
+def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
+    """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
+    1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
+    5.21 (1.83D) at the printed worst case, the width's band on the head's
+    side under the -X datum."""
+    spec = cone_tip_block_spec
+    engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
+    assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
+    assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
+    assert engagement == pytest.approx(5.21)
+
+
+def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
+    """Regression pin (the 1/2 screw passed it too): at the width's lower
+    limit the 5/8 screw's tip stays 0.25 inside the far face."""
+    spec = cone_tip_block_spec
+    recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
+    assert recess >= 0.25
+    assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
+    assert recess == pytest.approx(0.325)
+
+
+def test_axis_and_flange_slot_locate_from_the_minus_x_face() -> None:
+    """Main's datum: PassageCenter, and FlangeSlotX with it, measure from the
+    -X face; the model, the spec and both prints agree."""
+    spec = cone_tip_block_spec
+    for feature in ("PassageCenterReference", "FlangeSlotXReference"):
+        assert _datum_face_x(feature) == pytest.approx(-spec.BLOCK_X / 2.0), feature
+    assert spec.PASSAGE_CENTER_DATUM == "-X"
+    # Each print's extension lines rise from the -X face and the centre.
+    ink = drawing.sheet_dimension_ink()
+    half_x = spec.BLOCK_X * drawing._S / 2.0
+
+    def witnesses(name: str) -> list[float]:
+        return sorted({round(a[0], 9) for a, b in ink[name].lines if a[0] == b[0]})
+
+    assert witnesses("PassageCenter") == pytest.approx(
+        [drawing.FRONT_CENTER[0] - half_x, drawing.FRONT_CENTER[0]]
+    )
+    assert witnesses("FlangeSlotX") == pytest.approx(
+        [drawing._PLAN_LEFT, drawing.TOP_CENTER[0]]
+    )
+
+
+def test_print_worst_containment_fails_loud_on_the_east_datum() -> None:
+    """The width band on the -X side would put the block's west face 0.252
+    past the swing platform's trimmed corner at W 17; from the -X datum the
+    west half is PassageCenter's .XX limit, 0.548 inside it (floor 0.25 plus
+    the 0.25 print-worst margin)."""
+    import build_drive_train_assembly as drive_train
+
+    spec = cone_tip_block_spec
+    with pytest.raises(AssertionError, match="overhang the swing platform"):
+        drive_train.tip_block_print_worst_containment_mm(spec.worst_half_widths_mm("+X"))
+    margin = drive_train.tip_block_print_worst_containment_mm(
+        spec.worst_half_widths_mm(spec.PASSAGE_CENTER_DATUM)
+    )
+    assert margin == pytest.approx(0.548, abs=1e-3)
+    assert margin >= (
+        drive_train.TIP_CONTAINMENT_FLOOR_MM + drive_train.TIP_PRINT_WORST_MARGIN_MM
+    )
+    assert drive_train.TIP_PRINT_WORST_CONTAINMENT_MM == pytest.approx(margin)
+    source = Path(drive_train.__file__).read_text(encoding="utf-8")
+    assert (
+        "tip_block_print_worst_containment_mm(\n"
+        "    tip_worst_half_widths_mm(TIP_PASSAGE_CENTER_DATUM)\n)"
+    ) in source
+
+
+def test_drive_train_screw_keeps_1_5d_past_the_far_wall() -> None:
+    """The drive train's own check read the NEAR jaw at nominal (12.7 -
+    (15 - 1.2)/2 >= 1.5 mm).  The placed screw keeps 1.5D past the printed
+    worst far wall, and is the screw the block was sized for."""
+    import build_drive_train_assembly as drive_train
+
+    engagement = drive_train.PINCH_SHANK_LEN - _worst_far_wall_from_head()
+    assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
+    source = Path(drive_train.__file__).read_text(encoding="utf-8")
+    assert "_PINCH_NEAR_JAW" not in source
+    assert "PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM" in source
+
+
+def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
+    """The hardware follows the ruling: 91794A112 everywhere, 15.875 under
+    the head, and the BOM says stainless over steel is fine here."""
+    import _config
+    from _fastener_catalog import fastener
+    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+
+    config = _config.parts("cone-tip-pinch-screw")
+    assert config["supplier_skus"] == ["91794A112"]
+    assert "18-8 stainless" in config["material"]
+    assert "STAINLESS OVER\nSTEEL IS FINE FOR THIS #4-40 PINCH SCREW" in (
+        config["installation_notes"]
+    )
+    assert fastener("cone-tip-pinch-screw").skus == ("91794A112",)
+    assert fastener("cone-tip-pinch-screw").material == "AISI 304"
+    assert FILLISTER_SIZES["91794A112"][1] == cone_tip_block_spec.PINCH_SCREW_LENGTH
+    assert cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
+    assert "90280A110" not in FILLISTER_SIZES
+
+
+# Run 1 (d09c2b9eb leaf dump, c2-dumps/cone-tip-block-d09c2b9eb.json.gz):
+# section A's north arrow ran 0.072 -> 0.084 at y 0.209, and PassageCenter's
+# 7.50 was centred at (0.0795, 0.205828).  layoutcheck's replay read the
+# arrow 1.45 mm over the value (c5-near-crops/cone-tip-block-01).
+_RUN1_SECTION_ARROW = ((0.072, 0.209), (0.084, 0.209))
+_RUN1_PASSAGE_CENTER = (0.0795, 0.205828)
+
+
+def test_sheet_audit_sees_section_arrows_run1_hid() -> None:
+    """The sheet's own audit fed only dimension and leader arrows, so a
+    cutting-plane arrow over a value passed it.  Planted from run 1, the
+    same value is clear without the section arrow and flagged with it."""
+    x, y = _RUN1_PASSAGE_CENTER
+    half_w, half_h = drawing.VALUE_TEXT_HALF_WIDTH, drawing.VALUE_TEXT_HALF_HEIGHT
+    texts = {"PassageCenter": (x - half_w, y - half_h, x + half_w, y + half_h)}
+    assert drawing.sheet_ink_collisions(texts, {}, {}, {}) == []
+    arrow = {"section A north": drawing.section_arrow_ink(*_RUN1_SECTION_ARROW)}
+    # Its head, 3.2 across, reached into the value's box, as on the render.
+    findings = drawing.sheet_ink_collisions(texts, {}, arrow, {})
+    assert _findings_match(
+        findings,
+        [
+            "text-on-line: section A north's dimension line crosses 'PassageCenter'",
+            "arrow-near-text: section A north's arrow ... 'PassageCenter'",
+        ],
+    ), findings
+
+
+def test_section_arrows_stand_clear_of_every_value() -> None:
+    """Today both cutting-plane arrows keep ARROW_TEXT_CLEARANCE (2 mm) from
+    every text: PassageCenter's value moved to the slit's left with its
+    datum, 3.5 mm from the north arrow; VIEW C's letter is 2.65 mm from the
+    south one.  The build cuts the section where the model draws it."""
+    from _drawing_leaders import distance_to_box
+
+    texts = drawing.sheet_text_boxes()
+    ink = drawing.sheet_dimension_ink()
+    gaps = {}
+    for arrow in drawing.sheet_section_arrows():
+        for name, box in texts.items():
+            if name == arrow:
+                continue
+            nearest = min(distance_to_box(s, box) for s in ink[arrow].arrows)
+            gaps[(arrow, name)] = nearest - drawing.ARROW_HALF_WIDTH
+    assert min(gaps.values()) >= drawing.ARROW_TEXT_CLEARANCE
+    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00352, abs=5e-5)
+    assert gaps[("section A south", "view C letter")] == pytest.approx(0.00265, abs=5e-5)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("async def build(") :]
+    assert "_plan_y(Z_NORTH) - SECTION_LINE_OVERSHOOT)" in body
+    assert "_plan_y(Z_SOUTH) + SECTION_LINE_OVERSHOOT)" in body
