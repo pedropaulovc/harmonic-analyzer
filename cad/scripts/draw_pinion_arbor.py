@@ -30,6 +30,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
+from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_DIA_Z,
@@ -217,6 +218,12 @@ PRINCIPAL_KEEP = {
     # Radial leader down-left from the back crown, below the shaft axis and
     # clear of the (1.2) sag reference above it and the overall witnesses.
     "BackCapR": (0.045, 0.140),
+    # R1a's collar pin hole (x 0.269) sits over the front land's Ra symbol,
+    # so both its dimensions stand ABOVE the shaft: the station from the head
+    # rear face in a row over the neck's Ø10.5, and the hole's leader rising
+    # left of that row's witness, above the 19.0's right arrow tail.
+    "PinStationFromHeadRear": (0.288, 0.207),
+    "PinHoleDia": (0.250, 0.222),
 }
 DETAIL_KEEP = {
     "HeadLen": (0.165, 0.201),
@@ -232,9 +239,16 @@ DETAIL_KEEP = {
 # top and bottom edges), so its witnesses stay inside the circle: they used
 # to run out through it to x 0.340, reading as part of the detail callout
 # with the "A" label between them (Fable r-delta).
+# The neck's Ø10.5 block (27 mm wide, its right edge 11.5 mm right of the
+# dimension line) is wider than the 11.3 mm neck, so centred on the neck it
+# ran over the head-rear-face witness of R1a's collar-pin station (x 0.3076,
+# stacktop-dbe47ae3 layout audit).  Its line stands just ahead of the neck's
+# front shoulder (x 0.2967) instead, with short witnesses, so the block ends
+# 1.6 mm short of that witness.
+NECK_DIA_TEXT_RIGHT_FROM_LINE = 0.0115
 DIAMETER_POSITIONS = {
     "HeadDia": (0.3238, 0.192),
-    "NeckDia": (0.300, 0.194),
+    "NeckDia": (0.2945, 0.194),
 }
 DIMENSION_CALLOUTS = {
     # One name for the axial datum every station runs from (Fable m1): the
@@ -248,6 +262,8 @@ DIMENSION_CALLOUTS = {
     "FrontJournalDia": "JOURNAL",
     "BackJournalDia": "JOURNAL",
     "BondZoneDia": "BOND ZONE",
+    "PinStationFromHeadRear": "COLLAR PIN",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The turning axis runs the full part and this far past each crown.
 AXIS_OVERSHOOT_MM = 3.0

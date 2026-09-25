@@ -52,6 +52,7 @@ from _gtol_spec import CylinderFace
 from _part_pmi import _face_geometry, _face_matches, _resolve_faces, author_part_pmi
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from _saved_part_guard import require_saved_drawing_properties
+from pinion_arbor_pin_spec import PIN_HOLE_DIA, PIN_HOLE_DIA_BAND
 from pinion_arbor_spec import (
     BACK_RIM_FROM_HEAD_REAR,
     BACK_CAP_R,
@@ -84,6 +85,8 @@ from pinion_arbor_spec import (
     NECK_END_Z,
     NECK_LEN,
     OVERALL_LEN,
+    PIN_STATION_FROM_HEAD_REAR,
+    PIN_Z,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
     SHAFT_LEN,
@@ -105,6 +108,7 @@ SHAFT_R = SHAFT_DIA / 2.0
 NECK_R = NECK_DIA / 2.0
 HEAD_R = HEAD_DIA / 2.0
 CROSS_HOLE_R = CROSS_HOLE_DIA / 2.0
+PIN_HOLE_R = PIN_HOLE_DIA / 2.0
 V_SHAFT = math.pi * SHAFT_R**2 * EXPOSED_SHAFT_LEN
 V_NECK = math.pi * NECK_R**2 * NECK_LEN
 V_HEAD = math.pi * HEAD_R**2 * HEAD_LEN
@@ -155,7 +159,10 @@ def _perpendicular_cylinder_intersection(hole_radius: float, body_radius: float)
 
 
 V_CROSS_HOLE = _perpendicular_cylinder_intersection(CROSS_HOLE_R, HEAD_R)
-V_TOTAL = V_NECK + V_SHAFT + V_HEAD + V_FRONT_CAP + V_BACK_CAP - V_CROSS_HOLE
+V_PIN_HOLE = _perpendicular_cylinder_intersection(PIN_HOLE_R, SHAFT_R)
+V_TOTAL = (
+    V_NECK + V_SHAFT + V_HEAD + V_FRONT_CAP + V_BACK_CAP - V_CROSS_HOLE - V_PIN_HOLE
+)
 
 
 def _require_one_solid_body(adapter, *, label: str) -> None:
@@ -540,6 +547,8 @@ async def build(adapter) -> dict[str, str]:
         "FrontJournalFromHeadRear": FRONT_JOURNAL_FROM_HEAD_REAR,
         "BackJournalFromHeadRear": BACK_JOURNAL_FROM_HEAD_REAR,
         "DrumStationFromHeadRear": DRUM_STATION,
+        "PinStationFromHeadRear": PIN_STATION_FROM_HEAD_REAR,
+        "PinHoleDia": PIN_HOLE_DIA,
     }
     for name, value in globals_mm.items():
         await set_global(adapter, name, f"{value}mm")
@@ -785,6 +794,38 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "BackCap")
     expected += V_BACK_CAP
     await volume_check(adapter, "back crown", expected, 0.03 * V_BACK_CAP)
+
+    # R1a: the MHA-144 collar's 1/16 in spring-pin hole, through the Ø8 on
+    # the crossrod's local Y (one V-block setup drills both cross holes).
+    pin_hole = SketchDims()
+    check("create_sketch collar pin hole", await adapter.create_sketch("Top"))
+    await define_circle(
+        adapter,
+        0.0,
+        -PIN_Z,
+        PIN_HOLE_R,
+        "collar pin hole",
+        dims=pin_hole,
+        names=("PinHoleCx", "PinHoleZ", "PinHoleDia"),
+        drives=(
+            None,
+            '"HeadCenterZ" + "HeadLen" / 2 + "PinStationFromHeadRear"',
+            '"PinHoleDia"',
+        ),
+    )
+    await ensure_fully_defined(adapter, "collar-pin-hole sketch")
+    check("exit_sketch collar pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    check(
+        "cut collar pin hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SHAFT_DIA + 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
+    expected -= V_PIN_HOLE
+    await volume_check(adapter, "collar pin hole", expected, 0.05 * V_PIN_HOLE)
     _require_one_solid_body(adapter, label="integral pinion arbor")
 
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "arbor axis")
@@ -804,6 +845,16 @@ async def build(adapter) -> dict[str, str]:
         end_v=-(HEAD_REAR_Z + DRUM_STATION),
         drive_expression='"DrumStationFromHeadRear"',
         end_on_flank=DRUM_STATION_POINT_X,
+    )
+    # The pin station ends on the axis at the hole's centre: the sheet's
+    # witness rises from the hole's own centre mark.
+    drive_jobs += await _add_axial_reference(
+        adapter,
+        feature_name="PinStationReference",
+        dimension_name="PinStationFromHeadRear",
+        start_v=-HEAD_REAR_Z,
+        end_v=-PIN_Z,
+        drive_expression='"PinStationFromHeadRear"',
     )
     drive_jobs += await _add_axial_reference(
         adapter,
@@ -843,6 +894,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "CrossHoleProfile", "CrossHoleDia", *deviations(CROSS_HOLE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
     )
     set_dimension_symmetric_tolerance(
         adapter, "DrumStationReference", "DrumStationFromHeadRear", DRUM_STATION_BAND

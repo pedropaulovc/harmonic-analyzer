@@ -251,6 +251,15 @@ if not (
 ):
     raise AssertionError("the bond-zone diameter must sit on the drum, clear of both lands")
 
+# R1a (user, 2026-09-24): the station of the cross hole for the MHA-144
+# collar's spring pin, at the general .X band from the head rear face (U27:
+# the collar-to-strap gap grows to absorb it, pinion_arbor_collar_spec).  The
+# drive-train assembly reads the station; the hole itself and its clearance
+# proofs live in pinion_arbor_pin_spec.
+PIN_STATION_FROM_HEAD_REAR = 39.0
+PIN_STATION_BAND = LINEAR_X_BAND
+PIN_Z = HEAD_REAR_Z + PIN_STATION_FROM_HEAD_REAR
+
 SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
         key,
@@ -281,6 +290,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FrontCapProfile": {"HeadCapR", "HeadCapSagDim"},
     "BackCapProfile": {"BackCapR", "BackCapSagDim"},
     "CrossHoleProfile": {"CrossHoleDia"},
+    # R1a: the collar's spring-pin hole, from the same head rear face.
+    "PinHoleProfile": {"PinHoleDia"},
+    "PinStationReference": {"PinStationFromHeadRear"},
     "BackRimReference": {"BackRimFromHeadRear"},
     "OverallReference": {"OverallLen"},
     "FrontJournalReference": {
@@ -305,6 +317,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FrontCapProfile": {"HeadCapR": 1, "HeadCapSagDim": 1},
     "BackCapProfile": {"BackCapR": 1, "BackCapSagDim": 1},
     "CrossHoleProfile": {"CrossHoleDia": 2},
+    "PinHoleProfile": {"PinHoleDia": 2},
+    "PinStationReference": {"PinStationFromHeadRear": 1},
     "BackRimReference": {"BackRimFromHeadRear": 1},
     "OverallReference": {"OverallLen": 1},
     "FrontJournalReference": {
