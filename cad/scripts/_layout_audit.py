@@ -51,6 +51,7 @@ from _drawing_layout_check import (
     _proper_crossing,
 )
 from _layout_geometry import (
+    ARROW_TEXT_CLEARANCE_M,
     DEFAULT_ADVANCE_RATIO,
     DEFAULT_TEXT_TOUCH_TOL_M,
     MM,
@@ -58,12 +59,14 @@ from _layout_geometry import (
     Box,
     Finding,
     Segment,
+    SegmentGrid,
     SheetGeometry,
     ViewGeometry,
     clip_segment_to_box,
     find_border_breaches,
     find_leader_crossings,
     find_text_on_line,
+    segment_box_distance,
     segment_box_overlap_length,
     union_boxes,
 )
@@ -188,6 +191,12 @@ DIM_CROSSING_TEXT_HEIGHTS = 0.5
 # is not where the sheet is (origin, scale or page mapping): fail.
 MIN_MATCH_SHARE = 0.5
 # Line roles a leader must not cross.
+# How far an outside arrow's tail runs from its tip, arrowhead included: the
+# stand-alone tail of every outside arrow on the six d09c2b9eb calibration
+# sheets is 6.35 mm (a 3.56 mm head plus 2.79 mm of line). A longer run from
+# the tip is a run-out to parked text; only its first 6.35 mm is tail.
+ARROW_TAIL_M = 0.00635
+
 LINE_ROLES = frozenset({"line", "dim-line", "ext-line"})
 # Annotation ink a leader may cross (see ``find_leader_across_lines``).
 _NOT_CROSSING_TARGETS = frozenset({"geometry", "detail-circle"})
@@ -705,6 +714,48 @@ def _split_dimension_lines(segments: Sequence[Segment], arrows: Sequence[Any]) -
     return out
 
 
+def _arrow_tails(segments: Sequence[Segment], arrows: Sequence[Any]) -> list[Segment]:
+    """Each outside arrow's tail, as ``arrow-tail`` segments from its tip.
+
+    An outside arrow's dimension line leaves its tip one way (``-dir``, toward
+    the other extension line) and its tail the other (``dir``, on past the
+    arrowhead's base). An inside arrow has no tail: the only line from its
+    tip runs ``dir``, as dimension line. A run ``dir`` that ends on another
+    arrow's tip is dimension line, not tail.
+    """
+    tips = []
+    for raw in arrows:
+        values = _floats(raw)
+        if len(values) < 8:
+            continue
+        length = math.hypot(values[3], values[4])
+        if length:
+            tips.append(((values[0], values[1]), (values[3] / length, values[4] / length)))
+
+    def at_tip(x: float, y: float) -> bool:
+        return any(math.hypot(x - tx, y - ty) <= COLLINEAR_TOL_M for (tx, ty), _u in tips)
+
+    tails = []
+    for (tx, ty), (ux, uy) in tips:
+        leaving = []
+        for segment in segments:
+            if segment.role != "dim-line" or not segment.length:
+                continue
+            ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            for (sx, sy), (fx, fy) in (ends, ends[::-1]):
+                if math.hypot(sx - tx, sy - ty) <= COLLINEAR_TOL_M:
+                    dot = ((fx - sx) * ux + (fy - sy) * uy) / segment.length
+                    leaving.append((dot, segment.length, (fx, fy)))
+        if not any(dot < -0.98 for dot, _length, _far in leaving):
+            continue
+        for dot, length, far in leaving:
+            if dot <= 0.98 or at_tip(*far):
+                continue
+            run = min(length, ARROW_TAIL_M)
+            tails.append(Segment(tx, ty, tx + ux * run, ty + uy * run, "arrow-tail"))
+    return tails
+
+
 def _is_horizontal(segment: Segment) -> bool:
     return abs(segment.y1 - segment.y0) < 1e-7 and segment.length > 0.0
 
@@ -816,6 +867,7 @@ class AuditAnnotation(AnnotationGeometry):
     """
 
     text_height: float = 0.0
+    arrow_tails: tuple[Segment, ...] = ()
 
 
 def text_height(annotation: AnnotationGeometry) -> float:
@@ -854,8 +906,10 @@ def annotation_geometry(
     # (hole callout, leadered note) has a shoulder under its text.
     shoulders = _shoulders(segments, items) if kind in ("hole-callout", "note") else []
     segments = _classify(kind, annotation, segments, shoulders)
+    tails: list[Segment] = []
     if kind == "dim":
         segments = _split_dimension_lines(segments, display.get("arrows", ()))
+        tails = _arrow_tails(segments, display.get("arrows", ()))
     registered = _registered_leaders(annotation)
     segments = [s for s in segments if not any(_same_run(s, leader) for leader in registered)]
     segments.extend(registered)
@@ -910,6 +964,7 @@ def annotation_geometry(
         position=(position[0], position[1]) if len(position) >= 2 else None,
         exact=exact,
         text_height=height,
+        arrow_tails=tuple(tails),
     )
 
 
@@ -1721,6 +1776,81 @@ def find_dimension_line_crossings(
     return findings
 
 
+def _near_foreign_text(
+    sheet: SheetGeometry,
+    sources: Sequence[tuple[int, Segment]],
+    *,
+    kind: str,
+    what: str,
+    clearance: float,
+) -> list[Finding]:
+    """Each (source, text owner) pair where a source segment stands nearer
+    than ``clearance`` to ANOTHER annotation's text box, at its nearest."""
+    grid = SegmentGrid(sources)
+    nearest: dict[tuple[int, int], tuple[float, Segment, Box]] = {}
+    for target_index, target in enumerate(sheet.annotations):
+        if target.kind == "geometry":
+            continue
+        for box in target.text_boxes:
+            reach = Box(box.xmin - clearance, box.ymin - clearance, box.xmax + clearance, box.ymax + clearance)
+            for owner, segment in grid.near(reach):
+                if sheet.annotations[owner].label == target.label:
+                    continue
+                gap = segment_box_distance(segment, box)
+                key = (owner, target_index)
+                if gap < clearance and (key not in nearest or gap < nearest[key][0]):
+                    nearest[key] = (gap, segment, box)
+    findings = []
+    for (owner, target_index), (gap, segment, box) in nearest.items():
+        source, target = sheet.annotations[owner], sheet.annotations[target_index]
+        findings.append(
+            Finding(
+                kind=kind,
+                sheet=sheet.name,
+                a=source.label,
+                b=target.label,
+                detail=(
+                    f"{what} of {source.label!r} {segment.format_mm()} stands {gap * MM:.2f}mm from "
+                    f"{target.label!r}'s text {box.format_mm()} (clearance {clearance * MM:.1f}mm)"
+                ),
+                at_mm=tuple(value * MM for value in box.center()),
+                extra={"gap_mm": gap * MM},
+            )
+        )
+    return findings
+
+
+def find_arrows_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:
+    """An arrowhead, or an outside arrow's tail, nearer than ``clearance`` to
+    another annotation's text: gating, the fleet's arrow-to-text rule. That
+    close the arrow reads as part of the text (MHA-092 round 2: the 15.2's
+    tail 0.2 mm over ADJUSTER ENTRY, the 10.7's arrow inside the 3.97's
+    tolerance stack)."""
+    sources = [
+        (owner, segment)
+        for owner, annotation in enumerate(sheet.annotations)
+        for segment in (
+            *(s for s in annotation.segments if s.role == "arrow"),
+            *getattr(annotation, "arrow_tails", ()),
+        )
+    ]
+    return _near_foreign_text(sheet, sources, kind="arrow-near-text", what="arrow", clearance=clearance)
+
+
+def find_extensions_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:
+    """An extension line within ``clearance`` of another annotation's text
+    without running through it: advisory, since witnesses routinely pass
+    close to neighbouring text (Main's ruling). Through it is
+    ``text-on-line``, which gates."""
+    sources = [
+        (owner, segment)
+        for owner, annotation in enumerate(sheet.annotations)
+        for segment in annotation.segments
+        if segment.role == "ext-line"
+    ]
+    return _near_foreign_text(sheet, sources, kind="extension-near-text", what="extension line", clearance=clearance)
+
+
 def _collinear_overlap(segment: Segment, line: Segment, tol: float = COLLINEAR_TOL_M) -> tuple[tuple[float, float], float] | None:
     """Midpoint and length of the stretch where ``segment`` lies ON ``line``."""
     if not line.length or not segment.length:
@@ -1944,6 +2074,7 @@ GATING_KINDS = frozenset(
         "leader-crosses-section-line",
         "dim-line-crosses-extension-at-text",
         "line-on-dimension-line",
+        "arrow-near-text",
         "merged-blocks",
         "tall-block",
         "text-on-view",
@@ -1974,16 +2105,20 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
     touching = {frozenset((f.a, f.b)) for f in clearance}
     merged = [f for f in find_merged_blocks(sheet) if frozenset((f.a, f.b)) not in touching]
     reported = touching | {frozenset((f.a, f.b)) for f in merged}
+    on_line = find_text_on_line(unled)
+    through = {frozenset((f.a, f.b)) for f in on_line}
     return _one_per_pair([
         *clearance,
         *merged,
         *find_tall_blocks(dump),
-        *find_text_on_line(unled),
+        *on_line,
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
         *find_leader_across_lines(sheet),
         *find_dimension_line_crossings(sheet),
         *find_lines_on_dimension_lines(sheet),
+        *(f for f in find_arrows_near_text(sheet) if frozenset((f.a, f.b)) not in through),
+        *(f for f in find_extensions_near_text(sheet) if frozenset((f.a, f.b)) not in through),
         *find_leader_crossings(sheet),
         *find_border_breaches(sheet),
         *find_unmatched_text(model),
