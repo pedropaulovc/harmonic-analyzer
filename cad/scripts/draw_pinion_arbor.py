@@ -86,15 +86,21 @@ DETAIL_LABEL_XY = (
     - DETAIL_LABEL_DROP,
 )
 # Profile scale is 1:1 with the head to the right, so model z maps to sheet
-# x = 0.200 - (z - 106.725) / 1000.  The lands are centred on their straps, so
+# x = 0.200 - (z - 106.35) / 1000.  The lands are centred on their straps, so
 # their centres (x 0.252 front, 0.099 back) hold whatever the derived land
 # length; only their ends move.  The front land's length rides above the
 # shaft and its diameter hangs below; the back land's are swapped (see
 # BACK_JOURNAL_TEXT_X).  The stations from the Ø15 head rear face stack
 # below the shaft.
-MODEL_Z_AT_SHEET_ORIGIN_X = 106.725
-# The back crown's apex, the profile's left end (x 0.0793).
-BACK_APEX_Z = HEAD_FRONT_Z - HEAD_CAP_SAG + OVERALL_LEN
+# The view is placed on its geometry's centre, midway between the two crown
+# apexes, not on a typed station: the old 106.725 sat 0.375 mm off (half the
+# head's 0.75 mm forward growth, rule 12), and leaf neckc2-07af measured the
+# drum witness at x 246.5, the bond-zone witness at 192.6 and the (1.2) apex
+# extension at 78.9 mm, where 106.725 put them at 246.9, 193.0 and 79.3.
+FRONT_APEX_Z = HEAD_FRONT_Z - HEAD_CAP_SAG
+# The back crown's apex, the profile's left end (x 0.0789).
+BACK_APEX_Z = FRONT_APEX_Z + OVERALL_LEN
+MODEL_Z_AT_SHEET_ORIGIN_X = (FRONT_APEX_Z + BACK_APEX_Z) / 2.0
 
 
 def _sheet_x(model_z: float) -> float:
@@ -260,43 +266,50 @@ DETAIL_KEEP = {
 END_CENTER = (0.047, PRINCIPAL_CENTER[1])
 END_SCALE = SHEET_SCALE
 VIEW_ANGLE = -math.pi / 2.0
-# Both diameters stand above the view, their leaders running down through the
-# common centre (the two lines cross there, as concentric diameters do): the
-# Ø15 up-left towards the border, the Ø10.5 up-right towards the profile, the
-# rows 8 mm apart so no text shares a height with the other.
+# Both diameters print LEFT of the view, each text's shoulder running left
+# from its circle-side (right) end: the Ø15 above-left, the Ø10.5 below-left,
+# their leaders entering from the upper and lower left and crossing at the
+# common centre as concentric diameters must.  The right side is fenced by the
+# back crown's (1.2) apex extension line rising at x 78.9: with the Ø10.5
+# up-right of the view (0.062, 0.188) the layout audit boxed its text to x 79.9
+# and failed text-on-line (leaf neckc2-07af, 07afe186b).
 END_KEEP = {
     "HeadDia": (0.030, 0.196),
-    "NeckDia": (0.062, 0.188),
+    "NeckDia": (0.026, 0.158),
 }
 END_VIEW_LABEL = "integral-arbor end view"
 # The sheet position tolerance for the end view's centre after placement.
 END_CENTER_TOL_M = 1e-5
+# _sheet_x's drift from the profile's real projection that is worth a warning.
+PROFILE_DRIFT_WARN_M = 5e-5
 
 # ---------------------------------------------------------------------------
 # End-view ink audit
 #
 # The layout audit this module gates (_assert_no_text_on_line) compares text
-# with lines and text with text, but no text with a view's model outline, and
-# the shared layout check boxes every dimension as a nominal 8 mm
-# CollisionScope.NONE square (_drawing_common._dim_element), so it compares
-# no dimension text at all.  So the end view's corner of the sheet audits its
-# own ink before any COM work (cone-tip-block's sheet_ink_collisions, 287c5cf6a):
-# the two diameters' text blocks against each other, the neighbouring profile
-# callouts, every view's outline, the lines that stand in that corner and the
-# sheet border.
+# with lines and text with text, but no text with a view's model outline or an
+# arrowhead, and the shared layout check boxes every dimension as a nominal
+# 8 mm CollisionScope.NONE square (_drawing_common._dim_element), so it
+# compares no dimension text at all.  So the end view's corner of the sheet
+# audits its own ink before any COM work (cone-tip-block's
+# sheet_ink_collisions, 287c5cf6a): the two diameters' texts against each
+# other, the neighbouring profile callouts, every view's outline, every line
+# and arrowhead standing in that corner, and the sheet border.
 #
-# Extents are (left, down, right, up) of the printed ink from the position the
-# module commands, in sheet metres.  A circle diameter prints its text about
-# its position with the leader's shoulder ~2 mm past each end (wheel-axle's
-# Ø35.00: ±8.3 mm by -2.3/+2.1 mm, rk3 render), while the layout audit boxed
-# the profile's Ø10.5 from 15.6 mm left of its position to 11.5 mm right,
-# 2.8 mm down and 0.7 mm up (stacktop-dbe47ae3).  The end-view box covers
-# both, 15.6 mm to either side.
-END_DIA_TEXT_EXTENT = (0.0156, 0.0030, 0.0156, 0.0025)
-# Where the leader leaves the shoulder: its circle-side end, this far along
-# and below the text position (wheel-axle's shoulders end ~1.5 mm past a
-# ~7 mm half-text, ~2.5 mm under its centre).
-END_DIA_SHOULDER = (0.0090, 0.0025)
+# Extents are (left, down, right, up) from the position the module commands,
+# in sheet metres, as leaf neckc2-07af measured them on both diameters (the
+# two agree to 0.1 mm):
+# - the layout audit's text box, the box its text-on-line gate compares:
+#   HeadDia [22.8,193.2]..[47.9,196.7] mm for (30.0, 196.0), NeckDia
+#   [54.8,185.2]..[79.9,188.7] mm for (62.0, 188.0);
+# - the printed text inside it: [28.1..40.6] and [60.1..72.6] mm;
+# - the shoulder, 2.8 mm under the position, reaching 10.0 mm towards the
+#   circle and 8.5 mm away from it: HeadDia's 21.5..40.0, NeckDia's 52.0..70.5.
+END_DIA_AUDIT_EXTENT = (0.0072, 0.0028, 0.0179, 0.0007)
+END_DIA_CORE_EXTENT = (0.0019, 0.0028, 0.0106, 0.0007)
+END_DIA_SHOULDER_TOWARD = 0.0100
+END_DIA_SHOULDER_AWAY = 0.0085
+END_DIA_SHOULDER_DROP = 0.0028
 # The profile's callouts in that corner, measured on the a1a694a6 render
 # (4.63 px/mm): "SR7.3" x 38.9-50.7, y 137.3-142.3 mm with its shelf to 54 mm;
 # "(1.2) / BACK CROWN" x 38.9-71.2, y 214.6-225.0 mm with its shelf to 77 mm;
@@ -308,15 +321,23 @@ NEIGHBOUR_TEXT_EXTENTS = {
 }
 # The SR7.3 leader leaves its shelf end for the crown 2.9 mm under the axis.
 BACK_CAP_R_LEADER_DROP = 0.0029
-# A text block keeps this much air to another text block, and to any view's
-# model outline, line or the sheet's inner border.
+# The (1.2)'s extension lines rise from 1 mm off the axis to 4.6 mm under its
+# text position (neckc2-07af: (78.9,171.0)->(78.9,215.4) mm for y 220).
+BACK_CAP_SAG_WITNESS_GAP = 0.0010
+BACK_CAP_SAG_WITNESS_TOP_DROP = 0.0046
+# Air an end-view text keeps: to a foreign line, and to any arrowhead tip
+# (Main: 2 mm); to another text, a view's model outline and the inner border.
+END_LINE_CLEARANCE = 0.0020
+END_ARROW_CLEARANCE = 0.0020
 END_TEXT_CLEARANCE = 0.0010
 END_OUTLINE_CLEARANCE = 0.0010
-# The landscape B sheet's inner border, measured on the a1a694a6 render.
-SHEET_INNER_LEFT = 0.0125
+# The landscape B sheet's inner border, read off the a1a694a6 render at
+# 12.5-13.4 mm; the larger is taken.
+SHEET_INNER_LEFT = 0.0134
 
 InkBox = tuple[float, float, float, float]
 InkLine = tuple[tuple[float, float], tuple[float, float]]
+DIAMETERS = {"HeadDia": HEAD_DIA, "NeckDia": NECK_DIA}
 
 
 def _ink_box(point: tuple[float, float], extent: tuple[float, float, float, float]) -> InkBox:
@@ -329,8 +350,9 @@ def _circle_box(center: tuple[float, float], radius: float) -> InkBox:
 
 
 def end_view_text_boxes(keep: dict[str, tuple[float, float]] = END_KEEP) -> dict[str, InkBox]:
-    """The end view's diameter texts and the profile callouts beside them."""
-    boxes = {name: _ink_box(point, END_DIA_TEXT_EXTENT) for name, point in keep.items()}
+    """The end view's diameter texts (as the layout audit boxes them) and the
+    profile callouts beside them."""
+    boxes = {name: _ink_box(point, END_DIA_AUDIT_EXTENT) for name, point in keep.items()}
     for name, extent in NEIGHBOUR_TEXT_EXTENTS.items():
         boxes[name] = _ink_box(PRINCIPAL_KEEP[name], extent)
     return boxes
@@ -345,58 +367,61 @@ def sheet_view_outlines(end_center: tuple[float, float] = END_CENTER) -> dict[st
         "profile": (
             _sheet_x(BACK_APEX_Z),
             axis_y - head_r,
-            _sheet_x(HEAD_FRONT_Z - HEAD_CAP_SAG),
+            _sheet_x(FRONT_APEX_Z),
             axis_y + head_r,
         ),
         "detail A": _circle_box(DETAIL_CENTER, DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0),
     }
 
 
-def _diameter_line(
+def diameter_ink(
     text_xy: tuple[float, float], center: tuple[float, float], diameter: float
-) -> InkLine:
-    """A circle diameter's line: from its shoulder, through the centre, to the far arrow."""
+) -> tuple[InkLine, InkLine, InkLine, tuple[tuple[float, float], tuple[float, float]]]:
+    """A circle diameter's shoulder, leader and through-line, and its two arrow tips.
+
+    The shoulder runs under the text, its circle-side end where the leader
+    leaves for the near arrow; the line runs on through the centre to the far
+    arrow.
+    """
     toward = 1.0 if text_xy[0] < center[0] else -1.0
-    start = (
-        text_xy[0] + toward * END_DIA_SHOULDER[0],
-        text_xy[1] - END_DIA_SHOULDER[1],
-    )
-    dx, dy = center[0] - start[0], center[1] - start[1]
+    shoulder_y = text_xy[1] - END_DIA_SHOULDER_DROP
+    start = (text_xy[0] + toward * END_DIA_SHOULDER_TOWARD, shoulder_y)
+    far_end = (text_xy[0] - toward * END_DIA_SHOULDER_AWAY, shoulder_y)
+    dx, dy = start[0] - center[0], start[1] - center[1]
     length = math.hypot(dx, dy)
     radius = diameter / 2000.0
-    return start, (center[0] + dx / length * radius, center[1] + dy / length * radius)
+    near = (center[0] + dx / length * radius, center[1] + dy / length * radius)
+    far = (center[0] - dx / length * radius, center[1] - dy / length * radius)
+    return (far_end, start), (start, near), (near, far), (near, far)
 
 
-def sheet_corner_lines(
+def sheet_corner_ink(
     keep: dict[str, tuple[float, float]] = END_KEEP,
     end_center: tuple[float, float] = END_CENTER,
-) -> dict[str, InkLine]:
-    """The lines standing in the end view's corner, keyed by their owner."""
+) -> tuple[dict[str, InkLine], dict[str, tuple[float, float]]]:
+    """The lines standing in the end view's corner, keyed by owner and run, and
+    the end-view arrowhead tips."""
     axis_y = PRINCIPAL_CENTER[1]
-    shaft_top = axis_y + SHAFT_DIA / 2000.0
-    sag_x, sag_y = PRINCIPAL_KEEP["BackCapSagDim"]
-    witness_top = sag_y - NEIGHBOUR_TEXT_EXTENTS["BackCapSagDim"][1] + 0.0005
+    sag_y = PRINCIPAL_KEEP["BackCapSagDim"][1]
+    witness = (axis_y + BACK_CAP_SAG_WITNESS_GAP, sag_y - BACK_CAP_SAG_WITNESS_TOP_DROP)
     radius_x, radius_y = PRINCIPAL_KEEP["BackCapR"]
     extent = NEIGHBOUR_TEXT_EXTENTS["BackCapR"]
-    diameters = {"HeadDia": HEAD_DIA, "NeckDia": NECK_DIA}
-    return {
-        "BackCapSagDim apex witness": (
-            (_sheet_x(BACK_APEX_Z), shaft_top),
-            (_sheet_x(BACK_APEX_Z), witness_top),
-        ),
-        "BackCapSagDim root witness": (
-            (_sheet_x(BACK_APEX_Z - BACK_CAP_SAG), shaft_top),
-            (_sheet_x(BACK_APEX_Z - BACK_CAP_SAG), witness_top),
-        ),
-        "BackCapR": (
-            (radius_x + extent[2], radius_y - extent[1]),
-            (_sheet_x(BACK_APEX_Z), axis_y - BACK_CAP_R_LEADER_DROP),
-        ),
-        **{
-            name: _diameter_line(xy, end_center, diameters[name])
-            for name, xy in keep.items()
-        },
-    }
+    lines: dict[str, InkLine] = {}
+    for run, z in (("apex", BACK_APEX_Z), ("root", BACK_APEX_Z - BACK_CAP_SAG)):
+        x = _sheet_x(z)
+        lines[f"BackCapSagDim {run} extension"] = ((x, witness[0]), (x, witness[1]))
+    lines["BackCapR leader"] = (
+        (radius_x + extent[2], radius_y - extent[1]),
+        (_sheet_x(BACK_APEX_Z), axis_y - BACK_CAP_R_LEADER_DROP),
+    )
+    arrows: dict[str, tuple[float, float]] = {}
+    for name, xy in keep.items():
+        shoulder, leader, through, tips = diameter_ink(xy, end_center, DIAMETERS[name])
+        lines[f"{name} shoulder"] = shoulder
+        lines[f"{name} leader"] = leader
+        lines[f"{name} line"] = through
+        arrows[f"{name} near arrow"], arrows[f"{name} far arrow"] = tips
+    return lines, arrows
 
 
 def _box_gap(a: InkBox, b: InkBox) -> float:
@@ -428,15 +453,44 @@ def _grown(box: InkBox, by: float) -> InkBox:
     return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
 
 
+def _in_box(point: tuple[float, float], box: InkBox) -> bool:
+    return box[0] <= point[0] <= box[2] and box[1] <= point[1] <= box[3]
+
+
+def _cross(o: tuple[float, float], a: tuple[float, float], b: tuple[float, float]) -> float:
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _lines_cross(first: InkLine, second: InkLine) -> bool:
+    """Whether two runs cross or touch (collinear overlaps included)."""
+    (p, q), (r, s) = first, second
+    d1, d2 = _cross(r, s, p), _cross(r, s, q)
+    d3, d4 = _cross(p, q, r), _cross(p, q, s)
+    if ((d1 > 0.0) != (d2 > 0.0)) and ((d3 > 0.0) != (d4 > 0.0)) and d1 and d2 and d3 and d4:
+        return True
+    return any(
+        d == 0.0 and _in_box(point, _line_box(line))
+        for d, point, line in ((d1, p, second), (d2, q, second), (d3, r, first), (d4, s, first))
+    )
+
+
+def _line_box(line: InkLine) -> InkBox:
+    (x0, y0), (x1, y1) = line
+    return (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+
+
 def end_view_ink_collisions(
     texts: dict[str, InkBox],
     outlines: dict[str, InkBox],
     lines: dict[str, InkLine],
+    arrows: dict[str, tuple[float, float]] | None = None,
     *,
     audited: tuple[str, ...] = tuple(END_KEEP),
 ) -> list[str]:
-    """Every ``audited`` text too near another text, an outline, a foreign line
-    or the sheet's inner border."""
+    """Every ``audited`` text too near another text, an outline, a foreign line,
+    an arrowhead or the sheet's inner border, and every one of its leader runs
+    that crosses a foreign line.  A line keyed ``"<name> ..."`` is the text's
+    own ink and is not foreign to it; every arrowhead, its own included, is."""
     findings: list[str] = []
     for name in audited:
         box = texts[name]
@@ -456,20 +510,43 @@ def end_view_ink_collisions(
                     f"{view} outline"
                 )
         for owner, line in sorted(lines.items()):
-            if owner != name and _line_meets_box(line, _grown(box, END_TEXT_CLEARANCE)):
-                findings.append(f"text-on-line: {owner}'s line runs through {name!r}")
+            if owner.split(" ")[0] == name:
+                continue
+            if _line_meets_box(line, _grown(box, END_LINE_CLEARANCE)):
+                findings.append(
+                    f"text-on-line: {owner} runs within {END_LINE_CLEARANCE * 1000.0:.1f} mm "
+                    f"of {name!r}"
+                )
+        for tip_name, tip in sorted((arrows or {}).items()):
+            if _in_box(tip, _grown(box, END_ARROW_CLEARANCE)):
+                findings.append(
+                    f"text-on-arrow: {tip_name} at ({tip[0] * 1000.0:.1f}, "
+                    f"{tip[1] * 1000.0:.1f}) mm is within "
+                    f"{END_ARROW_CLEARANCE * 1000.0:.1f} mm of {name!r}"
+                )
         if box[0] - SHEET_INNER_LEFT < END_OUTLINE_CLEARANCE:
             findings.append(
                 f"outside-border: {name!r} starts {(box[0] - SHEET_INNER_LEFT) * 1000.0:.2f} "
                 "mm inside the sheet's inner border"
             )
+        # A leader and its shoulder cross nothing; only the two through-lines
+        # meet, at the common centre, as concentric diameters must.
+        for run in ("shoulder", "leader"):
+            own = lines.get(f"{name} {run}")
+            if own is None:
+                continue
+            for owner, line in sorted(lines.items()):
+                if owner.split(" ")[0] == name or not _lines_cross(own, line):
+                    continue
+                findings.append(f"leader-crosses-line: {name}'s {run} crosses {owner}")
     return findings
 
 
 def assert_end_view_ink_clear() -> None:
     """Refuse an end-view placement whose own text collides, before any COM work."""
+    lines, arrows = sheet_corner_ink()
     findings = end_view_ink_collisions(
-        end_view_text_boxes(), sheet_view_outlines(), sheet_corner_lines()
+        end_view_text_boxes(), sheet_view_outlines(), lines, arrows
     )
     if findings:
         raise RuntimeError(
@@ -614,6 +691,18 @@ def _assert_end_view_projects_the_profile(adapter: Any, end: Any, principal: Any
         f"pinion-arbor: {END_VIEW_LABEL} projects the profile's +Z end on its row, axis at "
         f"({end_points['axis'][0] * 1000:.2f}, {end_points['axis'][1] * 1000:.2f}) mm"
     )
+    # Every derived profile placement reads _sheet_x: say how far it sits
+    # from the real projection, so a moved view origin is visible in the log.
+    drift = profile_points["left end"][0] - _sheet_x(BACK_APEX_Z)
+    message = (
+        f"pinion-arbor: the profile's back-crown apex projects to x "
+        f"{profile_points['left end'][0] * 1000:.2f} mm, _sheet_x "
+        f"{_sheet_x(BACK_APEX_Z) * 1000:.2f} mm ({drift * 1000:+.2f} mm)"
+    )
+    if abs(drift) > PROFILE_DRIFT_WARN_M:
+        _telemetry.warn(message)
+    else:
+        _telemetry.info(message)
 
 
 def end_view_owner_problems(

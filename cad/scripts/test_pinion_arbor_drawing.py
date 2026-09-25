@@ -685,7 +685,8 @@ def test_end_view_is_the_profiles_third_angle_left_view_on_its_row() -> None:
     """*Front looks from +Z, and the profile runs +Z to the left: the end view
     stands left of the back crown, on the axis row, at the profile's scale."""
     back_end_x = drawing._sheet_x(drawing.BACK_APEX_Z)
-    assert back_end_x == pytest.approx(0.0793, abs=5e-5)
+    # Leaf neckc2-07af measured the (1.2)'s apex extension at x 78.9 mm.
+    assert back_end_x == pytest.approx(0.0789, abs=5e-5)
     assert drawing.END_CENTER[1] == drawing.PRINCIPAL_CENTER[1]
     assert drawing.END_SCALE == drawing.SHEET_SCALE
     assert drawing.VIEW_ANGLE == pytest.approx(-3.141592653589793 / 2.0)
@@ -752,51 +753,161 @@ def test_owner_check_wants_each_diameter_once_on_the_end_view_only() -> None:
         assert drawing.end_view_owner_problems(names_by_view, "End"), case
 
 
-def test_end_view_ink_is_clear_of_its_neighbours() -> None:
-    assert (
-        drawing.end_view_ink_collisions(
-            drawing.end_view_text_boxes(),
-            drawing.sheet_view_outlines(),
-            drawing.sheet_corner_lines(),
-        )
-        == []
-    )
-    drawing.assert_end_view_ink_clear()
-
-
-def _ink_findings(**moves: tuple[float, float]) -> list[str]:
-    keep = {**drawing.END_KEEP, **moves}
+def _corner_findings(
+    keep: dict[str, tuple[float, float]], **arrows: tuple[float, float]
+) -> list[str]:
+    lines, tips = drawing.sheet_corner_ink(keep)
     return drawing.end_view_ink_collisions(
         drawing.end_view_text_boxes(keep),
         drawing.sheet_view_outlines(),
-        drawing.sheet_corner_lines(keep),
+        lines,
+        {**tips, **arrows},
     )
 
 
+def test_end_view_ink_is_clear_of_its_neighbours() -> None:
+    assert _corner_findings(drawing.END_KEEP) == []
+    drawing.assert_end_view_ink_clear()
+
+
 def test_end_view_ink_audit_catches_each_collision_class() -> None:
+    probe = drawing.END_KEEP["HeadDia"]
     cases = {
-        # Onto the back crown's sag witnesses and the profile's end.
-        "text-on-line": {"NeckDia": (0.070, 0.188)},
+        # 07afe186b's Ø10.5, up-right of the view: onto the (1.2)'s extensions.
+        "text-on-line": ({"NeckDia": (0.062, 0.188)}, {}),
         # Inside the Ø15 circle.
-        "text-on-outline": {"HeadDia": (0.047, 0.172)},
+        "text-on-outline": ({"HeadDia": (0.047, 0.172)}, {}),
         # Onto the other diameter's text.
-        "text-on-text": {"HeadDia": (0.062, 0.189)},
+        "text-on-text": ({"HeadDia": (0.028, 0.160)}, {}),
+        # An arrowhead tip 1 mm under the Ø15's text.
+        "text-on-arrow": ({}, {"probe arrow": (probe[0], probe[1] - 0.0038)}),
         # Past the sheet's inner border.
-        "outside-border": {"HeadDia": (0.020, 0.196)},
+        "outside-border": ({"HeadDia": (0.020, 0.196)}, {}),
+        # Down-right of the view, the Ø10.5's leader crosses the SR7.3's.
+        "leader-crosses-line": ({"NeckDia": (0.090, 0.150)}, {}),
     }
-    for kind, moves in cases.items():
-        findings = _ink_findings(**moves)
+    for kind, (moves, arrows) in cases.items():
+        findings = _corner_findings({**drawing.END_KEEP, **moves}, **arrows)
         assert any(finding.startswith(kind) for finding in findings), (kind, findings)
 
 
-def test_end_view_texts_stand_clear_of_the_back_crown_callouts() -> None:
-    """The back crown's SR7.3 hangs below the axis and its (1.2) sag above:
-    the end-view texts stand between them, clear of both with air."""
-    boxes = drawing.end_view_text_boxes()
+def test_the_two_diameter_lines_meet_only_at_the_common_centre() -> None:
+    lines, _ = drawing.sheet_corner_ink()
+    assert drawing._lines_cross(lines["HeadDia line"], lines["NeckDia line"])
     for name in drawing.END_KEEP:
-        assert boxes[name][1] > boxes["BackCapR"][3] + 0.030
+        for run in ("shoulder", "leader"):
+            own = lines[f"{name} {run}"]
+            for owner, line in lines.items():
+                if not owner.startswith(name):
+                    assert not drawing._lines_cross(own, line), (name, run, owner)
+
+
+# Leaf neckc2-07af (07afe186b): the layout audit's text boxes, the printed text
+# inside them, the shoulders and the (1.2)'s apex extension, in sheet mm, for
+# the positions that build commanded.
+_LEAF_07AF_KEEP = {"HeadDia": (0.030, 0.196), "NeckDia": (0.062, 0.188)}
+_LEAF_07AF_AUDIT_BOX = {
+    "HeadDia": (22.8, 193.2, 47.9, 196.7),
+    "NeckDia": (54.8, 185.2, 79.9, 188.7),
+}
+_LEAF_07AF_CORE_BOX = {
+    "HeadDia": (28.1, 193.2, 40.6, 196.7),
+    "NeckDia": (60.1, 185.2, 72.6, 188.7),
+}
+_LEAF_07AF_SHOULDER = {
+    "HeadDia": ((21.5, 193.2), (40.0, 193.2)),
+    "NeckDia": ((52.0, 185.2), (70.5, 185.2)),
+}
+_LEAF_07AF_APEX_EXTENSION = ((78.9, 171.0), (78.9, 215.4))
+
+
+def _mm(value):
+    if isinstance(value, float):
+        return value * 1000.0
+    return tuple(_mm(item) for item in value)
+
+
+def test_ink_extents_are_the_boxes_the_leaf_measured() -> None:
+    """The module's text, shoulder and (1.2) extension ink reproduce what the
+    layout audit measured on neckc2-07af, to its 0.1 mm print."""
+    audit = drawing.end_view_text_boxes(_LEAF_07AF_KEEP)
+    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP)
+    for name, point in _LEAF_07AF_KEEP.items():
+        assert _mm(audit[name]) == pytest.approx(_LEAF_07AF_AUDIT_BOX[name], abs=0.051)
+        core = drawing._ink_box(point, drawing.END_DIA_CORE_EXTENT)
+        assert _mm(core) == pytest.approx(_LEAF_07AF_CORE_BOX[name], abs=0.051)
+        shoulder = sorted(_mm(lines[f"{name} shoulder"]))
+        for got, want in zip(shoulder, sorted(_LEAF_07AF_SHOULDER[name]), strict=True):
+            assert got == pytest.approx(want, abs=0.051), name
+    extension = sorted(_mm(lines["BackCapSagDim apex extension"]), key=lambda p: p[1])
+    for got, want in zip(extension, _LEAF_07AF_APEX_EXTENSION, strict=True):
+        assert got == pytest.approx(want, abs=0.051)
+
+
+def test_the_measured_leaf_boxes_fail_and_the_shipped_positions_clear_them() -> None:
+    """Plant the leaf's measured boxes: at 07afe186b's positions the Ø10.5 is
+    crossed by the (1.2)'s apex extension; moved with END_KEEP, every measured
+    box stands 2 mm clear of that line and of every other ink."""
+    extension = tuple(
+        (x / 1000.0, y / 1000.0) for x, y in _LEAF_07AF_APEX_EXTENSION
+    )
+    neighbours = {
+        name: box
+        for name, box in drawing.end_view_text_boxes().items()
+        if name not in _LEAF_07AF_AUDIT_BOX
+    }
+
+    def planted(keep):
+        texts = dict(neighbours)
+        for name, box in _LEAF_07AF_AUDIT_BOX.items():
+            dx = keep[name][0] - _LEAF_07AF_KEEP[name][0]
+            dy = keep[name][1] - _LEAF_07AF_KEEP[name][1]
+            texts[name] = (
+                box[0] / 1000.0 + dx,
+                box[1] / 1000.0 + dy,
+                box[2] / 1000.0 + dx,
+                box[3] / 1000.0 + dy,
+            )
+        return texts
+
+    lines, _ = drawing.sheet_corner_ink(_LEAF_07AF_KEEP)
+    lines = {**lines, "BackCapSagDim apex extension": extension}
+    leaf = drawing.end_view_ink_collisions(
+        planted(_LEAF_07AF_KEEP), drawing.sheet_view_outlines(), lines
+    )
+    assert any(
+        finding.startswith("text-on-line: BackCapSagDim apex extension")
+        and "'NeckDia'" in finding
+        for finding in leaf
+    ), leaf
+
+    shipped = planted(drawing.END_KEEP)
+    lines, arrows = drawing.sheet_corner_ink()
+    lines = {**lines, "BackCapSagDim apex extension": extension}
+    assert (
+        drawing.end_view_ink_collisions(
+            shipped, drawing.sheet_view_outlines(), lines, arrows
+        )
+        == []
+    )
+    for name in drawing.END_KEEP:
+        assert extension[0][0] - shipped[name][2] >= drawing.END_LINE_CLEARANCE
+
+
+def test_end_view_texts_stand_clear_of_the_back_crown_callouts() -> None:
+    """The back crown's SR7.3 hangs below the axis and its (1.2) sag above,
+    with the sag's extensions rising at the profile's left end: the end-view
+    texts stand left of those extensions, the Ø15 above the view and the Ø10.5
+    below it, clear of both callouts with air."""
+    boxes = drawing.end_view_text_boxes()
+    apex_x = drawing._sheet_x(drawing.BACK_APEX_Z)
+    head_r = spec.HEAD_DIA / 2000.0
+    for name in drawing.END_KEEP:
+        assert boxes[name][2] < apex_x - drawing.END_LINE_CLEARANCE
+        assert drawing._box_gap(boxes[name], boxes["BackCapR"]) > 0.010
         assert boxes[name][3] < boxes["BackCapSagDim"][1] - 0.010
-    assert boxes["HeadDia"][1] > boxes["NeckDia"][3]
+    assert boxes["HeadDia"][1] > drawing.END_CENTER[1] + head_r
+    assert boxes["NeckDia"][3] < drawing.END_CENTER[1] - head_r
 
 
 def test_only_the_two_diameters_crossing_at_the_end_view_centre_are_excused() -> None:
