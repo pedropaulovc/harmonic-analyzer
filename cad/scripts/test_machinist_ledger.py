@@ -260,12 +260,15 @@ def test_the_text_layer_catches_what_the_ink_tolerance_cannot(tmp_path: Path) ->
     assert any("18 DEEP" in line for line in difference.text)
 
 
-def test_text_positions_tolerate_a_quarter_millimetre(tmp_path: Path) -> None:
+def test_text_positions_tolerate_render_noise_but_not_a_move(tmp_path: Path) -> None:
+    # 0.06 mm is the largest wobble measured between noise-only renders.
     base = _only(_sheet(tmp_path / "base.pdf"))
-    wobble = _only(_sheet(tmp_path / "wobble.pdf", note_x=30.0 + 0.2 * PT_PER_MM))
+    wobble = _only(_sheet(tmp_path / "wobble.pdf", note_x=30.0 + 0.06 * PT_PER_MM))
+    nudge = _only(_sheet(tmp_path / "nudge.pdf", note_x=30.0 + 0.15 * PT_PER_MM))
     moved = _only(_sheet(tmp_path / "moved.pdf", note_x=30.0 + 0.3 * PT_PER_MM))
 
     assert ml.text_difference(base.text, wobble.text) == []
+    assert ml.text_difference(base.text, nudge.text)
     assert ml.text_difference(base.text, moved.text) == [
         f"~ {NOTE!r} moved (+0.30, +0.00) mm at (10.88, 69.82) mm"
     ]
@@ -639,6 +642,8 @@ def test_a_qualifying_last_resort_counts(
     status = ml.check(["crank_arm"], ledger_path=ledger_path)[0]
     assert recorded.counts and entry["counts"]
     assert entry["quota_refusal"]["message"] == CODEX_REFUSAL
+    assert entry["quota_refusal"]["source_sha256"] == ml.sha256_file(pdf)
+    assert entry["quota_refusal_window_hours"] == 24
     assert entry["author"]["model"] == "claude-opus-5-5"
     assert (entry["model"], entry["effort"]) == ("claude-fable-5-1", "medium")
     assert (status.state, status.via) == (ml.State.OK, "last_resort ship")
@@ -662,6 +667,7 @@ def test_a_qualifying_last_resort_counts(
         ),
         ("claude-fable-5-1", REFUSED_AT, "medium", "high effort"),
         (None, REFUSED_AT, "high", "not named by a trailer"),
+        ("claude-opus-5-5", "other sheet", "medium", "a different PDF"),
     ],
 )
 def test_a_last_resort_without_its_evidence_does_not_count(
@@ -671,7 +677,11 @@ def test_a_last_resort_without_its_evidence_does_not_count(
     ledger_path = tmp_path / "ledger.json"
     pdf = _sheet(registry)
     refusal = None
-    if refused_at is not None:
+    if refused_at == "other sheet":
+        other = _sheet(tmp_path / "other.pdf", note=NOTE.replace("13", "14"))
+        report = _refused(tmp_path, other)
+        refusal = ml.quota_refusal(report, name="crank_arm", author_family="claude")
+    elif refused_at is not None:
         report = _refused(tmp_path, pdf, refused_at=refused_at)
         refusal = ml.quota_refusal(report, name="crank_arm", author_family="claude")
 
@@ -905,6 +915,29 @@ def test_check_reports_drift_and_writes_the_diff(
     ]
 
 
+@pytest.mark.parametrize(
+    ("damage", "message"),
+    [
+        (lambda stored: stored.unlink(), "reviewed PDF is missing"),
+        (
+            lambda stored: stored.write_bytes(b"%PDF-1.4 not the reviewed file"),
+            "does not hash",
+        ),
+    ],
+)
+def test_an_exact_match_still_needs_the_stored_pdf(
+    tmp_path: Path, registry: Path, damage, message: str
+) -> None:
+    ledger_path = _recorded(tmp_path, registry)  # the current PDF IS the reviewed one
+    for stored in (tmp_path / "sheets").glob("*.pdf"):
+        damage(stored)
+
+    status = ml.check(["crank_arm"], ledger_path=ledger_path)[0]
+
+    assert status.state == ml.State.DRIFT
+    assert message in status.detail
+
+
 def test_check_treats_a_missing_reviewed_pdf_as_drift(
     tmp_path: Path, registry: Path
 ) -> None:
@@ -1055,6 +1088,11 @@ def test_last_resort_run_is_refused_before_any_reviewer_runs(
     for argv, message in cases:
         assert mr.main(argv) == 2, message
         assert message in capsys.readouterr().err
+
+    other = _sheet(tmp_path / "other.pdf", note=NOTE.replace("13", "14"))
+    elsewhere = _refused(tmp_path / "elsewhere", other)
+    assert mr.main([*same, "crank_arm", "--quota-refusal", str(elsewhere)]) == 2
+    assert "a different PDF" in capsys.readouterr().err
 
     _trailer(monkeypatch, "claude-fable-5-1")
     assert mr.main([*same, "crank_arm", *evidence]) == 2
@@ -1210,13 +1248,25 @@ def test_review_run_fails_when_the_pdf_changed_before_it_could_be_recorded(
     assert not ledger_path.exists()
 
 
+def test_the_ledger_tests_run_under_the_recipe_gate() -> None:
+    dodo = (ml.REPO_ROOT / "dodo.py").read_text(encoding="utf-8")
+    assert 'SCRIPTS_DIR / "test_machinist_ledger.py"' in dodo
+    assert 'SCRIPTS_DIR / "test_machinist_review.py"' in dodo
+
+
 def test_no_build_task_reads_the_ledger() -> None:
-    """Recording a review must never re-key a build: only these tools import it."""
+    """Recording a review must never re-key a build: only these tools import it.
+
+    Naming a test file (``test_machinist_ledger.py``) to enroll it in a gate is
+    not a read of the ledger.
+    """
+    import re
+
+    reads = re.compile(r"(?<!\w)machinist_ledger(?!\w)|machinist-ledger")
     readers = {
         path.name
         for path in [*ml.SCRIPTS_DIR.rglob("*.py"), ml.REPO_ROOT / "dodo.py"]
-        if "machinist_ledger" in path.read_text(encoding="utf-8")
-        or "machinist-ledger" in path.read_text(encoding="utf-8")
+        if reads.search(path.read_text(encoding="utf-8"))
     }
     assert readers == {
         "machinist_ledger.py",

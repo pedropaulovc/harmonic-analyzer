@@ -95,9 +95,10 @@ FINGERPRINT_DPI = 300
 INK_THRESHOLD = 128  # grayscale value below which a pixel is ink
 MASK_PAD_PT = 2.0  # anti-aliasing margin around a masked text run
 MATCH_TOLERANCE_PX = 2  # 0.17 mm at 300 dpi
-# Half the 0.5 mm grid: a tolerance, not rounding, so a 0.06 mm render wobble
-# never flips a span across a grid line.
-TEXT_POSITION_TOLERANCE_MM = 0.25
+# A tolerance, not grid rounding, so render wobble never flips a span across a
+# grid line: twice the largest wobble measured between noise-only renders
+# (0.058 mm over 48 pairs), well under a 0.3 mm move.
+TEXT_POSITION_TOLERANCE_MM = 0.12
 FINGERPRINT_ALGORITHM = "sheet-1bit-sha256-v1"
 MM_PER_PT = 25.4 / 72.0
 
@@ -627,6 +628,7 @@ def quota_evidence(data: dict[str, Any], report: Path) -> dict[str, Any] | None:
             "effort": data["effort"],
             "command": attempt.get("command"),
             "refused_at": data["reviewed_at"],
+            "source_sha256": (data.get("source_sha256") or [None])[0],
             "message": text[line_start : line_end if line_end >= 0 else None].strip()[
                 :300
             ],
@@ -653,11 +655,24 @@ def quota_refusal(report: Path, *, name: str, author_family: str) -> dict[str, A
     return evidence
 
 
-def refusal_age_problem(refused_at: str, reviewed_at: str) -> str | None:
-    """Why a refusal is not recent evidence for a review at ``reviewed_at``."""
-    age = datetime.fromisoformat(reviewed_at) - datetime.fromisoformat(refused_at)
+def refusal_problem(
+    refusal: dict[str, Any], *, pdf_sha256: str, reviewed_at: str
+) -> str | None:
+    """Why a refusal does not license a same-family review of this PDF at this time."""
+    if refusal.get("source_sha256") != pdf_sha256:
+        return (
+            f"the quota refusal was for a different PDF ({str(refusal.get('source_sha256'))[:12]}), "
+            f"not {pdf_sha256[:12]}"
+        )
+    age = datetime.fromisoformat(reviewed_at) - datetime.fromisoformat(
+        refusal["refused_at"]
+    )
     if age < timedelta(0) or age > QUOTA_REFUSAL_MAX_AGE:
-        return f"the quota refusal at {refused_at} is not within 24 h before the review"
+        hours = QUOTA_REFUSAL_MAX_AGE / timedelta(hours=1)
+        return (
+            f"the quota refusal at {refusal['refused_at']} is not within {hours:g} h "
+            "before the review"
+        )
     return None
 
 
@@ -855,6 +870,7 @@ def record_review(
         entry["rebuttals"] = rebutted
     if slot == LAST_RESORT:
         entry["quota_refusal"] = refusal
+        entry["quota_refusal_window_hours"] = QUOTA_REFUSAL_MAX_AGE / timedelta(hours=1)
         entry["not_counted_because"] = problem
     ledger = load_ledger(ledger_path)
     ledger["drawings"].setdefault(name, {})[slot] = entry
@@ -867,9 +883,13 @@ def _last_resort_problem(
 ) -> str | None:
     if refusal is None:
         return "no recorded quota refusal by the cross-family reviewer"
-    age = refusal_age_problem(refusal["refused_at"], review["reviewed_at"])
-    if age:
-        return age
+    stale = refusal_problem(
+        refusal,
+        pdf_sha256=review["source_sha256"][0],
+        reviewed_at=review["reviewed_at"],
+    )
+    if stale:
+        return stale
     if author["model_source"] != "trailer":
         return "the author model is not named by a trailer on the draw script's last commit"
     return last_resort_tier_problem(author["model"], review["model"], review["effort"])
@@ -937,11 +957,26 @@ class Comparison:
 
 
 class _References:
-    """Reviewed PDFs rendered once per check."""
+    """Reviewed PDFs, verified and rendered once per check."""
 
     def __init__(self, directory: Path) -> None:
         self.directory = directory
         self.cache: dict[str, list[Sheet]] = {}
+        self.problems: dict[str, str] = {}
+
+    def problem(self, sha: str) -> str:
+        """Empty when the stored PDF exists and still hashes to ``sha``."""
+        if sha not in self.problems:
+            path = self.directory / f"{sha}.pdf"
+            if not path.is_file():
+                self.problems[sha] = "the reviewed PDF is missing from the ledger"
+            elif sha256_file(path) != sha:
+                self.problems[sha] = (
+                    f"the stored reviewed PDF {path.name} does not hash to its name"
+                )
+            else:
+                self.problems[sha] = ""
+        return self.problems[sha]
 
     def get(self, sha: str) -> list[Sheet] | None:
         if sha not in self.cache:
@@ -959,6 +994,9 @@ def _compare(
         return Comparison(
             f"{len(entry['sheets'])} sheets reviewed, {len(current)} now", []
         )
+    stored = references.problem(entry["pdf"])
+    if stored:
+        return Comparison(stored, [])
     digests = [sheet_digest(sheet.ink) for sheet in current]
     if digests == entry["sheets"]:
         return Comparison("", [])

@@ -314,7 +314,11 @@ medium effort, which is the Opus fallback.
 Every review run names the author's family with `--author-family
 <claude|gpt|mimo>`, and a same-family pair is refused. The author model is read
 from the `Co-Authored-By:` trailer of the last commit that touched the drawing's
-`draw_*.py`, and `--author-family`/`--author-model` must agree with it. A
+`draw_*.py`, and `--author-family`/`--author-model` must agree with it. Every
+agent commit that touches a `draw_*.py` carries a model trailer, Codex sessions
+included (for example `Co-Authored-By: GPT-6 Sol <noreply@openai.com>`); without
+one the ledger can only record the claimed family, and a last-resort review
+cannot count. A
 cross-family run refused for usage limits keeps its report as
 `<name>.quota-refused.json`. A same-family `--last-resort` run is refused before
 any reviewer runs unless that refusal is under 24 h old and the trailer's model
@@ -328,7 +332,7 @@ A finding with no cited ruling keeps the drawing failing.
 `uv run cad/scripts/machinist_ledger.py check [<name>...]` exits nonzero for any
 drawing whose current PDF matches no accepted, counting review. Sheets match on
 identical masked ink, or on an identical text layer (every string, positions
-within 0.25 mm) plus ink within 2 px, so re-render noise passes and a changed
+within 0.12 mm) plus ink within 2 px, so re-render noise passes and a changed
 character does not. On a mismatch it writes the leftover pixels and the text
 difference under `cad/out/reports/machinist-ledger/`. A review that predates
 the ledger is entered with `machinist_ledger.py ingest <verdict.json>

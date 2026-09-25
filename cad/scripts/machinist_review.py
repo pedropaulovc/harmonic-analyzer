@@ -1173,10 +1173,16 @@ def _last_resort_problem(args: argparse.Namespace) -> str:
         )
     except (OSError, ValueError, KeyError) as exc:
         return str(exc)
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    age = machinist_ledger.refusal_age_problem(args.refusal["refused_at"], now)
-    if age:
-        return age
+    pdf = DRAWINGS_BY_NAME[name].outputs["pdf"]
+    if not pdf.is_file():
+        return f"no rendered PDF at {pdf}"
+    stale = machinist_ledger.refusal_problem(
+        args.refusal,
+        pdf_sha256=machinist_ledger.sha256_file(pdf),
+        reviewed_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    )
+    if stale:
+        return stale
     if author["model_source"] != "trailer":
         return "the draw script's last commit names no author model in a trailer"
     return machinist_ledger.last_resort_tier_problem(author["model"], model, effort) or ""
