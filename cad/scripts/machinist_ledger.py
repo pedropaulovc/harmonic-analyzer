@@ -342,33 +342,37 @@ class SheetDifference:
     index: int  # 1-based sheet number
     pixels: int  # leftover ink pixels; -1 when the sheet size changed
     text: list[str]
+    reviewed: str  # masked-ink sha256 of the reviewed sheet
+    current: str  # and of the sheet now rendered
     mask: Any = field(repr=False, default=None)
 
     def summary(self) -> str:
+        pair = f"reviewed {self.reviewed[:12]} -> now {self.current[:12]}"
         if self.pixels < 0:
-            return f"{self.index} (sheet size changed)"
+            return f"{self.index} (sheet size changed; {pair})"
         parts = [f"{self.pixels} px"]
         if self.text:
             parts.append(
                 f"{len(self.text)} text change{'s' if len(self.text) != 1 else ''}"
             )
-        return f"{self.index} ({', '.join(parts)})"
+        return f"{self.index} ({', '.join(parts)}; {pair})"
 
 
 def sheet_difference(
     reference: Sheet, current: Sheet, *, index: int
 ) -> SheetDifference | None:
     """None when ``current`` matches ``reference`` under rule (a) or (b)."""
-    if sheet_digest(reference.ink) == sheet_digest(current.ink):
+    reviewed, now = sheet_digest(reference.ink), sheet_digest(current.ink)
+    if reviewed == now:
         return None
     text = text_difference(reference.text, current.text)
     if reference.ink.shape != current.ink.shape:
-        return SheetDifference(index, -1, text)
+        return SheetDifference(index, -1, text, reviewed, now)
     mask = residual_mask(reference.ink, current.ink)
     pixels = int(mask.sum())
     if not pixels and not text:
         return None
-    return SheetDifference(index, pixels, text, mask)
+    return SheetDifference(index, pixels, text, reviewed, now, mask)
 
 
 def write_diff(
@@ -1312,7 +1316,12 @@ def _run(args: argparse.Namespace) -> int:
         authors = draw_script_authors([status.name for status in failing])
         for status in failing:
             fix = fix_command(status, authors[status.name])
-            print(f"  {status.name} ({status.state}): {fix}", file=sys.stderr)
+            why = (
+                f"drift: {status.detail}"
+                if status.state == State.DRIFT
+                else status.state
+            )
+            print(f"  {status.name} ({why}): {fix}", file=sys.stderr)
     return 1 if failing else 0
 
 

@@ -922,6 +922,11 @@ def test_check_reports_drift_and_writes_the_diff(
     assert status.detail.startswith("sheet 1 (")
     assert "2 text changes" in status.detail
     assert "since codex/gpt-6-astra" in status.detail
+    reviewed = ml.load_ledger(ledger_path)["drawings"]["crank_arm"][ml.CROSS_FAMILY]
+    current = ml.fingerprint(registry)[0]
+    assert (
+        f"reviewed {reviewed['sheets'][0][:12]} -> now {current[:12]}" in status.detail
+    )
     assert [Path(path).name for path in status.diff_files] == [
         "crank_arm-sheet1-diff.png",
         "crank_arm-diff.txt",
@@ -1375,6 +1380,45 @@ def test_release_is_gated_on_the_ledger_and_no_build_task_is_keyed_on_it() -> No
         or str(Path(dep).resolve()) == tool
     ]
     assert keyed == []
+
+
+def test_a_drawing_whose_ink_moved_fails_with_its_sheet_and_digest_pair(
+    tmp_path: Path, registry: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    reviewed = _sheet(registry)
+    ml.record_review(
+        _review(reviewed),
+        reviewed,
+        author_family="claude",
+        provenance={},
+        ledger_path=ledger_path,
+    )
+    before = ml.fingerprint(registry)[0]
+    _sheet(
+        registry, edge_x=40.0 + 6 * PT_PER_PX
+    )  # a view edge 6 px over: beyond tolerance
+    after = ml.fingerprint(registry)[0]
+    _trailer(monkeypatch, "claude-opus-5-5")
+
+    assert (
+        ml.main(
+            [
+                "--ledger",
+                str(ledger_path),
+                "check",
+                "crank_arm",
+                "--report-dir",
+                str(tmp_path / "r"),
+            ]
+        )
+        == 1
+    )
+
+    err = capsys.readouterr().err
+    assert "crank_arm (drift: sheet 1 (" in err
+    assert f"reviewed {before[:12]} -> now {after[:12]}" in err
+    assert "--reviewer codex --author-family claude" in err
 
 
 def test_failing_check_lists_each_blocked_drawing_with_its_fix(
