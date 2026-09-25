@@ -91,6 +91,31 @@ def test_every_bonded_seat_keeps_the_retained_joint_window() -> None:
         assert loosest <= GAP_FILL_CAP, teeth
 
 
+def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
+    # A later land or web change re-derives the band instead of silently
+    # breaking the T006 web or the retained window.
+    assert spec.BORE_BAND_FIT_UPPER == pytest.approx(
+        min(
+            bonded_bore_band(band)[0]
+            for band, teeth in zip(
+                lands.SECTION_DIA_BANDS, lands.SECTION_CONE_GEAR_TEETH
+            )
+            if teeth
+        )
+    )
+    web_cap = (
+        spec.FLOOR_LIMITS_MM[6][0]
+        - 2.0 * spec.WEB_EXCEPTIONS_MM[6]
+        - spec.bore_dia_mm(6)
+    )
+    assert spec.BORE_BAND_WEB_UPPER <= web_cap
+    assert web_cap - spec.BORE_BAND_WEB_UPPER < 10.0**-spec.BORE_BAND_PLACES
+    assert spec.BORE_DIA_BAND[0] == pytest.approx(
+        min(spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_WEB_UPPER)
+    )
+    assert spec.BORE_DIA_BAND[1] == pytest.approx(spec.BORE_BAND_LOWER)
+
+
 def test_the_t006_web_caps_the_bore_band() -> None:
     # The largest T006 bore under its printed MIN floor keeps the named web.
     floor_min = spec.FLOOR_LIMITS_MM[6][0]
