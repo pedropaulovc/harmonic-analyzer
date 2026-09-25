@@ -803,14 +803,19 @@ from pinion_arbor_spec import (  # noqa: E402
     CROSSROD_MAX_CLEARANCE as ARBOR_CROSSROD_MAX_CLEARANCE,
     CROSSROD_MIN_CLEARANCE as ARBOR_CROSSROD_MIN_CLEARANCE,
     CROSS_HOLE_DIA as ARBOR_CROSS_HOLE_DIA,
+    BACK_JOURNAL_Z as ARBOR_BACK_JOURNAL_Z,
+    DRUM_STATION as ARBOR_DRUM_STATION,
+    FRONT_JOURNAL_Z as ARBOR_FRONT_JOURNAL_Z,
+    JOURNAL_LEN as ARBOR_JOURNAL_LEN,
+    MIN_LAND_OVER_STRAP as ARBOR_MIN_LAND_OVER_STRAP,
     RETAINING_COMPOUND_MAX_GAP_MM as ARBOR_BOND_MAX_GAP,
     HEAD_CAP_SAG as ARBOR_HEAD_CAP_SAG,
     HEAD_CENTER_Z as ARBOR_HEAD_CENTER_Z,
     HEAD_DIA as ARBOR_HEAD_DIA,
     HEAD_FRONT_Z as ARBOR_HEAD_FRONT_Z,
+    HEAD_REAR_Z as ARBOR_HEAD_REAR_Z,
     NECK_END_Z as ARBOR_NECK_END_Z,
     SHAFT_DIA as ARBOR_DIA,
-    SHAFT_LEN as ARBOR_LEN,
 )
 from pinion_bracket_geometry import (  # noqa: E402
     ARBOR_BORE as STRAP_ARBOR_BORE,
@@ -1357,16 +1362,15 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
 APINION_X = X_DRUM + TIP_DRUM120 + TIP_APINION + APINION_GAP
 # Tip circles keep the configured parked gap at Delta-y = 0 (axis level).
 APINION_Y = Y_DRIVE
-# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster and the
-# drum's bond station moved 0.3 aft -- every rig z station is
-# pinion_rig_layout's, shared with the base's transferred seats.
+# Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
+# rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
+# back block, line to line), shared with the base's transferred seats.
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
 PIVOT_Y = Y_BASE_TOP + 12.0  # 62.8: pivot block bore height
 # Bracket thickness, end radius and pivot-to-arbor spacing come from the
 # geometry-only contract imported above.
-STRAP_AIR = RIG.STRAP_AIR  # MODEL-pose drum-end air; physical play is the feeler P
 PIVOT_X = APINION_X + math.sqrt(
     STRAP_C2C**2 - (APINION_Y - PIVOT_Y) ** 2
 )  # the far side from the drum, so swinging the strap toward
@@ -1408,7 +1412,9 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 LEVER_Z = LIFT_ROD_Z0 + LEVER_HUB_LEN / 2.0 - LEVER_WALL_T
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
-ARBOR_Z0 = -135.0 + MECHANISM_Z_SHIFT
+# The drum is bonded on MHA-102 at the printed DRUM_STATION from the head
+# shoulder, so the arbor rides wherever the fit-up stack puts the drum.
+ARBOR_Z0 = APINION_Z_FRONT - ARBOR_DRUM_STATION - ARBOR_HEAD_REAR_Z
 # Preserve the released MHA-058 component origin at the head/cross-hole axis.
 # The head is now integral with MHA-102, whose local head centre is z=-6.5.
 HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
@@ -1501,7 +1507,7 @@ if _LEV_STUB_D < (ARBOR_DIA + max(LEVER_ROD_DIA, LEVER_ROD_TIP_DIA)) / 2.0 + 0.2
 # check below is the one exception -- it relies on the gated east side.
 SPRING_X = PIVOT_X + SPR_PIVOT_LX  # machine anchor; the part is placed Ry(180)
 # (its local +x runs machine -x), so every local-x offset below SUBTRACTS.
-# The strap's INNER face is what the drum end fixes (STRAP_AIR of axial air);
+# The strap's INNER face is what the drum end fixes (line to line at fit-up);
 # the 2026-10 thickness re-derive (5.0 -> 8.0) grows the strap OUTBOARD from
 # there.  The 4.0-wide leaf therefore stays referenced to that inner face --
 # SPRING_BLADE_INSET in from it -- instead of to the strap mid-plane: the blade
@@ -1633,7 +1639,7 @@ _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 # the thinnest strap (test_drive_train_support_layout).
 _STRAP_MID_Z = tuple(
     z + s * STRAP_T / 2.0 for z, s in zip(STRAP_Z_INNER, (-1.0, 1.0), strict=True)
-)  # -76.362, +76.338 (pinion_rig_layout)
+)  # -75.862, +76.338 (pinion_rig_layout)
 CAM_PIN_STATION = (STRAP_T / 2.0, 6.0)  # pin plane, from each collar front face
 CAM_Z0 = tuple(z - s for z, s in zip(_STRAP_MID_Z, CAM_PIN_STATION, strict=True))
 for _z0 in CAM_Z0:
@@ -1801,7 +1807,7 @@ for _lo, _hi, _what in (
     (BLOCK_FRONT_Z0, BLOCK_FRONT_Z0 + BLOCK_DEPTH, "front pivot block"),
     (LIFT_ROD_Z0, LIFT_ROD_Z0 + RIG.LIFT_ROD_LEN, "lift rod"),
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
-    (APINION_Z_FRONT - STRAP_T - STRAP_AIR, APINION_Z_FRONT, "front strap"),
+    (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0], "front strap"),
     (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm hub"),
 ):
@@ -1858,8 +1864,18 @@ if _LEV_Z[0] < _GRIP_HEAD_Z[1] + 0.25:
 # head/cross-hole station.
 if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
     raise AssertionError("grip crossrod is not centred in the integral head")
-if abs(ARBOR_Z0 + ARBOR_LEN - (91.25 + MECHANISM_Z_SHIFT)) > 0.01:
-    raise AssertionError("arbor back end off the translated p2 station")
+# MHA-102 runs in the straps on its two journal lands, so each land must
+# cover its strap in the pose, past both faces (the worst case over every
+# printed band and both drum stops is pinion_arbor_spec's own stack).
+for _land_z, _strap_faces, _which in (
+    (ARBOR_FRONT_JOURNAL_Z, (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0]), "front"),
+    (ARBOR_BACK_JOURNAL_Z, (RIG.STRAP_Z_INNER[1], RIG.STRAP_Z_OUTER[1]), "back"),
+):
+    _land = (ARBOR_Z0 + _land_z, ARBOR_Z0 + _land_z + ARBOR_JOURNAL_LEN)
+    if min(_strap_faces[0] - _land[0], _land[1] - _strap_faces[1]) < (
+        ARBOR_MIN_LAND_OVER_STRAP - 1e-9
+    ):
+        raise AssertionError(f"MHA-102's {_which} journal land misses its strap")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
 # R1: the crossrod is a bonded slip fit, modelled line to line; at the printed
@@ -2370,8 +2386,8 @@ async def build(adapter) -> dict[str, str]:
     _strap_euler = euler_from_rows(_strap_rows)
     pinion_brackets: dict[str, str] = {}
     for tag, z0 in (
-        ("front", APINION_Z_FRONT - STRAP_AIR),
-        ("back", APINION_Z_BACK + STRAP_AIR + STRAP_T),
+        ("front", RIG.STRAP_Z_INNER[0]),
+        ("back", RIG.STRAP_Z_OUTER[1]),
     ):
         pinion_brackets[tag] = await place_component(
             adapter,
